@@ -440,8 +440,7 @@ xfs_getattr(
 	mp = XFS_VFSTOM(vp->v_vfsp);
 	vap->va_nodeid = ip->i_ino;
 #if XFS_BIG_FILESYSTEMS
-	if (mp->m_flags & XFS_MOUNT_INO64)
-		vap->va_nodeid += XFS_INO64_OFFSET;
+	vap->va_nodeid += mp->m_inoadd;
 #endif
 
         if (vap->va_mask == (AT_FSID|AT_NODEID)) {
@@ -925,7 +924,7 @@ xfs_setattr(
 	}
 
 	if (code) {
-		return XFS_ERROR(code);
+		return code;
 	}
 
 	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_ATTRIBUTE) &&
@@ -947,7 +946,7 @@ xfs_setattr(
 		xfs_iunlock (ip, lock_flags);
 	}
 
-	return XFS_ERROR(code);
+	return code;
 }
 
 
@@ -1639,6 +1638,7 @@ xfs_stickytest(
  */
 
 #define DLF_IGET	0x01	/* get entry inode if name lookup succeeds */
+#define	DLF_NODNLC	0x02	/* don't use the dnlc */
 
 /*
  * Wrapper around xfs_dir_lookup. This routine will first look in
@@ -1652,7 +1652,7 @@ STATIC int
 xfs_dir_lookup_int(
 	xfs_trans_t  		*tp,
 	vnode_t      		*dir_vp,
-	int		 	flag,
+	int		 	flags,
 	char         		*name,
 	pathname_t   		*pnp,
 	xfs_ino_t    		*inum,
@@ -1665,7 +1665,8 @@ xfs_dir_lookup_int(
 	int	   do_iget;
 
 	vn_trace_entry(dir_vp, "xfs_dir_lookup_int");
-	do_iget = flag & DLF_IGET;
+	do_iget = flags & DLF_IGET;
+	ASSERT((flags & (DLF_IGET | DLF_NODNLC)) != (DLF_IGET | DLF_NODNLC));
 
 	/*
 	 * Handle degenerate pathname component.
@@ -1681,7 +1682,8 @@ xfs_dir_lookup_int(
         /*
          * Try the directory name lookup cache.
          */
-        if (vp = dnlc_lookup_fast(dir_vp, name, pnp, fd, NOCRED)) {
+        if (!(flags & DLF_NODNLC) &&
+	    (vp = dnlc_lookup_fast(dir_vp, name, pnp, fd, NOCRED))) {
                 *inum = XFS_VTOI(vp)->i_ino;
 		if (do_iget) {
 			*ipp = XFS_VTOI(vp);
@@ -1732,6 +1734,7 @@ xfs_dir_lookup_int(
 			VN_RELE (vp);
 			code = XFS_ERROR(ENOENT);
 		} else {
+			ASSERT(!(flags & DLF_NODNLC));
 			dnlc_enter_fast(dir_vp, fd, vp, NOCRED);
 		}
 	}
@@ -1768,8 +1771,9 @@ xfs_lookup(
 	/*
 	 * If it's not a directory, fail the request.
 	 */
-	if (dir_vp->v_type != VDIR)
+	if (dir_vp->v_type != VDIR) {
 		return XFS_ERROR(ENOTDIR);
+	}
 
 	dp = XFS_VTOI(dir_vp);
 	lock_mode = xfs_ilock_map_shared(dp);
@@ -1787,8 +1791,8 @@ xfs_lookup(
 		return code;
 	}
 
-	code = xfs_dir_lookup_int (NULL, dir_vp, DLF_IGET, name, pnp, 
-				   &e_inum, &ip, &fastdata);
+	code = xfs_dir_lookup_int(NULL, dir_vp, DLF_IGET, name, pnp, 
+				  &e_inum, &ip, &fastdata);
 	if (code) {
 		xfs_iunlock_map_shared(dp, lock_mode);
 		return code;
@@ -1805,8 +1809,9 @@ xfs_lookup(
         if (ISVDEV(vp->v_type)) {
                 newvp = specvp(vp, vp->v_rdev, vp->v_type, credp);
                 VN_RELE(vp);
-                if (newvp == NULL)
+                if (newvp == NULL) {
                         return XFS_ERROR(ENOSYS);
+		}
                 vp = newvp;
         }
 
@@ -2091,8 +2096,8 @@ xfs_create(
 	/*
 	 * Initially assume that the file does not exist and
 	 * reserve the resources for that case.  If that is not
-	 * the case we'll drop the one and get a more appropriate
-	 * transaction later.
+	 * the case we'll drop the one we have and get a more
+	 * appropriate transaction later.
 	 */
 	if (error = xfs_trans_reserve(tp,
 				      XFS_IALLOC_BLOCKS(mp) +
@@ -2119,8 +2124,18 @@ xfs_create(
 	if (error = xfs_iaccess(dp, IEXEC, credp))
                 goto error_return;
 
-	error = xfs_dir_lookup_int(NULL, dir_vp, DLF_IGET, name, NULL, 
-				   &e_inum, &ip, &fastdata);
+	/*
+	 * At this point we cannot do an xfs_iget() of the entry named
+	 * since we are already holding a log reservation and it could
+	 * be in xfs_inactive waiting for a log reservation.  We'd just
+	 * end up waiting forever for the inactive to complete.  Instead
+	 * we just look to see if there is an entry with the name.  In
+	 * the case where there is not, we didn't need the inode anyway.
+	 * In the case where there is an entry, we'll get it later after
+	 * dropping our transaction.
+	 */
+	error = xfs_dir_lookup_int(NULL, dir_vp, DLF_NODNLC, name, NULL, 
+				   &e_inum, NULL, NULL);
 	if (error && (error != ENOENT)) {
 		goto error_return;
 	}
@@ -2147,8 +2162,8 @@ xfs_create(
 		rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : NODEV;
 
 		error = xfs_dir_ialloc(&tp, dp, 
-				       MAKEIMODE(vap->va_type,vap->va_mode), 
-				       1, rdev, credp, &ip, &committed);
+				MAKEIMODE(vap->va_type,vap->va_mode), 1,
+				rdev, credp, &ip, &committed);
 		if (error) {
 			goto abort_return;
 		}
@@ -2195,11 +2210,14 @@ xfs_create(
 		}
 
 		dp->i_gen++;
-		dnlc_enter_fast(dir_vp, &fastdata, XFS_ITOV(ip), NOCRED);
+		/*
+		 * Since we used the DLF_NODNLC flag above, we have to
+		 * use the slower dnlc_enter() function here rather than
+		 * dnlc_enter_fast().
+		 */
+		dnlc_enter(dir_vp, name, XFS_ITOV(ip), NOCRED);
 
 	} else {
-		ASSERT(ip != NULL);
-		ITRACE(ip);
 
 		/*
 		 * The file already exists, so we're in the wrong
@@ -2211,6 +2229,20 @@ xfs_create(
 		 */
 		xfs_trans_cancel(tp, cancel_flags);
 		tp = NULL;
+
+		/*
+		 * Now that we've dropped our log reservation, get a
+		 * reference to the inode we are re-creating.  It had
+		 * better still be there since we haven't dropped the
+		 * directory lock.
+		 */
+		error = xfs_dir_lookup_int(NULL, dir_vp, DLF_IGET, name,
+					   NULL, &e_inum, &ip, &fastdata);
+		if (error) {
+			ASSERT(error != ENOENT);
+			goto error_return;
+		}
+
 		dir_generation = dp->i_gen;
 		xfs_iunlock(dp, XFS_ILOCK_EXCL);
 
@@ -2333,7 +2365,6 @@ xfs_create(
 	 * when it unlocks the inode. Since we want to return the 
 	 * vnode to the caller, we bump the vnode ref count now.
 	 */
-
 	IHOLD(ip);
 	vp = XFS_ITOV(ip);
 
@@ -2415,36 +2446,30 @@ xfs_create(
 }
 
 
-
 /*
- * The following routine will lock the inodes associated with the
- * directory and the named entry in the directory. The locks are
- * acquired in increasing inode number.
- * 
- * If the entry is "..", then only the directory is locked. The
- * vnode ref count will still include that from the .. entry in
- * this case.
+ * xfs_get_dir_entry is used to get a reference to an inode given
+ * its parent directory inode and the name of the file.  It does
+ * not lock the child inode, and it unlocks the directory before
+ * returning.  The directory's generation number is returned for
+ * use by a later call to xfs_lock_dir_and_entry.
  */
-
 STATIC int
-xfs_lock_dir_and_entry(
+xfs_get_dir_entry(
 	xfs_inode_t	*dp,
 	char		*name,
-	xfs_inode_t	**ipp)	/* inode of entry 'name' */
+	xfs_inode_t	**ipp,	/* inode of entry 'name' */
+	int		*dir_generationp)
 {
-	xfs_inode_t		*ip, *new_ip;
+	xfs_inode_t		*ip;
 	xfs_ino_t		e_inum;
-	unsigned long		dir_generation;
 	int			error;
 	struct ncfastdata	fastdata;
-
- again:
 
         xfs_ilock(dp, XFS_ILOCK_EXCL);
 
 	/*
 	 * If the link count on the directory is 0, there are no
-	 * entries to lock.
+	 * entries to look for.
 	 */
 	if (dp->i_d.di_nlink == 0) {
 		xfs_iunlock(dp, XFS_ILOCK_EXCL);
@@ -2463,6 +2488,90 @@ xfs_lock_dir_and_entry(
         ASSERT((e_inum != 0) && ip);
 	ITRACE(ip);
 
+	*dir_generationp = dp->i_gen;
+	xfs_iunlock(dp, XFS_ILOCK_EXCL);
+
+	*ipp = ip;
+	return 0;
+}
+
+
+/*
+ * The following routine will lock the inodes associated with the
+ * directory and the named entry in the directory. The locks are
+ * acquired in increasing inode number.
+ * 
+ * If the entry is "..", then only the directory is locked. The
+ * vnode ref count will still include that from the .. entry in
+ * this case.
+ *
+ * The inode passed in will have been looked up using xfs_get_dir_entry().
+ * Since that lookup the directory lock will have been dropped, so
+ * we need to validate that the inode given is still pointed to by the
+ * directory.  We use the directory inode in memory generation count
+ * as an optimization to tell if a new lookup is necessary.  If the
+ * directory no longer points to the given inode with the given name,
+ * then we drop the directory lock, set the entry_changed parameter to 1,
+ * and return.  It is up to the caller to drop the reference to the inode.
+ */
+STATIC int
+xfs_lock_dir_and_entry(
+	xfs_inode_t	*dp,
+	char		*name,
+	xfs_inode_t	*ip,	/* inode of entry 'name' */
+	int		dir_generation,
+	int		*entry_changed)		       
+{
+	xfs_ino_t		e_inum;
+	int			error;
+	int			new_dir_gen;
+	struct ncfastdata	fastdata;
+
+	*entry_changed = 0;
+        xfs_ilock(dp, XFS_ILOCK_EXCL);
+
+	if (dp->i_gen != dir_generation) {
+		/*
+		 * If the link count on the directory is 0, there are no
+		 * entries to lock.
+		 */
+		if (dp->i_d.di_nlink == 0) {
+			xfs_iunlock(dp, XFS_ILOCK_EXCL);
+			return XFS_ERROR(ENOENT);
+		}
+		/*
+		 * The directory has changed somehow, so do the lookup
+		 * for the entry again.  If it is changed we'll have to
+		 * give up and return to our caller.  We can't allow this
+		 * lookup to use the dnlc, because that could call vn_get
+		 * and we could deadlock if the vnode we're after is in
+		 * the inactive routine waiting for a log reservation that
+		 * we hold.
+		 */
+		error = xfs_dir_lookup_int(NULL, XFS_ITOV(dp), DLF_NODNLC,
+				name, NULL, &e_inum, NULL, &fastdata);
+		if (error) {
+			xfs_iunlock(dp, XFS_ILOCK_EXCL);
+			return error;
+		}
+
+		/*
+		 * The entry with the given name has changed since the
+		 * call to xfs_get_dir_entry().  Just return with
+		 * *entry_changed set to 1 so the caller can deal with it.
+		 */
+		ASSERT(e_inum != 0);
+		if (e_inum != ip->i_ino) {
+			xfs_iunlock(dp, XFS_ILOCK_EXCL);
+			*entry_changed = 1;
+			return 0;
+		}
+	} else {
+		e_inum = ip->i_ino;
+	}
+
+	ITRACE(ip);
+
         /*
          * We want to lock in increasing inum. Since we've already
          * acquired the lock on the directory, we may need to release
@@ -2476,46 +2585,55 @@ xfs_lock_dir_and_entry(
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 
 	} else if (e_inum < dp->i_ino) {
-                dir_generation = dp->i_gen;
+		new_dir_gen = dp->i_gen;
                 xfs_iunlock(dp, XFS_ILOCK_EXCL);
 
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
                 xfs_ilock(dp, XFS_ILOCK_EXCL);
+
+
 
                 /*
                  * Make sure that things are still consistent during
                  * the period we dropped the directory lock.
                  * Do a new lookup if directory was changed.
                  */
-                if (dp->i_gen != dir_generation) {
+                if (dp->i_gen != new_dir_gen) {
+			/*
+			 * If the directory has been unlinked, we're
+			 * not going to find our entry there anymore.
+			 */
+			if (dp->i_d.di_nlink == 0) {
+				xfs_iunlock(dp, XFS_ILOCK_EXCL);
+				xfs_iunlock(ip, XFS_ILOCK_EXCL);
+				return XFS_ERROR(ENOENT);
+			}
+			/*
+			 * The directory has changed somehow, so do the
+			 * lookup for the entry again.  If it is changed
+			 * we'll have to give up and return to our caller.
+			 * We can't allow this lookup to use the dnlc,
+			 * because that could call vn_get and we could
+			 * deadlock if the vnode we're after is in
+			 * the inactive routine waiting for a log
+			 * reservation that we hold.
+			 */
 			error = xfs_dir_lookup_int(NULL, XFS_ITOV(dp),
-				DLF_IGET, name, NULL, &e_inum, &new_ip,
+				DLF_NODNLC, name, NULL, &e_inum, NULL,
 				&fastdata);
 
                         if (error) {
 				xfs_iunlock(dp, XFS_ILOCK_EXCL);
 				xfs_iunlock(ip, XFS_ILOCK_EXCL);
-				IRELE(ip);
-				*ipp = NULL;
 				return error;
 			}
 
-			ITRACE(new_ip);
-
-                        if (new_ip != ip) {
-
-				/*
-				 * Things have changed too much,
-				 * just goto the top & start again.
-				 */
+			if (e_inum != ip->i_ino) {
 				xfs_iunlock(dp, XFS_ILOCK_EXCL);
                                 xfs_iunlock(ip, XFS_ILOCK_EXCL);
-				IRELE(ip);
-				IRELE(new_ip);
-
-				goto again;
+				*entry_changed = 1;
+				return 0;
                         }
-			IRELE(new_ip); /* ref from xfs_dir_lookup_int */
                 }
         }
 	/* else  e_inum == dp->i_ino */
@@ -2523,176 +2641,6 @@ xfs_lock_dir_and_entry(
 		 *     the entry is "..", which is also the parent directory.
 		 */
 
-	*ipp = ip;
-
-	return 0;
-}
-
-
-/*
- * The following routine will acquire the locks required for a rename
- * operation. The code understands the semantics of renames and will
- * validate that name1 exists under dp1 & that name2 may or may not
- * exist under dp2.
- *
- * We are renaming dp1/name1 to dp2/name2.
- *
- * Return ENOENT if dp1 does not exist, other lookup errors, or 0 for success.
- * Return EAGAIN if the caller needs to try again.
- */
-STATIC int
-xfs_lock_for_rename(
-	xfs_inode_t	*dp1,	/* old (source) directory inode */
-	xfs_inode_t	*dp2,	/* new (target) directory inode */
-	char		*name1,	/* old entry name */
-	char		*name2,	/* new entry name */
-	xfs_inode_t	**ipp1,	/* inode of old entry */
-	xfs_inode_t    **ipp2)	/* inode of new entry, if it 
-		           	   already exists, NULL otherwise. */
-{
-	xfs_inode_t		*ip1, *ip2, *temp;
-	xfs_ino_t		inum1, inum2;
-	unsigned long		dir_gen1, dir_gen2;
-	int			error;
-	xfs_inode_t		*i_tab[4];
-	int			num_inodes;
-	int			i, j;
-	uint			lock_mode;
-	struct ncfastdata	fastdata;
-
-	ip2 = NULL;
-
-	/*
-	 * First, find out the current inums of the entries so that we
-	 * can determine the initial locking order.  We'll have to 
-	 * sanity check stuff after all the locks have been acquired
-	 * to see if we still have the right inodes, directories, etc.
-	 */
-        lock_mode = xfs_ilock_map_shared(dp1);
-
-	/*
-	 * We don't want to do lookups in unlinked directories.
-	 */
-	if (dp1->i_d.di_nlink == 0) {
-		xfs_iunlock_map_shared(dp1, lock_mode);
-		return XFS_ERROR(ENOENT);
-	}
-
-        error = xfs_dir_lookup_int(NULL, XFS_ITOV(dp1), DLF_IGET,
-				   name1, NULL, &inum1, &ip1, &fastdata);
-
-	/*
-	 * Save the current generation so that we can detect if it's
-	 * modified between when we drop the lock & reacquire it down
-	 * below.  We only need to do this for the src directory since
-	 * the target entry does not need to exist yet. 
-	 */
-	dir_gen1 = dp1->i_gen;
-	xfs_iunlock_map_shared(dp1, lock_mode);
-        if (error)
-                return error;
-	ASSERT (ip1);
-	ITRACE(ip1);
-
-        lock_mode = xfs_ilock_map_shared(dp2);
-
-	/*
-	 * We don't want to do lookups in unlinked directories.
-	 */
-	if (dp2->i_d.di_nlink == 0) {
-		xfs_iunlock_map_shared(dp2, lock_mode);
-		return XFS_ERROR(ENOENT);
-	}
-
-        error = xfs_dir_lookup_int(NULL, XFS_ITOV(dp2), DLF_IGET,
-				   name2, NULL, &inum2, &ip2, &fastdata);
-	dir_gen2 = dp2->i_gen;
-        xfs_iunlock_map_shared(dp2, lock_mode);
-	if (error == ENOENT) {		/* target does not need to exist. */
-		inum2 = 0;
-	} else if (error) {
-		IRELE (ip1);
-                return error;
-	} else {
-		ITRACE(ip2);
-	}
-
-	/*
-	 * i_tab contains a list of pointers to inodes.  We initialize
-	 * the table here & we'll sort it.  We will then use it to 
-	 * order the acquisition of the inode locks.
-	 *
-	 * Note that the table may contain duplicates.  e.g., dp1 == dp2.
-	 */
-        i_tab[0] = dp1;
-        i_tab[1] = dp2;
-        i_tab[2] = ip1;
-	if (inum2 == 0) {
-		num_inodes = 3;
-		i_tab[3] = NULL;
-	} else {
-		num_inodes = 4;
-        	i_tab[3] = ip2;
-	}
-
-	/*
-	 * Sort the elements via bubble sort.  (Remember, there are at
-	 * most 4 elements to sort, so this is adequate.)
-	 */
-	for (i=0; i < num_inodes; i++) {
-		for (j=1; j < num_inodes; j++) {
-			if (i_tab[j]->i_ino < i_tab[j-1]->i_ino) {
-				temp = i_tab[j];
-				i_tab[j] = i_tab[j-1];
-				i_tab[j-1] = temp;
-			}
-		}
-	}
-
-	/*
-	 * Lock all the inodes in exclusive mode. If an inode appears
-	 * twice in the list, it will only be locked once.
-	 */
-	xfs_ilock (i_tab[0], XFS_ILOCK_EXCL);
-	for (i=1; i < num_inodes; i++) {
-		if (i_tab[i] != i_tab[i-1])
-			xfs_ilock(i_tab[i], XFS_ILOCK_EXCL);
-	}
-
-	/*
-	 * See if either of the directories was modified during the
-	 * interval between when the locks were released and when
-	 * they were reacquired.
-	 */
-	if (dp1->i_gen != dir_gen1 || dp2->i_gen != dir_gen2) {
-		/*
-		 * Someone else may have linked in a new inode
-		 * with the same name.  If so, we'll need to
-		 * release our locks & go through the whole
-		 * thing again.
-		 */
-		xfs_iunlock(i_tab[0], XFS_ILOCK_EXCL);
-		for (i=1; i < num_inodes; i++) {
-			if (i_tab[i] != i_tab[i-1])
-				xfs_iunlock(i_tab[i], XFS_ILOCK_EXCL);
-		}
-		if (num_inodes == 4)
-			IRELE (ip2);
-		IRELE (ip1);
-		return XFS_ERROR(EAGAIN);
-        }
-
-
-	/*
-	 * Set the return value.
-	 */
-	*ipp1 = *ipp2 = NULL;
-	for (i=0; i < num_inodes; i++) {
-		if (i_tab[i]->i_ino == inum1)
-			*ipp1 = i_tab[i];
-		if (i_tab[i]->i_ino == inum2)
-			*ipp2 = i_tab[i];
-	}
 	return 0;
 }
 
@@ -2784,6 +2732,8 @@ xfs_remove(
 	int			cancel_flags;
 	int			nospace;
 	int			committed;
+	int			dir_generation;
+	int			entry_changed;
 
 	nospace = 0;
 	vn_trace_entry(dir_vp, "xfs_remove");
@@ -2796,6 +2746,27 @@ xfs_remove(
 			return error;
 	}
  retry:
+	dp = XFS_VTOI(dir_vp);
+        ip = NULL;
+
+	/*
+	 * We need to get a reference to ip before we get our log
+	 * reservation.  The reason for this is that we cannot call
+	 * xfs_iget for an inode for which we do not have a reference
+	 * once we've acquired a log reservation.  This is because the
+	 * inode we are trying to get might be in xfs_inactive going
+	 * for a log reservation.  Since we'll have to wait for the
+	 * inactive code to complete before returning from xfs_iget,
+	 * we need to make sure that we don't have log space reserved
+	 * when we call xfs_iget.  Instead we get an unlocked referece
+	 * to the inode before getting our log reservation.
+	 */
+	error = xfs_get_dir_entry(dp, name, &ip, &dir_generation);
+	if (error) {
+		remove_which_error_return = __LINE__;
+		return error;
+	}
+	 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_REMOVE);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
         if (error = xfs_trans_reserve(tp, 10, XFS_REMOVE_LOG_RES(mp),
@@ -2812,20 +2783,32 @@ xfs_remove(
 		 * just return an error.
 		 */
 		if ((error != ENOSPC) || (nospace > 0)) {
-			remove_which_error_return = 1;
+			remove_which_error_return = __LINE__;
+			VN_RELE(XFS_ITOV(ip));
 			goto error_return;
 		} else {
 			nospace = 1;
 		}
 	}
 
-	dp = XFS_VTOI(dir_vp);
-        ip = NULL;
-
-	error = xfs_lock_dir_and_entry(dp, name, &ip);
+	error = xfs_lock_dir_and_entry(dp, name, ip, dir_generation,
+				       &entry_changed);
 	if (error) {
-		remove_which_error_return = 2;
-		goto error_return;
+		remove_which_error_return = __LINE__;
+		xfs_trans_cancel(tp, cancel_flags);
+		VN_RELE(XFS_ITOV(ip));
+		return error;
+	}
+
+	/*
+	 * If the inode we found in the first pass is no longer
+	 * the entry with the given name, then drop our transaction and
+	 * inode reference and start over.
+	 */
+	if (entry_changed) {
+		xfs_trans_cancel(tp, cancel_flags);
+		VN_RELE(XFS_ITOV(ip));
+		goto retry;
 	}
 
 	/*
@@ -2844,23 +2827,23 @@ xfs_remove(
 	}
  
 	if (error = xfs_iaccess(dp, IEXEC | IWRITE, credp)) {
-		remove_which_error_return = 3;
+		remove_which_error_return = __LINE__;
 		goto error_return;
 	}
 
 	if (error = xfs_stickytest(dp, ip, credp)) {
-		remove_which_error_return = 4;
+		remove_which_error_return = __LINE__;
 		goto error_return;
 	}
 
 	if (XFS_ITOV(ip)->v_vfsmountedhere) {
 		error = XFS_ERROR(EBUSY);
-		remove_which_error_return = 5;
+		remove_which_error_return = __LINE__;
 		goto error_return;
 	}
 	if ((ip->i_d.di_mode & IFMT) == IFDIR) {
 		error = XFS_ERROR(EPERM);
-		remove_which_error_return = 6;
+		remove_which_error_return = __LINE__;
 		goto error_return;
 	}
 
@@ -2870,12 +2853,12 @@ xfs_remove(
 	if (name[0] == '.') {
 		if (name[1] == '\0') {
 			error = XFS_ERROR(EINVAL);
-			remove_which_error_return = 7;
+			remove_which_error_return = __LINE__;
 			goto error_return;
 		}
 		else if (name[1] == '.' && name[2] == '\0') {
 			error = XFS_ERROR(EEXIST);
-			remove_which_error_return = 8;
+			remove_which_error_return = __LINE__;
 			goto error_return;
 		}
 	} 
@@ -2897,14 +2880,14 @@ xfs_remove(
 			error = xfs_truncate_file(mp, ip);
 			IRELE(ip);
 			if (error) {
-				remove_which_error_return = 9;
+				remove_which_error_return = __LINE__;
 				return error;
 			}
 			nospace = 2;
 			goto retry;
 		}
 		error = XFS_ERROR(ENOSPC);
-		remove_which_error_return = 10;
+		remove_which_error_return = __LINE__;
 		goto error_return;
 	}
 
@@ -2915,7 +2898,7 @@ xfs_remove(
 	error = xfs_dir_removename(tp, dp, name, &first_block, &free_list, 0);
 	if (error) {
 		ASSERT(error != ENOENT);
-		remove_which_error_return = 11;
+		remove_which_error_return = __LINE__;
 		goto error1;
 	}
 	xfs_ichgtime(dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
@@ -2927,7 +2910,7 @@ xfs_remove(
 
 	error = xfs_droplink(tp, ip);
 	if (error) {
-		remove_which_error_return = 12;
+		remove_which_error_return = __LINE__;
 		goto error1;
 	}
 
@@ -2948,7 +2931,7 @@ xfs_remove(
 
 	error = xfs_bmap_finish(&tp, &free_list, first_block, &committed);
 	if (error) {
-		remove_which_error_return = 13;
+		remove_which_error_return = __LINE__;
 		goto error_rele;
 	}
 
@@ -3029,7 +3012,6 @@ xfs_link(
         xfs_fsblock_t           first_block;
 	int			cancel_flags;
 	int			committed;
-	struct ncfastdata	fastdata;
 
 	vn_trace_entry(target_dir_vp, "xfs_link");
 	/*
@@ -3096,8 +3078,15 @@ xfs_link(
                 goto error_return;
 	}
 
-	error = xfs_dir_lookup_int(NULL, target_dir_vp, 0, target_name, 
-				   NULL, &e_inum, NULL, &fastdata);
+	/*
+	 * Make sure that nothing with the given name exists in the
+	 * target directory.  We can't allow the lookup to use the
+	 * dnlc, because doing so could cause deadlock if it has to
+	 * do a vn_get for the vnode and the vnode is inactive and
+	 * waiting for a log reservation in xfs_inactive.
+	 */
+	error = xfs_dir_lookup_int(NULL, target_dir_vp, DLF_NODNLC,
+			target_name, NULL, &e_inum, NULL, NULL);
 	if (error != ENOENT) {
 		if (error == 0) {
 			error = XFS_ERROR(EEXIST);
@@ -3141,7 +3130,12 @@ xfs_link(
 		return error;
 	}
 
-	dnlc_enter_fast(target_dir_vp, &fastdata, XFS_ITOV(sip), credp);
+	/*
+	 * We have to use dnlc_enter() rather than dnlc_enter_fast() here,
+	 * because we can't use the dnlc in the lookup call above.  Thus,
+	 * we have not initialized fastdata structure to use here.
+	 */
+	dnlc_enter(target_dir_vp, target_name, XFS_ITOV(sip), credp);
 
 	if (DM_EVENT_ENABLED(src_vp->v_vfsp, tdp, DM_POSTLINK)) {
 		(void) dm_namesp_event(DM_POSTLINK, target_dir_vp, src_vp,
@@ -3159,40 +3153,294 @@ xfs_link(
 }
 
 
+
 /*
- * xfs_ancestor_check.
+ * Given an array of up to 4 inode pointers, unlock the pointed to inodes.
+ * If there are fewer than 4 entries in the array, the empty entries will
+ * be at the end and will have NULL pointers in them.
+ */
+STATIC void
+xfs_rename_unlock4(
+	xfs_inode_t	**i_tab)
+{
+	int	i;
+
+	xfs_iunlock(i_tab[0], XFS_ILOCK_EXCL);
+	for (i = 1; i < 4; i++) {
+		if (i_tab[i] == NULL) {
+			break;
+		}
+		/*
+		 * Watch out for duplicate entries in the table.
+		 */
+		if (i_tab[i] != i_tab[i-1]) {
+			xfs_iunlock(i_tab[i], XFS_ILOCK_EXCL);
+		}
+	}
+}
+
+/*
+ * Given an array of up to 4 inode pointers, lock the pointed to inodes.
+ * If there are fewer than 4 entries in the array, the empty entries will
+ * be at the end and will have NULL pointers in them.  The array of inodes
+ * is already sorted by inode number, so we've already taken care of lock
+ * ordering.
+ */
+STATIC void
+xfs_rename_relock4(
+	xfs_inode_t	**i_tab)
+{
+	int	i;
+
+	xfs_ilock(i_tab[0], XFS_ILOCK_EXCL);
+	for (i = 1; i < 4; i++) {
+		if (i_tab[i] == NULL) {
+			break;
+		}
+		/*
+		 * Watch out for duplicate entries in the table.
+		 */
+		if (i_tab[i] != i_tab[i-1]) {
+			xfs_ilock(i_tab[i], XFS_ILOCK_EXCL);
+		}
+	}
+}
+
+/*
+ * Compare the i_gen fields of the inodes pointed to in the array of
+ * inode pointers to the gen values stored at the same offset in the
+ * array of generation counts.  Return 0 if they are the same and 1
+ * if they are different.
+ *
+ * There are a maximum of 4 entries in the array.  If there are
+ * fewer than that, the first empty entry will have a NULL pointer.
+ */
+STATIC int
+xfs_rename_compare_gencounts(
+	xfs_inode_t	**i_tab,
+	int		*i_gencounts)
+{
+	int	i;
+	int	compare;
+
+	compare = 0;
+	for (i = 0; i < 4; i++) {
+		if (i_tab[i] == NULL) {
+			break;
+		}
+		if (i_tab[i]->i_gen != i_gencounts[i]) {
+			compare = 1;
+			break;
+		}
+	}
+	return compare;
+}
+
+/*
+ * The following routine will acquire the locks required for a rename
+ * operation. The code understands the semantics of renames and will
+ * validate that name1 exists under dp1 & that name2 may or may not
+ * exist under dp2.
+ *
+ * We are renaming dp1/name1 to dp2/name2.
+ *
+ * Return ENOENT if dp1 does not exist, other lookup errors, or 0 for success.
+ * Return EAGAIN if the caller needs to try again.
+ */
+STATIC int
+xfs_lock_for_rename(
+	xfs_inode_t	*dp1,	/* old (source) directory inode */
+	xfs_inode_t	*dp2,	/* new (target) directory inode */
+	char		*name1,	/* old entry name */
+	char		*name2,	/* new entry name */
+	xfs_inode_t	**ipp1,	/* inode of old entry */
+	xfs_inode_t	**ipp2,	/* inode of new entry, if it 
+		           	   already exists, NULL otherwise. */
+	xfs_inode_t	**i_tab,/* array of inode returned, sorted */
+	int		*i_gencounts) /* array of inode gen counts */
+{
+	xfs_inode_t		*ip1, *ip2, *temp;
+	xfs_ino_t		inum1, inum2;
+	unsigned long		dir_gen1, dir_gen2;
+	int			error;
+	int			num_inodes;
+	int			i, j;
+	uint			lock_mode;
+	struct ncfastdata	fastdata;
+
+	ip2 = NULL;
+
+	/*
+	 * First, find out the current inums of the entries so that we
+	 * can determine the initial locking order.  We'll have to 
+	 * sanity check stuff after all the locks have been acquired
+	 * to see if we still have the right inodes, directories, etc.
+	 */
+        lock_mode = xfs_ilock_map_shared(dp1);
+
+	/*
+	 * We don't want to do lookups in unlinked directories.
+	 */
+	if (dp1->i_d.di_nlink == 0) {
+		xfs_iunlock_map_shared(dp1, lock_mode);
+		return XFS_ERROR(ENOENT);
+	}
+
+        error = xfs_dir_lookup_int(NULL, XFS_ITOV(dp1), DLF_IGET,
+				   name1, NULL, &inum1, &ip1, &fastdata);
+
+	/*
+	 * Save the current generation so that we can detect if it's
+	 * modified between when we drop the lock & reacquire it down
+	 * below.  We only need to do this for the src directory since
+	 * the target entry does not need to exist yet. 
+	 */
+	dir_gen1 = dp1->i_gen;
+	xfs_iunlock_map_shared(dp1, lock_mode);
+        if (error) {
+                return error;
+	}
+	ASSERT (ip1);
+	ITRACE(ip1);
+
+        lock_mode = xfs_ilock_map_shared(dp2);
+
+	/*
+	 * We don't want to do lookups in unlinked directories.
+	 */
+	if (dp2->i_d.di_nlink == 0) {
+		xfs_iunlock_map_shared(dp2, lock_mode);
+		return XFS_ERROR(ENOENT);
+	}
+
+        error = xfs_dir_lookup_int(NULL, XFS_ITOV(dp2), DLF_IGET,
+				   name2, NULL, &inum2, &ip2, &fastdata);
+	dir_gen2 = dp2->i_gen;
+        xfs_iunlock_map_shared(dp2, lock_mode);
+	if (error == ENOENT) {		/* target does not need to exist. */
+		inum2 = 0;
+	} else if (error) {
+		IRELE (ip1);
+                return error;
+	} else {
+		ITRACE(ip2);
+	}
+
+	/*
+	 * i_tab contains a list of pointers to inodes.  We initialize
+	 * the table here & we'll sort it.  We will then use it to 
+	 * order the acquisition of the inode locks.
+	 *
+	 * Note that the table may contain duplicates.  e.g., dp1 == dp2.
+	 */
+        i_tab[0] = dp1;
+        i_tab[1] = dp2;
+        i_tab[2] = ip1;
+	if (inum2 == 0) {
+		num_inodes = 3;
+		i_tab[3] = NULL;
+	} else {
+		num_inodes = 4;
+        	i_tab[3] = ip2;
+	}
+
+	/*
+	 * Sort the elements via bubble sort.  (Remember, there are at
+	 * most 4 elements to sort, so this is adequate.)
+	 */
+	for (i=0; i < num_inodes; i++) {
+		for (j=1; j < num_inodes; j++) {
+			if (i_tab[j]->i_ino < i_tab[j-1]->i_ino) {
+				temp = i_tab[j];
+				i_tab[j] = i_tab[j-1];
+				i_tab[j-1] = temp;
+			}
+		}
+	}
+
+	/*
+	 * Lock all the inodes in exclusive mode. If an inode appears
+	 * twice in the list, it will only be locked once.
+	 */
+	xfs_ilock (i_tab[0], XFS_ILOCK_EXCL);
+	for (i=1; i < num_inodes; i++) {
+		if (i_tab[i] != i_tab[i-1])
+			xfs_ilock(i_tab[i], XFS_ILOCK_EXCL);
+	}
+
+	/*
+	 * See if either of the directories was modified during the
+	 * interval between when the locks were released and when
+	 * they were reacquired.
+	 */
+	if (dp1->i_gen != dir_gen1 || dp2->i_gen != dir_gen2) {
+		/*
+		 * Someone else may have linked in a new inode
+		 * with the same name.  If so, we'll need to
+		 * release our locks & go through the whole
+		 * thing again.
+		 */
+		xfs_iunlock(i_tab[0], XFS_ILOCK_EXCL);
+		for (i=1; i < num_inodes; i++) {
+			if (i_tab[i] != i_tab[i-1])
+				xfs_iunlock(i_tab[i], XFS_ILOCK_EXCL);
+		}
+		if (num_inodes == 4) {
+			IRELE (ip2);
+		}
+		IRELE (ip1);
+		return XFS_ERROR(EAGAIN);
+        }
+
+
+	/*
+	 * Set the return value.  Return the gen counts of the inodes in
+	 * i_tab in i_gencounts.  Null out any unused entries in i_tab.
+	 */
+	*ipp1 = *ipp2 = NULL;
+	for (i=0; i < num_inodes; i++) {
+		if (i_tab[i]->i_ino == inum1) {
+			*ipp1 = i_tab[i];
+		}
+		if (i_tab[i]->i_ino == inum2) {
+			*ipp2 = i_tab[i];
+		}
+		i_gencounts[i] = i_tab[i]->i_gen;
+	}
+	for (;i < 4; i++) {
+		i_tab[i] = NULL;
+	}
+	return 0;
+}
+
+/*
+ * xfs_rename_ancestor_check.
  *
  * Routine called by xfs_rename to make sure that we are not moving
  * a directory under one of its children. This would have the effect
  * of orphaning the whole directory subtree.
  *
- * If two calls to xfs_ancestor_check overlapped execution, the 
+ * If two calls to xfs_rename_ancestor_check overlapped execution, the 
  * partially completed work of one call could be invalidated by the
  * rename that activated the other.  To avoid this, we serialize
  * using xfs_ancestormon.
  *
- * This routine will internally release all the inode locks and
- * then reacquire them before it returns. If the state of any of
- * the inodes have changed in the interim, state_has_changed will
- * be set to true.  In this case, the caller should take the 
- * appropriate recovery action - e.g., restart the whole rename
- * operation again.
+ * The caller, xfs_rename(), must have already acquired the
+ * xfs_ancestormon mutex and unlocked the inodes.  It is up
+ * to xfs_rename() to re-validate its inodes after this call
+ * returns since they have been unlocked.
  */
+/*ARGSUSED*/
 STATIC int
-xfs_ancestor_check(
+xfs_rename_ancestor_check(
 	xfs_inode_t *src_dp, 
 	xfs_inode_t *src_ip,
 	xfs_inode_t *target_dp,
-	xfs_inode_t *target_ip, 
-	boolean_t   *state_has_changed)
+	xfs_inode_t *target_ip)
 {
-	struct {
-		xfs_inode_t     *ip;
-		unsigned long   gen;
-	}			i_tab[4], temp;
-	int			i, j, num_inodes;
 	xfs_mount_t		*mp;
 	xfs_inode_t		*ip;
+	xfs_ino_t		parent_ino;
 	xfs_ino_t		root_ino;
 	int			error = 0;
 	struct ncfastdata	fastdata;
@@ -3201,15 +3449,13 @@ xfs_ancestor_check(
 	root_ino = mp->m_sb.sb_rootino;
 
 	/*
-	 * We know that all the inodes involved are directories at this
-	 * point.
+	 * We know that all the inodes other than target_ip are directories
+	 * at this point.  We can treat target_ip like a directory whether
+	 * it is or not, though, since if it is not i_gen won't change.
 	 */
 	ASSERT((src_dp->i_d.di_mode & IFMT) == IFDIR);
 	ASSERT((target_dp->i_d.di_mode & IFMT) == IFDIR);
-	if (src_ip != NULL)
-		ASSERT((src_ip->i_d.di_mode & IFMT) == IFDIR);
-	if (target_ip != NULL)
-		ASSERT((target_ip->i_d.di_mode & IFMT) == IFDIR);
+	ASSERT((src_ip == NULL) || ((src_ip->i_d.di_mode & IFMT) == IFDIR));
 
 	/*
 	 * Assert that all the relationships that were checked by our
@@ -3221,63 +3467,6 @@ xfs_ancestor_check(
 	ASSERT(src_dp != target_dp);
 
 	/*
-	 * Record all the inodes and their current generations.
-	 *
-	 * There are at least 2 entries in table.  May have duplicate 
-	 * entries if src_ip == target_dp, for example.
-	 */
-	i_tab[0].ip = src_dp;
-	i_tab[0].gen = src_dp->i_gen;
-        i_tab[1].ip = src_ip;
-	i_tab[1].gen = src_ip->i_gen;
-        i_tab[2].ip = target_dp;
-	i_tab[2].gen = target_dp->i_gen;
-	if (target_ip) {
-		i_tab[3].ip = target_ip;
-		i_tab[3].gen = target_ip->i_gen;
-		num_inodes = 4;
-	} else {
-		num_inodes = 3;
-	}
-
-        /*
-         * Sort the elements.
-         */
-        for (i=0; i < num_inodes; i++) {
-                for (j=1; j < num_inodes; j++) {
-                        if (i_tab[j].ip->i_ino < i_tab[j-1].ip->i_ino) {
-                                temp = i_tab[j];
-                                i_tab[j] = i_tab[j-1];
-                                i_tab[j-1] = temp;
-                        }
-                }
-        }
-
-	/*
-         * Release all the inode locks before acquiring xfs_ancestormon.
-         * We do this to avoid deadlocking with another process that
-         * already has xfs_ancestormon and is trying to get one of
-         * our directories via "..". 
-         */
-	xfs_iunlock(src_dp, XFS_ILOCK_EXCL);
-	/*
-	 * src_ip can't be same as src_dp
-	 */
-	xfs_iunlock(src_ip, XFS_ILOCK_EXCL);
-	/*
-	 * target_dp can't be same as src_dp
-	 */
-	if (target_dp != src_ip)
-		xfs_iunlock(target_dp, XFS_ILOCK_EXCL);
-	/*
-	 * target_ip can't be same as src_ip or target_dp
-	 */
-	if (target_ip && target_ip != src_dp)
-		xfs_iunlock(target_ip, XFS_ILOCK_EXCL);
-
-	mutex_lock(&xfs_ancestormon, PINOD);
-
-	/*
 	 * Ascend the target_dp's ancestor line, stopping if we
 	 * either encounter src_ip (failed check), or reached the
 	 * root of the filesystem.
@@ -3286,21 +3475,27 @@ xfs_ancestor_check(
 	 *
 	 * In this loop we need to lock the inodes exclusively since
 	 * we can't really get at the xfs_ilock_map_shared() interface
-	 * through xfs_dir_lookup_int().
+	 * through xfs_dir_lookup_int() and xfs_iget().
 	 */
 	ip = target_dp;
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 
 	while (ip->i_ino != root_ino) {
-		xfs_ino_t	parent_ino;
 
 		if (ip == src_ip) {
 			error = XFS_ERROR(EINVAL);
 			break;
 		}
+		if (ip->i_d.di_nlink == 0) {
+			/*
+			 * The directory has been removed, don't do
+			 * any lookups in it.
+			 */
+			error = XFS_ERROR(ENOENT);
+			break;
+		}
 		error = xfs_dir_lookup_int(NULL, XFS_ITOV(ip), 0, "..",
-					   NULL, &parent_ino, NULL,
-					   &fastdata);
+				NULL, &parent_ino, NULL, &fastdata);
 		if (error) {
 			break;
 		}
@@ -3323,7 +3518,7 @@ xfs_ancestor_check(
 
 		error = xfs_iget(mp, NULL, parent_ino, XFS_ILOCK_EXCL, &ip, 0);
 		if (error) {
-			goto relock_and_return;
+			goto error_return;
 		}
 		ASSERT(ip != NULL);
 		if (((ip->i_d.di_mode & IFMT) != IFDIR) ||
@@ -3340,43 +3535,195 @@ xfs_ancestor_check(
 	 * vnode reference count only if ip != target_dp.
 	 */
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
-	if (ip != target_dp)
+	if (ip != target_dp) {
 		IRELE(ip);
+	}
 
- relock_and_return:
-	/*
-         * Reacquire all the inode locks in exclusive mode. If an inode 
-	 * appears twice in the list, it will only be locked once.
-         */
-        xfs_ilock(i_tab[0].ip, XFS_ILOCK_EXCL);
-        for (i=1; i < num_inodes; i++) {
-                if (i_tab[i].ip != i_tab[i-1].ip)
-                        xfs_ilock(i_tab[i].ip, XFS_ILOCK_EXCL);
-        }
+ error_return:
+	return error;
+}
 
-	/*
-	 * Unserialize efs_notancestor calls.
-         */
-        mutex_unlock(&xfs_ancestormon);
+int rename_which_error_return = 0;
 
+/*
+ * Do all the mundane error checking for xfs_rename().  The code
+ * assumes that all of the non-NULL inodes have already been locked.
+ */
+STATIC int
+xfs_rename_error_checks(
+	xfs_inode_t	*src_dp,
+	xfs_inode_t	*target_dp,
+	xfs_inode_t	*src_ip,
+	xfs_inode_t	*target_ip,
+	char		*src_name,
+	char		*target_name,			
+	cred_t		*credp,
+	int		*status)			
+{
+	int	src_is_directory;
+	int	error;
+
+	*status = 0;
+	error = 0;
 	/*
-	 * See if anything has changed when they were unlocked.
+	 * If the target directory has been removed, we can't create any
+	 * more files in it.  We don't need to check the source dir,
+	 * because it was checked in xfs_lock_for_rename() while looking
+	 * for the source inode.  If it had been removed the source
+	 * dir's gen count would have been bumped removing the last entry
+	 * and then we'd have noticed that its link count had gone to zero.
 	 */
-	*state_has_changed = B_FALSE;
-	for (i=1; i < num_inodes; i++) {
-		if (i_tab[i].gen != i_tab[i].ip->i_gen) {
-			*state_has_changed = B_TRUE;
-			break;
+	if (target_dp->i_d.di_nlink == 0) {
+		error = ENOENT;
+		*status = __LINE__;
+		goto error_return;
+	}
+	if (error = xfs_iaccess(src_dp, IEXEC | IWRITE, credp)) {
+		*status = __LINE__;
+                goto error_return;
+	}
+	if (error = xfs_stickytest(src_dp, src_ip, credp)) {
+		*status = __LINE__;
+		goto error_return;
+	}
+
+	if (target_dp && (src_dp != target_dp)) {
+		if (error = xfs_iaccess(target_dp, IEXEC | IWRITE, credp)) {
+			*status = __LINE__;
+			goto error_return;
+		}
+		if ((target_ip != NULL) &&
+		    (error = xfs_stickytest(target_dp, target_ip, credp))) {
+			*status = __LINE__;
+			goto error_return;
+		}
+	} else {
+		if ((target_ip != NULL) &&
+		    (error = xfs_stickytest(src_dp, target_ip, credp))) {
+			*status = __LINE__;
+                        goto error_return;
 		}
 	}
 
-	return error;
+	if ((src_ip == src_dp) || (target_ip == target_dp)) {
+		error = XFS_ERROR(EINVAL);
+		*status = __LINE__;
+		goto error_return;
+	}
 
+	/*
+	 * Source and target are identical.
+	 */
+	if (src_ip == target_ip) {
+		/*
+		 * There is no error in this case, but we want to get
+		 * out anyway.  Set error to 0 so that no error will
+		 * be returned, but set *status so that the caller
+		 * will know that it should give up on the rename.
+		 */
+		error = 0;
+		*status = __LINE__;
+		goto error_return;
+	}
+
+	/*
+	 * Directory renames require special checks.
+	 */
+	src_is_directory = ((src_ip->i_d.di_mode & IFMT) == IFDIR);
+
+	if (src_is_directory) {
+
+		ASSERT(src_ip->i_d.di_nlink >= 2);
+
+		/*
+		 * Check for link count overflow on target_dp
+		 */
+		if (target_ip == NULL && (src_dp != target_dp) &&
+		    target_dp->i_d.di_nlink >= XFS_MAXLINK) {
+			error = XFS_ERROR(EMLINK);
+			*status = __LINE__;
+			goto error_return;
+		}
+		    
+		/*
+		 * Cannot rename ".."
+		 */
+		if ((src_name[0] == '.') && (src_name[1] == '.') &&
+		    (src_name[2] == '\0')) {
+			error = XFS_ERROR(EINVAL);
+			*status = __LINE__;
+			goto error_return;
+		}
+                if ((target_name[0] == '.') && (target_name[1] == '.') &&
+                    (target_name[2] == '\0')) {
+                        error = XFS_ERROR(EINVAL);
+			*status = __LINE__;
+                        goto error_return;
+                }
+
+	}
+
+ error_return:
+	return error;
 }
 
+/*
+ * Perform error checking on the target inode after the ancestor check
+ * has been done in xfs_rename().
+ */
+STATIC int
+xfs_rename_target_checks(
+	xfs_inode_t	*target_ip,
+	int		src_is_directory)
+{
+	int	error;
 
+	error = 0;
+	/*
+	 * If target exists and it's a directory, check that both
+	 * target and source are directories and that target can be
+	 * destroyed, or that neither is a directory.
+	 */
+	if ((target_ip->i_d.di_mode & IFMT) == IFDIR) {
 
-int rename_which_error_return = 0;
+		/*
+		 * Make sure src is a directory.
+		 */
+		if (!src_is_directory) {
+			error = XFS_ERROR(EISDIR);
+			rename_which_error_return = __LINE__;
+			goto error_return;
+		}
+
+		/*
+		 * Make sure target dir is empty.
+		 */
+		if (!(xfs_dir_isempty(target_ip)) || 
+		    (target_ip->i_d.di_nlink > 2)) {
+			error = XFS_ERROR(EEXIST);
+			rename_which_error_return = __LINE__;
+			goto error_return;
+		}
+
+		if (ABI_IS_SVR4(curprocp->p_abi) &&
+		    XFS_ITOV(target_ip)->v_vfsmountedhere) {
+			error = XFS_ERROR(EBUSY);
+			rename_which_error_return = __LINE__;
+			goto error_return;
+		}
+
+	} else {
+		if (src_is_directory) {
+			error = XFS_ERROR(ENOTDIR);
+			rename_which_error_return = __LINE__;
+			goto error_return;
+		}
+	}
+
+ error_return:
+	return error;
+}
+
 
 /*
  * xfs_rename
@@ -3394,7 +3741,6 @@ xfs_rename(
 	xfs_trans_t	*tp;
 	xfs_inode_t	*src_dp, *target_dp, *src_ip, *target_ip;
 	xfs_mount_t	*mp;
-	boolean_t	state_has_changed;
 	int		new_parent;		/* moving to a new dir */
 	int		src_is_directory;	/* src_name is a directory */
 	int		error;		
@@ -3402,31 +3748,26 @@ xfs_rename(
         xfs_fsblock_t   first_block;
 	int		cancel_flags;
 	int		committed;
+	int		status;
+	int		ancestor_checked;
+	xfs_inode_t	*inodes[4];
+	int		gencounts[4];
 
 	vn_trace_entry(src_dir_vp, "xfs_rename");
 	vn_trace_entry(target_dir_vp, "xfs_rename");
 
-	if (DM_EVENT_ENABLED(src_dir_vp->v_vfsp, XFS_VTOI(src_dir_vp), DM_RENAME) ||
-	    DM_EVENT_ENABLED(target_dir_vp->v_vfsp, XFS_VTOI(target_dir_vp), DM_RENAME)) {
+	if (DM_EVENT_ENABLED(src_dir_vp->v_vfsp, XFS_VTOI(src_dir_vp),
+			     DM_RENAME) ||
+	    DM_EVENT_ENABLED(target_dir_vp->v_vfsp,
+			     XFS_VTOI(target_dir_vp), DM_RENAME)) {
 		error = dm_namesp_event(DM_RENAME, src_dir_vp, target_dir_vp,
 					 src_name, target_name, 0, 0);
-		if (error)
+		if (error) {
 			return error;
+		}
 	}
 
  start_over:
-	XFS_BMAP_INIT(&free_list, &first_block);
-	mp = XFS_VFSTOM(src_dir_vp->v_vfsp);
-	tp = xfs_trans_alloc(mp, XFS_TRANS_RENAME);
-	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-        if (error = xfs_trans_reserve(tp, 10, XFS_RENAME_LOG_RES(mp),
-				      0, XFS_TRANS_PERM_LOG_RES,
-				      XFS_RENAME_LOG_COUNT)) {
-		cancel_flags = 0;
-		rename_which_error_return = 1;
-                goto error_return;
-	}
-
 	/*
 	 * Lock all the participating inodes. Depending upon whether
 	 * the target_name exists in the target directory, and
@@ -3435,22 +3776,106 @@ xfs_rename(
 	 * xfs_lock_for_rename() will return ENOENT if src_name
 	 * does not exist in the source directory.
 	 */
+	tp = NULL;
 	src_dp = XFS_VTOI(src_dir_vp);
         target_dp = XFS_VTOI(target_dir_vp);
-	while ((error = xfs_lock_for_rename(src_dp, target_dp, src_name,
-				target_name, &src_ip, &target_ip)) == EAGAIN)
-		continue;
+	do {
+		error = xfs_lock_for_rename(src_dp, target_dp, src_name,
+				target_name, &src_ip, &target_ip, inodes,
+				gencounts);
+	} while (error == EAGAIN);
 	if (error) {
-		rename_which_error_return = 2;
-		goto error_return;
+		rename_which_error_return = __LINE__;
+		/*
+		 * We have nothing locked, no inode references, and
+		 * no transaction, so just get out.
+		 */
+		return error;
 	}
 
 	ASSERT(src_ip != NULL);
 
-	ASSERT(!((src_name[0] == '.') && (src_name[1] == '\0')));
-	ASSERT(!((target_name[0] == '.') && (target_name[1] == '\0')));
+	error = xfs_rename_error_checks(src_dp, target_dp, src_ip,
+			target_ip, src_name, target_name, credp, &status);
+	if (error || status) {
+		rename_which_error_return = status;
+		goto unlock_rele_return;
+	}
 
 	new_parent = (src_dp != target_dp);
+	src_is_directory = ((src_ip->i_d.di_mode & IFMT) == IFDIR);
+
+	/*
+	 * Drop the locks on our inodes so that we can do the ancestor
+	 * check if necessary and start the transaction.  We have already
+	 * saved the i_gen fields of each of the inode in the gencounts
+	 * array when we called xfs_lock_for_rename().
+	 */
+	xfs_rename_unlock4(inodes);
+	if (src_is_directory && (src_dp != target_dp)) {
+		/*
+		 * Check whether the rename would orphan the tree
+		 * rooted at src_ip by moving it under itself.
+		 *
+		 * We use the xfs_ancestormon mutex to serialize all
+		 * renames that might be doing this.  This prevents
+		 * simultaneous renames from tricking each other into
+		 * thinking that things are OK when they are not.
+		 * In order for the serialization to work, we need to
+		 * reacquire the inode locks before dropping the
+		 * mutex.  We can't do that until after starting up
+		 * the transaction and acquiring our log reservation.
+		 *
+		 * It is OK to hold the mutex across the log reservation
+		 * call, because we don't hold any resources when
+		 * obtaining the mutex.  This means that we can't hold
+		 * anyone up as we wait for the mutex.
+		 */
+		mutex_lock(&xfs_ancestormon, PINOD);
+		error = xfs_rename_ancestor_check(src_dp, src_ip,
+						  target_dp, target_ip);
+		if (error) {
+			rename_which_error_return = __LINE__;
+			mutex_unlock(&xfs_ancestormon);
+			goto rele_return;
+		}
+		ancestor_checked = 1;
+	} else {
+		ancestor_checked = 0;
+	}
+
+	XFS_BMAP_INIT(&free_list, &first_block);
+	mp = XFS_VFSTOM(src_dir_vp->v_vfsp);
+	tp = xfs_trans_alloc(mp, XFS_TRANS_RENAME);
+	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
+        if (error = xfs_trans_reserve(tp, 10, XFS_RENAME_LOG_RES(mp),
+			0, XFS_TRANS_PERM_LOG_RES, XFS_RENAME_LOG_COUNT)) {
+		rename_which_error_return = __LINE__;
+		xfs_trans_cancel(tp, 0);
+		if (ancestor_checked) {
+			mutex_unlock(&xfs_ancestormon);
+		}
+                goto rele_return;
+	}
+
+	/*
+	 * Reacquire the inode locks we dropped above.  Then check the
+	 * generation counts on the inodes.  If any of them have changed,
+	 * we cancel the transaction and start over from the top.
+	 */
+	xfs_rename_relock4(inodes);
+	if (ancestor_checked) {
+		mutex_unlock(&xfs_ancestormon);
+	}		
+	if (xfs_rename_compare_gencounts(inodes, gencounts)) {
+		xfs_trans_cancel(tp, cancel_flags);
+		xfs_rename_unlock4(inodes);
+		IRELE(src_ip);
+		if (target_ip != NULL) {
+			IRELE(target_ip);
+		}
+		goto start_over;
+	}
 
 	/*
 	 * Join all the inodes to the transaction. From this point on,
@@ -3469,141 +3894,12 @@ xfs_rename(
 	if ((src_ip != src_dp) && (src_ip != target_dp)) {
 		xfs_trans_ijoin(tp, src_ip, XFS_ILOCK_EXCL);
 	}
-        if (target_ip &&
+        if ((target_ip != NULL) &&
 	    (target_ip != src_ip) &&
 	    (target_ip != src_dp) &&
 	    (target_ip != target_dp)) {
                 xfs_trans_ijoin(tp, target_ip, XFS_ILOCK_EXCL);
 	}
-
-
-
-	/*
-	 * Make all the access checks.
-	 */
-
-	/*
-	 * If the target directory has been removed, we can't create any
-	 * more files in it.  We don't need to check the source dir,
-	 * because it was checked in xfs_lock_for_rename() while looking
-	 * for the source inode.  If it had been removed the source
-	 * dir's gen count would have been bumped removing the last entry
-	 * and then we'd have noticed that its link count had gone to zero.
-	 */
-	if (target_dp->i_d.di_nlink == 0) {
-		error = XFS_ERROR(ENOENT);
-		rename_which_error_return = 3;
-		goto error_return;
-	}
-	if (error = xfs_iaccess(src_dp, IEXEC | IWRITE, credp)) {
-		rename_which_error_return = 4;
-                goto error_return;
-	}
-	if (error = xfs_stickytest(src_dp, src_ip, credp)) {
-		rename_which_error_return = 5;
-		goto error_return;
-	}
-
-	if (target_dp && (src_dp != target_dp)) {
-		if (error = xfs_iaccess(target_dp, IEXEC | IWRITE, credp)) {
-			rename_which_error_return = 6;
-			goto error_return;
-		}
-		if ((target_ip != NULL) &&
-		    (error = xfs_stickytest(target_dp, target_ip, credp))) {
-			rename_which_error_return = 7;
-			goto error_return;
-		}
-	}
-	else {
-		if ((target_ip != NULL) &&
-		    (error = xfs_stickytest(src_dp, target_ip, credp))) {
-			rename_which_error_return = 8;
-                        goto error_return;
-		}
-	}
-
-	if ((src_ip == src_dp) || (target_ip == target_dp)) {
-		error = XFS_ERROR(EINVAL);
-		rename_which_error_return = 9;
-		goto error_return;
-	}
-
-	/*
-	 * Source and target are identical.
-	 */
-	if (src_ip == target_ip) {
-		error = 0;		/* no-op */
-		rename_which_error_return = 10;
-		goto error_return;
-	}
-
-	/*
-	 * Directory renames require special checks.
-	 */
-	src_is_directory = ((src_ip->i_d.di_mode & IFMT) == IFDIR);
-
-	if (src_is_directory) {
-
-		ASSERT(src_ip->i_d.di_nlink >= 2);
-
-		/*
-		 * Check for link count overflow on target_dp
-		 */
-		if (target_ip == NULL && new_parent &&
-		    target_dp->i_d.di_nlink >= XFS_MAXLINK) {
-			error = XFS_ERROR(EMLINK);
-			rename_which_error_return = 11;
-			goto error_return;
-		}
-		    
-		/*
-		 * Cannot rename ".."
-		 */
-		if ((src_name[0] == '.') && (src_name[1] == '.') &&
-		    (src_name[2] == '\0')) {
-			error = XFS_ERROR(EINVAL);
-			rename_which_error_return = 12;
-			goto error_return;
-		}
-                if ((target_name[0] == '.') && (target_name[1] == '.') &&
-                    (target_name[2] == '\0')) {
-                        error = XFS_ERROR(EINVAL);
-			rename_which_error_return = 13;
-                        goto error_return;
-                }
-
-
-		if (src_dp != target_dp) {
-			/*
-			 * Check whether the rename would orphan the tree
-			 * rooted at src_ip by moving it under itself.
-			 *
-			 * This is very hairy.  We'll have to release all
-			 * the locks, do the ancestor check, and then
-			 * reacquire all the locks.
-			 * After we reacquire the locks, we'll have to run
-			 * through all the checks again if any of the
-			 * directories have been modified.  To simplify it,
-			 * we'll just return to the top and redo all this.
-			 * Fortunately, this is a rare case.
-			 */
-
-			error = xfs_ancestor_check(src_dp, src_ip,
-						   target_dp, target_ip,
-						   &state_has_changed);
-			if (error) {
-				rename_which_error_return = 14;
-				goto error_return;
-			}
-
-			if (state_has_changed) {
-				xfs_trans_cancel(tp, 0);
-				goto start_over;
-			}
-		}
-	}
-
 
 	/*
 	 * We should be in the same file system.
@@ -3612,21 +3908,31 @@ xfs_rename(
 	       XFS_VFSTOM(target_dir_vp->v_vfsp));
 
 	/*
+	 * We have to redo all of the checks we did above, because we've
+	 * unlocked all of the inodes in the interim.
+	 */
+	error = xfs_rename_error_checks(src_dp, target_dp, src_ip,
+			target_ip, src_name, target_name, credp, &status);
+	if (error || status) {
+		rename_which_error_return = status;
+		goto error_return;
+	}
+
+	/*
 	 * Set up the target.
 	 */
-
 	if (target_ip == NULL) {
 
 		/*
-		 * If target does not exist and the rename crosses directories,
-		 * adjust the target directory link count to account for the
-		 * ".." reference from the new entry.
+		 * If target does not exist and the rename crosses
+		 * directories, adjust the target directory link count
+		 * to account for the ".." reference from the new entry.
 		 */
 		error = xfs_dir_createname(tp, target_dp, target_name,
 					   src_ip->i_ino, &first_block,
 					   &free_list, MAX_EXT_NEEDED);
 		if (error) {
-			rename_which_error_return = 15;
+			rename_which_error_return = __LINE__;
 			goto abort_return;
 		}
 		xfs_ichgtime(target_dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
@@ -3634,54 +3940,18 @@ xfs_rename(
 		if (new_parent && src_is_directory) {
 			error = xfs_bumplink(tp, target_dp);
 			if (error) {
-				rename_which_error_return = 16;
+				rename_which_error_return = __LINE__;
 				goto abort_return;
 			}
 		}
 	} else { /* target_ip != NULL */
 
-		/*
-		 * If target exists and it's a directory, check that both
-		 * target and source are directories and that target can be
-		 * destroyed, or that neither is a directory.
-		 */
-
-		if ((target_ip->i_d.di_mode & IFMT) == IFDIR) {
-
-			/*
-			 * Make sure src is a directory.
-			 */
-			if (!src_is_directory) {
-				error = XFS_ERROR(EISDIR);
-				rename_which_error_return = 17;
-				goto error_return;
-			}
-
-			/*
-			 * Make sure target dir is empty.
-			 */
-			if (!(xfs_dir_isempty(target_ip)) || 
-			    (target_ip->i_d.di_nlink > 2)) {
-				error = XFS_ERROR(EEXIST);
-				rename_which_error_return = 18;
-                                goto error_return;
-                        }
-
-			if (ABI_IS_SVR4(curprocp->p_abi) &&
-                            XFS_ITOV(target_ip)->v_vfsmountedhere) {
-                                error = XFS_ERROR(EBUSY);
-				rename_which_error_return = 19;
-                                goto error_return;
-                        }
-
-		} else {
-			if (src_is_directory) {
-				error = XFS_ERROR(ENOTDIR);
-				rename_which_error_return = 20;
-				goto error_return;
-			}
+		error = xfs_rename_target_checks(target_ip,
+						 src_is_directory);
+		if (error) {
+			goto error_return;
 		}
-	       
+
 		/*
 		 * Purge all dnlc references to the old target.
 		 */
@@ -3700,7 +3970,7 @@ xfs_rename(
 			((target_pnp != NULL) ? target_pnp->pn_complen :
 			 strlen(target_name)), src_ip->i_ino);
 		if (error) {
-			rename_which_error_return = 21;
+			rename_which_error_return = __LINE__;
 			goto abort_return;
 		}
 		xfs_ichgtime(target_dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
@@ -3714,7 +3984,7 @@ xfs_rename(
 		 */
 		error = xfs_droplink(tp, target_ip);
 		if (error) {
-			rename_which_error_return = 22;
+			rename_which_error_return = __LINE__;
 			goto abort_return;;
 		}
 
@@ -3724,14 +3994,12 @@ xfs_rename(
 			 */
 			error = xfs_droplink(tp, target_ip);
 			if (error) {
-				rename_which_error_return = 23;
+				rename_which_error_return = __LINE__;
 				goto abort_return;
 			}
 		} 
 
 	} /* target_ip != NULL */
-
-
 
 	/*
 	 * Remove the source.
@@ -3745,7 +4013,7 @@ xfs_rename(
 		error = xfs_dir_replace(tp, src_ip, "..", 2,
 					target_dp->i_ino);
 		if (error) {
-			rename_which_error_return = 24;
+			rename_which_error_return = __LINE__;
 			goto abort_return;
 		}
 		xfs_ichgtime(src_ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
@@ -3758,7 +4026,7 @@ xfs_rename(
 		 */
 		error = xfs_droplink(tp, src_dp);
 		if (error) {
-			rename_which_error_return = 25;
+			rename_which_error_return = __LINE__;
 			goto abort_return;
 		}
 	}
@@ -3767,7 +4035,7 @@ xfs_rename(
 	error = xfs_dir_removename(tp, src_dp, src_name, &first_block,
 				   &free_list, MAX_EXT_NEEDED);
 	if (error) {
-		rename_which_error_return = 26;
+		rename_which_error_return = __LINE__;
 		goto abort_return;
 	}
 	xfs_ichgtime(src_dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
@@ -3845,6 +4113,16 @@ xfs_rename(
 	xfs_bmap_cancel(&free_list);
 	xfs_trans_cancel(tp, cancel_flags);
 	return error;
+
+ unlock_rele_return:
+	xfs_rename_unlock4(inodes);
+	/* FALLTHROUGH */
+ rele_return:
+	IRELE(src_ip);
+	if (target_ip != NULL) {
+		IRELE(target_ip);
+	}
+	return error;
 }
 
 
@@ -3873,7 +4151,6 @@ xfs_mkdir(
         xfs_bmap_free_t         free_list;
         xfs_fsblock_t           first_block;
 	boolean_t		dp_joined_to_trans = B_FALSE;
-	struct ncfastdata	fastdata;
 
         dp = XFS_VTOI(dir_vp);
 
@@ -3917,8 +4194,15 @@ xfs_mkdir(
 		goto error_return;
 	}
 
-        error = xfs_dir_lookup_int(NULL, dir_vp, 0, dir_name, NULL,
-				   &e_inum, NULL, &fastdata);
+	/*
+	 * Make sure that nothing with the given name exists in the
+	 * target directory.  We can't allow the lookup to use the
+	 * dnlc, because doing so could cause deadlock if it has to
+	 * do a vn_get for the vnode and the vnode is inactive and
+	 * waiting for a log reservation in xfs_inactive.
+	 */
+        error = xfs_dir_lookup_int(NULL, dir_vp, DLF_NODNLC, dir_name, NULL,
+				   &e_inum, NULL, NULL);
         if (error != ENOENT) {
 		if (error == 0)
 			error = XFS_ERROR(EEXIST);
@@ -3966,7 +4250,13 @@ xfs_mkdir(
 	}
 	xfs_ichgtime(dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
-	dnlc_enter_fast(dir_vp, &fastdata, XFS_ITOV(cdp), NOCRED);
+	/*
+	 * Since we used the DLF_NODNLC option to xfs_dir_lookup_int()
+	 * above, we don't have an initialized fastdata structure to
+	 * use for adding our entry to the dnlc.  Instead we have to
+	 * use the slightly slower plain dnlc_enter().
+	 */
+	dnlc_enter(dir_vp, dir_name, XFS_ITOV(cdp), NOCRED);
 	
 	error = xfs_dir_init(tp, cdp, dp);
 	if (error) {
@@ -4001,7 +4291,7 @@ xfs_mkdir(
 
 	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
 	if (error) {
-		dnlc_remove_fast(dir_vp, &fastdata);
+		dnlc_remove(dir_vp, dir_name);
 		return error;
 	}
 
@@ -4012,7 +4302,7 @@ xfs_mkdir(
 	return 0;
 
  error2:
-	dnlc_remove_fast(dir_vp, &fastdata);
+	dnlc_remove(dir_vp, dir_name);
  error1:
 	xfs_bmap_cancel(&free_list);
  abort_return:
@@ -4042,14 +4332,14 @@ xfs_rmdir(
         xfs_inode_t             *dp;
         xfs_inode_t             *cdp;   /* child directory */
         xfs_trans_t             *tp;
-        xfs_ino_t               e_inum;
 	xfs_mount_t		*mp;
         int                     error;
         xfs_bmap_free_t         free_list;
         xfs_fsblock_t           first_block;
 	int			cancel_flags;
 	int			committed;
-	struct ncfastdata	fastdata;
+	int			dir_generation;
+	int			entry_changed;
 
 	vn_trace_entry(dir_vp, "xfs_rmdir");
 
@@ -4059,6 +4349,29 @@ xfs_rmdir(
 		if (error)
 			return error;
 	}
+
+ retry:
+        dp = XFS_VTOI(dir_vp);
+	cdp = NULL;
+
+	/*
+	 * We need to get a reference to cdp before we get our log
+	 * reservation.  The reason for this is that we cannot call
+	 * xfs_iget for an inode for which we do not have a reference
+	 * once we've acquired a log reservation.  This is because the
+	 * inode we are trying to get might be in xfs_inactive going
+	 * for a log reservation.  Since we'll have to wait for the
+	 * inactive code to complete before returning from xfs_iget,
+	 * we need to make sure that we don't have log space reserved
+	 * when we call xfs_iget.  Instead we get an unlocked referece
+	 * to the inode before getting our log reservation.
+	 */
+	error = xfs_get_dir_entry(dp, name, &cdp, &dir_generation);
+	if (error) {
+		remove_which_error_return = __LINE__;
+		return error;
+	}
+
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
 	tp = xfs_trans_alloc(mp, XFS_TRANS_RMDIR);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
@@ -4066,44 +4379,56 @@ xfs_rmdir(
 				      0, XFS_TRANS_PERM_LOG_RES,
 				      XFS_DEFAULT_LOG_COUNT)) {
 		cancel_flags = 0;
+		VN_RELE(XFS_ITOV(cdp));
                 goto error_return;
 	}
 	XFS_BMAP_INIT(&free_list, &first_block);
 
-        dp = XFS_VTOI(dir_vp);
-	cdp = NULL;
-
-	VN_HOLD(dir_vp);
-        xfs_ilock(dp, XFS_ILOCK_EXCL);
-	xfs_trans_ijoin(tp, dp, XFS_ILOCK_EXCL);
+	/*
+	 * Now lock the child directory inode and the parent directory
+	 * inode in the proper order.  This will take care of validating
+	 * that the directory entry for the child directory inode has
+	 * not changed while we were obtaining a log reservation.
+	 */
+	error = xfs_lock_dir_and_entry(dp, name, cdp, dir_generation,
+				       &entry_changed);
+	if (error) {
+		xfs_trans_cancel(tp, cancel_flags);
+		VN_RELE(XFS_ITOV(cdp));
+		return error;
+	}
 
 	/*
-	 * If the directory has been removed, we don't want to do any
-	 * lookups and we know it has no entries.
+	 * If the inode we found in the first pass is no longer
+	 * the entry with the given name, then drop our transaction and
+	 * inode reference and start over.
 	 */
-	if (dp->i_d.di_nlink == 0) {
-		error = XFS_ERROR(ENOENT);
-		goto error_return;
+	if (entry_changed) {
+		xfs_trans_cancel(tp, cancel_flags);
+		VN_RELE(XFS_ITOV(cdp));
+		goto retry;
 	}
+
+	xfs_trans_ijoin(tp, dp, XFS_ILOCK_EXCL);
+	if (dp != cdp) {
+		/*
+		 * Only increment the parent directory vnode count if
+		 * we didn't bump it in looking up cdp.  The only time
+		 * we don't bump it is when we're looking up ".".
+		 */
+		VN_HOLD(dir_vp);
+	}
+
+	ITRACE(cdp);
+	xfs_trans_ijoin(tp, cdp, XFS_ILOCK_EXCL);
 
 	if (error = xfs_iaccess(dp, IEXEC | IWRITE, credp)) {
                 goto error_return;
 	}
 
-        error = xfs_dir_lookup_int(NULL, dir_vp, DLF_IGET, name, NULL,
-				   &e_inum, &cdp, &fastdata);
-	if (error) {
-		goto error_return;
-	}
-
-	ITRACE(cdp);
-	xfs_ilock(cdp, XFS_ILOCK_EXCL);
-	xfs_trans_ijoin(tp, cdp, XFS_ILOCK_EXCL);
-
 	if (error = xfs_stickytest(dp, cdp, credp)) {
                 goto error_return;
 	}
-
 
 	if ((cdp == dp) || (cdp == XFS_VTOI(current_dir_vp))) {
 		error = XFS_ERROR(EINVAL);
@@ -4134,7 +4459,7 @@ xfs_rmdir(
 
 	xfs_ichgtime(dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
-	dnlc_remove_fast(dir_vp, &fastdata);
+	dnlc_remove(dir_vp, name);
 
 	/*
 	 * Drop the link from cdp's "..".
@@ -4165,7 +4490,7 @@ xfs_rmdir(
 	 * does not go to xfs_inactive() from within the commit.
 	 */
 	IHOLD(cdp);
-
+	
 	/*
 	 * If this is a synchronous mount, make sure that the
 	 * rmdir transaction goes to disk before returning to
@@ -4290,7 +4615,6 @@ xfs_symlink(
 	boolean_t		dp_joined_to_trans = B_FALSE;
 	uint			cancel_flags;
 	int			committed;
-	struct ncfastdata	fastdata;
 
 	vn_trace_entry(dir_vp, "xfs_symlink");
 	/*
@@ -4355,8 +4679,15 @@ xfs_symlink(
                 goto error_return;
 	}
 
-        error = xfs_dir_lookup_int(NULL, dir_vp, 0, link_name, NULL,
-				   &e_inum, NULL, &fastdata);
+	/*
+	 * Since we've already started a transaction, we cannot allow
+	 * the lookup to do a vn_get().  Thus, stay out of the dnlc
+	 * in doing the lookup.  Doing a vn_get could cause us to deadlock
+	 * if the inode we are doing the get for is in inactive waiting
+	 * for a log reservation.
+	 */
+        error = xfs_dir_lookup_int(NULL, dir_vp, DLF_NODNLC, link_name,
+				   NULL, &e_inum, NULL, NULL);
 	if (error != ENOENT) {
 		if (!error) {
 			error = XFS_ERROR(EEXIST);
@@ -4459,7 +4790,7 @@ xfs_symlink(
 	}
 	xfs_ichgtime(dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
-        dnlc_enter_fast(dir_vp, &fastdata, XFS_ITOV(ip), NOCRED);
+        dnlc_enter(dir_vp, link_name, XFS_ITOV(ip), NOCRED);
 
 	/*
 	 * If this is a synchronous mount, make sure that the
@@ -4476,7 +4807,7 @@ xfs_symlink(
 	}
 	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
 	if (error) {
-		dnlc_remove_fast(dir_vp, &fastdata);
+		dnlc_remove(dir_vp, link_name);
 		return error;
 	}
 
@@ -4487,7 +4818,7 @@ xfs_symlink(
 	return 0;
 
  error2:
-	dnlc_remove_fast(dir_vp, &fastdata);
+	dnlc_remove(dir_vp, link_name);
  error1:
 	xfs_bmap_cancel(&free_list);
 	cancel_flags |= XFS_TRANS_ABORT;
@@ -4877,7 +5208,7 @@ xfs_allocstore(
 			  orig_imap, &orig_nimaps, NULL);
 	if (error) {
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
-		return XFS_ERROR(error);
+		return error;
 	}
 	ASSERT(orig_nimaps > 0);
 
