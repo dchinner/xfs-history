@@ -327,7 +327,6 @@ int linvfs_rmdir(struct inode *dir, struct dentry *dentry)
 	error = 0;
 	VOP_RMDIR(dvp, (char *)dentry->d_name.name, pwd_vp, &cred, error);
 	if (!error) {
-		ASSERT(dir->i_nlink == 2);
 		dir->i_nlink = 0;
 		dir->i_size = 0;
 		dir->i_version = ++event;
