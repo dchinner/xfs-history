@@ -910,8 +910,10 @@ static struct super_operations linvfs_sops = {
 	statfs:			linvfs_statfs,
 	remount_fs:		linvfs_remount,
 
+#if 0
 	fh_to_dentry:		linvfs_fh_to_dentry,
 	dentry_to_fh:		linvfs_dentry_to_fh,
+#endif
 };
 
 DECLARE_FSTYPE_DEV(xfs_fs_type, XFS_NAME, linvfs_read_super);
