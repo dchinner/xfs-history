@@ -15,7 +15,7 @@ struct xfs_gap;
 typedef struct xfs_ihash {
 	struct xfs_inode	*ih_next;	
 	sema_t			ih_lock;
-	ulong			ih_version;
+	uint			ih_version;
 } xfs_ihash_t;
 
 #ifdef NOTYET
@@ -102,9 +102,9 @@ typedef struct xfs_inode {
 	unsigned short		i_flags;	/* see defined flags below */
 	unsigned long		i_vcode;	/* version code token (RFS) */
 	unsigned long		i_mapcnt;	/* count of mapped pages */
-	unsigned long		i_update_core;	/* timestamps are dirty */
-	unsigned long		i_gen;		/* generation count */
-	unsigned long		i_delayed_blks;	/* count of delay alloc blks */
+	unsigned int		i_update_core;	/* timestamps are dirty */
+	unsigned int		i_gen;		/* generation count */
+	unsigned int		i_delayed_blks;	/* count of delay alloc blks */
 	int			i_queued_bufs;	/* count of xfsd queued bufs*/
 
 	/* File incore extent information. */
@@ -240,7 +240,7 @@ typedef __uint32_t	xfs_fid_ino_t;
 typedef struct xfs_fid {
 	u_short		fid_len;       /* length of remainder */
         u_short		fid_pad;       /* padding, must be zero */
-	u_long		fid_gen;       /* generation number */
+	__uint32_t		fid_gen;       /* generation number */
         xfs_fid_ino_t	fid_ino;       /* inode number */
 } xfs_fid_t;
 
