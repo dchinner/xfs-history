@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DA_BTREE_H
 #define	_FS_XFS_DA_BTREE_H
 
-#ident	"$Revision: 1.29 $"
+#ident	"$Revision: 1.30 $"
 
 /*
  * xfs_da_btree.h
@@ -176,6 +176,7 @@ typedef struct xfs_da_args {
 	int		index2;		/* index of 2nd attr in blk */
 	xfs_dablk_t	rmtblkno2;	/* remote attr value starting blkno */
 	int		rmtblkcnt2;	/* remote attr value block count */
+	int		justcheck;	/* check for ok with no space */
 } xfs_da_args_t;
 
 /*
