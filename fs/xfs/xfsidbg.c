@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.17 $"
+#ident	"$Revision: 1.18 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3001,8 +3001,35 @@ idbg_xtp(xfs_trans_t *tp)
 		0
 		};
 
-	qprintf("tp 0x%x type 0x%x mount 0x%x\n",
-		tp, tp->t_type, tp->t_mountp);
+	qprintf("tp 0x%x type ", tp);
+	switch (tp->t_type) {
+	case XFS_TRANS_SETATTR_NOT_SIZE: qprintf("SETATTR_NOT_SIZE");	break;
+	case XFS_TRANS_SETATTR_SIZE:	qprintf("SETATTR_SIZE");	break;
+	case XFS_TRANS_INACTIVE:	qprintf("INACTIVE");		break;
+	case XFS_TRANS_CREATE:		qprintf("CREATE");		break;
+	case XFS_TRANS_CREATE_TRUNC:	qprintf("CREATE_TRUNC");	break;
+	case XFS_TRANS_TRUNCATE_FILE:	qprintf("TRUNCATE_FILE");	break;
+	case XFS_TRANS_REMOVE:		qprintf("REMOVE");		break;
+	case XFS_TRANS_LINK:		qprintf("LINK");		break;
+	case XFS_TRANS_RENAME:		qprintf("RENAME");		break;
+	case XFS_TRANS_MKDIR:		qprintf("MKDIR");		break;
+	case XFS_TRANS_RMDIR:		qprintf("RMDIR");		break;
+	case XFS_TRANS_SYMLINK:		qprintf("SYMLINK");		break;
+	case XFS_TRANS_SET_DMATTRS:	qprintf("SET_DMATTRS");		break;
+	case XFS_TRANS_GROWFS:		qprintf("GROWFS");		break;
+	case XFS_TRANS_STRAT_WRITE:	qprintf("STRAT_WRITE");		break;
+	case XFS_TRANS_DIOSTRAT:	qprintf("DIOSTRAT");		break;
+	case XFS_TRANS_WRITE_SYNC:	qprintf("WRITE_SYNC");		break;
+	case XFS_TRANS_WRITEID:		qprintf("WRITEID");		break;
+	case XFS_TRANS_ADDAFORK:	qprintf("ADDAFORK");		break;
+	case XFS_TRANS_AINVAL:		qprintf("AINVAL");		break;
+	case XFS_ATRUNCATE:		qprintf("ATRUNCATE");		break;
+	case XFS_TRANS_ATTR_SET:	qprintf("ATTR_SET");		break;
+	case XFS_TRANS_ATTR_RM:		qprintf("ATTR_RM");		break;
+	case XFS_TRANS_ATTR_FLAG:	qprintf("ATTR_FLAG");		break;
+	default:			qprintf("0x%x", tp->t_type);	break;
+	}
+	qprintf(" mount 0x%x\n", tp->t_mountp);
 	qprintf("flags ");
 	printflags(tp->t_flags, xtp_flags,"xtp");
 	qprintf("\n");
