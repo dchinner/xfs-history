@@ -677,8 +677,8 @@ xfs_write(
 	isize = xip->i_d.di_size;
 
 	dprintk(xfsw_debug,
-	     ("xfsw: ip 0x%p(is 0x%Lx) offset 0x%Lx size 0x%x\n",
-		ip, ip->i_size, *offsetp, size));
+	     ("xfsw(%d): ip 0x%p(is 0x%Lx) offset 0x%Lx size 0x%x\n",
+		current->pid, ip, ip->i_size, *offsetp, size));
 
 	/*
 	 * On Linux, generic_file_write updates the times even if
