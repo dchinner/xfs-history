@@ -647,6 +647,16 @@ xlog_assign_tail_lsn(xfs_mount_t *mp, xlog_in_core_t *iclog)
 }	/* xlog_assign_tail_lsn */
 
 
+/*
+ * Return the space in the log between the tail and the head.  The head
+ * is passed in the cycle/bytes formal parms.  In the special case where
+ * the reserve head has wrapped passed the tail, this calculation is no
+ * longer valid.  In this case, just return 0 which means there is no space
+ * in the log.  This works for all places where this function is called
+ * with the reserve head.  Of course, if the write head were to ever
+ * wrap the tail, we should blow up.  Rather than catch this case here,
+ * we depend on other ASSERTions in other parts of the code.   XXXmiken
+ */
 int
 xlog_space_left(xlog_t *log, int cycle, int bytes)
 {
@@ -656,6 +666,8 @@ xlog_space_left(xlog_t *log, int cycle, int bytes)
 		free_bytes =
 			log->l_logsize -
 			(bytes - BBTOB(BLOCK_LSN(log->l_tail_lsn)));
+	} else if (CYCLE_LSN(log->l_tail_lsn)+1 < cycle) {
+		return 0;
 	} else {
 		free_bytes =
 			BBTOB(BLOCK_LSN(log->l_tail_lsn)) - bytes;
@@ -1574,6 +1586,7 @@ xlog_grant_log_space(xlog_t	   *log,
 	int		 free_bytes;
 	int		 need_bytes;
 	int		 spl;
+	xfs_lsn_t	 tail_lsn;
 	
 
 #ifdef DEBUG
@@ -1621,9 +1634,16 @@ redo:
 	XLOG_GRANT_ADD_SPACE(log, need_bytes, 'w');
 	XLOG_GRANT_ADD_SPACE(log, need_bytes, 'r');
 #ifdef DEBUG
-	if (CYCLE_LSN(log->l_tail_lsn) != log->l_grant_write_cycle) {
-		ASSERT(log->l_grant_write_cycle-1 == CYCLE_LSN(log->l_tail_lsn));
-		ASSERT(log->l_grant_write_bytes < BBTOB(BLOCK_LSN(log->l_tail_lsn)));
+	tail_lsn = log->l_tail_lsn;
+	/*
+	 * Check to make sure the grant write head didn't just over lap the
+	 * tail.  If the cycles are the same, we can't be overlapping.
+	 * Otherwise, make sure that the cycles differ by exactly one and
+	 * check the byte count.
+	 */
+	if (CYCLE_LSN(tail_lsn) != log->l_grant_write_cycle) {
+		ASSERT(log->l_grant_write_cycle-1 == CYCLE_LSN(tail_lsn));
+		ASSERT(log->l_grant_write_bytes <= BBTOB(BLOCK_LSN(tail_lsn)));
 	}
 #endif
 	xlog_trace_loggrant(log, tic, "xlog_grant_log_space: exit");
@@ -1645,6 +1665,7 @@ xlog_regrant_write_log_space(xlog_t	   *log,
 	xlog_ticket_t	*head;
 	int		spl;
 	int		free_bytes, need_bytes;
+	xfs_lsn_t	tail_lsn;
 
 	tic->t_curr_res = tic->t_unit_res;
 
@@ -1677,9 +1698,10 @@ redo:
 
 	XLOG_GRANT_ADD_SPACE(log, need_bytes, 'w'); /* we've got enough space */
 #ifdef DEBUG
-	if (CYCLE_LSN(log->l_tail_lsn) != log->l_grant_write_cycle) {
-		ASSERT(log->l_grant_write_cycle-1 == CYCLE_LSN(log->l_tail_lsn));
-		ASSERT(log->l_grant_write_bytes < BBTOB(BLOCK_LSN(log->l_tail_lsn)));
+	tail_lsn = log->l_tail_lsn;
+	if (CYCLE_LSN(tail_lsn) != log->l_grant_write_cycle) {
+		ASSERT(log->l_grant_write_cycle-1 == CYCLE_LSN(tail_lsn));
+		ASSERT(log->l_grant_write_bytes <= BBTOB(BLOCK_LSN(tail_lsn)));
 	}
 #endif
 
