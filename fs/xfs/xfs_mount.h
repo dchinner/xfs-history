@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.20 $"
+#ident	"$Revision: 1.21 $"
 
 struct xfs_ihash;
 
@@ -69,13 +69,16 @@ typedef struct xfs_mod_sb {
 #define	AIL_TRYLOCK(mp)		(_trylock((mp)->m_ail_lock, splhi))
 #define	AIL_UNLOCK(mp,s)	(spunlockspl((mp)->m_ail_lock, s))
 
+
+#ifdef SIM
+xfs_mount_t	*xfs_mount(dev_t, dev_t, dev_t);
+void		xfs_umount(xfs_mount_t *);
+#endif
+
 void		xfs_mod_sb(xfs_trans_t *, int);
 xfs_mount_t	*xfs_mount_init(void);
 int		xfs_mountfs(struct vfs *, dev_t);
-#ifdef SIM
-xfs_mount_t	*xfs_mount(dev_t, dev_t, dev_t);
-#endif
-void		xfs_umount(xfs_mount_t *);
+int		xfs_unmountfs(xfs_mount_t *);
 int		xfs_mod_incore_sb(xfs_mount_t *, uint, int);
 int		xfs_mod_incore_sb_batch(xfs_mount_t *, xfs_mod_sb_t *, uint);
 buf_t		*xfs_getsb(xfs_mount_t *);
