@@ -599,6 +599,10 @@ extern int pagebuf_write_full_page(	/* write a page via pagebuf	*/
 		struct page *,		/* page to write		*/
 		pagebuf_bmap_fn_t);	/* bmap function		*/
 
+extern void pagebuf_release_page(	/* Attempt to convert a delalloc page */
+		struct page *,		/* page to write		*/
+		pagebuf_bmap_fn_t);	/* bmap function		*/
+
 extern int pagebuf_commit_write(
 		struct file *,		/* file to write		*/
 		struct page *,		/* page to write		*/
