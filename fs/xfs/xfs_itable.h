@@ -33,6 +33,14 @@ typedef struct xfs_bstat
 } xfs_bstat_t;
 
 /*
+ * Flags for the bs_xflags field
+ * There should be a one-to-one correspondence between these flags and the
+ * XFS_DIFLAG_s.
+ */
+#define XFS_XFLAG_REALTIME	0x1
+#define XFS_XFLAG_ALL		( XFS_XFLAG_REALTIME )
+
+/*
  * Structures returned from xfs_inumbers syssgi routine.
  */
 typedef struct xfs_inogrp
@@ -68,12 +76,5 @@ xfs_itable(
 	caddr_t		ubuffer,	/* buffer with inode descriptions */
 	caddr_t		ocount);	/* output count */
 #endif	/* _KERNEL */
-
-/*
- * Values for di_flags
- */
-#define XFS_DIFLAG_REALTIME     0x1     /* file's blocks come from rt area */
-#define XFS_DIFLAG_ALL  (XFS_DIFLAG_REALTIME)
-
 
 #endif	/* !_FS_XFS_ITABLE_H */
