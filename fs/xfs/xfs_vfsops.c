@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.103 $"
+#ident  "$Revision: 1.104 $"
 
 #include <strings.h>
 #include <limits.h>
@@ -746,6 +746,7 @@ xfs_mountroot(
 	xfs_mount_t	*mp;
 	buf_t		*bp;
 	extern dev_t	rootdev;		/* from sys/systm.h */
+	struct bdevsw	*my_bdevsw;
 
 
 	/*
@@ -832,7 +833,9 @@ xfs_mountroot(
 			if (bp->b_pincount == 0) {
 				bp->b_flags &= ~(B_DONE | B_READ);
 				bp->b_flags |= B_WRITE;
-				bdstrat(bmajor(mp->m_dev), bp);
+				my_bdevsw = get_bdevsw(mp->m_dev);
+				ASSERT(my_bdevsw != NULL);
+				bdstrat(my_bdevsw, bp);
 				(void) iowait(bp);
 			}
 			return EBUSY;

@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.71 $"
+#ident	"$Revision: 1.72 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -103,6 +103,8 @@ xlog_bread(xlog_t	*log,
 	   int		nbblks,
 	   buf_t	*bp)
 {
+	struct bdevsw *my_bdevsw;
+
 	ASSERT(nbblks > 0);
 	ASSERT(BBTOB(nbblks) <= bp->b_bufsize);
 
@@ -114,7 +116,9 @@ xlog_bread(xlog_t	*log,
 #ifndef SIM
 	bp_dcache_wbinval(bp);
 #endif
-	bdstrat(bmajor(bp->b_edev), bp);
+	my_bdevsw = get_bdevsw(bp->b_edev);
+	ASSERT(my_bdevsw != NULL);
+	bdstrat(my_bdevsw, bp);
 	iowait(bp);
 
 	if (bp->b_flags & B_ERROR) {
@@ -2903,6 +2907,7 @@ xlog_do_recover(xlog_t	*log,
 	buf_t		*bp;
 	xfs_sb_t	*sbp;
 	int		error;
+	struct bdevsw	*my_bdevsw;
 
 	/*
 	 * First replay the images in the log.
@@ -2936,7 +2941,9 @@ xlog_do_recover(xlog_t	*log,
 #ifndef SIM
 	bp_dcache_wbinval(bp);
 #endif
-	bdstrat(bmajor(bp->b_edev), bp);
+	my_bdevsw = get_bdevsw(bp->b_edev);
+	ASSERT(my_bdevsw != NULL);
+	bdstrat(my_bdevsw, bp);
 	if (error = iowait(bp)) {
 		ASSERT(0);
 		brelse(bp);

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.143 $"
+#ident "$Revision: 1.144 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -3010,6 +3010,7 @@ xfs_strat_read(
 	int		error;
 #define	XFS_STRAT_READ_IMAPS	XFS_BMAP_MAX_NMAP
 	xfs_bmbt_irec_t	imap[XFS_STRAT_READ_IMAPS];
+	struct bdevsw	*my_bdevsw;
 	
 	ASSERT(bp->b_blkno == -1);
 	ip = XFS_VTOI(vp);
@@ -3203,7 +3204,9 @@ xfs_strat_read(
 				rbp->b_flags &= ~B_ASYNC;
 
 				xfs_check_rbp(ip, bp, rbp, 1);
-				bdstrat(bmajor(rbp->b_edev), rbp);
+				my_bdevsw = get_bdevsw(rbp->b_edev);
+				ASSERT(my_bdevsw != NULL);
+				bdstrat(my_bdevsw, rbp);
 				iowait(rbp);
 
 				if (rbp->b_flags & B_ERROR) {
@@ -3695,6 +3698,7 @@ xfs_strat_write(
 	int		committed;
 	xfs_bmbt_irec_t	imap[XFS_BMAP_MAX_NMAP];
 #define	XFS_STRAT_WRITE_IMAPS	2
+	struct bdevsw	*my_bdevsw;
 	/*
 	 * If XFS_STRAT_WRITE_IMAPS is changed then the definition
 	 * of XFS_STRATW_LOG_RES in xfs_trans.h must be changed to
@@ -3818,7 +3822,9 @@ xfs_strat_write(
 			xfs_strat_write_bp_trace(XFS_STRAT_FAST,
 						 ip, bp);
 			xfs_check_bp(ip, bp);
-			bdstrat(bmajor(bp->b_edev), bp);
+			my_bdevsw = get_bdevsw(bp->b_edev);
+			ASSERT(my_bdevsw != NULL);
+			bdstrat(my_bdevsw, bp);
 			/*
 			 * Drop the count of queued buffers.
 			 */
@@ -3923,7 +3929,9 @@ xfs_strat_write(
 			rbp->b_relse = xfs_strat_write_relse;
 			rbp->b_flags |= B_ASYNC;
 
-			bdstrat(bmajor(rbp->b_edev), rbp);
+			my_bdevsw = get_bdevsw(rbp->b_edev);
+			ASSERT(my_bdevsw != NULL);
+			bdstrat(my_bdevsw, rbp);
 
 			map_start_fsb +=
 				imapp->br_blockcount;
@@ -4000,6 +4008,7 @@ xfs_strategy(
 	buf_t	*bp)
 {
 	int		s;
+	struct bdevsw	*my_bdevsw;
 
 	/*
 	 * If this is just a buffer whose underlying disk space
@@ -4007,7 +4016,9 @@ xfs_strategy(
 	 */
 	if (bp->b_blkno >= 0) {
 		xfs_check_bp(XFS_VTOI(vp), bp);
-		bdstrat(bmajor(bp->b_edev), bp);
+		my_bdevsw = get_bdevsw(bp->b_edev);
+		ASSERT(my_bdevsw != NULL);
+		bdstrat(my_bdevsw, bp);
 		return;
 	}
 
@@ -4205,6 +4216,7 @@ xfs_diostrat( buf_t *bp)
 	int		committed;
 	uint		lock_mode;
 	xfs_fsize_t	new_size;
+	struct bdevsw	*my_bdevsw;
 
 	CHECK_GRIO_TIMESTAMP( bp, 40 );
 
@@ -4526,7 +4538,9 @@ xfs_diostrat( buf_t *bp)
  				 * Issue I/O request.
 				 */
 				CHECK_GRIO_TIMESTAMP( nbp, 40 );
-				bdstrat( bmajor(nbp->b_edev), nbp );
+				my_bdevsw = get_bdevsw(nbp->b_edev);
+				ASSERT(my_bdevsw != NULL);
+				bdstrat(my_bdevsw, nbp);
 	
 		    		if (error = geterror(nbp)) {
 					iowait( nbp );

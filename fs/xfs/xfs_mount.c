@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.105 $"
+#ident	"$Revision: 1.106 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -151,6 +151,7 @@ do_xfs_mountfs(vfs_t *vfsp, dev_t dev, int read_rootinos)
 	vmap_t		vmap;
 	__uint64_t	ret64;
 	daddr_t		d;
+	struct bdevsw	*my_bdevsw;
 
 	if (vfsp->vfs_flag & VFS_REMOUNT)   /* Can't remount XFS filesystems */
 		return 0;
@@ -175,7 +176,9 @@ do_xfs_mountfs(vfs_t *vfsp, dev_t dev, int read_rootinos)
 	bp->b_relse = xfs_sb_relse;
 	bp->b_blkno = XFS_SB_DADDR;		
 	bp->b_flags |= B_READ;
-	bdstrat(bmajor(dev), bp);
+	my_bdevsw = get_bdevsw(dev);
+	ASSERT(my_bdevsw != NULL);
+	bdstrat(my_bdevsw, bp);
 	if (error = iowait(bp)) {
 		ASSERT(error == 0);
 		goto error0;
@@ -599,8 +602,9 @@ xfs_mount_partial(dev_t dev, dev_t logdev, dev_t rtdev)
 int
 xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 {
-	buf_t	*bp;
-	int	error;
+	buf_t		*bp;
+	int		error;
+	struct bdevsw	*my_bdevsw;
 
 	xfs_iflush_all(mp, 0);
 	/*
@@ -616,7 +620,9 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	bp->b_flags &= ~(B_DONE | B_READ);
 	bp->b_flags |= B_WRITE;
 	bwait_unpin(bp);
-	bdstrat(bmajor(mp->m_dev), bp);
+	my_bdevsw = get_bdevsw(mp->m_dev);
+	ASSERT(my_bdevsw != NULL);
+	bdstrat(my_bdevsw, bp);
 	error = iowait(bp);
 	ASSERT(error == 0);
 	

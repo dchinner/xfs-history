@@ -1,4 +1,4 @@
-#ident "$Revision: 1.34 $"
+#ident "$Revision: 1.35 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -273,6 +273,7 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 	buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
 	int			error;
+	struct bdevsw		*my_bdevsw;
 
 	/*
 	 * Default to a normal get_buf() call if the tp is NULL.
@@ -328,7 +329,9 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 
 			ASSERT(!(bp->b_flags & B_ASYNC));
 			bp->b_flags |= B_READ;
-			bdstrat(bmajor(dev), bp);
+			my_bdevsw = get_bdevsw(dev);
+			ASSERT(my_bdevsw != NULL);
+			bdstrat(my_bdevsw, bp);
 
 #ifndef SIM
 			u.u_ior++;
