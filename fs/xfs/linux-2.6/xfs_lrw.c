@@ -349,11 +349,11 @@ xfs_read(
 	xfs_rw_enter_trace(XFS_READ_ENTER, &ip->i_iocore,
 				(void *)iovp, segs, *offset, ioflags);
 	ret = __generic_file_aio_read(iocb, iovp, segs, offset);
-	if (!(ioflags & IO_ISLOCKED))
-		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
-
 	if (ret > 0)
 		XFS_STATS_ADD(xs_read_bytes, ret);
+
+	if (!(ioflags & IO_ISLOCKED))
+		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
 	if (likely(!(ioflags & IO_INVIS)))
 		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
@@ -413,10 +413,12 @@ xfs_sendfile(
 	xfs_rw_enter_trace(XFS_SENDFILE_ENTER, &ip->i_iocore,
 			   (void*)(unsigned long)target, count, *offset, ioflags);
 	ret = generic_file_sendfile(filp, offset, count, actor, target);
+	if (ret > 0)
+		XFS_STATS_ADD(xs_read_bytes, ret);
+
 	if (!(ioflags & IO_ISLOCKED))
 		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
-	XFS_STATS_ADD(xs_read_bytes, ret);
 	xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
 	return ret;
 }
