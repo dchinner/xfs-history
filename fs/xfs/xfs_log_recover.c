@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.7 $"
+#ident	"$Revision: 1.8 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -374,9 +374,12 @@ xlog_find_tail(xlog_t  *log,
 	log->l_prev_block = i;
 	log->l_curr_block = *head_blk;
 	log->l_curr_cycle = rhead->h_cycle;
-	ASSIGN_LSN(log->l_reshead_lsn, log);
 	log->l_tail_lsn = rhead->h_tail_lsn;
 	log->l_last_sync_lsn = log->l_tail_lsn;
+	log->l_grant_reserve_cycle = log->l_curr_cycle;
+	log->l_grant_reserve_bytes = BBTOB(log->l_curr_block);
+	log->l_grant_write_cycle = log->l_curr_cycle;
+	log->l_grant_write_bytes = BBTOB(log->l_curr_block);
 	if (*head_blk == i+2 && rhead->h_num_logops == 1) {
 		xlog_bread(log, i+1, 1, bp);
 		op_head = (xlog_op_header_t *)bp->b_dmaaddr;
@@ -384,12 +387,6 @@ xlog_find_tail(xlog_t  *log,
 			log->l_tail_lsn =
 			     ((long long)log->l_curr_cycle << 32)|((uint)(i+2));
 		}
-	}
-	if (BLOCK_LSN(log->l_tail_lsn) <= *head_blk) {
-		log->l_logreserved =BBTOB(*head_blk-BLOCK_LSN(log->l_tail_lsn));
-	} else {
-		log->l_logreserved =
-		   log->l_logsize - BBTOB(BLOCK_LSN(log->l_tail_lsn)-*head_blk);
 	}
 exit:
 	xlog_put_bp(bp);
@@ -782,7 +779,7 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 		bit += nbits;
 	}
 	bp->b_flags = (B_BUSY | B_HOLD);	/* synchronous */
-	bwrite(bp);
+	bdwrite(bp);
 	if (bp->b_flags & B_ERROR)
 		xlog_panic("xlog_recover_do_buffer_trans: bwrite error");
 	/* Shouldn't be any more regions */
@@ -790,7 +787,6 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 		ASSERT(item->ri_buf[i].i_addr == 0);
 		ASSERT(item->ri_buf[i].i_len == 0);
 	}
-	brelse(bp);
 }	/* xlog_recover_do_buffer_trans */
 
 static void
@@ -845,10 +841,9 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	}
 write_inode_buffer:
 	bp->b_flags = (B_BUSY | B_HOLD);	/* synchronous */
-	bwrite(bp);
+	bdwrite(bp);
 	if (bp->b_flags & B_ERROR)
 		xlog_panic("xlog_recover_do_inode_trans: bwrite error");
-	brelse(bp);
 }	/* xlog_recover_do_inode_trans */
 
 static void
@@ -1027,40 +1022,78 @@ xlog_do_recover(xlog_t	*log,
 		daddr_t head_blk,
 		daddr_t tail_blk)
 {
-	xlog_rec_header_t *rhead;
-	daddr_t		  blk_no;
-	buf_t		  *hbp, *dbp;
-	int		  bblks;
-	xlog_recover_t	  *rhash[XLOG_RHASH_SIZE];
-#ifdef DEBUG
-	int		  stop_block = 3000;
-#endif
+    xlog_rec_header_t	*rhead;
+    daddr_t		blk_no;
+    caddr_t		bufaddr;
+    buf_t		*hbp, *dbp;
+    int		  	bblks, split_bblks;
+    xlog_recover_t	*rhash[XLOG_RHASH_SIZE];
 
-	hbp = xlog_get_bp(1);
-	dbp = xlog_get_bp(BTOBB(XLOG_RECORD_BSIZE));
-	bzero(rhash, sizeof(rhash));
-	if (tail_blk <= head_blk) {
-		for (blk_no = tail_blk; blk_no < head_blk; ) {
-#ifdef DEBUG
-			if (stop_block == blk_no)
-				stop_block--;
-#endif
-			xlog_bread(log, blk_no, 1, hbp);
-			rhead = (xlog_rec_header_t *)hbp->b_dmaaddr;
-			ASSERT(rhead->h_magicno == XLOG_HEADER_MAGIC_NUM);
-			bblks = BTOBB(rhead->h_len);
-			if (bblks > 0) {
-				xlog_bread(log, blk_no+1, bblks, dbp);
-				xlog_unpack_data(rhead, dbp->b_dmaaddr);
-				xlog_recover_process_data(log, rhash, rhead,
-							  dbp->b_dmaaddr);
-			}
-			blk_no += (bblks+1);
-		}
-	} else {
-		xlog_warning("no recovery");
+    hbp = xlog_get_bp(1);
+    dbp = xlog_get_bp(BTOBB(XLOG_RECORD_BSIZE));
+    bzero(rhash, sizeof(rhash));
+    if (tail_blk <= head_blk) {
+	for (blk_no = tail_blk; blk_no < head_blk; ) {
+	    xlog_bread(log, blk_no, 1, hbp);
+	    rhead = (xlog_rec_header_t *)hbp->b_dmaaddr;
+	    ASSERT(rhead->h_magicno == XLOG_HEADER_MAGIC_NUM);
+	    bblks = BTOBB(rhead->h_len);
+	    if (bblks > 0) {
+		xlog_bread(log, blk_no+1, bblks, dbp);
+		xlog_unpack_data(rhead, dbp->b_dmaaddr);
+		xlog_recover_process_data(log, rhash, rhead, dbp->b_dmaaddr);
+	    }
+	    blk_no += (bblks+1);
 	}
-}	/* xlog_do_recover */
+    } else {
+	/* read last part of log */
+	blk_no = tail_blk;
+	while (blk_no < log->l_logBBsize) {
+	    xlog_bread(log, blk_no, 1, hbp);
+	    rhead = (xlog_rec_header_t *)hbp->b_dmaaddr;
+	    ASSERT(rhead->h_magicno == XLOG_HEADER_MAGIC_NUM);
+	    bblks = BTOBB(rhead->h_len);
+	    ASSERT(bblks >= 0);
+	    if (bblks > 0) {
+		if (blk_no+bblks < log->l_logBBsize) {
+		    xlog_bread(log, blk_no+1, bblks, dbp);
+		} else {
+		    split_bblks = log->l_logBBsize - (blk_no+bblks);
+		    xlog_bread(log, blk_no+1, split_bblks, dbp);
+		    bufaddr = dbp->b_dmaaddr;
+		    dbp->b_dmaaddr += BBTOB(split_bblks);
+		    xlog_bread(log, blk_no + 1 + split_bblks,
+			       bblks - split_bblks, dbp);
+		    dbp->b_dmaaddr = bufaddr;
+		}
+		xlog_unpack_data(rhead, dbp->b_dmaaddr);
+		xlog_recover_process_data(log, rhash, rhead, dbp->b_dmaaddr);
+		blk_no += (bblks+1);
+	    }
+	}
+
+	ASSERT(blk_no >= log->l_logBBsize);
+	blk_no -= log->l_logBBsize;
+
+	/* read first part of physical log */
+	while (blk_no < head_blk) {
+	    xlog_bread(log, blk_no, 1, hbp);
+	    rhead = (xlog_rec_header_t *)hbp->b_dmaaddr;
+	    ASSERT(rhead->h_magicno == XLOG_HEADER_MAGIC_NUM);
+	    bblks = BTOBB(rhead->h_len);
+	    ASSERT(bblks >= 0);
+	    if (bblks > 0) {
+		xlog_bread(log, blk_no+1, bblks, dbp);
+		xlog_unpack_data(rhead, dbp->b_dmaaddr);
+		xlog_recover_process_data(log, rhash, rhead, dbp->b_dmaaddr);
+		blk_no += (bblks+1);
+	    }
+        }
+	xlog_put_bp(dbp);
+	xlog_put_bp(hbp);
+    }
+    bflush(log->l_dev);
+} /* xlog_do_recover */
 
 
 /*
