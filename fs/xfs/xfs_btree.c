@@ -1,8 +1,9 @@
-#ident	"$Revision: 1.4 $"
+#ident	"$Revision: 1.5 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
+#include <sys/uuid.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs.h"
@@ -29,7 +30,7 @@
 #define	ASSERT(x)	assert(x)
 #endif
 
-xfs_btree_cur_t *xfs_btree_curfreelist;
+STATIC xfs_btree_cur_t *xfs_btree_curfreelist;
 
 __uint32_t xfs_magics[XFS_BTNUM_MAX] =
 {
@@ -45,6 +46,8 @@ xfs_btree_bread(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno, xfs_agblo
 	daddr_t d;
 	xfs_sb_t *sbp;
 
+	ASSERT(agno != NULLAGNUMBER);
+	ASSERT(agbno != NULLAGBLOCK);
 	sbp = &mp->m_sb;
 	d = xfs_agb_to_daddr(sbp, agno, agbno);
 	return xfs_trans_bread(tp, mp->m_dev, d, mp->m_bsize);
@@ -259,6 +262,55 @@ xfs_btree_lastrec(xfs_btree_cur_t *cur, int level)
 	return 1;
 }
 
+void
+xfs_btree_log_ag(xfs_trans_t *tp, buf_t *buf, int fields)
+{
+	int first;
+	int last;
+	static const int offsets[] = {
+		offsetof(xfs_aghdr_t, ag_magic),
+		offsetof(xfs_aghdr_t, ag_version),
+		offsetof(xfs_aghdr_t, ag_seqno),
+		offsetof(xfs_aghdr_t, ag_length),
+		offsetof(xfs_aghdr_t, ag_roots[0]),
+		offsetof(xfs_aghdr_t, ag_freelist),
+		offsetof(xfs_aghdr_t, ag_levels[0]),
+		offsetof(xfs_aghdr_t, ag_flist_count),
+		offsetof(xfs_aghdr_t, ag_freeblks),
+		offsetof(xfs_aghdr_t, ag_longest),
+		offsetof(xfs_aghdr_t, ag_iroot),
+		offsetof(xfs_aghdr_t, ag_icount),
+		offsetof(xfs_aghdr_t, ag_ilevels),
+		offsetof(xfs_aghdr_t, ag_iflist),
+		offsetof(xfs_aghdr_t, ag_ifcount),
+		sizeof(xfs_aghdr_t)
+	};
+
+	xfs_btree_offsets(fields, offsets, XFS_AG_NUM_BITS, &first, &last);
+	xfs_trans_log_buf(tp, buf, first, last);
+}
+
+/*
+ * Log btree blocks (headers)
+ */
+void
+xfs_btree_log_block(xfs_trans_t *tp, buf_t *buf, int fields)
+{
+	int first;
+	int last;
+	static const int offsets[] = {
+		offsetof(xfs_btree_block_t, bb_magic),
+		offsetof(xfs_btree_block_t, bb_level),
+		offsetof(xfs_btree_block_t, bb_numrecs),
+		offsetof(xfs_btree_block_t, bb_leftsib),
+		offsetof(xfs_btree_block_t, bb_rightsib),
+		sizeof(xfs_btree_block_t)
+	};
+
+	xfs_btree_offsets(fields, offsets, XFS_BB_NUM_BITS, &first, &last);
+	xfs_trans_log_buf(tp, buf, first, last);
+}
+
 /*
  * Return maxrecs for the block.
  */
@@ -280,6 +332,30 @@ xfs_btree_maxrecs(xfs_btree_cur_t *cur, xfs_btree_block_t *block)
 		break;
 	}
 	return maxrecs;
+}
+
+/*
+ * Compute byte offsets for the fields given.
+ */
+void
+xfs_btree_offsets(int fields, const int *offsets, int nbits, int *first, int *last)
+{
+	int i;
+	int imask;
+
+	ASSERT(fields != 0);
+	for (i = 0, imask = 1; ; i++, imask <<= 1) {
+		if (imask & fields) {
+			*first = offsets[i];
+			break;
+		}
+	}
+	for (i = nbits - 1, imask = 1 << i; ; i--, imask >>= 1) {
+		if (imask & fields) {
+			*last = offsets[i + 1] - 1;
+			break;
+		}
+	}
 }
 
 void

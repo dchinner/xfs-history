@@ -10,6 +10,17 @@ typedef struct xfs_btree_block
 	xfs_agblock_t	bb_rightsib;	/* right sibling block or NULLAGBLOCK */
 } xfs_btree_block_t;
 
+/*
+ * For logging record fields.
+ */
+#define	XFS_BB_MAGIC		0x1
+#define	XFS_BB_LEVEL		0x2
+#define	XFS_BB_NUMRECS		0x4
+#define	XFS_BB_LEFTSIB		0x8
+#define	XFS_BB_RIGHTSIB		0x10
+#define	XFS_BB_NUM_BITS		5
+#define	XFS_BB_ALL_BITS		((1 << XFS_BB_NUM_BITS) - 1)
+
 #define	XFS_BTREE_BLOCK_MAXRECS(bsz,t,lev)	\
 	((((int)(bsz)) - (int)sizeof(xfs_btree_block_t)) / \
 	 ((int)sizeof(t) + (int)sizeof(xfs_agblock_t) * ((lev) > 0)))
@@ -64,7 +75,10 @@ int xfs_btree_firstrec(xfs_btree_cur_t *, int);
 xfs_btree_cur_t *xfs_btree_init_cursor(xfs_mount_t *, xfs_trans_t *, buf_t *, xfs_agnumber_t, xfs_btnum_t, struct xfs_inode *);
 int xfs_btree_islastblock(xfs_btree_cur_t *, int);
 int xfs_btree_lastrec(xfs_btree_cur_t *, int);
+void xfs_btree_log_ag(xfs_trans_t *, buf_t *, int);
+void xfs_btree_log_block(xfs_trans_t *, buf_t *, int);
 int xfs_btree_maxrecs(xfs_btree_cur_t *, xfs_btree_block_t *);
+void xfs_btree_offsets(int, const int *, int, int *, int *);
 void xfs_btree_setbuf(xfs_btree_cur_t *, int, buf_t *);
 
 extern __uint32_t xfs_magics[];

@@ -1,8 +1,9 @@
-#ident	"$Revision: 1.5 $"
+#ident	"$Revision: 1.6 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
+#include <sys/uuid.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs.h"
@@ -53,6 +54,8 @@ int xfs_bmbt_get_rec(xfs_btree_cur_t *, xfs_fsblock_t *, xfs_fsblock_t *, xfs_ex
 int xfs_bmbt_increment(xfs_btree_cur_t *, int);
 int xfs_bmbt_insert(xfs_btree_cur_t *);
 int xfs_bmbt_insrec(xfs_btree_cur_t *, int, xfs_agblock_t *, xfs_bmbt_rec_t *, xfs_btree_cur_t **);
+void xfs_bmbt_log_ptrs(xfs_btree_cur_t *, buf_t *, int, int);
+void xfs_bmbt_log_recs(xfs_btree_cur_t *, buf_t *, int, int);
 int xfs_bmbt_lookup(xfs_btree_cur_t *, xfs_lookup_t);
 int xfs_bmbt_lookup_eq(xfs_btree_cur_t *, xfs_fsblock_t, xfs_fsblock_t, xfs_extlen_t);
 int xfs_bmbt_lookup_ge(xfs_btree_cur_t *, xfs_fsblock_t, xfs_fsblock_t, xfs_extlen_t);
@@ -183,11 +186,9 @@ xfs_bmbt_delrec(xfs_btree_cur_t *cur, int level)
 			pp[i - 1] = pp[i];
 		}
 		if (ptr < i) {
-			if (level < cur->bc_nlevels - 1) {
-				first = (caddr_t)&pp[ptr - 1] - (caddr_t)block;
-				last = ((caddr_t)&pp[i - 1] - 1) - (caddr_t)block;
-				xfs_trans_log_buf(tp, cur->bc_bufs[level], first, last);
-			} else {
+			if (level < cur->bc_nlevels - 1)
+				xfs_bmbt_log_ptrs(cur, cur->bc_bufs[level], ptr, i - 1);
+			else {
 				/* log inode fields */
 				/* FIXME */
 			}
@@ -197,21 +198,17 @@ xfs_bmbt_delrec(xfs_btree_cur_t *cur, int level)
 			rp[i - 1] = rp[i];
 	}
 	if (ptr < i) {
-		if (level < cur->bc_nlevels - 1) {
-			first = (caddr_t)&rp[ptr - 1] - (caddr_t)block;
-			last = ((caddr_t)&rp[i - 1] - 1) - (caddr_t)block;
-			xfs_trans_log_buf(tp, cur->bc_bufs[level], first, last);
-		} else {
+		if (level < cur->bc_nlevels - 1)
+			xfs_bmbt_log_recs(cur, cur->bc_bufs[level], ptr, i - 1);
+		else {
 			/* log inode fields */
 			/* FIXME */
 		}
 	}
 	block->bb_numrecs--;
-	if (level < cur->bc_nlevels - 1) {
-		first = offsetof(xfs_btree_block_t, bb_numrecs);
-		last = first + (int)sizeof(block->bb_numrecs) - 1;
-		xfs_trans_log_buf(tp, cur->bc_bufs[level], first, last);
-	} else {
+	if (level < cur->bc_nlevels - 1)
+		xfs_btree_log_block(tp, cur->bc_bufs[level], XFS_BB_NUMRECS);
+	else {
 		/* log inode fields */
 		/* FIXME */
 	}
@@ -345,9 +342,7 @@ xfs_bmbt_delrec(xfs_btree_cur_t *cur, int level)
 		rrblock = xfs_buf_to_block(rrbuf);
 		xfs_btree_check_block(cur, rrblock, level);
 		rrblock->bb_leftsib = lbno;
-		first = offsetof(xfs_btree_block_t, bb_leftsib);
-		last = first + (int)sizeof(rrblock->bb_leftsib) - 1;
-		xfs_trans_log_buf(tp, rrbuf, first, last);
+		xfs_btree_log_block(tp, rrbuf, XFS_BB_LEFTSIB);
 	}
 	xfs_free_extent(tp, xfs_daddr_to_fsb(sbp, rbuf->b_blkno), 1);
 	xfs_bmbt_rcheck(cur);
@@ -664,6 +659,36 @@ xfs_bmbt_kcheck_btree(xfs_btree_cur_t *cur, xfs_aghdr_t *agp, xfs_agblock_t bno,
 	xfs_trans_brelse(tp, buf);
 }
 #endif
+
+void
+xfs_bmbt_log_ptrs(xfs_btree_cur_t *cur, buf_t *buf, int pfirst, int plast)
+{
+	xfs_btree_block_t *block;
+	int first;
+	int last;
+	xfs_agblock_t *pp;
+
+	block = xfs_buf_to_block(buf);
+	pp = XFS_BMAP_PTR_DADDR(block, 1, cur);
+	first = (caddr_t)&pp[pfirst - 1] - (caddr_t)block;
+	last = ((caddr_t)&pp[plast] - 1) - (caddr_t)block;
+	xfs_trans_log_buf(cur->bc_tp, buf, first, last);
+}
+
+void
+xfs_bmbt_log_recs(xfs_btree_cur_t *cur, buf_t *buf, int rfirst, int rlast)
+{
+	xfs_btree_block_t *block;
+	int first;
+	int last;
+	xfs_bmbt_rec_t *rp;
+
+	block = xfs_buf_to_block(buf);
+	rp = XFS_BMAP_REC_DADDR(block, 1, cur);
+	first = (caddr_t)&rp[rfirst - 1] - (caddr_t)block;
+	last = ((caddr_t)&rp[rlast] - 1) - (caddr_t)block;
+	xfs_trans_log_buf(cur->bc_tp, buf, first, last);
+}
 
 /*
  * Lookup the record.  The cursor is made to point to it, based on dir.
