@@ -2173,7 +2173,7 @@ start:
 
 	switch (type) {
 	case IFREG:
-		limit = ((uiop->uio_limit > XFS_MAX_FILE_OFFSET) ?
+		limit = ((uiop->uio_limit < XFS_MAX_FILE_OFFSET) ?
 			 uiop->uio_limit : XFS_MAX_FILE_OFFSET);
 		n = limit - uiop->uio_offset;
 		if (n <= 0) {
