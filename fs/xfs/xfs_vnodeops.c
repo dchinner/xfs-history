@@ -411,7 +411,9 @@ xfs_getattr(vnode_t	*vp,
 	if (flags & (AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS|AT_UUID)) {
 		vap->va_xflags = ip->i_d.di_flags;
 		vap->va_extsize = ip->i_d.di_extsize << mp->m_sb.sb_blocklog;
-		vap->va_nextents = ip->i_d.di_nextents;
+		vap->va_nextents = (ip->i_flags & XFS_IEXTENTS) ?
+			ip->i_bytes / sizeof(xfs_bmbt_rec_t) :
+			ip->i_d.di_nextents;
 		vap->va_uuid = ip->i_d.di_uuid;
 	}
 
@@ -3701,6 +3703,23 @@ xfs_fcntl(vnode_t	*vp,
 		va.va_xflags = fa.fsx_xflags;
 		va.va_extsize = fa.fsx_extsize;
 		error = xfs_setattr(vp, &va, 0, credp);
+		break;
+	    }
+
+	case F_GETBMAP: {
+		struct getbmap bm;
+
+		if (copyin(arg, &bm, sizeof(bm))) {
+			error = XFS_ERROR(EFAULT);
+			break;
+		}
+		if (bm.bmv_count < 2) {
+			error = XFS_ERROR(EINVAL);
+			break;
+		}
+		error = xfs_getbmap(vp, &bm, (struct getbmap *)arg + 1);
+		if (!error && copyout(&bm, arg, sizeof(bm)))
+			error = XFS_ERROR(EFAULT);
 		break;
 	    }
 
