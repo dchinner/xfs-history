@@ -13,12 +13,12 @@
 #include <sys/vnode.h>
 #include <sys/cred.h>
 #include <sys/uuid.h>
+#include <sys/kmem.h>
 #ifdef SIM
 #include <bstring.h>
 #include <stdio.h>
 #else
 #include <sys/systm.h>
-#include <sys/kmem.h>
 #endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -43,7 +43,7 @@
 #endif
 
 
-struct zone *xfs_inode_zone;
+zone_t *xfs_inode_zone;
 
 
 
@@ -267,11 +267,10 @@ xfs_iread(xfs_mount_t	*mp,
 	xfs_dinode_t	*dip;
 	xfs_inode_t	*ip;
 
-#ifndef SIM
-	ip = (xfs_inode_t *)kmem_zone_zalloc(xfs_inode_zone, KM_SLEEP);
-#else
-	ip = (xfs_inode_t *)kmem_zalloc(sizeof(xfs_inode_t), KM_SLEEP);
-#endif
+	if (!xfs_inode_zone)
+		xfs_inode_zone = kmem_zone_init(sizeof(*ip), "xfs_inode");
+
+	ip = kmem_zone_zalloc(xfs_inode_zone, KM_SLEEP);
 	ip->i_ino = ino;
 
 	/*
@@ -751,11 +750,7 @@ xfs_idestroy(xfs_inode_t *ip)
 	mrfree(&ip->i_iolock);
 	freesema(&ip->i_flock);
 	freesema(&ip->i_pinsema);
-#ifndef SIM
 	kmem_zone_free(xfs_inode_zone, ip);
-#else
-	kmem_free(ip, sizeof(xfs_inode_t));
-#endif
 }
 
 

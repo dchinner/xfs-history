@@ -12,10 +12,10 @@
 #include <sys/vnode.h>
 #include <sys/debug.h>
 #include <sys/uuid.h>
+#include <sys/kmem.h>
 #include <stddef.h>
 #ifndef SIM
 #include <sys/sysinfo.h>
-#include <sys/kmem.h>
 #include <sys/conf.h>
 #include <sys/user.h>
 #include <sys/systm.h>
@@ -42,7 +42,7 @@ STATIC void	xfs_trans_committed(xfs_trans_t *);
 STATIC void	xfs_trans_chunk_committed(xfs_log_item_chunk_t *, xfs_lsn_t);
 STATIC void	xfs_trans_free(xfs_trans_t *);
 
-struct zone	*xfs_trans_zone;
+zone_t		*xfs_trans_zone;
 
 xfs_tid_t	
 xfs_trans_id_alloc(xfs_mount_t *mp)
@@ -83,11 +83,9 @@ xfs_trans_alloc(xfs_mount_t	*mp,
 {
 	xfs_trans_t	*tp;
 
-#ifndef SIM
-	tp = (xfs_trans_t*)kmem_zone_zalloc(xfs_trans_zone, KM_SLEEP);
-#else
-	tp = (xfs_trans_t*)kmem_zalloc(sizeof(xfs_trans_t), 0);
-#endif
+	if (!xfs_trans_zone)
+		xfs_trans_zone = kmem_zone_init(sizeof(*tp), "xfs_trans");
+	tp = kmem_zone_zalloc(xfs_trans_zone, KM_SLEEP);
 
 	/*
 	 * Initialize the transaction structure.
@@ -690,15 +688,10 @@ xfs_trans_cancel(xfs_trans_t *tp)
 STATIC void
 xfs_trans_free(xfs_trans_t *tp)
 {
-#ifndef SIM
 /*
 	xfs_log_unreserve(tp->t_mountp, tp->t_log_res);
 */
-
 	kmem_zone_free(xfs_trans_zone, tp);
-#else
-	kmem_free(tp, sizeof(*tp));
-#endif
 }
 
 
