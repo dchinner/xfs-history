@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.12 $"
+#ident	"$Revision: 1.13 $"
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
@@ -431,7 +431,7 @@ xfs_trans_apply_dquot_deltas(
 			/*
 			 * SHAREII doesn't distinguish between RT and reg blks.
 			 */
-			if (SHshareActive) {
+			if (SHR_ACTIVE) {
 				oldresbcnt = dqp->q_res_bcount + 
 					dqp->q_res_rtbcount;
 				oldresicnt = dqp->q_res_icount;
@@ -515,23 +515,25 @@ xfs_trans_apply_dquot_deltas(
 			ASSERT(dqp->q_res_icount >= dqp->q_core.d_icount);
 			ASSERT(dqp->q_res_rtbcount >= dqp->q_core.d_rtbcount);
 #ifdef _SHAREII
-			if (SHshareActive) {
-				if (dqp->q_res_bcount + dqp->q_res_rtbcount -
-				    oldresbcnt) {
-				      (void) SHlimitDisk(XFS_MTOVFS(dqp->q_mount),
+			if (SHR_ACTIVE) {
+				long x = dqp->q_res_bcount + dqp->q_res_rtbcount -
+				    oldresbcnt;
+				if (x)
+				{
+				      (void) SHR_LIMITDISK(XFS_MTOVFS(dqp->q_mount),
 						   dqp->q_core.d_id,
-						   (int)(dqp->q_res_bcount +
-							 dqp->q_res_rtbcount -
-							 oldresbcnt),
+						   (u_long)(x > 0 ? x : -x),
 						   XFS_FSB_TO_B(dqp->q_mount, 1),
-						   LI_UPDATE, NULL, NULL);
+						   (x > 0 ? LI_ALLOC : LI_FREE)|LI_UPDATE, NULL, NULL);
 			        }
-				if (dqp->q_res_icount - oldresicnt) {
-				     (void) SHlimitDisk(XFS_MTOVFS(dqp->q_mount),
+				x = dqp->q_res_icount - oldresicnt;
+				if (x)
+				{
+				     (void) SHR_LIMITDISK(XFS_MTOVFS(dqp->q_mount),
 							dqp->q_core.d_id,
-							(int)(dqp->q_res_icount -
-							      oldresicnt),
-							0, LI_UPDATE, NULL, NULL);
+							(u_long)(x > 0 ? x : -x),
+							0, 
+							(x > 0 ? LI_ALLOC : LI_FREE)|LI_UPDATE, NULL, NULL);
 				}
 			}	
 #endif /* _SHAREII */
@@ -587,7 +589,7 @@ xfs_trans_unreserve_and_mod_dquots(
 				dqp->q_res_bcount -= 
 					(xfs_qcnt_t)qtrx->qt_blk_res; 
 #ifdef _SHAREII
-				if (SHshareActive)
+				if (SHR_ACTIVE)
 					blkunres = (int)qtrx->qt_blk_res;
 #endif /* _SHAREII */
 			}
@@ -599,7 +601,7 @@ xfs_trans_unreserve_and_mod_dquots(
 				dqp->q_res_icount -= 
 					(xfs_qcnt_t)qtrx->qt_ino_res; 
 #ifdef _SHAREII
-				if (SHshareActive) 
+				if (SHR_ACTIVE) 
 					inounres = (int)qtrx->qt_blk_res;
 #endif /* _SHAREII */
 			}
@@ -612,27 +614,26 @@ xfs_trans_unreserve_and_mod_dquots(
 				dqp->q_res_rtbcount -= 
 					(xfs_qcnt_t)qtrx->qt_rtblk_res; 
 #ifdef _SHAREII
-				if (SHshareActive)
+				if (SHR_ACTIVE)
 					blkunres += (int)qtrx->qt_blk_res;
 #endif /* _SHAREII */
 			}
-			
 #ifdef _SHAREII
 			/* Undo the SHAREII reservation. */
-			if (SHshareActive) {
+			if (SHR_ACTIVE) {
 				if (blkunres)
-				     (void) SHlimitDisk(XFS_MTOVFS(dqp->q_mount),
+				     (void) SHR_LIMITDISK(XFS_MTOVFS(dqp->q_mount),
 						   dqp->q_core.d_id,
-						   -blkunres,
+						   blkunres,
 						   XFS_FSB_TO_B(dqp->q_mount, 1),
-						   LI_UPDATE,
+						   LI_UPDATE|LI_FREE,
 						   NULL,
 						   NULL);
 				if (inounres)
-				     (void) SHlimitDisk(XFS_MTOVFS(dqp->q_mount),
+				     (void) SHR_LIMITDISK(XFS_MTOVFS(dqp->q_mount),
 							dqp->q_core.d_id,
-							-inounres,
-							0, LI_UPDATE, NULL, NULL);
+							inounres,
+							0, LI_UPDATE|LI_FREE, NULL, NULL);
 			}
 #endif /* _SHAREII */
 			if (locked)
@@ -746,18 +747,18 @@ xfs_trans_dqresv(
 	}
 
 #ifdef _SHAREII
-	if (SHshareActive) {
+	if (SHR_ACTIVE) {
 		if ((flags & XFS_QMOPT_FORCE_RES) == 0  &&
 		    dqp->q_core.d_id != 0) 
 			enforceflag = LI_ENFORCE;
 		else
 			enforceflag = 0;
 		/* disk blk reservation */
-		if (SHlimitDisk(XFS_MTOVFS(dqp->q_mount),
+		if (SHR_LIMITDISK(XFS_MTOVFS(dqp->q_mount),
 				dqp->q_core.d_id,
-				(int) nblks,
+				(u_long) nblks,
 				XFS_FSB_TO_B(dqp->q_mount, 1),
-				LI_UPDATE | enforceflag,
+				LI_ALLOC|LI_UPDATE | enforceflag,
 				NULL,
 				NULL)) {
 			error = EDQUOT;
@@ -765,10 +766,10 @@ xfs_trans_dqresv(
 		}
 		/* inode reservation */
 		if (ninos != 0) {
-			if (SHlimitDisk(XFS_MTOVFS(dqp->q_mount),
+			if (SHR_LIMITDISK(XFS_MTOVFS(dqp->q_mount),
 					dqp->q_core.d_id, 
-					1, 0,
-					LI_ENFORCE | enforceflag,
+					(u_long)1, 0,
+					LI_ALLOC|LI_ENFORCE | enforceflag,
 					NULL,
 					NULL)) {
 				error = EDQUOT;
