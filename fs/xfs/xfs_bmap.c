@@ -1243,6 +1243,7 @@ xfs_bmap_alloc(
 	xfs_mount_t	*mp;		/* mount point structure */
 	int		nullfb;		/* true if ap->firstblock isn't set */
 	xfs_extlen_t	prod;		/* product factor for allocators */
+	xfs_extlen_t	rotor;		/* rt rotor value */
 	int		rt;		/* true if inode is realtime */
 
 	/*
@@ -1252,8 +1253,22 @@ xfs_bmap_alloc(
 	nullfb = ap->firstblock == NULLFSBLOCK;
 	rt = ap->ip->i_d.di_flags & XFS_DIFLAG_REALTIME;
 	fb_agno = nullfb ? NULLAGNUMBER : XFS_FSB_TO_AGNO(mp, ap->firstblock);
-	ap->rval = rt ? 0 :
-		(nullfb ? XFS_INO_TO_FSB(mp, ap->ip->i_ino) : ap->firstblock);
+	if (rt) {
+		if (!ap->eof || ap->off != 0 || mp->m_sb.sb_rbmblocks == 1)
+			ap->rval = 0;
+		else {
+			rotor = mp->m_rbmrotor;
+			ap->rval = XFS_BLOCKTOBIT(mp, rotor) *
+				   mp->m_sb.sb_rextsize;
+			ASSERT(ap->rval < mp->m_sb.sb_rblocks);
+			if (++rotor == mp->m_sb.sb_rbmblocks)
+				rotor = 0;
+			mp->m_rbmrotor = rotor;
+		}
+	} else if (nullfb)
+		ap->rval = XFS_INO_TO_FSB(mp, ap->ip->i_ino);
+	else
+		ap->rval = ap->firstblock;
 	/*
 	 * If allocating at eof, and there's a previous real block,
 	 * try to use it's last block as our starting point.
