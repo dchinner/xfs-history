@@ -2710,7 +2710,7 @@ xlog_recover_clear_agi_bucket(
 	}
 	agi = XFS_BUF_TO_AGI(agibp);
 	if (agi->agi_magicnum != XFS_AGI_MAGIC) {
-		xfs_trans_cancel(tp, 0);
+		xfs_trans_cancel(tp, XFS_TRANS_ABORT);
 		return;
 	}
 	ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
@@ -2721,7 +2721,7 @@ xlog_recover_clear_agi_bucket(
 	xfs_trans_log_buf(tp, agibp, offset,
 			  (offset + sizeof(xfs_agino_t) - 1));
 
-	xfs_trans_commit(tp, 0);
+	(void) xfs_trans_commit(tp, 0);
 }	/* xlog_recover_clear_agi_bucket */
 
 

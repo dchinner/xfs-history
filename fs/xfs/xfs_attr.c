@@ -1,4 +1,4 @@
-#ident "$Revision: 1.43 $"
+#ident "$Revision: 1.44 $"
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/buf.h>
@@ -233,7 +233,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 				      XFS_ATTRSET_LOG_RES(dp->i_mount),
 				      0, XFS_TRANS_PERM_LOG_RES,
 				      XFS_ATTRSET_LOG_COUNT)) {
-		xfs_trans_cancel(args.trans, XFS_TRANS_RELEASE_LOG_RES);
+		xfs_trans_cancel(args.trans, 0);
 		return(error);
 	}
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
@@ -360,7 +360,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	return(0);
 
 out:
-	xfs_trans_cancel(args.trans, XFS_TRANS_RELEASE_LOG_RES);
+	xfs_trans_cancel(args.trans, XFS_TRANS_RELEASE_LOG_RES|XFS_TRANS_ABORT);
 	xfs_iunlock(dp, XFS_ILOCK_EXCL);
 	return(error);
 }
@@ -436,7 +436,7 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 				      XFS_ATTRRM_LOG_RES(dp->i_mount),
 				      0, XFS_TRANS_PERM_LOG_RES,
 				      XFS_ATTRRM_LOG_COUNT)) {
-		xfs_trans_cancel(args.trans, XFS_TRANS_RELEASE_LOG_RES);
+		xfs_trans_cancel(args.trans, 0);
 		return(error);
 	
 	}
@@ -496,7 +496,7 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	return(0);
 
 out:
-	xfs_trans_cancel(args.trans, XFS_TRANS_RELEASE_LOG_RES);
+	xfs_trans_cancel(args.trans, XFS_TRANS_RELEASE_LOG_RES|XFS_TRANS_ABORT);
 	xfs_iunlock(dp, XFS_ILOCK_EXCL);
 	return(error);
 }
@@ -609,7 +609,7 @@ xfs_attr_inactive(xfs_inode_t *dp)
 				      XFS_ATTRINVAL_LOG_RES(dp->i_mount),
 				      0, XFS_TRANS_PERM_LOG_RES,
 				      XFS_ATTRINVAL_LOG_COUNT)) {
-		xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
+		xfs_trans_cancel(trans, 0);
 		return(error);
 	}
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
@@ -654,7 +654,7 @@ xfs_attr_inactive(xfs_inode_t *dp)
 	return(0);
 
 out:
-	xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
+	xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES|XFS_TRANS_ABORT);
 	xfs_iunlock(dp, XFS_ILOCK_EXCL);
 	return(error);
 }

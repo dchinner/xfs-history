@@ -1,4 +1,4 @@
-#ident "$Revision: 1.22 $"
+#ident "$Revision: 1.23 $"
 
 
 #include <sys/param.h>
@@ -2519,15 +2519,15 @@ xfs_qm_write_sb_changes(
 	if (error = xfs_trans_reserve(tp, 0, 
 				      mp->m_sb.sb_sectsize + 128, 0,
 				      0, 
-				      XFS_DEFAULT_LOG_COUNT))
-		goto error0;
+				      XFS_DEFAULT_LOG_COUNT)) {
+		xfs_trans_cancel(tp, 0);
+		return (error);
+	}
+		
 	xfs_mod_sb(tp, flags);
-	error = xfs_trans_commit(tp, 0);
+	(void) xfs_trans_commit(tp, 0);
  
-error0:
-	if (error)
-		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES);
-	return (error);
+	return (0);
 }
 
 

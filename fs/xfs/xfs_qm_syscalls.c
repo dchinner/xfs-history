@@ -1,4 +1,4 @@
-#ident "$Revision: 1.24 $"
+#ident "$Revision: 1.25 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -767,7 +767,7 @@ xfs_qm_scall_setqlim(
 	 * Allocate the dquot if this doesn't exist.
 	 */
 	if (error = xfs_qm_dqget(mp, NULL, id, type, XFS_QMOPT_DQALLOC, &dqp)) {
-		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES);
+		xfs_trans_cancel(tp, XFS_TRANS_ABORT);
 		mutex_unlock(&(XFS_QI_QOFFLOCK(mp)));
 		ASSERT(error != ENOENT);
 		return (error);	    

@@ -4095,9 +4095,7 @@ xfs_strat_write(
 					0, XFS_TRANS_PERM_LOG_RES,
 					XFS_WRITE_LOG_COUNT);
 			if (error) {
-				xfs_trans_cancel(tp,
-						 (XFS_TRANS_RELEASE_LOG_RES |
-						  XFS_TRANS_ABORT));
+				xfs_trans_cancel(tp, 0);
 				bp->b_flags |= B_ERROR;
 				bp->b_error = error;
 				goto error0;

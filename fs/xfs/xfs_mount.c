@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.151 $"
+#ident	"$Revision: 1.152 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -1389,7 +1389,7 @@ xfs_mount_reset_sbqflags(
 	tp = xfs_trans_alloc(mp, XFS_TRANS_QM_SBCHANGE);
 	if (xfs_trans_reserve(tp, 0, mp->m_sb.sb_sectsize + 128, 0, 0, 
 				      XFS_DEFAULT_LOG_COUNT)) {
-		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES);
+		xfs_trans_cancel(tp, 0);
 		return;
 	}
 	xfs_mod_sb(tp, XFS_SB_QFLAGS);
@@ -1416,7 +1416,7 @@ xfs_mount_log_sbunit(
 	tp = xfs_trans_alloc(mp, XFS_TRANS_SB_UNIT);
 	if (xfs_trans_reserve(tp, 0, mp->m_sb.sb_sectsize + 128, 0, 0, 
 				XFS_DEFAULT_LOG_COUNT)) {
-		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES);
+		xfs_trans_cancel(tp, 0);
 		return;
 	}
 	xfs_mod_sb(tp, fields);
