@@ -44,11 +44,11 @@ typedef struct xfs_log_item {
 /*
  * Log item types.
  */
-#define	XFS_LI_BUF	1
-#define	XFS_LI_INODE	2
-#define	XFS_LI_EFI	3
-#define	XFS_LI_EFD	4
-#define	XFS_LI_IUNLINK	5
+#define	XFS_LI_BUF	0x1234
+#define	XFS_LI_INODE	0x1235
+#define	XFS_LI_EFI	0x1236
+#define	XFS_LI_EFD	0x1237
+#define	XFS_LI_IUNLINK	0x1238
 
 
 
@@ -185,6 +185,7 @@ typedef struct xfs_trans_header {
  * This is the structure maintained for every active transaction.
  */
 typedef struct xfs_trans {
+	unsigned int		t_magic;	/* magic number */
 	xfs_trans_id_t		t_tid;		/* transaction id */
 	xfs_log_callback_t	t_logcb;	/* log callback struct */
 	struct xfs_trans	*t_forw;	/* async list pointers */
@@ -214,6 +215,7 @@ typedef struct xfs_trans {
 	xfs_trans_header_t	t_header;	/* header for in-log trans */
 } xfs_trans_t;
 
+#define	XFS_TRANS_MAGIC		0x5452414E	/* 'TRAN' */
 /*
  * Values for t_flags.
  */
