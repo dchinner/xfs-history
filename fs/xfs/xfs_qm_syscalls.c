@@ -1,4 +1,4 @@
-#ident "$Revision: 1.19 $"
+#ident "$Revision: 1.20 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -1391,10 +1391,12 @@ xfs_dqtest_cmp2(
 			err++;
 		}
 	}
+#if 0
 	if (!err) {
 		printf("%d [%s] [0x%x] qchecked\n", 
 		       (int) d->d_id, XFS_QM_ISUDQ(d) ? "USR" : "PRJ", d->q_mount);
 	}
+#endif
 	return (err);
 }
 
@@ -1551,7 +1553,12 @@ xfs_qm_internalqcheck(
 	
 	if (! XFS_IS_QUOTA_ON(mp))
 		return (ESRCH);
-
+	
+	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
+	bflush(mp->m_dev);
+	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
+	bflush(mp->m_dev);
+	
 	mutex_lock(&qcheck_lock, PINOD);
 	/* There should be absolutely no quota activity while this
 	   is going on. */
