@@ -407,7 +407,7 @@ xfs_mount(
 	xfs_mount_t		*mp;
 	struct block_device	*ddev, *logdev, *rtdev;
 	int			ronly = (vfsp->vfs_flag & VFS_RDONLY);
-	int			flags = 0, error = 0;
+	int			flags = 0, error;
 
 	ddev = vfsp->vfs_super->s_bdev;
 	logdev = rtdev = NULL;
