@@ -35,7 +35,7 @@ STATIC xfs_log_item_t	*sbb_next(xfs_log_item_t **, xfs_log_item_t*);
  * should allow the routine to return quickly in the common case without
  * doing anything.
  */
-#ifndef SIM
+#ifdef NOTYET
 void
 xfs_trans_push_ail(struct xfs_mount *mp)
 {
