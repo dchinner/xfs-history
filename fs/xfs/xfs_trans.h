@@ -560,7 +560,7 @@ typedef struct xfs_trans {
 	 (mp)->m_sb.sb_sectsize + \
 	 (mp)->m_sb.sb_sectsize + \
 	 XFS_FSB_TO_B((mp), 1) + \
-	 MAX(XFS_FSB_TO_B((mp), 1), XFS_INODE_CLUSTER_SIZE) + \
+	 MAX(XFS_FSB_TO_B((mp), 1), XFS_INODE_CLUSTER_SIZE(mp)) + \
 	 (128 * 5))
 
 #define	XFS_IFREE_LOG_RES(mp)	((mp)->m_reservations.tr_ifree)
