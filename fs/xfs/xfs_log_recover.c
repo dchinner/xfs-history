@@ -1358,12 +1358,13 @@ xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog)
 	uint	chksum = 0;
 
 	up = (uint *)iclog->ic_data;
+	/* divide length by 4 to get # words */
 	for (i=0; i<iclog->ic_offset >> 2; i++) {
-		chksum |= *up;
+		chksum ^= *up;
 		up++;
 	}
 	iclog->ic_header.h_chksum = chksum;
-#endif
+#endif /* DEBUG */
 
 	dp = iclog->ic_data;
 	for (i = 0; i<BTOBB(iclog->ic_offset); i++) {
@@ -1379,11 +1380,26 @@ xlog_unpack_data(xlog_rec_header_t *rhead,
 		 caddr_t	   dp)
 {
 	int i;
+#ifdef DEBUG
+	uint *up = (uint *)dp;
+	uint chksum = 0;
+#endif
 
 	for (i=0; i<BTOBB(rhead->h_len); i++) {
 		*(uint *)dp = *(uint *)&rhead->h_cycle_data[i];
 		dp += BBSIZE;
 	}
+#ifdef DEBUG
+	/* divide length by 4 to get # words */
+	for (i=0; i < rhead->h_len >> 2; i++) {
+		chksum ^= *up;
+		up++;
+	}
+	if (chksum != rhead->h_chksum)
+		cmn_err(CE_WARN,
+			"chksum mismatch: was (0x%x) is (0x%x) len (%d)",
+			rhead->h_chksum, chksum, rhead->h_len);
+#endif /* DEBUG */
 }	/* xlog_unpack_data */
 
 
