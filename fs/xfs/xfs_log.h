@@ -91,7 +91,7 @@ int	  xfs_log_force(struct xfs_mount *mp,
 int	  xfs_log_init(void);
 int	  xfs_log_mount(struct xfs_mount *mp,
 			dev_t		 log_dev,
-			int		 start_block,
+			daddr_t		 start_block,
 			int		 num_bblocks,
 			uint		 flags);
 void	  xfs_log_notify(struct xfs_mount   *mp,
@@ -112,7 +112,7 @@ int	  xfs_log_unmount(struct xfs_mount *mp);
 /* Log manager utility interfaces */
 void xfs_log_print(struct xfs_mount *mp,
 		   dev_t	    log_dev,
-		   int		    start_block,
+		   daddr_t	    start_block,
 		   int		    num_bblocks,
 		   uint		    flags);
 
