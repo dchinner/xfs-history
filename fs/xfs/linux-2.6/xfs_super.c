@@ -194,7 +194,7 @@ linvfs_read_super(
     /* check to see if kio is suppose to be on for this mount */
     if(args->flags & MS_KIOBUFIO){
 	  sb->s_flags |= MS_KIOBUFIO;
-	  printk("XFS (dev: %d/%d) mounting with KIOBIFIO\n",MAJOR(sb->s_dev),MINOR(sb->s_dev));
+	  printk("XFS (dev: %d/%d) mounting with KIOBUFIO\n",MAJOR(sb->s_dev),MINOR(sb->s_dev));
 	}
 
 	args->fsname = uap->spec;
