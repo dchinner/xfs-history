@@ -35,13 +35,22 @@
 #include "sim.h"
 #endif
 
+STATIC buf_t *
+xfs_trans_buf_item_match(
+	xfs_trans_t	*tp,
+	dev_t		dev,
+	daddr_t		blkno,
+	int		len);
+
+
 /*
  * Get and lock the buffer for the caller if it is not already
  * locked within the given transaction.  If it is already locked
  * within the transaction, just increment its lock recursion count
  * and return a pointer to it.
  *
- * Use the buffer cache routine incore_match() to find the buffer
+ * Use the fast path function xfs_trans_buf_item_match() or the buffer
+ * cache routine incore_match() to find the buffer
  * if it is already owned by this transaction.
  *
  * If we don't already own the buffer, use get_buf() to get it.
@@ -79,7 +88,13 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	 * have it locked.  In this case we just increment the lock
 	 * recursion count and return the buffer to the caller.
 	 */
-	if ((bp = incore_match(dev, blkno, len, BUF_FSPRIV2, tp)) != NULL) {
+	if (tp->t_items.lic_next == NULL) {
+		bp = xfs_trans_buf_item_match(tp, dev, blkno, len);
+	} else {
+		bp = incore_match(dev, blkno, len, BUF_FSPRIV2, tp);
+	}
+	if (bp != NULL) {
+		ASSERT(bp->b_fsprivate2 == tp);
 		bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 		ASSERT(bip != NULL);
 		ASSERT(bip->bli_refcount > 0);
@@ -232,7 +247,8 @@ xfs_trans_getsb(xfs_trans_t	*tp,
  * within the transaction and already read in, just increment its
  * lock recursion count and return a pointer to it.
  *
- * Use the buffer cache routine incore_match() to find the buffer
+ * Use the fast path function xfs_trans_buf_item_match() or the buffer
+ * cache routine incore_match() to find the buffer
  * if it is already owned by this transaction.
  *
  * If we don't already own the buffer, use read_buf() to get it.
@@ -276,7 +292,13 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 	 * If the buffer is not yet read in, then we read it in, increment
 	 * the lock recursion count, and return it to the caller.
 	 */
-	if ((bp = incore_match(dev, blkno, len, BUF_FSPRIV2, tp)) != NULL) {
+	if (tp->t_items.lic_next == NULL) {
+		bp = xfs_trans_buf_item_match(tp, dev, blkno, len);
+	} else {
+		bp = incore_match(dev, blkno, len, BUF_FSPRIV2, tp);
+	}
+	if (bp != NULL) {
+		ASSERT(bp->b_fsprivate2 == tp);
 		ASSERT(bp->b_fsprivate != NULL);
 		if (!(bp->b_flags & B_DONE)) {
 #ifndef SIM
@@ -808,4 +830,58 @@ xfs_trans_inode_alloc_buf(
 	ASSERT(!(bip->bli_flags & XFS_BLI_INODE_ALLOC_BUF));
 
 	bip->bli_flags |= XFS_BLI_INODE_ALLOC_BUF;
+}
+
+
+/*
+ * Check to see if a buffer matching the given parameters is already
+ * a part of the given transaction.  Only check the first, embedded
+ * chunk, since we don't want to spend all day scanning large transactions.
+ */
+STATIC buf_t *
+xfs_trans_buf_item_match(
+	xfs_trans_t	*tp,
+	dev_t		dev,
+	daddr_t		blkno,
+	int		len)
+{
+	xfs_log_item_chunk_t	*licp;
+	xfs_log_item_desc_t	*lidp;
+	xfs_buf_log_item_t	*blip;
+	buf_t			*bp;
+	int			i;
+
+	bp = NULL;
+	len = BBTOB(len);
+	licp = &tp->t_items;
+	if (!XFS_LIC_ARE_ALL_FREE(licp)) {
+		for (i = 0; i <= XFS_LIC_MAX_SLOT; i++) {
+			/*
+			 * Skip unoccupied slots.
+			 */
+			if (XFS_LIC_ISFREE(licp, i)) {
+				continue;
+			}
+
+			lidp = XFS_LIC_SLOT(licp, i);
+			blip = (xfs_buf_log_item_t *)lidp->lid_item;
+			if (blip->bli_item.li_type != XFS_LI_BUF) {
+				continue;
+			}
+
+			bp = blip->bli_buf;
+			if ((bp->b_edev == dev) &&
+			    (bp->b_blkno == blkno) &&
+			    (bp->b_bcount == len)) {
+				/*
+				 * We found it.  Break out and
+				 * return the pointer to the buffer.
+				 */
+				break;
+			} else {
+				bp = NULL;
+			}
+		}
+	}
+	return bp;
 }
