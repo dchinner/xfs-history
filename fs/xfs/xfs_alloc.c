@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.71 $"
+#ident	"$Revision: 1.72 $"
 
 /*
  * Free space allocation for xFS.
@@ -480,7 +480,8 @@ xfs_alloc_ag_vextent(
 		if (!wasfromfl) {
 			agf = XFS_BUF_TO_AGF(args->agbp);
 			agf->agf_freeblks -= args->len;
-			xfs_trans_agblocks_delta(args->tp, -(args->len));
+			xfs_trans_agblocks_delta(args->tp,
+						 -((long)(args->len)));
 			args->pag->pagf_freeblks -= args->len;
 			ASSERT(agf->agf_freeblks <= agf->agf_length);
 			xfs_alloc_trace_modagf("xfs_alloc_ag_vextent", NULL,
