@@ -1,4 +1,4 @@
-#ident "$Revision: 1.248 $"
+#ident "$Revision: 1.249 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -6853,7 +6853,7 @@ vnodeops_t xfs_vnodeops = {
 	fs_nosys,	/* attr_set */
 	fs_nosys,	/* attr_remove */
 	fs_nosys,	/* attr_list */
-	fs_noval,	/* link_removed */
+	(int (*)(bhv_desc_t *, struct mounta *, char *, struct vfsops *))fs_noval,	/* link_removed */
 };
 
 #else
