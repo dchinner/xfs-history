@@ -622,6 +622,23 @@ xfs_iread(
 			XFS_IFORK_DSIZE(ip) / sizeof(xfs_bmbt_rec_t);
 	}	
 
+	/*
+	 * The inode format changed when we moved the link count and
+	 * made it 32 bits long.  If this is an old format inode,
+	 * convert it in memory to look like a new one.  If it gets
+	 * flushed to disk we will convert back before flushing or
+	 * logging it.  We zero out the new projid field and the old link
+	 * count field.  We'll handle clearing the pad field (the remains
+	 * of the old uuid field) when we actually convert the inode to
+	 * the new format. We don't change the version number so that we
+	 * can distinguish this from a real new format inode.
+	 */
+	if (ip->i_d.di_version == XFS_DINODE_VERSION_1) {
+		ip->i_d.di_nlink = ip->i_d.di_onlink;
+		ip->i_d.di_onlink = 0;
+		ip->i_d.di_projid = 0;
+	}
+
 	ip->i_delayed_blks = 0;
 
 	/*
@@ -761,10 +778,28 @@ xfs_ialloc(
 	vp->v_type = IFTOVT(mode);
 	vp->v_rdev = rdev;
 	ip->i_d.di_mode = (__uint16_t)mode;
+	ip->i_d.di_onlink = 0;
 	ip->i_d.di_nlink = nlink;
 	ASSERT(ip->i_d.di_nlink == nlink);
 	ip->i_d.di_uid = cr->cr_uid;
 	ip->i_d.di_gid = cr->cr_gid;
+	ip->i_d.di_projid = 0;
+	bzero(&(ip->i_d.di_pad[0]), sizeof(ip->i_d.di_pad));
+
+	/*
+	 * If the superblock version is up to where we support new format
+	 * inodes and this is currently an old format inode, then change
+	 * the inode version number now.  This way we only do the conversion
+	 * here rather than here and in the flush/logging code.
+	 */
+	if ((tp->t_mountp->m_sb.sb_versionnum >= XFS_SB_VERSION_HASNLINK) &&
+	    (ip->i_d.di_version == XFS_DINODE_VERSION_1)) {
+		ip->i_d.di_version = XFS_DINODE_VERSION_2;
+		/*
+		 * We've alredy zeroed the old link count, the projid field,
+		 * and the pad field.
+		 */
+	}
 
 	/*
 	 * For multiple groups support: if ISGID bit is set in the parent
@@ -801,7 +836,6 @@ xfs_ialloc(
 	ip->i_d.di_nextents = 0;
 	ASSERT(ip->i_d.di_nblocks == 0);
 	xfs_ichgtime(ip, XFS_ICHGTIME_CHG|XFS_ICHGTIME_ACC|XFS_ICHGTIME_MOD);
-	uuid_create(&ip->i_d.di_uuid, &status);
 	/*
 	 * di_gen will have been taken care of in xfs_iread.
 	 */
@@ -2695,6 +2729,38 @@ xfs_iflush(
 	xfs_buf_item_flush_log_debug(bp, first,
 				     (first + sizeof(xfs_dinode_core_t) - 1));
 #endif
+
+	/*
+	 * If this is really an old format inode and the superblock version
+	 * has not been updated to support only new format inodes, then
+	 * convert back to the old inode format.  If the superblock version
+	 * has been updated, then make the conversion permanent.
+	 */
+	ASSERT((ip->i_d.di_version == XFS_DINODE_VERSION_1) ||
+	       (mp->m_sb.sb_versionnum >= XFS_SB_VERSION_HASNLINK));
+	if (ip->i_d.di_version == XFS_DINODE_VERSION_1) {
+		if (mp->m_sb.sb_versionnum < XFS_SB_VERSION_HASNLINK) {
+			/*
+			 * Convert it back.
+			 */
+			ASSERT(ip->i_d.di_nlink <= XFS_MAXLINK_1);
+			dip->di_core.di_onlink = ip->i_d.di_nlink;
+		} else {
+			/*
+			 * The superblock version has already been bumped,
+			 * so just make the conversion to the new inode
+			 * format permanent.
+			 */
+			ip->i_d.di_version = XFS_DINODE_VERSION_2;
+			dip->di_core.di_version = XFS_DINODE_VERSION_2;
+			ip->i_d.di_onlink = 0;
+			dip->di_core.di_onlink = 0;
+			bzero(&(ip->i_d.di_pad[0]), sizeof(ip->i_d.di_pad));
+			bzero(&(dip->di_core.di_pad[0]),
+			      sizeof(dip->di_core.di_pad));
+			ASSERT(ip->i_d.di_projid == 0);
+		}
+	}
 
 	xfs_iflush_fork(ip, dip, iip, XFS_DATA_FORK, bp);
 	if (XFS_IFORK_Q(ip))
