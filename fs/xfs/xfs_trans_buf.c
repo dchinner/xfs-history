@@ -1,4 +1,4 @@
-#ident "$Revision: 1.48 $"
+#ident "$Revision: 1.49 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -180,6 +180,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
  */
 buf_t *
 xfs_trans_getsb(xfs_trans_t	*tp,
+		struct xfs_mount *mp,
 		int		flags)
 {
 	buf_t			*bp;
@@ -190,7 +191,7 @@ xfs_trans_getsb(xfs_trans_t	*tp,
 	 * if tp is NULL.
 	 */
 	if (tp == NULL) {
-		return (xfs_getsb(tp->t_mountp, flags));
+		return (xfs_getsb(mp, flags));
 	}
 
 	/*
@@ -199,7 +200,7 @@ xfs_trans_getsb(xfs_trans_t	*tp,
 	 * have it locked.  In this case we just increment the lock
 	 * recursion count and return the buffer to the caller.
 	 */
-	bp = tp->t_mountp->m_sb_bp;
+	bp = mp->m_sb_bp;
 	if (((xfs_trans_t *)bp->b_fsprivate2) == tp) {
 		bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 		ASSERT(bip != NULL);
@@ -209,7 +210,7 @@ xfs_trans_getsb(xfs_trans_t	*tp,
 		return (bp);
 	}
 
-	bp = xfs_getsb(tp->t_mountp, flags);
+	bp = xfs_getsb(mp, flags);
 	if (bp == NULL) {
 		return NULL;
 	}
@@ -219,7 +220,7 @@ xfs_trans_getsb(xfs_trans_t	*tp,
 	 * it doesn't have one yet, then allocate one and initialize it.
 	 * The checks to see if one is there are in xfs_buf_item_init().
 	 */
-	xfs_buf_item_init(bp, tp->t_mountp);
+	xfs_buf_item_init(bp, mp);
 
 	/*
 	 * Set the recursion count for the buffer within this transaction

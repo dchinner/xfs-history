@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.146 $"
+#ident	"$Revision: 1.147 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -960,7 +960,7 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
 	if (!fields)
 		return;
 	mp = tp->t_mountp;
-	bp = xfs_trans_getsb(tp, 0);
+	bp = xfs_trans_getsb(tp, mp, 0);
 	sbp = XFS_BUF_TO_SBP(bp);
 	first = sizeof(xfs_sb_t);
 	last = 0;

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.81 $"
+#ident "$Revision: 1.82 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -405,7 +405,7 @@ xfs_trans_apply_sb_deltas(
 	buf_t		*bp;
 	int		whole = 0;
 
-	bp = xfs_trans_getsb(tp, 0);
+	bp = xfs_trans_getsb(tp, tp->t_mountp, 0);
 	sbp = XFS_BUF_TO_SBP(bp);
 
 	/*
