@@ -25,19 +25,19 @@ tarballs: xfs-cmds
 i386kernel:
 	@echo "=== Making $@ `date`"; \
 	cd $(WORKAREA)/SPECS; \
-	rpm -ba --target i386 ${KERN_SPEC}; \
+	rpm -ba --target=i386 ${KERN_SPEC}; \
 	echo "=== Done Making $@ `date`"
 
 i586kernel:
 	@echo "=== Making $@ `date`"; \
 	cd $(WORKAREA)/SPECS; \
-	rpm -ba --target i586 ${KERN_SPEC}; \
+	rpm -ba --target=i586 ${KERN_SPEC}; \
 	echo "=== Done Making $@ `date`"
 
 i686kernel:
 	@echo "=== Making $@ `date`"; \
 	cd $(WORKAREA)/SPECS; \
-	rpm -ba --target i686 ${KERN_SPEC}; \
+	rpm -ba --target=i686 ${KERN_SPEC}; \
 	echo "=== Done Making $@ `date`"
 
 i386cmd: xfs-cmds
