@@ -292,9 +292,11 @@ again:
 	 * Call hook for imon to see whether ip is of interest and should
 	 * have its vnodeops monitored.
 	 */
+#ifndef SIM
 	if (newnode) {
 		IMON_CHECK(vp, ip->i_dev, (ino_t)ino);
 	}
+#endif
 	*ipp = ip;
 	return 0;
 }
