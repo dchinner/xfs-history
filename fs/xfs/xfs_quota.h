@@ -1,6 +1,6 @@
 #ifndef __XFS_QUOTA_H__
 #define __XFS_QUOTA_H__
-#ident "$Revision: 1.1 $"
+#ident "$Revision: 1.2 $"
 /*
  * External Interface to the XFS disk quota subsystem.
  */
