@@ -1,3 +1,5 @@
+#ident "$Revision$"
+
 #ifdef SIM
 #define _KERNEL 1
 #endif
@@ -9,7 +11,7 @@
 #include <sys/user.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
-#include <fs/specfs/snode.h>
+#include <specfs/snode.h>
 #include <sys/systm.h>
 #include <sys/dnlc.h>
 #include <sys/sysmacros.h>
@@ -41,7 +43,6 @@
 #include <sys/sema.h>
 #include <sys/statvfs.h>
 #include <sys/region.h>
-#include <fs/specfs/snode.h>
 #include <sys/stat.h>
 #include <sys/file.h>
 #include <sys/mode.h>
@@ -65,10 +66,10 @@
 #include "xfs_ialloc.h"
 #include "xfs_alloc.h"
 #include "xfs_bmap.h"
+#include "xfs_dir.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
-#include "xfs_dir.h"
 #include "xfs_rw.h"
 #include "xfs_error.h"
 
@@ -4577,6 +4578,7 @@ xfs_reclaim(vnode_t	*vp,
 	return 0;
 }
 
+#ifndef SIM
 
 /*
  * xfs_free_file_space()
@@ -4921,6 +4923,7 @@ xfs_error( xfs_mount_t *mp, int type)
 			break;
 	}
 }
+#endif	/* !SIM */
 
 #ifdef SIM
 
