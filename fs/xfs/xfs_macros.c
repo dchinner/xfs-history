@@ -975,11 +975,27 @@ xfs_dir_sf_entsize_byname(int len)
 }
 #endif
 
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR_SF_GET_DIRINO)
+void
+xfs_dir_sf_get_dirino(xfs_dir_ino_t *from, xfs_ino_t *to)
+{
+	XFS_DIR_SF_GET_DIRINO(from, to);
+}
+#endif
+
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR_SF_NEXTENTRY)
 xfs_dir_sf_entry_t *
 xfs_dir_sf_nextentry(xfs_dir_sf_entry_t *sfep)
 {
 	return XFS_DIR_SF_NEXTENTRY(sfep);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR_SF_PUT_DIRINO)
+void
+xfs_dir_sf_put_dirino(xfs_ino_t *from, xfs_dir_ino_t *to)
+{
+	XFS_DIR_SF_PUT_DIRINO(from, to);
 }
 #endif
 
@@ -1479,6 +1495,14 @@ void
 xfs_lic_init(xfs_log_item_chunk_t *cp)
 {
 	XFS_LIC_INIT(cp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_LIC_INIT_SLOT)
+void
+xfs_lic_init_slot(xfs_log_item_chunk_t *cp, int slot)
+{
+	XFS_LIC_INIT_SLOT(cp, slot);
 }
 #endif
 
