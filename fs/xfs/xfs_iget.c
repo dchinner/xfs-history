@@ -60,8 +60,6 @@ xfs_ihash_init(xfs_mount_t *mp)
 void
 xfs_ihash_free(xfs_mount_t *mp)
 {
-	int	i;
-
 	kmem_free(mp->m_ihash, mp->m_ihsize*sizeof(xfs_ihash_t));
 	mp->m_ihash = NULL;
 }
@@ -553,7 +551,6 @@ xfs_inode_incore(xfs_mount_t	*mp,
 {
 	xfs_ihash_t	*ih;
 	xfs_inode_t	*ip;
-	xfs_inode_t	*iq;
 
 	ih = XFS_IHASH(mp, ino);
 	read_lock(&ih->ih_lock);
