@@ -931,7 +931,7 @@ pagebuf_lookup(
 {
 	page_buf_t		*pb;
 
-	flags |= _PBF_PRIVATE_BH;
+	flags |= _PBF_PRIVATE_BH | _PBF_LOCKABLE;
 	pb = pagebuf_allocate(flags);
 	if (pb) {
 		_pagebuf_initialize(pb, target, ioff, isize, flags);
