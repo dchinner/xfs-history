@@ -1373,11 +1373,11 @@ xlog_recover_print_inode_core(xfs_dinode_core_t *di)
     printf("	CORE inode:\n");
     if (!print_inode)
 	return;
-    printf("		magic:%c%c  mode:0x%x  ver:%d  format:%d  nlink:%d\n",
+    printf("		magic:%c%c  mode:0x%x  ver:%d  format:%d  onlink:%d\n",
 	   ((char *)&di->di_magic)[0], ((char *)&di->di_magic)[1], di->di_mode,
-	   di->di_version, di->di_format, di->di_nlink);
-    printf("		uid:%d  gid:%d  uuid:0x%llx\n",
-	   di->di_uid, di->di_gid, di->di_uuid);
+	   di->di_version, di->di_format, di->di_onlink);
+    printf("		uid:%d  gid:%d  nlink:%d projid:%d\n",
+	   di->di_uid, di->di_gid, di->di_nlink, (uint)di->di_projid);
     printf("		atime:%d  mtime:%d  ctime:%d\n",
 	   di->di_atime.t_sec, di->di_mtime.t_sec, di->di_ctime.t_sec);
     printf("		size:0x%llx  nblks:0x%llx  exsize:%d  nextents:%d  anextents:%d\n",
