@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision: 6.0 $"
+#ident "$Revision: 1.82 $"
 
 struct buf;
 struct xfs_efd_log_item;
@@ -111,6 +111,7 @@ typedef struct xfs_item_ops {
 	xfs_lsn_t (*iop_committed)(xfs_log_item_t *, xfs_lsn_t);	
 	void (*iop_push)(xfs_log_item_t *);
 	void (*iop_abort)(xfs_log_item_t *);
+	void (*iop_pushbuf)(xfs_log_item_t *);
 } xfs_item_ops_t;
 
 #define	IOP_SIZE(ip)		(*(ip)->li_ops->iop_size)(ip)
@@ -122,6 +123,7 @@ typedef struct xfs_item_ops {
 #define	IOP_COMMITTED(ip, lsn)	(*(ip)->li_ops->iop_committed)(ip, lsn)
 #define	IOP_PUSH(ip)		(*(ip)->li_ops->iop_push)(ip)
 #define	IOP_ABORT(ip)		(*(ip)->li_ops->iop_abort)(ip)
+#define IOP_PUSHBUF(ip)         (*(ip)->li_ops->iop_pushbuf)(ip)
 
 /*
  * Return values for the IOP_TRYLOCK() routines.
@@ -130,7 +132,7 @@ typedef struct xfs_item_ops {
 #define	XFS_ITEM_PINNED		1
 #define	XFS_ITEM_LOCKED		2
 #define	XFS_ITEM_FLUSHING	3
- 
+#define XFS_ITEM_PUSHBUF      	4
 
 /*
  * This structure is used to track log items associated with
