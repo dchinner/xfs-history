@@ -222,7 +222,6 @@ int linvfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *den
 		ip->i_nlink++;
 		ip->i_ctime = CURRENT_TIME;
 		VN_HOLD(vp);
-		inode->i_count++;
 		d_instantiate(dentry, ip);
 	}
 	return -error;
