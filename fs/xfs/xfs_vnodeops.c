@@ -1,4 +1,4 @@
-#ident "$Revision: 1.379 $"
+#ident "$Revision: 1.380 $"
 
 
 #ifdef SIM
@@ -2889,7 +2889,7 @@ xfs_create_new(
 std_return:
 #ifndef SIM
 	if ( (created || (error != 0 && dm_event_sent != 0)) &&
-			DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, 
+			DM_EVENT_ENABLED(dir_vp->v_vfsp, XFS_BHVTOI(dir_bdp), 
 							DM_EVENT_POSTCREATE)) {
 		(void) dm_send_namesp_event(DM_EVENT_POSTCREATE,
 			dir_bdp, DM_RIGHT_NULL,
@@ -4313,7 +4313,7 @@ xfs_mkdir(
 std_return:
 #ifndef SIM
 	if ( (created || (error != 0 && dm_event_sent != 0)) &&
-			DM_EVENT_ENABLED(dir_vp->v_vfsp, dp,
+			DM_EVENT_ENABLED(dir_vp->v_vfsp, XFS_BHVTOI(dir_bdp),
 						DM_EVENT_POSTCREATE)) {
 		(void) dm_send_namesp_event(DM_EVENT_POSTCREATE,
 					dir_bdp, DM_RIGHT_NULL,
@@ -5743,6 +5743,8 @@ xfs_fcntl(
 		}
 
 		iflags = (cmd == F_GETBMAPA ? BMV_IF_ATTRFORK : 0);
+		if (flags&FINVIS)
+			iflags |= BMV_IF_NO_DMAPI_READ;
 		error = xfs_getbmap(bdp, &bm, (struct getbmap *)arg + 1, iflags);
 
 		if (!error && copyout(&bm, arg, sizeof(bm))) {
@@ -6305,9 +6307,10 @@ dmapi_enospc_check:
 	if (error == ENOSPC && (attr_flags&ATTR_DMI) == 0 &&
 	    DM_EVENT_ENABLED(XFS_MTOVFS(mp), ip, DM_EVENT_NOSPACE)) {
 
-		error = xfs_dm_send_data_event(DM_EVENT_NOSPACE,
-				XFS_ITOBHV(ip), 0, 0,
-				AT_DELAY_FLAG(attr_flags), NULL);
+		error = dm_send_namesp_event(DM_EVENT_NOSPACE,
+				XFS_ITOBHV(ip), DM_RIGHT_NULL, 
+				XFS_ITOBHV(ip), DM_RIGHT_NULL,
+				NULL, NULL, 0, 0, 0); /* Delay flag intentionally unused */
 		if (error == 0) 
 			goto retry;	/* Maybe DMAPI app. has made space */
 		/* else fall through with error = xfs_dm_send_data_event result. */
@@ -6399,7 +6402,8 @@ STATIC int
 xfs_free_file_space( 
 	xfs_inode_t		*ip,
 	off_t 			offset,
-	off_t			len)
+	off_t			len,
+	int			attr_flags)
 {
 	int			committed;
 	int			done;
@@ -6438,12 +6442,13 @@ xfs_free_file_space(
 	endoffset_fsb = XFS_B_TO_FSBT(mp, end_dmi_offset);
 
 	if ( offset < ip->i_d.di_size &&
+		(attr_flags&ATTR_DMI) == 0  &&
 		DM_EVENT_ENABLED(XFS_MTOVFS(mp), ip, DM_EVENT_WRITE)) {
 		if (end_dmi_offset > ip->i_d.di_size)
 			end_dmi_offset = ip->i_d.di_size;
 		error = xfs_dm_send_data_event(DM_EVENT_WRITE, XFS_ITOBHV(ip),
 			offset, end_dmi_offset - offset,
-			0, NULL);
+			AT_DELAY_FLAG(attr_flags), NULL);
 		if (error)
 			return(error);
 	}
@@ -6628,7 +6633,8 @@ xfs_change_file_space(
 		break;
 	case F_UNRESVSP:
 	case F_UNRESVSP64:
-		if (error = xfs_free_file_space(ip, startoffset, bf->l_len))
+		if (error = xfs_free_file_space(ip, startoffset, bf->l_len,
+									attr_flags))
 			return error;
 		break;
 	case F_ALLOCSP:
