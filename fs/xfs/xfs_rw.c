@@ -93,8 +93,10 @@ int uiodbg_switch = 0;
 
 /*
  * XXXrcc - temporary until I get a tunable in
- */
 #define XFS_NFS_IO_UNITS	10
+ */
+
+extern int xfs_nfs_io_units;
 
 /*
  * This lock is used by xfs_strat_write().
@@ -2160,18 +2162,7 @@ xfs_iomap_write(
 	XFS_INODE_CLEAR_READ_AHEAD(ip);
 	return 0;
 }
-#if 0
-int rcc = 0;
-int rcc_cnt_eof = 0;
-int rcc_cnt_back = 0;
-int rcc_overflow = 0;
-int rcc_array[30] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		     0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-int rcc_eof_array[30] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		     0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-#endif
+
 int
 xfs_write_file(
 	bhv_desc_t	*bdp,
@@ -2187,7 +2178,7 @@ xfs_write_file(
 	xfs_inode_t	*ip;
 	int		error;
 	int		eof_zeroed;
-	int		fill;
+	int		fillhole;
 	int		gaps_mapped;
 	off_t		offset;
 	ssize_t		count;
@@ -2196,9 +2187,6 @@ xfs_write_file(
 	xfs_fsize_t	new_size;
 	xfs_mount_t	*mp;
 	extern void	chunkrelse(buf_t*);
-#if 0
-	int		rcc_index;
-#endif
 
 	vp = BHV_TO_VNODE(bdp);
 	ip = XFS_BHVTOI(bdp);
@@ -2252,38 +2240,6 @@ xfs_write_file(
 	 * This is protected by the io lock.
 	 */
 	ip->i_write_offset = uiop->uio_offset;
-#if 0
-	if (ip->i_ino == 131 && ip->i_mount->m_fsname[1] == 'x' &&
-			uiop->uio_resid == 32768 &&
-			uiop->uio_offset != ip->i_d.di_size)  {
-		atomicAddInt(&rcc, 1);
-		/*
-		 * write beyond eof, leaving a hole, update write offset
-		 */
-		if (uiop->uio_offset > ip->i_d.di_size)  {
-			rcc_index = (uiop->uio_offset - ip->i_d.di_size)
-					/ 32768;
-			if (rcc_index >= 30)  {
-				rcc_index = 29;
-				atomicAddInt(&rcc_overflow, 1);
-			}
-			atomicAddInt(&rcc_cnt_eof, 1);
-			atomicAddInt(&rcc_eof_array[rcc_index], 1);
-		} else if (uiop->uio_offset < ip->i_d.di_size)  {
-			/*
-			 * write into a hole, leave write offset alone
-			 */
-			rcc_index = (ip->i_d.di_size - uiop->uio_offset)
-					/ 32768;
-			if (rcc_index >= 30)  {
-				rcc_index = 29;
-				atomicAddInt(&rcc_overflow, 1);
-			}
-			atomicAddInt(&rcc_cnt_back, 1);
-			atomicAddInt(&rcc_array[rcc_index], 1);
-		}
-	}
-#endif
 
 	/*
 	 * Loop until uiop->uio_resid, which is the number of bytes the
@@ -2297,16 +2253,21 @@ xfs_write_file(
 	 */
 	if (!((ioflag & IO_NFS3) &&
 	    uiop->uio_offset > ip->i_d.di_size &&
-	    uiop->uio_offset - ip->i_d.di_size <= (XFS_NFS_IO_UNITS *
+	    uiop->uio_offset - ip->i_d.di_size <= (xfs_nfs_io_units *
 					 (1 << (int) MAX(ip->i_writeio_log,
 						   uiop->uio_writeiolog))))) {
-		fill = 0;
+		fillhole = 0;
 		offset = uiop->uio_offset;
 		count = uiop->uio_resid;
 	} else  {
-		fill = 1;
+		/*
+		 * have to zero-fill for NFS3.  Set up offset/count
+		 * so we deal with all the bytes between current eof
+		 * and end of the new write.
+		 */
+		fillhole = 1;
 		offset = ip->i_d.di_size;
-		count = uiop->uio_offset - offset;
+		count = uiop->uio_offset + uiop->uio_resid - offset;
 	}
 
 	do {
@@ -2449,13 +2410,16 @@ xfs_write_file(
 				continue;
 			}
 
-			ASSERT(fill || fill == 0 &&
+			ASSERT(fillhole || fillhole == 0 &&
 					BBTOOFF(bmapp->offset) + bmapp->pboff
 						== uiop->uio_offset);
 
 			/*
 			 * zero the bytes up to the data being written
-			 * but don't overwrite data we read in
+			 * but don't overwrite data we read in.  This
+			 * zero-fills the buffers we set up for the NFS3
+			 * case to fill the holes between EOF and the new
+			 * write.
 			 */
 			if (!read && BBTOOFF(bmapp->offset) + bmapp->pboff
 					<  uiop->uio_offset)  {
@@ -2467,14 +2431,20 @@ xfs_write_file(
 
 			/*
 			 * biomove the data in the region to be written.
-			 * Be careful moving data into the first overlapped
-			 * buffer.
+			 * In the NFS3 hole-filling case, don't fill
+			 * anything until we hit the first buffer with
+			 * data that we have to write.
 			 */
-			if (!fill)
+			if (!fillhole)
 				error = biomove(bp, bmapp->pboff, bmapp->pbsize,
 						UIO_WRITE, uiop);
 			else if (BBTOOFF(bmapp->offset) + bmapp->pboff +
 					bmapp->pbsize >= uiop->uio_offset)  {
+				/*
+				 * NFS3 - first buffer to be written.  biomove
+				 * into the portion of the buffer that the
+				 * user originally asked to write to.
+				 */
 				ASSERT(BBTOOFF(bmapp->offset) + bmapp->pboff
 							<= uiop->uio_offset);
 				error = biomove(bp,
@@ -2486,7 +2456,12 @@ xfs_write_file(
 						     bmapp->pboff)),
 						UIO_WRITE,
 						uiop);
-				fill = 0;
+				/*
+				 * turn off hole-filling code.  The rest
+				 * of the buffers can be handled as per
+				 * the usual write path.
+				 */
+				fillhole = 0;
 			}
 
 			if (error)  {
@@ -2526,12 +2501,23 @@ xfs_write_file(
 			 *
 			 * No one could have shrunken the file, because
 			 * we are holding the iolock shared.
+			 *
+			 * reset offset/count to reflect the biomove
 			 */
-			if (!fill)
+			if (!fillhole)  {
 				offset = uiop->uio_offset;
-			else
+				count = uiop->uio_resid;
+			} else  {
+				/*
+				 * NFS3 - set offset to the beginning
+				 * of the next area in the file to be
+				 * copied or zero-filled.  Drop count
+				 * by the the amount we just zero-filled.
+				 */
 				offset = BBTOOFF(bmapp->offset) +
 					 bmapp->pboff + bmapp->pbsize;
+				count -= bmapp->pbsize;
+			}
 
 			if (offset > isize) {
 				xfs_ilock(ip, XFS_ILOCK_EXCL);
@@ -5669,29 +5655,27 @@ xfs_diordwr(
 	else
 		bp->b_edev = mp->m_dev;
 
-	if (ioflag & IO_PRIORITY) {
-		/*
- 	 	 * Check if this is a guaranteed rate I/O
-	 	 */
-		if (xfs_io_is_guaranteed((vfile_t *)uiop->uio_fp, &stream_id)) {
-			if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
-				bp->b_flags2 |= B_GR_BUF;
-			else
-				bp->b_flags2 |= B_PRIO_BUF;
+	/*
+	 * Check if this is a guaranteed rate I/O
+	 */
+	if (!(ioflag & IO_PRIORITY)) {
+		bp->b_grio_private = NULL;
+		bp->b_flags2 &= ~B_GR_BUF;
+		bp->b_flags2 &= ~B_PRIO_BUF;
+	} else if (xfs_io_is_guaranteed((vfile_t *)uiop->uio_fp, &stream_id)) {
+		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
+			bp->b_flags2 |= B_GR_BUF;
+		else
+			bp->b_flags2 |= B_PRIO_BUF;
 
-			ASSERT(bp->b_grio_private == NULL);
-			bp->b_grio_private = 
-				kmem_zone_alloc(grio_buf_data_zone, KM_SLEEP);
-			ASSERT(BUF_GRIO_PRIVATE(bp));
-			COPY_STREAM_ID(stream_id,BUF_GRIO_PRIVATE(bp)->grio_id);
-			iosize =  uiop->uio_iov[0].iov_len;
-			index = grio_monitor_io_start(&stream_id, iosize);
-			INIT_GRIO_TIMESTAMP(bp);
-		} else {
-			bp->b_grio_private = NULL;
-			bp->b_flags2 &= ~B_GR_BUF;
-			bp->b_flags2 &= ~B_PRIO_BUF;
-		}
+		ASSERT(bp->b_grio_private == NULL);
+		bp->b_grio_private = 
+			kmem_zone_alloc(grio_buf_data_zone, KM_SLEEP);
+		ASSERT(BUF_GRIO_PRIVATE(bp));
+		COPY_STREAM_ID(stream_id,BUF_GRIO_PRIVATE(bp)->grio_id);
+		iosize =  uiop->uio_iov[0].iov_len;
+		index = grio_monitor_io_start(&stream_id, iosize);
+		INIT_GRIO_TIMESTAMP(bp);
 	} else {
 		bp->b_grio_private = NULL;
 		bp->b_flags2 &= ~B_GR_BUF;
