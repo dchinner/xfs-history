@@ -1087,6 +1087,7 @@ xfs_iomap_write(
 	 * If bmapi returned us nothing, then we must have run out of space.
 	 */
 	if (nimaps == 0) {
+		kmem_zone_free(xfs_irec_zone, (void *)imap);
 		return ENOSPC;
 	}
 	
@@ -2076,6 +2077,7 @@ xfs_strat_write(
 			bp->b_bcount = XFS_FSB_TO_B(locals->mp,
 						    locals->count_fsb);
 			bdstrat(bmajor(bp->b_edev), bp);
+			kmem_zone_free(xfs_strat_write_zone, (void *)locals);
 			return;
 		}
 
@@ -2169,11 +2171,13 @@ xfs_strat_write(
 		spunlockspl(xfs_strat_lock, locals->s);
 
 		iodone(bp);
+		kmem_zone_free(xfs_strat_write_zone, (void *)locals);
 		return;
 	}
 
 	bp->b_flags &= ~B_PARTIAL;
 	spunlockspl(xfs_strat_lock, locals->s);
+	kmem_zone_free(xfs_strat_write_zone, (void *)locals);
 	return;
 }
 
