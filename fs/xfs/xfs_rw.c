@@ -1,4 +1,4 @@
-#ident "$Revision: 1.238 $"
+#ident "$Revision: 1.239 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1369,8 +1369,21 @@ xfs_read(
 	vp = BHV_TO_VNODE(bdp);
 	ip = XFS_BHVTOI(bdp);
 
-	if (!(ioflag & IO_ISLOCKED))
-		xfs_rwlock(bdp, VRWLOCK_READ);
+	if (!(ioflag & IO_ISLOCKED)) {
+		/* For calls from the paging system where the faulting
+		 * process is multithreaded, try to grab the I/O lock,
+		 * if it is already held, then we ask the paging system
+		 * to try again by returning EAGAIN.
+		 */
+		if ((uiop->uio_segflg == UIO_NOSPACE) &&
+		    (ioflag & IO_MTTHREAD) && VN_MAPPED(vp)) {
+			if (!xfs_ilock_nowait(ip, XFS_IOLOCK_SHARED)) {
+				return (EAGAIN);
+			}
+		} else {
+			xfs_rwlock(bdp, VRWLOCK_READ);
+		}
+	}
 	
 	type = ip->i_d.di_mode & IFMT;
 	ASSERT(type == IFDIR ||
