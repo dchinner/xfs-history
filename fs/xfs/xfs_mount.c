@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.189 $"
+#ident	"$Revision: 1.190 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -245,11 +245,10 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	/*
 	 * Initialize and read in the superblock buffer.
 	 */
-	bp->b_edev = dev;
 	bp->b_relse = xfs_sb_relse;
 	XFS_BUF_SET_ADDR(bp, XFS_SB_DADDR);
 	XFS_BUF_READ(bp);
-	bp->b_target = mp->m_ddev_targp;
+	XFS_BUF_SET_TARGET(bp, mp->m_ddev_targp);
 	xfsbdstrat(mp, bp);
 	if (error = iowait(bp)) {
 		goto err;
@@ -1074,7 +1073,7 @@ xfs_unmountfs_writesb(xfs_mount_t *mp)
 		XFS_BUF_UNREAD(sbp);
 		XFS_BUF_WRITE(sbp);
 		bwait_unpin(sbp);
-		ASSERT(sbp->b_edev == mp->m_dev);
+		ASSERT(XFS_BUF_TARGET(sbp) == mp->m_dev);
 		xfsbdstrat(mp, sbp);
 		/* Nevermind errors we might get here. */
 		error = iowait(sbp);

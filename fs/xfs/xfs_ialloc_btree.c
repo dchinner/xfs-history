@@ -338,7 +338,7 @@ xfs_inobt_delrec(
 					      cur->bc_private.i.agno,
 					      XFS_AGF_DADDR);
 			if (error = xfs_trans_read_buf(cur->bc_mp, cur->bc_tp,
-					cur->bc_mp->m_dev, agfbno, 1, 0,
+					cur->bc_mp->m_ddev_targp, agfbno, 1, 0,
 					&agfbp))
 				return error;
 			ASSERT(!geterror(agfbp));
@@ -631,7 +631,7 @@ xfs_inobt_delrec(
 	agfbno = XFS_AG_DADDR(cur->bc_mp, cur->bc_private.i.agno,
 			      XFS_AGF_DADDR);
 	if (error = xfs_trans_read_buf(cur->bc_mp, cur->bc_tp,
-			cur->bc_mp->m_dev, agfbno, 1, 0, &agfbp))
+			cur->bc_mp->m_ddev_targp, agfbno, 1, 0, &agfbp))
 		return error;
 	ASSERT(!geterror(agfbp));
 	xfs_trans_bhold_until_committed(cur->bc_tp, agfbp);

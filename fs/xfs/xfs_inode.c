@@ -257,8 +257,7 @@ xfs_inotobp(
 {
 	int		di_ok;
 	xfs_imap_t	imap;
-	xfs_buf_t		*bp;
-	dev_t		dev;
+	xfs_buf_t	*bp;
 	int		error;
 	xfs_dinode_t	*dip;
 
@@ -286,8 +285,7 @@ xfs_inotobp(
 	 * Read in the buffer.  If tp is NULL, xfs_trans_read_buf() will
 	 * default to just a read_buf() call.
 	 */
-	dev = mp->m_dev;
-	error = xfs_trans_read_buf(mp, tp, dev, imap.im_blkno,
+	error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, imap.im_blkno,
 				   (int)imap.im_len, 0, &bp);
 
 	if (error) {
@@ -340,11 +338,10 @@ xfs_itobp(
 	xfs_trans_t	*tp,
 	xfs_inode_t	*ip,	
 	xfs_dinode_t	**dipp,
-	xfs_buf_t		**bpp,
+	xfs_buf_t	**bpp,
 	daddr_t		bno)
 {
-	xfs_buf_t		*bp;
-	dev_t		dev;
+	xfs_buf_t	*bp;
 	int		error;
 	xfs_imap_t	imap;
 #ifndef XFS_REPAIR_SIM
@@ -396,9 +393,8 @@ xfs_itobp(
 	 * Read in the buffer.  If tp is NULL, xfs_trans_read_buf() will
 	 * default to just a read_buf() call.
 	 */
-	dev = mp->m_dev;
-	error = xfs_trans_read_buf(mp, tp, dev, imap.im_blkno, (int)imap.im_len,
-				   0, &bp);
+	error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, imap.im_blkno,
+				   (int)imap.im_len, 0, &bp);
 
 	if (error) {
 		return error;
@@ -1781,7 +1777,8 @@ xfs_iunlink(
 	 * Get the agi buffer first.  It ensures lock ordering
 	 * on the list.
 	 */
-	error = xfs_trans_read_buf(mp, tp, mp->m_dev, agdaddr, 1, 0, &agibp);
+	error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, agdaddr,
+				   1, 0, &agibp);
 	if (error) {
 		return error;
 	}
@@ -1878,7 +1875,8 @@ xfs_iunlink_remove(
 	 * Get the agi buffer first.  It ensures lock ordering
 	 * on the list.
 	 */
-	error = xfs_trans_read_buf(mp, tp, mp->m_dev, agdaddr, 1, 0, &agibp);
+	error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, agdaddr,
+				   1, 0, &agibp);
 	if (error != 0) {
 		return error;
 	}
@@ -3135,7 +3133,6 @@ cluster_corrupt_out:
 		 */
 		if (XFS_BUF_IODONE_FUNC(bp)) {
 			XFS_BUF_CLR_BDSTRAT_FUNC(bp);
-			bp->b_target = NULL;
 			XFS_BUF_UNDONE(bp);
 			XFS_BUF_STALE(bp);
 			XFS_BUF_SHUT(bp);

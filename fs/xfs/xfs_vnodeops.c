@@ -1,4 +1,4 @@
-#ident "$Revision: 1.421 $"
+#ident "$Revision: 1.422 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -6530,11 +6530,9 @@ xfs_zero_remaining_bytes(
 	ASSERT(!geterror(bp));
 
 	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
-		bp->b_edev = mp->m_rtdev;
-		bp->b_target = &mp->m_rtdev_targ;
+		XFS_BUF_SET_TARGET(bp, &mp->m_rtdev_targ);
 	} else {
-		bp->b_edev = mp->m_dev;
-		bp->b_target = mp->m_ddev_targp;
+		XFS_BUF_SET_TARGET(bp, mp->m_ddev_targp);
 	}
 
 	for (offset = startoff; offset <= endoff; offset = lastoffset + 1) {

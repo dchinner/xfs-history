@@ -162,9 +162,9 @@ xfs_growfs_data(
 		/*
 		 * AG freelist header block
 		 */
-		bp = get_buf(mp->m_dev, XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR),
-			     sectbb, 0);
-		bp->b_target =  mp->m_ddev_targp;
+		bp = get_buf_targ(mp->m_ddev_targp,
+				  XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR),
+			          sectbb, 0);
 		agf = XFS_BUF_TO_AGF(bp);
 		bzero(agf, mp->m_sb.sb_sectsize);
 		agf->agf_magicnum = XFS_AGF_MAGIC;
@@ -193,9 +193,9 @@ xfs_growfs_data(
 		/*
 		 * AG inode header block
 		 */
-		bp = get_buf(mp->m_dev, XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR),
-			sectbb, 0);
-		bp->b_target =  mp->m_ddev_targp;
+		bp = get_buf_targ(mp->m_ddev_targp,
+				  XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR),
+				  sectbb, 0);
 		agi = XFS_BUF_TO_AGI(bp);
 		bzero(agi, mp->m_sb.sb_sectsize);
 		agi->agi_magicnum = XFS_AGI_MAGIC;
@@ -217,10 +217,9 @@ xfs_growfs_data(
 		/*
 		 * BNO btree root block
 		 */
-		bp = get_buf(mp->m_dev,
+		bp = get_buf_targ(mp->m_ddev_targp,
 			XFS_AGB_TO_DADDR(mp, agno, XFS_BNO_BLOCK(mp)),
 			BTOBB(bsize), 0);
-		bp->b_target =  mp->m_ddev_targp;
 		block = XFS_BUF_TO_SBLOCK(bp);
 		bzero(block, bsize);
 		block->bb_magic = XFS_ABTB_MAGIC;
@@ -238,10 +237,9 @@ xfs_growfs_data(
 		/*
 		 * CNT btree root block
 		 */
-		bp = get_buf(mp->m_dev,
+		bp = get_buf_targ(mp->m_ddev_targp,
 			XFS_AGB_TO_DADDR(mp, agno, XFS_CNT_BLOCK(mp)),
 			BTOBB(bsize), 0);
-		bp->b_target =  mp->m_ddev_targp;
 		block = XFS_BUF_TO_SBLOCK(bp);
 		bzero(block, bsize);
 		block->bb_magic = XFS_ABTC_MAGIC;
@@ -260,10 +258,9 @@ xfs_growfs_data(
 		/*
 		 * INO btree root block
 		 */
-		bp = get_buf(mp->m_dev,
+		bp = get_buf_targ(mp->m_ddev_targp,
 			XFS_AGB_TO_DADDR(mp, agno, XFS_IBT_BLOCK(mp)),
 			BTOBB(bsize), 0);
-		bp->b_target = mp->m_ddev_targp;
 		block = XFS_BUF_TO_SBLOCK(bp);
 		bzero(block, bsize);
 		block->bb_magic = XFS_IBT_MAGIC;

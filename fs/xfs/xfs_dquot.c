@@ -1,4 +1,4 @@
-#ident "$Revision: 1.36 $"
+#ident "$Revision: 1.37 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include "xfs_buf.h"
@@ -588,7 +588,7 @@ xfs_qm_dqtobp(
 	 */
 	if (! newdquot) {
 		xfs_dqtrace_entry(dqp, "DQTOBP READBUF");
-		if (error = xfs_trans_read_buf(mp, tp, mp->m_dev,
+		if (error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp,
 					       dqp->q_blkno,
 					       XFS_QI_DQCHUNKLEN(mp),
 					       0, &bp)) {

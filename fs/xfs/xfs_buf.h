@@ -104,6 +104,12 @@ typedef struct buf xfs_buf_t;
 #define XFS_BUF_COUNT(bp)	((bp)->b_bcount)
 #define XFS_BUF_SET_COUNT(bp, cnt)		\
 			((bp)->b_bcount = cnt)
+
+#define XFS_BUF_SET_TARGET(bp, target)		\
+			(bp)->b_target = target; \
+			(bp)->b_edev = (target)->dev
+#define XFS_BUF_TARGET(bp)			\
+			((bp)->b_edev)
 #define XFS_BUF_SET_VTYPE_REF(bp, type, ref)	\
 			(bp)->b_bvtype = (type); \
 			(bp)->b_ref = (ref)
@@ -177,7 +183,8 @@ typedef struct buftarg {
 #define XFS_BUF_SET_VTYPE(bp, type)
 #define XFS_BUF_SET_REF(bp, ref)
 
-#define xfs_bdwrite(mp, bp) pagebuf_iostart(bp, PBF_DELWRI)
+#define xfs_bdwrite(mp, bp) pb->pb_flags |= PBF_DELWRI; \
+			    pagebuf_relse(bp)
 #define xfs_bawrite(mp, bp) pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC)
 
 #define xfs_buf_relse(bp)	\

@@ -52,7 +52,7 @@
 STATIC xfs_buf_t *
 xfs_trans_buf_item_match(
 	xfs_trans_t	*tp,
-	dev_t		dev,
+	buftarg_t	*target,
 	daddr_t		blkno,
 	int		len);
 
@@ -60,7 +60,7 @@ xfs_trans_buf_item_match(
 STATIC xfs_buf_t *
 xfs_trans_buf_item_match_all(
 	xfs_trans_t	*tp,
-	dev_t		dev,
+	buftarg_t	*target,
 	daddr_t		blkno,
 	int		len);
 #endif
@@ -90,7 +90,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 		  int		len,
 		  uint		flags)
 {
-	xfs_buf_t			*bp;
+	xfs_buf_t		*bp;
 	xfs_buf_log_item_t	*bip;
 
 	/*
@@ -107,8 +107,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 		 */
 		return (get_buf(target_dev->dev, blkno, len, flags));
 #else
-		bp = get_buf(target_dev->dev, blkno, len, flags | BUF_BUSY);
-		bp->b_target = target_dev;
+		bp = get_buf_targ(target_dev, blkno, len, flags | BUF_BUSY);
 		return(bp);
 #endif
 	}
@@ -120,16 +119,15 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	 * recursion count and return the buffer to the caller.
 	 */
 	if (tp->t_items.lic_next == NULL) {
-		bp = xfs_trans_buf_item_match(tp, target_dev->dev, blkno, len);
+		bp = xfs_trans_buf_item_match(tp, target_dev, blkno, len);
 	} else {
 		bp = incore_match(target_dev->dev, blkno, len, BUF_FSPRIV2, tp);
 		if (bp)
-			ASSERT(xfs_trans_buf_item_match_all(tp, target_dev->dev,
+			ASSERT(xfs_trans_buf_item_match_all(tp, target_dev,
 				blkno, len) == bp);
 	}
 	if (bp != NULL) {
 		ASSERT(valusema(&bp->b_lock) <= 0);
-		bp->b_target = target_dev;
 		if (XFS_FORCED_SHUTDOWN(tp->t_mountp)) {
 			buftrace("TRANS GET RECUR SHUT", bp);
 			bp->b_flags &= ~(B_DONE|B_DELWRI);
@@ -165,12 +163,11 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 #ifdef SIM
 	bp = get_buf(target_dev->dev, blkno, len, flags);
 #else
-	bp = get_buf(target_dev->dev, blkno, len, flags | BUF_BUSY);
+	bp = get_buf_targ(target_dev, blkno, len, flags | BUF_BUSY);
 #endif
 	if (bp == NULL) {
 		return NULL;
 	}
-	bp->b_target = target_dev;
 
 	ASSERT(!geterror(bp));
 
@@ -225,7 +222,7 @@ xfs_trans_getsb(xfs_trans_t	*tp,
 		struct xfs_mount *mp,
 		int		flags)
 {
-	xfs_buf_t			*bp;
+	xfs_buf_t		*bp;
 	xfs_buf_log_item_t	*bip;
 
 	/*
@@ -323,13 +320,13 @@ int
 xfs_trans_read_buf(
 	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
-	dev_t		dev,
+	buftarg_t	*target,
 	daddr_t		blkno,
 	int		len,
 	uint		flags,
 	xfs_buf_t	**bpp)
 {
-	xfs_buf_t			*bp;
+	xfs_buf_t		*bp;
 	xfs_buf_log_item_t	*bip;
 	int			error;
 	
@@ -345,22 +342,21 @@ xfs_trans_read_buf(
 		/*
 		 * There's no bdflush daemon in simulation.
 		 */
-		bp = read_buf(dev, blkno, len, flags);
+		bp = read_buf(target->dev, blkno, len, flags);
 #else
-		bp = read_buf_targ(mp->m_ddev_targp, blkno, len,
+		bp = read_buf_targ(target, blkno, len,
 			      flags | BUF_BUSY);
-		ASSERT(bp->b_target);
-		ASSERT(bp->b_edev == dev);
 #endif
 		if ((bp != NULL) && (geterror(bp) != 0)) {
-			xfs_ioerror_alert("xfs_trans_read_buf", mp, dev, blkno);
+			xfs_ioerror_alert("xfs_trans_read_buf", mp,
+					  target->dev, blkno);
 			error = geterror(bp);
 			xfs_buf_relse(bp);
 			return error;
 		}
 #ifdef DEBUG
 		if (xfs_do_error && (bp != NULL)) {
-			if (xfs_error_dev == bp->b_edev) {
+			if (xfs_error_dev == target->dev) {
 				if (((xfs_req_num++) % xfs_error_mod) == 0) {
 					xfs_buf_relse(bp);
 					printf("Returning error!\n");
@@ -384,11 +380,11 @@ xfs_trans_read_buf(
 	 * the lock recursion count, and return it to the caller.
 	 */
 	if (tp->t_items.lic_next == NULL) {
-		bp = xfs_trans_buf_item_match(tp, dev, blkno, len);
+		bp = xfs_trans_buf_item_match(tp, target, blkno, len);
 	} else {
-		bp = incore_match(dev, blkno, len, BUF_FSPRIV2, tp);
+		bp = incore_match(target->dev, blkno, len, BUF_FSPRIV2, tp);
 		if (bp)
-			ASSERT(xfs_trans_buf_item_match_all(tp, dev, blkno,
+			ASSERT(xfs_trans_buf_item_match_all(tp, target, blkno,
 				len) == bp);
 	}
 	if (bp != NULL) {
@@ -396,7 +392,6 @@ xfs_trans_read_buf(
 		ASSERT(XFS_BUF_FSPRIVATE2(bp, xfs_trans_t *) == tp);
 		ASSERT(XFS_BUF_FSPRIVATE(bp, void *) != NULL);
 		ASSERT((bp->b_flags & B_ERROR) == 0);
-		bp->b_target = mp->m_ddev_targp;
 		if (!(bp->b_flags & B_DONE)) {
 			buftrace("READ_BUF_INCORE !DONE", bp);
 #ifndef SIM
@@ -405,8 +400,7 @@ xfs_trans_read_buf(
 #endif
 #endif
 			ASSERT(!(bp->b_flags & B_ASYNC));
-			bp->b_flags |= B_READ;
-			ASSERT(bp->b_edev == dev);
+			XFS_BUF_READ(bp);
 			xfsbdstrat(tp->t_mountp, bp);
 #ifndef SIM
 #ifdef PAIN_IN_THE_ASS_UNDER_LINUX
@@ -417,7 +411,7 @@ xfs_trans_read_buf(
 			iowait(bp);
 			if (geterror(bp) != 0) {
 				xfs_ioerror_alert("xfs_trans_read_buf", mp, 
-						  dev, blkno);
+						  target->dev, blkno);
 				error = geterror(bp);
 				xfs_buf_relse(bp);
 				/*
@@ -461,9 +455,9 @@ xfs_trans_read_buf(
 	 * us to run out of stack space.
 	 */
 #ifdef SIM
-	bp = read_buf(dev, blkno, len, flags);
+	bp = read_buf(target->dev, blkno, len, flags);
 #else
-	bp = read_buf_targ(mp->m_ddev_targp, blkno, len, flags | BUF_BUSY);
+	bp = read_buf_targ(target, blkno, len, flags | BUF_BUSY);
 #endif
 	if (bp == NULL) {
 		*bpp = NULL;
@@ -476,7 +470,7 @@ xfs_trans_read_buf(
 		error = geterror(bp);
 			
 		xfs_ioerror_alert("xfs_trans_read_buf", mp, 
-				  dev, blkno);
+				  target->dev, blkno);
 		if (tp->t_flags & XFS_TRANS_DIRTY)
 			xfs_force_shutdown(tp->t_mountp, XFS_METADATA_IO_ERROR); 
 		xfs_buf_relse(bp);
@@ -484,7 +478,7 @@ xfs_trans_read_buf(
 	}
 #ifdef DEBUG
 	if (xfs_do_error && !(tp->t_flags & XFS_TRANS_DIRTY)) {
-		if (xfs_error_dev == bp->b_edev) {
+		if (xfs_error_dev == target->dev) {
 			if (((xfs_req_num++) % xfs_error_mod) == 0) {
 				xfs_force_shutdown(tp->t_mountp, 
 						   XFS_METADATA_IO_ERROR);
@@ -1052,7 +1046,7 @@ xfs_trans_dquot_buf(
 STATIC xfs_buf_t *
 xfs_trans_buf_item_match(
 	xfs_trans_t	*tp,
-	dev_t		dev,
+	buftarg_t	*target,
 	daddr_t		blkno,
 	int		len)
 {
@@ -1081,7 +1075,7 @@ xfs_trans_buf_item_match(
 			}
 
 			bp = blip->bli_buf;
-			if ((bp->b_edev == dev) &&
+			if ((XFS_BUF_TARGET(bp) == target->dev) &&
 			    (XFS_BUF_ADDR(bp) == blkno) &&
 			    (XFS_BUF_COUNT(bp) == len)) {
 				/*
@@ -1106,7 +1100,7 @@ xfs_trans_buf_item_match(
 STATIC xfs_buf_t *
 xfs_trans_buf_item_match_all(
 	xfs_trans_t	*tp,
-	dev_t		dev,
+	buftarg_t	*target,
 	daddr_t		blkno,
 	int		len)
 {
@@ -1139,7 +1133,7 @@ xfs_trans_buf_item_match_all(
 			}
 
 			bp = blip->bli_buf;
-			if ((bp->b_edev == dev) &&
+			if ((XFS_BUF_TARGET(bp) == target->dev) &&
 			    (XFS_BUF_ADDR(bp) == blkno) &&
 			    (XFS_BUF_COUNT(bp) == len)) {
 				/*

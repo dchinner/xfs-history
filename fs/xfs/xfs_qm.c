@@ -1,4 +1,4 @@
-#ident "$Revision: 1.41 $"
+#ident "$Revision: 1.42 $"
 
 
 #include <sys/param.h>
@@ -1626,7 +1626,7 @@ xfs_qm_dqiter_bufs(
 	xfs_filblks_t	blkcnt,
 	uint		flags)
 {
-	xfs_buf_t		*bp;	
+	xfs_buf_t	*bp;	
 	int		error;
 	int		notcommitted;
 	int		incr;
@@ -1647,7 +1647,7 @@ xfs_qm_dqiter_bufs(
 	 * everything if we were to crash in the middle of this loop.
 	 */
 	while (blkcnt--) {
-		error = xfs_trans_read_buf(mp, NULL, mp->m_dev,
+		error = xfs_trans_read_buf(mp, NULL, mp->m_ddev_targp,
 			      XFS_FSB_TO_DADDR(mp, bno),
 			      (int)XFS_QI_DQCHUNKLEN(mp), 0, &bp);
 		if (error)

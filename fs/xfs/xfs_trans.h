@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision: 1.101 $"
+#ident "$Revision: 1.102 $"
 
 struct xfs_buf;
 struct buftarg;
@@ -901,7 +901,8 @@ void		xfs_trans_mod_sb(xfs_trans_t *, uint, long);
 struct xfs_buf	*xfs_trans_get_buf(xfs_trans_t *, struct buftarg *, daddr_t,
 				   int, uint);
 int		xfs_trans_read_buf(struct xfs_mount *, xfs_trans_t *,
-				   dev_t, daddr_t, int, uint, struct xfs_buf **);
+				   struct buftarg *, daddr_t, int, uint,
+				   struct xfs_buf **);
 struct xfs_buf	*xfs_trans_getsb(xfs_trans_t *, struct xfs_mount *, int);
 
 void		xfs_trans_brelse(xfs_trans_t *, struct xfs_buf *);

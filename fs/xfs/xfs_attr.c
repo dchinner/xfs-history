@@ -1,4 +1,4 @@
-#ident "$Revision: 1.62 $"
+#ident "$Revision: 1.63 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -1987,10 +1987,9 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 		dblkno = XFS_FSB_TO_DADDR(mp, map.br_startblock),
 		blkcnt = XFS_FSB_TO_BB(mp, map.br_blockcount);
 
-		bp = get_buf(mp->m_dev, dblkno, blkcnt, 0);
+		bp = get_buf_targ(mp->m_ddev_targp, dblkno, blkcnt, 0);
 		ASSERT(bp);
 		ASSERT(!geterror(bp));
-		bp->b_target = mp->m_ddev_targp;
 
 		tmp = (valuelen < bp->b_bufsize) ? valuelen : bp->b_bufsize;
 		bcopy(src, XFS_BUF_PTR(bp), tmp);

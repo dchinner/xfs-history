@@ -1463,7 +1463,7 @@ xfs_mountroot(
 			if (bp->b_pincount == 0) {
 				bp->b_flags &= ~(B_DONE | B_READ);
 				bp->b_flags |= B_WRITE;
-				ASSERT(mp->m_dev == bp->b_edev);
+				ASSERT(mp->m_dev == XFS_BUF_TARGET(bp));
 				xfsbdstrat(mp, bp);
 				(void) iowait(bp);
 			}
@@ -1800,12 +1800,12 @@ static int
 devvptoxfs(
 	vnode_t		*devvp,
 	vnode_t		**vpp,
-	xfs_buf_t		**bpp,
+	xfs_buf_t	**bpp,
 	xfs_sb_t	**fsp,
 	cred_t		*cr)
 {
 	int		retval;
-	xfs_buf_t		*bp;
+	xfs_buf_t	*bp;
 	dev_t		dev;
 	int		error;
 	xfs_sb_t	*fs;

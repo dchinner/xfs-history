@@ -1176,8 +1176,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 
 	xlog_get_iclog_buffer_size(mp, log);
 	bp = log->l_xbuf   = getrbuf(0);	/* get my locked buffer */
-	bp->b_edev	   = log_dev;
-	bp->b_target	   = &mp->m_logdev_targ;
+	XFS_BUF_SET_TARGET(bp, &mp->m_logdev_targ);
 	bp->b_bufsize	   = log->l_iclog_size;
 	XFS_BUF_SET_IODONE_FUNC(bp, xlog_iodone);
 	XFS_BUF_SET_BDSTRAT_FUNC(bp, xlog_bdstrat_cb);
@@ -1220,8 +1219,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 		head->h_tail_lsn = 0;
 
 		bp = iclog->ic_bp = getrbuf(0);		/* my locked buffer */
-		bp->b_edev = log_dev;
-		bp->b_target = &mp->m_logdev_targ;
+		XFS_BUF_SET_TARGET(bp, &mp->m_logdev_targ);
 		bp->b_bufsize = log->l_iclog_size;
 		XFS_BUF_SET_IODONE_FUNC(bp, xlog_iodone);
 		XFS_BUF_SET_BDSTRAT_FUNC(bp, xlog_bdstrat_cb);
@@ -1438,7 +1436,7 @@ xlog_sync(xlog_t		*log,
 	 * is shutting down.
 	 */
 	if (error = bwrite(bp)) {
-		xfs_ioerror_alert("xlog_sync", log->l_mp, bp->b_edev, 
+		xfs_ioerror_alert("xlog_sync", log->l_mp, XFS_BUF_TARGET(bp), 
 				  XFS_BUF_ADDR(bp));
 		return (error);
 	}
@@ -1475,7 +1473,7 @@ xlog_sync(xlog_t		*log,
 		XFS_BUF_SET_ADDR(bp, XFS_BUF_ADDR(bp) + log->l_logBBstart);
 		if (error = bwrite(bp)) {
 			xfs_ioerror_alert("xlog_sync (split)", log->l_mp, 
-					  bp->b_edev, XFS_BUF_ADDR(bp));
+					  XFS_BUF_TARGET(bp), XFS_BUF_ADDR(bp));
 			return (error);
 		}
 	}

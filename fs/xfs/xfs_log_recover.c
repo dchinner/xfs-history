@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.144 $"
+#ident	"$Revision: 1.145 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -151,8 +151,7 @@ xlog_bread(xlog_t	*log,
 	XFS_BUF_READ(bp);
 	XFS_BUF_BUSY(bp);
 	XFS_BUF_SET_COUNT(bp, BBTOB(nbblks));
-	bp->b_edev	= log->l_dev;
-	bp->b_target	= &log->l_mp->m_logdev_targ;
+	XFS_BUF_SET_TARGET(bp, &log->l_mp->m_logdev_targ);
 
 #ifndef SIM
 	bp_dcache_wbinval(bp);
@@ -160,7 +159,7 @@ xlog_bread(xlog_t	*log,
 	xfsbdstrat(log->l_mp, bp);
 	if (error = iowait(bp)) {
 		xfs_ioerror_alert("xlog_bread", log->l_mp, 
-				  bp->b_edev, XFS_BUF_ADDR(bp));
+				  XFS_BUF_TARGET(bp), XFS_BUF_ADDR(bp));
 		return (error);
 	}
 	return error;
@@ -189,12 +188,11 @@ xlog_bwrite(
 	XFS_BUF_BUSY(bp);
     XFS_BUF_HOLD(bp);
 	XFS_BUF_SET_COUNT(bp, BBTOB(nbblks));
-	bp->b_edev	= log->l_dev;
-	bp->b_target	= &log->l_mp->m_logdev_targ;
+	XFS_BUF_SET_TARGET(bp, &log->l_mp->m_logdev_targ);
 
 	if (error = xfs_bwrite(log->l_mp, bp)) 
 		xfs_ioerror_alert("xlog_bwrite", log->l_mp, 
-				  bp->b_edev, XFS_BUF_ADDR(bp));
+				  XFS_BUF_TARGET(bp), XFS_BUF_ADDR(bp));
 	
 	return (error);
 }	/* xlog_bwrite */
@@ -2744,7 +2742,7 @@ xlog_recover_clear_agi_bucket(
 	xfs_trans_t	*tp;
 	xfs_agi_t	*agi;
 	daddr_t		agidaddr;
-	xfs_buf_t		*agibp;
+	xfs_buf_t	*agibp;
 	int		offset;
 	int		error;
 
@@ -2752,7 +2750,8 @@ xlog_recover_clear_agi_bucket(
 	xfs_trans_reserve(tp, 0, XFS_CLEAR_AGI_BUCKET_LOG_RES(mp), 0, 0, 0);
 
 	agidaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
-	error = xfs_trans_read_buf(mp, tp, mp->m_dev, agidaddr, 1, 0, &agibp);
+	error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, agidaddr,
+				   1, 0, &agibp);
 	if (error) {
 		xfs_trans_cancel(tp, XFS_TRANS_ABORT);
 		return;

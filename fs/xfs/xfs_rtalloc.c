@@ -1168,7 +1168,8 @@ xfs_rtbuf_get(
 	/*
 	 * Read the buffer.
 	 */
-	error = xfs_trans_read_buf(mp, tp, mp->m_dev, d, mp->m_bsize, 0, &bp);
+	error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, d,
+				   mp->m_bsize, 0, &bp);
 	if (error) {
 		return error;
 	}

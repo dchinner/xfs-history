@@ -422,7 +422,7 @@ xfs_btree_dup_cursor(
 		new->bc_ptrs[i] = cur->bc_ptrs[i];
 		new->bc_ra[i] = cur->bc_ra[i];
 		if (bp = cur->bc_bufs[i]) {
-			if (error = xfs_trans_read_buf(mp, tp, mp->m_dev,
+			if (error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp,
 				XFS_BUF_ADDR(bp), mp->m_bsize, 0, &bp)) {
 #pragma mips_frequency_hint NEVER
 				xfs_btree_del_cursor(new, error);
@@ -744,8 +744,8 @@ xfs_btree_read_bufl(
 
 	ASSERT(fsbno != NULLFSBLOCK);
 	d = XFS_FSB_TO_DADDR(mp, fsbno);
-	if (error = xfs_trans_read_buf(mp, tp, mp->m_dev, d, mp->m_bsize, lock,
-			&bp)) {
+	if (error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, d,
+			mp->m_bsize, lock, &bp)) {
 #pragma mips_frequency_hint NEVER
 		return error;
 	}
@@ -778,8 +778,8 @@ xfs_btree_read_bufs(
 	ASSERT(agno != NULLAGNUMBER);
 	ASSERT(agbno != NULLAGBLOCK);
 	d = XFS_AGB_TO_DADDR(mp, agno, agbno);
-	if (error = xfs_trans_read_buf(mp, tp, mp->m_dev, d, mp->m_bsize, lock,
-			&bp)) {
+	if (error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, d,
+					mp->m_bsize, lock, &bp)) {
 #pragma mips_frequency_hint NEVER
 		return error;
 	}

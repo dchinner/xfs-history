@@ -2173,7 +2173,7 @@ xfs_da_do_buf(
 		case 2:
 #endif /* XFS_REPAIR_SIM */
 			bp = NULL;
-			error = xfs_trans_read_buf(mp, trans, mp->m_dev,
+			error = xfs_trans_read_buf(mp, trans, mp->m_ddev_targp,
 				mappedbno, nmapped, 0, &bp);
 			break;
 #ifndef SIM
@@ -2434,7 +2434,7 @@ xfs_da_buf_make(int nbuf, xfs_buf_t **bps, inst_t *ra)
 	dabuf->dirty = 0;
 #ifdef XFS_DABUF_DEBUG
 	dabuf->ra = ra;
-	dabuf->dev = bps[0]->b_edev;
+	dabuf->dev = XFS_BUF_TAQRGET(bps[0]);
 	dabuf->blkno = XFS_BUF_ADDR(bps[0]);
 #endif
 	if (nbuf == 1) {

@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.119 $"
+#ident	"$Revision: 1.120 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -1259,7 +1259,7 @@ xfs_ialloc_read_agi(
 
 	ASSERT(agno != NULLAGNUMBER);
 	d = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
-	if (error = xfs_trans_read_buf(mp, tp, mp->m_dev, d, 1, 0, &bp))
+	if (error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, d, 1, 0, &bp))
 		return error;
 	ASSERT(bp && !geterror(bp));
 	/*
