@@ -75,8 +75,15 @@
 STATIC int	xfs_truncate_file(xfs_mount_t	*mp,
 				  xfs_inode_t	*ip);
 
-STATIC void	xfs_droplink (xfs_trans_t *tp,
-			      xfs_inode_t *ip);
+#define	XFS_ICHGTIME_MOD	0x1	/* data fork modification timestamp */
+#define	XFS_ICHGTIME_ACC	0x2	/* data fork access timestamp */
+#define	XFS_ICHGTIME_CHG	0x4	/* inode field change timestamp */
+STATIC void	xfs_ichgtime(xfs_inode_t *ip,
+			     int flags);
+STATIC void	xfs_droplink(xfs_trans_t *tp,
+			     xfs_inode_t *ip);
+STATIC void	xfs_bumplink(xfs_trans_t *tp,
+			     xfs_inode_t *ip);
 
 STATIC int	xfs_close(vnode_t	*vp,
 			  int		flag,
@@ -850,7 +857,6 @@ xfs_readlink(vnode_t	*vp,
 	int		count;
 	off_t		offset;
 	int		pathlen;
-	timestruc_t     tv;
         int             error = 0;
 
 	vn_trace_entry(vp, "xfs_readlink");
@@ -879,10 +885,7 @@ xfs_readlink(vnode_t	*vp,
 	}
 
 	if (!(uiop->uio_fmode & FINVIS)) {
-		nanotime(&tv);
-		ip->i_d.di_atime.t_sec  = tv.tv_sec;
-		ip->i_d.di_atime.t_nsec = tv.tv_nsec;
-		ip->i_update_core = 1;
+		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
 	}
 
 	/*
@@ -1486,14 +1489,39 @@ xfs_dir_ialloc(
 
 
 /*
+ * Change the requested timestamp in the given inode.
+ * We don't lock across timestamp updates, and we don't log them but
+ * we do record the fact that there is dirty information in core.
+ */
+STATIC void
+xfs_ichgtime(xfs_inode_t *ip,
+	      int flags)
+{
+	timestruc_t	tv;
+
+	nanotime(&tv);
+	if (flags & XFS_ICHGTIME_MOD)
+		ip->i_d.di_mtime.t_sec = tv.tv_sec;
+	if (flags & XFS_ICHGTIME_ACC)
+		ip->i_d.di_atime.t_sec = tv.tv_sec;
+	if (flags & XFS_ICHGTIME_CHG)
+		ip->i_d.di_ctime.t_sec = tv.tv_sec;
+	ip->i_update_core = 1;
+}
+
+
+
+/*
  * Decrement the link count on an inode & log the change.
  * If this causes the link count to go to zero, initiate the
  * logging activity required to truncate a file.
  */
 STATIC void
-xfs_droplink (xfs_trans_t *tp,
-	      xfs_inode_t *ip)
+xfs_droplink(xfs_trans_t *tp,
+	     xfs_inode_t *ip)
 {
+	xfs_ichgtime(ip, XFS_ICHGTIME_CHG);
+
         ASSERT (ip->i_d.di_nlink > 0);
         ip->i_d.di_nlink--;
         xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
@@ -1513,9 +1541,11 @@ xfs_droplink (xfs_trans_t *tp,
  * Increment the link count on an inode & log the change.
  */
 STATIC void
-xfs_bumplink (xfs_trans_t *tp,
-              xfs_inode_t *ip)
+xfs_bumplink(xfs_trans_t *tp,
+             xfs_inode_t *ip)
 {
+	xfs_ichgtime(ip, XFS_ICHGTIME_CHG);
+
         ip->i_d.di_nlink++;
         xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 }
@@ -1550,7 +1580,6 @@ xfs_create(vnode_t	*dir_vp,
 	uint			cancel_flags;
 	int			committed;
 	uint			truncate_flag;
-	timestruc_t		tv;
 	struct ncfastdata	fastdata;
 
 	vn_trace_entry(dir_vp, "xfs_create");
@@ -1641,8 +1670,10 @@ try_again:
 
 		if (error = xfs_dir_createname(tp, dp, name, ip->i_ino,
 					       &first_block, &free_list,
-					       MAX_EXT_NEEDED)) 
+					       MAX_EXT_NEEDED)) {
 			ASSERT (0);	/* we've reserved the space. */
+		}
+		xfs_ichgtime(dp, XFS_ICHGTIME_MOD);
 
 		dp->i_gen++;
 		dnlc_enter_fast(dir_vp, &fastdata, XFS_ITOV(ip), NOCRED);
@@ -1748,9 +1779,7 @@ try_again:
 				xfs_itruncate_finish(&tp, ip, (xfs_fsize_t)0);
 				truncated = B_TRUE;
 			}
-			nanotime(&tv);
-			ip->i_d.di_mtime.t_sec = tv.tv_sec;
-			ip->i_d.di_ctime.t_sec = tv.tv_sec;
+			xfs_ichgtime(ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 			xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 		}
 	}
@@ -2286,6 +2315,7 @@ xfs_remove(vnode_t	*dir_vp,
 	XFS_BMAP_INIT(&free_list, &first_block);
 	error = xfs_dir_removename (tp, dp, name, &first_block, &free_list, 0);
 	ASSERT (error == 0);
+	xfs_ichgtime(dp, XFS_ICHGTIME_MOD);
 
 	dnlc_remove (dir_vp, name);
 
@@ -2394,9 +2424,10 @@ xfs_link(vnode_t	*target_dir_vp,
 
 	if (error = xfs_dir_createname (tp, tdp, target_name, sip->i_ino,
 					&first_block, &free_list,
-					MAX_EXT_NEEDED)) 
+					MAX_EXT_NEEDED)) {
 		goto error_return;
-
+	}
+	xfs_ichgtime(tdp, XFS_ICHGTIME_MOD);
 	tdp->i_gen++;
 	xfs_trans_log_inode (tp, tdp, XFS_ILOG_CORE);
 
@@ -2834,8 +2865,10 @@ start_over:
 		 */
 		if (error = xfs_dir_createname (tp, target_dp, target_name,
 						src_ip->i_ino, &first_block,
-						&free_list, MAX_EXT_NEEDED))
+						&free_list, MAX_EXT_NEEDED)) {
 			goto error_return;
+		}
+		xfs_ichgtime(target_dp, XFS_ICHGTIME_MOD);
 
 		if (new_parent && src_is_directory)
 			xfs_bumplink(tp, target_dp);
@@ -2900,6 +2933,7 @@ start_over:
 			((target_pnp != NULL) ? target_pnp->pn_complen :
 			 strlen(target_name)), src_ip->i_ino);
 		ASSERT (!error);
+		xfs_ichgtime(target_dp, XFS_ICHGTIME_MOD);
 
 		dnlc_enter (target_dir_vp, target_name,
 			    XFS_ITOV(src_ip), credp);
@@ -2931,8 +2965,9 @@ start_over:
 		 * Rewrite the ".." entry to point to the new 
 	 	 * directory.
 		 */
-		error = xfs_dir_replace (tp, src_ip, "..",
-                        2, target_dp->i_ino);
+		error = xfs_dir_replace (tp, src_ip, "..", 2,
+					     target_dp->i_ino);
+		xfs_ichgtime(src_ip, XFS_ICHGTIME_MOD);
 		
 		ASSERT (! error);
 
@@ -2947,6 +2982,7 @@ start_over:
 	error = xfs_dir_removename (tp, src_dp, src_name, &first_block,
 				    &free_list, MAX_EXT_NEEDED);
 	ASSERT (! error);
+	xfs_ichgtime(src_dp, XFS_ICHGTIME_MOD);
 
 	dnlc_remove (src_dir_vp, src_name);
 
@@ -3018,7 +3054,6 @@ xfs_mkdir(vnode_t	*dir_vp,
 	boolean_t		dp_joined_to_trans = B_FALSE;
 	struct ncfastdata	fastdata;
 
-
 	vn_trace_entry(dir_vp, "xfs_mkdir");
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
         tp = xfs_trans_alloc (mp, 0);
@@ -3087,8 +3122,10 @@ xfs_mkdir(vnode_t	*dir_vp,
 
 	if (code = xfs_dir_createname (tp, dp, dir_name, cdp->i_ino,
 				       &first_block, &free_list,
-				       MAX_EXT_NEEDED)) 
+				       MAX_EXT_NEEDED)) {
  		ASSERT (0);
+	}
+	xfs_ichgtime(dp, XFS_ICHGTIME_MOD);
 
 	dnlc_enter_fast (dir_vp, &fastdata, XFS_ITOV(cdp), NOCRED);
 	
@@ -3210,6 +3247,7 @@ xfs_rmdir(vnode_t	*dir_vp,
 
         error = xfs_dir_removename (tp, dp, name, &first_block, &free_list, 0);
         ASSERT (! error);
+	xfs_ichgtime(dp, XFS_ICHGTIME_MOD);
 
 	dnlc_remove_fast (dir_vp, &fastdata);
 
@@ -3475,10 +3513,12 @@ xfs_symlink(vnode_t	*dir_vp,
 	 */
 	if (error = xfs_dir_createname (tp, dp, link_name, ip->i_ino,
 					&first_block, &free_list,
-					MAX_EXT_NEEDED))
+					MAX_EXT_NEEDED)) {
                 ASSERT (0);
-        dnlc_enter_fast (dir_vp, &fastdata, XFS_ITOV(ip), NOCRED);
+	}
+	xfs_ichgtime(dp, XFS_ICHGTIME_MOD);
 
+        dnlc_enter_fast (dir_vp, &fastdata, XFS_ITOV(ip), NOCRED);
 
 	(void) xfs_bmap_finish (&tp, &free_list, first_block);
 	xfs_trans_commit (tp, XFS_TRANS_RELEASE_LOG_RES);
