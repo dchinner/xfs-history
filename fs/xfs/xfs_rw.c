@@ -808,7 +808,7 @@ xfs_force_shutdown(
 	int logerror;
 	extern dev_t rootdev;		/* from sys/systm.h */
         
-#ifdef XFSDEBUG && 0
+#if defined(XFSDEBUG) && 0
         printk("xfs_force_shutdown entered [0x%p, %d]\n",
                 mp, flags);
         KDB_ENTER();
