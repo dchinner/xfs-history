@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.127 $"
+#ident	"$Revision: 1.128 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1749,7 +1749,8 @@ xfs_bmap_del_extent(
 		xfs_bmbt_set_blockcount(ep, temp);
 		ip->i_lastex = idx;
 		if (delay) {
-			temp = xfs_bmap_worst_indlen(ip, temp);
+			temp = XFS_EXTLEN_MIN(xfs_bmap_worst_indlen(ip, temp),
+				da_old);
 			xfs_bmbt_set_startblock(ep, NULLSTARTBLOCK(temp));
 			xfs_bmap_trace_post_update(fname, "2", ip, idx);
 			da_new = temp;
@@ -1774,7 +1775,8 @@ xfs_bmap_del_extent(
 		xfs_bmbt_set_blockcount(ep, temp);
 		ip->i_lastex = idx;
 		if (delay) {
-			temp = xfs_bmap_worst_indlen(ip, temp);
+			temp = XFS_EXTLEN_MIN(xfs_bmap_worst_indlen(ip, temp),
+				da_old);
 			xfs_bmbt_set_startblock(ep, NULLSTARTBLOCK(temp));
 			xfs_bmap_trace_post_update(fname, "1", ip, idx);
 			da_new = temp;
@@ -1844,11 +1846,10 @@ xfs_bmap_del_extent(
 	/*
 	 * Account for change in delayed indirect blocks.
 	 */
-	if (da_old != da_new) {
-		ASSERT(da_old > da_new);
+	ASSERT(da_old >= da_new);
+	if (da_old > da_new)
 		xfs_mod_incore_sb(ip->i_mount, XFS_SB_FDBLOCKS,
 			da_old - da_new);
-	}
 	kmem_check();
 	return flags;
 }
