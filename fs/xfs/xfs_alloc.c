@@ -235,10 +235,10 @@ xfs_alloc_fix_len(
 	if (k == mod)
 		return len;
 	if (k > mod) {
-		if ((rlen = len - k - mod) < minlen)
+		if ((int)(rlen = len - k - mod) < (int)minlen)
 			return len;
 	} else {
-		if ((rlen = len - prod - (mod - k)) < minlen)
+		if ((int)(rlen = len - prod - (mod - k)) < (int)minlen)
 			return len;
 	}
 	return rlen;
@@ -569,8 +569,20 @@ xfs_alloc_ag_vextent_near(
 
 		/*
 		 * Start from the entry that lookup found, sequence through
-		 * all larger free blocks.
+		 * all larger free blocks.  If we're actually pointing at a
+		 * record smaller than maxlen, go to the start of this block,
+		 * and skip all those smaller than minlen.
 		 */
+		if (ltlen) {
+			ASSERT(ltlen >= minlen && ltlen < maxlen);
+			cnt_cur->bc_ptrs[0] = 1;
+			do {
+				xfs_alloc_get_rec(cnt_cur, &ltbno, &ltlen);
+				if (ltlen >= minlen)
+					break;
+			} while (xfs_alloc_increment(cnt_cur, 0));
+			ASSERT(ltlen >= minlen);
+		}
 		i = cnt_cur->bc_ptrs[0];
 		besti = 0;
 		bdiff = ltdiff = (xfs_extlen_t)0;
