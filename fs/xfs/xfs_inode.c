@@ -1,4 +1,4 @@
-#ident "$Revision: 1.160 $"
+#ident "$Revision: 1.161 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1607,6 +1607,7 @@ xfs_iunlink(
 	ASSERT(agino != 0);
 	bucket_index = agino % XFS_AGI_UNLINKED_BUCKETS;
 	ASSERT(agi->agi_unlinked[bucket_index] != 0);
+	ASSERT(agi->agi_unlinked[bucket_index] != agino);
 
 	if (agi->agi_unlinked[bucket_index] != NULLAGINO) {
 		/*
@@ -1733,6 +1734,7 @@ xfs_iunlink_remove(
 		 * Point the bucket head pointer at the next inode.
 		 */
 		ASSERT(next_agino != 0);
+		ASSERT(next_agino != agino);
 		agi->agi_unlinked[bucket_index] = next_agino;
 		offset = offsetof(xfs_agi_t, agi_unlinked) +
 			(sizeof(xfs_agino_t) * bucket_index);
@@ -1773,6 +1775,7 @@ xfs_iunlink_remove(
 		}
 		next_agino = dip->di_next_unlinked;
 		ASSERT(next_agino != 0);
+		ASSERT(next_agino != agino);
 		if (next_agino != NULLAGINO) {
 			dip->di_next_unlinked = NULLAGINO;
 			offset = ((char *)dip - (char *)(ibp->b_un.b_addr)) +
