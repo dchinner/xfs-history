@@ -2197,7 +2197,7 @@ xfs_da_do_buf(
 				   (magic != XFS_DIR2_LEAFN_MAGIC) &&
 				   (magic1 != XFS_DIR2_BLOCK_MAGIC) &&
 				   (magic1 != XFS_DIR2_DATA_MAGIC) &&
-				   (magic1 != XFS_DIR2_FREE_MAGIC),
+				   (INT_GET(free->hdr.magic, ARCH_CONVERT) != XFS_DIR2_FREE_MAGIC),
 				mp, XFS_ERRTAG_DA_READ_BUF,
 				XFS_RANDOM_DA_READ_BUF)) {
 			xfs_buftrace("DA READ ERROR", rbp->bps[0]);
