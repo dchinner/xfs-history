@@ -938,7 +938,7 @@ retry:
 					goto retry;
 				}
 			case 2:
-				fsync_no_super(LINVFS_GET_IP(vp)->i_dev);
+				fsync_no_super(vp->v_vfsp->vfs_super->s_bdev);
 
 				error = 0;
 /**
