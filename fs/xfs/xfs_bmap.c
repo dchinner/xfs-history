@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.185 $"
+#ident	"$Revision: 1.186 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -2264,7 +2264,6 @@ xfs_bmap_del_extent(
 					del->br_startoff - got.br_startoff);
 				if (error = xfs_bmbt_increment(cur, 0, &i))
 					return error;
-				ASSERT(i == 1);
 				cur->bc_rec.b = new;
 				if (error = xfs_bmbt_insert(cur, &i))
 					return error;
