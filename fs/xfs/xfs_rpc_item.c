@@ -16,10 +16,8 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.4 $"
-#if defined(__linux__)
-#include <xfs_linux.h>
-#endif
+#ident "$Revision: 1.5 $"
+#include <xfs_os_defs.h>
 
 /*
  * Implementation of CXFS RPC log items -- needed to implement

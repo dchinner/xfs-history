@@ -24,7 +24,7 @@
  * See xfs_dir2_block.h for the format.
  */
 
-#include <xfs_linux.h>
+#include <xfs_os_defs.h>
 
 #ifdef SIM
 #define _KERNEL 1

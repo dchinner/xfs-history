@@ -23,9 +23,7 @@
  * Core data block handling routines for XFS V2 directories.
  * See xfs_dir2_data.h for data structures.
  */
-#if defined(__linux__)
-#include <xfs_linux.h>
-#endif
+#include <xfs_os_defs.h>
 
 #ifdef SIM
 #define _KERNEL 1

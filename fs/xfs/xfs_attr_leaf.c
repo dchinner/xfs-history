@@ -22,7 +22,7 @@
  * GROT: figure out how to recover gracefully when bmap returns ENOSPC.
  */
 
-#include <xfs_linux.h>
+#include <xfs_os_defs.h>
 
 #include <sys/param.h>
 #include "xfs_buf.h"

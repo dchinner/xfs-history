@@ -18,10 +18,7 @@
  */
 #ident "$Revision$"
 
-#if defined(__linux__)
-#include <xfs_linux.h>
-#endif
-
+#include <xfs_os_defs.h>
 
 #ifdef SIM
 #define	_KERNEL 1

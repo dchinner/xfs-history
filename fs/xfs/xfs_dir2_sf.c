@@ -22,7 +22,7 @@
  * Shortform directory implementation for v2 directories.
  */
 
-#include <xfs_linux.h>
+#include <xfs_os_defs.h>
 
 #ifdef SIM
 #define _KERNEL 1

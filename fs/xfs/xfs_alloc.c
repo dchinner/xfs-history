@@ -21,7 +21,7 @@
 /*
  * Free space allocation for XFS.
  */
-#include <xfs_linux.h>
+#include <xfs_os_defs.h>
 
 #ifdef SIM
 #define _KERNEL 1

@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.4 $"
+#ident "$Revision: 1.5 $"
 /*
  * xfsrt stubs
  */
@@ -26,13 +26,13 @@
 #include <sys/vnode.h>
 #include "xfs_buf.h"
 #include <ksys/behavior.h>
-#include <sys/fs/xfs_types.h>
-#include <sys/fs/xfs_inum.h>
-#include <sys/fs/xfs_sb.h>
-#include <sys/fs/xfs_log.h>
-#include <sys/fs/xfs_trans.h>
-#include <sys/fs/xfs_dir.h>
-#include <sys/fs/xfs_mount.h>
+#include <xfs_types.h>
+#include <xfs_inum.h>
+#include <xfs_sb.h>
+#include <xfs_log.h>
+#include <xfs_trans.h>
+#include <xfs_dir.h>
+#include <xfs_mount.h>
 
 extern int nopkg(void);
 

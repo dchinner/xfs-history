@@ -24,7 +24,7 @@
  * GROT: figure out how to recover gracefully when bmap returns ENOSPC.
  */
 
-#include <xfs_linux.h>
+#include <xfs_os_defs.h>
 
 #ifdef SIM
 #define _KERNEL 1

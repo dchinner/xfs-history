@@ -22,7 +22,7 @@
  * High level interface routines for log manager
  */
 
-#include <xfs_linux.h>
+#include <xfs_os_defs.h>
 
 #include <sys/param.h>
 

@@ -1,6 +1,6 @@
 #ident "$Revision$"
 
-#include <xfs_linux.h>
+#include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
 
 #ifdef SIM

@@ -16,15 +16,13 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.3 $"
+#ident "$Revision$"
 
 /*
  * xfs_dir2_trace.c
  * Tracing for xfs v2 directories.
  */
-#if defined(__linux__)
-#include <xfs_linux.h>
-#endif
+#include <xfs_os_defs.h>
 
 #include <sys/types.h>
 #include "xfs_buf.h"

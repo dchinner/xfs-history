@@ -18,7 +18,7 @@
  */
 #ident "$Revision$"
 
-#include <xfs_linux.h>
+#include <xfs_os_defs.h>
 
 #include <sys/types.h>
 #include <sys/uuid.h>

@@ -24,10 +24,7 @@
  * items as well as utility routines used by the inode specific
  * transaction routines.
  */
-#if defined(__linux__)
-#include <xfs_linux.h>
-#endif
-
+#include <xfs_os_defs.h>
 
 #ifdef SIM
 #define _KERNEL 1

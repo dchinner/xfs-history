@@ -23,7 +23,7 @@
  * See data structures in xfs_dir2_node.h and xfs_da_btree.h.
  */
 
-#include <xfs_linux.h>
+#include <xfs_os_defs.h>
 
 #ifdef SIM
 #define _KERNEL 1

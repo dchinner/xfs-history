@@ -19,7 +19,7 @@
  */
 #ident  "$Revision$"
 
-#include <linux/xfs_linux.h>
+#include <xfs_os_defs.h>
 
 #ifndef SIM
 #define FSID_T

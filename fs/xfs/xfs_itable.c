@@ -17,7 +17,7 @@
  */
 #ident	"$Revision$"
 
-#include <xfs_linux.h>
+#include <xfs_os_defs.h>
 #include <sys/sysmacros.h>
 
 #include <sys/param.h>

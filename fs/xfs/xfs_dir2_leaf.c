@@ -26,7 +26,7 @@
  * XFS_DIR2_LEAF1 block containing the hash table and freespace map.
  */
 
-#include <xfs_linux.h>
+#include <xfs_os_defs.h>
 
 #ifdef SIM
 #define _KERNEL 1

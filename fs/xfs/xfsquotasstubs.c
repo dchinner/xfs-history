@@ -18,21 +18,32 @@
  */
 /*
  *
- * $Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfsquotasstubs.c,v 1.5 2000/06/09 01:50:04 nathans Exp $
- * $Author: nathans $
- * $Id: xfsquotasstubs.c,v 1.5 2000/06/09 01:50:04 nathans Exp $
+ * $Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfsquotasstubs.c,v 1.6 2000/06/09 02:10:00 cattelan Exp $
+ * $Author: cattelan $
+ * $Id: xfsquotasstubs.c,v 1.6 2000/06/09 02:10:00 cattelan Exp $
  *
  * $Log: xfsquotasstubs.c,v $
- * Revision 1.5  2000/06/09 01:50:04  nathans
- * Merge of 2.3.99pre2-xfs:slinx:46428a by ananth.
+ * Revision 1.6  2000/06/09 02:10:00  cattelan
+ * Merge of 2.3.99pre2-xfs:slinx:46541a by ananth.
  *
- *   Merge of 2.3.42-xfs:slinx:46428a by ananth.
- *   remove unused include files.
+ *   Merge of 2.3.42-xfs:slinx:46541a by ananth.
+ *   Removed <sys/fs... from include files
+ *   This should eliminate the need for the link in pseudo-inc
+ *
+ * Revision 1.6  2000/03/25 01:42:41  cattelan
+ * Merge of 2.3.42-xfs:slinx:46541a by ananth.
+ *
+ *   Removed <sys/fs... from include files
+ *   This should eliminate the need for the link in pseudo-inc
  *
  * Revision 1.5  2000/03/25 01:29:53  nathans
  * Merge of 2.3.42-xfs:slinx:46428a by ananth.
  *
  *   remove unused include files.
+ *
+ * Revision 1.6  2000/03/21 01:58:59  cattelan
+ * Removed <sys/fs... from include files
+ * This should eliminate the need for the link in pseudo-inc
  *
  * Revision 1.5  2000/03/20 07:37:34  nathans
  * remove unused include files.
@@ -58,7 +69,7 @@
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/quota.h>
-#include <sys/fs/xfs_types.h>
+#include <xfs_types.h>
 #include <linux/xfs_sema.h>
 
 struct xfs_qm *xfs_Gqm = NULL;

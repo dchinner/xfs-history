@@ -22,7 +22,7 @@
 #define _KERNEL 1
 #endif
 
-#include <xfs_linux.h>
+#include <xfs_os_defs.h>
 
 #include <sys/param.h>
 #include <sys/debug.h>
