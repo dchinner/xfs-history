@@ -1,4 +1,4 @@
-#ident "$Revision: 1.253 $"
+#ident "$Revision: 1.254 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1843,7 +1843,8 @@ xfs_zero_last_block(
 	 * buffer go thru or not, in case of a forced shutdown.
 	 */
 	ASSERT(bp->b_vp);
-	if (imap.br_startblock == DELAYSTARTBLOCK) {
+	if (imap.br_startblock == DELAYSTARTBLOCK ||
+	    imap.br_state == XFS_EXT_UNWRITTEN) {
 		bdwrite(bp);
 	} else {
 		error = bwrite(bp);
@@ -2033,7 +2034,8 @@ xfs_zero_eof(
 	        }
 		ASSERT(bp->b_vp);
 		buftrace("XFS ZERO EOF", bp);
-		if (imap.br_startblock == DELAYSTARTBLOCK) {
+		if (imap.br_startblock == DELAYSTARTBLOCK ||
+		    imap.br_state == XFS_EXT_UNWRITTEN) {
 			bdwrite(bp);
 		} else {
 			error = bwrite(bp);
