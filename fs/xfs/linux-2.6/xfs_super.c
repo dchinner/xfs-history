@@ -329,11 +329,6 @@ linvfs_read_super(
 	statvfs_t	statvfs;
 	struct		inode *ip, *cip;
 
-	/* first mount pagebuf delayed write daemon not running yet */
-	if (pagebuf_daemon_start() < 0) {
-		goto fail_daemon;
-	}
-
 	/*  Setup the uap structure  */
 
 	memset(uap, 0, sizeof(struct mounta));
@@ -463,9 +458,6 @@ fail_vfsop:
 #endif  /* CONFIG_XFS_VNODE_TRACING */
 
 	kfree(cvp->v_inode);
-        
-fail_daemon:
-
 	return(NULL);
 }
 
