@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.46 $"
+#ident	"$Revision: 1.47 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3340,13 +3340,7 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		ip->i_write_offset, ip->i_gap_list);
 	printflags((int)ip->i_flags, tab_flags, "flags");
 	qprintf("\n");
-#ifdef DEBUG
-	qprintf("mapcnt 0x%x update_core 0x%x\n",
-		ip->i_mapcnt,
-		(int)(ip->i_update_core));
-#else
 	qprintf("update_core 0x%x\n", (int)(ip->i_update_core));
-#endif
 	qprintf("gen 0x%x qbufs %d delayed blks %d\n",
 		ip->i_gen,
 		ip->i_queued_bufs,
