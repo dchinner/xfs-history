@@ -111,16 +111,10 @@ int xlog_btolrbb(int b);
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 #define GET_CLIENT_ID(i,arch) \
-    ((arch==ARCH_NOCONVERT) ? \
-        ((i) & 0xff) : \
-        ((i) >> 24) \
-    )
+    ((i) & 0xff)
 #else
 #define GET_CLIENT_ID(i,arch) \
-    ((arch==ARCH_NOCONVERT) ? \
-        ((i) >> 24) : \
-        ((i) >> 0xff) \
-    )
+    ((i) >> 24)
 #endif
    
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XLOG_GRANT_SUB_SPACE)
