@@ -873,9 +873,8 @@ init_xfs_fs( void )
 {
 	int			error;
 	struct sysinfo		si;
-	static char		message[] __initdata =
-		KERN_INFO "SGI XFS " XFS_VERSION_STRING " with "
-		XFS_BUILD_OPTIONS " enabled\n";
+	static char		message[] __initdata = KERN_INFO \
+		XFS_VERSION_STRING " with " XFS_BUILD_OPTIONS " enabled\n";
 
 	printk(message);
 
@@ -929,6 +928,5 @@ module_init(init_xfs_fs);
 module_exit(exit_xfs_fs);
 
 MODULE_AUTHOR("Silicon Graphics, Inc.");
-MODULE_DESCRIPTION(
-	"SGI XFS " XFS_VERSION_STRING " with " XFS_BUILD_OPTIONS " enabled");
+MODULE_DESCRIPTION(XFS_VERSION_STRING " with " XFS_BUILD_OPTIONS " enabled");
 MODULE_LICENSE("GPL");
