@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.193 $"
+#ident	"$Revision: 1.195 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -253,6 +253,12 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	xfsbdstrat(mp, bp);
 	if (error = xfs_iowait(bp)) {
 		goto err;
+	}
+
+	{
+	page_buf_t	*pb;
+	pb = pagebuf_get(mp->m_ddev_targp->inode, 0, 16384, PBF_LOCK | PBF_READ);
+printk("pagebuf_get returned 0x%x\n", pb);
 	}
 
 	/*
