@@ -30,6 +30,7 @@
 #include <sys/systm.h>
 #endif
 #include <string.h>
+#include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -121,6 +122,9 @@ xfs_dir_mount(xfs_mount_t *mp)
 	count = shortcount > leafcount ? shortcount : leafcount;
 	mp->m_dircook_elog = xfs_da_log2_roundup(count);
 	ASSERT(mp->m_dircook_elog <= mp->m_sb.sb_blocklog);
+	mp->m_da_node_ents =
+		(XFS_LBSIZE(mp) - sizeof(xfs_da_node_hdr_t)) /
+		sizeof(xfs_da_node_entry_t);
 }
 
 /*
