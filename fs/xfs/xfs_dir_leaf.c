@@ -1376,11 +1376,15 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *bp, int index)
 		 * Replace smallest region (if it is smaller than free'd entry)
 		 */
 		map = &hdr->freemap[smallest];
+		/*
+		 * mark as needing compaction if we're going to lose space
+		 */
+		if (map->size > 0 && entsize > 0)
+			hdr->holes = 1;
 		if (map->size < entsize) {
 			map->base = entry->nameidx;
 			map->size = entsize;
 		}
-		hdr->holes = 1;		/* mark as needing compaction */
 	}
 
 	/*
