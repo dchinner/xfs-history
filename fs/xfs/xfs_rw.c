@@ -2283,7 +2283,9 @@ xfs_write(
 	ASSERT(!(vp->v_vfsp->vfs_flag & VFS_RDONLY));
 
 	ip = XFS_VTOI(vp);
-	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
+	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) ||
+	       (ismrlocked(&ip->i_iolock, MR_ACCESS) &&
+		(ioflag & IO_DIRECT)));
 
 	type = ip->i_d.di_mode & IFMT;
 	ASSERT(type == IFREG || type == IFDIR ||
@@ -4177,6 +4179,7 @@ xfs_diostrat( buf_t *bp)
 	int		blk_algn, rt, numrtextents, sbrtextsize, iprtextsize;
 	int		committed;
 	uint		lock_mode;
+	xfs_fsize_t	new_size;
 
 	dp        = (struct dio_s *)bp->b_private;
 	vp        = dp->vp;
@@ -4408,17 +4411,23 @@ xfs_diostrat( buf_t *bp)
 			/*
 			 * Check if this is the end of the file.
 			 */
-			if (offset_this_req +bytes_this_req >ip->i_d.di_size){
+			new_size = offset_this_req + bytes_this_req;
+			if (new_size >ip->i_d.di_size){
 				if ( writeflag ) {
 					/*
 					 * File is being extended on a
-					 * write, update the file size.
+					 * write, update the file size if
+					 * someone else didn't make it even
+					 * bigger.
 					 */
 			         	ASSERT((vp->v_flag & VISSWAP) == 0);
 					xfs_ilock(ip, XFS_ILOCK_EXCL);
-				 	ip->i_d.di_size = offset_this_req + 
+					if (new_size > ip->i_d.di_size) {
+				 		ip->i_d.di_size =
+							offset_this_req + 
 							bytes_this_req;
-					ip->i_update_core = 1;
+						ip->i_update_core = 1;
+					}
 					xfs_iunlock(ip, XFS_ILOCK_EXCL);
 				} else {
 					/*

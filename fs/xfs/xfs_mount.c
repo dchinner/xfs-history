@@ -297,7 +297,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		if (error == ENOSPC) {
 			error = XFS_ERROR(E2BIG);
 		}
-		goto error0;
+		goto error1;
 	}
 
 	if (mp->m_logdev && mp->m_logdev != mp->m_dev) {
@@ -310,7 +310,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 			if (error == ENOSPC) {
 				error = XFS_ERROR(E2BIG);
 			}
-			goto error0;
+			goto error1;
 		}
 	}
 	/*
@@ -333,7 +333,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 			if (error == ENOSPC) {
 				error = XFS_ERROR(E2BIG);
 			}
-			goto error0;
+			goto error1;
 		}
 	}
 	/*
@@ -380,11 +380,11 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 				      XFS_FSB_TO_DADDR(mp, sbp->sb_logstart),
 				      XFS_FSB_TO_BB(mp, sbp->sb_logblocks));
 		if (error) {
-			goto error1;
+			goto error2;
 		}
 	} else {	/* No log has been defined */
 		error = XFS_ERROR(EINVAL);
-		goto error1;
+		goto error2;
 	}
 
 #ifdef SIM
@@ -401,7 +401,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		error = xfs_iget(mp, NULL, sbp->sb_rootino, XFS_ILOCK_EXCL,
 				 &rip);
 		if (error) {
-			goto error1;
+			goto error2;
 		}
 		ASSERT(rip != NULL);
 		rvp = XFS_ITOV(rip);
@@ -413,7 +413,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 			VN_RELE(rvp);
 			vn_purge(rvp, &vmap);
 			error = XFS_ERROR(EINVAL);
-			goto error1;
+			goto error2;
 		}
 		VN_FLAGSET(rvp, VROOT);
 		mp->m_rootip = rip;				/* save it */
@@ -433,7 +433,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 			VMAP(rvp, vmap);
 			VN_RELE(rvp);
 			vn_purge(rvp, &vmap);
-			goto error1;
+			goto error2;
 		}
 		ASSERT(mp->m_rbmip != NULL);
 		ASSERT(sbp->sb_rsumino != NULLFSINO);
@@ -451,7 +451,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 			VMAP(rbmvp, vmap);
 			VN_RELE(rbmvp);
 			vn_purge(rbmvp, &vmap);
-			goto error1;
+			goto error2;
 		}
 		ASSERT(mp->m_rsumip != NULL);
 	}
@@ -465,7 +465,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	error = xfs_log_mount_finish(mp);
 #endif
 	if (error) {
-		goto error1;
+		goto error2;
 	}
 
 	/*
@@ -475,9 +475,20 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 
 	return 0;
 
- error1:
+ error2:
 	xfs_ihash_free(mp);
+	mrfree(&mp->m_peraglock);
+	kmem_free(mp->m_perag, sbp->sb_agcount * sizeof(xfs_perag_t));
 	/* FALLTHROUGH */
+ error1:
+	/*
+	 * Use xfs_getsb() so that the buffer will be locked
+	 * when we call nfreerbuf().
+	 */
+	bp = xfs_getsb(mp, 0);
+	nfreerbuf(bp);
+	mp->m_sb_bp = NULL;
+	return error;
  error0:
 	brelse(bp);
 	nfreerbuf(bp);
