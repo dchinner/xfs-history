@@ -340,13 +340,11 @@ extern int pagebuf_iorequest(		/* start real I/O		*/
 extern int pagebuf_iowait(		/* wait for buffer I/O done	*/
 		page_buf_t *);		/* buffer to wait on		*/
 
-extern caddr_t	pagebuf_offset(
-		page_buf_t *,
-		unsigned int);
+extern caddr_t	pagebuf_offset(page_buf_t *, off_t);
 
 extern void pagebuf_iomove(		/* move data in/out of pagebuf	*/
 		page_buf_t *,		/* buffer to manipulate		*/
-		loff_t,			/* starting buffer offset	*/
+		off_t,			/* starting buffer offset	*/
 		size_t,			/* length in buffer		*/
 		caddr_t,		/* data pointer			*/
 		page_buf_rw_t);		/* direction			*/

@@ -1005,21 +1005,22 @@ pagebuf_associate_memory(
 	void			*mem,
 	size_t			len)
 {
-	unsigned long		base, offset, end;
-	int			page_count, rval, i = 0;
-
-	base = (unsigned long)mem & PAGE_CACHE_MASK;
-	offset = (unsigned long)mem & ~PAGE_CACHE_MASK;
-	end = PAGE_CACHE_ALIGN((unsigned long)mem + len);
+	int			rval;
+	int			i = 0;
+	size_t			ptr;
+	size_t			end, end_cur;
+	off_t			offset;
+	int			page_count;
 
 	page_count = PAGE_CACHE_ALIGN(len) >> PAGE_CACHE_SHIFT;
+	offset = (off_t) mem - ((off_t)mem & PAGE_CACHE_MASK);
 	if (offset && (len > PAGE_CACHE_SIZE))
 		page_count++;
 
 	/* Free any previous set of page pointers */
-	if (pb->pb_pages != pb->pb_page_array)
+	if (pb->pb_pages && (pb->pb_pages != pb->pb_page_array)) {
 		kfree(pb->pb_pages);
-
+	}
 	pb->pb_pages = NULL;
 	pb->pb_addr = mem;
 
@@ -1027,15 +1028,22 @@ pagebuf_associate_memory(
 	if (rval)
 		return rval;
 
-
-	for ( ; base < end; base += PAGE_CACHE_SIZE) {
-		pb->pb_pages[i] = mem_to_page((void *)base);
-		pb->pb_page_count = ++i;
-		base += PAGE_CACHE_SIZE;
-	}
-
-	pb->pb_locked = 0;
 	pb->pb_offset = offset;
+	ptr = (size_t) mem & PAGE_CACHE_MASK;
+	end = PAGE_CACHE_ALIGN((size_t) mem + len);
+	end_cur = end;
+	/* set up first page */
+	pb->pb_pages[0] = mem_to_page(mem);
+
+	ptr += PAGE_CACHE_SIZE;
+	pb->pb_page_count = ++i;
+	while (ptr < end) {
+		pb->pb_pages[i] = mem_to_page((void *)ptr);
+		pb->pb_page_count = ++i;
+		ptr += PAGE_CACHE_SIZE;
+	}
+	pb->pb_locked = 0;
+
 	pb->pb_count_desired = pb->pb_buffer_length = len;
 	pb->pb_flags |= PBF_MAPPED | _PBF_PRIVATE_BH;
 
@@ -1516,7 +1524,7 @@ _pagebuf_page_io(
 	pb_target_t		*pbr,	/* device parameters (bsz, ssz, dev) */
 	page_buf_t		*pb,	/* pagebuf holding it, can be NULL */
 	page_buf_daddr_t	bn,	/* starting block number */
-	loff_t			pg_offset,	/* starting offset in page */
+	off_t			pg_offset,	/* starting offset in page */
 	size_t			pg_length,	/* count of data to process */
 	int			locking,	/* page locking in use */
 	int			rw,	/* read/write operation */
@@ -1732,7 +1740,7 @@ _page_buf_page_apply(
 
 	if (pb->pb_flags & PBF_READ) {
 		_pagebuf_page_io(page, pbr, pb, bn,
-			pg_offset, pg_length, pb->pb_locked, READ, 0);
+			(off_t)pg_offset, pg_length, pb->pb_locked, READ, 0);
 	} else if (pb->pb_flags & PBF_WRITE) {
 		int locking = (pb->pb_flags & _PBF_LOCKABLE) == 0;
 
@@ -1740,7 +1748,7 @@ _page_buf_page_apply(
 		if (locking && (pb->pb_locked == 0))
 			lock_page(page);
 		_pagebuf_page_io(page, pbr, pb, bn,
-			pg_offset, pg_length, locking, WRITE,
+			(off_t)pg_offset, pg_length, locking, WRITE,
 			last && (pb->pb_flags & PBF_FLUSH));
 	}
 
@@ -1837,7 +1845,7 @@ pagebuf_mapout_locked(
 caddr_t
 pagebuf_offset(
 	page_buf_t		*pb,
-	unsigned int		offset)
+	off_t			offset)
 {
 	struct page		*page;
 
@@ -1893,7 +1901,7 @@ pagebuf_segment(
 void
 pagebuf_iomove(
 	page_buf_t		*pb,	/* buffer to process		*/
-	loff_t			boff,	/* starting buffer offset	*/
+	off_t			boff,	/* starting buffer offset	*/
 	size_t			bsize,	/* length to copy		*/
 	caddr_t			data,	/* data address			*/
 	page_buf_rw_t		mode)	/* read/write flag		*/
