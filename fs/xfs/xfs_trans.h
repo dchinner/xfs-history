@@ -215,6 +215,20 @@ typedef struct xfs_trans {
 #define	XFS_TRANS_SB_RES_FREXTENTS	0x00000020
 
 /*
+ * Various log reservation values.
+ */
+#define XFS_DEFAULT_LOG_RES	BBTOB(128)
+#define	XFS_ITRUNCATE_LOG_RES	BBTOB(128)
+#define	XFS_IALLOC_LOG_RES	BBTOB(XFS_IALLOC_MAX_EVER_BLOCKS)
+#define	XFS_REMOVE_LOG_RES	BBTOB(10)
+#define	XFS_LINK_LOG_RES	BBTOB(10)
+#define	XFS_RENAME_LOG_RES	BBTOB(10)
+#define	XFS_SYMLINK_LOG_RES	BBTOB(XFS_IALLOC_MAX_EVER_BLOCKS + 12)
+#define	XFS_CREATE_LOG_RES	BBTOB(XFS_IALLOC_MAX_EVER_BLOCKS + 10)
+#define	XFS_MKDIR_LOG_RES	BBTOB(XFS_IALLOC_MAX_EVER_BLOCKS + 10)
+
+
+/*
  * Transaction types to be passed to xfs_trans_alloc().
  */
 #define	XFS_TRANS_FILE_WRITE	1
@@ -223,6 +237,13 @@ struct xfs_inode;
 struct xfs_mount;
 struct xfs_efi_log_item;
 struct xfs_efd_log_item;
+
+/*
+ * xFS transaction mechanism exported interfaces that are
+ * actually macros.
+ */
+#define	xfs_trans_get_log_res(tp)	((tp)->t_log_res)
+#define	xfs_trans_get_block_res(tp)	((tp)->t_blk_res)
 
 /*
  * xFS transaction mechanism exported interfaces.
