@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.12 $"
+#ident	"$Revision: 1.13 $"
 
 #define	XFS_MACRO_C
 
@@ -646,6 +646,14 @@ xfs_buf_to_bmbt_block(buf_t *bp)
 }
 #endif
 
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BUF_TO_DA_INTNODE)
+xfs_da_intnode_t *
+xfs_buf_to_da_intnode(struct buf *bp)
+{
+	return XFS_BUF_TO_DA_INTNODE(bp);
+}
+#endif
+
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BUF_TO_DINODE)
 xfs_dinode_t *
 xfs_buf_to_dinode(buf_t *bp)
@@ -670,6 +678,13 @@ xfs_buf_to_lblock(buf_t *bp)
 }
 #endif
 
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BUF_TO_LEAFDIRBLK)
+xfs_dir_leafblock_t *
+xfs_buf_to_leafdirblk(struct buf *bp)
+{
+	return XFS_BUF_TO_LEAFDIRBLK(bp);
+}
+#endif
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BUF_TO_SBLOCK)
 xfs_btree_sblock_t *
 xfs_buf_to_sblock(buf_t *bp)
