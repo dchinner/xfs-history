@@ -1,4 +1,8 @@
-#ident	"$Revision$"
+#ident	"$Revision: 1.24 $"
+
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 #define	XFS_MACRO_C
 

@@ -1,4 +1,7 @@
-#ident "$Revision: 1.404 $"
+#ident "$Revision: 1.405 $"
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 
 #ifdef SIM
@@ -30,6 +33,7 @@
 #include <sys/uthread.h>
 #include <sys/kmem.h>
 #include <sys/cmn_err.h>
+#include <sys/xlate.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -6897,8 +6901,8 @@ xfs_error(
 #ifdef SIM
 
 vnodeops_t xfs_vnodeops = {
-	BHV_IDENTITY_INIT(VN_BHV_XFS,VNODE_POSITION_BASE),
-	(vop_open_t)fs_noerr,
+  /*	BHV_IDENTITY_INIT(VN_BHV_XFS,VNODE_POSITION_BASE), */ 0,
+  /* (vop_open_t)fs_noerr, */ 0,
 	(vop_close_t)fs_nosys,
 	(vop_read_t)fs_nosys,
 	(vop_write_t)fs_nosys,
@@ -6957,7 +6961,7 @@ vnodeops_t xfs_vnodeops = {
 };
 
 #else
-
+#if 1
 vnodeops_t xfs_vnodeops = {
 	BHV_IDENTITY_INIT(VN_BHV_XFS,VNODE_POSITION_BASE),
 	xfs_open,
@@ -7017,5 +7021,5 @@ vnodeops_t xfs_vnodeops = {
 	fs_strgetmsg,
 	fs_strputmsg,
 };
-
+#endif /* if 0 */
 #endif /* SIM */

@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.2 $"
 
 /*
  * xfs_dir2_leaf.c
@@ -7,6 +7,9 @@
  * These directories have multiple XFS_DIR2_DATA blocks and one
  * XFS_DIR2_LEAF1 block containing the hash table and freespace map.
  */
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 #ifdef SIM
 #define _KERNEL 1
@@ -14,6 +17,7 @@
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/uuid.h>
+#include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -1731,6 +1735,11 @@ xfs_dir2_leaf_trim_data(
 	data = dbp->data;
 	ASSERT(data->hdr.magic == XFS_DIR2_DATA_MAGIC);
 #endif
+	/* this seems to be an error 
+	 * data is only valid if DEBUG is defined?
+	 * RMC 09/08/1999
+	 */
+
 	leaf = lbp->data;
 	ltp = XFS_DIR2_LEAF_TAIL_P(mp, leaf);
 	ASSERT(data->hdr.bestfree[0].length ==

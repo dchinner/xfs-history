@@ -1,4 +1,8 @@
-#ident "$Revision$"
+#ident "$Revision: 1.59 $"
+
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 #ifdef SIM
 #define _KERNEL	1
@@ -396,15 +400,19 @@ xfs_trans_read_buf(
 		if (!(bp->b_flags & B_DONE)) {
 			buftrace("READ_BUF_INCORE !DONE", bp);
 #ifndef SIM
+#ifdef PAIN_IN_THE_ASS_UNDER_LINUX
 			SYSINFO.lread += len;
+#endif
 #endif
 			ASSERT(!(bp->b_flags & B_ASYNC));
 			bp->b_flags |= B_READ;
 			ASSERT(bp->b_edev == dev);
 			xfsbdstrat(tp->t_mountp, bp);
 #ifndef SIM
+#ifdef PAIN_IN_THE_ASS_UNDER_LINUX
 			KTOP_UPDATE_CURRENT_INBLOCK(1);
 			SYSINFO.bread += len;
+#endif
 #endif
 			iowait(bp);
 			if (geterror(bp) != 0) {

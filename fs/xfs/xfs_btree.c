@@ -3,36 +3,28 @@
 /*
  * This file contains common code for the space manager's btree implementations.
  */
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 #ifdef SIM
 #define _KERNEL 1
 #endif
 #include <sys/param.h>
-# if !defined(__linux__)
 #include <sys/buf.h>
 #include <sys/uuid.h>
 #include <sys/vnode.h>
 #include <sys/grio.h>
 #include <sys/debug.h>
-# endif
 #ifdef SIM
 #undef _KERNEL
 #endif
 #include <sys/errno.h>
-# if !defined(__linux__)
-#include <sys/kmem.h>
-# endif
 #ifdef SIM
 #include <bstring.h>
 #else
-# if !defined(__linux__)
-#include <sys/systm.h>
-# endif
 #endif
 
-#if defined(__linux__)
-#include "xfs_linux.h"
-#endif
 
 #include "xfs_macros.h"
 #include "xfs_types.h"

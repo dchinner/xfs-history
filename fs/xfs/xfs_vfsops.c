@@ -16,7 +16,10 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision$"
+#ident  "$Revision: 1.213 $"
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 #include <limits.h>
 #ifdef SIM
@@ -109,6 +112,7 @@
 #else
 #include <fs/fs_bhv_id.h>
 #endif
+#include <fs/fs_bhv_id.h>
 
 #ifndef SIM
 #define	whymount_t	whymountroot_t
@@ -2709,7 +2713,7 @@ vfsops_t xfs_vfsops = {
 };
 #else	/* SIM */
 vfsops_t xfs_vfsops = {
-	BHV_IDENTITY_INIT(VFS_BHV_XFS,VFS_POSITION_BASE),
+  /*	BHV_IDENTITY_INIT(VFS_BHV_XFS,VFS_POSITION_BASE), */ 0,
 	0,
 	0,
 	0,

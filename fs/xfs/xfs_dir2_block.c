@@ -1,10 +1,14 @@
-#ident "$Revision$"
+#ident "$Revision: 1.1 $"
 
 /*
  * xfs_dir2_block.c
  * XFS V2 directory implementation, single-block form.
  * See xfs_dir2_block.h for the format.
  */
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
+
 
 #ifdef SIM
 #define _KERNEL 1
@@ -12,6 +16,7 @@
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/uuid.h>
+#include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
 #endif

@@ -1,9 +1,12 @@
-#ident "$Revision$"
+#ident "$Revision: 1.34 $"
 
 /*
  * This file contains the implementation of the xfs_efi_log_item
  * and xfs_efd_log_item items.
  */
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 
 #ifdef SIM

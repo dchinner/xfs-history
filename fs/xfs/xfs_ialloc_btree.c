@@ -1,9 +1,12 @@
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.39 $"
 
 /*
  * Inode allocation management for XFS.
  */
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 #ifdef SIM
 #define _KERNEL 1

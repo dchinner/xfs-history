@@ -1,6 +1,9 @@
 /*
  * xfs_da_btree.c
  */
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2279,7 +2282,7 @@ xfs_da_get_buf(
 	int		whichfork)
 {
 	return xfs_da_do_buf(trans, dp, bno, &mappedbno, bpp, whichfork, 0,
-		(inst_t *)__return_address);
+						 (inst_t *)__return_address);
 }
 
 /*

@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.72 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -6,6 +6,10 @@
  * items as well as utility routines used by the buffer specific
  * transaction routines.
  */
+
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 #include <limits.h>
 #ifdef SIM

@@ -1,9 +1,12 @@
-#ident "$Revision$"
+#ident "$Revision: 1.1 $"
 
 /*
  * XFS v2 directory implmentation.
  * Top-level and utility routines.
  */
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 #ifdef SIM
 #define _KERNEL 1

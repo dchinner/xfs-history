@@ -1,10 +1,13 @@
-#ident "$Revision$"
+#ident "$Revision: 1.1 $"
 
 /*
  * xfs_dir2_data.c
  * Core data block handling routines for XFS V2 directories.
  * See xfs_dir2_data.h for data structures.
  */
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 #ifdef SIM
 #define _KERNEL 1
@@ -12,6 +15,7 @@
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/uuid.h>
+#include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
 #endif

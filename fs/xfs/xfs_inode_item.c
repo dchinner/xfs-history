@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.78 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -6,6 +6,9 @@
  * items as well as utility routines used by the inode specific
  * transaction routines.
  */
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 
 #ifdef SIM

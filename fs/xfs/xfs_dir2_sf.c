@@ -1,9 +1,13 @@
-#ident "$Revision$"
+#ident "$Revision: 1.1 $"
 
 /*
  * xfs_dir2_sf.c
  * Shortform directory implementation for v2 directories.
  */
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
+
 
 #ifdef SIM
 #define _KERNEL 1

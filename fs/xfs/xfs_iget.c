@@ -1,4 +1,7 @@
-#ident "$Revision: 1.107 $"
+#ident "$Revision: 1.103 $"
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 #ifdef SIM
 #define _KERNEL 1
@@ -191,13 +194,15 @@ xfs_iget(
 	int		error;
 	/* REFERENCED */
 	int		newnode;
-	int		quiesce_new;
+	int		quiesce_new = 0;
 	vmap_t		vmap;
 	xfs_chash_t	*ch;
 	xfs_chashlist_t	*chl, *chlnew;
 	SPLDECL(s);
 
-	SYSINFO.iget++;
+#if 0 /* conflicting with linux sysinfo... clean up later RMC */
+	SYSINFO.iget++; 
+#endif
 	XFSSTATS.xs_ig_attempts++;
 
 	ih = XFS_IHASH(mp, ino);

@@ -1,4 +1,7 @@
-#ident	"$Revision$"
+#ident	"$Revision: 1.184 $"
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 #include <limits.h>
 #ifdef SIM

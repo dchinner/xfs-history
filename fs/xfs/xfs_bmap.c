@@ -1,36 +1,33 @@
 #ident	"$Revision: 1.226 $"
 
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
+
 #ifdef SIM
 #define	_KERNEL 1
 #endif
 #include <sys/param.h>
-#if !defined(__linux__)
 #include <sys/sema.h>
 #include <sys/buf.h>
 #include <sys/debug.h>
-#endif
 #ifdef SIM
 #undef _KERNEL
 #endif
-#if !defined(__linux__)
 #include <sys/kmem.h>
 #include <sys/ktrace.h>
 #include <sys/cmn_err.h>
-#endif
 #include <sys/fcntl.h>
 #include <sys/errno.h>
 #ifdef SIM
 #include <stddef.h>
 #include <bstring.h>
 #else
-# if !defined(__linux__)
 #include <sys/systm.h>
-# endif
 #endif
 #ifdef SIM
 #define _KERNEL 1
 #endif
-# if !defined(__linux__)
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/grio.h>
@@ -40,11 +37,6 @@
 #include <sys/cred.h>
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
-# endif
-
-#if defined(__linux__)
-#include "xfs_linux.h"
-#endif
 
 #ifdef SIM
 #undef _KERNEL

@@ -1,4 +1,9 @@
-#ident "$Revision: 1.4 $"
+#ident "$Revision: 1.2 $"
+
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
+
 
 #ifdef SIM
 #define _KERNEL 1
@@ -196,7 +201,9 @@ xfs_checklock(
 	bf.l_start = offset;
 	bf.l_len = len;
 	bf.l_pid = fl->fl_pid;
-	bf.l_sysid = fl->fl_sysid;
+	/* Hack aleart hack alert */
+	/* the sysid stuct does not exist in linux flock */
+	/*	bf.l_sysid = fl->fl_sysid; */
 
 	if (fmode & (FNDELAY|FNONBLOCK))
 		cmd = F_CHKLK;

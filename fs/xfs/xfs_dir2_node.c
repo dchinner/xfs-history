@@ -1,10 +1,13 @@
-#ident "$Revision$"
+#ident "$Revision: 1.3 $"
 
 /*
  * xfs_dir2_node.c
  * XFS directory implementation, version 2, node form files
  * See data structures in xfs_dir2_node.h and xfs_da_btree.h.
  */
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 #ifdef SIM
 #define _KERNEL 1
