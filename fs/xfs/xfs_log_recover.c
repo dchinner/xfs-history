@@ -51,45 +51,6 @@
 #include <sys/uuid.h>
 #include <stddef.h>
 
-#if 0
-#include <sys/fs/xfs_macros.h>
-#include <sys/fs/xfs_types.h>
-#include <sys/fs/xfs_inum.h>
-#include <sys/fs/xfs_log.h>
-#include <sys/fs/xfs_ag.h>		/* needed by xfs_sb.h */
-#include <sys/fs/xfs_sb.h>		/* depends on xfs_types.h, xfs_inum.h */
-#include <sys/fs/xfs_trans.h>
-#include <sys/fs/xfs_dir.h>
-#include <sys/fs/xfs_dir2.h>
-#include <sys/fs/xfs_mount.h>		/* depends on xfs_trans.h & xfs_sb.h */
-#include <sys/fs/xfs_error.h>
-#include <sys/fs/xfs_bmap_btree.h>
-#include <sys/fs/xfs_alloc.h>
-#include <sys/fs/xfs_attr_sf.h>
-#include <sys/fs/xfs_dir_sf.h>
-#include <sys/fs/xfs_dir2_sf.h>
-#include <sys/fs/xfs_dinode.h>
-#include <sys/fs/xfs_imap.h>
-#include <sys/fs/xfs_inode_item.h>
-#include <sys/fs/xfs_inode.h>
-#include <sys/fs/xfs_ialloc_btree.h>
-#include <sys/fs/xfs_ialloc.h>
-#include <sys/fs/xfs_error.h>
-#include <sys/fs/xfs_log_priv.h>	/* depends on all above */
-#include <sys/fs/xfs_buf_item.h>
-#include <sys/fs/xfs_alloc_btree.h>
-#include <sys/fs/xfs_log_recover.h>
-#include <sys/fs/xfs_extfree_item.h>
-#include <sys/fs/xfs_trans_priv.h>
-#include <sys/fs/xfs_bit.h>
-#include <sys/fs/xfs_quota.h>
-#include <sys/fs/xfs_dqblk.h>
-#include <sys/fs/xfs_dquot_item.h>
-#include <sys/fs/xfs_dquot.h>
-#include <sys/fs/xfs_qm.h>
-#include <sys/fs/xfs_rw.h>
-#endif
-
 #include <xfs_macros.h>
 #include <xfs_types.h>
 #include <xfs_inum.h>
