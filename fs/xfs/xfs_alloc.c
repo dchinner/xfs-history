@@ -208,6 +208,8 @@ xfs_alloc_fix_len(
 		    (int)args->minlen)
 			return;
 	}
+	ASSERT(rlen >= args->minlen);
+	ASSERT(rlen <= args->maxlen);
 	args->len = rlen;
 }
 
@@ -382,6 +384,7 @@ xfs_alloc_ag_vextent_exact(
 		return;
 	}
 	rlen = args->len;
+	ASSERT(args->agbno + rlen <= fend);
 	end = args->agbno + rlen;
 	/*
 	 * We are allocating agbno for rlen [agbno .. end)
@@ -452,6 +455,8 @@ xfs_alloc_ag_vextent_exact(
 	xfs_alloc_kcheck(bno_cur);
 	xfs_btree_del_cursor(bno_cur);
 	args->len = rlen;
+	ASSERT(args->agbno + args->len <=
+	       XFS_BUF_TO_AGF(args->agbp)->agf_length);
 }
 
 /*
@@ -462,7 +467,7 @@ xfs_alloc_ag_vextent_exact(
  */
 STATIC void
 xfs_alloc_ag_vextent_near(
-	xfs_alloc_arg_t	*args)	/* allocation argument structure */
+	xfs_alloc_arg_t	*args)		/* allocation argument structure */
 {
 	xfs_btree_cur_t	*bno_cur_gt;	/* cursor for bno btree, right side */
 	xfs_btree_cur_t	*bno_cur_lt;	/* cursor for bno btree, left side */
@@ -508,6 +513,8 @@ xfs_alloc_ag_vextent_near(
 			xfs_btree_del_cursor(cnt_cur);
 			args->len = 1;
 			args->agbno = ltbno;
+			ASSERT(args->agbno + args->len <=
+			       XFS_BUF_TO_AGF(args->agbp)->agf_length);
 			return;
 		}
 		/*
@@ -591,6 +598,8 @@ xfs_alloc_ag_vextent_near(
 		 */
 		ltnew = bnew;
 		ltnewend = bnew + rlen;
+		ASSERT(ltnew >= ltbno);
+		ASSERT(ltnewend <= ltend);
 		/*
 		 * Set up a cursor for the by-bno tree.
 		 */
@@ -662,6 +671,8 @@ xfs_alloc_ag_vextent_near(
 		xfs_alloc_kcheck(bno_cur_lt);
 		xfs_btree_del_cursor(bno_cur_lt);
 		args->agbno = ltnew;
+		ASSERT(args->agbno + args->len <=
+		       XFS_BUF_TO_AGF(args->agbp)->agf_length);
 		return;
 	}
 	/*
@@ -927,6 +938,8 @@ xfs_alloc_ag_vextent_near(
 		ltdiff = xfs_alloc_compute_diff(args->agbno, rlen, ltbno, ltlen,
 			&ltnew);
 		ltnewend = ltnew + rlen;
+		ASSERT(ltnew >= ltbno);
+		ASSERT(ltnewend <= ltend);
 		/*
 		 * Find the equivalent by-size btree record and delete it.
 		 */
@@ -985,6 +998,8 @@ xfs_alloc_ag_vextent_near(
 		xfs_alloc_kcheck(bno_cur_lt);
 		xfs_btree_del_cursor(bno_cur_lt);
 		args->agbno = ltnew;
+		ASSERT(args->agbno + args->len <=
+		       XFS_BUF_TO_AGF(args->agbp)->agf_length);
 	}
 	/*
 	 * On the right side.
@@ -1005,6 +1020,8 @@ xfs_alloc_ag_vextent_near(
 		gtdiff = xfs_alloc_compute_diff(args->agbno, rlen, gtbno, gtlen,
 			&gtnew);
 		gtnewend = gtnew + rlen;
+		ASSERT(gtnew >= gtbno);
+		ASSERT(gtnewend <= gtend);
 		/*
 		 * Find the equivalent by-size btree record and delete it.
 		 */
@@ -1039,6 +1056,8 @@ xfs_alloc_ag_vextent_near(
 		xfs_alloc_kcheck(bno_cur_gt);
 		xfs_btree_del_cursor(bno_cur_gt);
 		args->agbno = gtnew;
+		ASSERT(args->agbno + args->len <=
+		       XFS_BUF_TO_AGF(args->agbp)->agf_length);
 	}
 }
 
@@ -1080,6 +1099,8 @@ xfs_alloc_ag_vextent_size(
 			xfs_btree_del_cursor(cnt_cur);
 			args->len = 1;
 			args->agbno = fbno;
+			ASSERT(args->agbno + args->len <=
+			       XFS_BUF_TO_AGF(args->agbp)->agf_length);
 			return;
 		} else
 			flen = 0;
@@ -1110,6 +1131,7 @@ xfs_alloc_ag_vextent_size(
 		return;
 	}
 	rlen = args->len;
+	ASSERT(rlen <= flen);
 	/*
 	 * Delete the entry from the by-size btree.
 	 */
@@ -1148,6 +1170,8 @@ xfs_alloc_ag_vextent_size(
 	xfs_btree_del_cursor(cnt_cur);
 	args->len = rlen;
 	args->agbno = fbno;
+	ASSERT(args->agbno + args->len <=
+	       XFS_BUF_TO_AGF(args->agbp)->agf_length);
 }
 
 /*
@@ -1376,6 +1400,7 @@ xfs_alloc_ag_freeblks(
 	if (!agbp)
 		return 0;
 	agf = XFS_BUF_TO_AGF(agbp);
+	ASSERT(agf->agf_magicnum == XFS_AGF_MAGIC);
 	freeblks = agf->agf_freeblks;
 	xfs_trans_brelse(tp, agbp);
 	return freeblks;
@@ -1435,6 +1460,7 @@ xfs_alloc_fix_freelist(
 	 * Figure out how many blocks we should have in the freelist.
 	 */
 	agf = XFS_BUF_TO_AGF(agbp);
+	ASSERT(agf->agf_magicnum == XFS_AGF_MAGIC);
 	need = XFS_MIN_FREELIST(agf, mp);
 	/*
 	 * If there isn't enough total or single-extent, reject it.
@@ -1748,8 +1774,13 @@ xfs_alloc_vextent(
 	}
 	if (args->agbno == NULLAGBLOCK)
 		args->fsbno = NULLFSBLOCK;
-	else
+	else {
 		args->fsbno = XFS_AGB_TO_FSB(mp, args->agno, args->agbno);
+		ASSERT(args->len >= args->minlen);
+		ASSERT(args->len <= args->maxlen);
+		XFS_AG_CHECK_DADDR(mp, XFS_FSB_TO_DADDR(mp, args->fsbno),
+			args->len);
+	}
 }
 
 /*
@@ -1768,6 +1799,7 @@ xfs_free_extent(
 	xfs_agnumber_t	agno;	/* allocation group number */
 
 	ASSERT(len != 0);
+	XFS_AG_CHECK_DADDR(tp->t_mountp, bno, len);
 	agno = XFS_FSB_TO_AGNO(tp->t_mountp, bno);
 	ASSERT(agno < tp->t_mountp->m_sb.sb_agcount);
 	agbno = XFS_FSB_TO_AGBNO(tp->t_mountp, bno);

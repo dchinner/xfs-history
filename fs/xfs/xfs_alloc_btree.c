@@ -983,6 +983,17 @@ xfs_alloc_log_recs(
 
 	block = XFS_BUF_TO_ALLOC_BLOCK(bp);
 	rp = XFS_ALLOC_REC_ADDR(block, 1, cur);
+#ifdef DEBUG
+	{
+		xfs_agf_t	*agf;
+		xfs_alloc_rec_t	*p;
+
+		agf = XFS_BUF_TO_AGF(cur->bc_private.a.agbp);
+		for (p = &rp[rfirst - 1]; p <= &rp[rlast - 1]; p++)
+			ASSERT(p->ar_startblock + p->ar_blockcount <=
+			       agf->agf_length);
+	}
+#endif
 	first = (caddr_t)&rp[rfirst - 1] - (caddr_t)block;
 	last = ((caddr_t)&rp[rlast] - 1) - (caddr_t)block;
 	xfs_trans_log_buf(cur->bc_tp, bp, first, last);
