@@ -276,7 +276,7 @@ xfs_dir_shortform_to_leaf(xfs_trans_t *trans, xfs_da_name_t *iargs)
 
 	xfs_idata_realloc(dp, -size, XFS_DATA_FORK);
 	dp->i_d.di_size = 0;
-	retval = xfs_da_grow_inode(trans, iargs, &blkno);
+	retval = xfs_da_grow_inode(trans, iargs, 1, &blkno);
 	if (retval) {
 		dp->i_d.di_size = size;
 		xfs_idata_realloc(dp, size, XFS_DATA_FORK);
@@ -330,31 +330,6 @@ out:
 }
 
 #ifndef SIM
-/*
- * Print the shortform directory.
- */
-/*ARGSUSED*/
-void
-xfs_dir_shortform_print(xfs_trans_t *trans, xfs_inode_t *dp)
-{
-	xfs_dir_shortform_t *sf;
-	xfs_dir_sf_entry_t *sfe;
-	xfs_ino_t ino;
-	int i;
-
-	sf = (xfs_dir_shortform_t *)dp->i_df.if_u1.if_data;
-	printf("%20lld  .\n", dp->i_ino);
-	bcopy(sf->hdr.parent, (char *)&ino, sizeof(ino));
-	printf("%20lld  ..\n", ino);
-
-	sfe = &sf->list[0];
-	for (i = sf->hdr.count-1; i >= 0; i--) {
-		bcopy(sfe->inumber, (char *)&ino, sizeof(ino));
-		printf("%20lld  %*.*s\n", ino, sfe->namelen, sfe->namelen, sfe->name);
-		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
-	}
-}
-
 /*
  * Copy out directory entries for getdents(), for shortform directories.
  */
@@ -492,7 +467,7 @@ xfs_dir_leaf_to_shortform(xfs_trans_t *trans, xfs_da_name_t *iargs)
 	tmpbuffer = kmem_alloc(XFS_LBSIZE(dp->i_mount), KM_SLEEP);
 	ASSERT(tmpbuffer != NULL);
 
-	retval = xfs_da_read_buf(trans, dp, 0, &bp);
+	retval = xfs_da_read_buf(trans, dp, 0, &bp, XFS_DATA_FORK);
 	if (retval)
 		return(retval);
 	ASSERT(bp != NULL);
@@ -519,7 +494,7 @@ xfs_dir_leaf_to_shortform(xfs_trans_t *trans, xfs_da_name_t *iargs)
 			entry->nameidx = 0;
 		}
 	}
-	retval = xfs_da_shrink_inode(trans, iargs, 0, bp);
+	retval = xfs_da_shrink_inode(trans, iargs, 0, 1, bp);
 	if (retval)
 		goto out;
 	retval = xfs_dir_shortform_create(trans, dp, parent);
@@ -566,15 +541,15 @@ xfs_dir_leaf_to_node(xfs_trans_t *trans, xfs_da_name_t *args)
 	int retval;
 
 	dp = args->dp;
-	retval = xfs_da_grow_inode(trans, args, &blkno);
+	retval = xfs_da_grow_inode(trans, args, 1, &blkno);
 	ASSERT(blkno == 1);
 	if (retval)
 		return(retval);
-	retval = xfs_da_read_buf(trans, dp, 0, &bp1);
+	retval = xfs_da_read_buf(trans, dp, 0, &bp1, XFS_DATA_FORK);
 	if (retval)
 		return(retval);
 	ASSERT(bp1 != NULL);
-	retval = xfs_da_get_buf(trans, dp, 1, &bp2);
+	retval = xfs_da_get_buf(trans, dp, 1, &bp2, XFS_DATA_FORK);
 	if (retval)
 		return(retval);
 	ASSERT(bp2 != NULL);
@@ -584,7 +559,7 @@ xfs_dir_leaf_to_node(xfs_trans_t *trans, xfs_da_name_t *args)
 	/*
 	 * Set up the new root node.
 	 */
-	retval = xfs_da_node_create(trans, dp, 0, 1, &bp1);
+	retval = xfs_da_node_create(trans, dp, 0, 1, &bp1, XFS_DATA_FORK);
 	if (retval)
 		return(retval);
 	node = (xfs_da_intnode_t *)bp1->b_un.b_addr;
@@ -616,7 +591,7 @@ xfs_dir_leaf_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t blkno,
 	buf_t *bp;
 	int retval;
 
-	retval = xfs_da_get_buf(trans, dp, blkno, &bp);
+	retval = xfs_da_get_buf(trans, dp, blkno, &bp, XFS_DATA_FORK);
 	if (retval)
 		return(retval);
 	ASSERT(bp != NULL);
@@ -650,7 +625,7 @@ xfs_dir_leaf_split(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 	 * Allocate space for a new leaf node.
 	 */
 	ASSERT(oldblk->magic == XFS_DIR_LEAF_MAGIC);
-	error = xfs_da_grow_inode(state->trans, state->args, &blkno);
+	error = xfs_da_grow_inode(state->trans, state->args, 1, &blkno);
 	if (error)
 		return(error);
 	error = xfs_dir_leaf_create(state->trans, state->args->dp, blkno,
@@ -1174,8 +1149,8 @@ xfs_dir_leaf_toosmall(xfs_da_state_t *state, int *action)
 			blkno = info->back;
 		if (blkno == 0)
 			continue;
-		error = xfs_da_read_buf(state->trans, state->args->dp,
-						      blkno, &bp);
+		error = xfs_da_read_buf(state->trans, state->args->dp, blkno,
+						      &bp, XFS_DATA_FORK);
 		if (error)
 			return(error);
 		ASSERT(bp != NULL);
@@ -1706,30 +1681,6 @@ xfs_dir_leaf_lasthash(buf_t *bp, int *count)
 }
 
 #ifndef SIM
-/*
- * Print the contents of a leaf block.
- */
-/*ARGSUSED*/
-void
-xfs_dir_leaf_print_int(buf_t *bp, xfs_inode_t *dp)
-{
-	xfs_dir_leafblock_t *leaf;
-	xfs_dir_leaf_entry_t *entry;
-	xfs_dir_leaf_name_t *namest;
-	xfs_ino_t ino;
-	int i;
-
-	leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
-	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
-	entry = &leaf->entries[0];
-	for (i = 0; i < leaf->hdr.count; entry++, i++) {
-		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
-		bcopy(namest->inumber, (char *)&ino, sizeof(ino));
-		printf("%20lld  %*.*s\n", ino,
-				entry->namelen, entry->namelen, namest->name);
-	}
-}
-
 /*
  * Copy out directory entries for getdents(), for leaf directories.
  */
