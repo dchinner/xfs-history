@@ -2069,7 +2069,7 @@ xfs_bmbt_decrement(
 	tp = cur->bc_tp;
 	mp = cur->bc_mp;
 	for (block = xfs_bmbt_get_block(cur, lev, &bp); lev > level; ) {
-		fsbno = *XFS_BMAP_PTR_IADDR(block, cur->bc_ptrs[lev], cur);
+		fsbno = INT_GET(*XFS_BMAP_PTR_IADDR(block, cur->bc_ptrs[lev], cur), ARCH_UNKNOWN);
 		if (error = xfs_btree_read_bufl(mp, tp, fsbno, 0, &bp,
 				XFS_BMAP_BTREE_REF)) {
 			XFS_BMBT_TRACE_CURSOR(cur, ERROR);
@@ -2436,7 +2436,7 @@ xfs_bmbt_increment(
 	tp = cur->bc_tp;
 	mp = cur->bc_mp;
 	for (block = xfs_bmbt_get_block(cur, lev, &bp); lev > level; ) {
-		fsbno = *XFS_BMAP_PTR_IADDR(block, cur->bc_ptrs[lev], cur);
+		fsbno = INT_GET(*XFS_BMAP_PTR_IADDR(block, cur->bc_ptrs[lev], cur), ARCH_UNKNOWN);
 		if (error = xfs_btree_read_bufl(mp, tp, fsbno, 0, &bp,
 				XFS_BMAP_BTREE_REF)) {
 			XFS_BMBT_TRACE_CURSOR(cur, ERROR);
