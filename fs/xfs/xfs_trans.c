@@ -1,4 +1,4 @@
-#ident "$Revision: 1.77 $"
+#ident "$Revision: 1.78 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -44,7 +44,7 @@
 #include "xfs_dinode.h"
 #include "xfs_inode.h"
 #include "xfs_da_btree.h"
-
+#include "xfs_quota.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -110,6 +110,7 @@ xfs_trans_alloc(
 
 	ASSERT(xfs_trans_zone != NULL);
 	tp = kmem_zone_zalloc(xfs_trans_zone, KM_SLEEP);
+	tp->t_dqinfo = NULL;
 
 	/*
 	 * Initialize the transaction structure.
@@ -157,6 +158,11 @@ xfs_trans_dup(
 	ntp->t_rtx_res = tp->t_rtx_res - tp->t_rtx_res_used;
 	tp->t_rtx_res = tp->t_rtx_res_used;
 
+	/* 
+	 * dup the dquot stuff too. 
+	 */
+	if (tp->t_dqinfo) 
+		xfs_trans_dup_dqinfo(tp, ntp);
 	return ntp;
 }
 
@@ -170,6 +176,9 @@ xfs_trans_dup(
  * The only valid value for the flags parameter is XFS_RES_LOG_PERM, which
  * is used by long running transactions.  If any one of the reservations
  * fails then they will all be backed out.
+ * 
+ * This does not do quota reservations. That typically is done by the 
+ * caller afterwards.
  */
 int
 xfs_trans_reserve(
@@ -597,6 +606,11 @@ xfs_trans_commit(
 	if (tp->t_flags & XFS_TRANS_SB_DIRTY) {
 		xfs_trans_apply_sb_deltas(tp);
 	}
+	if (tp->t_flags & XFS_TRANS_DQ_DIRTY) {
+#ifndef SIM
+		xfs_trans_apply_dquot_deltas(tp);
+#endif
+	}
 
 	/*
 	 * Ask each log item how many log_vector entries it will
@@ -817,6 +831,10 @@ xfs_trans_cancel(
 #endif
 
 	xfs_trans_unreserve_and_mod_sb(tp);
+	
+	if (tp->t_dqinfo)
+		xfs_trans_unreserve_and_mod_dquots(tp);
+
 	if (tp->t_ticket) {
 		if (flags & XFS_TRANS_RELEASE_LOG_RES) {
 			ASSERT(tp->t_flags & XFS_TRANS_PERM_LOG_RES);
@@ -839,6 +857,8 @@ STATIC void
 xfs_trans_free(
 	xfs_trans_t	*tp)
 {
+	if (tp->t_dqinfo)
+		xfs_trans_free_dqinfo(tp);
 	kmem_zone_free(xfs_trans_zone, tp);
 }
 
