@@ -4928,6 +4928,7 @@ xfs_fcntl(
 	struct flock		bf;
 	struct irix4_flock	i4_bf;
 	struct irix5_flock	i5_bf;
+	extern int		scache_linemask;
 	
 	vn_trace_entry(vp, "xfs_fcntl");
 	mp = XFS_VFSTOM( vp->v_vfsp );
@@ -4941,13 +4942,16 @@ xfs_fcntl(
 			break;
 		}
                 /*
-                 * This value was changed from BBSIZE (512 bytes) to
-                 * NBPP so that a full maxdmasz sized request can be issued.
-                 * If the buffer was not aligned on a NBPP byte boundary,
-                 * all the pages in a maxdmmasz sized request could not be
-                 * mapped (see bug #248912).
+		 * We align to the secondary cache line size so that we
+		 * don't have to worry about nasty writeback caches on
+		 * I/O incoherent machines.  Making this less than a page
+		 * requires setting the maximum I/O size to 1 page less
+		 * than maxdmasz.  This is for the case of a maximum
+		 * size I/O that is not page aligned.  It requires the
+		 * maximum size plus 1 pages.
                  */
-		da.d_mem = NBPP;
+		ASSERT(scache_linemask != 0);
+		da.d_mem = scache_linemask + 1;
 
 		/*
 		 * this only really needs to be BBSIZE.
@@ -4956,7 +4960,7 @@ xfs_fcntl(
 		 */
 		da.d_miniosz = mp->m_sb.sb_blocksize;
 		da.d_maxiosz = XFS_FSB_TO_B(mp,
-				    XFS_B_TO_FSBT(mp, ctob(v.v_maxdmasz)));
+				    XFS_B_TO_FSBT(mp, ctob(v.v_maxdmasz - 1)));
 
 		if (copyout(&da, arg, sizeof(da))) {
 			error = XFS_ERROR(EFAULT);
