@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.140 $"
+#ident	"$Revision: 1.141 $"
 
 /*
  * High level interface routines for log manager
@@ -421,7 +421,7 @@ xfs_log_stat(caddr_t mnt_pt, int *log_BBstart, int *log_BBsize)
 	int error, start, size;
 	extern int xfs_fstype;
 
-	if (error = lookupname(mnt_pt, UIO_USERSPACE, NO_FOLLOW, NULLVPP, &vp))
+	if (error = lookupname(mnt_pt, UIO_USERSPACE, NO_FOLLOW, NULLVPP, &vp, NULL))
 		return error;
 	if (vp->v_vfsp->vfs_fstype != xfs_fstype) {
 		error = XFS_ENOTXFS;

@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.156 $"
+#ident  "$Revision: 1.157 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -382,7 +382,7 @@ spectodev(
 	vnode_t	*bvp;
 	int	error;
 
-	if (error = lookupname(spec, UIO_USERSPACE, FOLLOW, NULLVPP, &bvp))
+	if (error = lookupname(spec, UIO_USERSPACE, FOLLOW, NULLVPP, &bvp, NULL))
 		return error;
 	if (bvp->v_type != VBLK) {
 		VN_RELE(bvp);

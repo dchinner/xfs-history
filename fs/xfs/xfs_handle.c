@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.36 $"
+#ident "$Revision: 1.37 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -76,7 +76,7 @@ path_to_handle (
 	vnode_t		*vp;
 	handle_t	handle;
 
-	error = lookupname (path, UIO_USERSPACE, NO_FOLLOW, NULLVPP, &vp);
+	error = lookupname (path, UIO_USERSPACE, NO_FOLLOW, NULLVPP, &vp, NULL);
 	if (error)
 		return error;
 	error = vp_to_handle (vp, &handle);
@@ -101,7 +101,7 @@ path_to_fshandle (
 	vnode_t		*vp;
 	handle_t	handle;
 
-	error = lookupname (path, UIO_USERSPACE, NO_FOLLOW, NULLVPP, &vp);
+	error = lookupname (path, UIO_USERSPACE, NO_FOLLOW, NULLVPP, &vp, NULL);
 	if (error)
 		return error;
 	error = vp_to_handle (vp, &handle);
