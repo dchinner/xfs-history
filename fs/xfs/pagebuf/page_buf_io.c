@@ -534,12 +534,7 @@ pagebuf_release_page(
 
 /*
  * Convert delalloc or unmapped space to real space and flush out
- * to disk. Called in two circumstances, with and without PageDelalloc
- * set. Having PageDelalloc means we are actually being called to 
- * flush a delalloc buffer, we need to convert this buffer and the
- * surrounding space, but not allocate space for anything which is
- * not already delalloc. In the other case we need to allocate space
- * for all the page before EOF.
+ * to disk.
  */
 int
 pagebuf_write_full_page(
@@ -565,8 +560,7 @@ pagebuf_write_full_page(
 					   1 << inode->i_blkbits);
 	}
 
-	ret = pagebuf_delalloc_convert(inode, page, bmap,
-					1, !PageDelalloc(page));
+	ret = pagebuf_delalloc_convert(inode, page, bmap, 1, delalloc == 0);
 
 out:
 	if (ret < 0) {
@@ -813,11 +807,11 @@ cluster_write(
 }
 
 /*
- * Calling this with Delalloc set means we are being asked to flush
- * a dirty buffer head. When called with async_write set then we are
- * coming from writepage. A writepage call without Delalloc set means
- * we are being asked to write out all of the page which is before EOF
- * and therefore need to allocate space for unmapped portions of the
+ * Calling this without allocate_space set means we are being asked to
+ * flush a dirty buffer head. When called with async_write set then we
+ * are coming from writepage. A writepage call with allocate_space set
+ * means we are being asked to write out all of the page which is before
+ * EOF and therefore need to allocate space for unmapped portions of the
  * page.
  */
 STATIC int
