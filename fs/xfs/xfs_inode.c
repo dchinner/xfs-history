@@ -54,9 +54,10 @@
 zone_t *xfs_inode_zone;
 
 /*
- * Used in xfs_itruncate().  This number needs more thought.
+ * Used in xfs_itruncate().  This is the maximum number of extents
+ * freed from a file in a single transaction.
  */
-#define	XFS_ITRUNC_MAX_EXTENTS	128
+#define	XFS_ITRUNC_MAX_EXTENTS	4
 
 STATIC buf_t *
 xfs_inotobp(
