@@ -94,7 +94,7 @@ int xfs_btree_long_ptrs(xfs_btnum_t btnum);
 /*
  * Magic numbers for btree blocks.
  */
-extern __uint32_t	xfs_magics[];
+extern const __uint32_t	xfs_magics[];
 
 /*
  * Maximum and minimum records in a btree block.
@@ -357,7 +357,7 @@ xfs_btree_lastrec(
 void
 xfs_btree_offsets(
 	__int64_t		fields,	/* bitmask of fields */
-	const int		*offsets,/* table of field offsets */
+	const short		*offsets,/* table of field offsets */
 	int			nbits,	/* number of bits to inspect */
 	int			*first,	/* output: first byte offset */
 	int			*last);	/* output: last byte offset */

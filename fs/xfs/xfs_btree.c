@@ -52,7 +52,7 @@ zone_t	*xfs_btree_cur_zone;
 /*
  * Btree magic numbers.
  */
-__uint32_t xfs_magics[XFS_BTNUM_MAX] =
+const __uint32_t xfs_magics[XFS_BTNUM_MAX] =
 {
 	XFS_ABTB_MAGIC, XFS_ABTC_MAGIC, XFS_BMAP_MAGIC, XFS_IBT_MAGIC
 };
@@ -642,7 +642,7 @@ xfs_btree_lastrec(
 void
 xfs_btree_offsets(
 	__int64_t	fields,		/* bitmask of fields */
-	const int	*offsets,	/* table of field offsets */
+	const short	*offsets,	/* table of field offsets */
 	int		nbits,		/* number of bits to inspect */
 	int		*first,		/* output: first byte offset */
 	int		*last)		/* output: last byte offset */
