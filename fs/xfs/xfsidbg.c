@@ -1556,8 +1556,8 @@ xfs_broot(xfs_inode_t *ip, xfs_ifork_t *f)
 	pp = XFS_BMAP_BROOT_PTR_ADDR(broot, 1, f->if_broot_bytes);
 	for (i = 1; i <= INT_GET(broot->bb_numrecs, ARCH_UNKNOWN); i++)
 		printk("\t%d: startoff %Ld ptr %Lx %s\n",
-			i, kp[i - 1].br_startoff, pp[i - 1],
-			xfs_fmtfsblock(pp[i - 1], ip->i_mount));
+			i, INT_GET(kp[i - 1].br_startoff, ARCH_UNKNOWN), INT_GET(pp[i - 1], ARCH_UNKNOWN),
+			xfs_fmtfsblock(INT_GET(pp[i - 1], ARCH_UNKNOWN), ip->i_mount));
 }
 
 /*
@@ -1660,8 +1660,8 @@ xfs_btino(xfs_inobt_block_t *bt, int bsz)
 
 			r = XFS_BTREE_REC_ADDR(bsz, xfs_inobt, bt, i, 0);
 			printk("rec %d startino 0x%x freecount %d, free %Lx\n",
-				i, r->ir_startino, r->ir_freecount,
-				r->ir_free);
+				i, INT_GET(r->ir_startino, ARCH_UNKNOWN), INT_GET(r->ir_freecount, ARCH_UNKNOWN),
+				INT_GET(r->ir_free, ARCH_UNKNOWN));
 		}
 	} else {
 		int mxr;
@@ -1674,7 +1674,7 @@ xfs_btino(xfs_inobt_block_t *bt, int bsz)
 			k = XFS_BTREE_KEY_ADDR(bsz, xfs_inobt, bt, i, mxr);
 			p = XFS_BTREE_PTR_ADDR(bsz, xfs_inobt, bt, i, mxr);
 			printk("key %d startino 0x%x ptr 0x%x\n",
-				i, k->ir_startino, *p);
+				i, INT_GET(k->ir_startino, ARCH_UNKNOWN), INT_GET(*p, ARCH_UNKNOWN));
 		}
 	}
 }

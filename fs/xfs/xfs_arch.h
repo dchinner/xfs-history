@@ -273,8 +273,10 @@
     (reference)
 #define INT_SET(reference,arch,valueref) \
     ((reference) = (valueref))
+#define INT_MODX(reference,arch,code) \
+    ((reference) code)
 #define INT_MOD(reference,arch,delta) \
-    ((reference) += (delta))
+    INT_MODX(reference,arch,+=(delta))
 #define INT_COPY(srcref,srcarch,dstref,dstarch) \
     ((dstref) = (srcref))
 #define INT_ISZERO(reference,arch) \
@@ -357,17 +359,19 @@
         (valueref) \
     )
 
-#define INT_MOD(reference,arch,delta) \
+#define INT_MODX(reference,arch,code) \
     (((arch) == ARCH_NOCONVERT) \
         ? \
-            ((reference) += (delta)) \
+            ((reference) code) \
         : \
             ( \
                 (reference) = INT_GET((reference),arch) , \
-                ((reference) += (delta)) , \
+                ((reference) code) , \
                 INT_SET(reference, arch, reference) \
             ) \
     )
+#define INT_MOD(reference,arch,delta) \
+    INT_MODX(reference,arch,+=(delta))
     
 #define INT_COPY(srcref,srcarch,dstref,dstarch) \
     if ((dstarch) == ARCH_NOCONVERT) { \

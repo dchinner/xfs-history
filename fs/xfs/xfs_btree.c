@@ -194,7 +194,7 @@ xfs_btree_check_key(
 
 		k1 = ak1;
 		k2 = ak2;
-		ASSERT(k1->ir_startino < k2->ir_startino);
+		ASSERT(INT_GET(k1->ir_startino, ARCH_UNKNOWN) < INT_GET(k2->ir_startino, ARCH_UNKNOWN));
 		break;
 	    }
 	default:
@@ -307,8 +307,8 @@ xfs_btree_check_rec(
 
 		r1 = ar1;
 		r2 = ar2;
-		ASSERT(r1->ir_startino + XFS_INODES_PER_CHUNK <=
-		       r2->ir_startino);
+		ASSERT(INT_GET(r1->ir_startino, ARCH_UNKNOWN) + XFS_INODES_PER_CHUNK <=
+		       INT_GET(r2->ir_startino, ARCH_UNKNOWN));
 		break;
 	    }
 	default:

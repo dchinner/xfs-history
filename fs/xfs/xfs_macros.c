@@ -1796,17 +1796,17 @@ xfs_inobt_block_size(int lev, xfs_btree_cur_t *cur)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_INOBT_CLR_FREE)
 void
-xfs_inobt_clr_free(xfs_inobt_rec_t *rp, int i)
+xfs_inobt_clr_free(xfs_inobt_rec_t *rp, int i, xfs_arch_t arch)
 {
-	XFS_INOBT_CLR_FREE(rp, i);
+	XFS_INOBT_CLR_FREE(rp, i, arch);
 }
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_INOBT_IS_FREE)
 int
-xfs_inobt_is_free(xfs_inobt_rec_t *rp, int i)
+xfs_inobt_is_free(xfs_inobt_rec_t *rp, int i, xfs_arch_t arch)
 {
-	return XFS_INOBT_IS_FREE(rp, i);
+	return XFS_INOBT_IS_FREE(rp, i, arch);
 }
 #endif
 
@@ -1862,9 +1862,9 @@ xfs_inobt_rec_addr(xfs_inobt_block_t *bb, int i, xfs_btree_cur_t *cur)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_INOBT_SET_FREE)
 void
-xfs_inobt_set_free(xfs_inobt_rec_t *rp, int i)
+xfs_inobt_set_free(xfs_inobt_rec_t *rp, int i, xfs_arch_t arch)
 {
-	XFS_INOBT_SET_FREE(rp, i);
+	XFS_INOBT_SET_FREE(rp, i, arch);
 }
 #endif
 

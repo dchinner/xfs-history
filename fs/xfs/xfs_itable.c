@@ -385,7 +385,7 @@ xfs_bulkstat(
 			    tmp &&	/* lookup succeeded */
 					/* got the record, should always work */
 			    !(error = xfs_inobt_get_rec(cur, &gino, &gcnt,
-				    &gfree, &i)) &&
+				    &gfree, &i, ARCH_NOCONVERT)) &&
 			    i == 1 &&
 					/* this is the right chunk */
 			    agino < gino + XFS_INODES_PER_CHUNK &&
@@ -405,9 +405,9 @@ xfs_bulkstat(
 						gcnt++;
 				}
 				gfree |= XFS_INOBT_MASKN(0, chunkidx);
-				irbp->ir_startino = gino;
-				irbp->ir_freecount = gcnt;
-				irbp->ir_free = gfree;
+				INT_SET(irbp->ir_startino, ARCH_UNKNOWN, gino);
+				INT_SET(irbp->ir_freecount, ARCH_UNKNOWN, gcnt);
+				INT_SET(irbp->ir_free, ARCH_UNKNOWN, gfree);
 				irbp++;
 				agino = gino + XFS_INODES_PER_CHUNK;
 				icount = XFS_INODES_PER_CHUNK - gcnt;
@@ -454,7 +454,7 @@ xfs_bulkstat(
 			 */
 			if (error ||
 			    (error = xfs_inobt_get_rec(cur, &gino, &gcnt,
-				    &gfree, &i)) ||
+				    &gfree, &i, ARCH_NOCONVERT)) ||
 			    i == 0) {
 				end_of_ag = 1;
 				break;
@@ -463,9 +463,9 @@ xfs_bulkstat(
 			 * If this chunk has any allocated inodes, save it.
 			 */
 			if (gcnt < XFS_INODES_PER_CHUNK) {
-				irbp->ir_startino = gino;
-				irbp->ir_freecount = gcnt;
-				irbp->ir_free = gfree;
+				INT_SET(irbp->ir_startino, ARCH_UNKNOWN, gino);
+				INT_SET(irbp->ir_freecount, ARCH_UNKNOWN, gcnt);
+				INT_SET(irbp->ir_free, ARCH_UNKNOWN, gfree);
 				irbp++;
 				icount += XFS_INODES_PER_CHUNK - gcnt;
 			}
@@ -497,14 +497,14 @@ xfs_bulkstat(
 				 * inodes in that cluster.
 				 */
 				for (agbno = XFS_AGINO_TO_AGBNO(mp,
-							irbp[1].ir_startino),
+							INT_GET(irbp[1].ir_startino, ARCH_UNKNOWN)),
 				     chunkidx = 0;
 				     chunkidx < XFS_INODES_PER_CHUNK;
 				     chunkidx += nicluster,
 				     agbno += nbcluster) {
 					if (XFS_INOBT_MASKN(chunkidx,
 							    nicluster) &
-					    ~(irbp[1].ir_free))
+					    ~(INT_GET(irbp[1].ir_free, ARCH_UNKNOWN)))
 						xfs_btree_reada_bufs(mp, agno,
 							agbno, nbcluster);
 				}
@@ -512,9 +512,9 @@ xfs_bulkstat(
 			/*
 			 * Now process this chunk of inodes.
 			 */
-			for (agino = irbp->ir_startino, chunkidx = 0, clustidx = 0;
+			for (agino = INT_GET(irbp->ir_startino, ARCH_UNKNOWN), chunkidx = 0, clustidx = 0;
 			     ubleft > 0 &&
-				irbp->ir_freecount < XFS_INODES_PER_CHUNK;
+				INT_GET(irbp->ir_freecount, ARCH_UNKNOWN) < XFS_INODES_PER_CHUNK;
 			     chunkidx++, clustidx++, agino++) {
 				ASSERT(chunkidx < XFS_INODES_PER_CHUNK);
 				/*
@@ -534,7 +534,7 @@ xfs_bulkstat(
 				 */
 				if ((chunkidx & (nicluster - 1)) == 0) {
 					agbno = XFS_AGINO_TO_AGBNO(mp,
-							irbp->ir_startino) +
+							INT_GET(irbp->ir_startino, ARCH_UNKNOWN)) +
 						((chunkidx & nimask) >>
 						 mp->m_sb.sb_inopblog);
 
@@ -571,13 +571,13 @@ xfs_bulkstat(
 				/*
 				 * Skip if this inode is free.
 				 */
-				if (XFS_INOBT_MASK(chunkidx) & irbp->ir_free)
+				if (XFS_INOBT_MASK(chunkidx) & INT_GET(irbp->ir_free, ARCH_UNKNOWN))
 					continue;
 				/*
 				 * Count used inodes as free so we can tell
 				 * when the chunk is used up.
 				 */
-				irbp->ir_freecount++;
+				INT_MOD(irbp->ir_freecount, ARCH_UNKNOWN, +1);
 				ino = XFS_AGINO_TO_INO(mp, agno, agino);
 				bno = XFS_AGB_TO_DADDR(mp, agno, agbno);
 				if (flags & BULKSTAT_FG_QUICK) {
@@ -768,7 +768,7 @@ xfs_inumbers(
 			}
 		}
 		if ((error = xfs_inobt_get_rec(cur, &gino, &gcnt, &gfree,
-			&i)) ||
+			&i, ARCH_NOCONVERT)) ||
 		    i == 0) {
 			xfs_trans_brelse(tp, agbp);
 			agbp = NULL;
