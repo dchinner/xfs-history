@@ -608,6 +608,167 @@ xfs_readlink_by_handle(
 
 
 int
+xfs_attrctl_by_handle(
+	unsigned int	cmd,
+	unsigned long	arg,
+	struct file	*parfilp,
+	struct inode	*parinode,
+	vfs_t		*vfsp,
+	xfs_mount_t	*mp)
+{
+	int			error;
+	xfs_fsop_attr_handlereq_t attr_hreq;
+	xfs_fsop_handlereq_t	hreq;
+	attr_op_t		*ops;
+	void			*hanp;
+	size_t			hlen;
+	xfs_handle_t		handle;
+	xfs_handle_t		*handlep;
+	xfs_fid_t		*xfid;
+	xfs_ino_t		xinode;
+	xfs_inode_t		*xip = NULL;
+	__u32			xigen;
+	vnode_t			*vp = NULL;
+	struct inode		*inode = NULL;
+	
+
+#ifndef	PERMISSIONS_BY_USER
+	/*
+	 * Only allow Sys Admin capable users.
+	 */
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+#endif /* !PERMISSIONS_BY_USER */
+
+	/*
+	 * Only allow handle opens under a directory.
+	 */
+	if (!S_ISDIR(parinode->i_mode))
+		return -ENOTDIR;
+
+	/*
+	 * Copy the compound attribute/handle structure down.
+	 */
+	if (copy_from_user(&attr_hreq, (struct xfs_fsop_attr_handlereq *)arg,
+			   sizeof(struct xfs_fsop_attr_handlereq)))
+		return -XFS_ERROR(EFAULT);
+
+	/*
+	 * Now copy the handle down from the user and validate
+	 * that it looks to be in the correct format.
+	 */
+	if (copy_from_user(&hreq, (struct xfs_fsop_handlereq *)attr_hreq.hreq,
+			   sizeof(struct xfs_fsop_handlereq)))
+		return -XFS_ERROR(EFAULT);
+
+	if (!attr_hreq.ops)
+		return -XFS_ERROR(EINVAL);
+
+	hanp = hreq.ihandle;
+	hlen = hreq.ihandlen;
+	handlep = &handle;
+
+	if (hlen < sizeof(handlep->ha_fsid) || hlen > sizeof(*handlep))
+		return -XFS_ERROR(EINVAL);
+
+	if (copy_from_user(handlep, hanp, hlen))
+		return -XFS_ERROR(EFAULT);
+
+	if (hlen < sizeof(*handlep))
+		bzero(((char *)handlep) + hlen, sizeof(*handlep) - hlen);
+
+	if (hlen > sizeof(handlep->ha_fsid)) {
+
+		if (handlep->ha_fid.xfs_fid_len !=
+			(hlen - sizeof(handlep->ha_fsid)
+				- sizeof(handlep->ha_fid.xfs_fid_len))
+		    || handlep->ha_fid.xfs_fid_pad) {
+
+			return -XFS_ERROR(EINVAL);
+		}
+	}
+
+
+	/*
+	 * Crack the handle, obtain the inode # & generation #
+	 */
+
+	xfid = (struct xfs_fid *)&handlep->ha_fid;
+
+	if (xfid->xfs_fid_len == sizeof(*xfid) - sizeof(xfid->xfs_fid_len)) {
+		xinode = xfid->xfs_fid_ino;
+		xigen = xfid->xfs_fid_gen;
+	} else {
+		/*
+		 * Invalid.  Since handles can be created in user
+		 * space and passed in via gethandle(), this is not
+		 * cause for a panic.
+		 */
+		return -XFS_ERROR(EINVAL);
+	}
+
+
+	/* get the xfs inode */
+	error = xfs_iget(mp, NULL, xinode, XFS_ILOCK_SHARED, &xip, 0);
+
+	if (error)
+		return -error;
+
+	if (xip == NULL)
+		return -XFS_ERROR(EIO);
+
+	if (xip->i_d.di_mode == 0 || xip->i_d.di_gen != xigen) {
+		xfs_iput(xip, XFS_ILOCK_SHARED);
+		return -XFS_ERROR(ENOENT);
+	}
+
+	/* get vnode and linux inode */
+	vp = XFS_ITOV(xip);
+	inode = LINVFS_GET_IP(vp);
+
+	xfs_iunlock(xip, XFS_ILOCK_SHARED);
+
+
+	/* Copyin and hand off to VFS */
+	lock_kernel();
+	error = -EINVAL;
+
+	/* allocate space for attribute ops */
+	ops = (attr_op_t *) kmalloc(attr_hreq.count * sizeof(attr_op_t), GFP_KERNEL);
+	
+	if (!ops) {
+		error = -ENOMEM;
+		goto unlock;
+	}
+
+	if (copy_from_user(ops, attr_hreq.ops, attr_hreq.count * sizeof(attr_op_t)) != 0) {
+		error = -EFAULT;
+		goto free_mem;
+	}
+		
+	UPDATE_ATIME(inode);
+
+	/* call through to the vfs: note we know this is an XFS inode */
+	error = inode->i_op->attrctl(inode, ops, attr_hreq.count);
+
+	VN_RELE(vp);
+
+	if (copy_to_user(attr_hreq.ops, ops, attr_hreq.count * sizeof(attr_op_t)) != 0) {
+		error = -EFAULT;
+		goto free_mem;
+	}
+
+ free_mem:
+	kfree(ops);
+
+ unlock:
+	unlock_kernel();
+	return error;
+}
+
+
+int
 xfs_ioctl(
 	bhv_desc_t	*bdp,
 	struct inode	*inode,
@@ -959,6 +1120,11 @@ xfs_ioctl(
 	case XFS_IOC_READLINK_BY_HANDLE: {
 
 		return xfs_readlink_by_handle(cmd, arg, filp, inode, vfsp, mp);
+	}
+
+	case XFS_IOC_ATTRCTL_BY_HANDLE: {
+
+		return xfs_attrctl_by_handle(cmd, arg, filp, inode, vfsp, mp);
 	}
 
 	case XFS_IOC_SWAPEXT: {
