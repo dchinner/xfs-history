@@ -31,6 +31,7 @@ typedef struct xfs_ihash {
  * Other state kept in the in-core inode is used for identification,
  * locking, transactional updating, etc of the inode.
  */
+struct xfs_iunlink_log_item;
 #define	XFS_INLINE_EXTS	2
 #define	XFS_INLINE_DATA	32
 typedef struct xfs_inode {
@@ -53,6 +54,7 @@ typedef struct xfs_inode {
 	sema_t			i_flock;	/* inode flush lock */
 	unsigned int		i_pincount;	/* inode pin count */
 	sema_t			i_pinsema;	/* inode pin sema */
+	struct xfs_iunlink_log_item	*i_iui;	/* unlink log item */
 
 	/* I/O state */
 	off_t			i_next_offset;	/* seq read detector */
