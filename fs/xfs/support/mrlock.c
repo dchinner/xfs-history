@@ -38,8 +38,6 @@
 
 #include "mrlock.h"
 
-spinlock_t Atomic_spin = SPIN_LOCK_UNLOCKED;
-
 
 #if USE_RW_WAIT_QUEUE_SPINLOCK
 # define wq_write_lock	write_lock
