@@ -191,14 +191,6 @@ STATIC int	xfs_frlock(vnode_t	*vp,
 STATIC int	xfs_realvp(vnode_t	*vp,
 			   vnode_t	**vpp);
 
-STATIC int	xfs_bmap(vnode_t	*vp,
-			 off_t		offset,
-			 ssize_t	count,
-			 int		rw,
-			 cred_t		*credp,
-			 struct bmapval	*bmapp,
-			 int		*nmaps);
-
 STATIC int	xfs_map(vnode_t	*vp,
 			uint	offset,
 			preg_t	*pregp,
@@ -585,7 +577,7 @@ xfs_dir_ialloc(
 		tp = xfs_trans_alloc (XFS_VFSTOM((XFS_ITOV(dp))->v_vfsp), 
 			XFS_TRANS_WAIT);
 		if (code = xfs_trans_reserve (tp, 10, 10, 0, 0)) {
-			xfs_trans_cancel (tp);
+			xfs_trans_cancel (tp, 0);
 			*tpp = NULL;
 			brelse (ialloc_context);
 			return code;
@@ -832,7 +824,7 @@ error_return:
 	 * where tp == NULL.
 	 */
 	if (tp) {
-		xfs_trans_cancel (tp);
+		xfs_trans_cancel (tp, 0);
 		tp = NULL;
 	}
 	xfs_iunlock (dp, XFS_ILOCK_EXCL);
@@ -1161,7 +1153,7 @@ xfs_remove(vnode_t	*dir_vp,
 
 	tp = xfs_trans_alloc (XFS_VFSTOM(dir_vp->v_vfsp), XFS_TRANS_WAIT);
 	if (error = xfs_trans_reserve (tp, 10, 10, 0, 0)) {
-		xfs_trans_cancel (tp);
+		xfs_trans_cancel (tp, 0);
 		goto error_return;
 	}
 
@@ -1256,7 +1248,7 @@ xfs_link(vnode_t	*target_dir_vp,
         xfs_trans_ijoin (tp, tdp, XFS_ILOCK_EXCL);
 
 	if (error = xfs_dir_createname (tp, tdp, target_name, sip->i_ino)) {
-		xfs_trans_cancel (tp);
+		xfs_trans_cancel (tp, 0);
 		return error;
 	}
 
@@ -1567,7 +1559,7 @@ error_return:
 		 * always have control over how the inodes are unlocked
 		 * and their ref counts adjusted.
 		 */
-		xfs_trans_cancel (tp);
+		xfs_trans_cancel (tp, 0);
 	}
 
 	/* release locks */
@@ -1695,7 +1687,7 @@ xfs_mkdir(vnode_t	*dir_vp,
 
 error_return:
 	if (tp) {
-		xfs_trans_cancel (tp);
+		xfs_trans_cancel (tp, 0);
 	}
 	else 
 		xfs_iunlock(dp, XFS_ILOCK_EXCL);
@@ -1968,7 +1960,7 @@ xfs_symlink(vnode_t	*dir_vp,
 
 error_return:
 	if (tp)
-		xfs_trans_cancel (tp);
+		xfs_trans_cancel (tp, 0);
 
 	xfs_iunlock (dp, XFS_ILOCK_EXCL);
 	return error;
@@ -2070,25 +2062,6 @@ xfs_realvp(vnode_t	*vp,
 {
 	return -1;
 }
-
-
-/*
- * xfs_bmap
- *
- * This is a stub.
- */
-STATIC int
-xfs_bmap(vnode_t	*vp,
-	 off_t		offset,
-	 ssize_t	count,
-	 int		rw,
-	 cred_t		*credp,
-	 struct bmapval	*bmapp,
-	 int		*nmaps)
-{
-	return 0;
-}
-
 
 
 /*
