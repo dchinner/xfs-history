@@ -36,7 +36,7 @@
  * Implementation for VFS_DOUNMOUNT.
  */
 int
-fs_dounmount(
+xfs_fs_dounmount(
 	bhv_desc_t 	*bdp, 
         int 		flags, 
         vnode_t 	*rootvp, 
@@ -85,7 +85,7 @@ fs_dounmount(
  * Stub for no-op vnode operations that return error status.
  */
 int
-fs_noerr()
+xfs_fs_noerr()
 {
 	return 0;
 }
@@ -94,7 +94,7 @@ fs_noerr()
  * Operation unsupported under this file system.
  */
 int
-fs_nosys()
+xfs_fs_nosys()
 {
 	return ENOSYS;
 }
@@ -104,7 +104,7 @@ fs_nosys()
  */
 /* ARGSUSED */
 void
-fs_noval()
+xfs_fs_noval()
 {
 }
 
@@ -117,12 +117,12 @@ fs_noval()
  * appropriately if they so desire.
  */
 void
-fs_vnode_change(
+xfs_fs_vnode_change(
         bhv_desc_t	*bdp, 
         vchange_t 	cmd, 
         __psint_t 	val)
 {
-	printk("XFS: fs_vnode_change() NOT IMPLEMENTED\n");
+	printk("XFS: xfs_fs_vnode_change() NOT IMPLEMENTED\n");
 }
 
 
@@ -130,7 +130,7 @@ fs_vnode_change(
  * vnode pcache layer for vnode_tosspages.
  */
 void
-fs_tosspages(
+xfs_fs_tosspages(
         bhv_desc_t	*bdp,
 	xfs_off_t	first,
 	int		fiopt)
@@ -145,7 +145,7 @@ fs_tosspages(
  * vnode pcache layer for vnode_flushinval_pages.
  */
 void
-fs_flushinval_pages(
+xfs_fs_flushinval_pages(
         bhv_desc_t	*bdp,
 	xfs_off_t	first,
 	int		fiopt)
@@ -161,7 +161,7 @@ fs_flushinval_pages(
  * vnode pcache layer for vnode_flush_pages.
  */
 int
-fs_flush_pages(
+xfs_fs_flush_pages(
         bhv_desc_t	*bdp,
 	xfs_off_t	first,
 	uint64_t	flags,
@@ -178,12 +178,25 @@ fs_flush_pages(
  * vnode pcache layer for vnode_pages_sethole.
  */
 void
-fs_pages_sethole(
+xfs_fs_pages_sethole(
         bhv_desc_t	*bdp,
 	void		*pfd,
 	int		cnt,
 	int		doremap,
 	xfs_off_t	remap_offset)
 {
-	printk("XFS: fs_pages_sethole() NOT IMPLEMENTED\n");
+	printk("XFS: xfs_fs_pages_sethole() NOT IMPLEMENTED\n");
 }
+
+#ifdef CELL_CAPABLE
+EXPORT_SYMBOL(xfs_fs_noerr);
+EXPORT_SYMBOL(xfs_fs_nosys);
+EXPORT_SYMBOL(xfs_fs_nodev);
+EXPORT_SYMBOL(xfs_fs_noval);
+EXPORT_SYMBOL(xfs_fs_vnode_change);
+EXPORT_SYMBOL(xfs_fs_dounmount);
+EXPORT_SYMBOL(xfs_fs_tosspages);
+EXPORT_SYMBOL(xfs_fs_flushinval_pages);
+EXPORT_SYMBOL(xfs_fs_flush_pages);
+EXPORT_SYMBOL(xfs_fs_pages_sethole);
+#endif

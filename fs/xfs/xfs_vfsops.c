@@ -1585,7 +1585,7 @@ xfs_syncsub(
 
 			if (XFS_FORCED_SHUTDOWN(mp)) {
                                 if (xflags & XFS_XSYNC_RELOC) {
-					fs_tosspages(XFS_ITOBHV(ip), 0,
+					xfs_fs_tosspages(XFS_ITOBHV(ip), 0,
 						     FI_REMAPF);
 				}
 				else {
@@ -1593,7 +1593,7 @@ xfs_syncsub(
 				}
 			} else {
                                 if (xflags & XFS_XSYNC_RELOC) {
-					fs_flushinval_pages(XFS_ITOBHV(ip),
+					xfs_fs_flushinval_pages(XFS_ITOBHV(ip),
 							    0, FI_REMAPF);
 				}
 				else {
@@ -2080,7 +2080,7 @@ xfs_get_vnode(bhv_desc_t *bdp,
 vfsops_t xfs_vfsops = {
 	xfs_vfsmount,
 	xfs_rootinit,
-	fs_dounmount,
+	xfs_fs_dounmount,
 	xfs_unmount,
 	xfs_root,
 	xfs_statvfs,
