@@ -1,4 +1,4 @@
-#ident "$Revision: 1.50 $"
+#ident "$Revision: 1.51 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -108,6 +108,10 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 		bp = incore_match(dev, blkno, len, BUF_FSPRIV2, tp);
 	}
 	if (bp != NULL) {
+		if (XFS_FORCED_SHUTDOWN(tp->t_mountp)) {
+			bp->b_flags &= ~(B_DONE|B_DELWRI);
+			bp->b_flags |= B_STALE;
+		}
 		ASSERT(bp->b_fsprivate2 == tp);
 		bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 		ASSERT(bip != NULL);
@@ -133,10 +137,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	if (bp == NULL) {
 		return NULL;
 	}
-	
-	/*
-	 * XXXsup we should get errors here, when FORCED_SHUTDOWN is on.
-	 */
+
 	ASSERT(!geterror(bp));
 
 	/*
@@ -297,9 +298,6 @@ xfs_trans_read_buf(
 	xfs_buf_log_item_t	*bip;
 	int			error;
 	
-	if (XFS_FORCED_SHUTDOWN(mp))
-		return XFS_ERROR(EIO);
-
 	/*
 	 * Default to a normal get_buf() call if the tp is NULL.
 	 * Always specify the BUF_BUSY flag so that get_buf() does
@@ -333,6 +331,8 @@ xfs_trans_read_buf(
 			}
 		}
 #endif
+		if (XFS_FORCED_SHUTDOWN(mp))   
+			goto shutdown_abort;
 		*bpp = bp;
 		return 0;
 	}
@@ -382,10 +382,23 @@ xfs_trans_read_buf(
 				 * already dirty.
 				 */
 				if (tp->t_flags & XFS_TRANS_DIRTY)
-					xfs_force_shutdown(tp->t_mountp);
+					xfs_force_shutdown(tp->t_mountp, 
+							   XFS_METADATA_IO_ERROR); 
 				return error;
 			}
 		}
+		/*
+		 * We never locked this buf ourselves, so we shouldn't 
+		 * brelse it either. Just get out.
+		 */
+		if (XFS_FORCED_SHUTDOWN(mp)) {
+#ifndef SIM
+			buftrace("READ_BUF_INCORE XFSSHUTDN", bp);
+#endif
+			*bpp = NULL;
+			return XFS_ERROR(EIO);
+		}
+		
 
 		bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 		bip->bli_recur++;
@@ -414,16 +427,17 @@ xfs_trans_read_buf(
 		return 0;
 	}
 	if (geterror(bp) != 0) {
-		bp->b_flags |= B_DONE|B_STALE|B_ERROR;
-		if (error = geterror(bp)) {
-			xfs_ioerror_alert("xfs_trans_read_buf", mp, 
-					  dev, blkno);
-			if (tp->t_flags & XFS_TRANS_DIRTY)
-				xfs_force_shutdown(tp->t_mountp);
-		} else {
-			error = bp->b_error = EIO;
-		}
-		
+		bp->b_flags |= B_STALE;
+		bp->b_flags &= ~(B_DONE|B_DELWRI);
+#ifndef SIM
+		buftrace("READ ERROR", bp);
+#endif
+		error = geterror(bp);
+			
+		xfs_ioerror_alert("xfs_trans_read_buf", mp, 
+				  dev, blkno);
+		if (tp->t_flags & XFS_TRANS_DIRTY)
+			xfs_force_shutdown(tp->t_mountp, XFS_METADATA_IO_ERROR); 
 		brelse(bp);
 		return error;
 	}
@@ -431,7 +445,8 @@ xfs_trans_read_buf(
 	if (xfs_do_error && !(tp->t_flags & XFS_TRANS_DIRTY)) {
 		if (xfs_error_dev == bp->b_edev) {
 			if (((xfs_req_num++) % xfs_error_mod) == 0) {
-				xfs_force_shutdown(tp->t_mountp);
+				xfs_force_shutdown(tp->t_mountp, 
+						   XFS_METADATA_IO_ERROR);
 				brelse(bp);
 				printf("Returning error in trans!\n");
 				return XFS_ERROR(EIO);
@@ -439,6 +454,8 @@ xfs_trans_read_buf(
 		}
 	}
 #endif
+	if (XFS_FORCED_SHUTDOWN(mp)) 
+		goto shutdown_abort;
 
 	/*
 	 * The xfs_buf_log_item pointer is stored in b_fsprivate.  If
@@ -476,7 +493,18 @@ xfs_trans_read_buf(
 	xfs_buf_item_trace("READ", bip);
 	*bpp = bp;
 	return 0;
-}
+
+ shutdown_abort:
+
+	bp->b_flags &= ~(B_DONE|B_DELWRI);
+	bp->b_flags |= B_STALE;
+#ifndef SIM
+	buftrace("READ_BUF XFSSHUTDN", bp);
+#endif
+	brelse(bp);	
+	*bpp = NULL;
+	return XFS_ERROR(EIO);
+}	
 
 
 /*
@@ -507,7 +535,8 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 	 */
 	if (tp == NULL) {
 #ifndef NO_XFS_PARANOIA
-		ASSERT(bp->b_fsprivate2 == NULL || bp->b_flags2 & B_XFS_INO &&
+		ASSERT(bp->b_fsprivate2 == NULL || 
+		       (bp->b_flags2 & B_XFS_INO) == NULL ||
 			((xfs_trans_t *) bp->b_fsprivate2)->t_magic !=
 			XFS_TRANS_HEADER_MAGIC);
 #else
@@ -629,6 +658,7 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 		xfs_trans_unlocked_item(bip->bli_item.li_mountp,
 					(xfs_log_item_t*)bip);
 	}
+
 	brelse(bp);
 	return;
 }
@@ -776,8 +806,12 @@ xfs_trans_log_buf(xfs_trans_t	*tp,
 	 * item from the AIL and free it when the buffer is flushed
 	 * to disk.  See xfs_buf_attach_iodone() for more details
 	 * on li_cb and xfs_buf_iodone_callbacks().
+	 * If we end up aborting this transaction, we trap this buffer
+	 * inside the b_bdstrat callback so that this won't get written to
+	 * disk.
 	 */
 	bp->b_flags |= B_DELWRI | B_DONE;
+
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 	ASSERT(bip->bli_refcount > 0);
 	if (bp->b_iodone == NULL) {
