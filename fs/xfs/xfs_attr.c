@@ -214,9 +214,15 @@ xfs_attr_set(vnode_t *vp, char *name, char *value, int valuelen, int flags,
 			if (retval != 0)
 				goto out;
 /* GROT: another possible req'mt for a double-split btree operation */
+			retval = xfs_attr_leaf_addname(trans, &args);
+			if (retval == ENOSPC) {
+				retval = xfs_attr_leaf_to_node(trans, &args);
+				if (retval != 0)
+					goto out;
+				retval = xfs_attr_node_addname(trans, &args);
+			}
 		}
-	}
-	if (xfs_bmap_one_block(dp, XFS_ATTR_FORK)) {
+	} else if (xfs_bmap_one_block(dp, XFS_ATTR_FORK)) {
 		retval = xfs_attr_leaf_addname(trans, &args);
 		if (retval == ENOSPC) {
 			retval = xfs_attr_leaf_to_node(trans, &args);
