@@ -881,6 +881,12 @@ xfs_attrctl_by_handle(
 
 	xfs_iunlock(xip, XFS_ILOCK_SHARED);
 
+	linvfs_set_inode_ops(inode);
+	error = linvfs_revalidate_core(inode, ATTR_COMM);
+	if (error) {
+		iput(inode);
+		return -XFS_ERROR(error);
+	}
 
 	/* Copyin and hand off to VFS */
 	lock_kernel();
@@ -902,7 +908,8 @@ xfs_attrctl_by_handle(
 	UPDATE_ATIME(inode);
 
 	/* call through to the vfs: note we know this is an XFS inode */
-	error = inode->i_op->attrctl(inode, ops, attr_hreq.count);
+	if (inode->i_op && inode->i_op->attrctl)
+		error = inode->i_op->attrctl(inode, ops, attr_hreq.count);
 
 	VN_RELE(vp);
 
