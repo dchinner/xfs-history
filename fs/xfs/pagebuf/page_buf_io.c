@@ -310,7 +310,8 @@ int pagebuf_iozero(		/* zero contents of buffer      */
 		__pb_block_prepare_write_async(ip, page,
 			cpoff, cpoff+csize, at_eof, NULL,
 			pbmapp, PBF_WRITE);
-		memset((void *) (kmap(page) + cpoff), 0, csize);
+		/* __pb_block_prepare_write already kmap'd the page */
+		memset((void *) (page_address(page) + cpoff), 0, csize);
 		pagebuf_commit_write_core(ip, page, cpoff, cpoff + csize);
 		pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) +
 			cpoff + csize;
