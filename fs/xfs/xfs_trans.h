@@ -257,15 +257,48 @@ typedef struct xfs_trans {
 #define	XFS_RENAME_LOG_RES(mp)		XFS_FSB_TO_B(mp, 20)
 #define	XFS_SYMLINK_LOG_RES(mp)		\
 		XFS_FSB_TO_B(mp, XFS_IALLOC_BLOCKS(mp) + 12)
-     
-#define	XFS_CREATE_LOG_RES(mp)		(MAX(XFS_FSB_TO_B(mp, \
-     					    XFS_IALLOC_BLOCKS(mp) + 10),\
-				            XFS_ITRUNCATE_LOG_RES(mp)))
-     
+
+/*
+ * For create we can modify:
+ *    the directory inode: inode size
+ *    the new inode: inode size
+ *    the directory btree: max depth * block size
+ *    the directory inode\'s bmap btree: max depth * block size
+ *    the allocation btrees: 2 * max depth * block size
+ */
+#define	XFS_CREATE_LOG_RES(mp) \
+     			((mp)->m_sb.sb_inodesize + \
+     			 (mp)->m_sb.sb_inodesize + \
+			 XFS_FSB_TO_B((mp), 5) + \
+			 XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp)) + \
+			 (2 * XFS_FSB_TO_B((mp), XFS_BTREE_MAXLEVELS)))
+
+/*
+ * For mkdir we can modify:
+ *    the parent directory inode: inode size
+ *    the new inode: inode size
+ *    the directory btree: max depth * block size
+ *    the directory inode\'s bmap btree: max depth * block size
+ * Or in the first xact we allocate some inodes giving:
+ *    the agi and agf of the ag getting the new inodes: 2 * sectorsize
+ *    the inode blocks allocated: XFS_IALLOC_BLOCKS * blocksize
+ *    the inode btree: max depth * blocksize
+ *    the allocation btrees: 2 * max depth * block size
+ */
 #define	XFS_MKDIR_LOG_RES(mp)		\
-		XFS_FSB_TO_B(mp, XFS_IALLOC_BLOCKS(mp) + 10)
+     		(MAX( \
+		 ((mp)->m_sb.sb_inodesize + \
+		  (mp)->m_sb.sb_inodesize + \
+		  XFS_FSB_TO_B((mp), 5) + \
+		  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp))), \
+		 (2 * (mp)->m_sb.sb_sectsize + \
+		  XFS_FSB_TO_B((mp), XFS_IALLOC_BLOCKS((mp))) + \
+		  XFS_FSB_TO_B((mp), 5) + \
+		  (2 * XFS_FSB_TO_B((mp), XFS_BTREE_MAXLEVELS)))))
+     
 #define	XFS_IFREE_LOG_RES(mp)		XFS_FSB_TO_B(mp, 10)
-#define	XFS_IUI_LOG_RES(mp)		512     
+#define	XFS_IUI_LOG_RES(mp)		512
+#define	XFS_ICHANGE_LOG_RES(mp)		((mp)->m_sb.sb_inodesize + 512)     
 
 
 /*
@@ -274,6 +307,7 @@ typedef struct xfs_trans {
 #define	XFS_DEFAULT_LOG_COUNT		1
 #define	XFS_DEFAULT_PERM_LOG_COUNT	2     
 #define	XFS_ITRUNCATE_LOG_COUNT		2
+#define	XFS_CREATE_LOG_COUNT		2
 #define	XFS_MKDIR_LOG_COUNT		3
 #define	XFS_SYMLINK_LOG_COUNT		3
 #define	XFS_REMOVE_LOG_COUNT		2

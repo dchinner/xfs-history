@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.48 $"
+#ident  "$Revision: 1.49 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -1012,7 +1012,9 @@ xfs_statvfs(vfs_t	*vfsp,
 	statp->f_fsid = mp->m_dev;
 	(void) strcpy(statp->f_basetype, vfssw[xfs_fstype].vsw_name);
 	statp->f_namemax = MAXNAMELEN;
-	bzero(statp->f_fstr, sizeof(statp->f_fstr));
+	bcopy((char *)&(mp->m_sb.sb_uuid), statp->f_fstr, sizeof(uuid_t));
+	bzero(&(statp->f_fstr[sizeof(uuid_t)]),
+	      (sizeof(statp->f_fstr) - sizeof(uuid_t)));
 
 	return 0;
 }

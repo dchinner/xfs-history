@@ -457,6 +457,7 @@ xfs_setattr(vnode_t	*vp,
 	int		mask;
 	int		code;
 	uint		lock_flags;
+	uint		commit_flags;
 	boolean_t	ip_held;
 	timestruc_t 	tv;
 	uid_t		uid;
@@ -507,20 +508,24 @@ xfs_setattr(vnode_t	*vp,
 	 * first do an error checking pass.
 	 */
 	mp = ip->i_mount;
-        tp = xfs_trans_alloc (mp, 0);
-        if (code = xfs_trans_reserve (tp, 0, XFS_ITRUNCATE_LOG_RES(mp), 0,
-				      XFS_TRANS_PERM_LOG_RES,
-				      XFS_ITRUNCATE_LOG_COUNT)) {
-                xfs_trans_cancel (tp, 0);
-                return code;
-        }
-
+	tp = NULL;
 	lock_flags = XFS_ILOCK_EXCL;
-	if (mask & AT_SIZE) {
+	ASSERT(!(mask & AT_SIZE) || (mask == AT_SIZE));
+	if (!(mask & AT_SIZE)) {
+		tp = xfs_trans_alloc (mp, 0);
+		if (code = xfs_trans_reserve (tp, 0,
+					      XFS_ICHANGE_LOG_RES(mp), 0,
+					      0, 0)) {
+			xfs_trans_cancel (tp, 0);
+			return code;
+		}
+		commit_flags = 0;
+
+	} else {
 		lock_flags |= XFS_IOLOCK_EXCL;
 	}
-        xfs_ilock (ip, lock_flags);
 
+        xfs_ilock (ip, lock_flags);
 
         /*
          * Change file access modes.  Must be owner or privileged.
@@ -650,14 +655,28 @@ xfs_setattr(vnode_t	*vp,
 	 * once it is a part of the transaction.
 	 */
 	if (mask & AT_SIZE) {
+
 		if (vap->va_size > ip->i_d.di_size) {
 			xfs_igrow_start (ip, vap->va_size, credp);
+			xfs_iunlock (ip, XFS_ILOCK_EXCL);
 		} else if (vap->va_size < ip->i_d.di_size) {
 			xfs_iunlock (ip, XFS_ILOCK_EXCL);
 			xfs_itruncate_start (ip, XFS_ITRUNC_DEFINITE,
 					     (xfs_fsize_t)vap->va_size);
-			xfs_ilock (ip, XFS_ILOCK_EXCL);
+		} else {
+			xfs_iunlock (ip, XFS_ILOCK_EXCL);
 		}
+		tp = xfs_trans_alloc (mp, 0);
+		if (code = xfs_trans_reserve (tp, 0,
+					      XFS_ITRUNCATE_LOG_RES(mp), 0,
+					      XFS_TRANS_PERM_LOG_RES,
+					      XFS_ITRUNCATE_LOG_COUNT)) {
+			xfs_trans_cancel (tp, 0);
+			xfs_iunlock (ip, XFS_IOLOCK_EXCL);
+			return code;
+		}
+		commit_flags = XFS_TRANS_RELEASE_LOG_RES;
+		xfs_ilock (ip, XFS_ILOCK_EXCL);
 	}
 
         xfs_trans_ijoin (tp, ip, lock_flags);
@@ -766,7 +785,7 @@ xfs_setattr(vnode_t	*vp,
 
 	if (!ip_held)
 		IHOLD (ip);
-	xfs_trans_commit (tp, XFS_TRANS_RELEASE_LOG_RES);
+	xfs_trans_commit (tp, commit_flags);
 	if (ip_held) {
 		xfs_iunlock (ip, lock_flags);
 	}
@@ -778,7 +797,9 @@ xfs_setattr(vnode_t	*vp,
 
 error_return:
 
-	xfs_trans_cancel (tp, XFS_TRANS_RELEASE_LOG_RES);
+	if (tp) {
+		xfs_trans_cancel (tp, commit_flags);
+	}
 	xfs_iunlock (ip, lock_flags);
 
 	return code;
@@ -990,7 +1011,7 @@ xfs_inactive(vnode_t	*vp,
 	 * only one with a reference to the inode.
 	 */
 	truncate = ((ip->i_d.di_nlink == 0) &&
-		    (ip->i_d.di_size > 0) &&
+		    ((ip->i_d.di_size != 0) || (ip->i_d.di_nextents > 0)) &&
 		    ((ip->i_d.di_mode & IFMT) == IFREG));
 
 	ASSERT(ip->i_d.di_nlink >= 0);
@@ -999,16 +1020,22 @@ xfs_inactive(vnode_t	*vp,
 		tp = xfs_trans_alloc(mp, 0);
 
 		if (truncate) {
+			/*
+			 * Do the xfs_itruncate_start() call before
+			 * reserving any log space because itruncate_start
+			 * will call into the buffer cache and we can't
+			 * do that within a transaction.
+			 */
+			xfs_ilock(ip, XFS_IOLOCK_EXCL);
+			xfs_itruncate_start(ip, XFS_ITRUNC_DEFINITE, 0);
+
 			status = xfs_trans_reserve(tp, 0,
 					XFS_ITRUNCATE_LOG_RES(mp),
 					0, XFS_TRANS_PERM_LOG_RES,
 					XFS_ITRUNCATE_LOG_COUNT);
 			ASSERT(status == 0);
 
-			xfs_ilock(ip, XFS_IOLOCK_EXCL);
-			xfs_itruncate_start(ip, XFS_ITRUNC_DEFINITE, 0);
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
-
 			xfs_trans_ijoin(tp, ip,
 					XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 			xfs_trans_ihold(tp, ip);
@@ -1516,19 +1543,25 @@ try_again:
 	dp_joined_to_trans = B_FALSE;
 	truncated = B_FALSE;
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
-	tp = xfs_trans_alloc (mp, 0);
+	tp = xfs_trans_alloc(mp, 0);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-	if (error = xfs_trans_reserve (tp, XFS_IALLOC_BLOCKS(mp) + 12,
-				       XFS_ITRUNCATE_LOG_RES(mp), 0,
-				       XFS_TRANS_PERM_LOG_RES,
-				       XFS_ITRUNCATE_LOG_COUNT)) {
+	/*
+	 * Initially assume that the file does not exist and
+	 * reserve the resources for that case.  If that is not
+	 * the case we'll drop the one and get a more appropriate
+	 * transaction later.
+	 */
+	if (error = xfs_trans_reserve(tp, XFS_IALLOC_BLOCKS(mp) +
+				      XFS_BM_MAXLEVELS(mp) + 10,
+				      XFS_CREATE_LOG_RES(mp), 0,
+				      XFS_TRANS_PERM_LOG_RES,
+				      XFS_CREATE_LOG_COUNT)) {
 		cancel_flags = 0;
 		dp = NULL;
 		goto error_return;
 	}
 
         dp = XFS_VTOI(dir_vp);
-
 	xfs_ilock (dp, XFS_ILOCK_EXCL);
 
 	/*
@@ -1542,8 +1575,8 @@ try_again:
 	if (error = xfs_iaccess(dp, IEXEC, credp))
                 goto error_return;
 
-	error = xfs_dir_lookup_int (NULL, dir_vp, DLF_IGET, name, NULL, 
-				    &e_inum, &ip);
+	error = xfs_dir_lookup_int(NULL, dir_vp, DLF_IGET, name, NULL, 
+				   &e_inum, &ip);
 	if ((error != 0) && (error != ENOENT)) 
 		goto error_return;
 
@@ -1551,7 +1584,7 @@ try_again:
 
 	if (error == ENOENT) {
 
-		ASSERT (ip == NULL);
+		ASSERT(ip == NULL);
 
 		if (error = xfs_iaccess(dp, IWRITE, credp)) {
 			goto error_return;
@@ -1571,7 +1604,7 @@ try_again:
 		 * It is locked (and joined to the transaction).
 		 */
 
-		ASSERT (ismrlocked (&ip->i_lock, MR_UPDATE));
+		ASSERT(ismrlocked (&ip->i_lock, MR_UPDATE));
 
 		/*
 		 * Now we join the directory inode to the transaction.
@@ -1580,127 +1613,110 @@ try_again:
 		 * all the locks).
 		 */
 
-		VN_HOLD (dir_vp);
-		xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
+		VN_HOLD(dir_vp);
+		xfs_trans_ijoin(tp, dp, XFS_ILOCK_EXCL);
 		dp_joined_to_trans = B_TRUE;
 
 		/*
 		 * XXX Need to sanity check namelen.
 		 */
 
-		if (error = xfs_dir_createname (tp, dp, name, ip->i_ino,
-						&first_block, &free_list,
-						MAX_EXT_NEEDED)) 
+		if (error = xfs_dir_createname(tp, dp, name, ip->i_ino,
+					       &first_block, &free_list,
+					       MAX_EXT_NEEDED)) 
 			ASSERT (0);	/* we've reserved the space. */
 
+		dp->i_gen++;
 		dnlc_enter(dir_vp, name, XFS_ITOV(ip), NOCRED);
 
-	}
-	else {
-		ASSERT (ip != NULL);
+	} else {
+		ASSERT(ip != NULL);
 		ITRACE(ip);
 
-		/* Now lock the inode also, in the right order. */
-		if (dp->i_ino < ip->i_ino) {
-			xfs_ilock (ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
-		}
-		else if (! xfs_ilock_nowait (ip,
-					     (XFS_ILOCK_EXCL |
-					      XFS_IOLOCK_EXCL))) {
-			/*
-			 * We're out of order and the trylock failed.
-			 */
-			dir_generation = dp->i_gen;
-			xfs_iunlock (dp, XFS_ILOCK_EXCL);
-			xfs_ilock (ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
-			xfs_ilock (dp, XFS_ILOCK_EXCL);
-			
-			/*
-			 * If things have changed while the dp was
-			 * unlocked, drop all the locks and try
-			 * again.
-			 */
-			if (dp->i_gen != dir_generation) {
-				xfs_trans_cancel (tp, cancel_flags);
-				xfs_iunlock(dp, XFS_ILOCK_EXCL);
-				xfs_iunlock(ip,
-					    XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
-				IRELE(ip);
-				goto try_again;
-			}
-		}
+		/*
+		 * The file already exists, so we're in the wrong
+		 * transaction for this operation.  Cancel the old
+		 * transaction and start a new one.  We have to drop
+		 * our locks in doing this, so check the directory
+		 * generation number to make sure nothing changes
+		 * while we're unlocked.
+		 */
+		xfs_trans_cancel(tp, cancel_flags);
+		tp = NULL;
+		dir_generation = dp->i_gen;
+		xfs_iunlock(dp, XFS_ILOCK_EXCL);
 
+		/*
+		 * We need to do the xfs_itruncate_start call before
+		 * reserving any log space in the transaction.
+		 */
+		xfs_ilock(ip, XFS_IOLOCK_EXCL);
 		vp = XFS_ITOV(ip);
-		if (excl == EXCL)
-                        error = XFS_ERROR(EEXIST);
-		else if (vp->v_type == VDIR && (I_mode & IWRITE))
-                        error = XFS_ERROR(EISDIR);
-		else if (I_mode)
-			error = xfs_iaccess(ip, I_mode, credp);
-
-		if (!error &&
-		    (vp->v_type == VREG) &&
+		if ((vp->v_type == VREG) &&
 		    (vap->va_mask & AT_SIZE) &&
-		    (ip->i_d.di_size != 0)) {
-			/*
-			 * We need to drop the inode lock in order to call
-			 * xfs_itruncate_start().  The relocking when we're
-			 * out of order is a bit of a nightmare, but we
-			 * need to preserve lock ordering.
-			 */
-			xfs_iunlock (ip, XFS_ILOCK_EXCL);
-			if (dp->i_ino < ip->i_ino) {
-				/*
-				 * We're in order so we know we won't have
-				 * to bail out.
-				 */
-				xfs_itruncate_start (ip, XFS_ITRUNC_DEFINITE,
-						     0);
-				xfs_ilock (ip, XFS_ILOCK_EXCL);
-			} else {
-				/*
-				 * We're out of order.
-				 */
-				xfs_itruncate_start (ip, XFS_ITRUNC_MAYBE, 0);
-				if (!xfs_ilock_nowait (ip, XFS_ILOCK_EXCL)) {
-					/*
-					 * We can't get the inode lock, so
-					 * drop the directory lock and do
-					 * things in the right order.  We
-					 * don't have to drop the I/O lock,
-					 * because for these inode numbers
-					 * it is in order.  If the directory
-					 * generation count changes while
-					 * we're doing this, then start all
-					 * over again.
-					 */
-					dir_generation = dp->i_gen;
-					xfs_iunlock (dp, XFS_ILOCK_EXCL);
-					xfs_ilock (ip, XFS_ILOCK_EXCL);
-					xfs_ilock (dp, XFS_ILOCK_EXCL);
+		    ((ip->i_d.di_size != 0) || (ip->i_d.di_nextents != 0))) {
+			xfs_itruncate_start(ip, XFS_ITRUNC_MAYBE, 0);
+		}
 
-					if (dp->i_gen != dir_generation) {
-						xfs_trans_cancel(tp,
-							cancel_flags);
-						xfs_iunlock(dp,
-							    XFS_ILOCK_EXCL);
-						xfs_iunlock(ip,
-							    XFS_ILOCK_EXCL |
-							    XFS_IOLOCK_EXCL);
-						IRELE(ip);
-						goto try_again;
-					}
-				}
-			}
+		tp = xfs_trans_alloc(mp, 0);
+		if (error = xfs_trans_reserve(tp, 0,
+					      XFS_ITRUNCATE_LOG_RES(mp), 0,
+					      XFS_TRANS_PERM_LOG_RES,
+					      XFS_ITRUNCATE_LOG_COUNT)) {
+			xfs_iunlock(ip, XFS_IOLOCK_EXCL);
+			IRELE(ip);
+			cancel_flags = 0;
+			dp = NULL;
+			goto error_return;
+		}
+		
+		/*
+		 * Now lock inode and directory in the right order.
+		 */
+		if (dp->i_ino < ip->i_ino) {
+			xfs_ilock(dp, XFS_ILOCK_EXCL);
+			xfs_ilock(ip, XFS_ILOCK_EXCL);
+		} else {
+			xfs_ilock(ip, XFS_ILOCK_EXCL);
+			xfs_ilock(dp, XFS_ILOCK_EXCL);
+		}
+			
+		/*
+		 * If things have changed while the dp was
+		 * unlocked, drop all the locks and try
+		 * again.
+		 */
+		if (dp->i_gen != dir_generation) {
+			xfs_trans_cancel(tp, cancel_flags);
+
+			xfs_iunlock(dp, XFS_ILOCK_EXCL);
+			xfs_iunlock(ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
+			IRELE(ip);
+			goto try_again;
+		}
+
+		/*
+		 * If the directory has been removed, then fail all creates.
+		 * We check this again since we dropped the directory lock.
+		 */
+		if (dp->i_d.di_nlink == 0) {
+			error = ENOENT;
+		} else 	if (excl == EXCL) {
+                        error = XFS_ERROR(EEXIST);
+		} else if (vp->v_type == VDIR && (I_mode & IWRITE)) {
+                        error = XFS_ERROR(EISDIR);
+		} else if (I_mode) {
+			error = xfs_iaccess(ip, I_mode, credp);
 		}
 			
 		IHOLD(dp);
-		xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
+		xfs_trans_ijoin(tp, dp, XFS_ILOCK_EXCL);
 		dp_joined_to_trans = B_TRUE;
-		xfs_trans_ijoin (tp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
+		xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 
-		if (error)
+		if (error) {
 			goto error_return;
+		}
 
 		if (vp->v_type == VREG && (vap->va_mask & AT_SIZE)) {
 			/*
@@ -1709,7 +1725,7 @@ try_again:
 			 * or not.
 			 */
 			ASSERT(vap->va_size == 0);
-			if (ip->i_d.di_size > 0) {
+			if ((ip->i_d.di_size > 0) || (ip->i_d.di_nextents)) {
 				xfs_trans_ihold(tp, ip);
 				xfs_itruncate_finish(&tp, ip, (xfs_fsize_t)0);
 				truncated = B_TRUE;
@@ -1728,23 +1744,23 @@ try_again:
 	 * vnode to the caller, we bump the vnode ref count now.
 	 */
 
-	IHOLD (ip);
-	vp = XFS_ITOV (ip);
+	IHOLD(ip);
+	vp = XFS_ITOV(ip);
 
-	(void) xfs_bmap_finish (&tp, &free_list, first_block);
+	(void) xfs_bmap_finish(&tp, &free_list, first_block);
 
-	xfs_trans_commit (tp, XFS_TRANS_RELEASE_LOG_RES);
+	xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
 	if (truncated) {
 		/*
 		 * If we truncated the file, then the inode will
 		 * have been held within the transaction and must
 		 * be unlocked now.
 		 */
-		xfs_iunlock (ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
-		ASSERT (vp->v_count >= 2);
-		IRELE (ip);
+		xfs_iunlock(ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
+		ASSERT(vp->v_count >= 2);
+		IRELE(ip);
 	}
-	ASSERT (dp_joined_to_trans);
+	ASSERT(dp_joined_to_trans);
 
         /*
          * If vnode is a device, return special vnode instead.
@@ -1769,10 +1785,10 @@ try_again:
 error_return:
 
 	if (tp != NULL)
-		xfs_trans_cancel (tp, cancel_flags);
+		xfs_trans_cancel(tp, cancel_flags);
 
-	if (! dp_joined_to_trans && (dp != NULL))
-		xfs_iunlock (dp, XFS_ILOCK_EXCL);
+	if (!dp_joined_to_trans && (dp != NULL))
+		xfs_iunlock(dp, XFS_ILOCK_EXCL);
 	ASSERT(!truncated);
 
 	return error;
@@ -2089,6 +2105,14 @@ xfs_truncate_file(
 	xfs_trans_t	*tp;
 	int		error;
 
+	/*
+	 * Make the call to xfs_itruncate_start before starting the
+	 * transaction, because we cannot make the call while we're
+	 * in a transaction.
+	 */
+	xfs_ilock(ip, XFS_IOLOCK_EXCL);
+	xfs_itruncate_start(ip, XFS_ITRUNC_DEFINITE, (xfs_fsize_t)0);
+
 	tp = xfs_trans_alloc(mp, 0);
 	if (error = xfs_trans_reserve(tp, 0, XFS_ITRUNCATE_LOG_RES(mp), 0,
 				      XFS_TRANS_PERM_LOG_RES,
@@ -2102,8 +2126,6 @@ xfs_truncate_file(
 	 * hold the inode in the transaction, we know that it's number
 	 * of references will stay constant.
 	 */
-	xfs_ilock(ip, XFS_IOLOCK_EXCL);
-	xfs_itruncate_start(ip, XFS_ITRUNC_DEFINITE, (xfs_fsize_t)0);
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 	xfs_trans_ihold(tp, ip);
@@ -2223,7 +2245,7 @@ xfs_remove(vnode_t	*dir_vp,
 		 * that gets us here.
 		 */
 		if (((ip->i_d.di_mode & IFMT) == IFREG) &&
-		    (ip->i_d.di_size > 0) &&
+		    ((ip->i_d.di_size > 0) || (ip->i_d.di_nextents != 0)) &&
 		    (ip->i_d.di_nlink == 1)) {
 			IHOLD(ip);
 			xfs_trans_cancel(tp, cancel_flags);
@@ -3815,13 +3837,39 @@ xfs_reclaim(vnode_t	*vp,
 	ASSERT(!VN_MAPPED(vp));
 	ip = XFS_VTOI(vp);
 	mp = ip->i_mount;
+	ASSERT(ip->i_queued_bufs >= 0);
 
 	/*
-	 * Flush and invalidate any data left around that is
-	 * a part of this file.
+	 * If this is not an unmount (flag == 0) and there are dirty
+	 * buffers or pages still associated with the file, then don't
+	 * allow it to be reclaimed.  Doing the pflushinvalvp() can cause
+	 * us to wait in the buffer cache.  We can be called here via
+	 * vn_alloc() from xfs_iget().  We can be holding any number of
+	 * locks at that point in the middle of a transaction, so we
+	 * can't do anything that might need log space or the locks we
+	 * might be holding.  Flushing our buffers can require log space
+	 * to allocate the space for delayed allocation extents underlying
+	 * them.  If the transaction we're already in has all the log
+	 * space, then we won't be able to get any more and we'll hang.
+	 *
+	 * Not allowing the inode to be reclaimed if it has dirty data
+	 * also prevents memory deadlocks where it is vhand calling here
+	 * via the vnode shake routine.  Since our dirty data might be
+	 * delayed allocation dirty data which will require us to allocate
+	 * memory to flush, we can't do this from vhand.
+	 *
+	 * It is OK to return an error here.  The vnode cache will just
+	 * come back later.
 	 */
-	if (((ip->i_d.di_mode & IFMT) == IFREG) && (ip->i_d.di_size > 0)) {
+	if (!(flag & FSYNC_INVAL) &&
+	    (VN_DIRTY(vp) || (ip->i_queued_bufs > 0))) {
+		return EAGAIN;
+	} else if (((ip->i_d.di_mode & IFMT) == IFREG) &&
+		   (ip->i_d.di_size > 0)) {
 		/*
+		 * Flush and invalidate any data left around that is
+		 * a part of this file.
+		 *
 		 * Get the inode's i/o lock so that buffers are pushed
 		 * out while holding the proper lock.  We can't hold
 		 * the inode lock here since flushing out buffers may
@@ -3847,6 +3895,7 @@ xfs_reclaim(vnode_t	*vp,
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	ASSERT(ip->i_update_core == 0);
 	ASSERT(ip->i_item.ili_format.ilf_fields == 0);
+	ASSERT(!VN_DIRTY(vp) && (ip->i_queued_bufs == 0));
 	xfs_ireclaim(ip);
 	return 0;
 }
