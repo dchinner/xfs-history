@@ -464,29 +464,6 @@ xfs_open_by_handle(
 
 
 int
-xfs_fssetdm_by_handle(
-	unsigned int	cmd,
-	unsigned long	arg,
-	struct file	*filp,
-	struct inode	*inode,
-	vfs_t		*vfsp,
-	xfs_mount_t	*mp)
-{
-#ifdef CONFIG_XFS_DMAPI
-
-	/*
-	 * Need some code in here - xfsrestore does this by handle.
-	 * I'm too busy =) + Dean knows much more about this anyway.
-	 */
-	return -EBUSY;
-
-#else	/* !CONFIG_XFS_DMAPI */
-	return -ENOSYS;
-#endif	/* CONFIG_XFS_DMAPI */
-}
-
-
-int
 xfs_readlink_by_handle(
 	unsigned int	cmd,
 	unsigned long	arg,
@@ -646,6 +623,142 @@ xfs_readlink_by_handle(
 	rlsize = olen - auio.uio_resid;
 
 	return rlsize;
+}
+
+
+int
+xfs_fssetdm_by_handle(
+	unsigned int	cmd,
+	unsigned long	arg,
+	struct file	*parfilp,
+	struct inode	*parinode,
+	vfs_t		*vfsp,
+	xfs_mount_t	*mp)
+{
+	struct inode		*inode = NULL;
+	vnode_t			*vp = NULL;
+	xfs_inode_t		*ip = NULL;
+	int			error;
+	xfs_ino_t		ino;
+	__u32			igen;
+	xfs_fid_t		*xfid;
+	xfs_handle_t		*handlep;
+	xfs_handle_t		handle;
+	void			*hanp;
+	size_t			hlen;
+	xfs_fsop_setdm_handlereq_t dmhreq;
+	struct fsdmidata	fsd;
+	dm_fcntl_t		dmfcntl;
+	bhv_desc_t		*bdp;
+
+	if (! capable(CAP_MKNOD))
+		return -EPERM;
+
+	/*
+	 * Copy the handle down from the user and validate
+	 * that it looks to be in the correct format.
+	 */
+
+	if (copy_from_user(&dmhreq, (struct xfs_fsop_setdm_handlereq *)arg,
+				sizeof(struct xfs_fsop_setdm_handlereq)))
+		return -XFS_ERROR(EFAULT);
+
+
+	hanp = dmhreq.hreq.ihandle;
+	hlen = dmhreq.hreq.ihandlen;
+
+	handlep = &handle;
+
+	/*
+	 * gethandle(hanp, hlen, &handle)
+	 */
+	if (hlen < sizeof(handlep->ha_fsid) || hlen > sizeof(*handlep))
+		return -XFS_ERROR(EINVAL);
+
+	if (copy_from_user(handlep, hanp, hlen))
+		return -XFS_ERROR(EFAULT);
+
+	if (hlen < sizeof(*handlep))
+		bzero(((char *)handlep) + hlen,
+					sizeof(*handlep) - hlen);
+
+	if (hlen > sizeof(handlep->ha_fsid)) {
+
+		if (   handlep->ha_fid.xfs_fid_len !=
+				(hlen - sizeof(handlep->ha_fsid)
+					- sizeof(handlep->ha_fid.xfs_fid_len))
+		    || handlep->ha_fid.xfs_fid_pad) {
+
+			return -XFS_ERROR(EINVAL);
+		}
+	}
+
+
+	/*
+	 * Crack the handle, obtain the inode # & generation #
+	 */
+
+	/*
+	 * handle_to_vp(&handle)
+	 * VFS_VGET (vfsp, &vp, &handlep->ha_fid, error)
+	 *	     bdp, **vp, fidp;
+	 */
+	xfid = (struct xfs_fid *)&handlep->ha_fid;
+
+	if (xfid->xfs_fid_len == sizeof(*xfid) - sizeof(xfid->xfs_fid_len)) {
+		ino  = xfid->xfs_fid_ino;
+		igen = xfid->xfs_fid_gen;
+	} else {
+		/*
+		 * Invalid.  Since handles can be created in user
+		 * space and passed in via gethandle(), this is not
+		 * cause for a panic.
+		 */
+		return -XFS_ERROR(EINVAL);
+	}
+
+
+	/*
+	 * Get the XFS inode, building a vnode to go with it.
+	 */
+	error = xfs_iget(mp, NULL, ino, XFS_ILOCK_SHARED, &ip, 0);
+
+	if (error)
+		return -error;
+
+	if (ip == NULL)
+		return -XFS_ERROR(EIO);
+
+	if (ip->i_d.di_mode == 0 || ip->i_d.di_gen != igen) {
+
+		xfs_iput(ip, XFS_ILOCK_SHARED);
+
+		return -XFS_ERROR(ENOENT);
+	}
+
+	vp = XFS_ITOV(ip);
+
+	inode = vp->v_inode;
+	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+	linvfs_set_inode_ops(inode);
+	error = linvfs_revalidate_core(inode, ATTR_COMM);
+
+	/* copy in the 'struct fsdmidata' */
+
+	if (copy_from_user(&fsd, dmhreq.data, sizeof(fsd)))
+		return -XFS_ERROR(EFAULT);
+
+
+	dmfcntl.dmfc_subfunc = DM_FCNTL_FSSETDM;
+	dmfcntl.u_fcntl.setdmrq.fsd_dmevmask = fsd.fsd_dmevmask;
+	dmfcntl.u_fcntl.setdmrq.fsd_dmstate = fsd.fsd_dmstate;
+
+	bdp = bhv_base_unlocked(VN_BHV_HEAD(vp));
+	error = xfs_dm_fcntl(bdp, &dmfcntl, 0, 0, get_current_cred(), NULL);
+
+	VN_RELE(vp);
+
+	return error;
 }
 
 
