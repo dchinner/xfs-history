@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.60 $"
+#ident	"$Revision: 1.61 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -425,17 +425,19 @@ xfs_alloc_trace_entry(ktrace_entry_t *ktep)
 		NULL
 	};
 
-	if ((__psint_t)ktep->val[0] == 0)
+	if ((__psint_t)ktep->val[0] & 0xffff == 0)
 		return 0;
-	switch ((long)ktep->val[0]) {
+	switch ((long)ktep->val[0] & 0xffffL) {
 	case XFS_ALLOC_KTRACE_ALLOC:
-		qprintf("alloc %s[%s] mp 0x%x agno %d agbno %d\n",
+		qprintf("alloc %s[%s %d] mp 0x%x\n",
 			(char *)ktep->val[1],
 			ktep->val[2] ? (char *)ktep->val[2] : "",
-			(xfs_mount_t *)ktep->val[3], 
+			(__psint_t)ktep->val[0] >> 16,
+			(xfs_mount_t *)ktep->val[3]);
+		qprintf(
+	"agno %d agbno %d minlen %d maxlen %d mod %d prod %d minleft %d\n",
 			(__psunsigned_t)ktep->val[4],
-			(__psunsigned_t)ktep->val[5]);
-		qprintf("minlen %d maxlen %d mod %d prod %d minleft %d\n",
+			(__psunsigned_t)ktep->val[5],
 			(__psunsigned_t)ktep->val[6], 
 			(__psunsigned_t)ktep->val[7], 
 			(__psunsigned_t)ktep->val[8],
@@ -454,20 +456,22 @@ xfs_alloc_trace_entry(ktrace_entry_t *ktep)
 			((__psint_t)ktep->val[15] & (1 << 0)) != 0);
 		break;
 	case XFS_ALLOC_KTRACE_FREE:
-		qprintf("free %s[%s] mp 0x%x agno %d\n",
+		qprintf("free %s[%s %d] mp 0x%x\n",
 			(char *)ktep->val[1],
 			ktep->val[2] ? (char *)ktep->val[2] : "",
-			(xfs_mount_t *)ktep->val[3], 
-			(__psunsigned_t)ktep->val[4]);
-		qprintf("agbno %d len %d isfl %d\n",
+			(__psint_t)ktep->val[0] >> 16,
+			(xfs_mount_t *)ktep->val[3]);
+		qprintf("agno %d agbno %d len %d isfl %d\n",
+			(__psunsigned_t)ktep->val[4],
 			(__psunsigned_t)ktep->val[5],
 			(__psunsigned_t)ktep->val[6],
 			(__psint_t)ktep->val[7]);
 		break;
 	case XFS_ALLOC_KTRACE_MODAGF:
-		qprintf("modagf %s[%s] mp 0x%x ",
+		qprintf("modagf %s[%s %d] mp 0x%x\n",
 			(char *)ktep->val[1],
 			ktep->val[2] ? (char *)ktep->val[2] : "",
+			(__psint_t)ktep->val[0] >> 16,
 			(xfs_mount_t *)ktep->val[3]);
 		printflags((__psint_t)ktep->val[4], modagf_flags, "modified");
 		qprintf("seqno %d length %d roots b %d c %d\n",
