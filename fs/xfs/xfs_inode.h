@@ -161,6 +161,17 @@ typedef struct xfs_inode {
 #define	XFS_VTOI(vp)	((xfs_inode_t*)((vp)->v_data))
 
 /*
+ * Clear out the read-ahead state in the in-core inode.
+ */
+#define	XFS_INODE_CLEAR_READ_AHEAD(ip)	{	\
+		ip->i_next_offset = 0;		\
+		ip->i_io_offset = 0;		\
+		ip->i_reada_blkno = 0;		\
+		ip->i_io_size = 0;		\
+		ip->i_last_req_sz = 0;		\
+		ip->i_num_readaheads = 0; }
+     
+/*
  * Value for inode buffers' b_ref field.
  */
 #define XFS_INOREF	1
