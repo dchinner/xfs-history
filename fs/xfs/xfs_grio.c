@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.20 1994/05/09 15:53:44 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.21 1994/05/12 16:02:59 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -53,6 +53,10 @@
  *
  */
 
+#define LESS_THAN_ONE_SECOND(tv, nexttv)	\
+      (( tv.tv_sec < nexttv.tv_sec) ||	\
+  ((tv.tv_sec == nexttv.tv_sec) && (tv.tv_nsec < nexttv.tv_nsec)))
+
 #if defined(DEBUG) && !defined(SIM)
 extern int	grio_debug;
 #define GRIO_DBPRNT( level, str)        \
@@ -84,9 +88,11 @@ extern int xfs_write_file(vnode_t *, uio_t *, int, cred_t *);
 extern int xfs_diordwr(vnode_t *,uio_t *, int, cred_t *,int);
 extern struct vfs *vfs_devsearch( dev_t );
 extern int strncmp(char *, char *, int);
+#ifndef SIM
 extern void fasthz_delay( struct timeval *);
 extern void timestruc_sub( timestruc_t *, timestruc_t *);
 extern void timestruc_fix( timestruc_t *);
+#endif
 
 
 /*
@@ -155,8 +161,9 @@ xfs_add_ticket_to_inode( xfs_inode_t *ip, int sz, struct reservation_id *id )
 			ticket->sz = sz;
 			ticket->id.ino = id->ino;
 			ticket->id.pid = id->pid;
-			ticket->lastreq.tv_sec = 0;
+			ticket->lastreq.tv_sec  = 0;
 			ticket->lastreq.tv_nsec = 0;
+			ticket->iothissecond    = 0;
 			if (ip->i_ticket) 
 				ticket->nextticket = ip->i_ticket;
 			/*
@@ -331,79 +338,6 @@ xfs_grio_remove_ticket( file_id_t *fileidp, char *idptr)
 	return(0);
 }
 
-int xfs_fast_test = 0;
-
-/*
- * xfs_grio_time_check()
- *
- *
- *  
- * RETURNS: 
- * 	none
- */
-void
-xfs_grio_time_check(timestruc_t *lastreq)
-{
-	timestruc_t	tv, nexttv;
-	struct timeval	tvl;
-
-#ifdef SIM
-	/*
-	 * Check if the request is within the time limits
-	 * of the rate guarantee.
-	 */
-	if (lbolt < (lastreq->tv_sec + HZ)) {
-		/*
-		 * This request is being issued too soon
-		 * after the last request for this guarantee.
-		 * It cannot be issued until the next second.
-		 */
-		GRIO_DBPRNT(2,"request issued too soon \n");
-		delay(lastreq->tv_sec + HZ - lbolt);
-	}
-	lastreq->tv_sec  = lbolt;
-#else
-
-	/*
-	 * Check if the request is within the time limits
-	 * of the rate guarantee.
-	 */
-	nanotime(&tv);
-	
-	/*
-	 * Determine the time that the next request can be issued.
-	 */
-	nexttv.tv_sec  = lastreq->tv_sec + 1;
-	nexttv.tv_nsec = lastreq->tv_nsec;
-
-	if (( tv.tv_sec < nexttv.tv_sec) ||
-	    ((tv.tv_sec == nexttv.tv_sec) && (tv.tv_nsec < nexttv.tv_nsec))) {
-
-
-		/*
-		 * The user issued the next request too soon. The
-		 * process will be put to sleep until the next time slice.
-		 * The granularity of this delay is 1/fasthz (1 millisecond).
-		 */
-		GRIO_DBPRNT(2,"request issued too soon \n");
-
-		timestruc_sub( &nexttv, &tv );
-		timestruc_fix( &nexttv );
-
-		TIMESTRUC_TO_TIMEVAL(&nexttv, &tvl);
-
-		fasthz_delay( &tvl );
-		nanotime(&tv);
-
-	}
-
-	lastreq->tv_sec  =  tv.tv_sec;
-	lastreq->tv_nsec =  tv.tv_nsec;
-#endif
-	return;
-}
-
-
 /*
  * xfs_io_is_guaranteed()
  *
@@ -433,108 +367,7 @@ xfs_io_is_guaranteed( xfs_inode_t *ip, struct reservation_id *id)
 	} 
 	return(ticket);
 }
-/*
- * xfs_request_larger_than_guarantee()
- *      This routine takes the given user request (uiop) and issues
- *      multiple requests of the guaranteed rate size until the user request
- *      size is less than or equal to the guaranteed rate size.
- *      The routine returns immediately if the rate guarantee is removed
- *
- *
- * RETURNS:
- *      0 on success
- *      non-zero on error
- */
-int
-xfs_request_larger_than_guarantee(xfs_inode_t *ip, 	
-		struct reservation_id *id, 
-		uio_t *uiop, 
-		int ioflag, 
-		cred_t *credp, 
-		int rw)
-{
-        int     	remainingio, ret = 0;
-	vnode_t 	*vp;
-        grio_ticket_t 	*ticket;
 
-        /*
-         * Check that rate guarantee ticket still exists.
-         */
-        if (ticket = xfs_io_is_guaranteed( ip, id)) {
-                remainingio = uiop->uio_resid;
-                uiop->uio_resid = 0;
-
-                /*
-                 * Keep issuing requests until the user request size
-                 * is within the guaranteed amount.
-                 */
-                while ((remainingio > ticket->sz) && (!ret))  {
-                        /*
-                         * The size of the request is more than the guaranteed
-                         * amount. Issue the requests in pieces, each piece
-                         * the size of the guaranteed rate.
-                         */
-                        GRIO_DBPRNT(2,"request larger than guarantee.\n");
-
-                        /*
-                         * Set the I/O to be equal to the guaranteed rate size.
-                         */
-                        uiop->uio_resid      = ticket->sz;
-			uiop->uio_iov[0].iov_len = ticket->sz;
-                        remainingio    -= ticket->sz;
-
-
-			xfs_grio_time_check(&(ticket->lastreq));
-
-                        /*
-                         * Drop ticket lock before calling read/write.
-                         */
-                        ticket_unlock(ip);
-                        ticket = NULL;
-
-			vp = XFS_ITOV(ip);
-                        /*
-                         * Issue the request.
-                         */
-			ret = xfs_grio_issue_io(vp, uiop, ioflag, credp, rw);
-
-                        /*
-                         * Check for errors.
-                         */
-                        if (ret || (uiop->uio_resid != 0)) {
-                                /*
-                                 * Error occured.
-                                 */
-                                GRIO_DBPRNT(0, "GRIO RETURNING A -1 \n");
-                                ret = -1;
-                        }
-                        /*
-                         * Get the ticket again.
-                         */
-                        if ((ticket = xfs_io_is_guaranteed( ip, id)) == NULL) {
-                                /*
-                                 * Guarantee has been removed.
-                                 */
-                                GRIO_DBPRNT(0,"TICKET WAS REMOVED !! \n");
-                                break;
-                        }
-                }
-                /*
-                 * Add unperformed I/O count to the resid.
-                 */
-		if (ret) {
-                	uiop->uio_resid += remainingio;
-		} else {
-                	uiop->uio_resid = remainingio;
-			uiop->uio_iov[0].iov_len = remainingio;
-		}
-        }
-        /*
-         * Drop lock obtained by xfs_io_is_guaranteed().
-         */
-        ticket_unlock(ip);
-        return(ret);
-}
 
 /*
  * xfs_grio_req()
@@ -558,9 +391,11 @@ xfs_grio_req( xfs_inode_t *ip,
 	cred_t *credp,
 	int rw)
 {
-	int 		sz, ret = 0, remainingio;
+	int 		sz, ret = 0, remainingio, thisioreq;
 	vnode_t 	*vp;
 	grio_ticket_t 	*ticket;
+	timestruc_t	tv, nexttv;
+	struct	timeval	tvl;
 
         /*
          * Determine if this request has a guaranteed rate of I/O.
@@ -571,39 +406,149 @@ xfs_grio_req( xfs_inode_t *ip,
 		 */
 		ioflag |= IO_GRIO;
 
-                /*
-                 * Determine if the size of the request is
-                 * within the limits of the guaranteed rate.
-                 */
-                if (uiop->uio_resid > ticket->sz) {
-                        ticket_unlock(ip);
-                        /*
-                         * If the request is too large,
-                         * break it into smaller pieces.
-                         */
-                        ret = xfs_request_larger_than_guarantee(
-                                              ip, id, uiop, ioflag, credp,rw);
-                        ticket = xfs_io_is_guaranteed( ip, id);
+		/*
+	 	 * 1) Determine the time of the last request.
+	 	 *    *) if it has been more than 1 second, zero out
+	 	 *	the iothissecond field and set the new time
+		 *    *) if if has been less than 1 second since last req
+		 *	continue.
+	 	 * 2) Check the size of the request,
+		 *	*) if sz >= (reqsize + iothissecond)
+		 *		issue the whole request and update iothissecond.
+ 		 *	*) if sz < (reqsize + iothissecond)
+	 	 *		issue a request of the size 
+		 *			reqsize1 = sz - iothissecond.
+		 *		and update iothissecond
+		 */
+
+		ret = 0;
+		remainingio = uiop->uio_resid;
+		uiop->uio_resid = 0;
+		while ((remainingio) && (!ret)) {
+
+	       		/*
+         		 * Check if the request is within the time limits
+         		 * of the rate guarantee.
+         		 */
+        		nanotime(&tv);
+
+        		/*
+         	 	 * Determine the time that the next 
+			 * request can be issued.
+         	 	 */
+        		nexttv.tv_sec  = ticket->lastreq.tv_sec + 1;
+        		nexttv.tv_nsec = ticket->lastreq.tv_nsec;
+			
+			if (LESS_THAN_ONE_SECOND( tv, nexttv ) ) {
+		 		/*
+			 	 * It has been less than 1 second 
+			 	 * since the last request.
+			 	 */
+			} else {
+				/*
+			 	 * If has been more than 1 second	
+			 	 * since the last request.	
+			 	 */
+				ticket->iothissecond    = 0;
+				ticket->lastreq.tv_sec  = tv.tv_sec;
+				ticket->lastreq.tv_nsec = tv.tv_nsec;
+			}
+
+#ifdef NOTNOW
+                	/*
+			 * Determine if the user can issue more I/O 
+			 * this second.
+                 	 */
+                	if ((ticket->sz - ticket->iothissecond) > 0) {
+#else
+			/*
+			 * Only allow a single request each second.
+			 */
+                	if (ticket->iothissecond ==  0) {
+#endif
+
+                        	/*
+                         	 * Issue the largest I/O possible. 
+                         	 */
+				thisioreq = ticket->sz - ticket->iothissecond;
+				if (thisioreq > remainingio)
+					thisioreq = remainingio;
+
+				uiop->uio_resid 	 = thisioreq;
+				uiop->uio_iov[0].iov_len = thisioreq; 
+				remainingio		-= thisioreq;
+
+				ticket->iothissecond    += thisioreq; 
+
+                        	ticket_unlock(ip);
+				vp = XFS_ITOV(ip);
+
+				/*
+				 * Issue the request.
+				 */
+				ret = xfs_grio_issue_io( vp, 
+						uiop, ioflag, credp, rw);
+
+
+				/*
+			 	 * Check for errors.
+			 	 */
+				if (ret || (uiop->uio_resid != 0)) {
+					ret = -1;
+				}
+
+			} else {
+                		/*
+                 		 * The user issued the next request too soon, 
+				 * or the I/O request was too large. The
+                 		 * process will be put to sleep until the next 
+				 * time slice.
+                 		 * The granularity of this delay is 1/fasthz 
+				 * (1 millisecond).
+                 		 */
+                        	ticket_unlock(ip);
+                		GRIO_DBPRNT(2,"request issued too soon \n");
+
+#ifdef SIM
+				delay(1);
+#else
+		                timestruc_sub( &nexttv, &tv );
+               			timestruc_fix( &nexttv );
+
+                		TIMESTRUC_TO_TIMEVAL(&nexttv, &tvl);
+
+		                fasthz_delay( &tvl );
+#endif
+			}
+			/*
+		 	 * Check if rate guarantee was removed while
+		 	 * I/O was taking place.
+		 	 */
+			if (( ticket = xfs_io_is_guaranteed( ip, id)) == NULL) {
+				break;
+			}
                 }
-                /*
-                 * The request is the correct size, Check if
-                 * it is being issued too soon after the last
-                 * request for this guarantee.
-                 */
-                if ((!ret) && ticket) {
-			xfs_grio_time_check(&(ticket->lastreq));
-                }
-        }
-        /*
-         * Drop lock obtained by xfs_io_is_guaranteed().
-         */
-        ticket_unlock(ip);
-        if (!ret) {
+
+		/*
+		 * Add unperformed I/O back into resid.
+		 */
+		if (ret) {
+		        uiop->uio_resid += remainingio;
+		} else {
+                	uiop->uio_resid = remainingio;
+			uiop->uio_iov[0].iov_len = remainingio;
+		}
+       		ticket_unlock(ip);
+	} else {
+       		ticket_unlock(ip);
 		vp = XFS_ITOV(ip);
-		ret = xfs_grio_issue_io( vp, uiop, ioflag, credp, rw);
-        }
+		xfs_grio_issue_io(vp, uiop, ioflag, credp, rw);
+	}
         return (ret) ;
 }
+
+
+
 
 /*
  * xfs_grio_issue_io()
@@ -737,6 +682,9 @@ xfs_get_file_extents(file_id_t *fileidp, xfs_bmbt_irec_t extents[], int *count)
 		return( ret );
 	}
 
+	/*
+	 * Get the number of extents in the file.
+	 */
 	num_extents = ip->i_bytes / sizeof(*ep);
 	if (num_extents) {
 
@@ -915,7 +863,7 @@ xfs_remove_all_tickets()
 #endif
 	for (vfsp = rootvfs; vfsp != NULL; vfsp = vfsp->vfs_next) {
 		/*
- 		 * If is is an xfs file system ?
+ 		 * If this is an xfs file system ...
 		 */
 		if (vfsp->vfs_fstype == xfs_type) {
 			/*
@@ -1029,7 +977,7 @@ xfs_clear_inode_grio( file_id_t *fileidp)
 #endif
 
 	/*
- 	 * get inode
+ 	 * Get the inode.
 	 */
 	if (!(ip = xfs_get_inode( fs_dev, ino ))) {
 		return( 1 );
@@ -1038,6 +986,7 @@ xfs_clear_inode_grio( file_id_t *fileidp)
 	if (ip->i_flags & XFS_IGRIO) {
 		ip->i_flags &= ~XFS_IGRIO;
 	} 
+
 	xfs_iunlock( ip, XFS_ILOCK_EXCL );
 	IRELE( ip );
 	return( 0 );
