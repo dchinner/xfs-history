@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.14 $"
+#ident	"$Revision: 1.15 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1236,7 +1236,7 @@ xfs_xnode_fork(char *name, xfs_ifork_t *f)
 		f->if_flags & XFS_IFINLINE ?
 			f->if_u1.if_data :
 			(char *)f->if_u1.if_extents);
-	qprintf(" broot 0x%x broot_bytes %s ext_max %d",
+	qprintf(" broot 0x%x broot_bytes %s ext_max %d ",
 		f->if_broot, xfs_fmtsize(f->if_broot_bytes), f->if_ext_max);
 	printflags(f->if_flags, tab_flags, "flags");
 	qprintf("\n");
