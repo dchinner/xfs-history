@@ -2869,6 +2869,7 @@ xfs_bmap_add_attrfork(
 	VN_HOLD(XFS_ITOV(ip));
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 	ip->i_d.di_forkoff = mp->m_attroffset >> 3;
+	ip->i_af.if_ext_max = XFS_IFORK_ASIZE(ip) / sizeof(xfs_bmbt_rec_t);
 	logflags = XFS_ILOG_CORE;
 	XFS_BMAP_INIT(&flist, &firstblock);
 	switch (ip->i_d.di_format) {
