@@ -24,11 +24,11 @@ typedef struct xfs_dinode_core
 	__int8_t	di_version;	/* inode version */
 	__int8_t	di_format;	/* format of di_c data */
 	__int16_t	di_nlink;	/* number of links to file */
-	__uint16_t	di_uid;		/* owner's user id */
-	__uint16_t	di_gid;		/* owner's group id */
-	xfs_extnum_t	di_nextents;	/* number of extents in file */
+	__uint32_t	di_uid;		/* owner's user id */
+	__uint32_t	di_gid;		/* owner's group id */
 	uuid_t		di_uuid;	/* file unique id */
 	xfs_fsize_t	di_size;	/* number of bytes in file */
+	xfs_extnum_t	di_nextents;	/* number of extents in file */
 	/*
 	 * While these fields hold 64 bit values, we will only
 	 * be using the upper 32 bits for now.  The t_nsec
@@ -38,9 +38,6 @@ typedef struct xfs_dinode_core
 	xfs_timestamp_t	di_atime;	/* time last accessed */
 	xfs_timestamp_t	di_mtime;	/* time last modified */
 	xfs_timestamp_t	di_ctime;	/* time created/inode modified */
-	/*
-	 * Should this be 64 bits? What does nfs3.0 want?
-	 */
 	__uint32_t	di_gen;		/* generation number */
 	xfs_extlen_t	di_extsize;	/* basic/minimum extent size for file */
 	__uint32_t	di_flags;	/* random flags, XFS_DIFLAG_... */
@@ -69,9 +66,9 @@ typedef struct xfs_dinode
 #define	XFS_DI_NLINK	0x00010
 #define	XFS_DI_UID	0x00020
 #define	XFS_DI_GID	0x00040
-#define	XFS_DI_NEXTENTS	0x00080
-#define	XFS_DI_UUID	0x00100
-#define	XFS_DI_SIZE	0x00200
+#define	XFS_DI_UUID	0x00080
+#define	XFS_DI_SIZE	0x00100
+#define	XFS_DI_NEXTENTS	0x00200
 #define	XFS_DI_ATIME	0x00400
 #define	XFS_DI_MTIME	0x00800
 #define	XFS_DI_CTIME	0x01000
