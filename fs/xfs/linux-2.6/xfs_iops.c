@@ -34,6 +34,7 @@
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 #include <linux/mpage.h>
+#include <linux/iobuf.h>
 #include <linux/xfs_iops.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,9)

@@ -37,6 +37,7 @@
 #include <linux/smp_lock.h>
 #include <linux/dcache.h>
 #include <linux/namei.h>
+#include <linux/iobuf.h>
 
 
 extern int xfs_change_file_space(bhv_desc_t *, int,
