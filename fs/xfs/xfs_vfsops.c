@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.163 $"
+#ident  "$Revision: 1.164 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -425,6 +425,7 @@ xfs_cmountfs(
 	if (vfsp->vfs_flag & VFS_REMOUNT)
 		return 0;
 	
+	vfsp->vfs_flag |= VFS_CELLULAR;
 	mp = xfs_get_vfsmount(vfsp, ddev, logdev, rtdev);
 
 	/*
@@ -1258,13 +1259,14 @@ devvptoxfs(
 	int		error;
 	xfs_sb_t	*fs;
 	vnode_t		*openvp;
+#if     !UNIKERNEL
 #ifdef	OLDSPECFS
 	bhv_desc_t	*bdp;
 	bhv_head_t	*bhp;
 	struct snode	*sp;
 #endif	/* OLDSPECFS */
 	bhv_desc_t	*vfs_bdp;
-
+#endif  /* !UNIKERNEL */
 	if (devvp->v_type != VBLK)
 		return XFS_ERROR(ENOTBLK);
 	openvp = devvp;
@@ -1274,6 +1276,7 @@ devvptoxfs(
 	dev = devvp->v_rdev;
 	VOP_RWLOCK(devvp, VRWLOCK_WRITE);
 
+#if     !UNIKERNEL
 #ifdef	OLDSPECFS
 	/*
 	 * Find the spec behavior for this vnode so that we can look
@@ -1313,6 +1316,7 @@ devvptoxfs(
 					      &xfs_vfsops);
 		bcopy(&XFS_BHVTOM(vfs_bdp)->m_sb, fs, sizeof(*fs));
 	} else {
+#endif  /* !UNIKERNEL */
 		/*
 		 * If the buffer is already in core, it might be stale.
 		 * User might have been doing block reads, then mkfs.
@@ -1334,7 +1338,9 @@ devvptoxfs(
 			brelse(bp);
 		} else
 			fs = (xfs_sb_t *)bp->b_un.b_addr;
+#if     !UNIKERNEL
 	}
+#endif  /* !UNIKERNEL */
 	VOP_RWUNLOCK(devvp, VRWLOCK_WRITE);
 	*bpp = bp;
 	*fsp = fs;
