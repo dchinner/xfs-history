@@ -756,7 +756,8 @@ int linvfs_bmap(struct address_space *mapping, long block)
 
 struct address_space_operations linvfs_aops = {
   readpage:		pagebuf_read_full_page,
-  writepage:		pagebuf_write_full_page,
+  writepage:		pagebuf_write_full_page_unlock,
+  writepage_nounlock:	pagebuf_write_full_page_nounlock,
   sync_page:		block_sync_page,
   bmap:			linvfs_bmap,
   toss_page:		pagebuf_toss_page,
