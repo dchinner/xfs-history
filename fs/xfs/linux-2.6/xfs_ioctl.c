@@ -346,6 +346,13 @@ xfs_open_by_handle(
 	inode = XFS_ITOV(ip)->v_inode;
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
+	linvfs_set_inode_ops(inode);
+	error = linvfs_revalidate_core(inode, ATTR_COMM);
+	if (error) {
+		iput(inode);
+		return -XFS_ERROR(error);
+	}
+
 	/*
 	 * Restrict handle operations to directories & regular files.
          */
