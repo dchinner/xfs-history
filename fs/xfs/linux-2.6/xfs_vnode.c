@@ -30,7 +30,7 @@
  *  
  */
 
-#ident	"$Revision: 1.5 $"
+#ident	"$Revision: 1.6 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -406,6 +406,7 @@ vn_alloc(struct vfs *vfsp, enum vtype type, dev_t dev)
 		list = 0;
 	}
 
+	s = LOCK_VFREELIST(list);
 	vlist = VFREELIST(list);
 	vp = vlist->vl_next;
 

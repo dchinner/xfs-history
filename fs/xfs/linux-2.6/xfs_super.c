@@ -587,6 +587,7 @@ __initfunc(int init_xfs_fs(void))
   cred_init();
   binit();
   vfsinit();
+  uuid_init();
   xfs_init(NULL, 0);
   
   EXIT("init_xfs_fs"); 

@@ -319,7 +319,6 @@ xfs_init(
 	sv_init(&xfsd_wait, SV_DEFAULT, "xfsd");
 	spinlock_init(&xfsc_lock, "xfsc");
 	sv_init(&xfsc_wait, SV_DEFAULT, "xfsc");
-	uuid_init();
 
 	/*
 	 * Initialize the inode reference cache.
