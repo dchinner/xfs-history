@@ -1095,6 +1095,8 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
 		offsetof(xfs_sb_t, sb_uquotino),
 		offsetof(xfs_sb_t, sb_pquotino),
 		offsetof(xfs_sb_t, sb_qflags),
+		offsetof(xfs_sb_t, sb_flags),
+		offsetof(xfs_sb_t, sb_shared_vn),
 		offsetof(xfs_sb_t, sb_inoalignmt),
 		offsetof(xfs_sb_t, sb_unit),
 		offsetof(xfs_sb_t, sb_width),
