@@ -198,8 +198,6 @@ typedef void (*page_buf_iodone_t)(struct page_buf_s *);
 typedef void (*page_buf_relse_t)(struct page_buf_s *);
 			/* call-back function on I/O completion */
 typedef int (*page_buf_bdstrat_t)(struct page_buf_s *);
-typedef int (pagebuf_bmap_fn_t) (struct inode *, loff_t, ssize_t,
-			     page_buf_bmap_t *, int, int *, int);
 
 #define PB_PAGES	4
 
@@ -393,12 +391,10 @@ extern int pagebuf_ispin( page_buf_t *); /* check if pagebuf is pinned	*/
 
 extern int pagebuf_write_full_page(	/* write a page via pagebuf	*/
 		struct page *,		/* page to write		*/
-		int delalloc,		/* delalloc bh present		*/
-		pagebuf_bmap_fn_t);	/* bmap function		*/
+		int delalloc);		/* delalloc bh present		*/
 
 extern void pagebuf_release_page(	/* Attempt to convert a delalloc page */
-		struct page *,		/* page to release		*/
-		pagebuf_bmap_fn_t);	/* bmap function		*/
+		struct page *);		/* page to release		*/
 
 extern void pagebuf_delwri_queue(page_buf_t *, int);
 extern void pagebuf_delwri_dequeue(page_buf_t *);

@@ -661,25 +661,21 @@ linvfs_pb_bmap(
 	loff_t		offset,
 	ssize_t		count,
 	page_buf_bmap_t *pbmapp,
-	int		maxpbbm,
-	int		*retpbbm,
 	int		flags)
 {
 	vnode_t		*vp = LINVFS_GET_VP(inode);
-	int		error;
-
-	*retpbbm = maxpbbm;
+	int		error, nmaps = 1;
 
 retry:
 	if (flags & PBF_FILE_ALLOCATE) {
 		VOP_STRATEGY(vp, offset, count, flags, NULL,
-			(struct page_buf_bmap_s *) pbmapp, retpbbm, error);
+				pbmapp, &nmaps, error);
 	} else {
 		VOP_BMAP(vp, offset, count, flags, NULL,
-			(struct page_buf_bmap_s *) pbmapp, retpbbm, error);
+				pbmapp, &nmaps, error);
 	}
 	if (flags & PBF_WRITE) {
-		if (unlikely((flags & PBF_DIRECT) && *retpbbm &&
+		if (unlikely((flags & PBF_DIRECT) && nmaps &&
 		    (pbmapp->pbm_flags & PBMF_DELAY))) {
 			flags = PBF_WRITE | PBF_FILE_ALLOCATE;
 			goto retry;
@@ -765,8 +761,6 @@ linvfs_write_full_page(
 	struct page	*page)
 {
 	int		error;
-	struct vnode	*vp;
-	struct inode	*inode;
 	int		need_trans;
 	int		nr_delalloc, nr_unmapped;
 
@@ -779,9 +773,7 @@ linvfs_write_full_page(
 	if ((current->flags & (PF_FSTRANS)) && need_trans)
 		goto out_fail;
 
-	inode = page->mapping->host;
-	vp = LINVFS_GET_VP(inode);
-	error = pagebuf_write_full_page(page, nr_delalloc, linvfs_pb_bmap);
+	error = pagebuf_write_full_page(page, nr_delalloc);
 
 	return error;
 
@@ -834,7 +826,7 @@ linvfs_direct_IO(
 	size_t		page_offset;
 	page_buf_t	*pb;
 	page_buf_bmap_t map;
-	int		error = 0, nmap;
+	int		error = 0;
 	int		pb_flags, map_flags, pg_index = 0;
 	size_t		length, total;
 	loff_t		offset;
@@ -850,8 +842,7 @@ linvfs_direct_IO(
 	map_flags = (rw ? PBF_WRITE : PBF_READ) | PBF_DIRECT;
 	pb_flags = (rw ? PBF_WRITE : PBF_READ) | PBF_FORCEIO | _PBF_LOCKABLE;
 	while (length) {
-		error = linvfs_pb_bmap(inode, offset, length, &map,
-				1, &nmap, map_flags);
+		error = linvfs_pb_bmap(inode, offset, length, &map, map_flags);
 		if (error)
 			break;
 
@@ -941,7 +932,7 @@ linvfs_release_page(
 	}
 
 	if (gfp_mask & __GFP_FS) {
-		pagebuf_release_page(page, linvfs_pb_bmap);
+		pagebuf_release_page(page);
 		return try_to_free_buffers(page);
 	}
 	return 0;
