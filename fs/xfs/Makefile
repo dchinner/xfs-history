@@ -59,7 +59,7 @@ realclean: clean
 	rm -rf linux-2.4.0
 	rm -f kern
 	rm -f SPECS/_sgi_kvers_
-	rm -f SOURCES/linux-2.4.0.tar.bz2 SOURCES/pcmcia-cs-3.1.8.tar.gz SOURCES/ibcs-2.1-981105.tar.gz SOURCES/xfs-cmds-*.tar.gz
+	rm -f SOURCES/linux-2.4.0.tar.bz2 SOURCES/xfs-cmds-*.tar.gz
 	if [ -e SPECS/kernel-2.4.spec.old ] ; then \
 		rm SPECS/kernel-2.4.spec; \
 		mv SPECS/kernel-2.4.spec.old SPECS/kernel-2.4.spec; \
