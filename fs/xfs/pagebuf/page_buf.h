@@ -387,6 +387,10 @@ BUFFER_FNS(Sync, sync)
 BUFFER_FNS(Delay, delay)
 #endif /* kernel < 2.5.17 */
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,48)
+#define get_seconds()		CURRENT_TIME
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,67)
 #define blk_run_queues()	run_task_queue(&tq_disk)
 #endif
