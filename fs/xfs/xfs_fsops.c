@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.52 $"
+#ident	"$Revision: 1.53 $"
 
 #include <xfs_os_defs.h>
 
@@ -423,7 +423,11 @@ xfs_growfs_log(
 	return XFS_ERROR(ENOSYS);
 }
 
-STATIC int
+/*
+ * exported through ioctl XFS_IOC_FSCOUNTS
+ */
+
+int
 xfs_fs_counts(
 	xfs_mount_t		*mp,
 	xfs_fsop_counts_t	*cnt)
@@ -439,8 +443,9 @@ xfs_fs_counts(
 	return 0;
 }
 
-
 /*
+ * exported through ioctl XFS_IOC_SET_RESBLKS & XFS_IOC_GET_RESBLKS
+ *
  * xfs_reserve_blocks is called to set m_resblks
  * in the in-core mount table. The number of unused reserved blocks
  * is kept in m_resbls_avail.
@@ -453,14 +458,14 @@ xfs_fs_counts(
  * available  should  be returned no settings are changed.
  */
 
-STATIC int
+int
 xfs_reserve_blocks(
-	xfs_mount_t *mp, 
-	__uint64_t *inval, 
-	xfs_fsops_getblks_t *outval)
+	xfs_mount_t             *mp, 
+	__uint64_t              *inval, 
+	xfs_fsop_resblks_t      *outval)
 {
-	long long lcounter, delta;
-	__uint64_t request;
+	__uint64_t              lcounter, delta;
+	__uint64_t              request;
 	int s;
 
 	/* If inval is null, report current values and return */
@@ -506,126 +511,4 @@ xfs_reserve_blocks(
 	outval->resblks_avail = mp->m_resblks_avail;
 	XFS_SB_UNLOCK(mp, s);
 	return(0);
-}
-
-int					/* error status */
-xfs_fsoperations(
-	int		fd,		/* file descriptor for fs */
-	int		opcode,		/* operation code */
-	void		*in,		/* input structure */
-	void		*out)		/* output structure */
-{
-	int		error;
-	void		*inb;
-	xfs_mount_t	*mp;
-	void		*outb;
-	static const short	cisize[XFS_FSOPS_COUNT] =
-	{
-		0,				/* XFS_FS_GEOMETRY_V1 */
-		sizeof(xfs_growfs_data_t),	/* XFS_GROWFS_DATA */
-		sizeof(xfs_growfs_log_t),	/* XFS_GROWFS_LOG */
-		sizeof(xfs_growfs_rt_t),	/* XFS_GROWFS_RT */
-		0,				/* XFS_FS_COUNTS */
-		sizeof(__uint64_t),		/* XFS_SET_RESBLKS */
-		0,				/* XFS_GET_RESBLKS */
-		0,				/* XFS_FS_GEOMETRY_V2 */
-		0,				/* XFS_FS_GEOMETRY */
-	};
-	static const short	cosize[XFS_FSOPS_COUNT] =
-	{
-		sizeof(xfs_fsop_geom_v1_t),	/* XFS_FS_GEOMETRY_V1 */
-		0,				/* XFS_GROWFS_DATA */
-		0,				/* XFS_GROWFS_LOG */
-		0,				/* XFS_GROWFS_RT */
-		sizeof(xfs_fsop_counts_t),	/* XFS_FS_COUNTS */
-		sizeof(xfs_fsops_getblks_t),	/* XFS_SET_RESBLKS */
-		sizeof(xfs_fsops_getblks_t),	/* XFS_GET_RESBLKS */
-		sizeof(xfs_fsop_geom_v2_t),	/* XFS_FS_GEOMETRY_V2 */
-		sizeof(xfs_fsop_geom_t),	/* XFS_FS_GEOMETRY */
-	};
-	static const short	wperm[XFS_FSOPS_COUNT] =
-	{
-		0,	/* XFS_FS_GEOMETRY_V1 */
-		1,	/* XFS_GROWFS_DATA */
-		1,	/* XFS_GROWFS_LOG */
-		1,	/* XFS_GROWFS_RT */
-		0,	/* XFS_FS_COUNTS */
-		1,	/* XFS_SET_RESBLKS */
-		0,  	/* XFS_GET_RESBLKS */
-		0,	/* XFS_FS_GEOMETRY_V2 */
-		0,	/* XFS_FS_GEOMETRY */
-	};
-
-
-	if (opcode < 0 || opcode >= XFS_FSOPS_COUNT)
-		return XFS_ERROR(EINVAL);
-	if (error = xfs_fd_to_mp(fd, wperm[opcode], &mp, wperm[opcode]))
-		return error;
-	if (XFS_FORCED_SHUTDOWN(mp))
-		return (EIO);
-
-	if (cisize[opcode]) {
-		inb = kmem_alloc(cisize[opcode], KM_SLEEP);
-		if (copyin(in, inb, cisize[opcode])) {
-			kmem_free(inb, cisize[opcode]);
-			return XFS_ERROR(EFAULT);
-		}
-	} else
-		inb = NULL;
-	if (cosize[opcode])
-		outb = kmem_alloc(cosize[opcode], KM_SLEEP);
-	else
-		outb = NULL;
-	switch (opcode)
-	{
-	case XFS_FS_GEOMETRY_V1:
-		error = xfs_fs_geometry(mp, (xfs_fsop_geom_t *)outb, 1);
-		break;
-	case XFS_FS_GEOMETRY_V2:
-		error = xfs_fs_geometry(mp, (xfs_fsop_geom_t *)outb, 2);
-		break;
-	case XFS_FS_GEOMETRY:
-		error = xfs_fs_geometry(mp, (xfs_fsop_geom_t *)outb, 3);
-		break;
-	case XFS_GROWFS_DATA:
-		if (!cpsema(&mp->m_growlock))
-			return XFS_ERROR(EWOULDBLOCK);
-		error = xfs_growfs_data(mp, (xfs_growfs_data_t *)inb);
-		vsema(&mp->m_growlock);
-		break;
-	case XFS_GROWFS_LOG:
-		if (!cpsema(&mp->m_growlock))
-			return XFS_ERROR(EWOULDBLOCK);
-		error = xfs_growfs_log(mp, (xfs_growfs_log_t *)inb);
-		vsema(&mp->m_growlock);
-		break;
-	case XFS_GROWFS_RT:
-		if (!cpsema(&mp->m_growlock))
-			return XFS_ERROR(EWOULDBLOCK);
-		error = xfs_growfs_rt(mp, (xfs_growfs_rt_t *)inb);
-		vsema(&mp->m_growlock);
-		break;
-	case XFS_FS_COUNTS:
-		error = xfs_fs_counts(mp, (xfs_fsop_counts_t *)outb);
-		break;
-	case XFS_SET_RESBLKS:
-		error = xfs_reserve_blocks(mp, (__uint64_t *)inb, 
-					(xfs_fsops_getblks_t *)outb);
-		break;
-	case XFS_GET_RESBLKS:
-		error = xfs_reserve_blocks(mp, (__uint64_t *)NULL, 
-					(xfs_fsops_getblks_t *)outb);
-		break;
-	default:
-		error = XFS_ERROR(EINVAL);
-		break;
-	}
-	if (inb)
-		kmem_free(inb, cisize[opcode]);
-	if (!error && outb) {
-		if (copyout(outb, out, cosize[opcode]))
-			error = XFS_ERROR(EFAULT);
-		kmem_free(outb, cosize[opcode]);
-	}
-	return error;
 }

@@ -149,46 +149,102 @@ xfs_change_file_space(
 	int		attr_flags);
 
 
-
-
+/*
+ * xfs_find_handle: map from userspace xfs_fsop_handlereq structure to
+ * a file or fs handle - used for XFS_IOC_PATH_TO_FSHANDLE,
+ * XFS_IOC_PATH_TO_HANDLE and XFS_IOC_FD_TO_HANDLE.
+ */
 
 int
-xfs_something_to_handle(
-	struct inode	*inode,
-	struct file	*filp,
-	int		cmd,
-	unsigned long	arg,
-	vfs_t		*vfsp,
-	xfs_mount_t	*mp,
-	bhv_desc_t	*bdp,
-	vnode_t		*vp,
-	xfs_inode_t	*ip,
-	int		clamp_to_fsid)
+xfs_find_handle(
+        unsigned int    cmd,
+	unsigned long	arg)
 {
 	int			hsize;
-	xfs_fid_t		xfid;
-	xfs_fid_t		*xfidp;
 	xfs_handle_t		handle;
-	xfs_handle_t		*handlep;
 	xfs_fsop_handlereq_t	hreq;
+        struct vnode            *vp;
+        xfs_inode_t             *ip;
+        int                     only_fsid;
+	bhv_desc_t	        *bdp;
 
-
-	/*
-	 * XFS_IOC_PATH_TO_FSHANDLE comes in against a
-	 * "mount point" path, or any file within the
-	 * mount point.
-	 */
+        /* read handle request from user */
 	if (copy_from_user(&hreq, (struct xfs_fsop_handlereq *)arg,
 					sizeof(struct xfs_fsop_handlereq)))
 		return -XFS_ERROR(EFAULT);
 
-	handlep = &handle;
+        /* zero our handle */
+	bzero((char *)&handle, sizeof(handle));
+        
+        only_fsid=0;
+        switch (cmd) {
+	    case XFS_IOC_PATH_TO_FSHANDLE:
+                only_fsid=1;
+                /* fallthrough */
+	    case XFS_IOC_PATH_TO_HANDLE: {
+                struct nameidata        nd;
+                char                    path[PATH_MAX+1];
+                int                     error;
+                
+                /* we need the path */
+                error = strncpy_from_user(path, hreq.path, PATH_MAX);
+                if (error<0)
+                        return error;
+                
+                /* traverse the path */
+                if (path_init(path, 0, &nd))
+                        error = path_walk(path, &nd);
+                if (error)
+                        return error;
+                
+                ASSERT(nd.dentry);
+                
+                /* XXX dxm locking here? */
+                vp = LINVFS_GET_VP(nd.dentry->d_inode);
+                ASSERT(vp);
+                
+                path_release(&nd);
+                
+                break;
+            }
+                
+	    case XFS_IOC_FD_TO_HANDLE: {
+                struct file     * file;
+                
+                file = fget(hreq.fd);
+                if (!file)
+                    return -EBADF;
+                
+                ASSERT(file->f_dentry);
+                
+                /* XXX dxm locking here? */
+                vp = LINVFS_GET_VP(file->f_dentry->d_inode);
+                ASSERT(vp);
+                
+                fput(file);
+                
+                break;
+            }
+                
+            default:
+                ASSERT(0);
+                return -XFS_ERROR(EINVAL);
+        }
+        
+        
+        /* we need an xfs inode */
+	bdp = VNODE_TO_FIRST_BHV(vp);
+	ASSERT(bdp);
+        
+        if (!BHV_IS_XFS(bdp))
+            return -EINVAL;
+        
+	ip = XFS_BHVTOI(bdp);
+        
 
-	bzero((char *)handlep, sizeof(*handlep));
-
-	/*
-	 * vp_to_handle()
-	 */
+        /* check our vnode */
+        ASSERT(vp);
+        ASSERT(vp->v_vfsp);
 	if (vp->v_vfsp->vfs_altfsid == NULL)
 		return -XFS_ERROR(EINVAL);
 	
@@ -200,39 +256,25 @@ xfs_something_to_handle(
 		default:
 			return -XFS_ERROR(EBADF);
 	}
+        
+        if (!only_fsid) {
+	    /* fill in fid section of handle from inode ip and vnode vp */
 
-
-	/*
-	 * xfs_fid2()
-	 */
-	xfidp = &xfid;
-
-	xfidp->xfs_fid_len = sizeof(xfs_fid_t) - sizeof(xfidp->xfs_fid_len);
-	xfidp->xfs_fid_pad = 0;
-
-	/*
-	 * use bcopy because the inode is a long long and there's no
-	 * assurance that xfidp->xfs_fid_ino is properly aligned.
-	 */
-	bcopy(&ip->i_ino, &xfidp->xfs_fid_ino,
-					sizeof(xfidp->xfs_fid_ino));
-
-	xfidp->xfs_fid_gen = ip->i_d.di_gen;
-
-	/*
-	 * vp_to_handle() continued
-	 */
+	    handle.ha_fid.xfs_fid_len = sizeof(xfs_fid_t) - 
+                                            sizeof(handle.ha_fid.xfs_fid_len);
+	    handle.ha_fid.xfs_fid_pad = 0;
+	    handle.ha_fid.xfs_fid_gen = ip->i_d.di_gen;
+            handle.ha_fid.xfs_fid_ino = ip->i_ino;
+        }
+        
+        /* copy in fsid */
 	bcopy (vp->v_vfsp->vfs_altfsid,
-			&handlep->ha_fsid, sizeof (xfs_fsid_t));
+			&handle.ha_fsid, sizeof (xfs_fsid_t));
+        
+        /* how big is our handle? */
+        hsize = only_fsid ? sizeof(xfs_fsid_t) : XFS_HSIZE(handle);
 
-	bcopy(xfidp, &handlep->ha_fid, xfidp->xfs_fid_len
-					+ sizeof(xfidp->xfs_fid_len));
-
-	hsize = XFS_HSIZE(*handlep);
-
-	if (clamp_to_fsid)
-		hsize = sizeof(xfs_fsid_t);	/* Clamp downed size	*/
-
+        /* now copy our handle into the user buffer & write out the size */
 	if (copy_to_user((xfs_handle_t *)hreq.ohandle, &handle, hsize))
 		return -XFS_ERROR(EFAULT);
 
@@ -600,7 +642,7 @@ xfs_readlink_by_handle(
 	xfs_ino_t		ino;
 	xfs_inode_t		*ip = NULL;
 	xfs_fsop_handlereq_t	hreq;
-
+        __u32                   olen;
 
 #ifndef	PERMISSIONS_BY_USER
 	/*
@@ -712,20 +754,24 @@ xfs_readlink_by_handle(
 	}
 
 	aiov.iov_base	= hreq.ohandle;
-	aiov.iov_len	= *hreq.ohandlen;
+        
+        
+	if (copy_from_user(&olen, hreq.ohandlen, sizeof(__u32)))
+            return -XFS_ERROR(EFAULT);
+	aiov.iov_len	= olen;
 
 	auio.uio_iov	= &aiov;
 	auio.uio_iovcnt	= 1;
 	auio.uio_fmode	= FINVIS;
 	auio.uio_offset	= 0;
 	auio.uio_segflg	= UIO_USERSPACE;
-	auio.uio_resid	= *hreq.ohandlen;
+	auio.uio_resid	= olen;
 
 	VOP_READLINK(vp, &auio, get_current_cred(), error);
 
 	VN_RELE(vp);
 
-	rlsize = *hreq.ohandlen - auio.uio_resid;
+	rlsize = olen - auio.uio_resid;
 
 	return rlsize;
 }
@@ -1036,25 +1082,19 @@ int xfs_ioctl (
 		return copy_to_user((struct getbmapx *)arg, &bmx, sizeof(bmx));
 	}
 
-	case XFS_IOC_PATH_TO_FSHANDLE: {
-		/*
-		 * XFS_IOC_PATH_TO_FSHANDLE comes in against a "mount point"
-		 * path, or any file within the mount point.
-		 */
-		return xfs_something_to_handle(inode, filp, cmd, arg,
-						vfsp, mp, bdp, vp, ip, 1);
-	}
-
+	case XFS_IOC_PATH_TO_FSHANDLE:
 	case XFS_IOC_FD_TO_HANDLE:
 	case XFS_IOC_PATH_TO_HANDLE: {
 		/*
-		 * XFS_IOC_PATH_TO_HANDLE comes in against any file
-		 * within the mount point.
-		 * That file must've been opened by the user-land
-		 * library code.
+		 * XFS_IOC_PATH_TO_FSHANDLE 
+                 *    returns fs handle for a mount point or path within
+                 *    that mount point
+                 * XFS_IOC_FD_TO_HANDLE
+                 *    returns full handle for a FD opened in user space
+	         * XFS_IOC_PATH_TO_HANDLE
+                 *    returns full handle for a path
 		 */
-		return xfs_something_to_handle(inode, filp, cmd, arg,
-						vfsp, mp, bdp, vp, ip, 0);
+		return xfs_find_handle(cmd, arg);
 	}
 
 	case XFS_IOC_OPEN_BY_HANDLE: {
@@ -1082,6 +1122,41 @@ int xfs_ioctl (
 		return copy_to_user((char *)arg, (char *)&mp->m_sb.sb_uuid,
 						sizeof(uuid_t));
 	}
+        
+        case XFS_IOC_FSCOUNTS: {
+                xfs_fsop_counts_t out;
+                
+		error = xfs_fs_counts(mp, &out);
+                if (error)
+                        return -error;
+            
+                return copy_to_user((char *)arg, &out, sizeof(xfs_fsop_counts_t));
+        }
+        
+        case XFS_IOC_SET_RESBLKS: {
+                xfs_fsop_resblks_t inout;
+                __uint64_t in; 
+                              
+		error=copy_from_user(&inout, (char *)arg, sizeof(xfs_fsop_resblks_t));
+                if (error)
+                        return -error;
+                
+                /* input parameter is passed in resblks field of structure */
+                in=inout.resblks;
+		error = xfs_reserve_blocks(mp, &in, &inout);
+                
+                return copy_to_user((char *)arg, &inout, sizeof(xfs_fsop_resblks_t));
+        }
+            
+        case XFS_IOC_GET_RESBLKS: {
+                xfs_fsop_resblks_t out;
+                
+		error = xfs_reserve_blocks(mp, NULL, &out);
+                if (error)
+                        return -error;
+        
+                return copy_to_user((char *)arg, &out, sizeof(xfs_fsop_resblks_t));
+        }
 
 	default:
 		return -EINVAL;
