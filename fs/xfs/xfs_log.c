@@ -1168,15 +1168,15 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	 * with different amounts of memory.  See the definition of
 	 * xlog_in_core_t in xfs_log_priv.h for details.
 	 */
-	iclogsize = sizeof(xlog_in_core_t) - 1 +
-		    log->l_iclog_size - XLOG_HEADER_SIZE;
+	iclogsize = log->l_iclog_size;
 	ASSERT(log->l_iclog_size >= 4096);
 	for (i=0; i < log->l_iclog_bufs; i++) {
 		*iclogp = (xlog_in_core_t *)
+			  kmem_zalloc(sizeof(xlog_in_core_t), KM_CACHEALIGN);
+		iclog = *iclogp;
+		iclog->hic_data = (xlog_in_core_2_t *)
 			  kmem_zalloc(iclogsize, KM_CACHEALIGN);
 
-
-		iclog = *iclogp;
 		iclog->ic_prev = prev_iclog;
 		prev_iclog = iclog;
 		log->l_iclog_bak[i] = (xfs_caddr_t)&(iclog->ic_header);
@@ -1475,9 +1475,8 @@ xlog_unalloc_log(xlog_t *log)
 		}
 #endif
 		next_iclog = iclog->ic_next;
-		kmem_free(iclog,
-			  (sizeof(xlog_in_core_t) - 1 +
-			   log->l_iclog_size - XLOG_HEADER_SIZE));
+		kmem_free(iclog->hic_data, log->l_iclog_size);
+		kmem_free(iclog, sizeof(xlog_in_core_t));
 		iclog = next_iclog;
 	}
 	freesema(&log->l_flushsema);
