@@ -1,4 +1,4 @@
-#ident "$Revision: 1.1 $"
+#ident "$Revision: 1.2 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -98,7 +98,7 @@ xfs_qm_sysent(
 
 	ASSERT(vfsp);
 	bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
-        mp = xfs_bhvtom(bdp);
+        mp = XFS_BHVTOM(bdp);
 
 	done = B_FALSE;
 
