@@ -1,11 +1,12 @@
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision: 1.45 $"
+#ident	"$Revision: 1.46 $"
 
 #include <sys/cmn_err.h>
 
 struct buf;
 struct ktrace;
+struct log;
 struct xfs_buf_cancel;
 struct xfs_mount;
 
@@ -21,7 +22,12 @@ struct xfs_mount;
 #define XLOG_MAX_RECORD_BSIZE	(32*1024)
 #define XLOG_RECORD_BSHIFT	14		/* 16384 == 1 << 14 */
 #define XLOG_MAX_RECORD_BSHIFT	15		/* 32k == 1 << 15 */
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XLOG_BTOLRBB)
+int xlog_btolrbb(int b);
+#define XLOG_BTOLRBB(b)		xlog_btolrbb(b)
+#else
 #define XLOG_BTOLRBB(b)		(((b)+XLOG_RECORD_BSIZE-1) >> XLOG_RECORD_BSHIFT)
+#endif
 
 #define XLOG_HEADER_SIZE	512
 
@@ -31,7 +37,12 @@ struct xfs_mount;
 #define BLOCK_LSN(lsn)		(((uint *)&(lsn))[1])
 #define XLOG_SET(f,b)		(((f) & (b)) == (b))
 #define GET_CYCLE(ptr)	(*(uint *)(ptr) == XLOG_HEADER_MAGIC_NUM ? *((uint *)(ptr)+1) : *(uint *)(ptr))
-#define XLOG_GRANT_SUB_SPACE(log, bytes, type)				\
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XLOG_GRANT_SUB_SPACE)
+void xlog_grant_sub_space(struct log *log, int bytes, int type);
+#define XLOG_GRANT_SUB_SPACE(log,bytes,type)	\
+	xlog_grant_sub_space(log,bytes,type)
+#else
+#define XLOG_GRANT_SUB_SPACE(log,bytes,type)				\
     {									\
 	if (type == 'w') {						\
 		(log)->l_grant_write_bytes -= (bytes);			\
@@ -47,7 +58,13 @@ struct xfs_mount;
 		}							\
 	 }								\
     }
-#define XLOG_GRANT_ADD_SPACE(log, bytes, type)				\
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XLOG_GRANT_ADD_SPACE)
+void xlog_grant_add_space(struct log *log, int bytes, int type);
+#define XLOG_GRANT_ADD_SPACE(log,bytes,type)	\
+	xlog_grant_add_space(log,bytes,type)
+#else
+#define XLOG_GRANT_ADD_SPACE(log,bytes,type)				\
     {									\
 	if (type == 'w') {						\
 		(log)->l_grant_write_bytes += (bytes);			\
@@ -63,7 +80,8 @@ struct xfs_mount;
 		}							\
 	 }								\
     }
-#define XLOG_INS_TICKETQ(q, tic)			\
+#endif
+#define XLOG_INS_TICKETQ(q,tic)				\
     {							\
 	if (q) {					\
 		(tic)->t_next	    = (q);		\
@@ -76,7 +94,7 @@ struct xfs_mount;
 	}						\
 	(tic)->t_flags |= XLOG_TIC_IN_Q;		\
     }
-#define XLOG_DEL_TICKETQ(q, tic)			\
+#define XLOG_DEL_TICKETQ(q,tic)				\
     {							\
 	if ((tic) == (tic)->t_next) {			\
 		(q) = NULL;				\

@@ -164,15 +164,60 @@ typedef struct xfs_inode {
 /*
  * Fork handling.
  */
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_IFORK_PTR)
+xfs_ifork_t *xfs_ifork_ptr(xfs_inode_t *ip, int w);
+#define	XFS_IFORK_PTR(ip,w)   		xfs_ifork_ptr(ip,w)
+#else
 #define	XFS_IFORK_PTR(ip,w)   ((w) == XFS_DATA_FORK ? &(ip)->i_df : (ip)->i_afp)
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_IFORK_Q)
+int xfs_ifork_q(xfs_inode_t *ip);
+#define	XFS_IFORK_Q(ip)			xfs_ifork_q(ip)
+#else
 #define	XFS_IFORK_Q(ip)			XFS_CFORK_Q(&(ip)->i_d)
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_IFORK_DSIZE)
+int xfs_ifork_dsize(xfs_inode_t *ip);
+#define	XFS_IFORK_DSIZE(ip)		xfs_ifork_dsize(ip)
+#else
 #define	XFS_IFORK_DSIZE(ip)		XFS_CFORK_DSIZE(&ip->i_d, ip->i_mount)
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_IFORK_ASIZE)
+int xfs_ifork_asize(xfs_inode_t *ip);
+#define	XFS_IFORK_ASIZE(ip)		xfs_ifork_asize(ip)
+#else
 #define	XFS_IFORK_ASIZE(ip)		XFS_CFORK_ASIZE(&ip->i_d, ip->i_mount)
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_IFORK_SIZE)
+int xfs_ifork_size(xfs_inode_t *ip, int w);
+#define	XFS_IFORK_SIZE(ip,w)		xfs_ifork_size(ip,w)
+#else
 #define	XFS_IFORK_SIZE(ip,w)		XFS_CFORK_SIZE(&ip->i_d, ip->i_mount, w)
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_IFORK_FORMAT)
+int xfs_ifork_format(xfs_inode_t *ip, int w);
+#define	XFS_IFORK_FORMAT(ip,w)		xfs_ifork_format(ip,w)
+#else
 #define	XFS_IFORK_FORMAT(ip,w)		XFS_CFORK_FORMAT(&ip->i_d, w)
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_IFORK_FMT_SET)
+void xfs_ifork_fmt_set(xfs_inode_t *ip, int w, int n);
+#define	XFS_IFORK_FMT_SET(ip,w,n)	xfs_ifork_fmt_set(ip,w,n)
+#else
 #define	XFS_IFORK_FMT_SET(ip,w,n)	XFS_CFORK_FMT_SET(&ip->i_d, w, n)
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_IFORK_NEXTENTS)
+int xfs_ifork_nextents(xfs_inode_t *ip, int w);
+#define	XFS_IFORK_NEXTENTS(ip,w)	xfs_ifork_nextents(ip,w)
+#else
 #define	XFS_IFORK_NEXTENTS(ip,w)	XFS_CFORK_NEXTENTS(&ip->i_d, w)
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_IFORK_NEXT_SET)
+void xfs_ifork_next_set(xfs_inode_t *ip, int w, int n);
+#define	XFS_IFORK_NEXT_SET(ip,w,n)	xfs_ifork_next_set(ip,w,n)
+#else
 #define	XFS_IFORK_NEXT_SET(ip,w,n)	XFS_CFORK_NEXT_SET(&ip->i_d, w, n)
+#endif
 
 /*
  * In-core inode flags.
@@ -246,19 +291,33 @@ typedef struct xfs_inode {
 #define	XFS_MAX_FILE_OFFSET	((1LL<<40)-1LL)
 #endif
 
-
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_ITOV)
+struct vnode *xfs_itov(xfs_inode_t *ip);
 #define	XFS_ITOV(ip)	((struct vnode *)((ip)->i_vnode))
+#else
+#define	XFS_ITOV(ip)	((struct vnode *)((ip)->i_vnode))
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_VTOI)
+xfs_inode_t *xfs_vtoi(struct vnode *vp);
 #define	XFS_VTOI(vp)	((xfs_inode_t *)((vp)->v_data))
+#else
+#define	XFS_VTOI(vp)	((xfs_inode_t *)((vp)->v_data))
+#endif
 
 /*
  * Clear out the read-ahead state in the in-core inode.
  */
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_INODE_CLEAR_READ_AHEAD)
+void xfs_inode_clear_read_ahead(xfs_inode_t *ip);
+#define	XFS_INODE_CLEAR_READ_AHEAD(ip)		xfs_inode_clear_read_ahead(ip)
+#else
 #define	XFS_INODE_CLEAR_READ_AHEAD(ip)	{	\
 		ip->i_next_offset = 0;		\
 		ip->i_io_offset = 0;		\
 		ip->i_reada_blkno = 0;		\
 		ip->i_io_size = 0;		\
 		ip->i_last_req_sz = 0; }
+#endif
 
 /*
  * XFS file identifier.

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_LEAF_H
 #define	_FS_XFS_DIR_LEAF_H
 
-#ident	"$Revision: 1.2 $"
+#ident	"$Revision: 1.4 $"
 
 /*
  * xfs_dir_leaf.h
@@ -14,6 +14,17 @@
  * of a filename may not be unique, we may have duplicate keys.  The
  * internal links in the Btree are logical block offsets into the file.
  */
+
+struct buf;
+struct dirent;
+struct uio;
+struct xfs_bmap_free;
+struct xfs_da_args;
+struct xfs_da_state;
+struct xfs_da_state_blk;
+struct xfs_inode;
+struct xfs_mount;
+struct xfs_trans;
 
 /*========================================================================
  * Directory Structure when equal to XFS_LBSIZE(mp) bytes.
@@ -72,27 +83,34 @@ typedef struct xfs_dir_leaf_map xfs_dir_leaf_map_t;
 typedef struct xfs_dir_leaf_entry xfs_dir_leaf_entry_t;
 typedef struct xfs_dir_leaf_name xfs_dir_leaf_name_t;
 
-#define XFS_DIR_LEAF_ENTSIZE_BYNAME(LEN)	/* space a name will use */ \
-	(sizeof(xfs_dir_leaf_name_t)-1 + LEN)
-#define XFS_DIR_LEAF_ENTSIZE_BYENTRY(ENTRY)	/* space an entry will use */ \
-	(sizeof(xfs_dir_leaf_name_t)-1 + (ENTRY)->namelen)
-#define XFS_DIR_LEAF_NAMESTRUCT(LEAFP, OFFSET)	/* point to name struct */ \
-	((xfs_dir_leaf_name_t *)&((char *)(LEAFP))[OFFSET])
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR_LEAF_ENTSIZE_BYNAME)
+int xfs_dir_leaf_entsize_byname(int len);
+#define XFS_DIR_LEAF_ENTSIZE_BYNAME(len)	xfs_dir_leaf_entsize_byname(len)
+#else
+#define XFS_DIR_LEAF_ENTSIZE_BYNAME(len)	/* space a name will use */ \
+	(sizeof(xfs_dir_leaf_name_t)-1 + len)
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR_LEAF_ENTSIZE_BYENTRY)
+int xfs_dir_leaf_entsize_byentry(xfs_dir_leaf_entry_t *entry);
+#define XFS_DIR_LEAF_ENTSIZE_BYENTRY(entry)	\
+	xfs_dir_leaf_entsize_byentry(entry)
+#else
+#define XFS_DIR_LEAF_ENTSIZE_BYENTRY(entry)	/* space an entry will use */ \
+	(sizeof(xfs_dir_leaf_name_t)-1 + (entry)->namelen)
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR_LEAF_NAMESTRUCT)
+xfs_dir_leaf_name_t *
+xfs_dir_leaf_namestruct(xfs_dir_leafblock_t *leafp, int offset);
+#define XFS_DIR_LEAF_NAMESTRUCT(leafp,offset)	\
+	xfs_dir_leaf_namestruct(leafp,offset)
+#else
+#define XFS_DIR_LEAF_NAMESTRUCT(leafp,offset)	/* point to name struct */ \
+	((xfs_dir_leaf_name_t *)&((char *)(leafp))[offset])
+#endif
 
 /*========================================================================
  * Function prototypes for the kernel.
  *========================================================================*/
-
-struct buf;
-struct dirent;
-struct uio;
-struct xfs_bmap_free;
-struct xfs_da_args;
-struct xfs_da_state;
-struct xfs_da_state_blk;
-struct xfs_inode;
-struct xfs_mount;
-struct xfs_trans;
 
 /*
  * Internal routines when dirsize < XFS_LITINO(mp).

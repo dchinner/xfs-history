@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_SF_H
 #define	_FS_XFS_DIR_SF_H
 
-#ident	"$Revision: 1.12 $"
+#ident	"$Revision: 1.1 $"
 
 /*
  * xfs_dir_sf.h
@@ -36,15 +36,36 @@ typedef struct xfs_dir_shortform {
 typedef struct xfs_dir_sf_hdr xfs_dir_sf_hdr_t;
 typedef struct xfs_dir_sf_entry xfs_dir_sf_entry_t;
 
-#define XFS_DIR_SF_ENTSIZE_BYNAME(LEN)		/* space a name uses */ \
-	(sizeof(xfs_dir_sf_entry_t)-1 + (LEN))
-#define XFS_DIR_SF_ENTSIZE_BYENTRY(SFEP)	/* space an entry uses */ \
-	(sizeof(xfs_dir_sf_entry_t)-1 + (SFEP)->namelen)
-#define XFS_DIR_SF_NEXTENTRY(SFEP)		/* next entry in struct */ \
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR_SF_ENTSIZE_BYNAME)
+int xfs_dir_sf_entsize_byname(int len);
+#define XFS_DIR_SF_ENTSIZE_BYNAME(len)		xfs_dir_sf_entsize_byname(len)
+#else
+#define XFS_DIR_SF_ENTSIZE_BYNAME(len)		/* space a name uses */ \
+	(sizeof(xfs_dir_sf_entry_t)-1 + (len))
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR_SF_ENTSIZE_BYENTRY)
+int xfs_dir_sf_entsize_byentry(xfs_dir_sf_entry_t *sfep);
+#define XFS_DIR_SF_ENTSIZE_BYENTRY(sfep)	xfs_dir_sf_entsize_byentry(sfep)
+#else
+#define XFS_DIR_SF_ENTSIZE_BYENTRY(sfep)	/* space an entry uses */ \
+	(sizeof(xfs_dir_sf_entry_t)-1 + (sfep)->namelen)
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR_SF_NEXTENTRY)
+xfs_dir_sf_entry_t *xfs_dir_sf_nextentry(xfs_dir_sf_entry_t *sfep);
+#define XFS_DIR_SF_NEXTENTRY(sfep)		xfs_dir_sf_nextentry(sfep)
+#else
+#define XFS_DIR_SF_NEXTENTRY(sfep)		/* next entry in struct */ \
 	((xfs_dir_sf_entry_t *) \
-		((char *)(SFEP) + XFS_DIR_SF_ENTSIZE_BYENTRY(SFEP)))
-#define XFS_DIR_SF_ALLFIT(COUNT, TOTALLEN)	/* will all entries fit? */ \
+		((char *)(sfep) + XFS_DIR_SF_ENTSIZE_BYENTRY(sfep)))
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR_SF_ALLFIT)
+int xfs_dir_sf_allfit(int count, int totallen);
+#define XFS_DIR_SF_ALLFIT(count,totallen)	\
+	xfs_dir_sf_allfit(count,totallen)
+#else
+#define XFS_DIR_SF_ALLFIT(count,totallen)	/* will all entries fit? */ \
 	(sizeof(xfs_dir_sf_hdr_t) + \
-	       (sizeof(xfs_dir_sf_entry_t)-1)*(COUNT) + (TOTALLEN))
+	       (sizeof(xfs_dir_sf_entry_t)-1)*(count) + (totallen))
+#endif
 
 #endif	/* !XFS_XFS_DIR_SF_H */

@@ -1,11 +1,18 @@
 #ifndef _FS_XFS_DA_BTREE_H
 #define	_FS_XFS_DA_BTREE_H
 
-#ident	"$Revision: 1.20 $"
+#ident	"$Revision: 1.21 $"
 
 /*
  * xfs_da_btree.h
  */
+
+struct buf;
+struct xfs_bmap_free;
+struct xfs_inode;
+struct xfs_mount;
+struct xfs_trans;
+struct zone;
 
 /*========================================================================
  * Directory Structure when greater than XFS_LBSIZE(mp) bytes.
@@ -52,40 +59,61 @@ typedef struct xfs_da_intnode {
 typedef struct xfs_da_node_hdr xfs_da_node_hdr_t;
 typedef struct xfs_da_node_entry xfs_da_node_entry_t;
 
-#define XFS_DA_NODE_ENTSIZE_BYNAME()	/* space a name uses */ \
+#define XFS_DA_NODE_ENTSIZE_BYNAME	/* space a name uses */ \
 	(sizeof(xfs_da_node_entry_t))
-#define XFS_DA_NODE_ENTRIES(mp)		/* how many entries in this block? */ \
-	((XFS_LBSIZE(mp) - sizeof(xfs_da_node_hdr_t)) \
-		   / sizeof(xfs_da_node_entry_t))
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_NODE_ENTRIES)
+int xfs_da_node_entries(struct xfs_mount *mp);
+#define XFS_DA_NODE_ENTRIES(mp)		xfs_da_node_entries(mp)
+#else
+#define	XFS_DA_NODE_ENTRIES(mp)		((mp)->m_da_node_ents)
+#endif
 #define XFS_DA_MAXBLK		0x10000000	/* max hash value */
 
 /*
  * Macros used by directory code to interface to the filesystem.
  */
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_LBSIZE)
+int xfs_lbsize(struct xfs_mount *mp);
+#define	XFS_LBSIZE(mp)			xfs_lbsize(mp)
+#else
 #define	XFS_LBSIZE(mp)	((mp)->m_sb.sb_blocksize)
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_LBLOG)
+int xfs_lblog(struct xfs_mount *mp);
+#define	XFS_LBLOG(mp)			xfs_lblog(mp)
+#else
 #define	XFS_LBLOG(mp)	((mp)->m_sb.sb_blocklog)
+#endif
 
 /*
  * Macros used to manipulate directory off_t's
  */
-#define	XFS_DA_MAKE_COOKIE(mp, bno, entry) \
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_MAKE_COOKIE)
+off_t xfs_da_make_cookie(struct xfs_mount *mp, __uint32_t bno, int entry);
+#define	XFS_DA_MAKE_COOKIE(mp,bno,entry)	xfs_da_make_cookie(mp,bno,entry)
+#else
+#define	XFS_DA_MAKE_COOKIE(mp,bno,entry) \
 	(((bno) << (mp)->m_dircook_elog) | (entry))
-#define	XFS_DA_COOKIE_BNO(mp, cookie) \
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_COOKIE_BNO)
+__uint32_t xfs_da_cookie_bno(struct xfs_mount *mp, off_t cookie);
+#define	XFS_DA_COOKIE_BNO(mp,cookie)		xfs_da_cookie_bno(mp,cookie)
+#else
+#define	XFS_DA_COOKIE_BNO(mp,cookie) \
 	((cookie) >> (mp)->m_dircook_elog)
-#define	XFS_DA_COOKIE_ENTRY(mp, cookie) \
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_COOKIE_ENTRY)
+int xfs_da_cookie_entry(struct xfs_mount *mp, off_t cookie);
+#define	XFS_DA_COOKIE_ENTRY(mp,cookie)		xfs_da_cookie_entry(mp,cookie)
+#else
+#define	XFS_DA_COOKIE_ENTRY(mp,cookie) \
 	((cookie) & ((1 << (mp)->m_dircook_elog) - 1))
+#endif
 
 
 /*========================================================================
  * Btree searching and modification structure definitions.
  *========================================================================*/
-
-struct buf;
-struct xfs_bmap_free;
-struct xfs_inode;
-struct xfs_mount;
-struct xfs_trans;
-struct zone;
 
 /*
  * Structure to ease passing around component names.

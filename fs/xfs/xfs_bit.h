@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BIT_H
 #define	_FS_XFS_BIT_H
 
-#ident "$Revision: 1.2 $"
+#ident "$Revision: 1.3 $"
 
 /*
  * XFS bit manipulation routines.
@@ -10,10 +10,30 @@
 /*
  * masks with n high/low bits set, 32-bit values & 64-bit values
  */
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_MASK32HI)
+__uint32_t xfs_mask32hi(int n);
+#define	XFS_MASK32HI(n)		xfs_mask32hi(n)
+#else
 #define	XFS_MASK32HI(n)		((__uint32_t)-1 << (32 - (n)))
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_MASK64HI)
+__uint64_t xfs_mask64hi(int n);
+#define	XFS_MASK64HI(n)		xfs_mask64hi(n)
+#else
 #define	XFS_MASK64HI(n)		((__uint64_t)-1 << (64 - (n)))
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_MASK32LO)
+__uint32_t xfs_mask32lo(int n);
+#define	XFS_MASK32LO(n)		xfs_mask32lo(n)
+#else
 #define	XFS_MASK32LO(n)		(((__uint32_t)1 << (n)) - 1)
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_MASK64LO)
+__uint64_t xfs_mask64lo(int n);
+#define	XFS_MASK64LO(n)		xfs_mask64lo(n)
+#else
 #define	XFS_MASK64LO(n)		(((__uint64_t)1 << (n)) - 1)
+#endif
 
 /*
  * Index of low bit number in byte, -1 for none set, 0..7 otherwise.

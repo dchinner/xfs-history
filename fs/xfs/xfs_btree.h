@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BTREE_H
 #define	_FS_XFS_BTREE_H
 
-#ident "$Revision: 1.34 $"
+#ident "$Revision: 1.36 $"
 
 struct buf;
 struct xfs_bmap_free;
@@ -84,7 +84,12 @@ typedef struct xfs_btree_block
 /*
  * Boolean to select which form of xfs_btree_block_t.bb_u to use.
  */
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BTREE_LONG_PTRS)
+int xfs_btree_long_ptrs(xfs_btnum_t btnum);
 #define	XFS_BTREE_LONG_PTRS(btnum)	((btnum) == XFS_BTNUM_BMAP)
+#else
+#define	XFS_BTREE_LONG_PTRS(btnum)	((btnum) == XFS_BTNUM_BMAP)
+#endif
 
 /*
  * Magic numbers for btree blocks.
@@ -166,9 +171,24 @@ typedef struct xfs_btree_cur
 /*
  * Convert from buffer to btree block header.
  */
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_BLOCK)
+xfs_btree_block_t *xfs_buf_to_block(struct buf *bp);
+#define	XFS_BUF_TO_BLOCK(bp)	xfs_buf_to_block(bp)
+#else
 #define	XFS_BUF_TO_BLOCK(bp)	((xfs_btree_block_t *)((bp)->b_un.b_addr))
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_LBLOCK)
+xfs_btree_lblock_t *xfs_buf_to_lblock(struct buf *bp);
+#define	XFS_BUF_TO_LBLOCK(bp)	xfs_buf_to_lblock(bp)
+#else
 #define	XFS_BUF_TO_LBLOCK(bp)	((xfs_btree_lblock_t *)((bp)->b_un.b_addr))
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_SBLOCK)
+xfs_btree_sblock_t *xfs_buf_to_sblock(struct buf *bp);
+#define	XFS_BUF_TO_SBLOCK(bp)	xfs_buf_to_sblock(bp)
+#else
 #define	XFS_BUF_TO_SBLOCK(bp)	((xfs_btree_sblock_t *)((bp)->b_un.b_addr))
+#endif
 
 #ifdef DEBUG
 /*
@@ -410,32 +430,72 @@ xfs_btree_setbuf(
 /*
  * Min and max functions for extlen, agblock, fileoff, and filblks types.
  */
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_EXTLEN_MIN)
+xfs_extlen_t xfs_extlen_min(xfs_extlen_t a, xfs_extlen_t b);
+#define	XFS_EXTLEN_MIN(a,b)	xfs_extlen_min(a,b)
+#else
 #define	XFS_EXTLEN_MIN(a,b)	\
 	((xfs_extlen_t)(a) < (xfs_extlen_t)(b) ? \
 	 (xfs_extlen_t)(a) : (xfs_extlen_t)(b))
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_EXTLEN_MAX)
+xfs_extlen_t xfs_extlen_max(xfs_extlen_t a, xfs_extlen_t b);
+#define	XFS_EXTLEN_MAX(a,b)	xfs_extlen_max(a,b)
+#else
 #define	XFS_EXTLEN_MAX(a,b)	\
 	((xfs_extlen_t)(a) > (xfs_extlen_t)(b) ? \
 	 (xfs_extlen_t)(a) : (xfs_extlen_t)(b))
+#endif
 
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_AGBLOCK_MIN)
+xfs_agblock_t xfs_agblock_min(xfs_agblock_t a, xfs_agblock_t b);
+#define	XFS_AGBLOCK_MIN(a,b)	xfs_agblock_min(a,b)
+#else
 #define	XFS_AGBLOCK_MIN(a,b)	\
 	((xfs_agblock_t)(a) < (xfs_agblock_t)(b) ? \
 	 (xfs_agblock_t)(a) : (xfs_agblock_t)(b))
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_AGBLOCK_MAX)
+xfs_agblock_t xfs_agblock_max(xfs_agblock_t a, xfs_agblock_t b);
+#define	XFS_AGBLOCK_MAX(a,b)	xfs_agblock_max(a,b)
+#else
 #define	XFS_AGBLOCK_MAX(a,b)	\
 	((xfs_agblock_t)(a) > (xfs_agblock_t)(b) ? \
 	 (xfs_agblock_t)(a) : (xfs_agblock_t)(b))
+#endif
 
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_FILEOFF_MIN)
+xfs_fileoff_t xfs_fileoff_min(xfs_fileoff_t a, xfs_fileoff_t b);
+#define	XFS_FILEOFF_MIN(a,b)	xfs_fileoff_min(a,b)
+#else
 #define	XFS_FILEOFF_MIN(a,b)	\
 	((xfs_fileoff_t)(a) < (xfs_fileoff_t)(b) ? \
 	 (xfs_fileoff_t)(a) : (xfs_fileoff_t)(b))
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_FILEOFF_MAX)
+xfs_fileoff_t xfs_fileoff_max(xfs_fileoff_t a, xfs_fileoff_t b);
+#define	XFS_FILEOFF_MAX(a,b)	xfs_fileoff_max(a,b)
+#else
 #define	XFS_FILEOFF_MAX(a,b)	\
 	((xfs_fileoff_t)(a) > (xfs_fileoff_t)(b) ? \
 	 (xfs_fileoff_t)(a) : (xfs_fileoff_t)(b))
+#endif
 
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_FILBLKS_MIN)
+xfs_filblks_t xfs_filblks_min(xfs_filblks_t a, xfs_filblks_t b);
+#define	XFS_FILBLKS_MIN(a,b)	xfs_filblks_min(a,b)
+#else
 #define	XFS_FILBLKS_MIN(a,b)	\
 	((xfs_filblks_t)(a) < (xfs_filblks_t)(b) ? \
 	 (xfs_filblks_t)(a) : (xfs_filblks_t)(b))
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_FILBLKS_MAX)
+xfs_filblks_t xfs_filblks_max(xfs_filblks_t a, xfs_filblks_t b);
+#define	XFS_FILBLKS_MAX(a,b)	xfs_filblks_max(a,b)
+#else
 #define	XFS_FILBLKS_MAX(a,b)	\
 	((xfs_filblks_t)(a) > (xfs_filblks_t)(b) ? \
 	 (xfs_filblks_t)(a) : (xfs_filblks_t)(b))
+#endif
 
 #endif	/* !_FS_XFS_BTREE_H */

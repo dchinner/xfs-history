@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_ITEM_H
 #define	_XFS_INODE_ITEM_H
 
-#ident "$Revision: 1.25 $"
+#ident "$Revision: 1.26 $"
 
 struct buf;
 struct proc;
@@ -97,12 +97,27 @@ typedef struct xfs_inode_log_item {
 #define	XFS_ILOG_AEXT	0x080	/* log i_af.if_extents */
 #define	XFS_ILOG_ABROOT	0x100	/* log i_af.i_broot */
 
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_ILOG_FDATA)
+int xfs_ilog_fdata(int w);
+#define	XFS_ILOG_FDATA(w)	xfs_ilog_fdata(w)
+#else
 #define	XFS_ILOG_FDATA(w)	\
 	((w) == XFS_DATA_FORK ? XFS_ILOG_DDATA : XFS_ILOG_ADATA)
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_ILOG_FBROOT)
+int xfs_ilog_fbroot(int w);
+#define	XFS_ILOG_FBROOT(w)	xfs_ilog_fbroot(w)
+#else
 #define	XFS_ILOG_FBROOT(w)	\
 	((w) == XFS_DATA_FORK ? XFS_ILOG_DBROOT : XFS_ILOG_ABROOT)
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_ILOG_FEXT)
+int xfs_ilog_fext(int w);
+#define	XFS_ILOG_FEXT(w)	xfs_ilog_fext(w)
+#else
 #define	XFS_ILOG_FEXT(w)	\
 	((w) == XFS_DATA_FORK ? XFS_ILOG_DEXT : XFS_ILOG_AEXT)
+#endif
 
 #define	XFS_ILOG_NONCORE	(XFS_ILOG_DDATA | XFS_ILOG_DEXT | \
 				 XFS_ILOG_DBROOT | XFS_ILOG_DEV | \

@@ -1,13 +1,16 @@
 #ifndef _FS_XFS_SB_H
 #define	_FS_XFS_SB_H
 
-#ident	"$Revision: 1.22 $"
+#ident	"$Revision: 1.23 $"
 
 /*
  * Super block
  * Fits into a 512-byte buffer at daddr_t 0 of each allocation group.
  * Only the first of these is ever updated except during growfs.
  */
+
+struct buf;
+struct xfs_mount;
 
 #define	XFS_SB_MAGIC		0x58465342	/* 'XFSB' */
 #define	XFS_SB_VERSION_1	1		/* 5.3, 6.0.1, 6.1 */
@@ -16,8 +19,13 @@
 #define	XFS_SB_VERSION_HIGH	XFS_SB_VERSION_2
 #define	XFS_SB_VERSION_HASATTR	XFS_SB_VERSION_2
 #define	XFS_SB_VERSION		XFS_SB_VERSION_2
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_SB_GOOD_VERSION)
+int xfs_sb_good_version(unsigned v);
+#define	XFS_SB_GOOD_VERSION(v)	xfs_sb_good_version(v)
+#else
 #define	XFS_SB_GOOD_VERSION(v)	\
 	((v) >= XFS_SB_VERSION_LOW && (v) <= XFS_SB_VERSION_HIGH)
+#endif
 
 typedef struct xfs_sb
 {
@@ -100,14 +108,34 @@ typedef struct xfs_sb
 #define	XFS_SB_ALL_BITS		((1LL << XFS_SB_NUM_BITS) - 1)
 
 #define	XFS_SB_DADDR	((daddr_t)0)		/* daddr in filesystem/ag */
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_SB_BLOCK)
+xfs_agblock_t xfs_sb_block(struct xfs_mount *mp);
+#define	XFS_SB_BLOCK(mp)	xfs_sb_block(mp)
+#else
 #define	XFS_SB_BLOCK(mp)	XFS_HDR_BLOCK(mp, XFS_SB_DADDR)
+#endif
 
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_HDR_BLOCK)
+xfs_agblock_t xfs_hdr_block(struct xfs_mount *mp, daddr_t d);
+#define	XFS_HDR_BLOCK(mp,d)	xfs_hdr_block(mp,d)
+#else
 #define	XFS_HDR_BLOCK(mp,d)	((xfs_agblock_t)(XFS_BB_TO_FSBT(mp,d)))
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DADDR_TO_FSB)
+xfs_fsblock_t xfs_daddr_to_fsb(struct xfs_mount *mp, daddr_t d);
+#define	XFS_DADDR_TO_FSB(mp,d)		xfs_daddr_to_fsb(mp,d)
+#else
 #define	XFS_DADDR_TO_FSB(mp,d) \
 	XFS_AGB_TO_FSB(mp, XFS_DADDR_TO_AGNO(mp,d), XFS_DADDR_TO_AGBNO(mp,d))
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_FSB_TO_DADDR)
+daddr_t xfs_fsb_to_daddr(struct xfs_mount *mp, xfs_fsblock_t fsbno);
+#define	XFS_FSB_TO_DADDR(mp,fsbno)	xfs_fsb_to_daddr(mp,fsbno)
+#else
 #define	XFS_FSB_TO_DADDR(mp,fsbno) \
 	XFS_AGB_TO_DADDR(mp, XFS_FSB_TO_AGNO(mp,fsbno), \
 			 XFS_FSB_TO_AGBNO(mp,fsbno))
+#endif
 
 /*
  * File system block to basic block conversions.
@@ -127,7 +155,12 @@ typedef struct xfs_sb
 	((((__uint64_t)(b)) + (mp)->m_blockmask) >> (mp)->m_sb.sb_blocklog)
 #define	XFS_B_TO_FSBT(mp,b)	(((__uint64_t)(b)) >> (mp)->m_sb.sb_blocklog)
 #define	XFS_B_FSB_OFFSET(mp,b)	((b) & (mp)->m_blockmask)     
-     
+
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_SBP)
+xfs_sb_t *xfs_buf_to_sbp(struct buf *bp);
+#define	XFS_BUF_TO_SBP(bp)	xfs_buf_to_sbp(bp)
+#else
 #define	XFS_BUF_TO_SBP(bp)	((xfs_sb_t *)(bp)->b_un.b_addr)
+#endif
 
 #endif	/* !_FS_XFS_SB_H */

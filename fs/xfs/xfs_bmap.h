@@ -41,7 +41,12 @@ typedef	struct xfs_bmap_free
 #define	XFS_BMAPI_EXACT		0x10	/* allocate only to spec'd bounds */
 #define	XFS_BMAPI_ATTRFORK	0x20	/* use attribute fork not data */
 
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BMAPI_AFLAG)
+int xfs_bmapi_aflag(int w);
+#define	XFS_BMAPI_AFLAG(w)	xfs_bmapi_aflag(w)
+#else
 #define	XFS_BMAPI_AFLAG(w)	((w) == XFS_ATTR_FORK ? XFS_BMAPI_ATTRFORK : 0)
+#endif
 
 /*
  * Special values for xfs_bmbt_irec_t br_startblock field.
@@ -60,8 +65,13 @@ typedef	struct xfs_bmap_free
 #define	XFS_BMAP_TRACE_SIZE	4096	/* size of global trace buffer */
 #define	XFS_BMAP_KTRACE_SIZE	32	/* size of per-inode trace buffer */
 
-#define	XFS_BMAP_INIT(flp, fbp)	\
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BMAP_INIT)
+void xfs_bmap_init(xfs_bmap_free_t *flp, xfs_fsblock_t *fbp);
+#define	XFS_BMAP_INIT(flp,fbp)	xfs_bmap_init(flp,fbp)
+#else
+#define	XFS_BMAP_INIT(flp,fbp)	\
 	((flp)->xbf_first = NULL, (flp)->xbf_count = 0, *(fbp) = NULLFSBLOCK)
+#endif
 
 /*
  * Argument structure for xfs_bmap_alloc.

@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision: 1.73 $"
+#ident "$Revision: 1.75 $"
 
 struct buf;
 struct xfs_efd_log_item;
@@ -160,6 +160,10 @@ typedef struct xfs_log_item_chunk {
  * to where it is in the chunk and its size to 0.  Set the chunk's
  * free descriptor mask to indicate that all descriptors are free.
  */
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_LIC_INIT)
+void xfs_lic_init(xfs_log_item_chunk_t *cp);
+#define	XFS_LIC_INIT(cp)	xfs_lic_init(cp)
+#else
 #define	XFS_LIC_INIT(cp)	{ \
 					int			x; \
 					xfs_log_item_desc_t	*dp; \
@@ -171,15 +175,56 @@ typedef struct xfs_log_item_chunk {
 					} \
 					(cp)->lic_free = XFS_LIC_FREEMASK; \
 				}
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_LIC_VACANCY)
+int xfs_lic_vacancy(xfs_log_item_chunk_t *cp);
+#define	XFS_LIC_VACANCY(cp)		xfs_lic_vacancy(cp)
+#else
 #define	XFS_LIC_VACANCY(cp)		(((cp)->lic_free) & XFS_LIC_FREEMASK)	
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_LIC_ALL_FREE)
+void xfs_lic_all_free(xfs_log_item_chunk_t *cp);
+#define	XFS_LIC_ALL_FREE(cp)		xfs_lic_all_free(cp)
+#else
 #define	XFS_LIC_ALL_FREE(cp)		((cp)->lic_free |= XFS_LIC_FREEMASK)
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_LIC_ARE_ALL_FREE)
+int xfs_lic_are_all_free(xfs_log_item_chunk_t *cp);
+#define	XFS_LIC_ARE_ALL_FREE(cp)	xfs_lic_are_all_free(cp)
+#else
 #define	XFS_LIC_ARE_ALL_FREE(cp)	(((cp)->lic_free & XFS_LIC_FREEMASK) ==\
 					XFS_LIC_FREEMASK)
-#define	XFS_LIC_ISFREE(cp, slot)	((cp)->lic_free & (1 << (slot)))
-#define	XFS_LIC_CLAIM(cp, slot)		((cp)->lic_free &= ~(1 << (slot)))
-#define	XFS_LIC_RELSE(cp, slot)		((cp)->lic_free |= 1 << (slot))
-#define	XFS_LIC_SLOT(cp, slot)		(&((cp)->lic_descs[slot]))
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_LIC_ISFREE)
+int xfs_lic_isfree(xfs_log_item_chunk_t *cp, int slot);
+#define	XFS_LIC_ISFREE(cp,slot)	xfs_lic_isfree(cp,slot)
+#else
+#define	XFS_LIC_ISFREE(cp,slot)	((cp)->lic_free & (1 << (slot)))
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_LIC_CLAIM)
+void xfs_lic_claim(xfs_log_item_chunk_t *cp, int slot);
+#define	XFS_LIC_CLAIM(cp,slot)		xfs_lic_claim(cp,slot)
+#else
+#define	XFS_LIC_CLAIM(cp,slot)		((cp)->lic_free &= ~(1 << (slot)))
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_LIC_RELSE)
+void xfs_lic_relse(xfs_log_item_chunk_t *cp, int slot);
+#define	XFS_LIC_RELSE(cp,slot)		xfs_lic_relse(cp,slot)
+#else
+#define	XFS_LIC_RELSE(cp,slot)		((cp)->lic_free |= 1 << (slot))
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_LIC_SLOT)
+xfs_log_item_desc_t *xfs_lic_slot(xfs_log_item_chunk_t *cp, int slot);
+#define	XFS_LIC_SLOT(cp,slot)		xfs_lic_slot(cp,slot)
+#else
+#define	XFS_LIC_SLOT(cp,slot)		(&((cp)->lic_descs[slot]))
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_LIC_DESC_TO_SLOT)
+int xfs_lic_desc_to_slot(xfs_log_item_desc_t *dp);
+#define	XFS_LIC_DESC_TO_SLOT(dp)	xfs_lic_desc_to_slot(dp)
+#else
 #define	XFS_LIC_DESC_TO_SLOT(dp)	((uint)((dp)->lid_index))
+#endif
 /*
  * Calculate the address of a chunk given a descriptor pointer:
  * dp - dp->lid_index give the address of the start of the lic_descs array.
@@ -187,10 +232,15 @@ typedef struct xfs_log_item_chunk {
  * All of this yields the address of the chunk, which is
  * cast to a chunk pointer.
  */
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_LIC_DESC_TO_CHUNK)
+xfs_log_item_chunk_t *xfs_lic_desc_to_chunk(xfs_log_item_desc_t *dp);
+#define	XFS_LIC_DESC_TO_CHUNK(dp)	xfs_lic_desc_to_chunk(dp)
+#else
 #define	XFS_LIC_DESC_TO_CHUNK(dp)	((xfs_log_item_chunk_t*) \
 					(((caddr_t)((dp) - (dp)->lid_index)) -\
 					(caddr_t)(((xfs_log_item_chunk_t*) \
 					0)->lic_descs)))
+#endif
 
 /*
  * This is the type of function which can be given to xfs_trans_callback()
