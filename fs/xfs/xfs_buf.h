@@ -435,7 +435,7 @@ typedef struct buftarg {
 
 #define XFS_bdwrite(pb)              \
 	    pb->pb_flags |= PBF_DELWRI; \
-            pagebuf_release(pb)
+            pagebuf_unlock(pb)
 
 #define xfs_iowait(pb)              \
     pagebuf_iowait(pb)
