@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.133 $"
+#ident	"$Revision: 1.134 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -572,9 +572,9 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	
 #ifndef SIM 
 	quotaflags = 0;
-	if ((XFS_IS_QUOTA_ON(mp)) ||
+	if (XFS_IS_QUOTA_ON(mp) ||
 	    (XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
-	     mp->m_sb.sb_qflags & (XFS_MOUNT_UDQ_ACCT|XFS_MOUNT_PDQ_ACCT))) {
+	     mp->m_sb.sb_qflags & (XFS_UQUOTA_ACCT|XFS_PQUOTA_ACCT))) {
 		/*
 		 * Call mount_quotas at this point only if we won't have to do
 		 * a quotacheck.
@@ -597,8 +597,8 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 			 * inode goes inactive and wants to free blocks, 
 			 * or via xfs_log_mount_finish.
 			 */
-			quotaflags = mp->m_flags & XFS_MOUNT_QUOTA_MASK;
-			mp->m_flags &= ~(XFS_MOUNT_QUOTA_MASK);
+			quotaflags = mp->m_qflags;
+			mp->m_flags = 0;
 		}
 	}
 #endif		
@@ -617,7 +617,8 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 
 #ifndef SIM 
 	if (quotaflags) {
-		mp->m_flags |= quotaflags; 
+		ASSERT(mp->m_qflags == 0);
+		mp->m_qflags = quotaflags; 
 		(void) xfs_qm_mount_quotas(mp);
 	}
 
