@@ -2168,6 +2168,7 @@ xfs_strategy(vnode_t	*vp,
 	}
 }
 
+#ifndef SIM
 /*
  * This is the routine called by the xfs daemons as they enter the
  * kernel.  From here they wait in a loop for buffers which will
@@ -2240,6 +2241,7 @@ xfsd(void)
 		s = splock(xfsd_lock);
 	}
 }
+#endif	/* !SIM */
 
 
 struct dio_s {
