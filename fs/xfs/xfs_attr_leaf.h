@@ -88,6 +88,8 @@ typedef struct xfs_attr_leaf_name_remote xfs_attr_leaf_name_remote_t;
 
 /*
  * Flags used in the leaf_entry[i].flags field.
+ * NOTE: the INCOMPLETE bit must not collide with the flags bits specified
+ * on the system call, they are "or"ed together for a remove operation.
  */
 #define	XFS_ATTR_LOCAL_BIT	0	/* attr is stored locally */
 #define	XFS_ATTR_ROOT_BIT	1	/* limit access to attr to userid 0 */
