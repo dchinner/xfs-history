@@ -1073,7 +1073,7 @@ xlog_recover_print_inode(xlog_recover_item_t *item)
     xlog_recover_print_inode_core((xfs_dinode_core_t *)item->ri_buf[1].i_addr);
 
     /* does anything come next */
-    switch (f->ilf_fields & XFS_ILOG_DFORK) {
+    switch (f->ilf_fields & (XFS_ILOG_DFORK | XFS_ILOG_DEV | XFS_ILOG_UUID)) {
 	case XFS_ILOG_DEXT: {
 	    ASSERT(f->ilf_size <= 4);
 	    printf("		DATA FORK EXTENTS inode data:\n");
@@ -1864,6 +1864,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	caddr_t			dest;
 	int			error;
 	int			attr_index;
+	uint			fields;
 
 	if (pass == XLOG_RECOVER_PASS1) {
 		return 0;
@@ -1911,12 +1912,13 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		goto write_inode_buffer;
 	len = item->ri_buf[2].i_len;
 	src = item->ri_buf[2].i_addr;
+	fields = in_f->ilf_fields;
 	ASSERT(in_f->ilf_size <= 4);
-	ASSERT((in_f->ilf_size == 3) || (in_f->ilf_fields & XFS_ILOG_AFORK));
-	ASSERT(!(in_f->ilf_fields & XFS_ILOG_DFORK) ||
+	ASSERT((in_f->ilf_size == 3) || (fields & XFS_ILOG_AFORK));
+	ASSERT(!(fields & XFS_ILOG_DFORK) ||
 	       (len == in_f->ilf_dsize));
 
-	switch (in_f->ilf_fields & XFS_ILOG_DFORK) {
+	switch (fields & (XFS_ILOG_DFORK | XFS_ILOG_DEV | XFS_ILOG_UUID)) {
 	case XFS_ILOG_DDATA:
 	case XFS_ILOG_DEXT:
 		ASSERT((caddr_t)&dip->di_u+len <= bp->b_dmaaddr+bp->b_bcount);
@@ -1939,14 +1941,18 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 
 	default:
 		/*
-		 * There are no data fork flags set.
+		 * There are no data fork, dev or uuid flags set.
 		 */
+		ASSERT((fields &
+			(XFS_ILOG_DFORK|XFS_ILOG_DEV|XFS_ILOG_UUID)) == 0);
 		break;
 	}
 
+
+
 	/*
 	 * If we logged any attribute data, recover it.  There may or
-	 * may not have been any data fork data logged in this
+	 * may not have been any other non-core data logged in this
 	 * transaction.
 	 */
 	if (in_f->ilf_fields & XFS_ILOG_AFORK) {
