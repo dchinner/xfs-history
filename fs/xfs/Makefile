@@ -9,7 +9,7 @@ KERNEL_VERSION = 2.4.0-test5
 
 SGI_VERSION = `cat $(WORKAREA)/SPECS/_sgi_kvers_`
 
-default all: checkproc tarballs i386kernel i686kernel i386cmd
+default all: checkproc tarballs i386kernel i586kernel i686kernel i386cmd
 
 checkproc:
 	if [ ! -e /proc/stat ]; then \
@@ -26,6 +26,12 @@ i386kernel:
 	@echo "=== Making $@ `date`"; \
 	cd $(WORKAREA)/SPECS; \
 	rpm -ba --target i386 ${KERN_SPEC}; \
+	echo "=== Done Making $@ `date`"
+
+i586kernel:
+	@echo "=== Making $@ `date`"; \
+	cd $(WORKAREA)/SPECS; \
+	rpm -ba --target i586 ${KERN_SPEC}; \
 	echo "=== Done Making $@ `date`"
 
 i686kernel:
