@@ -49,7 +49,8 @@ xfs_rtallocate_extent(
 	xfs_extlen_t	maxlen,
 	xfs_extlen_t	*len,
 	xfs_alloctype_t	type,
-	int		wasdel);
+	int		wasdel,
+	xfs_extlen_t	prod);
 
 void
 xfs_rtfree_extent(
