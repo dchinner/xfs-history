@@ -34,8 +34,8 @@
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
-#include "xfs_bmap.h"
 #include "xfs_alloc.h"
+#include "xfs_bmap.h"
 #ifdef SIM
 #include "sim.h"
 #endif

@@ -33,6 +33,7 @@
 #include "xfs_alloc_btree.h"
 #include "xfs_bmap_btree.h"
 #include "xfs_ialloc_btree.h"
+#include "xfs_alloc.h"
 #include "xfs_bmap.h"
 #include "xfs_btree.h"
 #include "xfs_dinode.h"
