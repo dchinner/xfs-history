@@ -1,7 +1,7 @@
 #ifndef _XFS_HANDLE_H
 #define _XFS_HANDLE_H
 
-#ident	"$Revision: 1.1 $"
+#ident	"$Revision: 1.2 $"
 
 /*
  *  Ok.  This file contains stuff that defines a general handle
@@ -11,13 +11,6 @@
  */
 
 #ifdef _KERNEL
-
-/*
- *  This is called a dmi_handle because it uses the DMI version of
- *  a file system identifier in the vfs (*vfs_dmi).  It also isn't
- *  inherently xfs specific, although xfs is currently the only FS
- *  that supports it.
- */
 
 typedef	struct handle {
 	fsid_t	ha_fsid;		/* unique file system identifier */
@@ -32,6 +25,8 @@ int	path_to_handle		(char *path, void *hbuf, size_t *hlen);
 int	path_to_fshandle	(char *path, void *hbuf, size_t *hlen);
 int	fd_to_handle		(int	 fd, void *hbuf, size_t *hlen);
 int	open_by_handle		(void *hbuf, size_t hlen, int rw, rval_t *rvp);
+int	readlink_by_handle	(void *hanp, size_t hlen, void *buf, size_t bs,
+				 rval_t *rvp);
 int	gethandle		(void *hanp, size_t hlen, handle_t *handlep);
 
 struct vnode *	handle_to_vp (handle_t *handlep);
@@ -56,6 +51,7 @@ int	path_to_handle		(char *path, void **hanp, size_t *hlen);
 int	path_to_fshandle	(char *path, void **hanp, size_t *hlen);
 int	fd_to_handle		(int	 fd, void **hanp, size_t *hlen);
 int	open_by_handle		(void *hanp, size_t hlen, int rw);
+int	readlink_by_handle	(void *hanp, size_t hlen, void *buf, size_t bs);
 
 #endif	/* notdef _KERNEL */
 
