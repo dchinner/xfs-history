@@ -108,6 +108,21 @@ int					/* error */
 xfs_rtmount_inodes(
 	struct xfs_mount	*mp);	/* file system mount structure */
 
+#ifndef SIM
+/*
+ * Pick an extent for allocation at the start of a new realtime file.
+ * Use the sequence number stored in the atime field of the bitmap inode.
+ * Translate this to a fraction of the rtextents, and return the product
+ * of rtextents and the fraction.
+ * The fraction sequence is 0, 1/2, 1/4, 3/4, 1/8, ..., 7/8, 1/16, ...
+ */
+int					/* error */
+xfs_rtpick_extent(
+	struct xfs_mount	*mp,	/* file system mount point */
+	struct xfs_trans	*tp,	/* transaction pointer */
+	xfs_rtblock_t		*pick);	/* result rt extent */
+#endif	/* !SIM */
+
 #ifdef XFSDEBUG
 /*
  * Debug code: print out the value of a range in the bitmap.
