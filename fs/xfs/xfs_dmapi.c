@@ -87,10 +87,44 @@ xfs_setattr(
 #define MAX_DIO_SIZE(mp)	(64 * PAGE_CACHE_SIZE)
 #define XFS_TO_LINUX_RDEVT(xip,ip)	(new_encode_dev((ip)->i_rdev))
 #define XFS_TO_LINUX_DEVT(xip,ip)	(new_encode_dev((ip)->i_sb->s_dev))
+#define BREAK_LEASE(inode,flag)		break_lease(inode,flag)
 #else
 #define MAX_DIO_SIZE(mp)	XFS_B_TO_FSBT((mp), KIO_MAX_ATOMIC_IO << 10)
 #define XFS_TO_LINUX_RDEVT(xip,ip)	(kdev_t_to_nr(XFS_DEV_TO_KDEVT((xip)->i_df.if_u2.if_rdev)))
 #define XFS_TO_LINUX_DEVT(xip,ip)	((xip)->i_mount->m_dev)
+#define BREAK_LEASE(inode,flag)		get_lease(inode,flag)
+#endif
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0)
+#define DOWN_TRUNC_SEM(inode)				\
+	do {						\
+		down(&inode->i_sem);			\
+		down_write(&inode->i_alloc_sem);	\
+	} while(0)
+#define UP_TRUNC_SEM(inode)				\
+	do {						\
+		up_write(&inode->i_alloc_sem);		\
+		up(&inode->i_sem);			\
+	} while(0)
+#endif
+
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,4,21)) && \
+    (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
+#define DOWN_TRUNC_SEM(inode)				\
+	do {						\
+		down_write(&inode->i_alloc_sem);	\
+		down(&inode->i_sem);			\
+	} while(0)
+#define UP_TRUNC_SEM(inode)				\
+	do {						\
+		up(&inode->i_sem);			\
+		up_write(&inode->i_alloc_sem);		\
+	} while(0)
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,22)
+#define DOWN_TRUNC_SEM(inode)	down(&inode->i_sem)
+#define UP_TRUNC_SEM(inode)	up(&inode->i_sem)
 #endif
 
 /* Structure used to hold the on-disk version of a dm_attrname_t.  All
@@ -2390,23 +2424,39 @@ xfs_dm_punch_hole(
 	/* Returns negative errors to DMAPI */
 
 	if (right < DM_RIGHT_EXCL)
-		return(-EACCES);
+		return -EACCES;
 	if (VN_MAPPED(vp))
-		return(-EBUSY);
+		return -EBUSY;
+
+	/* Make sure there are no leases. */
+	error = BREAK_LEASE(inode, FMODE_WRITE);
+	if (error)
+		return -EBUSY;
+
+	error = get_write_access(inode);
+	if (error)
+		return -EBUSY;
 
 	XFS_BHV_LOOKUP(vp, xbdp);
 	xip = XFS_BHVTOI(xbdp);
 	mp = xip->i_mount;
 	bsize = mp->m_sb.sb_blocksize;
-	if (off & (bsize-1))
-		return(-EAGAIN);
-	if (len & (bsize-1))
-		return(-EAGAIN);
+	if (off & (bsize-1)) {
+		error = -EAGAIN;
+		goto put_and_out;
+	}
+	if (len & (bsize-1)) {
+		error = -EAGAIN;
+		goto put_and_out;
+	}
+
+	DOWN_TRUNC_SEM(inode);
 
 	xfs_ilock(xip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 	if ((off >= xip->i_d.di_size) || ((off+len) > xip->i_d.di_size)) {
 		xfs_iunlock(xip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
-		return(-E2BIG);
+		error = -E2BIG;
+		goto up_and_out;
 	}
 	realsize = xip->i_d.di_size;
 	xfs_iunlock(xip, XFS_ILOCK_EXCL);
@@ -2436,7 +2486,15 @@ xfs_dm_punch_hole(
 	xip->i_iocore.io_dmstate++;
 	xfs_iunlock(xip, XFS_IOLOCK_EXCL);
 
-	return(error);
+	vn_revalidate(vp);
+
+up_and_out:
+	UP_TRUNC_SEM(inode);
+
+put_and_out:
+	put_write_access(inode);
+
+	return error;
 }
 
 
