@@ -663,11 +663,9 @@ xfs_qm_scall_setqlim(
 	 * Make sure that hardlimits are >= soft limits before changing.
 	 */
 	hard = (newlim.d_fieldmask & FS_DQ_BHARD) ?
-		(xfs_qcnt_t) XFS_BB_TO_FSB(mp, newlim.d_blk_hardlimit) :
-			ddq->d_blk_hardlimit;
+		(xfs_qcnt_t) newlim.d_blk_hardlimit : ddq->d_blk_hardlimit;
 	soft = (newlim.d_fieldmask & FS_DQ_BSOFT) ?
-		(xfs_qcnt_t) XFS_BB_TO_FSB(mp, newlim.d_blk_softlimit) :
-			ddq->d_blk_softlimit;
+		(xfs_qcnt_t) newlim.d_blk_softlimit : ddq->d_blk_softlimit;
 	if (hard == 0 || hard >= soft) {
 		ddq->d_blk_hardlimit = hard;
 		ddq->d_blk_softlimit = soft;
@@ -677,11 +675,9 @@ xfs_qm_scall_setqlim(
 		printk("blkhard %Ld < blksoft %Ld\n", hard, soft);
 #endif			
 	hard = (newlim.d_fieldmask & FS_DQ_RTBHARD) ?
-		(xfs_qcnt_t) XFS_BB_TO_FSB(mp, newlim.d_rtb_hardlimit) :
-			ddq->d_rtb_hardlimit;
+		(xfs_qcnt_t) newlim.d_rtb_hardlimit : ddq->d_rtb_hardlimit;
 	soft = (newlim.d_fieldmask & FS_DQ_RTBSOFT) ?
-		(xfs_qcnt_t) XFS_BB_TO_FSB(mp, newlim.d_rtb_softlimit) :
-			ddq->d_rtb_softlimit;
+		(xfs_qcnt_t) newlim.d_rtb_softlimit : ddq->d_rtb_softlimit;
 	if (hard == 0 || hard >= soft) {
 		ddq->d_rtb_hardlimit = hard;
 		ddq->d_rtb_softlimit = soft;
@@ -753,7 +749,7 @@ xfs_qm_scall_setqlim(
 
 	xfs_dqtrace_entry(dqp, "Q_SETQLIM: COMMIT");
 	xfs_trans_commit(tp, 0, NULL);
-	/* xfs_qm_dqprint(dqp); */
+	xfs_qm_dqprint(dqp);
 	xfs_qm_dqrele(dqp);
 	mutex_unlock(&(XFS_QI_QOFFLOCK(mp)));
 
@@ -896,9 +892,6 @@ error0:
 
 /*
  * Translate an internal style on-disk-dquot to the exportable format.
- * Currently, the main difference is that the counters/limits are all in
- * Basic Blocks (BBs) instead of the internal FSBs.
- * This is used by qm_sysent to service syscalls like quotactl(Q_XGETQUOTA)
  */
 STATIC void
 xfs_qm_export_dquot(
@@ -910,25 +903,20 @@ xfs_qm_export_dquot(
 	dst->d_version = FS_DQUOT_VERSION;  /* different from src->d_version */
 	dst->d_flags = xfs_qm_export_qtype_flags(src->d_flags);
 	dst->d_id = src->d_id;
-	dst->d_blk_hardlimit = (__uint64_t) 
-		XFS_FSB_TO_BB(mp, src->d_blk_hardlimit);
-	dst->d_blk_softlimit = (__uint64_t) 
-		XFS_FSB_TO_BB(mp, src->d_blk_softlimit);
+	dst->d_blk_hardlimit = (__uint64_t) src->d_blk_hardlimit;
+	dst->d_blk_softlimit = (__uint64_t) src->d_blk_softlimit;
 	dst->d_ino_hardlimit = (__uint64_t) src->d_ino_hardlimit;
 	dst->d_ino_softlimit = (__uint64_t) src->d_ino_softlimit;
-		
-	dst->d_bcount = (__uint64_t) XFS_FSB_TO_BB(mp, src->d_bcount);
+	dst->d_bcount = (__uint64_t) src->d_bcount;
 	dst->d_icount = (__uint64_t) src->d_icount;
 	dst->d_btimer = (__uint32_t) src->d_btimer;
 	dst->d_itimer = (__uint32_t) src->d_itimer;
 	dst->d_iwarns = src->d_iwarns;
 	dst->d_bwarns = src->d_bwarns;
 
-	dst->d_rtb_hardlimit = (__uint64_t) 
-		XFS_FSB_TO_BB(mp, src->d_rtb_hardlimit);
-	dst->d_rtb_softlimit = (__uint64_t) 
-		XFS_FSB_TO_BB(mp, src->d_rtb_softlimit);
-	dst->d_rtbcount = (__uint64_t) XFS_FSB_TO_BB(mp, src->d_rtbcount);
+	dst->d_rtb_hardlimit = (__uint64_t) src->d_rtb_hardlimit;
+	dst->d_rtb_softlimit = (__uint64_t) src->d_rtb_softlimit;
+	dst->d_rtbcount = (__uint64_t) src->d_rtbcount;
 	dst->d_rtbtimer = (__uint32_t) src->d_rtbtimer;
 	dst->d_rtbwarns = src->d_rtbwarns;
 	
