@@ -62,12 +62,9 @@
 
 /* Local miscellaneous function prototypes */
 STATIC void	 xlog_init_log(xlog_t *log);
-STATIC xfs_lsn_t xlog_assign_tail_lsn(xfs_mount_t *mp,
-				      xlog_in_core_t *iclog);
-STATIC xfs_lsn_t xlog_commit_record(xfs_mount_t *mp,
-				    xlog_ticket_t *ticket);
-STATIC int	 xlog_find_zeroed(xlog_t	*log,
-				  daddr_t	*blk_no);
+STATIC xfs_lsn_t xlog_assign_tail_lsn(xfs_mount_t *mp, xlog_in_core_t *iclog);
+STATIC xfs_lsn_t xlog_commit_record(xfs_mount_t *mp, xlog_ticket_t *ticket);
+STATIC int	 xlog_find_zeroed(xlog_t *log, daddr_t *blk_no);
 STATIC xlog_t *  xlog_alloc(xfs_mount_t	*mp,
 			    dev_t	log_dev,
 			    daddr_t	blk_offset,
@@ -126,7 +123,7 @@ STATIC xfs_log_ticket_t *xlog_ticket_get(xlog_t *log,
 STATIC void		xlog_ticket_put(xlog_t *log, xlog_ticket_t *ticket);
 
 /* local debug functions */
-STATIC void	xlog_verify_dest_ptr(xlog_t *log, psint ptr);
+STATIC void	xlog_verify_dest_ptr(xlog_t *log, __psint_t ptr);
 STATIC void	xlog_verify_disk_cycle_no(xlog_t *log, xlog_in_core_t *iclog);
 STATIC void	xlog_verify_grant_head(xlog_t *log, int equals);
 STATIC void	xlog_verify_iclog(xlog_t *log, xlog_in_core_t *iclog,
@@ -740,7 +737,7 @@ xlog_init_log(xlog_t *log)
 		unaligned =
 			(caddr_t)kmem_zalloc(sizeof(xlog_in_core_t)+NBPP, 0);
 		*iclogp = (xlog_in_core_t *)
-			((psint)(unaligned+NBPP-1) & ~(NBPP-1));
+			((__psint_t)(unaligned+NBPP-1) & ~(NBPP-1));
 		iclog = *iclogp;
 		iclog->ic_prev = prev_iclog;
 		prev_iclog = iclog;
@@ -946,7 +943,7 @@ xlog_sync(xlog_t		*log,
 		bp->b_fsprivate2 = (void *)2;
 		bp->b_blkno	= 0;		     /* logical 0 */
 		bp->b_bcount	= bp->b_bufsize = split;
-		bp->b_dmaaddr	= (caddr_t)((psint)iclog+(psint)count);
+		bp->b_dmaaddr	= (caddr_t)((__psint_t)iclog+(__psint_t)count);
 		bp->b_fsprivate = iclog;
 		if (flags & XFS_LOG_SYNC)
 			bp->b_flags |= (B_BUSY | B_HOLD);
@@ -1035,7 +1032,7 @@ xlog_write(xfs_mount_t *	mp,
     xlog_ticket_t    *ticket = (xlog_ticket_t *)tic;
     xlog_op_header_t *logop_head;    /* ptr to log operation header */
     xlog_in_core_t   *iclog;	     /* ptr to current in-core log */
-    psint	     ptr;	     /* copy address into data region */
+    __psint_t	     ptr;	     /* copy address into data region */
     int		     len;	     /* # xlog_write() bytes 2 still copy */
     int		     index;	     /* region index currently copying */
     int		     log_offset;     /* offset (from 0) into data region */
@@ -1072,7 +1069,7 @@ xlog_write(xfs_mount_t *	mp,
 	log_offset =
 		xlog_state_get_iclog_space(log, len, &iclog, ticket, &contwr);
 	ASSERT(log_offset <= iclog->ic_size - 1);
-	ptr = (psint) &iclog->ic_data[log_offset];
+	ptr = (__psint_t) &iclog->ic_data[log_offset];
 	
 	/* start_lsn is the first lsn written to. That's all we need. */
 	if (! *start_lsn)
@@ -1083,7 +1080,7 @@ xlog_write(xfs_mount_t *	mp,
 	 */
 	while (index < nentries) {
 	    ASSERT(reg[index].i_len % sizeof(long) == 0);
-	    ASSERT((psint)ptr % sizeof(long) == 0);
+	    ASSERT((__psint_t)ptr % sizeof(long) == 0);
 	    start_rec_copy = 0;
 	    
 	    /* If first write for transaction, insert start record.
@@ -2164,16 +2161,16 @@ xlog_ticket_get(xlog_t		*log,
  * part of the log in case we trash the log structure.
  */
 void
-xlog_verify_dest_ptr(xlog_t *log,
-		     psint  ptr)
+xlog_verify_dest_ptr(xlog_t     *log,
+		     __psint_t  ptr)
 {
 #ifdef DEBUG
 	int i;
 	int good_ptr = 0;
 
 	for (i=0; i < XLOG_NUM_ICLOGS; i++) {
-		if (ptr >= (psint)log->l_iclog_bak[i] &&
-		    ptr <= (psint)log->l_iclog_bak[i]+log->l_iclog_size)
+		if (ptr >= (__psint_t)log->l_iclog_bak[i] &&
+		    ptr <= (__psint_t)log->l_iclog_bak[i]+log->l_iclog_size)
 			good_ptr++;
 	}
 	if (! good_ptr)
@@ -2309,7 +2306,7 @@ xlog_verify_iclog(xlog_t	 *log,
 
 		/* clientid is only 1 byte */
 		if (syncing == B_FALSE ||
-		    ((psint)&ophead->oh_clientid & 0x1ff))
+		    ((__psint_t)&ophead->oh_clientid & 0x1ff))
 			clientid = ophead->oh_clientid;
 		else
 			clientid = iclog->ic_header.h_cycle_data[BTOBB(&ophead->oh_clientid - iclog->ic_data)]>>24;
@@ -2318,23 +2315,23 @@ xlog_verify_iclog(xlog_t	 *log,
 
 		/* check tids */
 		if (syncing == B_FALSE ||
-		    ((psint)&ophead->oh_tid & 0x1ff))
+		    ((__psint_t)&ophead->oh_tid & 0x1ff))
 			tid = ophead->oh_tid;
 		else
-			tid = (xlog_tid_t)iclog->ic_header.h_cycle_data[BTOBB((psint)&ophead->oh_tid - (psint)iclog->ic_data)];
+			tid = (xlog_tid_t)iclog->ic_header.h_cycle_data[BTOBB((__psint_t)&ophead->oh_tid - (__psint_t)iclog->ic_data)];
 
 #ifndef _KERNEL
 		/* This is a user space check */
-		if ((psint)tid < 0x10000000 || (psint)tid > 0x20000000)
+		if ((__psint_t)tid < 0x10000000 || (__psint_t)tid > 0x20000000)
 			xlog_panic("xlog_verify_iclog: illegal tid");
 #endif
 
 		/* check length */
 		if (syncing == B_FALSE ||
-		    ((psint)&ophead->oh_len & 0x1ff))
+		    ((__psint_t)&ophead->oh_len & 0x1ff))
 			op_len = ophead->oh_len;
 		else
-			op_len = iclog->ic_header.h_cycle_data[BTOBB((psint)&ophead->oh_len - (psint)iclog->ic_data)];
+			op_len = iclog->ic_header.h_cycle_data[BTOBB((__psint_t)&ophead->oh_len - (__psint_t)iclog->ic_data)];
 		len -= sizeof(xlog_op_header_t) + op_len;
 		ptr += sizeof(xlog_op_header_t) + op_len;
 	}

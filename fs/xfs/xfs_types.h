@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_TYPES_H
 #define	_FS_XFS_TYPES_H
 
-#ident	"$Revision: 1.12 $"
+#ident	"$Revision: 1.16 $"
 
 /*
  * xFS types
@@ -52,11 +52,6 @@ typedef	long		xfs_rtword_t;	/* word type for bitmap manipulations */
 
 typedef	__int64_t	xfs_lsn_t;	/* log sequence number */
 typedef	__int32_t	xfs_tid_t;	/* transaction identifier */
-
-typedef __psint_t	psint;
-typedef __psunsigned_t	psuint;
-typedef __scint_t	scint;
-typedef __scunsigned_t	scuint;
 
 /*
  * These types are 64 bits on disk but are either 32 or 64 bits in memory.
