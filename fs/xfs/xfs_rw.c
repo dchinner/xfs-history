@@ -489,6 +489,7 @@ xfs_iomap_read(
 	 	 */
 		ASSERT(ip->i_io_size > 0);
 		iosize = ip->i_io_size;
+		ASSERT(iosize <= XFS_BB_TO_FSBT(mp, XFS_MAX_BMAP_LEN_BB));
 		last_offset = ip->i_io_offset;
 		ioalign = -1;
 	} else {
@@ -505,6 +506,8 @@ xfs_iomap_read(
 			 * to XFS_READ_SIZE boundaries as well.
 			 */
 			iosize = mp->m_readio_blocks;
+			ASSERT(iosize <=
+			       XFS_BB_TO_FSBT(mp, XFS_MAX_BMAP_LEN_BB));
 			aligned_offset = XFS_READIO_ALIGN(mp, offset);
 			ioalign = XFS_B_TO_FSBT(mp, aligned_offset);
 		} else {
@@ -533,6 +536,11 @@ xfs_iomap_read(
 			last_fsb = XFS_B_TO_FSB(mp,
 					ctooff(offtoc(offset + count)));
 			iosize = last_fsb - XFS_B_TO_FSBT(mp, offset_page);
+			if (iosize >
+			    XFS_BB_TO_FSBT(mp, XFS_MAX_BMAP_LEN_BB)) {
+				iosize = XFS_BB_TO_FSBT(mp,
+							XFS_MAX_BMAP_LEN_BB);
+			}
 			ioalign = XFS_B_TO_FSB(mp, offset_page);
 		}
 		last_offset = -1;
@@ -697,6 +705,7 @@ xfs_iomap_read(
 		ip->i_reada_blkno = bmapp[0].offset + bmapp[0].length;
 	}
 
+	ASSERT(iosize <= XFS_BB_TO_FSBT(mp, XFS_MAX_BMAP_LEN_BB));
 	ip->i_io_size = iosize;
 	ip->i_io_offset = last_required_offset;
 	if (count > ip->i_last_req_sz) {
