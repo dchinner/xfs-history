@@ -2393,7 +2393,7 @@ xfs_rtprint_range(
 {
 	xfs_extlen_t	i;		/* block number in the extent */
 
-	printk("%Ld: ", start);
+	printk("%Ld: ", (long long)start);
 	for (i = 0; i < len; i++)
 		printk("%d", xfs_rtcheck_bit(mp, tp, start + i, 1));
 	printk("\n");
@@ -2426,7 +2426,7 @@ xfs_rtprint_summary(
 							 mp->m_sb.sb_rextents));
 					p = 1;
 				}
-				printk(" %Ld:%d", i, c);
+				printk(" %Ld:%d", (long long)i, c);
 			}
 		}
 		if (p)
