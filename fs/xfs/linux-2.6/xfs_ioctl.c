@@ -999,6 +999,6 @@ xfs_ioctl(
 		return -error;
 
 	default: 
-		return -EINVAL;
+		return -ENOTTY;
 	}
 }
