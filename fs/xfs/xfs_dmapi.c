@@ -40,8 +40,6 @@
 	xbdp = vn_bhv_lookup(VN_BHV_HEAD(vp), &xfs_vnodeops); \
 	ASSERT(xbdp);
 
-STATIC int prohibited_mr_events(vnode_t	*vp);
-
 /* Structure used to hold the on-disk version of a dm_attrname_t.  All
    on-disk attribute names start with the 8-byte string "SGI_DMI_".
 */
@@ -199,11 +197,12 @@ xfs_dm_send_create_event(
  */
 
 STATIC int
-prohibited_mr_events(vnode_t	*vp)
+prohibited_mr_events(
+	vnode_t		*vp)
 {
-	int	prohibited;
 	struct address_space *mapping;
 	struct vm_area_struct *vma;
+	int		prohibited;
 
 	if(!VN_MAPPED(vp))
 		return 0;
@@ -212,14 +211,14 @@ prohibited_mr_events(vnode_t	*vp)
 	mapping = LINVFS_GET_IP(vp)->i_mapping;
 
 	spin_lock(&mapping->i_shared_lock);
-
-	for( vma = mapping->i_mmap_shared; vma; vma = vma->vm_next ) {
-		if( vma && (!vma->vm_flags & VM_DENYWRITE) ){
-			prohibited |= 1 << DM_EVENT_WRITE;
-			break;
+	if (mapping->i_mmap_shared) {
+		for (vma = mapping->i_mmap_shared; vma; vma = vma->vm_next) {
+			if (!(vma->vm_flags & VM_DENYWRITE)) {
+				prohibited |= 1 << DM_EVENT_WRITE;
+				break;
+			}
 		}
 	}
-
 	spin_unlock(&mapping->i_shared_lock);
 	return prohibited;
 }
