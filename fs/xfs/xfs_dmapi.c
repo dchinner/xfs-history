@@ -1272,7 +1272,7 @@ xfs_dm_get_bulkattr_rvp(
 	statstruct_sz = (statstruct_sz+(DM_STAT_ALIGN-1)) & ~(DM_STAT_ALIGN-1);
 
 	nelems = buflen / statstruct_sz; 
-	if (! nelems) {
+	if (nelems < 1) {
 		if (put_user( statstruct_sz, rlenp ))
 			return(EFAULT);
 		return(E2BIG);
