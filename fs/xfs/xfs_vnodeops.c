@@ -1089,8 +1089,10 @@ xfs_dir_ialloc(
 	ushort		nlink,
 	dev_t		rdev,
 	cred_t		*credp,
-	xfs_inode_t	**ipp)		/* pointer to inode; it will be
+	xfs_inode_t	**ipp,		/* pointer to inode; it will be
 					   locked. */
+	uint		commit_flags,
+	int		*committed)
 
 {
 	xfs_trans_t	*tp;
@@ -1143,7 +1145,9 @@ xfs_dir_ialloc(
 		 */
 		log_res = xfs_trans_get_log_res(tp);
 		block_res = xfs_trans_get_block_res(tp);
-		xfs_trans_commit (tp, 0);
+		xfs_trans_commit (tp, commit_flags);
+		if (committed != NULL)
+			*committed = 1;
 
 		tp = xfs_trans_alloc (XFS_VFSTOM((XFS_ITOV(dp))->v_vfsp), 
 			XFS_TRANS_WAIT);
@@ -1165,6 +1169,9 @@ xfs_dir_ialloc(
 
 		ASSERT ((! call_again) && (ip != NULL));
 
+	} else {
+		if (committed != NULL)
+			*committed = 0;
 	}
 
 	*ipp = ip;
@@ -1243,25 +1250,33 @@ xfs_create(vnode_t	*dir_vp,
         xfs_bmap_free_t 	free_list;
         xfs_fsblock_t   	first_block;
 	boolean_t		dp_joined_to_trans = B_FALSE;
+	boolean_t		truncated = B_FALSE;
+	uint			commit_flags;
+	int			committed;
+	timestruc_t		tv;
 
 
 try_again:
 
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
-	tp = xfs_trans_alloc (mp, XFS_TRANS_WAIT);
+	tp = xfs_trans_alloc (mp, 0);
+	commit_flags = XFS_TRANS_RELEASE_LOG_RES;
 	if (error = xfs_trans_reserve (tp, XFS_IALLOC_MAX_EVER_BLOCKS + 12,
-				       XFS_CREATE_LOG_RES, 0, 0)) 
+				       XFS_CREATE_LOG_RES, 0,
+				       XFS_TRANS_PERM_LOG_RES)) {
+		commit_flags = 0;
 		goto error_return;
+	}
 
         dp = XFS_VTOI(dir_vp);
 
 	xfs_ilock (dp, XFS_ILOCK_EXCL);
 
 	if (error = xfs_iaccess(dp, IEXEC, credp))
-                return error;
+                goto error_return;
 
 	error = xfs_dir_lookup_int (NULL, dir_vp, DLF_IGET, name, NULL, 
-		&e_inum, &ip);
+				    &e_inum, &ip);
 	if ((error != 0) && (error != ENOENT)) 
 		goto error_return;
 
@@ -1278,8 +1293,11 @@ try_again:
 		rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : NODEV;
 
 		error = xfs_dir_ialloc(&tp, dp, 
-			MAKEIMODE(vap->va_type,vap->va_mode), 
-			1, rdev, credp, &ip);
+				       MAKEIMODE(vap->va_type,vap->va_mode), 
+				       1, rdev, credp, &ip,
+				       XFS_TRANS_RELEASE_LOG_RES, &committed);
+		if (committed)
+			commit_flags = 0;
 		if (error)
 			goto error_return;
 
@@ -1314,60 +1332,65 @@ try_again:
 
 	}
 	else {
-
-		/* This path is not implemented yet. */
-
-		ASSERT (0);
-
 		ASSERT (ip != NULL);
-		xfs_trans_ijoin (tp, ip, XFS_ILOCK_EXCL);
+
+		/* Now lock the inode also, in the right order. */
+		if (dp->i_ino < ip->i_ino) {
+			xfs_ilock (ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
+		}
+		else {
+			dir_generation = dp->i_gen;
+			xfs_iunlock (dp, XFS_ILOCK_EXCL);
+			xfs_ilock (ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
+			xfs_ilock (dp, XFS_ILOCK_EXCL);
+			
+			/*
+			 * If things have changed while the dp was
+			 * unlocked, drop all the locks and try
+			 * again.
+			 */
+			if (dp->i_gen != dir_generation) {
+				xfs_trans_cancel (tp, commit_flags);
+				xfs_iunlock(dp, XFS_ILOCK_EXCL);
+				xfs_iunlock(ip,
+					    XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
+				IRELE(ip);
+				goto try_again;
+			}
+		}
+		IHOLD(dp);
+		xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
+		dp_joined_to_trans = B_TRUE;
+		xfs_trans_ijoin (tp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 
 		vp = XFS_ITOV(ip);
 		if (excl == EXCL)
                         error = EEXIST;
 		else if (vp->v_type == VDIR && (I_mode & IWRITE))
                         error = EISDIR;
-		else if (I_mode) {
-			/* XXX Do access checks */
-			error = 0;
-		}
-		if (!error && vp->v_type == VREG && (vap->va_mask & AT_SIZE)) {
+		else if (I_mode)
+			error = xfs_iaccess(ip, I_mode, credp);
 
+		if (error)
+			goto error_return;
+
+		if (vp->v_type == VREG && (vap->va_mask & AT_SIZE)) {
 			/*
-			 * Truncation case, not implemented yet.
+			 * Truncate the file.  The timestamps must
+			 * be updated whether the file is changed
+			 * or not.
 			 */
-			ASSERT (0);
-
-			/* Truncate case, not implemented yet.
-				GET the inode, droplink. */
-			ASSERT (0);
-
-			ASSERT (ip != NULL);
-
-			/* Now lock the inode also, in the right order. */
-			if (dp->i_ino < ip->i_ino) {
-				xfs_ilock (ip, XFS_ILOCK_EXCL);
-				IRELE (ip);	/* ref from lookup */
+			ASSERT(vap->va_size == 0);
+			if (ip->i_d.di_size > 0) {
+				xfs_trans_ihold(tp, ip);
+				xfs_itruncate(&tp, ip, (__int64_t)0);
+				truncated = B_TRUE;
 			}
-			else {
-				dir_generation = dp->i_gen;
-				xfs_iunlock (dp, XFS_ILOCK_EXCL);
-				xfs_ilock (ip, XFS_ILOCK_EXCL);
-				xfs_ilock (dp, XFS_ILOCK_EXCL);
-				IRELE (ip);	/* ref from lookup */
-
-				/*
-				 * If things have changed while the dp was
-				 * unlocked, drop all the locks and try
-			 	 * again.
-				 */
-				if (dp->i_gen != dir_generation) {
-					xfs_trans_cancel (tp, 0);
-					goto try_again;
-				}
-			}
+			nanotime(&tv);
+			ip->i_d.di_mtime.t_sec = tv.tv_sec;
+			ip->i_d.di_ctime.t_sec = tv.tv_sec;
+			xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 		}
-
 	}
 
 
@@ -1380,8 +1403,23 @@ try_again:
 	IHOLD (ip);
 	vp = XFS_ITOV (ip);
 
-	(void) xfs_bmap_finish (&tp, &free_list, first_block, 0);
-	xfs_trans_commit (tp, 0);
+	committed = xfs_bmap_finish (&tp, &free_list, first_block,
+				     commit_flags);
+	if (committed)
+		commit_flags = 0;
+
+	xfs_trans_commit (tp, commit_flags);
+	if (truncated) {
+		/*
+		 * If we truncated the file, then the inode will
+		 * have been held within the transaction and must
+		 * be unlocked now.
+		 */
+		xfs_iunlock (ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
+		ASSERT (vp->v_count >= 2);
+		IRELE (ip);
+	}
+	ASSERT (dp_joined_to_trans);
 
         /*
          * If vnode is a device, return special vnode instead.
@@ -1394,9 +1432,9 @@ try_again:
                 vp = newvp;
         }
 
-#if 0
+#ifndef SIM
 	if (truncated && vp->v_type == VREG && VN_MAPPED(vp))
-                remapf(vp, newsize, 0);
+                remapf(vp, 0, 0);
 #endif
 
         *vpp = vp;
@@ -1405,10 +1443,12 @@ try_again:
 
 error_return:
 
-	xfs_trans_cancel (tp, 0);
+	if (tp != NULL)
+		xfs_trans_cancel (tp, commit_flags);
 
 	if (! dp_joined_to_trans)
 		xfs_iunlock (dp, XFS_ILOCK_EXCL);
+	ASSERT(!truncated);
 
 	return error;
 
@@ -2508,7 +2548,7 @@ xfs_mkdir(vnode_t	*dir_vp,
 	 */
 	rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : NODEV;
         mode = IFDIR | (vap->va_mode & ~IFMT);
-	code = xfs_dir_ialloc(&tp, dp, mode, 2, rdev, credp, &cdp);
+	code = xfs_dir_ialloc(&tp, dp, mode, 2, rdev, credp, &cdp, 0, NULL);
 	if (code)
 		goto error_return;
 
@@ -2827,7 +2867,7 @@ xfs_symlink(vnode_t	*dir_vp,
 	rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : NODEV;
 
 	error = xfs_dir_ialloc(&tp, dp, IFLNK | (vap->va_mode&~IFMT),
-		1, rdev, credp, &ip);
+			       1, rdev, credp, &ip, 0, NULL);
 	if (error)
 		goto error_return;
 
