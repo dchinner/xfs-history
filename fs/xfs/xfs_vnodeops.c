@@ -1,4 +1,4 @@
-#ident "$Revision: 1.169 $"
+#ident "$Revision: 1.170 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -328,92 +328,14 @@ xfs_close(
 	off_t		offset,
 	cred_t		*credp)
 {
-	extern int	xfs_remove_grio_guarantee(xfs_inode_t *, pid_t);
 
-	struct ufchunk	*ufp;
-	struct file	*fp;
-	xfs_inode_t	*ip;
-	proc_t		*p  = u.u_procp;
-	shaddr_t	*sa = p->p_shaddr;
-	int		isshd, nofiles;
-	int		i, vpcount;
+        xfs_inode_t	*ip;
 
 	vn_trace_entry(vp, "xfs_close");
 	ip = XFS_VTOI(vp);
 
-	/*
-	 * If this is a last close and the file was marked
-	 * as being used for grio, check for tickets to remove.
-	 */
-	if (lastclose && (ip->i_flags & XFS_IGRIO)) {
-
-		vpcount = 0;
-
-#ifdef REDWOOD
-		/*
-		 * redwood uses a different mechanism for
-		 * handling shared file descriptors. shdflock()
-		 * is a no-op for single-threaded processes but
-		 * we test first since we need to know what to
-		 * set ufp and nofiles to.
-		 */
-		if (u.u_procp->p_shaddr)  {
-			shdflock();
-			ufp = &sa->s_flist;
-#else
-		if (isshd = ISSHDFD(p, sa)) {
-			mrlock(&sa->s_fsync, MR_ACCESS, PZERO);
-			ufp = sa->s_flist;
-#endif
-			nofiles  = sa->s_nofiles;
-		} else {
-#ifdef REDWOOD
-			ufp = &u.u_flist;
-#else
-			ufp = u.u_flist;
-#endif
-			nofiles = u.u_nofiles;
-		}
-
-		for (i = 0 ; i < nofiles; i++) {
-#ifdef REDWOOD
-			/* ufgetfast depends on the 5.3 shfd handling */
-
-			ufget(i, nofiles, &ufp, &fp);
-
-			if (fp)  {
-#else
-				if ((fp = ufgetfast( i,nofiles, ufp))) {
-#endif
-				if ((fp->f_vnode == vp) && (fp->f_count > 0)) {
-					vpcount++;
-				}
-			}
-		}
-
-#ifdef REDWOOD
-		if (u.u_procp->p_shaddr)  {
-			shdfunlock();
-		}
-#else
-		if (isshd) {
-			mrunlock(&sa->s_fsync);
-		}
-#endif
-
-		/*
-		 * If this process is nolonger accessing
-		 * this file, remove any guarantees that
-		 * were made by this process on this file.
-		 */
-		if (!vpcount) {
-			xfs_remove_grio_guarantee(ip, u.u_procp->p_pid);
-		}
-	}
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
-
-
 	cleanlocks(vp, u.u_procp->p_epid, u.u_procp->p_sysid);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 	return 0;
