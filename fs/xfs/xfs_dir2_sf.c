@@ -811,8 +811,11 @@ xfs_dir2_sf_getdents(
 
 	ASSERT(dp->i_df.if_bytes == dp->i_d.di_size);
 	ASSERT(dp->i_df.if_u1.if_data != NULL);
+
 	sfp = (xfs_dir2_sf_t *)dp->i_df.if_u1.if_data;
+
 	ASSERT(dp->i_d.di_size >= XFS_DIR2_SF_HDR_SIZE(sfp->hdr.i8count));
+
 	/*
 	 * If the block number in the offset is out of range, we're done.
 	 */
@@ -821,6 +824,7 @@ xfs_dir2_sf_getdents(
 		*eofp = 1;
 		return 0;
 	}
+
 	/*
 	 * Set up putargs structure.
 	 */
@@ -831,10 +835,16 @@ xfs_dir2_sf_getdents(
 	 * Put . entry unless we're starting past it.
 	 */
 	if (dir_offset <=
-	    XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
-				       XFS_DIR2_DATA_DOT_OFFSET)) {
+		    XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
+					       XFS_DIR2_DATA_DOT_OFFSET)) {
+		/*
+		 * NOTE! Linux "filldir" semantics require that the
+		 *	 offset "cookie" be for this entry, not the
+		 *	 next; all the actual shuffling to make it
+		 *	 "look right" to the user is done in filldir.
+		 */
 		p.cook = XFS_DIR2_DB_OFF_TO_DATAPTR(mp, 0,
-				XFS_DIR2_DATA_DOTDOT_OFFSET);
+						XFS_DIR2_DATA_DOT_OFFSET);
 #if XFS_BIG_FILESYSTEMS
 		p.ino = dp->i_ino + mp->m_inoadd;
 #else
@@ -842,23 +852,32 @@ xfs_dir2_sf_getdents(
 #endif
 		p.name = ".";
 		p.namelen = 1;
+
 		error = p.put(&p);
+
 		if (!p.done) {
 #pragma mips_frequency_hint NEVER
 			uio->uio_offset =
 				XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
-					XFS_DIR2_DATA_DOT_OFFSET);
+						XFS_DIR2_DATA_DOT_OFFSET);
 			return error;
 		}
 	}
+
 	/*
 	 * Put .. entry unless we're starting past it.
 	 */
 	if (dir_offset <=
-	    XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
-				       XFS_DIR2_DATA_DOTDOT_OFFSET)) {
+		    XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
+					       XFS_DIR2_DATA_DOTDOT_OFFSET)) {
+		/*
+		 * NOTE! Linux "filldir" semantics require that the
+		 *	 offset "cookie" be for this entry, not the
+		 *	 next; all the actual shuffling to make it
+		 *	 "look right" to the user is done in filldir.
+		 */
 		p.cook = XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
-				XFS_DIR2_DATA_FIRST_OFFSET);
+						XFS_DIR2_DATA_DOTDOT_OFFSET);
 #if XFS_BIG_FILESYSTEMS
 		p.ino = XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, &sfp->hdr.parent, arch) +
 			mp->m_inoadd;
@@ -867,7 +886,9 @@ xfs_dir2_sf_getdents(
 #endif
 		p.name = "..";
 		p.namelen = 2;
+
 		error = p.put(&p);
+
 		if (!p.done) {
 #pragma mips_frequency_hint NEVER
 			uio->uio_offset =
@@ -876,20 +897,31 @@ xfs_dir2_sf_getdents(
 			return error;
 		}
 	}
+
 	/*
 	 * Loop while there are more entries and put'ing works.
 	 */
 	for (i = 0, sfep = XFS_DIR2_SF_FIRSTENTRY(sfp);
-	     i < sfp->hdr.count;
-	     i++, sfep = XFS_DIR2_SF_NEXTENTRY(sfp, sfep)) {
+		     i < sfp->hdr.count;
+			     i++, sfep = XFS_DIR2_SF_NEXTENTRY(sfp, sfep)) {
+
 		off = XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
-			XFS_DIR2_SF_GET_OFFSET_ARCH(sfep, arch));
+				XFS_DIR2_SF_GET_OFFSET_ARCH(sfep, arch));
+
 		if (dir_offset > off)
 			continue;
+
 		p.namelen = sfep->namelen;
+
+		/*
+		 * NOTE! Linux "filldir" semantics require that the
+		 *	 offset "cookie" be for this entry, not the
+		 *	 next; all the actual shuffling to make it
+		 *	 "look right" to the user is done in filldir.
+		 */
 		p.cook = XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
-			XFS_DIR2_SF_GET_OFFSET_ARCH(sfep, arch) +
-			XFS_DIR2_DATA_ENTSIZE(p.namelen));
+				XFS_DIR2_SF_GET_OFFSET_ARCH(sfep, arch));
+
 #if XFS_BIG_FILESYSTEMS
 		p.ino = XFS_DIR2_SF_GET_INUMBER_ARCH(sfp,
 				XFS_DIR2_SF_INUMBERP(sfep), arch) +
@@ -899,19 +931,24 @@ xfs_dir2_sf_getdents(
 				XFS_DIR2_SF_INUMBERP(sfep), arch);
 #endif
 		p.name = (char *)sfep->name;
+
 		error = p.put(&p);
+
 		if (!p.done) {
 #pragma mips_frequency_hint NEVER
 			uio->uio_offset = off;
 			return error;
 		}
 	}
+
 	/*
 	 * They all fit.
 	 */
 	*eofp = 1;
+
 	uio->uio_offset =
 		XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk + 1, 0);
+
 	return 0;
 }
 #endif	/* !SIM */

@@ -974,8 +974,8 @@ xfs_dir2_put_dirent32_uio(
 	int			rval;		/* return value */
 	uio_t			*uio;		/* I/O control */
 #ifdef __linux__
-	ia32_off_t		offset = (ia32_off_t )pa->cook;
-	ia32_ino_t		ino = (ia32_ino_t) pa->ino;
+	linux_off_t		offset = (linux_off_t )pa->cook;
+	linux_ino_t		ino = (linux_ino_t) pa->ino;
 #endif /* __linux__ */
 
 #if XFS_BIG_FILESYSTEMS
@@ -1072,8 +1072,8 @@ xfs_dir2_put_dirent64_uio(
 	int			rval;		/* return value */
 	uio_t			*uio;		/* I/O control */
 #ifdef __linux__
-	ia32_off_t		offset = (ia32_off_t )pa->cook;
-	ia32_ino_t		ino = (ia32_ino_t) pa->ino;
+	linux_off_t		offset = (linux_off_t )pa->cook;
+	linux_ino_t		ino = (linux_ino_t) pa->ino;
 #endif /* __linux__ */
 
 	namelen = pa->namelen;

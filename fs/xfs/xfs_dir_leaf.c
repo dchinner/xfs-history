@@ -503,6 +503,7 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 	sbp->name = ".";
 	sbp->namelen = 1;
 	sbp++;
+
 	/*
 	 * Entry 1 is ..
 	 */
@@ -513,10 +514,13 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 	sbp->name = "..";
 	sbp->namelen = 2;
 	sbp++;
+
 	/*
 	 * Scan the directory data for the rest of the entries.
 	 */
-	for (i = 0, sfe = &sf->list[0]; i < INT_GET(sf->hdr.count, ARCH_UNKNOWN); i++) {
+	for (i = 0, sfe = &sf->list[0];
+			i < INT_GET(sf->hdr.count, ARCH_UNKNOWN); i++) {
+
 		if (((char *)sfe < (char *)sf) ||
 		    ((char *)sfe >= ((char *)sf + dp->i_df.if_bytes)) ||
 		    (sfe->namelen >= MAXNAMELEN)) {
@@ -524,6 +528,7 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 			kmem_free(sbuf, sbsize);
 			return XFS_ERROR(EFSCORRUPTED);
 		}
+
 		sbp->entno = i + 2;
 		sbp->seqno = 0;
 		sbp->hash = xfs_da_hashname((char *)sfe->name, sfe->namelen);
@@ -533,6 +538,7 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
 		sbp++;
 	}
+
 	/*
 	 * Sort the entries on hash then entno.
 	 */
@@ -546,18 +552,21 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 	/*
 	 * Figure out the sequence numbers in case there's a hash duplicate.
 	 */
-	for (hash = sbuf->hash, sbp = sbuf + 1; sbp < &sbuf[nsbuf + 1]; sbp++) {
+	for (hash = sbuf->hash, sbp = sbuf + 1;
+				sbp < &sbuf[nsbuf + 1]; sbp++) {
 		if (sbp->hash == hash)
 			sbp->seqno = sbp[-1].seqno + 1;
 		else
 			hash = sbp->hash;
 	}
+
 	/*
 	 * Set up put routine.
 	 */
 	p.dbp = dbp;
 	p.put = put;
 	p.uio = uio;
+
 	/*
 	 * Find our place.
 	 */
@@ -566,6 +575,7 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 		    (sbp->hash == cookhash && sbp->seqno >= want_entno))
 			break;
 	}
+
 	/* 
 	 * Did we fail to find anything?  We stop at the last entry,
 	 * the one we put maxhash into.
@@ -577,6 +587,7 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 		*eofp = 1;
 		return 0;
 	}
+
 	/*
 	 * Loop putting entries into the user buffer.
 	 */
@@ -587,7 +598,14 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 		 */
 		if (sbp->seqno == 0 || sbp == sbuf)
 			lastresid = uio->uio_resid;
-		XFS_PUT_COOKIE(p.cook, mp, 0, sbp[1].seqno, sbp[1].hash);
+		/*
+		 * NOTE! Linux "filldir" semantics require that the
+		 *	 offset "cookie" be for this entry, not the
+		 *	 next; all the actual shuffling to make it
+		 *	 "look right" to the user is done in filldir.
+		 */
+		XFS_PUT_COOKIE(p.cook, mp, 0, sbp->seqno, sbp->hash);
+
 #if XFS_BIG_FILESYSTEMS
 		p.ino = sbp->ino + mp->m_inoadd;
 #else
@@ -595,7 +613,9 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 #endif
 		p.name = sbp->name;
 		p.namelen = sbp->namelen;
+
 		retval = p.put(&p);
+
 		if (!p.done) {
 			uio->uio_offset =
 				XFS_DA_MAKE_COOKIE(mp, 0, 0, sbp->hash);
@@ -604,12 +624,20 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 			xfs_dir_trace_g_du("sf: E-O-B", dp, uio);
 			return retval;
 		}
+
 		sbp++;
 	}
+
 	kmem_free(sbuf, sbsize);
+
+	XFS_PUT_COOKIE(p.cook, mp, 0, 0, XFS_DA_MAXHASH);
+
 	uio->uio_offset = p.cook.o;
+
 	*eofp = 1;
+
 	xfs_dir_trace_g_du("sf: E-O-F", dp, uio);
+
 	return 0;
 }
 #endif	/* !SIM */
@@ -1976,18 +2004,25 @@ xfs_dir_leaf_lasthash(xfs_dabuf_t *bp, int *count)
  * Copy out directory entries for getdents(), for leaf directories.
  */
 int
-xfs_dir_leaf_getdents_int(xfs_dabuf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
-				      uio_t *uio, int *eobp, dirent_t *dbp,
-				      xfs_dir_put_t put, daddr_t nextda)
+xfs_dir_leaf_getdents_int(
+	xfs_dabuf_t	*bp,
+	xfs_inode_t	*dp,
+	xfs_dablk_t	bno,
+	uio_t		*uio,
+	int		*eobp,
+	dirent_t	*dbp,
+	xfs_dir_put_t	put,
+	daddr_t		nextda)
 {
-	xfs_dir_leafblock_t *leaf;
-	xfs_dir_leaf_entry_t *entry;
-	xfs_dir_leaf_name_t *namest;
-	int entno, want_entno, i, nextentno;
-	xfs_mount_t *mp;
-	xfs_dahash_t cookhash;
+	xfs_dir_leafblock_t	*leaf;
+	xfs_dir_leaf_entry_t	*entry;
+	xfs_dir_leaf_name_t	*namest;
+	int			entno, want_entno, i, nextentno;
+	xfs_mount_t		*mp;
+	xfs_dahash_t		cookhash;
+	xfs_dahash_t		nexthash;
 #if (_MIPS_SIM == _ABIN32)
-	xfs_dahash_t lasthash;
+	xfs_dahash_t		lasthash;
 #endif
 	xfs_dir_put_args_t p;
         xfs_arch_t arch = ARCH_GET(dp->i_mount->m_arch);
@@ -1998,17 +2033,23 @@ xfs_dir_leaf_getdents_int(xfs_dabuf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 		*eobp = 1;
 		return(XFS_ERROR(ENOENT));	/* XXX wrong code */
 	}
+
 	want_entno = XFS_DA_COOKIE_ENTRY(mp, uio->uio_offset);
+
 	cookhash = XFS_DA_COOKIE_HASH(mp, uio->uio_offset);
+
 	xfs_dir_trace_g_dul("leaf: start", dp, uio, leaf);
 
 	/*
 	 * Re-find our place.
 	 */
 	for (i = entno = 0, entry = &leaf->entries[0];
-	     i < INT_GET(leaf->hdr.count, ARCH_UNKNOWN);
-	     entry++, i++) {
-		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, INT_GET(entry->nameidx, ARCH_UNKNOWN));
+		     i < INT_GET(leaf->hdr.count, ARCH_UNKNOWN);
+			     entry++, i++) {
+
+		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf,
+				    INT_GET(entry->nameidx, ARCH_UNKNOWN));
+
 		if (((char *)namest < (char *)leaf) ||
 		    ((char *)namest >= (char *)leaf + XFS_LBSIZE(mp)) ||
 		    (entry->namelen >= MAXNAMELEN)) {
@@ -2016,14 +2057,18 @@ xfs_dir_leaf_getdents_int(xfs_dabuf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 			return XFS_ERROR(EFSCORRUPTED);
 		}
 		if (INT_GET(entry->hashval, ARCH_UNKNOWN) >= cookhash) {
-			if (entno < want_entno && INT_GET(entry->hashval, ARCH_UNKNOWN) == cookhash) {
+			if (   entno < want_entno
+			    && INT_GET(entry->hashval, ARCH_UNKNOWN)
+							== cookhash) {
 				/*
 				 * Trying to get to a particular offset in a
 				 * run of equal-hashval entries.
 				 */
 				entno++;
-			} else if (want_entno > 0 && entno == want_entno && 
-				INT_GET(entry->hashval, ARCH_UNKNOWN) == cookhash) {
+			} else if (   want_entno > 0
+				   && entno == want_entno
+				   && INT_GET(entry->hashval, ARCH_UNKNOWN)
+							== cookhash) {
 				break;
 			} else {
 				entno = 0;
@@ -2031,6 +2076,7 @@ xfs_dir_leaf_getdents_int(xfs_dabuf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 			}
 		}
 	}
+
 	if (i == INT_GET(leaf->hdr.count, ARCH_UNKNOWN)) {
 		xfs_dir_trace_g_du("leaf: hash not found", dp, uio);
 		if (!INT_GET(leaf->hdr.info.forw, ARCH_UNKNOWN))
@@ -2057,17 +2103,19 @@ xfs_dir_leaf_getdents_int(xfs_dabuf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 		lasthash = XFS_DA_MAXHASH
 #endif
 	     ;
-	     entno >= 0 && i < INT_GET(leaf->hdr.count, ARCH_UNKNOWN);
-	     entry++, i++, (entno = nextentno)) {
+		     entno >= 0 && i < INT_GET(leaf->hdr.count, ARCH_UNKNOWN);
+			     entry++, i++, (entno = nextentno)) {
 		int lastresid, retval;
 		xfs_dircook_t lastoffset;
-		xfs_dahash_t nexthash;
+		xfs_dahash_t thishash;
 
 		/*
 		 * Check for a damaged directory leaf block and pick up
 		 * the inode number from this entry.
 		 */
-		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, INT_GET(entry->nameidx, ARCH_UNKNOWN));
+		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf,
+				    INT_GET(entry->nameidx, ARCH_UNKNOWN));
+
 		if (((char *)namest < (char *)leaf) ||
 		    ((char *)namest >= (char *)leaf + XFS_LBSIZE(mp)) ||
 		    (entry->namelen >= MAXNAMELEN)) {
@@ -2075,48 +2123,64 @@ xfs_dir_leaf_getdents_int(xfs_dabuf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 			return XFS_ERROR(EFSCORRUPTED);
 		}
 
+		thishash = INT_GET(entry->hashval, ARCH_UNKNOWN);
+
 		/*
-		 * Find the next entry after this one (if there is one)
-		 * and calculate its magic cookie (ie: directory offset).
+		 * NOTE! Linux "filldir" semantics require that the
+		 *	 offset "cookie" be for this entry, not the
+		 *	 next; all the actual shuffling to make it
+		 *	 "look right" to the user is done in filldir.
 		 */
-		if (i < INT_GET(leaf->hdr.count, ARCH_UNKNOWN)-1) {
+		XFS_PUT_COOKIE(p.cook, mp, bno, entno, thishash);
+
+		xfs_dir_trace_g_duc("leaf: middle cookie  ",
+						   dp, uio, p.cook.o);
+
+		if (i < (INT_GET(leaf->hdr.count, ARCH_UNKNOWN) - 1)) {
 			nexthash = INT_GET(entry[1].hashval, ARCH_UNKNOWN);
+
 			if (nexthash == INT_GET(entry->hashval, ARCH_UNKNOWN))
 				nextentno = entno + 1;
 			else
 				nextentno = 0;
-			XFS_PUT_COOKIE(p.cook, mp, bno, nextentno, nexthash);
-			xfs_dir_trace_g_duc("leaf: middle cookie  ",
-						   dp, uio, p.cook.o);
+
 		} else if (INT_GET(leaf->hdr.info.forw, ARCH_UNKNOWN)) {
 			xfs_dabuf_t *bp2;
 			xfs_dir_leafblock_t *leaf2;
 
 			ASSERT(nextda != -1);
+
 			retval = xfs_da_read_buf(dp->i_transp, dp,
-						 INT_GET(leaf->hdr.info.forw, ARCH_UNKNOWN), nextda,
+						 INT_GET(leaf->hdr.info.forw,
+						 ARCH_UNKNOWN), nextda,
 						 &bp2, XFS_DATA_FORK);
 			if (retval)
 				return(retval);
+
 			ASSERT(bp2 != NULL);
+
 			leaf2 = bp2->data;
-			if ((INT_GET(leaf2->hdr.info.magic, ARCH_UNKNOWN) != XFS_DIR_LEAF_MAGIC) ||
-			    (INT_GET(leaf2->hdr.info.back, ARCH_UNKNOWN) != bno)) {	/* GROT */
+
+			if (   (INT_GET(leaf2->hdr.info.magic, ARCH_UNKNOWN)
+						!= XFS_DIR_LEAF_MAGIC)
+			    || (INT_GET(leaf2->hdr.info.back, ARCH_UNKNOWN)
+						!= bno)) {	/* GROT */
+
 				xfs_da_brelse(dp->i_transp, bp2);
+
 				return(XFS_ERROR(EFSCORRUPTED));
 			}
-			nexthash = INT_GET(leaf2->entries[0].hashval, ARCH_UNKNOWN);
+
+			nexthash = INT_GET(leaf2->entries[0].hashval,
+								ARCH_UNKNOWN);
 			nextentno = -1;
-			XFS_PUT_COOKIE(p.cook, mp, INT_GET(leaf->hdr.info.forw, ARCH_UNKNOWN), 0,
-				       nexthash);
+
 			xfs_da_brelse(dp->i_transp, bp2);
 			xfs_dir_trace_g_duc("leaf: next blk cookie",
 						   dp, uio, p.cook.o);
 		} else {
 			nextentno = -1;
-			XFS_PUT_COOKIE(p.cook, mp, 0, 0, XFS_DA_MAXHASH);
-			xfs_dir_trace_g_duc("leaf: EOF cookie",
-						   dp, uio, p.cook.o);
+			nexthash  = XFS_DA_MAXHASH;
 		}
 
 		/*
@@ -2135,11 +2199,10 @@ xfs_dir_leaf_getdents_int(xfs_dabuf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 #if (_MIPS_SIM == _ABIN32)
 		if (INT_GET(entry->hashval, ARCH_UNKNOWN) != lasthash) {
 #endif
-			XFS_PUT_COOKIE(lastoffset, mp, bno, entno,
-				INT_GET(entry->hashval, ARCH_UNKNOWN));
+			XFS_PUT_COOKIE(lastoffset, mp, bno, entno, thishash);
 			lastresid = uio->uio_resid;
 #if (_MIPS_SIM == _ABIN32)
-			lasthash = INT_GET(entry->hashval, ARCH_UNKNOWN);
+			lasthash = thishash;
 		} else {
 			xfs_dir_trace_g_duc("leaf: DUP COOKIES, skipped",
 						   dp, uio, p.cook.o);
@@ -2158,18 +2221,29 @@ xfs_dir_leaf_getdents_int(xfs_dabuf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 #endif
 		p.name = (char *)namest->name;
 		p.namelen = entry->namelen;
+
 		retval = p.put(&p);
+
 		if (!p.done) {
 			uio->uio_offset = lastoffset.o;
 			uio->uio_resid = lastresid;
+
 			*eobp = 1;
+
 			xfs_dir_trace_g_du("leaf: E-O-B", dp, uio);
+
 			return(retval);
 		}
 	}
+
+	XFS_PUT_COOKIE(p.cook, mp, 0, 0, nexthash);
+
 	uio->uio_offset = p.cook.o;
+
 	*eobp = 0;
+
 	xfs_dir_trace_g_du("leaf: E-O-F", dp, uio);
+
 	return(0);
 }
 
@@ -2217,13 +2291,11 @@ xfs_dir_put_dirent32_direct(xfs_dir_put_args_t *pa)
 int
 xfs_dir_put_dirent32_uio(xfs_dir_put_args_t *pa)
 {
-	int retval, reclen, namelen;
-	irix5_dirent_t *idbp;
-	uio_t *uio;
-#ifdef __linux__
-	ia32_off_t	offset = (ia32_off_t )pa->cook.s.h;
-	ia32_ino_t	ino = (ia32_ino_t) pa->ino;
-#endif /* __linux__ */
+	int		retval, reclen, namelen;
+	irix5_dirent_t	*idbp;
+	uio_t		*uio;
+	linux_off_t	offset = (linux_off_t )pa->cook.s.h;
+	linux_ino_t	ino = (linux_ino_t) pa->ino;
 
 #if XFS_BIG_FILESYSTEMS
 	if (pa->ino > XFS_MAXINUMBER_32) {
@@ -2236,29 +2308,17 @@ xfs_dir_put_dirent32_uio(xfs_dir_put_args_t *pa)
 	reclen = IRIX5_DIRENTSIZE(namelen);
 	uio = pa->uio;
 
-#ifdef __linux__
 	namelen = pa->namelen;
         retval = uio->uio_copy((void *)uio->uio_iov->iov_base,
-                pa->name, namelen, offset, ino);
+					pa->name, namelen, offset, ino);
+
 	if (retval == -EINVAL) {
 		pa->done = 0;
 		return 0;
 	}
+
 	pa->done = 1;
-#else
-	if (reclen > uio->uio_resid) {
-		pa->done = 0;
-		return 0;
-	}
-	idbp = (irix5_dirent_t *)pa->dbp;
-	idbp->d_reclen = reclen;
-	idbp->d_ino = pa->ino;
-	idbp->d_off = pa->cook.o;
-	idbp->d_name[namelen] = '\0';
-	bcopy(pa->name, idbp->d_name, namelen);
-	retval = uiomove((caddr_t)idbp, reclen, UIO_READ, uio);
-	pa->done = (retval == 0);
-#endif /* __linux__ */
+
 	return retval;
 }
 
@@ -2300,41 +2360,26 @@ xfs_dir_put_dirent64_direct(xfs_dir_put_args_t *pa)
 int
 xfs_dir_put_dirent64_uio(xfs_dir_put_args_t *pa)
 {
-	int retval, reclen, namelen;
-	dirent_t *idbp;
-	uio_t *uio;
-
-#ifdef __linux__
-	ia32_off_t	offset = (ia32_off_t )pa->cook.s.h;
-	ia32_ino_t	ino = (ia32_ino_t) pa->ino;
-#endif /* __linux__ */
+	int		retval, reclen, namelen;
+	dirent_t	*idbp;
+	uio_t		*uio;
+	linux_off_t	offset = (linux_off_t )pa->cook.s.h;
+	linux_ino_t	ino = (linux_ino_t) pa->ino;
 
 	namelen = pa->namelen;
 	reclen = DIRENTSIZE(namelen);
         uio = pa->uio;
 
-#ifdef __linux__
         retval = uio->uio_copy((void *)uio->uio_iov->iov_base,
-                pa->name, namelen, offset, ino);
+					pa->name, namelen, offset, ino);
+
 	if (retval == -EINVAL) {
 		pa->done = 0;
 		return 0;
 	}
+
 	pa->done = 1;
-#else
-	if (reclen > uio->uio_resid) {
-		pa->done = 0;
-		return 0;
-	}
-	idbp = pa->dbp;
-	idbp->d_reclen = reclen;
-	idbp->d_ino = pa->ino;
-	idbp->d_off = pa->cook.o;
-	idbp->d_name[namelen] = '\0';
-	bcopy(pa->name, idbp->d_name, namelen);
-	retval = uiomove((caddr_t)idbp, reclen, UIO_READ, uio);
-	pa->done = (retval == 0);
-#endif /* __linux__ */
+
 	return retval;
 }
 #endif	/* !SIM */

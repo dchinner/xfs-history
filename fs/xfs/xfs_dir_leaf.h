@@ -132,13 +132,13 @@ typedef union {
 	 * Watch the order here (endian-ness dependent).
 	 */
 	struct {
-#ifdef __linux__
+#if __BYTE_ORDER == __LITTLE_ENDIAN
 		xfs_dahash_t	h;	/* hash value */
 		__uint32_t	be;	/* block and entry */
-#else
+#else	/* __BYTE_ORDER == __BIG_ENDIAN */
 		__uint32_t	be;	/* block and entry */
 		xfs_dahash_t	h;	/* hash value */
-#endif /* __linux__ */
+#endif	/* __BYTE_ORDER == __BIG_ENDIAN */
 	} s;
 } xfs_dircook_t;
 

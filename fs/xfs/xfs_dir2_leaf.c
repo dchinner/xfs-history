@@ -853,13 +853,13 @@ xfs_dir2_leaf_getdents(
 	int			map_size;	/* total entries in *map */
 	int			map_valid;	/* valid entries in *map */
 	xfs_mount_t		*mp;		/* filesystem mount point */
-	xfs_dir2_off_t		newoff;		/* new curoff after new block */
+	xfs_dir2_off_t		newoff;		/* new curoff after new blk */
 	int			nmap;		/* mappings to ask xfs_bmapi */
 	xfs_dir2_put_args_t	p;		/* formatting arg bundle */
 	char			*ptr;		/* pointer to current data */
 	int			ra_current;	/* number of read-ahead blks */
 	int			ra_index;	/* *map index for read-ahead */
-	int			ra_offset;	/* offset in map entry for ra */
+	int			ra_offset;	/* map entry offset for ra */
 	int			ra_want;	/* readahead count wanted */
 
 	/*
@@ -1124,15 +1124,18 @@ xfs_dir2_leaf_getdents(
 			else {
 				while ((char *)ptr - (char *)data < byteoff) {
 					dup = (xfs_dir2_data_unused_t *)ptr;
-					if (INT_GET(dup->freetag, ARCH_UNKNOWN) ==
-					    XFS_DIR2_DATA_FREE_TAG) {
-						length = INT_GET(dup->length, ARCH_UNKNOWN);
+
+					if (INT_GET(dup->freetag, ARCH_UNKNOWN)
+						  == XFS_DIR2_DATA_FREE_TAG) {
+
+						length = INT_GET(dup->length,
+								 ARCH_UNKNOWN);
 						ptr += length;
 						continue;
 					}
 					dep = (xfs_dir2_data_entry_t *)ptr;
 					length =
-					    XFS_DIR2_DATA_ENTSIZE(dep->namelen);
+					   XFS_DIR2_DATA_ENTSIZE(dep->namelen);
 					ptr += length;
 				}
 				/*
@@ -1140,8 +1143,8 @@ xfs_dir2_leaf_getdents(
 				 */
 				curoff =
 					XFS_DIR2_DB_OFF_TO_BYTE(mp,
-						XFS_DIR2_BYTE_TO_DB(mp, curoff),
-						(char *)ptr - (char *)data);
+					    XFS_DIR2_BYTE_TO_DB(mp, curoff),
+					    (char *)ptr - (char *)data);
 			}
 		}
 		/*
@@ -1152,26 +1155,40 @@ xfs_dir2_leaf_getdents(
 		/*
 		 * No, it's unused, skip over it.
 		 */
-		if (INT_GET(dup->freetag, ARCH_UNKNOWN) == XFS_DIR2_DATA_FREE_TAG) {
+		if (INT_GET(dup->freetag, ARCH_UNKNOWN)
+						== XFS_DIR2_DATA_FREE_TAG) {
 			length = INT_GET(dup->length, ARCH_UNKNOWN);
 			ptr += length;
 			curoff += length;
 			continue;
 		}
+
 		/*
 		 * Copy the entry into the putargs, and try formatting it.
 		 */
 		dep = (xfs_dir2_data_entry_t *)ptr;
+
 		p.namelen = dep->namelen;
+
 		length = XFS_DIR2_DATA_ENTSIZE(p.namelen);
-		p.cook = XFS_DIR2_BYTE_TO_DATAPTR(mp, curoff + length);
+
+		/*
+		 * NOTE! Linux "filldir" semantics require that the
+		 *	 offset "cookie" be for this entry, not the
+		 *	 next; all the actual shuffling to make it
+		 *	 "look right" to the user is done in filldir.
+		 */
+		p.cook = XFS_DIR2_BYTE_TO_DATAPTR(mp, curoff);
+
 #if XFS_BIG_FILESYSTEMS
 		p.ino = INT_GET(dep->inumber, ARCH_UNKNOWN) + mp->m_inoadd;
 #else
 		p.ino = INT_GET(dep->inumber, ARCH_UNKNOWN);
 #endif
 		p.name = (char *)dep->name;
+
 		error = p.put(&p);
+
 		/*
 		 * Won't fit.  Return to caller.
 		 */
@@ -1186,6 +1203,7 @@ xfs_dir2_leaf_getdents(
 		ptr += length;
 		curoff += length;
 	}
+
 	/*
 	 * All done.  Set output offset value to current offset.
 	 */

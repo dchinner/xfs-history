@@ -518,6 +518,7 @@ xfs_dir2_block_getdents(
 	xfs_mount_t		*mp;		/* filesystem mount point */
 	xfs_dir2_put_args_t	p;		/* arg package for put rtn */
 	char			*ptr;		/* current data entry */
+	char			*savptr;	/* saved data entry */
 	int			wantoff;	/* starting block offset */
 
 	mp = dp->i_mount;
@@ -567,7 +568,11 @@ xfs_dir2_block_getdents(
 			ptr += INT_GET(dup->length, ARCH_UNKNOWN);
 			continue;
 		}
+
 		dep = (xfs_dir2_data_entry_t *)ptr;
+
+		savptr = ptr;		/* In case we need it.. */
+
 		/*
 		 * Bump pointer for the next iteration.
 		 */
@@ -581,18 +586,27 @@ xfs_dir2_block_getdents(
 		 * Set up argument structure for put routine.
 		 */
 		p.namelen = dep->namelen;
+
+		/*
+		 * NOTE! Linux "filldir" semantics require that the
+		 *	 offset "cookie" be for this entry, not the
+		 *	 next; all the actual shuffling to make it
+		 *	 "look right" to the user is done in filldir.
+		 */
 		p.cook = XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
-			ptr - (char *)block);
+						    savptr - (char *)block);
 #if XFS_BIG_FILESYSTEMS
 		p.ino = INT_GET(dep->inumber, ARCH_UNKNOWN) + mp->m_inoadd;
 #else
 		p.ino = INT_GET(dep->inumber, ARCH_UNKNOWN);
 #endif
 		p.name = (char *)dep->name;
+
 		/*
 		 * Put the entry in the caller's buffer.
 		 */
 		error = p.put(&p);
+
 		/*
 		 * If it didn't fit, set the final offset to here & return.
 		 */
@@ -605,14 +619,18 @@ xfs_dir2_block_getdents(
 			return error;
 		}
 	}
+
 	/*
 	 * Reached the end of the block.
 	 * Set the offset to a nonexistent block 1 and return.
 	 */
 	*eofp = 1;
+
 	uio->uio_offset =
 		XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk + 1, 0);
+
 	xfs_da_brelse(tp, bp);
+
 	return 0;
 }
 #endif	/* !SIM */
