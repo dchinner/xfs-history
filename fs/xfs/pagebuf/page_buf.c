@@ -265,9 +265,7 @@ _pagebuf_initialize(
     size_t range_length,
     page_buf_flags_t flags)
 {
-	if (!target)
-		BUG();
-	
+	assert(target);
 	pb_tracking_get(pb);
 
 	memset(pb, 0, sizeof(page_buf_private_t));
@@ -408,6 +406,71 @@ void _pagebuf_free_object(
 }
 
 
+STATIC void
+_pagebuf_buffers_to_page(
+	struct page		*page,
+	page_buf_t		*pb,
+	int			pg_index,
+	size_t			pb_offset,
+	size_t			pb_length)
+{
+	pb_target_t		*target = pb->pb_target;
+	struct buffer_head	*bh, *head;
+	page_buf_daddr_t	bn;
+	size_t			offset, start, end, delta;
+	int			bbits, i = 0;
+
+	assert(target->pbr_blocksize < PAGE_CACHE_SIZE);
+	assert(pb->pb_bn != PAGE_BUF_DADDR_NULL);
+
+	start = pb_offset;
+	end = pb_offset + pb_length;
+
+	/* TODO XXX:nathans -[512 byte bh]-  We do not use blocksize
+	 * here because several buffers must be written in chunks of
+	 * 512 bytes, independent of the blocksize.
+	 * The problem is different for blksize==pgsize because there
+	 * isn't sufficient space after the AG header for a filesystem
+	 * block (of course);  for all smaller cases, there is enough
+	 * space, so we are not able to do the full-page IOs here that
+	 * the pgsize case can.
+	 */
+
+	/* For now, all metadata buffer_heads for non-pagesize blksize
+	 * filesystems are 512 bytes long.
+	 */
+	bbits = 9;
+
+	if (!page_has_buffers(page))
+		create_empty_buffers(page, target->pbr_device, 1 << bbits);
+
+	bh = head = page_buffers(page);
+	do {
+		offset = i << bbits;
+		if (offset < start)
+			continue;
+		if (offset >= end)
+			break;
+
+		delta = (offset - start);
+		if (pg_index) {
+			delta += (PAGE_CACHE_SIZE - pb->pb_offset);
+			delta += ((pg_index - 1) >> PAGE_CACHE_SHIFT);
+		}
+		bn = pb->pb_bn;
+		bn += (delta >> 9);
+		bh->b_size = 1 << bbits;
+		bh->b_rsector = bh->b_blocknr = bn;
+		bh->b_rdev = bh->b_dev = pb->pb_dev;
+		if (!buffer_mapped(bh)) {
+			init_waitqueue_head(&bh->b_wait);
+		}
+		atomic_set(&bh->b_count, 1);
+		set_bit(BH_Lock, &bh->b_state);
+		set_bit(BH_Mapped, &bh->b_state);
+	} while (i++, (bh = bh->b_this_page) != head);
+}
+
 /*
  *	_pagebuf_lookup_pages
  *
@@ -421,25 +484,22 @@ void _pagebuf_free_object(
 
 int
 _pagebuf_lookup_pages(
-    page_buf_t * pb,
-    struct address_space *aspace,
-    page_buf_flags_t flags)
+	page_buf_t		*pb,
+	struct address_space	*aspace,
+	page_buf_flags_t	flags)
 {
-	loff_t next_buffer_offset;
-	unsigned long page_count;
-	int rval = 0;
-	unsigned long pi;
-	unsigned long index;
-	int all_mapped, good_pages;
-	struct page *cp, **hash, *cached_page;
-	int gfp_mask;
-	int	retry_count = 0;
+	loff_t			next_buffer_offset;
+	unsigned long		page_count, pi, index;
+	struct page		*cp, **hash, *cached_page;
+	int			gfp_mask, retry_count = 0, rval = 0;
+	int			all_mapped, good_pages;
+	size_t			blocksize;
 
 	/* For pagebufs where we want to map an address, do not use
 	 * highmem pages - so that we do not need to use kmap resources
 	 * to access the data.
 	 *
-	 * For pages were the caller has indicated there may be resource
+	 * For pages where the caller has indicated there may be resource
 	 * contention (e.g. called from a transaction) do not flush
 	 * delalloc pages to obtain memory.
 	 */
@@ -455,7 +515,7 @@ _pagebuf_lookup_pages(
 	next_buffer_offset = pb->pb_file_offset + pb->pb_buffer_length;
 
 	good_pages = page_count = (page_buf_btoc(next_buffer_offset) -
-	    page_buf_btoct(pb->pb_file_offset));
+				   page_buf_btoct(pb->pb_file_offset));
 
 	if (pb->pb_flags & _PBF_ALL_PAGES_MAPPED) {
 		/* Bring pages forward in cache */
@@ -466,16 +526,18 @@ _pagebuf_lookup_pages(
 			all_mapped = 1;
 			goto mapit;
 		}
-		return (0);
+		return 0;
 	}
 
-	/* assure that we have a page list */
+	/* Ensure pb_pages field has been initialised */
 	rval = _pagebuf_get_pages(pb, page_count, flags);
-	if (rval != 0)
-		return (rval);
+	if (rval)
+		return rval;
 
 	rval = pi = 0;
 	cached_page = NULL;
+	blocksize = pb->pb_target->pbr_blocksize;
+
 	/* enter the pages in the page list */
 	index = (pb->pb_file_offset - pb->pb_offset) >> PAGE_CACHE_SHIFT;
 	for (all_mapped = 1; pi < page_count; pi++, index++) {
@@ -527,12 +589,21 @@ _pagebuf_lookup_pages(
 		 * way we do not need to deal with partially valid pages.
 		 * We keep the page locked, and in the read path fake out
 		 * the lower layers to issue an I/O for the whole page.
+		 *
+		 * This doesn't work for filesystem blocksizes which are
+		 * smaller than the pagesize.  We can have metadata blocks
+		 * on these block device inode pages overlapping with file
+		 * data...  so it would be possible to have multiple pages
+		 * thinking they all have uptodate (different) data. :(
+		 * We'll have to use a different approach for that case.
 		 */
 		if (!Page_Uptodate(cp)) {
 			good_pages--;
-			if ((pb->pb_buffer_length < PAGE_CACHE_SIZE) &&
-			    (flags & PBF_READ) && !PageSlab(cp)) {
-				pb->pb_locked = 1;
+			if (blocksize == PAGE_CACHE_SIZE) {
+				if ((pb->pb_buffer_length < PAGE_CACHE_SIZE) &&
+				    (flags & PBF_READ) && !PageSlab(cp)) {
+					pb->pb_locked = 1;
+				}
 			}
 		}
 		if (!pb->pb_locked)
@@ -1248,9 +1319,9 @@ int pagebuf_iostart(		/* start I/O on a buffer          */
 /* Helper routines for pagebuf_iorequest */
 
 typedef struct {
-	page_buf_t *pb;		/* pointer to pagebuf page is within */
-	int locking;		/* are pages locked */
-	atomic_t remain;	/* count of remaining I/O requests */
+	page_buf_t	*pb;		/* pointer to pagebuf page is within */
+	int		locking;	/* are pages locked? */
+	atomic_t	remain;		/* count of remaining I/O requests */
 } pagesync_t;
 
 static inline void _pb_io_done(page_buf_t *pb)
@@ -1263,12 +1334,16 @@ static inline void _pb_io_done(page_buf_t *pb)
 
 
 /*
- * Completion routines for I/O on a page/a locked page/multiple pages
+ * Completion routines for I/O on a page/a locked page/multiple buffers
  */
-STATIC void _end_pagebuf_page_io(struct buffer_head *bh, int uptodate)
+STATIC void
+_end_pagebuf_page_io(
+	struct buffer_head	*bh,
+	int			uptodate,
+	int			locked)
 {
-	struct page *page;
-	page_buf_t *pb = (page_buf_t *) bh->b_private;
+	struct page		*page;
+	page_buf_t		*pb = (page_buf_t *) bh->b_private;
 
 	mark_buffer_uptodate(bh, uptodate);
 	atomic_dec(&bh->b_count);
@@ -1283,13 +1358,36 @@ STATIC void _end_pagebuf_page_io(struct buffer_head *bh, int uptodate)
 	_pagebuf_free_bh(bh);
 
 	SetPageUptodate(page);
+	if (locked)
+		UnlockPage(page);
 	_pb_io_done(pb);
 }
 
-STATIC void _end_pagebuf_page_io_locked(struct buffer_head *bh, int uptodate)
+STATIC void
+_end_io_locked(
+	struct buffer_head	*bh,
+	int			uptodate)
 {
-	struct page *page;
-	page_buf_t *pb = (page_buf_t *) bh->b_private;
+	_end_pagebuf_page_io(bh, uptodate, 1);
+}
+
+STATIC void
+_end_io_nolock(
+	struct buffer_head	*bh,
+	int			uptodate)
+{
+	_end_pagebuf_page_io(bh, uptodate, 0);
+}
+
+STATIC void
+_end_pagebuf_page_io_multi(
+	struct buffer_head	*bh,
+	int			uptodate,
+	int			fullpage)
+{
+	pagesync_t		*psync = (pagesync_t *) bh->b_private;
+	page_buf_t		*pb = psync->pb;
+	struct page		*page;
 
 	mark_buffer_uptodate(bh, uptodate);
 	atomic_dec(&bh->b_count);
@@ -1301,33 +1399,12 @@ STATIC void _end_pagebuf_page_io_locked(struct buffer_head *bh, int uptodate)
 	}
 
 	unlock_buffer(bh);
-	_pagebuf_free_bh(bh);
-
-	SetPageUptodate(page);
-	UnlockPage(page);
-	_pb_io_done(pb);
-}
-
-STATIC void _end_pagebuf_page_io_multi(struct buffer_head *bh, int uptodate)
-{
-	pagesync_t *psync = (pagesync_t *) bh->b_private;
-	page_buf_t *pb = psync->pb;
-	struct page *page;
-
-	mark_buffer_uptodate(bh, uptodate);
-	atomic_dec(&bh->b_count);
-
-	page = bh->b_page;
-	if (!test_bit(BH_Uptodate, &bh->b_state)) {
-		set_bit(PG_error, &page->flags);
-		pb->pb_error = EIO;
-	}
-
-	unlock_buffer(bh);
-	_pagebuf_free_bh(bh);
+	if (fullpage)
+		_pagebuf_free_bh(bh);
 
 	if (atomic_dec_and_test(&psync->remain) == 1) {
-		SetPageUptodate(page);
+		if (fullpage)
+			SetPageUptodate(page);
 		if (psync->locking)
 			UnlockPage(page);
 		kfree(psync);
@@ -1335,35 +1412,68 @@ STATIC void _end_pagebuf_page_io_multi(struct buffer_head *bh, int uptodate)
 	}
 }
 
+STATIC void
+_end_io_multi_full(
+	struct buffer_head	*bh,
+	int			uptodate)
+{
+	_end_pagebuf_page_io_multi(bh, uptodate, 1);
+}
+
+STATIC void
+_end_io_multi_part(
+	struct buffer_head	*bh,
+	int			uptodate)
+{
+	_end_pagebuf_page_io_multi(bh, uptodate, 0);
+}
+
 /*
  * Initiate I/O on part of a page we are interested in
- *
- * This will attempt to make a request bigger than the sector
- * size if we are not running on the MD device - LVM need to be
- * added to this logic as well.
- *
- * If you think this change is causing problems initializing the
- * concat_ok variable will turn it off again.
  */
 STATIC int
 _pagebuf_page_io(
-    struct page *page,		/* Page structure we are dealing with */
-    page_buf_t * pb,		/* pagebuf holding it, can be NULL */
-    page_buf_daddr_t bn,	/* starting block number */
-    kdev_t dev,			/* device for I/O */
-    size_t sector,		/* device block size */
-    off_t pg_offset,		/* starting offset in page */
-    size_t pg_length,		/* count of data to process */
-    int locking,		/* page locking in use */
-    int rw)			/* read/write operation */
+	struct page		*page,	/* Page structure we are dealing with */
+	page_buf_t		*pb,	/* pagebuf holding it, can be NULL */
+	page_buf_daddr_t	bn,	/* starting block number */
+	kdev_t			dev,	/* device for I/O */
+	size_t			sector,	/* device block size */
+	size_t			blocksize,	/* filesystem block size */
+	off_t			pg_offset,	/* starting offset in page */
+	size_t			pg_length,	/* count of data to process */
+	int			locking,	/* page locking in use */
+	int			rw)	/* read/write operation */
 {
-	int cnt,itr;
-	pagesync_t *psync = NULL;
-	struct buffer_head	*bh, *bufferlist[MAX_BUF_PER_PAGE];
-	size_t blk_length;
-	int err=0;
-	int concat_ok;
+	size_t			blk_length = 0;
+	struct buffer_head	*bh, *head, *bufferlist[MAX_BUF_PER_PAGE];
+	int			concat_ok, multi_ok, i = 0, cnt = 0, err = 0;
 
+	if (blocksize < PAGE_CACHE_SIZE) {
+		multi_ok = 1;
+
+		/* find buffer_heads belonging to just this pagebuf */
+		bh = head = page_buffers(page);
+		do {
+			blk_length = i << 9; /* 512: _pagebuf_buffers_to_page */
+			if (blk_length < pg_offset)
+				continue;
+			if (blk_length >= pg_offset + pg_length)
+				break;
+			assert(buffer_mapped(bh));
+			bufferlist[cnt++] = bh;
+		} while (i++, (bh = bh->b_this_page) != head);
+		goto request;
+	}
+
+	assert(blocksize == PAGE_CACHE_SIZE);
+
+	/* This will attempt to make a request bigger than the sector
+	 * size if we are not running on the MD device - LVM need to be
+	 * added to this logic as well.
+	 *
+	 * If you think this change is causing problems initializing the
+	 * concat_ok variable will turn it off again.
+	 */
 	if ((MAJOR(dev) != LVM_BLK_MAJOR) && (MAJOR(dev) != MD_MAJOR)) {
 		concat_ok = 1;
 	} else if ((MAJOR(dev) == MD_MAJOR) && (pg_offset == 0) &&
@@ -1376,11 +1486,12 @@ _pagebuf_page_io(
 
 	/* Calculate the block offsets and length we will be using */
 	if (pg_offset) {
-		size_t block_offset;
+		size_t	block_offset;
 
 		block_offset = pg_offset >> PB_SECTOR_BITS;
 		block_offset = pg_offset - (block_offset << PB_SECTOR_BITS);
-		blk_length = (pg_length + block_offset + sector - 1) >> PB_SECTOR_BITS;
+		blk_length = (pg_length + block_offset + sector - 1) >>
+				PB_SECTOR_BITS;
 	} else {
 		blk_length = (pg_length + sector - 1) >> PB_SECTOR_BITS;
 	}
@@ -1390,76 +1501,72 @@ _pagebuf_page_io(
 		sector *= blk_length;
 		blk_length = 1;
 	}
+	multi_ok = (blk_length != 1);
 
-	/* Allocate pagesync_t and buffer heads for portions of the
-	 * page which need I/O.
-	 * Call generic_make_request
-	 */
-
-	if (blk_length != 1) {
-		psync = (pagesync_t *) kmalloc(sizeof(pagesync_t), GFP_NOFS);
-
-		/* Ugh - out of memory condition here */
-		if (psync == NULL)
-			BUG();
-
-		psync->pb = pb;
-		psync->locking = locking;
-		atomic_set(&psync->remain, 0);
-	}
-
-	for (cnt = 0; blk_length > 0;
-	     blk_length--, pg_offset += sector) {
+	for (; blk_length > 0; blk_length--, pg_offset += sector) {
 		bh = kmem_cache_alloc(bh_cachep, SLAB_NOFS);
-		if (bh == NULL){
+		if (!bh) {
 			bh = _pagebuf_get_prealloc_bh();
-			if (bh == NULL) {
+			if (!bh) {
 				/* This should never happen */
 				err = -ENOMEM;
 				goto error;
 			}
 		}
-
 		memset(bh, 0, sizeof(*bh));
 		init_waitqueue_head(&bh->b_wait);
-
-		if (psync) {
-			init_buffer(bh, _end_pagebuf_page_io_multi, psync);
-			atomic_inc(&psync->remain);
-		} else if (locking) {
-			init_buffer(bh, _end_pagebuf_page_io_locked, pb);
-		} else {
-			init_buffer(bh, _end_pagebuf_page_io, pb);
-		}
-
-		bh->b_size = sector;
 		set_bh_page(bh, page, pg_offset);
+		bh->b_size = sector;
+		bh->b_dev = bh->b_rdev = dev;
+		bh->b_blocknr = bh->b_rsector = bn++; 
 		atomic_set(&bh->b_count, 1);
-		bh->b_dev = dev;
-		bh->b_blocknr = bn++;
-
-		bh->b_rdev = bh->b_dev;
-		bh->b_rsector = bh->b_blocknr;
 		set_bit(BH_Lock, &bh->b_state);
 		set_bit(BH_Mapped, &bh->b_state);
-
-		if (rw == WRITE ) {
-			set_bit(BH_Uptodate, &bh->b_state);
-			set_bit(BH_Dirty, &bh->b_state);
-		}
 		bufferlist[cnt++] = bh;
 	}
 
+request:
 	if (cnt) {
+		pagesync_t	*psync = NULL;
+		void		(*callback)(struct buffer_head *, int);
+
+		if (multi_ok) {
+			size_t	size = sizeof(pagesync_t);
+
+			psync = (pagesync_t *) kmalloc(size, GFP_NOFS);
+			if (!psync)
+				BUG();	/* Ugh - out of memory condition here */
+			psync->pb = pb;
+			psync->locking = locking;
+			atomic_set(&psync->remain, 0);
+
+			callback = (blocksize < PAGE_CACHE_SIZE)?
+				   _end_io_multi_part : _end_io_multi_full;
+		} else {
+			callback = locking? _end_io_locked : _end_io_nolock;
+		}
+
 		/* Indicate that there is another page in progress */
 		atomic_inc(&PBP(pb)->pb_io_remaining);
 
-		for (itr=0; itr < cnt; itr++){
-			generic_make_request(rw, bufferlist[itr]);
-		}		  
+		for (i = 0; i < cnt; i++) {
+			bh = bufferlist[i];
+
+			/* Complete the buffer_head, then submit the IO */
+			if (psync) {
+				init_buffer(bh, callback, psync);
+				atomic_inc(&psync->remain);
+			} else {
+				init_buffer(bh, callback, pb);
+			}
+
+			if (rw == WRITE) {
+				set_bit(BH_Uptodate, &bh->b_state);
+				set_bit(BH_Dirty, &bh->b_state);
+			}
+			generic_make_request(rw, bh);
+		}
 	} else {
-		if (psync)
-			kfree(psync);
 		if (locking)
 			UnlockPage(page);
 	}
@@ -1467,29 +1574,33 @@ _pagebuf_page_io(
 	return err;
 error:
 	/* If we ever do get here then clean up what we already did */
-	for (itr=0; itr < cnt; itr++) {
-		atomic_set_buffer_clean (bufferlist[itr]);
-		bufferlist[itr]->b_end_io(bufferlist[itr], 0);
+	for (i = 0; i < cnt; i++) {
+		atomic_set_buffer_clean(bufferlist[i]);
+		bufferlist[i]->b_end_io(bufferlist[i], 0);
 	}
 	return err;
 }
 
 /* Apply function for pagebuf_segment_apply */
-STATIC int _page_buf_page_apply(
-    page_buf_t * pb,
-    loff_t offset,
-    struct page *page,
-    size_t pg_offset,
-    size_t pg_length)
+STATIC int
+_page_buf_page_apply(
+	page_buf_t		*pb,
+	loff_t			offset,
+	struct page		*page,
+	size_t			pg_offset,
+	size_t			pg_length)
 {
-	page_buf_daddr_t bn = pb->pb_bn;
-	kdev_t dev = pb->pb_dev;
-	size_t sector = 1 << PB_SECTOR_BITS;
-	loff_t pb_offset;
-	size_t	ret_len = pg_length;
+	page_buf_daddr_t	bn = pb->pb_bn;
+	kdev_t			dev = pb->pb_dev;
+	size_t			blocksize = pb->pb_target->pbr_blocksize;
+	size_t			sector = 1 << PB_SECTOR_BITS;
+	loff_t			pb_offset;
+	size_t			ret_len = pg_length;
+
 	assert(page);
 
-	if ((pb->pb_buffer_length < PAGE_CACHE_SIZE) &&
+	if ((blocksize == PAGE_CACHE_SIZE) &&
+	    (pb->pb_buffer_length < PAGE_CACHE_SIZE) &&
 	    (pb->pb_flags & PBF_READ) && pb->pb_locked) {
 		bn -= (pb->pb_offset >> PB_SECTOR_BITS);
 		pg_offset = 0;
@@ -1502,17 +1613,16 @@ STATIC int _page_buf_page_apply(
 	}
 
 	if (pb->pb_flags & PBF_READ) {
-		/* We only need to do I/O on pages which are not upto date */
-		_pagebuf_page_io(page, pb, bn, dev,
-		    sector, (off_t) pg_offset, pg_length, pb->pb_locked, READ);
+		_pagebuf_page_io(page, pb, bn, dev, sector, blocksize,
+		    	(off_t)pg_offset, pg_length, pb->pb_locked, READ);
 	} else if (pb->pb_flags & PBF_WRITE) {
 		int locking = (pb->pb_flags & _PBF_LOCKABLE) == 0;
 
 		/* Check we need to lock pages */
 		if (locking && (pb->pb_locked == 0))
 			lock_page(page);
-		_pagebuf_page_io(page, pb, bn, dev, sector,
-			    (off_t) pg_offset, pg_length, locking, WRITE);
+		_pagebuf_page_io(page, pb, bn, dev, sector, blocksize,
+			(off_t)pg_offset, pg_length, locking, WRITE);
 	}
 
 	return (ret_len);
@@ -1648,7 +1758,7 @@ int pagebuf_segment(		/* return next segment of buffer */
 				/* (NULL if not in mem_map[])   */
     size_t * soff_p,		/* offset in page (updated)     */
     size_t * ssize_p,		/* length of segment (updated)  */
-    page_buf_flags_t flags)	/* PBF_ALWAYS_ALLOC             */
+    page_buf_flags_t flags)	/* unused 			*/
 {
 	loff_t kpboff;		/* offset in pagebuf		*/
 	int kpi;		/* page index in pagebuf	*/
@@ -1718,23 +1828,21 @@ int pagebuf_iomove(			/* move data in/out of buffer	*/
  *	a driver scatter-gather list.
  */
 
-int pagebuf_segment_apply(	/* apply function to segments   */
-    page_buf_apply_t func,	/* function to call             */
-    page_buf_t * pb)		/* buffer to examine            */
+int
+pagebuf_segment_apply(			/* apply function to segments   */
+	page_buf_apply_t	func,	/* function to call             */
+	page_buf_t		*pb)	/* buffer to examine            */
 {
-	int buf_index;
-	int status = 0;
-	int sval;
-	loff_t buffer_offset = pb->pb_file_offset;
-	size_t buffer_len = pb->pb_count_desired;
-	size_t page_offset;
-	size_t len;
-	size_t total = 0;
-	size_t cur_offset;
-	size_t cur_len;
+	int			buf_index, sval, blocksize, status = 0;
+	loff_t			buffer_offset = pb->pb_file_offset;
+	size_t			buffer_len = pb->pb_count_desired;
+	size_t			page_offset, len, total = 0;
+	size_t			cur_offset, cur_len;
+	struct page		*cp;
 
 	pagebuf_hold(pb);
 
+	blocksize = pb->pb_target->pbr_blocksize;
 	cur_offset = pb->pb_offset;
 	cur_len = buffer_len;
 
@@ -1753,9 +1861,17 @@ int pagebuf_segment_apply(	/* apply function to segments   */
 		if (len > cur_len)
 			len = cur_len;
 		cur_len -= len;
+
+		cp = pb->pb_pages[buf_index];
+
+		if (blocksize < PAGE_CACHE_SIZE) {
+			assert(pb->pb_bn != PAGE_BUF_DADDR_NULL);
+			_pagebuf_buffers_to_page(cp, pb, buf_index,
+							page_offset, len);
+		}
+
 		/* func probably = _page_buf_page_apply */
-		sval = func(pb, buffer_offset,
-			    pb->pb_pages[buf_index], page_offset, len);
+		sval = func(pb, buffer_offset, cp, page_offset, len);
 
 		if (sval <= 0) {
 			status = sval;

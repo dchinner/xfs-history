@@ -54,11 +54,6 @@
 
 #include "page_buf_internal.h"
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,9)
-#define page_buffers(page)	((page)->buffers)
-#define page_has_buffers(page)	((page)->buffers)
-#endif
-
 #define MAX_BUF_PER_PAGE 	(PAGE_CACHE_SIZE / 512)
 #define PBF_IO_CHUNKSIZE 	65536
 #define PBF_MAX_MAPS		1 /* TODO: XFS_BMAP_MAX_NMAP? */
@@ -636,6 +631,13 @@ __pb_match_offset_to_mapping(
 	full_offset = page->index << PAGE_CACHE_SHIFT;	/* from file start */
 	full_offset += offset;			/* include from page start */
 
+	/* first check the mapping doesn't come up short, unexpectedly */
+	if (full_offset < (map[0].pbm_offset + map[0].pbm_delta)) {
+		printk("ERROR: file IO path map start not aligned\n");
+		printk("full=%lld; pbm_offset=%lld + pbm_delta=%d\n",
+			full_offset, map[0].pbm_offset, map[0].pbm_delta);
+		BUG();
+	}
 	for (i = *index; i < nmaps; i++) {
 		if (map[i].pbm_offset + map[i].pbm_bsize > full_offset)
 			break;
@@ -1007,7 +1009,6 @@ __pb_block_commit_write_async(
 	int			partial)
 {
 	struct buffer_head	*bh, *head;
-	int			nr = 0;
 
 	/*
 	 * Prepare write took care of reading/zero-out
@@ -1038,19 +1039,16 @@ __pb_block_commit_write_async(
 			if (need_balance_dirty) {
 				buffer_insert_inode_data_queue(bh, inode);
 				if (!partial)
-					nr++;
+					balance_dirty();
 			}
 		}
 		else {
-			nr++;
 			bh->b_state = (1 << BH_Delay) | (1 << BH_Mapped);
 			__mark_buffer_dirty(bh);
 			buffer_insert_inode_data_queue(bh, inode);
+			balance_dirty();
 		}
 	} while ((bh = bh->b_this_page) != head);
-
-	if (nr)
-		balance_dirty();
 }
 
 STATIC int
@@ -1422,7 +1420,7 @@ submit_page_io(struct page *page)
 
 	bh = head = page_buffers(page);
 	do {
-		if (buffer_uptodate(bh))
+		if (buffer_uptodate(bh) && !buffer_dirty(bh))
 			continue;
 		assert(buffer_mapped(bh));
 		assert(!buffer_delay(bh));
@@ -1484,7 +1482,7 @@ remap:
 				maps, PBF_MAX_MAPS, nmaps, flags);
 			if (nr)
 				return nr;
-#if 1	/* PAGEBUF_DEBUG? */
+#ifdef PAGEBUF_DEBUG
 			for (nr = 0; nr < *nmaps; nr++) {
 				if ((mp[nr].pbm_flags & PBMF_HOLE)) {
 					printk(
@@ -1494,7 +1492,7 @@ remap:
 					BUG();
 				}
 			}
-#endif
+#endif /* PAGEBUF_DEBUG */
 		}
 		tmp = __pb_match_offset_to_mapping(page, mp, *nmaps,
 							offset, &index);
@@ -1524,7 +1522,7 @@ remap:
  * delalloc pages only, for the original page it is possible that
  * the page has no mapping at all.
  */
-STATIC void
+STATIC int
 convert_page(
 	pb_target_t		*target,
 	struct inode		*inode,
@@ -1535,13 +1533,18 @@ convert_page(
 	pagebuf_bmap_fn_t	bmap,	/* bmap function */
 	int			async_write)
 {
-	map_page(target, inode, page, maps, nmaps, bmap, flags);
+	int			rval;
+
+	rval = map_page(target, inode, page, maps, nmaps, bmap, flags);
+	if (rval)
+		return rval;
 
 	if (async_write) {
 		submit_page_io(page);
 	}
 
 	page_cache_release(page);
+	return 0;
 }
 
 /*
@@ -1562,26 +1565,31 @@ cluster_write(
 	unsigned long		tindex, tlast;
 	struct page		*page;
 	loff_t			sz = 0;
-	int			i;
+	int			i, rval;
 
 	if (startpage->index != 0) {
+		size_t		delta = mp[0].pbm_delta;
+
+		/* nathans TODO -- must page align from pbm_offset
+		 * for multiple blocksizes */
+
+		mp[0].pbm_delta = 0;
 		tlast = mp[0].pbm_offset >> PAGE_CACHE_SHIFT;
-		/*
-		 * NB: This mapping is guaranteed to cover full pages
-		 * by the above calculation and because its actually a
-		 * mapping for "startpage" not "page".  Hence bmap can
-		 * be passed in as NULL below, ensuring this is true.
-		 */
 		for (tindex = startpage->index-1; tindex >= tlast; tindex--) {
 			if (!(page = probe_page(inode, tindex)))
 				break;
-			convert_page(target, inode, page,
+			rval = convert_page(target, inode, page,
 						mp, &nmaps, flags, NULL, 1);
+			if (rval)
+				return rval;
 		}
+		mp[0].pbm_delta = delta;
 	}
 
-	convert_page(target, inode, startpage,
+	rval = convert_page(target, inode, startpage,
 				mp, &nmaps, flags, bmap, async_write);
+	if (rval)
+		return rval;
 
 	for (i = 0; i < nmaps; i++)
 		sz += mp[i].pbm_bsize;
@@ -1590,10 +1598,12 @@ cluster_write(
 	for (tindex = startpage->index + 1; tindex < tlast; tindex++) {
 		if (!(page = probe_page(inode, tindex)))
 			break;
-		convert_page(target, inode, page,
+		rval = convert_page(target, inode, page,
 					mp, &nmaps, flags, NULL, 1);
+		if (rval)
+			return rval;
 	}
-	return 0;
+	return rval;
 }
 
 STATIC int
@@ -1625,8 +1635,7 @@ pagebuf_delalloc_convert(
 		}
 	}
 
-	/*
-	 * Get an initial mapping - the extent(s) returned are
+	/* Get an initial mapping - the extent(s) returned are
 	 * only guaranteed to cover the first block, but may
 	 * also cover multiple pages surrounding this page (we
 	 * want to write 'em all if they're delalloc) and also

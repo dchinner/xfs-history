@@ -43,6 +43,11 @@
 #define PB_DEFINE_TRACES
 #include "page_buf_trace.h"
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,9)
+#define page_buffers(page)	((page)->buffers)
+#define page_has_buffers(page)	((page)->buffers)
+#endif
+
 #define PAGE_CACHE_OFF_LL	((long long)(PAGE_CACHE_SIZE-1))
 #define PAGE_CACHE_MASK_LL	(~((long long)(PAGE_CACHE_SIZE-1)))
 #define PAGE_CACHE_ALIGN_LL(addr) \
@@ -182,19 +187,8 @@ extern int _pagebuf_find_lockable_buffer(
 			page_buf_t **, page_buf_t *);
 
 extern int _pagebuf_initialize(
-		page_buf_t *,
-		struct pb_target *,
-		loff_t,
-		size_t,
-		page_buf_flags_t);
-
-extern page_buf_bmap_t *
-__pb_match_offset_to_mapping(
-		struct page *, page_buf_bmap_t *, int, unsigned long, int *);
-extern void
-__pb_map_buffer_at_offset(
-		pb_target_t *, struct page *, struct buffer_head *,
-		unsigned long, int, page_buf_bmap_t *);
+			page_buf_t *, pb_target_t *, loff_t,
+			size_t, page_buf_flags_t);
 
 extern int pagebuf_locking_init(void);
 extern void pagebuf_locking_terminate(void);
