@@ -4,7 +4,8 @@
 
 WORKAREA ?= `pwd`
 
-KERN_SPECS = kernel-2.4.spec
+KERN_SPEC = kernel-2.4.spec
+KERNEL_VERSION = 2.4.0-test5
 
 SGI_VERSION = `cat $(WORKAREA)/SPECS/_sgi_kvers_`
 
@@ -24,13 +25,13 @@ tarballs: xfs-cmds
 i386kernel:
 	@echo "=== Making $@ `date`"; \
 	cd $(WORKAREA)/SPECS; \
-	rpm -ba --target i386 ${KERN_SPECS}; \
+	rpm -ba --target i386 ${KERN_SPEC}; \
 	echo "=== Done Making $@ `date`"
 
 i686kernel:
 	@echo "=== Making $@ `date`"; \
 	cd $(WORKAREA)/SPECS; \
-	rpm -ba --target i686 ${KERN_SPECS}; \
+	rpm -ba --target i686 ${KERN_SPEC}; \
 	echo "=== Done Making $@ `date`"
 
 i386cmd: xfs-cmds
@@ -51,12 +52,12 @@ clean:
 	cd $(WORKAREA)/cmd/xfs && make clean
 
 realclean: clean
-	rm -rf linux-2.4.0
+	rm -rf linux-${KERNEL_VERSION}
 	rm -f kern
-	rm -f SOURCES/linux-2.4.0.tar.bz2 SOURCES/xfs-cmds-*.tar.gz
-	if [ -e SPECS/kernel-2.4.spec.old ] ; then \
-		rm SPECS/kernel-2.4.spec; \
-		mv SPECS/kernel-2.4.spec.old SPECS/kernel-2.4.spec; \
+	rm -f SOURCES/linux-${KERNEL_VERSION}.tar.bz2 SOURCES/xfs-cmds-*.tar.gz
+	if [ -e SPECS/${KERN_SPEC}.old ] ; then \
+		rm SPECS/${KERN_SPEC}; \
+		mv SPECS/${KERN_SPEC}.old SPECS/${KERN_SPEC}; \
 	fi
 	cd $(WORKAREA)/cmd/xfs && make realclean
 
