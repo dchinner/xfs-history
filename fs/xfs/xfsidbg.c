@@ -83,7 +83,6 @@
 MODULE_AUTHOR("Silicon Graphics, Inc.");
 MODULE_DESCRIPTION("Additional kdb commands for debugging XFS");
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;
 
 #define qprintf	kdb_printf
 
@@ -2332,17 +2331,24 @@ static void	printinode(struct inode *ip)
 	if (ip == NULL)
 		return;
 
-	kdb_printf(" i_ino = %lu i_count = %u i_dev = 0x%x i_size %Ld\n",
+	kdb_printf(" i_ino = %lu i_count = %u i_size %Ld\n",
 					ip->i_ino, atomic_read(&ip->i_count),
-					kdev_t_to_nr(ip->i_dev), ip->i_size);
-
+					ip->i_size);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 	kdb_printf(
 		" i_mode = 0x%x  i_nlink = %d  i_rdev = 0x%x i_state = 0x%lx\n",
 					ip->i_mode, ip->i_nlink,
 					kdev_t_to_nr(ip->i_rdev), ip->i_state);
-
-	kdb_printf(" i_hash.nxt = 0x%p i_hash.prv = 0x%p\n",
-					ip->i_hash.next, ip->i_hash.prev);
+	kdb_printf(" i_hash.nxt = 0x%p i_hash.pprv = 0x%p\n",
+                                        ip->i_hash.next, ip->i_hash.prev);
+#else
+	kdb_printf(
+		" i_mode = 0x%x  i_nlink = %d  i_rdev = 0x%x i_state = 0x%lx\n",
+					ip->i_mode, ip->i_nlink,
+					ip->i_rdev, ip->i_state);
+	kdb_printf(" i_hash.nxt = 0x%p i_hash.pprv = 0x%p\n",
+                                        ip->i_hash.next, ip->i_hash.pprev);
+#endif
 	kdb_printf(" i_list.nxt = 0x%p i_list.prv = 0x%p\n",
 					ip->i_list.next, ip->i_list.prev);
 	kdb_printf(" i_dentry.nxt = 0x%p i_dentry.prv = 0x%p\n",
@@ -2693,7 +2699,7 @@ pb_trace_core(
 		kdb_symbol_print((unsigned long)trace->ra, NULL,
 			KDB_SP_SPACEB|KDB_SP_PAREN|KDB_SP_NEWLINE);
 		kdb_printf("    offset 0x%Lx size 0x%lx task 0x%p\n",
-			   trace->offset, trace->size, trace->task);
+			   trace->offset, (long)trace->size, trace->task);
 		kdb_printf("    flags: %s\n",
 			   pb_flags(trace->flags));
 	}
@@ -3813,7 +3819,7 @@ xfs_dir2_trace_entry(ktrace_entry_t *ktep)
 			ktep->val[8]);
 		break;
 	case XFS_DIR2_KTRACE_ARGS_I:
-		qprintf(" i 0x%llx", (unsigned long long)ktep->val[7]);
+		qprintf(" i 0x%lx", (unsigned long)ktep->val[7]);
 		break;
 	case XFS_DIR2_KTRACE_ARGS_S:
 		qprintf(" s 0x%x", (int)(__psint_t)ktep->val[7]);
@@ -6409,8 +6415,8 @@ xfsidbg_xlog(xlog_t *log)
 			xfsidbg_get_cstate(log->l_covered_state));
 	kdb_printf("flags: ");
 	printflags(log->l_flags, t_flags,"log");
-	kdb_printf("  dev: 0x%x logBBstart: %lld logsize: %d logBBsize: %d\n",
-		log->l_dev, (long long) log->l_logBBstart,
+	kdb_printf("  logBBstart: %lld logsize: %d logBBsize: %d\n",
+		(long long) log->l_logBBstart,
 		log->l_logsize,log->l_logBBsize);
 	kdb_printf("curr_cycle: %d  prev_cycle: %d  curr_block: %d  prev_block: %d\n",
 	     log->l_curr_cycle, log->l_prev_cycle, log->l_curr_block,
