@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.38 $"
+#ident "$Revision: 1.40 $"
 
 struct getbmap;
 struct xfs_bmbt_rec;
@@ -234,6 +234,7 @@ xfs_bunmapi(
 	struct xfs_inode	*ip,		/* incore inode */
 	xfs_fileoff_t		bno,		/* starting offset to unmap */
 	xfs_extlen_t		len,		/* length to unmap in file */
+	int			flags,		/* XFS_BMAPI_... */
 	xfs_extnum_t		nexts,		/* number of extents max */
 	xfs_fsblock_t		firstblock,	/* controls a.g. for allocs */
 	xfs_bmap_free_t		*flist,		/* i/o: list extents to free */

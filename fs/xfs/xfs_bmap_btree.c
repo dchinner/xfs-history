@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.43 $"
+#ident	"$Revision: 1.48 $"
 
 #include <sys/param.h>
 #include <sys/vnode.h>
@@ -549,6 +549,7 @@ xfs_bmbt_delrec(
 	}
 	xfs_bmap_add_free(XFS_DADDR_TO_FSB(l->mp, l->rbp->b_blkno), 1,
 		cur->bc_private.b.flist, l->mp);
+	xfs_trans_set_sync(cur->bc_tp);
 	cur->bc_private.b.ip->i_d.di_nblocks--;
 	xfs_trans_log_inode(cur->bc_tp, cur->bc_private.b.ip, XFS_ILOG_CORE);
 	xfs_trans_binval(cur->bc_tp, l->rbp);
@@ -897,6 +898,7 @@ xfs_bmbt_killroot(
 	bcopy((caddr_t)cpp, (caddr_t)pp, block->bb_numrecs * (int)sizeof(*pp));
 	xfs_bmap_add_free(XFS_DADDR_TO_FSB(cur->bc_mp, cbp->b_blkno), 1,
 		cur->bc_private.b.flist, cur->bc_mp);
+	xfs_trans_set_sync(cur->bc_tp);
 	ip->i_d.di_nblocks--;
 	xfs_trans_binval(cur->bc_tp, cbp);
 	cur->bc_bufs[level - 1] = NULL;
