@@ -391,19 +391,18 @@ linvfs_write_super(
 int
 linvfs_statfs(
 	struct super_block *sb,
-	struct statfs	*statfsbuf,
+	struct statfs	*buf,
 	int		size)
 {
 	vfs_t		*vfsp = LINVFS_GET_VFS(sb);
 	vnode_t		*rootvp;
 	statvfs_t	stat;
 
-	struct statfs	sfs;
 	int		error;
 	
 	VFS_ROOT(vfsp, &rootvp, error);
 	if (error){
-	  return(-error);
+		return(-error);
 	}
 
 	VFS_STATVFS(vfsp, &stat, rootvp, error);
@@ -411,26 +410,21 @@ linvfs_statfs(
 	VN_RELE(rootvp);
 
 	if (error){
-	  return(-error);
+		return(-error);
 	}
 
 
-	memset(&sfs, 0, sizeof(struct statfs));
-
-	sfs.f_type = XFS_SB_MAGIC;
-	sfs.f_bsize = stat.f_bsize;
-	sfs.f_blocks = stat.f_blocks;
-	sfs.f_bfree = stat.f_bfree;
-	sfs.f_bavail = stat.f_bavail;
-	sfs.f_files = stat.f_files;
-	sfs.f_ffree = stat.f_ffree;
+	buf->f_type = XFS_SB_MAGIC;
+	buf->f_bsize = stat.f_bsize;
+	buf->f_blocks = stat.f_blocks;
+	buf->f_bfree = stat.f_bfree;
+	buf->f_bavail = stat.f_bavail;
+	buf->f_files = stat.f_files;
+	buf->f_ffree = stat.f_ffree;
 	/* sfs.f_fsid = stat.f_fsid; JIMJIMJIM Fix this??? */
-	sfs.f_namelen = stat.f_namemax;
+	buf->f_namelen = stat.f_namemax;
 
-	error = copy_to_user(statfsbuf, &sfs,
-		(size < sizeof(struct statfs)) ? size : sizeof(struct statfs));
-
-	return(error);
+	return 0;
 }
 
 
