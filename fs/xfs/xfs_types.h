@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_TYPES_H
 #define	_FS_XFS_TYPES_H
 
-#ident	"$Revision: 1.16 $"
+#ident	"$Revision: 1.18 $"
 
 /*
  * xFS types
@@ -44,6 +44,7 @@ typedef __uint32_t	xfs_agblock_t;	/* blockno in alloc. group */
 typedef	__uint32_t	xfs_extlen_t;	/* extent length in blocks */
 typedef	__uint32_t	xfs_agnumber_t;	/* allocation group number */
 typedef __int32_t	xfs_extnum_t;	/* # of extents in a file */
+typedef __int16_t	xfs_attrextnm_t;/* # extents in an attribute fork */
 typedef	__int64_t	xfs_fsize_t;	/* bytes in a file */
 
 typedef	__int32_t	xfs_suminfo_t;	/* type of bitmap summary info */
