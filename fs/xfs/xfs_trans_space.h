@@ -1,7 +1,7 @@
 #ifndef _XFS_TRANS_SPACE_H
 #define _XFS_TRANS_SPACE_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.1 $"
 
 /*
  * Components of space reservations.
@@ -37,6 +37,8 @@
 	(XFS_EXTENTADD_SPACE_RES(mp, XFS_DATA_FORK) + (v))
 #define	XFS_GROWFS_SPACE_RES(mp)	\
 	(2 * XFS_AG_MAXLEVELS(mp))
+#define	XFS_GROWFSRT_SPACE_RES(mp,b)	\
+	((b) + XFS_EXTENTADD_SPACE_RES(mp, XFS_DATA_FORK))
 #define	XFS_LINK_SPACE_RES(mp,n)	\
 	XFS_DIRENTER_SPACE_RES(mp,n)
 #define	XFS_MKDIR_SPACE_RES(mp,n)	\
