@@ -97,7 +97,6 @@ _xfs_force_shutdown(
 	char		*fname,
 	int		lnnum)
 {
-	int             ntries;
 	int             logerror;
 
 #if defined(XFSDEBUG) && 0
@@ -160,32 +159,9 @@ _xfs_force_shutdown(
 	}
 
 	/*
-	 * Release all delayed write buffers for this device.
-	 * It wouldn't be a fatal error if we couldn't release all
-	 * delwri bufs; in general they all get unpinned eventually.
+	 * Any delwri buffers left over for this device will be caught
+	 * in the write path and destroyed. (pagebuf_write_full_page)
 	 */
-	ntries = 0;
-#ifdef XFSERRORDEBUG
-	{
-		int nbufs;
-		while (nbufs = xfs_incore_relse(&mp->m_ddev_targ, 1, 0)) {
-			printf("XFS: released 0x%x bufs\n", nbufs);
-			if (ntries >= XFS_MAX_DRELSE_RETRIES) {
-				printf("XFS: ntries 0x%x\n", ntries);
-				debug("ntries");
-				break;
-			}
-			delay(++ntries * 5);
-		}
-	}
-#else
-	while (xfs_incore_relse(&mp->m_ddev_targ, 1, 0)) {
-		if (ntries >= XFS_MAX_DRELSE_RETRIES)
-			break;
-		delay(++ntries * 5);
-	}
-
-#endif
 
 #if CELL_CAPABLE
 	if (cell_enabled && !(flags & XFS_SHUTDOWN_REMOTE_REQ) &&

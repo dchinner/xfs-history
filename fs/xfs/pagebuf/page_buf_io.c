@@ -754,8 +754,12 @@ int pagebuf_write_full_page(struct page *page, pagebuf_bmap_fn_t bmap)
 	kunmap(page);
 out:
 	if (ret < 0) {
+		/*
+		 * If it's delalloc and we have nowhere to put it,
+		 * throw it away.
+		 */
 		if (DelallocPage(page))
-			_unmark_delalloc(page);
+			block_flushpage(page, 0);
 		ClearPageUptodate(page);
 		UnlockPage(page);
 	}
