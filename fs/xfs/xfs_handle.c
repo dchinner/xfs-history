@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.31 $"
+#ident "$Revision: 1.32 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -127,7 +127,9 @@ fd_to_handle (
 	error = getf (fd, &fp);
 	if (error)
 		return error;
-	vp = fp->vf_vnode;
+	if (!VF_IS_VNODE(fp))
+		return EINVAL;
+	vp = VF_TO_VNODE(fp);
 	error = vp_to_handle (vp, &handle);
 	if (error)
 		return error;
@@ -254,7 +256,7 @@ open_by_handle (
 	if (error)
 		vfile_alloc_undo(fd, fp);
 	else {
-		fp->vf_vnode = vp;
+		VF_SET_VNODE(fp, vp);
 		rvp->r_val1 = fd;
 		vfile_ready (fp);
 	}

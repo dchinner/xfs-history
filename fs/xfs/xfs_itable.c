@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.45 $"
+#ident	"$Revision: 1.46 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -629,7 +629,10 @@ xfs_fd_to_mp(
 
 	if (error = getf(fd, &fp))
 		return XFS_ERROR(error);
-	vp = fp->vf_vnode;
+	if (!VF_IS_VNODE(fp))
+		return XFS_ERROR(EINVAL);
+
+	vp = VF_TO_VNODE(fp);
 	if (vp->v_type == VBLK || vp->v_type == VCHR) {
 		if (wperm && !(fp->vf_flag & FWRITE))
 			return XFS_ERROR(EPERM);

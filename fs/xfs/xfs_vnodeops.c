@@ -1,4 +1,4 @@
-#ident "$Revision: 1.270 $"
+#ident "$Revision: 1.271 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -7428,7 +7428,10 @@ xfs_get_inumber_fs_dev( int fdes, xfs_ino_t *ino, dev_t *dev)
 		return( -1 );
 	}
 
-	vp = fp->vf_vnode;
+	if (!VF_IS_VNODE(fp)) {
+		return( -1 );
+	}
+	vp = VF_TO_VNODE(fp);
 	bhp = VN_BHV_HEAD(vp);
 	BHV_READ_LOCK(bhp);
 	bdp = bhv_lookup(bhp, &xfs_vnodeops);

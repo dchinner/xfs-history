@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.70 1996/09/17 16:00:09 henseler Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.71 1996/10/02 22:31:44 pjr Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -319,7 +319,10 @@ xfs_grio_get_inumber( int fdes )
 		return( (xfs_ino_t)0 );
 	}
 
-	vp = fp->vf_vnode;
+	if (!VF_IS_VNODE(fp)) {
+		return( (xfs_ino_t)0 );
+	}
+	vp = VF_TO_VNODE(fp);
 	bhp = VN_BHV_HEAD(vp);
 	BHV_READ_LOCK(bhp);
 	bdp = bhv_lookup(bhp, &xfs_vnodeops);
@@ -358,7 +361,10 @@ xfs_grio_get_fs_dev( int fdes )
 		return( 0 );
 	}
 
-	vp = fp->vf_vnode;
+	if (!VF_IS_VNODE(fp)) {
+		return( 0 );
+	}
+	vp = VF_TO_VNODE(fp);
 	bhp = VN_BHV_HEAD(vp);
 	BHV_READ_LOCK(bhp);
 	bdp = bhv_lookup(bhp, &xfs_vnodeops);
