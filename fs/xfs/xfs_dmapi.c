@@ -31,6 +31,7 @@
  */
 
 #include <xfs.h>
+#include <linux/xfs_iops.h> /* linvfs_revalidate_core() */
 
 #define MAXNAMLEN MAXNAMELEN
 
@@ -990,7 +991,6 @@ xfs_dm_rdwr(
 	ssize_t		xfer;
 	vnode_t		*vp = BHV_TO_VNODE(bdp);
 	struct file	file;
-	ssize_t		ret;
 	struct inode	*ip;
 	struct dentry	*dentry;
 	uio_t		uio;
@@ -1062,19 +1062,17 @@ xfs_dm_rdwr(
 	uio.uio_iov->iov_len = uio.uio_resid = len;
 
 	if (fflag & FMODE_READ) {
-		VOP_READ(vp, &uio, 0, NULL, NULL, ret);
+		VOP_READ(vp, &uio, 0, NULL, NULL, error);
 	} else {
-		VOP_WRITE(vp, &uio, 0, NULL, NULL, ret);
+		VOP_WRITE(vp, &uio, 0, NULL, NULL, error);
 	}
 
 	dput(dentry);
 
-	error = 0;
-	if( ret < 0 )
-		error = ret;
+	if (!error)
+		linvfs_revalidate_core(ip, ATTR_COMM);
 
-	*rvp = xfer = ret;
-
+	*rvp = xfer = len - uio.uio_resid;
 
 	if (fflag & FMODE_READ) {
 	        XFS_STATS_ADD(xfsstats.xs_read_bytes, xfer);
