@@ -1,4 +1,4 @@
-#ident "$Revision: 1.224 $"
+#ident "$Revision: 1.225 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -6098,7 +6098,7 @@ xfs_refcache_purge_mp(
 			/*
 			 * Make sure the don't hold the lock for too long.
 			 */
-			if (i % 16 == 0) {
+			if ((i & 15) == 0) {
 				mp_mutex_spinunlock(&xfs_refcache_lock, s);
 				s = mp_mutex_spinlock(&xfs_refcache_lock);
 			}
