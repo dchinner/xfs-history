@@ -1,4 +1,4 @@
-#ident "$Revision: 1.229 $"
+#ident "$Revision: 1.230 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -491,9 +491,16 @@ xfs_iformat(
 					ip->i_ino, ip->i_mount->m_fsname);
 				return XFS_ERROR(EINVAL);
 			}
-			size = (int)ip->i_d.di_size;
-			error = xfs_iformat_local(ip, dip, XFS_DATA_FORK,
-						  size);
+			if (dip->di_core.di_size >
+			    XFS_DFORK_DSIZE(dip, ip->i_mount)) {
+				cmn_err(CE_WARN,
+					"corrupt inode %lld (bad size %lld for local inode) in filesystem \"%s\".  Unmount and run xfs_repair.",
+					ip->i_ino, dip->di_core.di_size,
+					ip->i_mount->m_fsname);
+				return XFS_ERROR(EIO);
+			}
+			size = (int)dip->di_core.di_size;
+			error = xfs_iformat_local(ip, dip, XFS_DATA_FORK, size);
 			break;
 		case XFS_DINODE_FMT_EXTENTS:
 			error = xfs_iformat_extents(ip, dip, XFS_DATA_FORK);
@@ -568,8 +575,10 @@ xfs_iformat_local(
 	 */
 	if (size > XFS_DFORK_SIZE(dip, ip->i_mount, whichfork)) {
 		cmn_err(CE_WARN,
-			"corrupt inode %lld (bad fork size %d for local inode) in filesystem \"%s\".  Unmount and run xfs_repair.",
-			ip->i_ino, size, ip->i_mount->m_fsname);
+			"corrupt inode %lld (bad size %d for local fork, size = %d) in filesystem \"%s\".  Unmount and run xfs_repair.",
+			ip->i_ino, size,
+			XFS_DFORK_SIZE(dip, ip->i_mount, whichfork),
+			ip->i_mount->m_fsname);
 		return XFS_ERROR(EIO);
 	}
 	ifp = XFS_IFORK_PTR(ip, whichfork);
@@ -614,12 +623,12 @@ xfs_iformat_extents(
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	nex = XFS_DFORK_NEXTENTS(dip, whichfork);
 	size = nex * (int)sizeof(xfs_bmbt_rec_t);
+
 	/*
 	 * If the number of extents is unreasonable, then something
 	 * is wrong and we just bail out rather than crash in
 	 * kmem_alloc() or bcopy() below.
 	 */
-
 	if (size > XFS_DFORK_SIZE(dip, ip->i_mount, whichfork)) {
 		cmn_err(CE_WARN,
 			"corrupt inode %lld ((a)extents = %d) in filesystem \"%s\".  Unmount and run xfs_repair.",
@@ -2893,39 +2902,46 @@ xfs_iflush(
 	 */
 	xfs_dir_shortform_validate(mp, ip);
 
-	if (dip->di_core.di_magic != XFS_DINODE_MAGIC) {
-		cmn_err(CE_ALERT,
+	if (XFS_TEST_ERROR(dip->di_core.di_magic != XFS_DINODE_MAGIC,
+				mp, XFS_ERRTAG_IFLUSH_1)) {
+		xfs_cmn_err(XFS_PTAG_IFLUSH, CE_ALERT,
 			"xfs_iflush: Bad dinode %lld magic number 0x%x, ptr 0x%x, in filesystem \"%s\"",
 			ip->i_ino, (int) dip->di_core.di_magic,
 			dip, mp->m_fsname);
 		goto corrupt_out;
 	}
-	if (ip->i_d.di_magic != XFS_DINODE_MAGIC) {
-		cmn_err(CE_ALERT,
+	if (XFS_TEST_ERROR(ip->i_d.di_magic != XFS_DINODE_MAGIC,
+				mp, XFS_ERRTAG_IFLUSH_2)) {
+		xfs_cmn_err(XFS_PTAG_IFLUSH, CE_ALERT,
 			"xfs_iflush: Bad inode %lld, ptr 0x%x, magic number 0x%x, in filesystem \"%s\"",
 			ip->i_ino, ip, ip->i_d.di_magic, mp->m_fsname);
 		goto corrupt_out;
 	}
 	if ((ip->i_d.di_mode & IFMT) == IFREG) {
-		if ((ip->i_d.di_format != XFS_DINODE_FMT_EXTENTS) &&
-		    (ip->i_d.di_format != XFS_DINODE_FMT_BTREE)) {
-			cmn_err(CE_ALERT,
+		if (XFS_TEST_ERROR(
+		    (ip->i_d.di_format != XFS_DINODE_FMT_EXTENTS) &&
+		    (ip->i_d.di_format != XFS_DINODE_FMT_BTREE),
+		    mp, XFS_ERRTAG_IFLUSH_3)) {
+			xfs_cmn_err(XFS_PTAG_IFLUSH, CE_ALERT,
 				"xfs_iflush: Bad regular inode %lld, ptr 0x%x, in filesystem \"%s\"",
 				ip->i_ino, ip, mp->m_fsname);
 			goto corrupt_out;
 		}
 	} else if ((ip->i_d.di_mode & IFMT) == IFDIR) {
-		if ((ip->i_d.di_format != XFS_DINODE_FMT_EXTENTS) &&
+		if (XFS_TEST_ERROR(
+		    (ip->i_d.di_format != XFS_DINODE_FMT_EXTENTS) &&
 		    (ip->i_d.di_format != XFS_DINODE_FMT_BTREE) &&
-		    (ip->i_d.di_format != XFS_DINODE_FMT_LOCAL)) {
-			cmn_err(CE_ALERT,
+		    (ip->i_d.di_format != XFS_DINODE_FMT_LOCAL),
+		    mp, XFS_ERRTAG_IFLUSH_4)) {
+			xfs_cmn_err(XFS_PTAG_IFLUSH, CE_ALERT,
 				"xfs_iflush: Bad directory inode %lld, ptr 0x%x, in filesystem \"%s\"",
 				ip->i_ino, ip, mp->m_fsname);
 			goto corrupt_out;
 		}
 	}
-	if (ip->i_d.di_nextents + ip->i_d.di_anextents > ip->i_d.di_nblocks) {
-		cmn_err(CE_ALERT,
+	if (XFS_TEST_ERROR(ip->i_d.di_nextents + ip->i_d.di_anextents >
+				ip->i_d.di_nblocks, mp, XFS_ERRTAG_IFLUSH_5)) {
+		xfs_cmn_err(XFS_PTAG_IFLUSH, CE_ALERT,
 			"xfs_iflush: detected corrupt incore inode %lld in filesystem \"%s\", total extents = %d, nblocks = %d, ptr 0x%x",
 			ip->i_ino,
 			mp->m_fsname,
@@ -2934,8 +2950,9 @@ xfs_iflush(
 			ip);
 		goto corrupt_out;
 	}
-	if (ip->i_d.di_forkoff > mp->m_sb.sb_inodesize) {
-		cmn_err(CE_ALERT,
+	if (XFS_TEST_ERROR(ip->i_d.di_forkoff > mp->m_sb.sb_inodesize,
+				mp, XFS_ERRTAG_IFLUSH_6)) {
+		xfs_cmn_err(XFS_PTAG_IFLUSH, CE_ALERT,
 			"xfs_iflush: bad inode %lld, forkoff 0x%x, ptr 0x%x, in filesystem \"%s\"",
 			ip->i_ino, ip->i_d.di_forkoff, ip, mp->m_fsname);
 		goto corrupt_out;
@@ -3120,6 +3137,7 @@ xfs_iflush(
 	return XFS_ERROR(error);
 
 corrupt_out:
+	brelse(bp);
 	xfs_ifunlock(ip);
 	xfs_force_shutdown(mp, XFS_CORRUPT_INCORE);
 	return XFS_ERROR(EFSCORRUPTED);
