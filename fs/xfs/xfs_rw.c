@@ -1,4 +1,4 @@
-#ident "$Revision: 1.257 $"
+#ident "$Revision: 1.258 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -228,6 +228,13 @@ xfs_diordwr(
 	int		ioflag,
 	cred_t		*credp,
 	uint64_t	rw);
+
+STATIC int
+xfs_dio_write_zero_rtarea(
+	xfs_inode_t	*ip,
+	struct buf	*bp,
+	xfs_fileoff_t	*off_fsb,
+	xfs_filblks_t	*cnt_fsb);
 
 extern int
 grio_io_is_guaranteed(
@@ -7096,6 +7103,117 @@ xfs_inval_cached_pages(
 	}
 }
 
+/*
+ * A user has written some portion of a realtime extent. We need to zero
+ * what remains, so the caller can mark the entire realtime extent as
+ * written.
+ */
+STATIC int
+xfs_dio_write_zero_rtarea(
+	xfs_inode_t	*ip,
+	struct buf	*bp,
+	xfs_fileoff_t	*off_fsb,
+	xfs_filblks_t	*cnt_fsb)
+{
+	char		*buf;
+	long		bufsize, remain_count;
+	xfs_filblks_t	count_fsb = *cnt_fsb;
+	int		error;
+	xfs_mount_t	*mp;
+	struct bdevsw	*my_bdevsw;
+	xfs_bmbt_irec_t	imaps[XFS_BMAP_MAX_NMAP], *imapp;
+	buf_t		*nbp;
+	xfs_fileoff_t	offset_fsb = *off_fsb;
+	int		reccount, sbrtextsize;
+	xfs_fsblock_t	firstfsb;
+	xfs_fileoff_t	zero_offset_fsb, limit_offset_fsb;
+	xfs_fileoff_t	orig_zero_offset_fsb;
+	xfs_filblks_t	zero_count_fsb;
+
+	ASSERT(ip->i_d.di_flags & XFS_DIFLAG_REALTIME);
+	mp = ip->i_mount;
+	sbrtextsize = mp->m_sb.sb_rextsize;
+	/* Arbitrarily limit the buffer size to 32 FS blocks or less. */
+	if (sbrtextsize <= 32)
+		bufsize = XFS_FSB_TO_B(mp, sbrtextsize);
+	else
+		bufsize = mp->m_sb.sb_blocksize * 32;
+	ASSERT(sbrtextsize > 0 && bufsize > 0);
+	limit_offset_fsb = (((offset_fsb + count_fsb + sbrtextsize - 1)
+				/ sbrtextsize ) * sbrtextsize );
+	zero_offset_fsb = offset_fsb - (offset_fsb % sbrtextsize);
+	orig_zero_offset_fsb = zero_offset_fsb;
+	zero_count_fsb = limit_offset_fsb - zero_offset_fsb;
+	reccount = 1;
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+
+	/* Discover the full realtime extent affected */
+
+	error = xfs_bmapi(NULL, ip, zero_offset_fsb, 
+			  zero_count_fsb, 0, &firstfsb, 0, imaps, 
+			  &reccount, 0);
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	imapp = &imaps[0];
+	if (error)
+		return error;
+
+	buf = (char *)kmem_alloc(bufsize, KM_SLEEP|KM_CACHEALIGN);
+	bzero(buf, bufsize);
+	nbp = getphysbuf(bp->b_edev);
+	nbp->b_grio_private = bp->b_grio_private;
+						/* b_iopri */
+     	nbp->b_error     = 0;
+	nbp->b_edev	 = bp->b_edev;
+	nbp->b_un.b_addr = buf;
+	my_bdevsw	 = get_bdevsw(nbp->b_edev);
+	ASSERT(my_bdevsw != NULL);
+
+	/* Loop while there are blocks that need to be zero'ed */
+
+	while (zero_offset_fsb < limit_offset_fsb) {
+		remain_count = 0;
+		if (zero_offset_fsb < offset_fsb)
+			remain_count = offset_fsb - zero_offset_fsb;
+		else if (zero_offset_fsb >= (offset_fsb + count_fsb))
+			remain_count = limit_offset_fsb - zero_offset_fsb;
+		else {
+			zero_offset_fsb += count_fsb;
+			continue;
+		}
+		remain_count = XFS_FSB_TO_B(mp, remain_count);
+		nbp->b_flags     = bp->b_flags;
+		nbp->b_bcount    = (bufsize < remain_count) ? bufsize :
+						remain_count;
+ 	    	nbp->b_error     = 0;
+		nbp->b_blkno     = XFS_FSB_TO_BB(mp, imapp->br_startblock +
+				    (zero_offset_fsb - orig_zero_offset_fsb));
+		(void) bdstrat(my_bdevsw, nbp);
+		if ((error = geterror(nbp)) != 0)
+			break;
+		biowait(nbp);
+		/* Stolen directly from xfs_dio_write */
+		nbp->b_flags &= ~B_GR_BUF;	/* Why? B_PRV_BUF? */
+		if ((error = geterror(nbp)) != 0)
+			break;
+		else if (nbp->b_resid)
+			nbp->b_bcount -= nbp->b_resid;
+			
+		zero_offset_fsb += XFS_B_TO_FSB(mp, nbp->b_bcount);
+	}
+	/* Clean up for the exit */
+	nbp->b_flags		= 0;
+	nbp->b_bcount		= 0;
+	nbp->b_un.b_addr	= 0;
+	nbp->b_grio_private	= 0;	/* b_iopri */
+ 	putphysbuf( nbp );
+	kmem_free(buf, bufsize);
+	if (!error) {
+		*off_fsb = orig_zero_offset_fsb;
+		*cnt_fsb = zero_count_fsb;
+	}
+				
+	return error;
+}
 
 /*
  * xfs_dio_read()
@@ -7707,6 +7825,14 @@ retry:
 			break;
 		
 		if (unwritten) {
+			offset_fsb = XFS_B_TO_FSBT(mp, offset_this_req);
+			count_fsb = XFS_B_TO_FSB(mp, bytes_this_req);
+			if (rt && ((count_fsb % sbrtextsize) != 0)) {
+				error = xfs_dio_write_zero_rtarea(ip, bp,
+						&offset_fsb, &count_fsb);
+				if (error)
+					break;
+			}
 			/*
 			 * Set up the xfs_bmapi() call to change the 
 			 * extent from unwritten to written.
@@ -7739,8 +7865,6 @@ retry:
 			 * to written.
 			 */
 			reccount = 1;
-			offset_fsb = XFS_B_TO_FSBT(mp, offset_this_req);
-			count_fsb = XFS_B_TO_FSB(mp, bytes_this_req);
 			CHECK_GRIO_TIMESTAMP(bp, 40);
 			error = xfs_bmapi(tp, ip, offset_fsb, count_fsb, 
 				  XFS_BMAPI_WRITE, &firstfsb, 0, imapp,
