@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.2 $"
+#ident	"$Revision: 1.7 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -934,6 +934,7 @@ xlog_recover_process_data(xlog_t	    *log,
     xlog_recover_t	*trans;
     xlog_tid_t		tid;
     int			hash;
+    uint		flags;
 
     while (dp < lp) {
 	ASSERT(dp + sizeof(xlog_op_header_t) <= lp);
@@ -950,7 +951,10 @@ xlog_recover_process_data(xlog_t	    *log,
 			xlog_recover_new_tid(&rhash[hash], tid);
 	} else {
 	    ASSERT(dp+ohead->oh_len <= lp);
-	    switch (ohead->oh_flags & ~XLOG_END_TRANS) {
+	    flags = ohead->oh_flags & ~XLOG_END_TRANS;
+	    if (flags & XLOG_WAS_CONT_TRANS)
+		    flags &= ~XLOG_CONTINUE_TRANS;
+	    switch (flags) {
 		case XLOG_COMMIT_TRANS: {
 		    xlog_recover_commit_trans(log, &rhash[hash], trans);
 		    break;
@@ -1073,5 +1077,3 @@ xlog_recover(xlog_t *log)
 	}
 	return 0;
 }
-
-
