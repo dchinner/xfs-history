@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.82 $"
+#ident	"$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -3500,9 +3500,15 @@ xlog_recover_check_summary(xlog_t	*log)
 
 	sbbp = xfs_getsb(mp, 0);
 	sbp = XFS_BUF_TO_SBP(sbbp);
-	cmn_err(CE_WARN, "xlog_recover_check_summary: sb_icount %lld itotal %lld\n", sbp->sb_icount, itotal);
-	cmn_err(CE_WARN, "xlog_recover_check_summary: sb_ifree %lld itotal %lld\n", sbp->sb_ifree, ifree);
-	cmn_err(CE_WARN, "xlog_recover_check_summary: sb_fdblocks %lld freeblks %lld\n", sbp->sb_fdblocks, freeblks);
+	cmn_err(CE_NOTE,
+		"xlog_recover_check_summary: sb_icount %lld itotal %lld",
+		sbp->sb_icount, itotal);
+	cmn_err(CE_NOTE,
+		"xlog_recover_check_summary: sb_ifree %lld itotal %lld",
+		sbp->sb_ifree, ifree);
+	cmn_err(CE_NOTE,
+		"xlog_recover_check_summary: sb_fdblocks %lld freeblks %lld",
+		sbp->sb_fdblocks, freeblks);
 #if 0
 	/*
 	 * This is turned off until I account for the allocation
