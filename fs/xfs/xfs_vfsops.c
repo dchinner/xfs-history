@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.70 $"
+#ident  "$Revision: 1.71 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -199,6 +199,7 @@ xfs_init(vfssw_t	*vswp,
 	extern zone_t	*xfs_bmap_zone;
 	extern zone_t	*xfs_irec_zone;
 	extern zone_t	*xfs_strat_write_zone;
+	extern zone_t	*xfs_gap_zone;
 #ifdef DEBUG
 	extern ktrace_t	*xfs_alloc_trace_buf;
 	extern ktrace_t	*xfs_bmap_trace_buf;
@@ -233,6 +234,7 @@ xfs_init(vfssw_t	*vswp,
 					sizeof(struct bmapval)), "xfs_bmap");
 	xfs_strat_write_zone = kmem_zone_init(sizeof(xfs_strat_write_locals_t),
 					      "xfs_strat_write");
+	xfs_gap_zone = kmem_zone_init(sizeof(xfs_gap_t), "xfs_gap");
 #endif
 	xfs_alloc_arg_zone =
 		kmem_zone_init(sizeof(xfs_alloc_arg_t), "xfs_alloc_arg");
@@ -1300,7 +1302,8 @@ xfs_sync(vfs_t		*vfsp,
 			 * we can't hold it across calls to the buffer
 			 * cache.
 			 */
-			last_byte = XFS_B_TO_FSB(mp, ip->i_d.di_size);
+			last_byte = XFS_ISIZE_MAX(ip);
+			last_byte = XFS_B_TO_FSB(mp, last_byte);
 			last_byte = XFS_FSB_TO_B(mp, last_byte);
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
 			if (VN_MAPPED(vp)) {
@@ -1321,8 +1324,8 @@ xfs_sync(vfs_t		*vfsp,
 				 * Drop the inode lock since we can't hold it
 				 * across calls to the buffer cache.
 				 */
-				last_byte = XFS_B_TO_FSB(mp,
-							 ip->i_d.di_size);
+				last_byte = XFS_ISIZE_MAX(ip);
+				last_byte = XFS_B_TO_FSB(mp, last_byte);
 				last_byte = XFS_FSB_TO_B(mp, last_byte);
 				xfs_iunlock(ip, XFS_ILOCK_SHARED);
 				error = pflushvp(vp, last_byte, fflag);
@@ -1365,8 +1368,7 @@ xfs_sync(vfs_t		*vfsp,
 				 */
 				if ((ip->i_pincount == 0) &&
 				    xfs_iflock_nowait(ip)) {
-					xfs_iflush(ip,
-					       XFS_IFLUSH_DELWRI_ELSE_ASYNC);
+					xfs_iflush(ip, XFS_IFLUSH_DELWRI);
 				}
 			}
 
@@ -1389,8 +1391,7 @@ xfs_sync(vfs_t		*vfsp,
 					 * flush if it can and to otherwise
 					 * do it async.
 					 */
-					xfs_iflush(ip,
-					       XFS_IFLUSH_DELWRI_ELSE_ASYNC);
+					xfs_iflush(ip, XFS_IFLUSH_DELWRI);
 				}
 			}
 		}
