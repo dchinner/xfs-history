@@ -33,34 +33,6 @@
 #include <xfs.h>
 
 
-/* ARGSUSED */
-static int
-xfs_rsync_fn(
-	xfs_inode_t	*ip,
-	int		ioflag,
-	xfs_off_t		start,
-	xfs_off_t		end)
-{
-	xfs_mount_t	*mp = ip->i_mount;
-	int		error = 0;
-
-	if (ioflag & IO_SYNC) {
-		xfs_ilock(ip, XFS_ILOCK_SHARED);
-		xfs_iflock(ip);
-		error = xfs_iflush(ip, XFS_IFLUSH_SYNC);
-		xfs_iunlock(ip, XFS_ILOCK_SHARED);
-		return error;
-	} else {
-		if (ioflag & IO_DSYNC) {
-			xfs_log_force(mp, (xfs_lsn_t)0,
-					XFS_LOG_FORCE | XFS_LOG_SYNC );
-		}
-	}
-
-	return error;
-}
-
-
 static xfs_fsize_t
 xfs_size_fn(
 	xfs_inode_t	*ip)
@@ -102,7 +74,6 @@ xfs_ioops_t	xfs_iocore_xfs = {
 	xfs_strat_write_func:	(xfs_strat_write_t)fs_nosys,
 	xfs_bmapi_func:		(xfs_bmapi_t) xfs_bmapi,
 	xfs_bmap_eof_func:	(xfs_bmap_eof_t) xfs_bmap_eof,
-	xfs_rsync_func:		(xfs_rsync_t) xfs_rsync_fn,
 	xfs_lck_map_shared:	(xfs_lck_map_shared_t) xfs_ilock_map_shared,
 	xfs_ilock:		(xfs_lock_t) xfs_ilock,
 	xfs_ilock_demote:	(xfs_lock_demote_t) xfs_ilock_demote,
