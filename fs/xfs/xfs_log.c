@@ -497,6 +497,8 @@ xfs_log_unmount(xfs_mount_t *mp)
 	      iclog->ic_state == XLOG_STATE_DIRTY))
 		spunlockspl_psema(log->l_icloglock, spl,	/* sleep */
 				  &iclog->ic_forcesema, 0);
+	else
+		LOG_UNLOCK(log, spl);
 	xlog_state_put_ticket(log, tic);
 	xlog_unalloc_log(log);
 
@@ -2162,7 +2164,7 @@ xlog_verify_disk_cycle_no(xlog_t	 *log,
 	for (i = 0; i < BLOCK_LSN(iclog->ic_header.h_lsn); i++) {
 	    xlog_bread(log, i, 1, bp);
 	    if (GET_CYCLE(bp->b_dmaaddr) != cycle_no)
-		xlog_warning("xlog_verify_disk_cycle_no: bad cycle no");
+		xlog_warn("xFS: xlog_verify_disk_cycle_no: bad cycle no");
 	}
 	xlog_put_bp(bp);
     }
