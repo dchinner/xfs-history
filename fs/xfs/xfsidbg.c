@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.23 $"
+#ident	"$Revision: 1.24 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -2776,9 +2776,9 @@ idbg_xnode(xfs_inode_t *ip)
 		ip->i_blkno,
 		ip->i_len,
 		ip->i_boffset);
-	qprintf("transp 0x%x &item 0x%x &lock 0x%x &iolock 0x%x\n",
+	qprintf("transp 0x%x &itemp 0x%x &lock 0x%x &iolock 0x%x\n",
 		ip->i_transp,
-		&ip->i_item,
+		ip->i_itemp,
 		&ip->i_lock,
 		&ip->i_iolock);
 	qprintf("&flock 0x%x (%d) pincount 0x%x &pinsema 0x%x\n",
@@ -2795,10 +2795,8 @@ idbg_xnode(xfs_inode_t *ip)
 		ip->i_io_offset,
 		xfs_fmtfsblock(ip->i_reada_blkno, ip->i_mount),
 		ip->i_io_size);
-	qprintf("last_req_sz 0x%x num_readaheads 0x%x new_size %llx\n",
-		ip->i_last_req_sz,
-		ip->i_num_readaheads,
-		ip->i_new_size);
+	qprintf("last_req_sz 0x%x new_size %llx\n",
+		ip->i_last_req_sz, ip->i_new_size);
 	qprintf("write off %llx gap list 0x%x ",
 		ip->i_write_offset, ip->i_gap_list);
 	printflags((int)ip->i_flags, tab_flags, "flags");
@@ -2816,7 +2814,7 @@ idbg_xnode(xfs_inode_t *ip)
 		ip->i_delayed_blks);
 	xfs_xnode_fork("data", &ip->i_df);
 	xfs_xnode_fork("attr", ip->i_afp);
-	qprintf("dmevents 0x%x\n", ip->i_dmevents);
+	qprintf("\n");
 	xfs_prdinode_core(&ip->i_d);
 }
 
