@@ -168,7 +168,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	if ((sbp->sb_magicnum != XFS_SB_MAGIC)		||
 	    (sbp->sb_versionnum != XFS_SB_VERSION)	||
 	    (sbp->sb_logstart == 0 && mp->m_logdev == mp->m_dev)) {
-		error = XFS_ERROR(EINVAL);		/* or EIO ? */
+		error = XFS_ERROR(EINVAL);
 		goto bad;
 	}
 	mp->m_sb_bp = bp;
@@ -234,6 +234,29 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	mp->m_writeio_blocks = 1 << (mp->m_writeio_log - sbp->sb_blocklog);
 
 	/*
+	 * Check that the data (and log if separate) are an ok size.
+	 */
+	bp = read_buf(mp->m_dev, XFS_FSB_TO_BB(mp, mp->m_sb.sb_dblocks) - 1,
+		1, 0);
+	ASSERT(bp);
+	error = geterror(bp);
+	brelse(bp);
+	if (error == ENOSPC)
+		return XFS_ERROR(E2BIG);
+	else if (error)
+		return XFS_ERROR(error);
+	if (mp->m_logdev != mp->m_dev) {
+		bp = read_buf(mp->m_logdev,
+			XFS_FSB_TO_BB(mp, mp->m_sb.sb_logblocks) - 1, 1, 0);
+		ASSERT(bp);
+		error = geterror(bp);
+		brelse(bp);
+		if (error == ENOSPC)
+			return XFS_ERROR(E2BIG);
+		else if (error)
+			return XFS_ERROR(error);
+	}
+	/*
 	 * Initialize realtime fields in the mount structure
 	 */
 	if (sbp->sb_rblocks) {
@@ -241,6 +264,18 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		mp->m_rsumsize = sizeof(xfs_suminfo_t) * mp->m_rsumlevels * sbp->sb_rbmblocks;
 		mp->m_rsumsize = roundup(mp->m_rsumsize, sbp->sb_blocksize);
 		mp->m_rbmip = mp->m_rsumip = NULL;
+		/*
+		 * Check that the realtime section is an ok size.
+		 */
+		bp = read_buf(mp->m_rtdev,
+			XFS_FSB_TO_BB(mp, mp->m_sb.sb_rblocks) - 1, 1, 0);
+		ASSERT(bp);
+		error = geterror(bp);
+		brelse(bp);
+		if (error == ENOSPC)
+			return XFS_ERROR(E2BIG);
+		else if (error)
+			return XFS_ERROR(error);
 	}
 	/*
 	 *  Copies the low order bits of the timestamp and the randomly
