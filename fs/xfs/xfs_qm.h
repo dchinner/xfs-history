@@ -1,7 +1,7 @@
 #ifndef __XFS_QM_H__
 #define __XFS_QM_H__
 
-#ident "$Revision: 1.3 $"
+#ident "$Revision: 1.4 $"
 
 #include "xfs_quota.h"
 
@@ -22,7 +22,8 @@ extern	struct xfs_qm		*G_xqm;
  * If the number of incore dquots go over this high water mark, we start
  * popping dquots out of the freelist (instead of allocating more on heap).
  */
-#define XFS_QM_NDQUOT_HIWAT		3
+#define XFS_QM_NDQUOT_HIWAT_1		64
+#define XFS_QM_NDQUOT_HIWAT_2		16
 
 /*
  * Used in xfs_qm_sync called by xfs_sync to count the max times that it can
@@ -81,7 +82,7 @@ typedef struct xfs_frlist {
 } xfs_frlist_t;
 
 /*
- * Quota Manager (global) structure.
+ * Quota Manager (global) structure. Lives only in core.
  */
 typedef struct xfs_qm {
 	xfs_dqlist_t	*qm_usr_dqhtable;/* udquot hash table */
@@ -89,6 +90,7 @@ typedef struct xfs_qm {
 	uint		 qm_dqhashmask;  /* # buckets in dq hashtab - 1 */
 	xfs_frlist_t	 qm_dqfreelist;  /* freelist of dquots */
 	uint		 qm_totaldquots; /* total incore dquots */
+	uint		 qm_ndqhiwat; 	 /* soft HWM for ndquots in core */
 	uint		 qm_nrefs;	 /* file systems with quota on */
 	int		 qm_dqfree_ratio;/* ratio of free to inuse dquots */
 	zone_t		*qm_dqzone;	 /* dquot mem-alloc zone */
