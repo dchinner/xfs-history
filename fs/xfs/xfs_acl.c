@@ -322,7 +322,7 @@ xfs_acl_allow_set(vnode_t *vp, int kind)
 	VOP_GETATTR(vp, &va, 0, NULL, error);
 	if (error)
 		return error;
-	error = EACCES;
+	error = EPERM;
 	if (va.va_uid != current->fsuid && !capable(CAP_FOWNER))
 		return error;
 	return 0;
