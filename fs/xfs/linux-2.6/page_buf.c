@@ -77,6 +77,7 @@
  * Debug code
  */
 
+#define _PAGE_BUF_INTERNAL_
 #define PB_DEFINE_TRACES
 #include "page_buf_trace.h"
 
