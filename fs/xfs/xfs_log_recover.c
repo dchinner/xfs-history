@@ -1820,7 +1820,7 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	}
 
 	mp = log->l_mp;
-	bp = read_buf_targ(mp->m_ddev_targp, blkno, len, 0);
+	bp = xfs_buf_read(mp->m_ddev_targp, blkno, len, 0);
 	if (XFS_BUF_ISERROR(bp)) {
 		xfs_ioerror_alert("xlog_recover_do..(read)", log->l_mp, 
 				  mp->m_dev, blkno);
@@ -1916,7 +1916,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		imap.im_blkno = 0;
 		xfs_imap(log->l_mp, 0, ino, &imap, 0);
 	}
-	bp = read_buf_targ(mp->m_ddev_targp, imap.im_blkno, imap.im_len, 0);
+	bp = xfs_buf_read(mp->m_ddev_targp, imap.im_blkno, imap.im_len, 0);
 	if (XFS_BUF_ISERROR(bp)) {
 		xfs_ioerror_alert("xlog_recover_do..(read)", mp, 
 				  mp->m_dev, imap.im_blkno);
@@ -2807,7 +2807,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 		 * Find the agi for this ag.
 		 */
 		agidaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
-		agibp = read_buf_targ(mp->m_ddev_targp, agidaddr, 1, 0);
+		agibp = xfs_buf_read(mp->m_ddev_targp, agidaddr, 1, 0);
 		agi = XFS_BUF_TO_AGI(agibp);
 		ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
 
@@ -2877,7 +2877,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 			 * the loop.
 			 */
 			agidaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
-			agibp = read_buf_targ(mp->m_ddev_targp,
+			agibp = xfs_buf_read(mp->m_ddev_targp,
 					 agidaddr, 1, 0);
 			agi = XFS_BUF_TO_AGI(agibp);
 			ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
@@ -3381,7 +3381,7 @@ xlog_recover_check_summary(xlog_t	*log)
 	ifree = 0LL;
 	for (agno = 0; agno < mp->m_sb.sb_agcount; agno++) {
 		agfdaddr = XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR);
-		agfbp = read_buf_targ(mp->m_ddev_targp, agfdaddr, 1, 0);
+		agfbp = xfs_buf_read(mp->m_ddev_targp, agfdaddr, 1, 0);
 		agfp = XFS_BUF_TO_AGF(agfbp);
 		ASSERT(agfp->agf_magicnum == XFS_AGF_MAGIC);
 		ASSERT(XFS_AGF_GOOD_VERSION(agfp->agf_versionnum));
@@ -3391,7 +3391,7 @@ xlog_recover_check_summary(xlog_t	*log)
 		xfs_buf_relse(agfbp);
 
 		agidaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
-		agibp = read_buf_targ(mp->m_ddev_targp, agidaddr, 1, 0);
+		agibp = xfs_buf_read(mp->m_ddev_targp, agidaddr, 1, 0);
 		agip = XFS_BUF_TO_AGI(agibp);
 		ASSERT(agip->agi_magicnum == XFS_AGI_MAGIC);
 		ASSERT(XFS_AGI_GOOD_VERSION(agip->agi_versionnum));

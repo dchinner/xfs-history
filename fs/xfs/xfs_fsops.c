@@ -162,7 +162,7 @@ xfs_growfs_data(
 		/*
 		 * AG freelist header block
 		 */
-		bp = get_buf_targ(mp->m_ddev_targp,
+		bp = xfs_buf_get(mp->m_ddev_targp,
 				  XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR),
 			          sectbb, 0);
 		agf = XFS_BUF_TO_AGF(bp);
@@ -193,7 +193,7 @@ xfs_growfs_data(
 		/*
 		 * AG inode header block
 		 */
-		bp = get_buf_targ(mp->m_ddev_targp,
+		bp = xfs_buf_get(mp->m_ddev_targp,
 				  XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR),
 				  sectbb, 0);
 		agi = XFS_BUF_TO_AGI(bp);
@@ -217,7 +217,7 @@ xfs_growfs_data(
 		/*
 		 * BNO btree root block
 		 */
-		bp = get_buf_targ(mp->m_ddev_targp,
+		bp = xfs_buf_get(mp->m_ddev_targp,
 			XFS_AGB_TO_DADDR(mp, agno, XFS_BNO_BLOCK(mp)),
 			BTOBB(bsize), 0);
 		block = XFS_BUF_TO_SBLOCK(bp);
@@ -237,7 +237,7 @@ xfs_growfs_data(
 		/*
 		 * CNT btree root block
 		 */
-		bp = get_buf_targ(mp->m_ddev_targp,
+		bp = xfs_buf_get(mp->m_ddev_targp,
 			XFS_AGB_TO_DADDR(mp, agno, XFS_CNT_BLOCK(mp)),
 			BTOBB(bsize), 0);
 		block = XFS_BUF_TO_SBLOCK(bp);
@@ -258,7 +258,7 @@ xfs_growfs_data(
 		/*
 		 * INO btree root block
 		 */
-		bp = get_buf_targ(mp->m_ddev_targp,
+		bp = xfs_buf_get(mp->m_ddev_targp,
 			XFS_AGB_TO_DADDR(mp, agno, XFS_IBT_BLOCK(mp)),
 			BTOBB(bsize), 0);
 		block = XFS_BUF_TO_SBLOCK(bp);

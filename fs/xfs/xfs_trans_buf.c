@@ -107,7 +107,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 		 */
 		return (get_buf(target_dev->dev, blkno, len, flags));
 #else
-		bp = get_buf_targ(target_dev, blkno, len, flags | BUF_BUSY);
+		bp = xfs_buf_get(target_dev, blkno, len, flags | BUF_BUSY);
 		return(bp);
 #endif
 	}
@@ -163,7 +163,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 #ifdef SIM
 	bp = get_buf(target_dev->dev, blkno, len, flags);
 #else
-	bp = get_buf_targ(target_dev, blkno, len, flags | BUF_BUSY);
+	bp = xfs_buf_get(target_dev, blkno, len, flags | BUF_BUSY);
 #endif
 	if (bp == NULL) {
 		return NULL;
@@ -344,7 +344,7 @@ xfs_trans_read_buf(
 		 */
 		bp = read_buf(target->dev, blkno, len, flags);
 #else
-		bp = read_buf_targ(target, blkno, len,
+		bp = xfs_buf_read(target, blkno, len,
 			      flags | BUF_BUSY);
 #endif
 		if ((bp != NULL) && (geterror(bp) != 0)) {
@@ -457,7 +457,7 @@ xfs_trans_read_buf(
 #ifdef SIM
 	bp = read_buf(target->dev, blkno, len, flags);
 #else
-	bp = read_buf_targ(target, blkno, len, flags | BUF_BUSY);
+	bp = xfs_buf_read(target, blkno, len, flags | BUF_BUSY);
 #endif
 	if (bp == NULL) {
 		*bpp = NULL;

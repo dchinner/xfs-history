@@ -6578,7 +6578,7 @@ xfs_read_buf(
 	xfs_buf_t		 *bp;
 	int 		 error;
 	
-	bp = read_buf_targ(target, blkno, len, flags);
+	bp = xfs_buf_read(target, blkno, len, flags);
 	error = geterror(bp);
 	if (bp && !error && !XFS_FORCED_SHUTDOWN(mp)) {
 		*bpp = bp;

@@ -735,10 +735,10 @@ xfs_btree_read_bufl(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_fsblock_t	fsbno,		/* file system block number */
 	uint		lock,		/* lock flags for read_buf */
-	xfs_buf_t		**bpp,		/* buffer for fsbno */
+	xfs_buf_t	**bpp,		/* buffer for fsbno */
 	int		refval)		/* ref count value for buffer */
 {
-	xfs_buf_t		*bp;		/* return value */
+	xfs_buf_t	*bp;		/* return value */
 	daddr_t		d;		/* real disk block address */
 	int		error;
 
@@ -768,10 +768,10 @@ xfs_btree_read_bufs(
 	xfs_agnumber_t	agno,		/* allocation group number */
 	xfs_agblock_t	agbno,		/* allocation group block number */
 	uint		lock,		/* lock flags for read_buf */
-	xfs_buf_t		**bpp,		/* buffer for agno/agbno */
+	xfs_buf_t	**bpp,		/* buffer for agno/agbno */
 	int		refval)		/* ref count value for buffer */
 {
-	xfs_buf_t		*bp;		/* return value */
+	xfs_buf_t	*bp;		/* return value */
 	daddr_t		d;		/* real disk block address */
 	int		error;
 

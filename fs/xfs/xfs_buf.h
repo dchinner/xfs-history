@@ -105,9 +105,11 @@ typedef struct buf xfs_buf_t;
 #define XFS_BUF_SET_COUNT(bp, cnt)		\
 			((bp)->b_bcount = cnt)
 
+/* setup the buffer target from a buftarg structure */
 #define XFS_BUF_SET_TARGET(bp, target)		\
 			(bp)->b_target = target; \
 			(bp)->b_edev = (target)->dev
+/* return the dev_t being used */
 #define XFS_BUF_TARGET(bp)			\
 			((bp)->b_edev)
 #define XFS_BUF_SET_VTYPE_REF(bp, type, ref)	\
@@ -120,6 +122,12 @@ typedef struct buf xfs_buf_t;
 
 int
 xfs_bdstrat_cb(struct xfs_buf *bp);
+
+#define xfs_buf_read(target, blkno, len, flags) \
+		read_buf_targ(target, blkno, len, flags)
+
+#define xfs_buf_get(target, blkno, len, flags) \
+		get_buf_targ(target, blkno, len, flags)
 
 #define xfs_bdwrite(mp, bp) \
 	{ ((bp)->b_vp == NULL) ? (bp)->b_bdstrat = xfs_bdstrat_cb: 0; \
@@ -183,8 +191,15 @@ typedef struct buftarg {
 #define XFS_BUF_SET_VTYPE(bp, type)
 #define XFS_BUF_SET_REF(bp, ref)
 
-#define xfs_bdwrite(mp, bp) pb->pb_flags |= PBF_DELWRI; \
-			    pagebuf_relse(bp)
+#define xfs_buf_read(target, blkno, len, flags) \
+		pagebuf_get((target)->inode, (blkno) << 9, (len) << 9, \
+				PBF_LOCK | PBF_READ)
+#define xfs_buf_get(target, blkno, len, flags) \
+		pagebuf_get((target)->inode, (blkno) << 9, (len) << 9, \
+				PBF_LOCK)
+#define xfs_bdwrite(mp, bp)			\
+			pb->pb_flags |= PBF_DELWRI; \
+			pagebuf_relse(bp)
 #define xfs_bawrite(mp, bp) pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC)
 
 #define xfs_buf_relse(bp)	\

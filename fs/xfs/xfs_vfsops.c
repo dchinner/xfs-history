@@ -1902,8 +1902,7 @@ devvptoxfs(
 			bp = NULL;
 		}
 		if (!bp) {
-			bp = read_buf_targ(&target, XFS_SB_DADDR, BLKDEV_BB, 0);
-			bp->b_target = NULL;
+			bp = xfs_buf_read(&target, XFS_SB_DADDR, BLKDEV_BB, 0);
 		}
 		if (bp->b_flags & B_ERROR) {
 			error = bp->b_error;

@@ -1327,7 +1327,7 @@ xfs_readlink(
                 for (n = 0; n < nmaps; n++) {
                         d = XFS_FSB_TO_DADDR(mp, mval[n].br_startblock);
                         byte_cnt = XFS_FSB_TO_B(mp, mval[n].br_blockcount);
-                        bp = read_buf_targ(mp->m_ddev_targp, d,
+                        bp = xfs_buf_read(mp->m_ddev_targp, d,
 				      BTOBB(byte_cnt), 0);
 			error = geterror(bp);
 			if (error) {
