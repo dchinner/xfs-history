@@ -49,6 +49,7 @@
 
 #include <linux/linux_to_xfs.h>
 
+#include <sys/systm.h>
 #include <sys/sysmacros.h>
 #include <sys/capability.h>
 #include <sys/cred.h>
@@ -74,6 +75,8 @@
 #include <sys/uuid.h>
 #include <sys/pvfs.h>
 #include <xfs_sb.h>
+
+#undef sysinfo
 
 /* xfs_fs_bio.c */
 void binit(void);
@@ -650,7 +653,12 @@ static struct file_system_type xfs_fs_type = {
 
 int __init init_xfs_fs(void)
 {
+  struct sysinfo	si;
+
   ENTER("init_xfs_fs"); 
+  si_meminfo(&si);
+
+  physmem = btoc(si.totalram);
   cred_init();
 #if !defined(_USING_PAGEBUF_T)
   binit();
