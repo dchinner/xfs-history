@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.3 $"
+#ident	"$Revision: 1.4 $"
 
 #include <sys/types.h>
 #include <sys/arsess.h>
@@ -35,6 +35,7 @@
 #include "xfs_clnt.h"
 #include "xfs_quota.h"
 #include "xfs_dqblk.h"
+#include "xfs_dquot_item.h"
 #include "xfs_dquot.h"
 #include "xfs_qm.h"
 #include "xfs_quota_priv.h"
