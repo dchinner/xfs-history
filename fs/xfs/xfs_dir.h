@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_H
 #define	_FS_XFS_DIR_H
 
-#ident	"$Revision: 1.19 $"
+#ident	"$Revision: 1.20 $"
 
 /*
  * xfs_dir.h
@@ -32,7 +32,7 @@ typedef	__uint8_t xfs_dir_ino_t[sizeof(xfs_ino_t)];
  * and the elements much be bcopy()'d out into a work area to get correct
  * alignment for the inode number fields.
  */
-struct xfs_dir_shortform {
+typedef struct xfs_dir_shortform {
 	struct xfs_dir_sf_hdr {		/* constant-structure header block */
 		xfs_dir_ino_t parent;	/* parent dir inode number */
 		__uint8_t count;	/* count of active entries */
@@ -42,18 +42,20 @@ struct xfs_dir_shortform {
 		__uint8_t namelen;	/* actual length of name (no NULL) */
 		__uint8_t name[1];	/* name */
 	} list[1];			/* variable sized array */
-};
+} xfs_dir_shortform_t;
+typedef struct xfs_dir_sf_hdr xfs_dir_sf_hdr_t;
+typedef struct xfs_dir_sf_entry xfs_dir_sf_entry_t;
 
 #define XFS_DIR_SF_ENTSIZE_BYNAME(LEN)		/* space a name uses */ \
-	(sizeof(struct xfs_dir_sf_entry)-1 + (LEN))
+	(sizeof(xfs_dir_sf_entry_t)-1 + (LEN))
 #define XFS_DIR_SF_ENTSIZE_BYENTRY(SFEP)	/* space an entry uses */ \
-	(sizeof(struct xfs_dir_sf_entry)-1 + (SFEP)->namelen)
+	(sizeof(xfs_dir_sf_entry_t)-1 + (SFEP)->namelen)
 #define XFS_DIR_SF_NEXTENTRY(SFEP)		/* next entry in struct */ \
-	((struct xfs_dir_sf_entry *) \
+	((xfs_dir_sf_entry_t *) \
 		((char *)(SFEP) + XFS_DIR_SF_ENTSIZE_BYENTRY(SFEP)))
 #define XFS_DIR_SF_ALLFIT(COUNT, TOTALLEN)	/* will all entries fit? */ \
-	(sizeof(struct xfs_dir_sf_hdr) + \
-	       (sizeof(struct xfs_dir_sf_entry)-1)*(COUNT) + (TOTALLEN))
+	(sizeof(xfs_dir_sf_hdr_t) + \
+	       (sizeof(xfs_dir_sf_entry_t)-1)*(COUNT) + (TOTALLEN))
 
 /*========================================================================
  * Directory Structure when equal to XFS_LBSIZE(mp) bytes.
@@ -68,11 +70,11 @@ struct xfs_dir_shortform {
 #define XFS_DIR_LEAF_MAGIC	0xfeeb	/* magic number for leaf blocks */
 #define XFS_DIR_NODE_MAGIC	0xfebe	/* magic number for non-leaf blocks */
 
-struct xfs_dir_blkinfo {
+typedef struct xfs_dir_blkinfo {
 	__uint32_t forw;			/* previous block in list */
 	__uint32_t back;			/* following block in list */
 	__uint16_t magic;			/* validity check on block */
-};
+} xfs_dir_blkinfo_t;
 
 /*
  * This is the structure of the leaf nodes in the Btree.
@@ -98,9 +100,9 @@ struct xfs_dir_blkinfo {
  */
 #define XFS_DIR_LEAF_MAPSIZE	3	/* how many freespace slots */
 
-struct xfs_dir_leafblock {
+typedef struct xfs_dir_leafblock {
 	struct xfs_dir_leaf_hdr {	/* constant-structure header block */
-		struct xfs_dir_blkinfo info;	/* block type, links, etc. */
+		xfs_dir_blkinfo_t info;	/* block type, links, etc. */
 		__uint16_t count;	/* count of active leaf_entry's */
 		__uint16_t namebytes;	/* num bytes of name strings stored */
 		__uint16_t firstused;	/* first used byte in name area */
@@ -121,14 +123,18 @@ struct xfs_dir_leafblock {
 		xfs_dir_ino_t inumber;	/* inode number for this key */
 		__uint8_t name[1];	/* name string itself */
 	} namelist[1];			/* grows from bottom of buf */
-};
+} xfs_dir_leafblock_t;
+typedef struct xfs_dir_leaf_hdr xfs_dir_leaf_hdr_t;
+typedef struct xfs_dir_leaf_map xfs_dir_leaf_map_t;
+typedef struct xfs_dir_leaf_entry xfs_dir_leaf_entry_t;
+typedef struct xfs_dir_leaf_name xfs_dir_leaf_name_t;
 
 #define XFS_DIR_LEAF_ENTSIZE_BYNAME(LEN)	/* space a name will use */ \
-	(sizeof(struct xfs_dir_leaf_name)-1 + LEN)
+	(sizeof(xfs_dir_leaf_name_t)-1 + LEN)
 #define XFS_DIR_LEAF_ENTSIZE_BYENTRY(ENTRY)	/* space an entry will use */ \
-	(sizeof(struct xfs_dir_leaf_name)-1 + (ENTRY)->namelen)
+	(sizeof(xfs_dir_leaf_name_t)-1 + (ENTRY)->namelen)
 #define XFS_DIR_LEAF_NAMESTRUCT(LEAFP, OFFSET)	/* point to name struct */ \
-	((struct xfs_dir_leaf_name *)&((char *)(LEAFP))[OFFSET])
+	((xfs_dir_leaf_name_t *)&((char *)(LEAFP))[OFFSET])
 
 /*========================================================================
  * Directory Structure when greater than XFS_LBSIZE(mp) bytes.
@@ -145,9 +151,9 @@ struct xfs_dir_leafblock {
  */
 #define	XFS_DIR_NODE_MAXDEPTH	5	/* max depth of Btree */
 
-struct xfs_dir_intnode {
+typedef struct xfs_dir_intnode {
 	struct xfs_dir_node_hdr {	/* constant-structure header block */
-		struct xfs_dir_blkinfo info;	/* block type, links, etc. */
+		xfs_dir_blkinfo_t info;	/* block type, links, etc. */
 		__uint16_t count;	/* count of active entries */
 		__uint16_t level;	/* level above leaves (leaf == 0) */
 	} hdr;
@@ -155,13 +161,15 @@ struct xfs_dir_intnode {
 		__uint32_t hashval;	/* hash value for this descendant */
 		__uint32_t before;	/* Btree block before this key */
 	} btree[1];			/* variable sized array of keys */
-};
+} xfs_dir_intnode_t;
+typedef struct xfs_dir_node_hdr xfs_dir_node_hdr_t;
+typedef struct xfs_dir_node_entry xfs_dir_node_entry_t;
 
 #define XFS_DIR_NODE_ENTSIZE_BYNAME()	/* space a name uses */ \
-	(sizeof(struct xfs_dir_node_entry))
+	(sizeof(xfs_dir_node_entry_t))
 #define XFS_DIR_NODE_ENTRIES(mp)	/* how many entries in this block? */ \
-	((XFS_LBSIZE(mp) - sizeof(struct xfs_dir_node_hdr)) \
-		   / sizeof(struct xfs_dir_node_entry))
+	((XFS_LBSIZE(mp) - sizeof(xfs_dir_node_hdr_t)) \
+		   / sizeof(xfs_dir_node_entry_t))
 #define XFS_DIR_MAXBLK		0x10000000	/* max hash value */
 
 /*
@@ -185,55 +193,60 @@ struct xfs_dir_intnode {
  * Function prototypes for the kernel.
  *========================================================================*/
 
-struct xfs_dir_name;
-struct uio;
+struct buf;
 struct dirent;
+struct uio;
 struct xfs_bmap_free;
+struct xfs_dir_name;
+struct xfs_inode;
+struct xfs_mount;
+struct xfs_trans;
 
 /*
  * Internal routines when dirsize == XFS_LBSIZE(mp).
  */
-buf_t	*xfs_dir_leaf_create(xfs_trans_t *trans, xfs_inode_t *dp,
+struct buf *xfs_dir_leaf_create(struct xfs_trans *trans, struct xfs_inode *dp,
 				xfs_fileoff_t which_block);
 
 /*
  * Internal routines when dirsize > XFS_LBSIZE(mp).
  */
-buf_t	*xfs_dir_node_create(xfs_trans_t *trans, xfs_inode_t *dp,
+struct buf *xfs_dir_node_create(struct xfs_trans *trans, struct xfs_inode *dp,
 				xfs_fileoff_t which_block, int leaf_block_next);
 
 /*
  * Utility routines.
  */
-int	xfs_dir_grow_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
+int	xfs_dir_grow_inode(struct xfs_trans *trans, struct xfs_dir_name *args,
 				xfs_fileoff_t *new_logblock);
 #ifndef SIM
-int	xfs_dir_shrink_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
-				xfs_fileoff_t dead_logblock, buf_t *dead_buf);
+int	xfs_dir_shrink_inode(struct xfs_trans *trans, struct xfs_dir_name *args,
+				xfs_fileoff_t dead_logblock,
+				struct buf *dead_buf);
 #endif	/* !SIM */
-buf_t	*xfs_dir_get_buf(xfs_trans_t *trans, xfs_inode_t *dp,
+struct buf *xfs_dir_get_buf(struct xfs_trans *trans, struct xfs_inode *dp,
 				xfs_fileoff_t bno);
-buf_t	*xfs_dir_read_buf(xfs_trans_t *trans, xfs_inode_t *dp,
+struct buf *xfs_dir_read_buf(struct xfs_trans *trans, struct xfs_inode *dp,
 				xfs_fileoff_t bno);
 #ifndef SIM
-int	xfs_dir_put_dirent(xfs_mount_t *mp, struct dirent *dbp, xfs_ino_t ino,
-				char *name, int namelen, off_t nextcook,
-				uio_t *uio, int *done);
+int	xfs_dir_put_dirent(struct xfs_mount *mp, struct dirent *dbp,
+				xfs_ino_t ino, char *name, int namelen,
+				off_t nextcook, struct uio *uio, int *done);
 #endif	/* !SIM */
 
 /*
  * Overall external interface routines.
  */
-void	xfs_dir_mount(xfs_mount_t *mp);
+void	xfs_dir_mount(struct xfs_mount *mp);
 
-int	xfs_dir_isempty(xfs_inode_t *dp);
+int	xfs_dir_isempty(struct xfs_inode *dp);
 
-int	xfs_dir_init(xfs_trans_t *trans,
-		     xfs_inode_t *dir,
-		     xfs_inode_t *parent_dir);
+int	xfs_dir_init(struct xfs_trans *trans,
+		     struct xfs_inode *dir,
+		     struct xfs_inode *parent_dir);
 
-int	xfs_dir_createname(xfs_trans_t *trans,
-			   xfs_inode_t *dp,
+int	xfs_dir_createname(struct xfs_trans *trans,
+			   struct xfs_inode *dp,
 			   char *name_string,
 			   xfs_ino_t inode_number,
 			   xfs_fsblock_t *firstblock,
@@ -241,31 +254,31 @@ int	xfs_dir_createname(xfs_trans_t *trans,
 			   xfs_extlen_t total);
 
 #ifndef SIM
-int	xfs_dir_removename(xfs_trans_t *trans,
-			   xfs_inode_t *dp,
+int	xfs_dir_removename(struct xfs_trans *trans,
+			   struct xfs_inode *dp,
 			   char *name_string,
 			   xfs_fsblock_t *firstblock,
 			   struct xfs_bmap_free *flist,
 			   xfs_extlen_t total);
 #endif	 /* !SIM */
 
-int	xfs_dir_lookup(xfs_trans_t *tp,
-		       xfs_inode_t *dp,
+int	xfs_dir_lookup(struct xfs_trans *tp,
+		       struct xfs_inode *dp,
 		       char *name_string,
 		       int name_length,
 		       xfs_ino_t *inode_number);
 
 #ifndef SIM
-void	xfs_dir_print(xfs_trans_t *tp,
-		      xfs_inode_t *dp);
+void	xfs_dir_print(struct xfs_trans *tp,
+		      struct xfs_inode *dp);
 
-int	xfs_dir_getdents(xfs_trans_t *tp,
-			 xfs_inode_t *dp,
+int	xfs_dir_getdents(struct xfs_trans *tp,
+			 struct xfs_inode *dp,
 			 struct uio *uiop,
 			 int *eofp);
 
-int	xfs_dir_replace(xfs_trans_t *tp,
-			xfs_inode_t *dp,
+int	xfs_dir_replace(struct xfs_trans *tp,
+			struct xfs_inode *dp,
 			char *name_string,
 			int name_length,
 			xfs_ino_t inode_number);
