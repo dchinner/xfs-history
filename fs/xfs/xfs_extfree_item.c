@@ -91,7 +91,7 @@ xfs_efi_item_format(xfs_efi_log_item_t	*efip,
 
 	size = sizeof(xfs_efi_log_format_t);
 	size += (efip->efi_format.efi_nextents - 1) * sizeof(xfs_extent_t);
-	efip->efi_format.efi_size = size;
+	efip->efi_format.efi_size = 1;
 
 	log_vector->i_addr = (caddr_t)&(efip->efi_format);
 	log_vector->i_len = size;
