@@ -628,8 +628,9 @@ __pb_match_offset_to_mapping(
 	assert(*index <= nmaps);
 	assert(offset < PAGE_CACHE_SIZE);
 
-	full_offset = page->index << PAGE_CACHE_SHIFT;	/* from file start */
-	full_offset += offset;			/* include from page start */
+	full_offset = page->index;		/* NB: using 64bit number */
+	full_offset <<= PAGE_CACHE_SHIFT;	/* offset from file start */
+	full_offset += offset;			/* offset from page start */
 
 	/* first check the mapping doesn't come up short, unexpectedly */
 	if (full_offset < (map[0].pbm_offset + map[0].pbm_delta)) {
