@@ -1,4 +1,4 @@
-#ident "$Revision: 1.69 $"
+#ident "$Revision: 1.71 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -831,8 +831,10 @@ xfs_inode_item_push(
 	 * Write out the inode.  The completion routine ('iflush_done') will
 	 * pull it from the AIL, mark it clean, unlock the flush lock.
 	 */
-	xfs_iflush(ip, XFS_IFLUSH_DELWRI);
+	(void) xfs_iflush(ip, XFS_IFLUSH_DELWRI);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+
+	return;
 }
 
 /*
