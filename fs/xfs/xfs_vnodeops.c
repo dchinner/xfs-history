@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.458 $"
+#ident "$Revision: 1.459 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -2057,7 +2057,8 @@ xfs_inactive(
 		if ((((ip->i_d.di_mode & IFMT) == IFREG) &&
 		     ((ip->i_d.di_size > 0) || (VN_CACHED(vp) > 0)) &&
 		     (ip->i_df.if_flags & XFS_IFEXTENTS))  &&
-		    (!(ip->i_d.di_flags & XFS_DIFLAG_PREALLOC))) {
+		    (!(ip->i_d.di_flags & XFS_DIFLAG_PREALLOC) ||
+		     (ip->i_delayed_blks != 0))) {
 			if (error = xfs_inactive_free_eofblocks(mp, ip))
 				return (VN_INACTIVE_CACHE);
 		}
@@ -5473,6 +5474,10 @@ xfs_finish_reclaim(
 		mrunlock(&ih->ih_lock);
 		return(0);
 	}
+	if (locked) {
+		ip->i_flags |= XFS_IRECLAIM;
+		mrunlock(&ih->ih_lock);
+	}
 #endif
 
 	/*
@@ -5524,8 +5529,11 @@ xfs_finish_reclaim(
 		ASSERT(ip->i_itemp == NULL || 
 		       ip->i_itemp->ili_format.ilf_fields == 0);
 		ASSERT(ip->i_iocore.io_queued_bufs == 0);
-	} else 
+	}
+#ifndef SIM
+	else if (!locked) 
 		mrunlock(&ih->ih_lock);
+#endif
 
 	xfs_ireclaim(ip);
 	return 0;

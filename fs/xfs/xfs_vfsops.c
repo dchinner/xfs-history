@@ -31,7 +31,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident  "$Revision: 1.271 $"
+#ident  "$Revision: 1.272 $"
 
 #include <xfs_os_defs.h>
 
@@ -1641,9 +1641,18 @@ xfs_syncsub(
 
 		if (vp == NULL) {
 			if (!(ip->i_flags & XFS_IRECLAIM)) {
+				if (xfs_ilock_nowait(ip, XFS_ILOCK_EXCL) == 0) {
+					ip = ip->i_mnext;
+					continue;
+				}
+				if (!xfs_iflock_nowait(ip)) {
+					xfs_iunlock(ip, XFS_ILOCK_EXCL);
+					ip = ip->i_mnext;
+					continue;
+				}
 				IPOINTER_INSERT(ip, mp);
 
-				xfs_finish_reclaim(ip, 0);
+				xfs_finish_reclaim(ip, 1);
 
 				XFS_MOUNT_ILOCK(mp);
 				mount_locked = B_TRUE;
