@@ -1,9 +1,10 @@
-#ident	"$Revision: 1.1 $"
+#ident	"$Revision: 1.2 $"
 
 #include <sys/types.h>
 #include <sys/arsess.h>
 #include <sys/kmem.h>
 #include <sys/uuid.h>
+#include <ksys/behavior.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
