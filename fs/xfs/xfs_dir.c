@@ -101,17 +101,17 @@ static int	xfs_dir_shortform_validate_ondisk(xfs_mount_t *mp,
 						  xfs_dinode_t *dip);
 
 xfs_dirops_t xfsv1_dirops = {
-	xd_mount:			xfs_dir_mount,
-	xd_isempty:			xfs_dir_isempty,
-	xd_init:			xfs_dir_init,
-	xd_createname:			xfs_dir_createname,
-	xd_lookup:			xfs_dir_lookup,
-	xd_removename:			xfs_dir_removename,
-	xd_getdents:			xfs_dir_getdents,
-	xd_replace:			xfs_dir_replace,
-	xd_canenter:			xfs_dir_canenter,
-	xd_shortform_validate_ondisk:	xfs_dir_shortform_validate_ondisk,
-	xd_shortform_to_single:		xfs_dir_shortform_to_leaf,
+	.xd_mount			= xfs_dir_mount,
+	.xd_isempty			= xfs_dir_isempty,
+	.xd_init			= xfs_dir_init,
+	.xd_createname			= xfs_dir_createname,
+	.xd_lookup			= xfs_dir_lookup,
+	.xd_removename			= xfs_dir_removename,
+	.xd_getdents			= xfs_dir_getdents,
+	.xd_replace			= xfs_dir_replace,
+	.xd_canenter			= xfs_dir_canenter,
+	.xd_shortform_validate_ondisk	= xfs_dir_shortform_validate_ondisk,
+	.xd_shortform_to_single		= xfs_dir_shortform_to_leaf,
 };
 
 /*

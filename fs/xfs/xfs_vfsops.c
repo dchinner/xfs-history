@@ -1705,13 +1705,13 @@ xfs_vget(
 
 
 vfsops_t xfs_vfsops = {
-	vfs_mount:		xfs_mount,
-	vfs_dounmount:		fs_dounmount,
-	vfs_unmount:		xfs_unmount,
-	vfs_root:		xfs_root,
-	vfs_statvfs:		xfs_statvfs,
-	vfs_sync:		xfs_sync,
-	vfs_vget:		xfs_vget,
-	vfs_dmapi_mount:	xfs_dm_mount,
-	vfs_dmapi_fsys_vector:	xfs_dm_get_fsys_vector,
+	.vfs_mount		= xfs_mount,
+	.vfs_dounmount		= fs_dounmount,
+	.vfs_unmount		= xfs_unmount,
+	.vfs_root		= xfs_root,
+	.vfs_statvfs		= xfs_statvfs,
+	.vfs_sync		= xfs_sync,
+	.vfs_vget		= xfs_vget,
+	.vfs_dmapi_mount	= xfs_dm_mount,
+	.vfs_dmapi_fsys_vector	= xfs_dm_get_fsys_vector,
 };

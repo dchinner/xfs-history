@@ -851,21 +851,21 @@ xfs_inode_item_committing(
  * This is the ops vector shared by all buf log items.
  */
 struct xfs_item_ops xfs_inode_item_ops = {
-	iop_size:	(uint(*)(xfs_log_item_t*))xfs_inode_item_size,
-	iop_format:	(void(*)(xfs_log_item_t*, xfs_log_iovec_t*))
+	.iop_size	= (uint(*)(xfs_log_item_t*))xfs_inode_item_size,
+	.iop_format	= (void(*)(xfs_log_item_t*, xfs_log_iovec_t*))
 					xfs_inode_item_format,
-	iop_pin:	(void(*)(xfs_log_item_t*))xfs_inode_item_pin,
-	iop_unpin:	(void(*)(xfs_log_item_t*))xfs_inode_item_unpin,
-	iop_unpin_remove: (void(*)(xfs_log_item_t*, xfs_trans_t*))
+	.iop_pin	= (void(*)(xfs_log_item_t*))xfs_inode_item_pin,
+	.iop_unpin	= (void(*)(xfs_log_item_t*))xfs_inode_item_unpin,
+	.iop_unpin_remove = (void(*)(xfs_log_item_t*, xfs_trans_t*))
 					xfs_inode_item_unpin_remove,
-	iop_trylock:	(uint(*)(xfs_log_item_t*))xfs_inode_item_trylock,
-	iop_unlock:	(void(*)(xfs_log_item_t*))xfs_inode_item_unlock,
-	iop_committed:	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))
+	.iop_trylock	= (uint(*)(xfs_log_item_t*))xfs_inode_item_trylock,
+	.iop_unlock	= (void(*)(xfs_log_item_t*))xfs_inode_item_unlock,
+	.iop_committed	= (xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))
 					xfs_inode_item_committed,
-	iop_push:	(void(*)(xfs_log_item_t*))xfs_inode_item_push,
-	iop_abort:	(void(*)(xfs_log_item_t*))xfs_inode_item_abort,
-	iop_pushbuf:	(void(*)(xfs_log_item_t*))xfs_inode_item_pushbuf,
-	iop_committing: (void(*)(xfs_log_item_t*, xfs_lsn_t))
+	.iop_push	= (void(*)(xfs_log_item_t*))xfs_inode_item_push,
+	.iop_abort	= (void(*)(xfs_log_item_t*))xfs_inode_item_abort,
+	.iop_pushbuf	= (void(*)(xfs_log_item_t*))xfs_inode_item_pushbuf,
+	.iop_committing = (void(*)(xfs_log_item_t*, xfs_lsn_t))
 					xfs_inode_item_committing
 };
 
