@@ -188,6 +188,8 @@ int		xfs_ilock_nowait(xfs_inode_t *, uint);
 void		xfs_iunlock(xfs_inode_t *, uint);
 void		xfs_iflock(xfs_inode_t *);
 int		xfs_iflock_nowait(xfs_inode_t *);
+uint		xfs_ilock_map_shared(xfs_inode_t *);
+void		xfs_iunlock_map_shared(xfs_inode_t *, uint);
 void		xfs_ifunlock(xfs_inode_t *);
 void		xfs_ireclaim(xfs_inode_t *);
 
