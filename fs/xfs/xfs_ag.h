@@ -113,6 +113,22 @@ typedef	struct xfs_agfl
 	xfs_agblock_t	agfl_bno[XFS_AGFL_SIZE];
 } xfs_agfl_t;
 
+/*
+ * Per-ag incore structure, copies of information in agf and agi,
+ * to improve the performance of allocation group selection.
+ */
+typedef struct xfs_perag
+{
+	char		pagf_init;	/* this agf's entry is initialized */
+	char		pagi_init;	/* this agi's entry is initialized */
+	char		pagf_levels[XFS_BTNUM_MAX - 1];
+					/* # of levels in bno & cnt btree */
+	__uint32_t	pagf_flcount;	/* count of blocks in freelist */
+	xfs_extlen_t	pagf_freeblks;	/* total free blocks */
+	xfs_extlen_t	pagf_longest;	/* longest free space */
+	xfs_agino_t	pagi_freecount;	/* number of free inodes */
+} xfs_perag_t;
+
 #define	XFS_AG_MIN_BYTES	(1LL << 24)	/* 16 MB */
 #define	XFS_AG_MAX_BYTES	(1LL << 32)	/*  4 GB */
 
@@ -122,10 +138,14 @@ typedef	struct xfs_agfl
 #define	XFS_AG_MIN(a,b)		((a) < (b) ? (a) : (b))
 #define	XFS_AG_MAXLEVELS(mp)	((mp)->m_ag_maxlevels)
 #define	XFS_MIN_FREELIST(a,mp)	\
-	(XFS_AG_MIN((a)->agf_levels[XFS_BTNUM_BNOi] + 1, \
-		    XFS_AG_MAXLEVELS(mp)) + \
-	 XFS_AG_MIN((a)->agf_levels[XFS_BTNUM_CNTi] + 1, \
-		    XFS_AG_MAXLEVELS(mp)))
+	XFS_MIN_FREELIST_RAW((a)->agf_levels[XFS_BTNUM_BNOi], \
+			     (a)->agf_levels[XFS_BTNUM_CNTi], mp)
+#define	XFS_MIN_FREELIST_PAG(pag,mp)	\
+	XFS_MIN_FREELIST_RAW((pag)->pagf_levels[XFS_BTNUM_BNOi], \
+			     (pag)->pagf_levels[XFS_BTNUM_CNTi], mp)
+#define	XFS_MIN_FREELIST_RAW(bl,cl,mp)	\
+	(XFS_AG_MIN(bl + 1, XFS_AG_MAXLEVELS(mp)) + \
+	 XFS_AG_MIN(cl + 1, XFS_AG_MAXLEVELS(mp)))
 
 #define	XFS_AGB_MASK(k)	((1 << (k)) - 1)
 #define	XFS_AGB_TO_FSB(mp,agno,agbno) \
