@@ -1,4 +1,4 @@
-#ident "$Revision: 1.18 $"
+#ident "$Revision: 1.19 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -19,11 +19,6 @@
 #include <sys/ktrace.h>
 #include <sys/quota.h>
 #include <limits.h>
-
-#ifdef _BANYAN_XFS
-#include <sys/proc.h>
-#endif
-
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -898,13 +893,8 @@ xfs_qm_scall_getquota(
 	fs_disk_quota_t	out;
 	int 		error;
 
-#ifndef _BANYAN_XFS
 	if (id != get_current_cred()->cr_ruid && !_CAP_ABLE(CAP_QUOTA_MGT))
 		return XFS_ERROR(EPERM);
-#else
-	if (id != curprocp->p_cred->cr_ruid && !_CAP_ABLE(CAP_QUOTA_MGT))
-		return XFS_ERROR(EPERM);
-#endif
 	/*
 	 * Try to get the dquot. We don't want it allocated on disk, so
 	 * we aren't passing the XFS_QMOPT_DOALLOC flag. If it doesn't
