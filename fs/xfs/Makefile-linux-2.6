@@ -7,8 +7,14 @@
 #
 
 #CFLAGS := $(filter-out -Wall,$(CFLAGS))
+
+# EXTRA_MKDEP_OPTIONS = -v
+
+EXTRA_FIND_DIRECTORIES = linux pseudo-inc
+EXTRA_INCLUDE_DIRECTORIES = -I./linux -I./pseudo-inc -I.
+
 EXTRA_CFLAGS += -g3 -Wno-unused  -Wno-unknown-pragmas -Wno-parentheses \
-                -Wno-uninitialized -I./linux -I./pseudo-inc -I. -D_KERNEL \
+                -Wno-uninitialized ${EXTRA_INCLUDE_DIRECTORIES} -D_KERNEL \
 		-funsigned-char 
 
 # EXTRA_CFLAGS += -DDEBUG -DXFSDEBUG
