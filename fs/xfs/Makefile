@@ -4,13 +4,7 @@
 
 WORKAREA ?= `pwd`
 
-ARCH = `uname -m`
-ifeq ($(ARCH),"i686")
-	ARCH = i386
-endif
-ifeq ($(ARCH),"586")
-	ARCH = i386
-endif
+ARCH := $(shell uname -m | sed -e s/i.86/i386/)
 KERN_SPEC = kernel-2.4.spec
 KERNEL_VERSION = 2.4.0
 
