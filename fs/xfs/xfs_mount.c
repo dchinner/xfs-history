@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.56 $"
+#ident	"$Revision: 1.57 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -52,7 +52,7 @@
 #endif
 
 
-STATIC int	_xfs_mod_incore_sb(xfs_mount_t *, uint, int);
+STATIC int	xfs_mod_incore_sb_unlocked(xfs_mount_t *, uint, int);
 STATIC void	xfs_sb_relse(buf_t *);
 
 /*
@@ -474,7 +474,7 @@ xfs_mod_sb(xfs_trans_t *tp, int fields)
 
 
 /*
- * _xfs_mod_incore_sb() is a utility routine common used to apply
+ * xfs_mod_incore_sb_unlocked() is a utility routine common used to apply
  * a delta to a specified field in the in-core superblock.  Simply
  * switch on the field indicated and apply the delta to that field.
  * Fields are not allowed to dip below zero, so if the delta would
@@ -483,7 +483,7 @@ xfs_mod_sb(xfs_trans_t *tp, int fields)
  * The SB_LOCK must be held when this routine is called.
  */
 STATIC int
-_xfs_mod_incore_sb(xfs_mount_t *mp, uint field, int delta)
+xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, uint field, int delta)
 {
 	register int		scounter; /* short counter for 32 bit fields */
 	register long long	lcounter; /* long counter for 64 bit fields */
@@ -499,6 +499,7 @@ _xfs_mod_incore_sb(xfs_mount_t *mp, uint field, int delta)
 		lcounter = mp->m_sb.sb_icount;
 		lcounter += delta;
 		if (lcounter < 0) {
+			ASSERT(0);
 			return (XFS_ERROR(EINVAL));
 		}
 		mp->m_sb.sb_icount = lcounter;
@@ -507,6 +508,7 @@ _xfs_mod_incore_sb(xfs_mount_t *mp, uint field, int delta)
 		lcounter = mp->m_sb.sb_ifree;
 		lcounter += delta;
 		if (lcounter < 0) {
+			ASSERT(0);
 			return (XFS_ERROR(EINVAL));
 		}
 		mp->m_sb.sb_ifree = lcounter;
@@ -515,7 +517,7 @@ _xfs_mod_incore_sb(xfs_mount_t *mp, uint field, int delta)
 		lcounter = mp->m_sb.sb_fdblocks;
 		lcounter += delta;
 		if (lcounter < 0) {
-			return (XFS_ERROR(EINVAL));
+			return (XFS_ERROR(ENOSPC));
 		}
 		mp->m_sb.sb_fdblocks = lcounter;
 		return (0);
@@ -523,7 +525,7 @@ _xfs_mod_incore_sb(xfs_mount_t *mp, uint field, int delta)
 		lcounter = mp->m_sb.sb_frextents;
 		lcounter += delta;
 		if (lcounter < 0) {
-			return (XFS_ERROR(EINVAL));
+			return (XFS_ERROR(ENOSPC));
 		}
 		mp->m_sb.sb_frextents = lcounter;
 		return (0);
@@ -536,7 +538,7 @@ _xfs_mod_incore_sb(xfs_mount_t *mp, uint field, int delta)
 /*
  * xfs_mod_incore_sb() is used to change a field in the in-core
  * superblock structure by the specified delta.  This modification
- * is protected by the SB_LOCK.  Just use the _xfs_mod_incore_sb()
+ * is protected by the SB_LOCK.  Just use the xfs_mod_incore_sb_unlocked()
  * routine to do the work.
  */
 int
@@ -546,7 +548,7 @@ xfs_mod_incore_sb(xfs_mount_t *mp, uint field, int delta)
 	int	status;
 
 	s = XFS_SB_LOCK(mp);
-	status = _xfs_mod_incore_sb(mp, field, delta);
+	status = xfs_mod_incore_sb_unlocked(mp, field, delta);
 	XFS_SB_UNLOCK(mp, s);
 	return (status);
 }
@@ -587,8 +589,8 @@ xfs_mod_incore_sb_batch(xfs_mount_t *mp, xfs_mod_sb_t *msb, uint nmsb)
 		 * from the loop so we'll fall into the undo loop
 		 * below.
 		 */
-		status = _xfs_mod_incore_sb(mp, msbp->msb_field,
-					    msbp->msb_delta);
+		status = xfs_mod_incore_sb_unlocked(mp, msbp->msb_field,
+						    msbp->msb_delta);
 		if (status != 0) {
 			break;
 		}
@@ -605,8 +607,8 @@ xfs_mod_incore_sb_batch(xfs_mount_t *mp, xfs_mod_sb_t *msb, uint nmsb)
 	if (status != 0) {
 		msbp--;
 		while (msbp >= msb) {
-			status = _xfs_mod_incore_sb(mp, msbp->msb_field,
-						    -(msbp->msb_delta));
+			status = xfs_mod_incore_sb_unlocked(mp,
+				    msbp->msb_field, -(msbp->msb_delta));
 			ASSERT(status == 0);
 			msbp--;
 		}
