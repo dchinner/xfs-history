@@ -1,4 +1,4 @@
-#ident "$Revision: 1.44 $"
+#ident "$Revision: 1.45 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -914,6 +914,7 @@ xfs_trans_inode_alloc_buf(
  * between user dquot bufs and proj dquot bufs, because user and proj quotas
  * can be turned off independently.
  */
+/* ARGSUSED */
 void
 xfs_trans_dquot_buf(
 	xfs_trans_t	*tp,
