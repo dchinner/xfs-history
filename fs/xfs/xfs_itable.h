@@ -32,13 +32,6 @@
 #ifndef __XFS_ITABLE_H__
 #define	__XFS_ITABLE_H__
 
-struct xfs_mount;
-struct xfs_trans;
-
-/*
- * Prototypes for visible xfs_itable.c routines.
- */
-
 /*
  * Convert file descriptor of a file in the filesystem to
  * a mount structure pointer.
@@ -83,8 +76,8 @@ typedef int (*bulkstat_one_pf)(struct xfs_mount	*mp,
  */
 int					/* error status */
 xfs_bulkstat(
-	struct xfs_mount	*mp,	/* mount point for filesystem */
-	struct xfs_trans	*tp,	/* transaction pointer */
+	xfs_mount_t	*mp,		/* mount point for filesystem */
+	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	*lastino,	/* last inode returned */
 	int		*count,		/* size of buffer/count returned */
 	bulkstat_one_pf formatter,	/* func that'd fill a single buf */
@@ -95,19 +88,27 @@ xfs_bulkstat(
 
 int
 xfs_bulkstat_single(
-	struct xfs_mount	*mp,
+	xfs_mount_t		*mp,
 	xfs_ino_t		*lastinop,
 	xfs_caddr_t		buffer,
 	int			*done);
 
 int
 xfs_bulkstat_one(
-	struct xfs_mount	*mp,
-	struct xfs_trans	*tp,
+	xfs_mount_t		*mp,
+	xfs_trans_t		*tp,
 	xfs_ino_t		ino,
 	void			*buffer,
 	xfs_daddr_t		bno,
 	void			*dibuff,
 	int			*stat);
+
+int					/* error status */
+xfs_inumbers(
+	xfs_mount_t		*mp,	/* mount point for filesystem */
+	xfs_trans_t		*tp,	/* transaction pointer */
+	xfs_ino_t		*last,	/* last inode returned */
+	int			*count,	/* size of buffer/count returned */
+	xfs_caddr_t		buffer);/* buffer with inode descriptions */
 
 #endif	/* __XFS_ITABLE_H__ */

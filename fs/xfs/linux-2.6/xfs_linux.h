@@ -62,7 +62,6 @@
 #include <linux/dmapi_kern.h>
 #include <linux/attributes.h>
 #include <linux/attr_kern.h>
-#include <linux/acl.h>
 
 #ifndef STATIC
 #define STATIC static

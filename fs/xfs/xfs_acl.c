@@ -38,6 +38,19 @@
 #define SGI_ACL_FILE	"SGI_ACL_FILE"
 #define SGI_ACL_DEFAULT	"SGI_ACL_DEFAULT"
 
+#define ACL_PERM_NONE	0x00
+#define ACL_READ	0x04
+#define ACL_WRITE	0x02
+#define ACL_EXECUTE	0x01
+
+#define ACL_USER_OBJ	0x01
+#define ACL_USER	0x02
+#define ACL_GROUP_OBJ	0x04
+#define ACL_GROUP	0x08
+#define ACL_MASK	0x10
+#define ACL_OTHER_OBJ	0x20
+#define ACL_OTHER	0x20
+
 STATIC int	xfs_acl_setmode(vnode_t *, struct acl *);
 STATIC void     xfs_acl_filter_mode(mode_t, struct acl *);
 STATIC void	xfs_acl_get_endian(struct acl *);

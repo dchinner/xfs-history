@@ -132,6 +132,8 @@ int		xfs_errortag_clearall_umount(int64_t fsid, char *fsname,
 						int loud);
 #else
 #define XFS_TEST_ERROR(expr, mp, tag, rf)	(expr)
+#define xfs_errortag_add(tag, mp)		(ENOSYS)
+#define xfs_errortag_clearall(mp)		(ENOSYS)
 #endif /* (DEBUG || INDUCE_IO_ERROR) */
 
 /*

@@ -203,12 +203,12 @@ xfs_bulkstat(
 	int			flags, 	/* defined in xfs_itable.h */
 	int			*done)	/* 1 if there're more stats to get */
 {
-	xfs_agblock_t		agbno=0;	/* allocation group block number */
+	xfs_agblock_t		agbno=0;/* allocation group block number */
 	xfs_buf_t		*agbp;	/* agi header buffer */
 	xfs_agi_t		*agi;	/* agi header data */
 	xfs_agino_t		agino;	/* inode # in allocation group */
 	xfs_agnumber_t		agno;	/* allocation group number */
-	xfs_daddr_t			bno;	/* inode cluster start daddr */
+	xfs_daddr_t		bno;	/* inode cluster start daddr */
 	int			chunkidx; /* current index into inode chunk */
 	int			clustidx; /* current index into inode cluster */
 	xfs_btree_cur_t		*cur;	/* btree cursor for ialloc btree */
@@ -233,14 +233,13 @@ xfs_bulkstat(
 	int			tmp;	/* result value from btree calls */
 	int			ubcount; /* size of user's buffer */
 	int			ubleft;	/* spaces left in user's buffer */
-	xfs_caddr_t			ubufp;	/* current pointer into user's buffer */
+	xfs_caddr_t		ubufp;	/* current pointer into user's buffer */
 	xfs_buf_t		*bp;	/* ptr to on-disk inode cluster buf */
 	xfs_dinode_t		*dip;	/* ptr into bp for specific inode */
 	xfs_inode_t		*ip;	/* ptr to in-core inode struct */
 	vfs_t			*vfsp;
 	int			vfs_unbusy_needed = 0;
         
-
 
 	/*
 	 * Check that the device is valid/mounted and mark it busy
@@ -618,8 +617,8 @@ xfs_bulkstat(
 int					/* error status */
 xfs_bulkstat_single(
 	xfs_mount_t		*mp,	/* mount point for filesystem */
-	xfs_ino_t			*lastinop, /* inode to return */
-	xfs_caddr_t			buffer,	/* buffer with inode stats */
+	xfs_ino_t		*lastinop, /* inode to return */
+	xfs_caddr_t		buffer,	/* buffer with inode stats */
 	int			*done)	/* 1 if there're more stats to get */
 {
 	xfs_bstat_t		bstat;	/* one bulkstat result structure */
@@ -661,18 +660,16 @@ xfs_bulkstat_single(
 	return 0;
 }
 
-#ifdef NOTYET
-/* No callers of this on linux yet, lets not build it */
 /*
  * Return inode number table for the filesystem.
  */
-STATIC int				/* error status */
+int					/* error status */
 xfs_inumbers(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
 	xfs_trans_t	*tp,		/* transaction pointer */
-	xfs_ino_t		*lastino,	/* last inode returned */
+	xfs_ino_t	*lastino,	/* last inode returned */
 	int		*count,		/* size of buffer/count returned */
-	xfs_caddr_t		ubuffer)	/* buffer with inode descriptions */
+	xfs_caddr_t	ubuffer)	/* buffer with inode descriptions */
 {
 	xfs_buf_t	*agbp;
 	xfs_agino_t	agino;
@@ -695,7 +692,7 @@ xfs_inumbers(
 	agino = XFS_INO_TO_AGINO(mp, ino);
 	left = *count;
 	*count = 0;
-	bcount = MIN(left, NBPP / sizeof(*buffer));
+	bcount = MIN(left, (int)(NBPP / sizeof(*buffer)));
 	buffer = kmem_alloc(bcount * sizeof(*buffer), KM_SLEEP);
 	error = bufidx = 0;
 	cur = NULL;
@@ -794,7 +791,6 @@ xfs_inumbers(
 		xfs_trans_brelse(tp, agbp);
 	return error;
 }
-#endif
 
 /*
  * Convert file descriptor of a file in the filesystem to
