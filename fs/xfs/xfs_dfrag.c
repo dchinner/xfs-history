@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Id: xfs_dfrag.c,v 1.20 2000/07/27 12:04:42 lord Exp $"
+#ident "$Id: xfs_dfrag.c,v 1.21 2000/07/31 16:16:28 lord Exp $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -103,6 +103,7 @@ xfs_swapext(
 	__uint64_t	tmp;
 	__uint64_t	cxfs_val;
 	int		aforkblks = 0;
+	int		taforkblks = 0;
 	int		locked = 0;
 
 	if (copyin(sxp, &sx, sizeof sx))
@@ -233,9 +234,13 @@ xfs_swapext(
 		goto error0;
 	}
 
-	/* Verify that ftmp does not contain extended attrs */
-	if ( ((XFS_IFORK_Q(tip) != 0) && (tip->i_d.di_anextents > 0)) ) {
-		error = XFS_ERROR(ENOTSUP);
+	/*
+	 * If the target has extended attributes, the tmp file
+	 * must also in order to ensure the correct data fork
+	 * format.
+	 */
+	if ( XFS_IFORK_Q(ip) != XFS_IFORK_Q(tip) ) {
+		error = XFS_ERROR(EINVAL);
 		goto error0;
 	}
 		
@@ -308,6 +313,17 @@ xfs_swapext(
 			return error;
 		}
 	}
+	if ( ((XFS_IFORK_Q(tip) != 0) && (tip->i_d.di_anextents > 0)) &&
+	     (tip->i_d.di_aformat != XFS_DINODE_FMT_LOCAL)) {
+		error = xfs_bmap_count_blocks(tp, tip, XFS_ATTR_FORK, 
+			&taforkblks);
+		if (error) {
+			xfs_iunlock(ip,  lock_flags);
+			xfs_iunlock(tip, lock_flags);
+			xfs_trans_cancel(tp, 0);
+			return error;
+		}
+	}
 
 	/* 
 	 * Swap the data forks of the inodes 
@@ -322,8 +338,8 @@ xfs_swapext(
 	 * Fix the on-disk inode values
 	 */
 	tmp = (__uint64_t)ip->i_d.di_nblocks;
-	ip->i_d.di_nblocks = tip->i_d.di_nblocks + aforkblks;
-	tip->i_d.di_nblocks = tmp - aforkblks;
+	ip->i_d.di_nblocks = tip->i_d.di_nblocks - taforkblks + aforkblks;
+	tip->i_d.di_nblocks = tmp + taforkblks - aforkblks;
 
 	tmp = (__uint64_t) ip->i_d.di_nextents;
 	ip->i_d.di_nextents = tip->i_d.di_nextents;
