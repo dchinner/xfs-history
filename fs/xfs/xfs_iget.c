@@ -177,9 +177,6 @@ xfs_iget_core(
 	int		error;
 	/* REFERENCED */
 	int		newnode;
-#ifdef CELL_CAPABLE
-	int		quiesce_new = 0;
-#endif
 	xfs_chash_t	*ch;
 	xfs_chashlist_t	*chl, *chlnew;
 	SPLDECL(s);
@@ -279,9 +276,6 @@ finish_inode:
 				ip->i_flags &= ~XFS_IRECLAIM;
 				xfs_iocore_inode_reinit(ip);
 			}
-#ifdef CELL_CAPABLE
-			quiesce_new = 0;
-#endif
 			vn_trace_exit(vp, "xfs_iget.found",
 						(inst_t *)__return_address);
 			goto return_ip;
@@ -324,12 +318,6 @@ finish_inode:
 
 	xfs_inode_lock_init(ip, vp);
 	xfs_iocore_inode_init(ip);
-
-#ifdef CELL_CAPABLE
-	quiesce_new = 0;
-	if (mp->m_inode_quiesce)
-		quiesce_new = cxfs_inode_qset(ip);
-#endif	/* CELL_CAPABLE */
 
 	if (lock_flags != 0) {
 		xfs_ilock(ip, lock_flags);
@@ -441,10 +429,6 @@ finish_inode:
 		ip->i_mprev = ip;
 	}
 	mp->m_inodes = ip;
-#ifdef CELL_CAPABLE
-	ASSERT((quiesce_new == 0) || (mp->m_inode_quiesce != 0));
-#endif
-
 
 	XFS_MOUNT_IUNLOCK(mp);
 
@@ -456,12 +440,6 @@ finish_inode:
 
 	ASSERT(((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0) ==
 	       ((ip->i_iocore.io_flags & XFS_IOCORE_RT) != 0));
-#ifdef CELL_CAPABLE
-	if (newnode) {
-	        if (quiesce_new)
-			cxfs_inode_quiesce(ip);
-	}
-#endif
 
 	*ipp = ip;
 

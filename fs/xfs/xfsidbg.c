@@ -83,6 +83,7 @@ static void	xfsidbg_xiclogall(xlog_in_core_t *);
 static void	xfsidbg_xiclogcb(xlog_in_core_t *);
 static void	xfsidbg_xihash(xfs_mount_t *mp);
 static void	xfsidbg_xinodes(xfs_mount_t *);
+static void	xfsidbg_xinodes_quiesce(xfs_mount_t *);
 static void	xfsidbg_xlog(xlog_t *);
 static void	xfsidbg_xlog_ritem(xlog_recover_item_t *);
 static void	xfsidbg_xlog_rtrans(xlog_recover_t *);
@@ -772,6 +773,27 @@ static int	kdbm_xfs_xinodes(
 		return diag;
 
 	xfsidbg_xinodes((xfs_mount_t *) addr);
+	return 0;
+}
+
+static int	kdbm_xfs_xinodes_quiesce(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xinodes_quiesce((xfs_mount_t *) addr);
 	return 0;
 }
 
@@ -1732,6 +1754,8 @@ static struct xif {
 				"Dump XFS inode hash statistics"},
   {  "xinodes",	kdbm_xfs_xinodes,	"<xfs_mount_t>",
 			 	"Dump XFS inodes per mount"},
+  {  "xquiesce",kdbm_xfs_xinodes_quiesce, "<xfs_mount_t>",
+				"Dump non-quiesced XFS inodes per mount"},
   {  "xl_rcit",	kdbm_xfs_xlog_ritem,	"<xlog_recover_item_t>",
 				"Dump XFS recovery item"},
   {  "xl_rctr",	kdbm_xfs_xlog_rtrans,	"<xlog_recover_t>",
@@ -3508,6 +3532,30 @@ xfsidbg_xinodes(xfs_mount_t *mp)
 			}
 			kdb_printf("\n");
 			xfsidbg_xnode(ip);
+			ip = ip->i_mnext;
+		} while (ip != mp->m_inodes);
+	}
+	kdb_printf("\nEnd of Inodes\n");
+}
+
+static void
+xfsidbg_xinodes_quiesce(xfs_mount_t *mp)
+{
+	xfs_inode_t	*ip;
+
+	kdb_printf("xfs_mount at 0x%p\n", mp);
+	ip = mp->m_inodes;
+	if (ip != NULL) {
+		do {
+			if (ip->i_mount == NULL) {
+				ip = ip->i_mnext;
+				continue;
+			}
+			if (!(ip->i_flags & XFS_IQUIESCE)) {
+				kdb_printf("ip 0x%p not quiesced\n", ip);
+			} else if (!BHV_IS_WRITE_LOCKED(VN_BHV_HEAD(XFS_ITOV(ip)))) {
+				kdb_printf("ip 0x%p not write locked\n", ip);
+			}
 			ip = ip->i_mnext;
 		} while (ip != mp->m_inodes);
 	}

@@ -62,13 +62,6 @@ extern int cxfs_mount(	        /* For any specia mount handling. */
 extern void cxfs_unmount(       /* For any special unmount handling. */
 		struct xfs_mount    *mp);
 
-/*
- * Other cxfs routines.  Stubs provided in non-CELL case.
- */
-extern void cxfs_inode_quiesce(             /* Quiesce new inode for vfs */
-		struct xfs_inode    *ip);   /* relocation. */
-extern int cxfs_inode_qset(                 /* Set quiesce flag on inode. */
-		struct xfs_inode    *ip);  
 extern int cxfs_remount_server(             /* Modify mount parameters.  This */
                 struct xfs_mount    *mp,    /* may result in vfs relocation. */
                 struct mounta       *uap,   /* There are separate implementa- */
