@@ -193,7 +193,7 @@ xfs_mount_validate_sb(
 
 #if !XFS_BIG_FILESYSTEMS
 	if (sbp->sb_dblocks > INT_MAX || sbp->sb_rblocks > INT_MAX)  {
-		cmn_err_tag(83,CE_WARN,
+		cmn_err(CE_WARN,
 "XFS:  File systems greater than 1TB not supported on this system.\n");
 		return XFS_ERROR(E2BIG);
 	}
