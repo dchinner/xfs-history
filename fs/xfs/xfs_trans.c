@@ -11,17 +11,18 @@
 #include "xfs.h"
 #include "xfs_trans.h"
 #include "xfs_buf_item.h"
-#include "xfs_trans_priv.h"
 #include "xfs_bio.h"
 #include "xfs_log.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
 #include "xfs_mount.h"
+#include "xfs_trans_priv.h"
 #include "xfs_alloc.h"
 #include "xfs_ialloc.h"
 #include "xfs_bmap.h"
 #include "xfs_btree.h"
 #include "xfs_dinode.h"
+#include "xfs_inode_item.h"
 #include "xfs_inode.h"
 
 #ifdef SIM
@@ -618,27 +619,40 @@ xfs_trans_bhold(xfs_trans_t *tp, buf_t *bp)
  * Since the inode log item structure is embedded in the incore
  * inode structure and is initialized when the inode is brought
  * into memory, there is nothing to do with it here.
+ *
+ * If the given transaction pointer is NULL, just call xfs_iget().
+ * This simplifies code which must handle both cases.
  */
-#ifndef SIM
-void
-xfs_trans_iget(xfs_trans_t *tp, xfs_ino_t ino, xfs_inode_t **ipp)
+xfs_inode_t *
+xfs_trans_iget(xfs_mount_t *mp, xfs_trans_t *tp, xfs_ino_t ino, uint flags)
 {
 	xfs_inode_log_item_t	*iip;
 	xfs_inode_t		*ip;
+
+	/*
+	 * If the transaction pointer is NULL, just call the normal
+	 * xfs_iget().
+	 */
+	if (tp == NULL) {
+		return (xfs_iget(mp, NULL, ino, flags));
+	}
 
 	/*
 	 * If we find the inode in core with this transaction
 	 * pointer in its i_transp field, then we know we already
 	 * have it locked.  In this case we just increment the lock
 	 * recursion count and return the inode to the caller.
+	 * Assert that the inode is already locked in the mode requested
+	 * by the caller.  We cannot do lock promotions yet, so
+	 * die if someone gets this wrong.
 	 */
 	if ((ip = xfs_inode_incore(tp->t_mountp, ino, tp)) != NULL) {
+		ASSERT(ismrlocked(&ip->i_lock, flags));
 		ip->i_item.ili_recur++;
-		*ipp = ip;
-		return;
+		return (ip);
 	}
 
-	ip = xfs_iget(tp->t_mountp, ino);
+	ip = xfs_iget(tp->t_mountp, tp, ino, flags);
 
 	/*
 	 * Get a log_item_desc to point at the new item.
@@ -651,10 +665,8 @@ xfs_trans_iget(xfs_trans_t *tp, xfs_ino_t ino, xfs_inode_t **ipp)
 	 */
 	ip->i_transp = tp;
 
-	*ipp = ip;
-	return;
+	return (ip);
 }
-#endif /* SIM */
 
 
 /*
@@ -663,27 +675,31 @@ xfs_trans_iget(xfs_trans_t *tp, xfs_ino_t ino, xfs_inode_t **ipp)
  * recursion count of the inode item.  If the count goes to less than 0,
  * the inode will be unlocked and disassociated from the transaction. 
  *
- * The inode must not have been modified within this transaction,
- * because we have no way to put it back to its previous state.
+ * If the inode has been modified within the transaction, it will not be
+ * unlocked until the transaction commits.
  */
-#ifndef SIM
 void
-xfs_trans_irelse(xfs_trans_t *tp, xfs_inode_t *ip)
+xfs_trans_iput(xfs_trans_t *tp, xfs_inode_t *ip)
 {
 	xfs_inode_log_item_t	*iip;
 	xfs_log_item_desc_t	*lidp;
+
+	/*
+	 * If the transaction pointer is NULL, just call xfs_iput().
+	 */
+	if (tp == NULL) {
+		xfs_iput(ip);
+	}
 
 	ASSERT(ip->i_transp == tp);
 	iip = &ip->i_item;	
 
 	/*
 	 * Find the item descriptor pointing to this inode's
-	 * log item.  It must be there, and it must not be
-	 * dirty.
+	 * log item.  It must be there.
 	 */
 	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)iip);
 	ASSERT(lidp != NULL);
-	ASSERT(!(lidp->lid_flags & XFS_LID_DIRTY));
 
 	/*
 	 * If the release is just for a recursive lock,
@@ -691,6 +707,14 @@ xfs_trans_irelse(xfs_trans_t *tp, xfs_inode_t *ip)
 	 */
 	if (iip->ili_recur > 0) {
 		iip->ili_recur--;
+		return;
+	}
+
+	/*
+	 * If the inode was dirtied within this transaction, it cannot
+	 * be released until the transaction commits.
+	 */
+	if (lidp->lid_flags & XFS_LID_DIRTY) {
 		return;
 	}
 
@@ -710,10 +734,9 @@ xfs_trans_irelse(xfs_trans_t *tp, xfs_inode_t *ip)
 	 * freed, because it is embedded within the inode.
 	 * All we have to do is release the inode.
 	 */
-	xfs_irelse(ip);
+	xfs_iput(ip);
 	return;
 }
-#endif /* SIM */
 
 
 /*
@@ -721,13 +744,11 @@ xfs_trans_irelse(xfs_trans_t *tp, xfs_inode_t *ip)
  * The inode must be locked, and it cannot be associated with any
  * transaction.
  */
-#ifndef SIM
 void
 xfs_trans_ijoin(xfs_trans_t *tp, xfs_inode_t *ip)
 {
 	xfs_inode_log_item_t	*iip;
 
-	ASSERT(ip->i_flags & I_LOCKED);
 	ASSERT(ip->i_transp == NULL);
 
 	/*
@@ -741,7 +762,6 @@ xfs_trans_ijoin(xfs_trans_t *tp, xfs_inode_t *ip)
 	 */
 	ip->i_transp = tp;
 }
-#endif /* SIM */
 
 
 
@@ -750,16 +770,13 @@ xfs_trans_ijoin(xfs_trans_t *tp, xfs_inode_t *ip)
  * IOP_UNLOCK() routine is called.  The inode must already be locked
  * and associated with the given transaction.
  */
-#ifndef SIM
 void
 xfs_trans_ihold(xfs_trans_t *tp, xfs_inode_t *ip)
 {
-	ASSERT(ip->i_flags & I_LOCKED);
 	ASSERT(ip->i_transp == tp);
 
 	ip->i_item.ili_flags |= XFS_ILI_HOLD;
 }
-#endif /* SIM */
 
 /*
  * This is called to mark bytes first through last inclusive of the given
@@ -804,17 +821,20 @@ xfs_trans_log_buf(xfs_trans_t *tp, buf_t *bp, uint first, uint last)
 /*
  * This is called to mark the fields indicated in fieldmask as needing
  * to be logged when the transaction is committed.  The inode must
- * already be associated with the given transaction.  The values for
- * fieldmask are defined in xfs_inode_item.h.
+ * already be associated with the given transaction.
+ *
+ * The values for fieldmask are defined in xfs_inode_item.h.  We always
+ * log all of the core inode if any of it has changed, and we always log
+ * all of the inline data/extents/b-tree root if any of them has changed.
  */
-#ifndef SIM
 void
-xfs_trans_log_inode(xfs_trans_t *tp, xfs_inode_t *ip, uint fieldmask)
+xfs_trans_log_inode(xfs_trans_t	*tp,
+		    xfs_inode_t	*ip,
+		    uint	flags)
 {
 	xfs_inode_log_item_t	*iip;
 	xfs_log_item_desc_t	*lidp;
 
-	ASSERT(ip->i_flags & I_LOCKED);
 	ASSERT(ip->i_transp == tp);
 
 	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)&(ip->i_item));
@@ -822,9 +842,8 @@ xfs_trans_log_inode(xfs_trans_t *tp, xfs_inode_t *ip, uint fieldmask)
 
 	tp->t_flags |= XFS_TRANS_DIRTY;
 	lidp->lid_flags |= XFS_LID_DIRTY;
-	ip->i_item.ili_field_mask |= fieldmask;
+	ip->i_item.ili_fields |= flags;
 }
-#endif /* SIM */
 
 
 /*
