@@ -73,6 +73,13 @@
 				XFS_QUOTA_STRING XFS_VNTRACE_STRING \
 				XFS_DBG_STRING /* DBG must be last */
 
+
+#define LINVFS_GET_VFS(s) \
+	(vfs_t *)((s)->u.generic_sbp)
+#define LINVFS_SET_VFS(s, vfsp) \
+	((s)->u.generic_sbp = vfsp)
+
+
 struct buftarg;
 struct xfs_args;
 

@@ -72,8 +72,7 @@ vfs_deallocate(vfs_t *vfsp)
  * Multiple accessors are allowed: vfs_busycnt tracks the number of
  * concurrent accesses.  Update permission sleeps until the last access
  * has finished, but leaves the VFS_MWANT flag to hold (if called via
- * vfs_busy) or reject (called via vfs_busydev or vfs_lock) subsequent
- * accesses/updates.
+ * vfs_busy) or reject (called via vfs_lock) subsequent accesses/updates.
  * Note that traverse understands the vfs locking model and waits for
  * any update to complete, and retries the mount-point traversal.
  *
@@ -188,45 +187,6 @@ vfs_busy(struct vfs *vfsp)
 	spin_unlock(&vfslock);
 
 	return 0;
-}
-
-/*
- * Given a <dev, filesystem-type> pair, return the vfs-entry for it.
- */
-struct vfs *
-vfs_busydev(dev_t dev, int type)
-{
-	struct vfs *vfsp;
-	kdev_t kdev = mk_kdev(MAJOR(dev), MINOR(dev));
-	struct super_block *sb;
-
-	sb = get_super(kdev);
-	if (!sb)
-		return NULL;
-	
-	vfsp = LINVFS_GET_VFS(sb);
-again:
-	spin_lock(&vfslock);
-	if (vfsp->vfs_dev == dev && type == vfsp->vfs_fstype) {
-		if (vfsp->vfs_flag & VFS_OFFLINE) {
-			spin_unlock(&vfslock);
-			drop_super(sb);
-			return NULL;
-		}
-		if (vfsp->vfs_flag & (VFS_MLOCK|VFS_MWANT)) {
-			ASSERT(vfsp->vfs_flag & VFS_MWANT ||
-			       vfsp->vfs_busycnt == 0);
-			vfsp->vfs_flag |= VFS_MWAIT;
-			vfsp_wait(vfsp, 0, 0);	 /* JIMJIM removed PZERO */
-			goto again;
-		}
-
-		ASSERT(vfsp->vfs_busycnt >= 0);
-		vfsp->vfs_busycnt++;
-	}
-	spin_unlock(&vfslock);
-	drop_super(sb);
-	return vfsp;
 }
 
 STATIC void

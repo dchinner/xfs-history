@@ -221,6 +221,5 @@ extern int      vfs_lock(struct vfs *); /* lock and unlock a vfs */
 extern void     vfs_unlock(struct vfs *);
 extern int      vfs_busy(struct vfs *); /* mark busy for serial sync/unmount */
 extern void     vfs_unbusy(struct vfs *);
-extern vfs_t	*vfs_busydev(dev_t, int);/* to keep dev from unmounting */
 
 #endif	/* __XFS_VFS_H__ */

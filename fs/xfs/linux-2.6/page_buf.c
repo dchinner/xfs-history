@@ -67,6 +67,8 @@
 #include <support/time.h>
 #include <support/kmem.h>
 
+#include <linux/xfs_fs.h>	/* for BBMASK */
+
 #include "page_buf_internal.h"
 
 #define SECTOR_SHIFT	9
@@ -179,9 +181,6 @@ pagebuf_param_t pb_params = {{ HZ, 15 * HZ, 256, 0, 0 }};
 
 struct pbstats pbstats;
 
-#define REMAPPING_SUPPORT
-
-#ifdef REMAPPING_SUPPORT
 STATIC void *pagebuf_mapout_locked(page_buf_t *);
 
 STATIC  spinlock_t              as_lock = SPIN_LOCK_UNLOCKED;
@@ -225,7 +224,6 @@ purge_addresses(void)
 		kfree(old);
 	}
 }
-#endif
 
 /*
  *	Locking model:
@@ -359,7 +357,6 @@ void _pagebuf_free_object(
 	}
 	
 	if (!(pb_flags & PBF_FREED)) {
-#ifdef REMAPPING_SUPPORT
 		/* release any virtual mapping */ ;
 		if (pb->pb_flags & _PBF_ADDR_ALLOCATED) {
 			void *vaddr = pagebuf_mapout_locked(pb);
@@ -367,7 +364,6 @@ void _pagebuf_free_object(
 				free_address(vaddr);
 			}
 		}
-#endif
 
 		if (pb->pb_flags & _PBF_MEM_ALLOCATED) {
 			if (pb->pb_pages) {
@@ -569,9 +565,7 @@ mapit:
 			    (caddr_t) page_address(pb->pb_pages[0]) + 
 					pb->pb_offset;
 			pb->pb_flags |= PBF_MAPPED;
-		}
-#ifdef REMAPPING_SUPPORT
-		else if (flags & PBF_MAPPED) {
+		} else if (flags & PBF_MAPPED) {
 			if (as_list_len > 64)
 				purge_addresses();
 			pb->pb_addr = remap_page_array(pb->pb_pages,
@@ -581,12 +575,6 @@ mapit:
 			pb->pb_addr += pb->pb_offset;
 			pb->pb_flags |= PBF_MAPPED | _PBF_ADDR_ALLOCATED;
 		}
-#else
-		else if (flags & PBF_MAPPED) {
-			printk("request for a mapped pagebuf > page size\n");
-			BUG();
-		}
-#endif
 	}
 	/* If some pages were found with data in them
 	 * we are not in PBF_NONE state.
@@ -1689,11 +1677,8 @@ pagebuf_daemon(void *data)
 
 		if (count)
 			blk_run_queues();
-
-#ifdef REMAPPING_SUPPORT
 		if (as_list_len > 0)
 			purge_addresses();
-#endif
 
 		force_flush = 0;
 	} while (pb_daemon->active == 1);

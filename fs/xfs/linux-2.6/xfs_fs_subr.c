@@ -125,7 +125,6 @@ fs_vnode_change(
 //	printk("XFS: fs_vnode_change() NOT IMPLEMENTED\n");
 }
 
-
 /*
  * vnode pcache layer for vnode_tosspages.
  * 'last' parameter unused but left in for IRIX compatibility
@@ -137,10 +136,11 @@ fs_tosspages(
 	xfs_off_t	last,
 	int		fiopt)
 {
-	vnode_t	*vp = BHV_TO_VNODE(bdp);
+	vnode_t		*vp = BHV_TO_VNODE(bdp);
+	struct inode	*ip = LINVFS_GET_IP(vp);
 
 	if (VN_CACHED(vp))
-		pagebuf_inval(LINVFS_GET_IP(vp), first, 0);
+		truncate_inode_pages(ip->i_mapping, first);
 }
 
 
@@ -155,13 +155,17 @@ fs_flushinval_pages(
 	xfs_off_t	last,
 	int		fiopt)
 {
-	vnode_t	*vp = BHV_TO_VNODE(bdp);
+	vnode_t		*vp = BHV_TO_VNODE(bdp);
+	struct inode	*ip = LINVFS_GET_IP(vp);
 
-	if (VN_CACHED(vp))
-		pagebuf_flushinval(LINVFS_GET_IP(vp), first, 0);
+	if (VN_CACHED(vp)) {
+		filemap_fdatawait(ip->i_mapping);
+		filemap_fdatawrite(ip->i_mapping);
+		filemap_fdatawait(ip->i_mapping);
+
+		truncate_inode_pages(ip->i_mapping, first);
+	}
 }
-
-
 
 /*
  * vnode pcache layer for vnode_flush_pages.
@@ -175,10 +179,15 @@ fs_flush_pages(
 	uint64_t	flags,
 	int		fiopt)
 {
-	vnode_t	*vp = BHV_TO_VNODE(bdp);
+	vnode_t		*vp = BHV_TO_VNODE(bdp);
+	struct inode	*ip = LINVFS_GET_IP(vp);
 
-	if (VN_CACHED(vp))
-		pagebuf_flush(LINVFS_GET_IP(vp), first, 0);
+	if (VN_CACHED(vp)) {
+		filemap_fdatawait(ip->i_mapping);
+		filemap_fdatawrite(ip->i_mapping);
+		filemap_fdatawait(ip->i_mapping);
+	}
+
 	return 0;
 }
 

@@ -452,8 +452,8 @@ linvfs_fill_super(
 {
 	vfs_t		*vfsp;
 	vfsops_t	*vfsops;
-	vnode_t		*cvp, *rootvp;
-	struct inode	*ip, *cip;
+	vnode_t		*rootvp;
+	struct inode	*ip;
 	struct mounta	ap;
 	struct xfs_args	args;
 	struct statfs	statvfs;
@@ -481,29 +481,7 @@ linvfs_fill_super(
 	if (sb->s_flags & MS_RDONLY)
 		vfsp->vfs_flag |= VFS_RDONLY;
 
-	/*  Setup up the cvp structure  */
-
-	cip = linvfs_alloc_inode(sb);
-	if (!cip) { 
-		vfs_deallocate(vfsp);
-		return  -EINVAL;
-	} 
-
-	atomic_set(&cip->i_count, 1);
-
-	cvp = LINVFS_GET_VPTR(cip);
-	cvp->v_type   = VDIR;
-	cvp->v_number = 1;		/* Place holder */
-
-#ifdef CONFIG_XFS_VNODE_TRACING
-	cvp->v_trace = ktrace_alloc(VNODE_TRACE_SIZE, KM_SLEEP);
-	vn_trace_entry(cvp, "linvfs_read_super", (inst_t *)__return_address);
-#endif /* CONFIG_XFS_VNODE_TRACING */
-
-	vn_bhv_head_init(VN_BHV_HEAD(cvp), "vnode");	/* for DMAPI */
-	LINVFS_SET_CVP(sb, cvp);
 	vfsp->vfs_super = sb;
-
 	set_blocksize(sb->s_bdev, BBSIZE);
 	set_posix_acl(sb);
 	sb->s_xattr_flags |= XATTR_MNT_FLAG_USER;
@@ -514,7 +492,7 @@ linvfs_fill_super(
 
 	LINVFS_SET_VFS(sb, vfsp);
 
-	VFSOPS_MOUNT(vfsops, vfsp, cvp, &ap, NULL, sys_cred, error);
+	VFSOPS_MOUNT(vfsops, vfsp, NULL, &ap, NULL, sys_cred, error);
 	if (error)
 		goto fail_vfsop;
 
@@ -537,7 +515,7 @@ linvfs_fill_super(
 	sb->s_root = d_alloc_root(ip);
 	if (!sb->s_root)
 		goto fail_vnrele;
-	if (is_bad_inode((struct inode *)sb->s_root))
+	if (is_bad_inode(sb->s_root->d_inode))
 		goto fail_vnrele;
 
 	/* Don't set the VFS_DMI flag until here because we don't want
@@ -564,14 +542,6 @@ fail_unmount:
 
 fail_vfsop:
 	vfs_deallocate(vfsp);
-
-#ifdef  CONFIG_XFS_VNODE_TRACING
-	ktrace_free(cvp->v_trace);
-	cvp->v_trace = NULL;
-#endif  /* CONFIG_XFS_VNODE_TRACING */
-
-	linvfs_destroy_inode(LINVFS_GET_IP(cvp));
-	return(-EINVAL);
 }
 
 void
@@ -665,7 +635,6 @@ linvfs_put_super(
 	int		error;
 	int		sector_size;
 	vfs_t 		*vfsp = LINVFS_GET_VFS(sb);
-	vnode_t		*cvp;
 
 	VFS_DOUNMOUNT(vfsp, 0, NULL, sys_cred, error); 
 	if (error) {
@@ -675,15 +644,6 @@ linvfs_put_super(
 	}
 
 	vfs_deallocate(vfsp);
-
-	cvp = LINVFS_GET_CVP(sb);
-#ifdef  CONFIG_XFS_VNODE_TRACING
-	ktrace_free(cvp->v_trace);
-	cvp->v_trace = NULL;
-#endif  /* CONFIG_XFS_VNODE_TRACING */
-	linvfs_destroy_inode(LINVFS_GET_IP(cvp));
-
-	/*  Do something to get rid of the VNODE/VFS layer here  */
 
 	/* Reset device block size */
 	sector_size = bdev_hardsect_size(sb->s_bdev);
@@ -786,19 +746,17 @@ linvfs_dmapi_mount(
 {
 	struct super_block *sb = mnt->mnt_sb;
 	vfsops_t	*vfsops;
-	vnode_t		*cvp;	/* covered vnode */
 	vfs_t		*vfsp; /* mounted vfs */
 	int		error;
 
 	vfsp = LINVFS_GET_VFS(sb);
 	if ( ! (vfsp->vfs_flag & VFS_DMI) )
 		return 0;
-	cvp = LINVFS_GET_CVP(sb);
 
 	/*  Kludge in XFS until we have other VFS/VNODE FSs  */
 	vfsops = &xfs_vfsops;
 
-	VFSOPS_DMAPI_MOUNT(vfsops, vfsp, cvp, dir_name, sb->s_id, mnt, error);
+	VFSOPS_DMAPI_MOUNT(vfsops, vfsp, NULL, dir_name, sb->s_id, mnt, error);
 	if (error) {
 		if (atomic_read(&sb->s_active) == 1)
 			vfsp->vfs_flag &= ~VFS_DMI;
