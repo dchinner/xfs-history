@@ -1750,24 +1750,18 @@ static int
 kdbm_pb(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 {
 	page_buf_private_t bp;
-	unsigned char *p = (unsigned char *)&bp;
 	unsigned long addr;
 	long	offset=0;
 	int nextarg;
 	int diag;
-	int i;
 	
 	if (argc != 1) 
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
-	if (diag) 
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)) ||
+	    (diag = kdb_getarea(bp, addr)))
 		return diag;
-
-	for (i=0; i<sizeof(page_buf_private_t); i++) {
-		*p++ = kdba_getword(addr+i, 1);
-	}
 
 	kdb_printf("page_buf_t at 0x%lx\n", addr);
 	kdb_printf("  pb_flags %s\n", pb_flags(bp.pb_common.pb_flags));
@@ -1827,24 +1821,17 @@ kdbm_pbiodesc(int argc, const char **argv, const char **envp,
 	struct pt_regs *regs)
 {
 	pb_io_desc_t	pbio;
-	unsigned char *p = (unsigned char *)&pbio;
 	unsigned long addr;
 	long	offset=0;
 	int nextarg;
 	int diag;
-	int i;
 	
 	if (argc != 1) 
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
-	if (diag) 
-		return diag;
-
-	for (i = 0; i < sizeof(pb_io_desc_t); i++) {
-		*p++ = kdba_getword(addr+i, 1);
-	}
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)) ||
+	    (diag = kdb_getarea(pbio, addr)))
 
 	kdb_printf("pb_io_desc_t at 0x%lx\n", addr);
 	kdb_printf("  io_rdesc [ written 0x%x count 0x%x buf 0x%p error %d ]\n",
@@ -1868,24 +1855,17 @@ kdbm_pbmap(int argc, const char **argv, const char **envp,
 	struct pt_regs *regs)
 {
 	page_buf_bmap_t	pbm;
-	unsigned char *p = (unsigned char *)&pbm;
 	unsigned long addr;
 	long	offset=0;
 	int nextarg;
 	int diag;
-	int i;
 	
 	if (argc != 1) 
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
-	if (diag) 
-		return diag;
-
-	for (i = 0; i < sizeof(page_buf_bmap_t); i++) {
-		*p++ = kdba_getword(addr+i, 1);
-	}
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)) ||
+	    (diag = kdb_getarea(pbm, addr)))
 
 	kdb_printf("page_buf_bmap_t at 0x%lx\n", addr);
 	kdb_printf("  pbm_bn 0x%Lx pbm_offset 0x%Lx pbm_delta 0x%x pbm_bsize 0x%x\n",
