@@ -534,6 +534,15 @@ xfs_inode_item_unpin(
 	xfs_iunpin(iip->ili_inode);
 }
 
+/* ARGSUSED */
+STATIC void
+xfs_inode_item_unpin_remove(
+	xfs_inode_log_item_t	*iip,
+	xfs_trans_t		*tp)
+{
+	xfs_iunpin(iip->ili_inode);
+}
+
 /*
  * This is called to attempt to lock the inode associated with this
  * inode log item, in preparation for the push routine which does the actual
@@ -845,6 +854,7 @@ struct xfs_item_ops xfs_inode_item_ops = {
 	(void(*)(xfs_log_item_t*, xfs_log_iovec_t*))xfs_inode_item_format,
 	(void(*)(xfs_log_item_t*))xfs_inode_item_pin,
 	(void(*)(xfs_log_item_t*))xfs_inode_item_unpin,
+	(void(*)(xfs_log_item_t*, xfs_trans_t*))xfs_inode_item_unpin_remove,
 	(uint(*)(xfs_log_item_t*))xfs_inode_item_trylock,
 	(void(*)(xfs_log_item_t*))xfs_inode_item_unlock,
 	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_inode_item_committed,
