@@ -3385,6 +3385,13 @@ xfs_rmdir(vnode_t	*dir_vp,
 	struct ncfastdata	fastdata;
 
 	vn_trace_entry(dir_vp, "xfs_rmdir");
+
+	if (DM_EVENT_ENABLED (dir_vp->v_vfsp, XFS_VTOI (dir_vp), DM_REMOVE)) {
+		error = dm_namesp_event (DM_REMOVE, dir_vp, NULL,
+			name, NULL, 0, 0);
+		if (error)
+			return error;
+	}
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
 	tp = xfs_trans_alloc(mp, XFS_TRANS_RMDIR);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
@@ -3488,6 +3495,11 @@ xfs_rmdir(vnode_t	*dir_vp,
 	(void) xfs_bmap_finish (&tp, &free_list, first_block);
 
 	xfs_trans_commit (tp, XFS_TRANS_RELEASE_LOG_RES);
+
+	if (DM_EVENT_ENABLED (dir_vp->v_vfsp, dp, DM_POSTREMOVE)) {
+		(void) dm_namesp_event (DM_POSTREMOVE, dir_vp, NULL,
+			name, NULL, cdp->i_d.di_mode, 0);
+	}
 	IRELE(cdp);
 
 	return 0;
