@@ -42,6 +42,7 @@
 #include <sys/sysinfo.h>
 #include <sys/ksa.h>
 #include <sys/grio.h>
+#include <sys/var.h>
 #include <string.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -237,7 +238,7 @@ STATIC int	xfs_setfl(vnode_t	*vp,
 
 STATIC int	xfs_fcntl(vnode_t	*vp,
 			  int		cmd,
-			  void		*argp,
+			  void		*arg,
 			  int		flags,
 			  off_t		offset,
 			  cred_t	*credp,
@@ -370,10 +371,12 @@ xfs_getattr(vnode_t	*vp,
 	/*
 	 * XFS-added attributes
 	 */
-	vap->va_xflags = ip->i_d.di_flags;
-	vap->va_extsize = ip->i_d.di_extsize;
-	vap->va_nextents = ip->i_d.di_nextents;
-	vap->va_uuid = ip->i_d.di_uuid;
+	if (flags & (AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS|AT_UUID)) {
+		vap->va_xflags = ip->i_d.di_flags;
+		vap->va_extsize = ip->i_d.di_extsize;
+		vap->va_nextents = ip->i_d.di_nextents;
+		vap->va_uuid = ip->i_d.di_uuid;
+	}
 
 	xfs_iunlock (ip, XFS_ILOCK_EXCL);
 
@@ -451,8 +454,9 @@ xfs_setattr(vnode_t	*vp,
 
         /*
          * Change file access modes.  Must be owner or privileged.
+	 * Also check here for xflags, extsize.
          */
-        if (mask & AT_MODE) {
+        if (mask & (AT_MODE|AT_XFLAGS|AT_EXTSIZE)) {
                 if (credp->cr_uid != ip->i_d.di_uid && !crsuser(credp)) {
                         code = EPERM;
                         goto error_return;
@@ -510,6 +514,28 @@ xfs_setattr(vnode_t	*vp,
                 }
         }
 
+	/*
+	 * Change extent size or realtime flag.
+	 */
+	if (mask & (AT_EXTSIZE|AT_XFLAGS)) {
+		/*
+		 * Can't change extent size if any extents are allocated.
+		 */
+		if (ip->i_d.di_nextents && (mask & AT_EXTSIZE) &&
+		    ip->i_d.di_extsize != vap->va_extsize) {
+			code = EINVAL;	/* EFBIG? */
+			goto error_return;
+		}
+		/*
+		 * Can't change realtime flag if any extents are allocated.
+		 */
+		if (ip->i_d.di_nextents && (mask & AT_XFLAGS) &&
+		    (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) !=
+		    (vap->va_xflags & XFS_DIFLAG_REALTIME)) {
+			code = EINVAL;	/* EFBIG? */
+			goto error_return;
+		}
+	}
 
 	/*
 	 * Now we can make the changes.
@@ -598,20 +624,11 @@ xfs_setattr(vnode_t	*vp,
 	 * Change XFS-added attributes.
 	 */
 	if (mask & (AT_EXTSIZE|AT_XFLAGS)) {
-                if (credp->cr_uid != ip->i_d.di_uid && !crsuser(credp)) {
-                        code = EPERM;
-                        goto error_return;
-                }
-		if (mask & AT_EXTSIZE) {
-			if (ip->i_d.di_nextents) {
-				code = EINVAL;	/* EFBIG? */
-				goto error_return;
-			}
+		if (mask & AT_EXTSIZE)
 			ip->i_d.di_extsize = vap->va_extsize;
-		}
 		if (mask & AT_XFLAGS)
 			ip->i_d.di_flags = vap->va_xflags & XFS_DIFLAG_ALL;
-		xfs_trans_log_inode (tp, ip, XFS_ILOG_CORE);
+		xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	}
 
 	XFS_IGETINFO.ig_attrchg++;
@@ -2706,19 +2723,77 @@ xfs_setfl(vnode_t	*vp,
 
 /*
  * xfs_fcntl
- *
- * This is a stub.
  */
 STATIC int
 xfs_fcntl(vnode_t	*vp,
 	  int		cmd,
-	  void		*argp,
+	  void		*arg,
 	  int		flags,
 	  off_t		offset,
 	  cred_t	*credp,
 	  rval_t	*rvalp)
 {
-	return 0;
+	int		error = 0;
+	xfs_inode_t	*ip;
+
+	switch (cmd) {
+	case F_DIOINFO: {
+		struct dioattr	da;
+		xfs_sb_t	*sbp;
+
+		/* only works on files opened for direct I/O */
+		if (!(flags & FDIRECT)) {
+			error = EINVAL;
+			break;
+		}
+		ip = XFS_VTOI(vp);
+		sbp = &ip->i_mount->m_sb;
+		da.d_mem = sbp->sb_blocksize;	/* memory alignment?? */
+		da.d_miniosz =
+			(ip->i_d.di_extsize ? ip->i_d.di_extsize :
+			 (ip->i_d.di_flags & XFS_DIFLAG_REALTIME ?
+			  sbp->sb_rextsize : 1)) << sbp->sb_blocklog;
+		da.d_maxiosz = ctob(v.v_maxdmasz);	/* round? */
+		if (copyout(&da, arg, sizeof(da)))
+			error = EFAULT;
+		break;
+	    }
+
+	case F_FSGETXATTR: {
+		struct fsxattr fa;
+		vattr_t va;
+
+		error = xfs_getattr(vp, &va, AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS|AT_UUID, credp);
+		if (error)
+			break;
+		fa.fsx_xflags = va.va_xflags;
+		fa.fsx_extsize = va.va_extsize;
+		fa.fsx_nextents = va.va_nextents;
+		fa.fsx_uuid = va.va_uuid;
+		if (copyout(&fa, arg, sizeof(fa)))
+			error = EFAULT;
+		break;
+	    }
+
+	case F_FSSETXATTR: {
+		struct fsxattr fa;
+		vattr_t va;
+
+		if (copyin(arg, &fa, sizeof(fa))) {
+			error = EFAULT;
+			break;
+		}
+		va.va_xflags = fa.fsx_xflags;
+		va.va_extsize = fa.fsx_extsize;
+		error = xfs_setattr(vp, &va, AT_XFLAGS|AT_EXTSIZE, credp);
+		break;
+	    }
+
+	default:
+		error = EINVAL;
+		break;
+	}
+	return error;
 }
 
 
