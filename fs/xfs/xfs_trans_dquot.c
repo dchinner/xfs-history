@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.8 $"
+#ident	"$Revision: 1.9 $"
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
@@ -6,7 +6,6 @@
 #include <sys/errno.h>
 #include <sys/kmem.h>
 #include <sys/debug.h>
-#include <sys/proc.h>
 #include <sys/cmn_err.h>	
 #include <sys/atomic_ops.h>
 #include <sys/systm.h>

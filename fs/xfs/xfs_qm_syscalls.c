@@ -1,4 +1,4 @@
-#ident "$Revision: 1.15 $"
+#ident "$Revision: 1.16 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -12,7 +12,6 @@
 #include <sys/errno.h>
 #include <sys/kmem.h>
 #include <sys/debug.h>
-#include <sys/proc.h>
 #include <sys/cmn_err.h>
 #include <sys/vfs.h>
 #include <sys/atomic_ops.h>
@@ -20,6 +19,10 @@
 #include <sys/ktrace.h>
 #include <sys/quota.h>
 #include <limits.h>
+
+#ifdef _BANYAN_XFS
+#include <sys/proc.h>
+#endif
 
 #include "xfs_macros.h"
 #include "xfs_types.h"
