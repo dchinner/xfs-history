@@ -1670,7 +1670,7 @@ xfs_dm_get_dioinfo(
 	 */
 	dio.d_miniosz = mp->m_sb.sb_blocksize;
 	dio.d_maxiosz = XFS_FSB_TO_B(mp,
-			    XFS_B_TO_FSBT(mp, ctob(v.v_maxdmasz - 1)));
+			    XFS_B_TO_FSBT(mp, pagebuf_max_direct()));
 
 	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
 		dio.d_dio_only = DM_TRUE;
