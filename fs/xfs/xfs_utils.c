@@ -1,4 +1,4 @@
-#ident "$Revision: 1.12 $"
+#ident "$Revision: 1.13 $"
 
 #include <sys/types.h>
 #include <sys/buf.h>
@@ -130,6 +130,7 @@ xfs_dir_lookup_int(
 	 * we're holding the directory lock.
          */
         if (!(flags & DLF_NODNLC)) {
+retry_dnlc:
 		dir_gen = dp->i_gen;
 		bdp = dnlc_lookup_fast(dir_vp, name, pnp, fd, NOCRED,
 			VN_GET_NOWAIT);
@@ -166,9 +167,21 @@ xfs_dir_lookup_int(
 			return 0;
 		}
 		/*
-		 * Need to VN_RELE bdp but it's not safe to do this
-		 * until the directory is unlocked.
+		 * If we get here with bdp set then we need to VN_RELE it
+		 * because the directory generation number changed. It's not
+		 * safe to do this until the directory is unlocked. If we
+		 * are not going to get the actual inode then do this here
+		 * and check the dnlc for the name again. If we are going to
+		 * read the inode then let that code do the work for us.
 		 */
+		if (!do_iget && bdp) {
+			if (dir_unlocked != NULL)
+				*dir_unlocked = 1;
+			xfs_iunlock(dp, lock_mode);
+			VN_RELE(BHV_TO_VNODE(bdp));
+			xfs_ilock(dp, lock_mode);
+			goto retry_dnlc;
+		}
         } else
 		bdp = NULL;
 
@@ -290,8 +303,16 @@ xfs_dir_lookup_int(
 			bdp = NULL;
 		}
 	}
-	if (bdp)
+	if (bdp) {
+		/* The only time we should get here is if the dir_lookup
+		 * failed.
+		 */
+		ASSERT(error);
+		xfs_iunlock(dp, lock_mode);
 		VN_RELE(BHV_TO_VNODE(bdp));
+		xfs_ilock(dp, lock_mode);
+		if (dir_unlocked != NULL) *dir_unlocked = 1;
+	}
 	return error;
 }
 
