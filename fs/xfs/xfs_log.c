@@ -42,6 +42,8 @@
 #include "xfs_inode_item.h"
 #include "xfs_error.h"
 #include "xfs_log_priv.h"	/* depends on all above */
+#include "xfs_buf_item.h"
+#include "xfs_log_recover.h"
 
 
 #ifdef SIM
@@ -60,7 +62,7 @@ STATIC xfs_lsn_t xlog_commit_record(xfs_mount_t *mp, xlog_ticket_t *ticket);
 STATIC int	 xlog_find_zeroed(xlog_t *log, daddr_t* blk_no);
 STATIC xlog_t *  xlog_init_log(xfs_mount_t *mp, dev_t log_dev,
 			       daddr_t blk_offset, int num_bblks);
-STATIC void	 xlog_push_buffers_to_disk(xfs_mount_t *mp, xlog_t *log);
+STATIC void	 xlog_push_buffers_to_disk(xfs_mount_t *mp);
 STATIC void	 xlog_sync(xlog_t *log, xlog_in_core_t *iclog, uint flags);
 STATIC void	 xlog_unalloc(void);
 STATIC int	 xlog_write(xfs_mount_t *mp, xfs_log_iovec_t region[],
@@ -108,7 +110,7 @@ STATIC void		xlog_verify_iclog(xlog_t *log, xlog_in_core_t *iclog,
  * 1 => enable log manager
  * 2 => enable log manager and log debugging
  */
-int xlog_debug = 2;
+int xlog_debug = 1;
 
 
 #ifdef DEBUG
@@ -282,7 +284,7 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 		log->l_tail_lsn = tail_lsn;
 	else
 		log->l_tail_lsn = log->l_last_sync_lsn;
-	xlog_push_buffers_to_disk(mp, log);
+	xlog_push_buffers_to_disk(mp);
 
 	if ((int)(*ticket = xlog_state_get_ticket(log,len,client,flags)) == -1)
 		return XFS_ENOLOGSPACE;
@@ -578,13 +580,16 @@ xlog_commit_record(xfs_mount_t  *mp,
  * water mark.  In this manner, we would be creating a low water mark.
  */
 void
-xlog_push_buffers_to_disk(xfs_mount_t *mp, xlog_t *log)
+xlog_push_buffers_to_disk(xfs_mount_t *mp)
 {
     int		blocks;		/* valid blocks left to write to */
+    xlog_t	*log = mp->m_log;
     xfs_lsn_t	tail_lsn;
     xfs_lsn_t	threshhold_lsn;
     int		threshhold_block;
+    int		spl;
 
+    spl = splockspl(log->l_icloglock, splhi);
     tail_lsn = log->l_tail_lsn;
     if (CYCLE_LSN(tail_lsn) == log->l_curr_cycle) {
 	blocks = log->l_logBBsize - (log->l_curr_block - BLOCK_LSN(tail_lsn));
@@ -592,6 +597,7 @@ xlog_push_buffers_to_disk(xfs_mount_t *mp, xlog_t *log)
 	ASSERT(CYCLE_LSN(tail_lsn) + 1 == log->l_curr_cycle);
 	blocks = BLOCK_LSN(tail_lsn) - log->l_curr_block;
     }
+    spunlockspl(log->l_icloglock, spl);
 
     if (blocks < (log->l_logBBsize >> 2)) {
 	threshhold_block = BLOCK_LSN(tail_lsn) + (log->l_logBBsize >> 2);
@@ -1350,6 +1356,7 @@ xlog_state_sync_all(xlog_t *log, uint flags)
 	xfs_lsn_t	lsn;
 	int		spl;
 
+	xlog_push_buffers_to_disk(log->l_mp);
 	spl = splockspl(log->l_icloglock, splhi);
 
 	iclog = log->l_iclog;
@@ -1587,23 +1594,23 @@ xlog_verify_tail_lsn(xlog_t	    *log,
 		     xlog_in_core_t *iclog,
 		     xfs_lsn_t	    tail_lsn)
 {
-	int blocks;
+    int blocks;
 
-	if (CYCLE_LSN(tail_lsn) == log->l_prev_cycle) {
-		blocks =
-		    log->l_logBBsize - (log->l_prev_block -BLOCK_LSN(tail_lsn));
-		if (blocks < BTOBB(iclog->ic_offset)+1)
-			xlog_panic("ran out of log space");
-	} else {
-		ASSERT(CYCLE_LSN(tail_lsn)+1 == log->l_prev_cycle);
+    if (CYCLE_LSN(tail_lsn) == log->l_prev_cycle) {
+	blocks =
+	    log->l_logBBsize - (log->l_prev_block -BLOCK_LSN(tail_lsn));
+	if (blocks < BTOBB(iclog->ic_offset)+1)
+	    xlog_panic("xlog_verify_tail_lsn: ran out of log space");
+    } else {
+	ASSERT(CYCLE_LSN(tail_lsn)+1 == log->l_prev_cycle);
 
-		if (BLOCK_LSN(tail_lsn) == log->l_prev_block)
-			xlog_panic("ran out of log space");
+	if (BLOCK_LSN(tail_lsn) == log->l_prev_block)
+	    xlog_panic("xlog_verify_tail_lsn: tail wrapped");
 		
-		blocks = BLOCK_LSN(tail_lsn) - log->l_prev_block;
-		if (blocks < BTOBB(iclog->ic_offset) + 1)
-			xlog_panic("ran out of log space");
-	}
+	blocks = BLOCK_LSN(tail_lsn) - log->l_prev_block;
+	if (blocks < BTOBB(iclog->ic_offset) + 1)
+	    xlog_panic("xlog_verify_tail_lsn: ran out of log space");
+    }
 }	/* xlog_verify_tail_lsn */
 
 
