@@ -1,4 +1,4 @@
-#ident "$Revision: 1.78 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -18,6 +18,7 @@
 #define _KERNEL 1
 #endif /* SIM */
 #include <sys/dirent.h>
+#include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/ktrace.h>
 #include <sys/sysinfo.h>
@@ -910,8 +911,9 @@ xfs_dir_node_replace(xfs_trans_t *trans, xfs_da_args_t *args)
 	xfs_da_state_free(state);
 	return(retval);
 }
+#endif	/* !SIM */
 
-#if defined(DEBUG)
+#if defined(XFS_DIR_TRACE)
 /*
  * Add a trace buffer entry for an inode and a uio.
  */
@@ -1033,5 +1035,5 @@ xfs_dir_trace_enter(int type, char *where,
 					(void *)a9, (void *)a10, (void *)a11,
 					NULL, NULL);
 }
-#endif	/* DEBUG */
-#endif	/* !SIM */
+#endif	/* XFS_DIR_TRACE */
+

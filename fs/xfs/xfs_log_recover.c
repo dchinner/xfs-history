@@ -33,6 +33,7 @@
 #include <sys/ktrace.h>
 #include <sys/user.h>
 #include <sys/vfs.h>
+#include <sys/uuid.h>
 #include <stddef.h>
 
 #include <sys/fs/xfs_macros.h>
@@ -3369,11 +3370,18 @@ xlog_recover(xlog_t *log)
 		head_blk = HEAD_BLK;
 		tail_blk = TAIL_BLK;
 #endif
-#if defined(DEBUG) && defined(_KERNEL)
+#ifdef _KERNEL
+#ifdef DEBUG
 		cmn_err(CE_NOTE,
 			"Starting XFS recovery on filesystem: %s (dev: %d/%d)",
 			log->l_mp->m_fsname, emajor(log->l_dev),
 			eminor(log->l_dev));
+#else
+		cmn_err(CE_NOTE,
+			"!Starting XFS recovery on filesystem: %s (dev: %d/%d)",
+			log->l_mp->m_fsname, emajor(log->l_dev),
+			eminor(log->l_dev));
+#endif
 #endif
 		error = xlog_do_recover(log, head_blk, tail_blk);
 		log->l_flags |= XLOG_RECOVERY_NEEDED;
@@ -3417,14 +3425,26 @@ xlog_recover_finish(xlog_t *log)
 		xlog_recover_process_iunlinks(log);
 		xlog_recover_check_summary(log);
 #endif /* _KERNEL */
+#ifdef DEBUG
 		cmn_err(CE_NOTE,
 			"Ending XFS recovery for filesystem: %s (%s)",
 			log->l_mp->m_fsname, dev_to_name(log->l_dev, devnm, MAXDEVNAME));
+#else
+		cmn_err(CE_NOTE,
+			"!Ending XFS recovery for filesystem: %s (%s)",
+			log->l_mp->m_fsname, dev_to_name(log->l_dev, devnm, MAXDEVNAME));
+#endif
 		log->l_flags &= ~XLOG_RECOVERY_NEEDED;
 	} else {
+#ifdef DEBUG
 		cmn_err(CE_NOTE,
 			"Ending clean XFS mount for filesystem: %s",
 			log->l_mp->m_fsname);
+#else
+		cmn_err(CE_NOTE,
+			"!Ending clean XFS mount for filesystem: %s",
+			log->l_mp->m_fsname);
+#endif
 	}
 	return 0;
 }	/* xlog_recover_finish */
