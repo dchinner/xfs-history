@@ -703,8 +703,7 @@ xfs_imap(xfs_mount_t	*mp,
 	int off;
 	xfs_sb_t *sbp;
 
-	if (!xfs_dilocate(mp, tp, ino, &fsbno, &off))
-		return 0;
+	xfs_dilocate(mp, tp, ino, &fsbno, &off);
 	sbp = &mp->m_sb;
 	imap->im_blkno = xfs_fsb_to_daddr(sbp, fsbno);
 	imap->im_len = xfs_btod(sbp, 1);
