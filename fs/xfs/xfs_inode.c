@@ -887,8 +887,6 @@ xfs_igrow_finish(
 	xfs_inode_t	*ip,
 	xfs_fsize_t	new_size)
 {
-	timestruc_t	tv;
-
 	ASSERT(ismrlocked(&(ip->i_lock), MR_UPDATE) != 0);
 	ASSERT(ismrlocked(&(ip->i_iolock), MR_UPDATE) != 0);
 	ASSERT(ip->i_transp == tp);
@@ -898,8 +896,7 @@ xfs_igrow_finish(
 	 * Update the file size and inode change timestamp.
 	 */
 	ip->i_d.di_size = new_size;
-	nanotime(&tv);
-	ip->i_d.di_ctime.t_sec = tv.tv_sec;
+	xfs_ichgtime(ip, XFS_ICHGTIME_CHG);
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 
 }
@@ -2229,4 +2226,32 @@ xfs_iroundup(
 			return v + 1;
 	}
 	ASSERT(0);
+}
+
+/*
+ * Change the requested timestamp in the given inode.
+ * We don't lock across timestamp updates, and we don't log them but
+ * we do record the fact that there is dirty information in core.
+ */
+void
+xfs_ichgtime(xfs_inode_t *ip,
+	     int flags)
+{
+	timestruc_t	tv;
+
+	/*
+	 * We're not supposed to change timestamps in readonly-mounted
+	 * filesystems.  Throw it away if anyone asks us.
+	 */
+	if (XFS_ITOV(ip)->v_vfsp->vfs_flag & VFS_RDONLY)
+		return;
+
+	nanotime(&tv);
+	if (flags & XFS_ICHGTIME_MOD)
+		ip->i_d.di_mtime.t_sec = tv.tv_sec;
+	if (flags & XFS_ICHGTIME_ACC)
+		ip->i_d.di_atime.t_sec = tv.tv_sec;
+	if (flags & XFS_ICHGTIME_CHG)
+		ip->i_d.di_ctime.t_sec = tv.tv_sec;
+	ip->i_update_core = 1;
 }

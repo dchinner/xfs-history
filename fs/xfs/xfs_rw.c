@@ -1119,7 +1119,6 @@ xfs_read(
 	off_t		offset;
 	size_t		count;
 	int		error;
-	timestruc_t	tv;
 
 
 	ip = XFS_VTOI(vp);
@@ -1171,11 +1170,8 @@ xfs_read(
 				     UIO_READ);
 		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
 		/* don't update timestamps if doing invisible I/O */
-		if (!(ioflag & IO_INVIS)) {
-			nanotime (&tv);
-			ip->i_d.di_atime.t_sec = tv.tv_sec;
-			ip->i_update_core = 1;
-		}
+		if (!(ioflag & IO_INVIS))
+			xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
 		break;
 
 	case IFDIR:
@@ -2094,10 +2090,11 @@ xfs_write(
 	int		error;
 	off_t		n;
 	int		resid;
-	timestruc_t	tv;
 	off_t		savedsize;
 	int		eventsent = 0;
 
+
+	ASSERT(!(vp->v_vfsp->vfs_flag & VFS_RDONLY));
 
 	ip = XFS_VTOI(vp);
 	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
@@ -2213,12 +2210,9 @@ retry:
 		if (count != uiop->uio_resid) {
 			error = 0;
 			/* don't update timestamps if doing invisible I/O */
-			if (!(ioflag & IO_INVIS)) {
-				nanotime(&tv);
-				ip->i_d.di_mtime.t_sec = tv.tv_sec;
-				ip->i_d.di_ctime.t_sec = tv.tv_sec;
-				ip->i_update_core = 1;
-			}
+			if (!(ioflag & IO_INVIS))
+				xfs_ichgtime(ip,
+					XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 		}
 
 		/*
@@ -4140,18 +4134,13 @@ xfs_diostrat( buf_t *bp)
  	 *  Update the inode timestamp if file was written.
  	 */
 	if ( writeflag ) {
-		timestruc_t tv;
-
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 		if ((ip->i_d.di_mode & (ISUID|ISGID)) && dp->cr->cr_uid != 0){
 			ip->i_d.di_mode &= ~ISUID;
 			if (ip->i_d.di_mode & (IEXEC >> 3))
 				ip->i_d.di_mode &= ~ISGID;
 		}
-		nanotime( &tv );
-		ip->i_d.di_mtime.t_sec = ip->i_d.di_ctime.t_sec = tv.tv_sec;
-
-		ip->i_update_core = 1;
+		xfs_ichgtime(ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	}
 

@@ -78,11 +78,6 @@
 STATIC int	xfs_truncate_file(xfs_mount_t	*mp,
 				  xfs_inode_t	*ip);
 
-#define	XFS_ICHGTIME_MOD	0x1	/* data fork modification timestamp */
-#define	XFS_ICHGTIME_ACC	0x2	/* data fork access timestamp */
-#define	XFS_ICHGTIME_CHG	0x4	/* inode field change timestamp */
-STATIC void	xfs_ichgtime(xfs_inode_t *ip,
-			     int flags);
 STATIC void	xfs_droplink(xfs_trans_t *tp,
 			     xfs_inode_t *ip);
 STATIC void	xfs_bumplink(xfs_trans_t *tp,
@@ -478,7 +473,6 @@ xfs_setattr(vnode_t	*vp,
 	uint		lock_flags;
 	uint		commit_flags;
 	boolean_t	ip_held;
-	timestruc_t 	tv;
 	uid_t		uid;
 	gid_t		gid;
 	int		timeflags = 0;
@@ -1599,30 +1593,6 @@ xfs_dir_ialloc(
 
 	return 0;
 }
-
-
-
-/*
- * Change the requested timestamp in the given inode.
- * We don't lock across timestamp updates, and we don't log them but
- * we do record the fact that there is dirty information in core.
- */
-STATIC void
-xfs_ichgtime(xfs_inode_t *ip,
-	      int flags)
-{
-	timestruc_t	tv;
-
-	nanotime(&tv);
-	if (flags & XFS_ICHGTIME_MOD)
-		ip->i_d.di_mtime.t_sec = tv.tv_sec;
-	if (flags & XFS_ICHGTIME_ACC)
-		ip->i_d.di_atime.t_sec = tv.tv_sec;
-	if (flags & XFS_ICHGTIME_CHG)
-		ip->i_d.di_ctime.t_sec = tv.tv_sec;
-	ip->i_update_core = 1;
-}
-
 
 
 /*

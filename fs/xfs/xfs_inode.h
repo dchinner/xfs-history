@@ -184,6 +184,13 @@ typedef struct xfs_inode {
 #define	XFS_ITRUNC_MAYBE	0x2
 
 /*
+ * Flags for xfs_ichgtime().
+ */
+#define	XFS_ICHGTIME_MOD	0x1	/* data fork modification timestamp */
+#define	XFS_ICHGTIME_ACC	0x2	/* data fork access timestamp */
+#define	XFS_ICHGTIME_CHG	0x4	/* inode field change timestamp */
+
+/*
  * Maximum number of extent pointers in i_u1.iu_extents.
  */
 #define	XFS_MAX_INCORE_EXTENTS	32768
@@ -287,6 +294,7 @@ void		xfs_iprint(xfs_inode_t *);
 #endif
 int		xfs_iaccess(xfs_inode_t *, mode_t, struct cred *);
 uint		xfs_iroundup(uint);
+void		xfs_ichgtime(xfs_inode_t *, int);
 
 #ifdef DEBUG
 void		xfs_isize_check(xfs_mount_t *, xfs_inode_t *, xfs_fsize_t);
