@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.65 $"
+#ident  "$Revision: 1.66 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -368,11 +368,18 @@ xfs_cmountfs(struct vfs 	*vfsp,
 			}
 			mp->m_logdevp = ldevvp;
 		}
+		if (ap->version != 1) {
+			error = XFS_ERROR(EINVAL);
+			goto error;
+		}
+		mp->m_logbufs = ap->logbufs;
+		mp->m_logbsize = ap->logbufsize;
 	} else
 		ldevvp = NULL;
 
 	if (error = xfs_mountfs(vfsp, ddev)) {
 		xfs_mount_free(mp);
+error:
 		if (ldevvp) {
 			VOP_CLOSE(ldevvp, vfs_flags, 1, 0, cr);
 			binval(logdev);
