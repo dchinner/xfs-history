@@ -2,7 +2,7 @@
 #
 # Makefile for SGI XFS File System
 #
-# $Revision: 1.54 $
+# $Revision: 1.55 $
 DEPTH?=../..
 include ${DEPTH}/kcommondefs
 KPATH=$(TOP)/fs/xfs
@@ -17,7 +17,7 @@ KPATH=$(TOP)/fs/xfs
 KWOFF=,1552
 #endif
 
-#if defined(CELL_IRIX)
+#if defined(CELL)
 SUBDIRS=cell
 #endif
 
