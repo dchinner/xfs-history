@@ -43,7 +43,7 @@ extern struct xfsstats xfsstats;
 unsigned long xfs_min[XFS_PARAM] = {			 0,			 0, 0 };
 unsigned long xfs_max[XFS_PARAM] = { XFS_REFCACHE_SIZE_MAX,  XFS_REFCACHE_SIZE_MAX, 1 };
 
-xfs_param_t xfs_params = {{ 128, 32, 0 }};
+xfs_param_t xfs_params = { 128, 32, 0 };
 
 static struct ctl_table_header *xfs_table_header;
 
@@ -66,8 +66,8 @@ xfs_refcache_resize_proc_handler(ctl_table *ctl, int write, struct file * filp,
 	if (!ret && write && xfs_refcache_new_size != xfs_refcache_old_size) {
 		xfs_refcache_resize(xfs_refcache_new_size);
 		/* Don't purge more than size of the cache */
-		if (xfs_refcache_new_size < xfs_params.xfs_un.refcache_purge)
-			xfs_params.xfs_un.refcache_purge = xfs_refcache_new_size;
+		if (xfs_refcache_new_size < xfs_params.refcache_purge)
+			xfs_params.refcache_purge = xfs_refcache_new_size;
 	}
 
 	return ret;
@@ -89,22 +89,22 @@ xfs_stats_clear_proc_handler(ctl_table *ctl, int write, struct file * filp,
 		vn_active = xfsstats.vn_active;
 		memset(&xfsstats, 0, sizeof(xfsstats));
 		xfsstats.vn_active = vn_active;
-		xfs_params.xfs_un.stats_clear = 0;
+		xfs_params.stats_clear = 0;
 	}
 
 	return ret;
 }
 
 static ctl_table xfs_table[] = {
-	{XFS_REFCACHE_SIZE, "refcache_size", &xfs_params.data[0],
+	{XFS_REFCACHE_SIZE, "refcache_size", &xfs_params.refcache_size,
 	sizeof(ulong), 0644, NULL, &xfs_refcache_resize_proc_handler,
 	&sysctl_intvec, NULL, &xfs_min[0], &xfs_max[0]},
 
-	{XFS_REFCACHE_PURGE, "refcache_purge", &xfs_params.data[1],
+	{XFS_REFCACHE_PURGE, "refcache_purge", &xfs_params.refcache_purge,
 	sizeof(ulong), 0644, NULL, &proc_doulongvec_minmax,
-	&sysctl_intvec, NULL, &xfs_min[1], &xfs_params.xfs_un.refcache_size},
+	&sysctl_intvec, NULL, &xfs_min[1], &xfs_params.refcache_size},
 
-	{XFS_STATS_CLEAR, "stats_clear", &xfs_params.data[2],
+	{XFS_STATS_CLEAR, "stats_clear", &xfs_params.stats_clear,
 	sizeof(ulong), 0644, NULL, &xfs_stats_clear_proc_handler,
 	&sysctl_intvec, NULL, &xfs_min[2], &xfs_max[2]},
 

@@ -29,13 +29,18 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef __XFS_RANDOM_H__
-#define __XFS_RANDOM_H__
+#ifndef __XFS_STATS_H__
+#define __XFS_STATS_H__
 
 /*
  * procfs interface
  */
-extern void	xfs_init_procfs(void);
-extern void	xfs_cleanup_procfs(void);
+#ifdef CONFIG_PROC_FS
+extern void xfs_init_procfs(void);
+extern void xfs_cleanup_procfs(void);
+#else
+static __inline void xfs_init_procfs(void) { };
+static __inline void xfs_cleanup_procfs(void) { };
+#endif
 
-#endif /* __XFS_RANDOM_H__ */
+#endif /* __XFS_STATS_H__ */

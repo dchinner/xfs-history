@@ -30,8 +30,8 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#ifndef __XFS_SYSCNTL_H__
-#define __XFS_SYSCNTL_H__
+#ifndef __XFS_SYSCTL_H__
+#define __XFS_SYSCTL_H__
 
 #include <linux/sysctl.h>
 
@@ -41,17 +41,13 @@
 
 #define XFS_PARAM	3
 
-typedef union xfs_param {
-	struct {
-		ulong	refcache_size;	/* Size of nfs refcache */
-		ulong	refcache_purge; /* # of entries to purge each time */
-		ulong	stats_clear;	/* reset all xfs stats to 0 */
-	} xfs_un;
-	ulong data[XFS_PARAM];
+typedef struct xfs_param {
+	ulong	refcache_size;	/* Size of nfs refcache */
+	ulong	refcache_purge; /* # of entries to purge each time */
+	ulong	stats_clear;	/* reset all xfs stats to 0 */
 } xfs_param_t;
 
-enum
-{
+enum {
 	XFS_REFCACHE_SIZE = 1,
 	XFS_REFCACHE_PURGE = 2,
 	XFS_STATS_CLEAR = 3,
@@ -59,7 +55,12 @@ enum
 
 extern xfs_param_t	xfs_params;
 
-void	xfs_sysctl_register(void);
-void	xfs_sysctl_unregister(void);
+#ifdef CONFIG_SYSCTL
+extern void xfs_sysctl_register(void);
+extern void xfs_sysctl_unregister(void);
+#else
+static __inline void xfs_sysctl_register(void) { };
+static __inline void xfs_sysctl_unregister(void) { };
+#endif
 
-#endif /* __XFS_SYSCNTL_H__ */
+#endif /* __XFS_SYSCTL_H__ */

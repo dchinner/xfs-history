@@ -33,7 +33,6 @@
 #include <xfs.h>
 #include <linux/proc_fs.h>
 
-#ifdef CONFIG_PROC_FS
 static int
 xfs_read_xfsstats(char *buffer, char **start, off_t offset,
 			int count, int *eof, void *data)
@@ -114,27 +113,20 @@ xfs_read_xfsquota(char *buffer, char **start, off_t offset,
 
 	return len;
 }
-#endif	/* CONFIG_PROC_FS */
-
 
 void
 xfs_init_procfs(void)
 {
-#ifdef	CONFIG_PROC_FS
 	if (!proc_mkdir("fs/xfs", 0))
 		return;
 	create_proc_read_entry("fs/xfs/stat", 0, 0, xfs_read_xfsstats, NULL);
 	create_proc_read_entry("fs/xfs/xqm", 0, 0, xfs_read_xfsquota, NULL);
-#endif
 }
-
 
 void
 xfs_cleanup_procfs(void)
 {
-#ifdef	CONFIG_PROC_FS
 	remove_proc_entry("fs/xfs/stat", NULL);
 	remove_proc_entry("fs/xfs/xqm", NULL);
 	remove_proc_entry("fs/xfs", NULL);
-#endif
 }

@@ -82,6 +82,9 @@ xfs-obj-$(CONFIG_XFS_QUOTA)	+= xfs_dquot.o \
 xfs-obj-$(CONFIG_FS_POSIX_ACL)	+= xfs_acl.o
 xfs-obj-$(CONFIG_FS_POSIX_CAP)	+= xfs_cap.o
 xfs-obj-$(CONFIG_FS_POSIX_MAC)	+= xfs_mac.o
+xfs-obj-$(CONFIG_PROC_FS)	+= xfs_stats.o
+xfs-obj-$(CONFIG_SYSCTL)	+= xfs_sysctl.o
+
 
 xfs-objs			+= $(xfs-obj-y) \
 				   xfs_alloc.o \
@@ -144,8 +147,6 @@ xfs-objs			+= xfs_behavior.o \
 				   xfs_ioctl.o \
 				   xfs_iops.o \
 				   xfs_lrw.o \
-				   xfs_stats.o \
-				   xfs_sysctl.o \
 				   xfs_super.o \
 				   xfs_vnode.o \
 				   xfs_xattr.o
