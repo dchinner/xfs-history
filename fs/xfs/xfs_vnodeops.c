@@ -1,4 +1,4 @@
-#ident "$Revision: 1.190 $"
+#ident "$Revision: 1.191 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -420,7 +420,7 @@ xfs_getattr(
 	}
         vap->va_fsid = ip->i_dev;
 
-	/* XXX trunc to 32 bits for now. */
+	/* trunc to 32 bits in 32-bit kernels */
 
         vap->va_nodeid = ip->i_ino;
 
