@@ -98,7 +98,7 @@ xfs_error_trap(int e)
 #else
 		cmn_err(CE_NOTE, "xfs_error_trap: error %d", e);
 		debug_stop_all_cpus((void *)-1LL);
-		debug("xfs");
+		BUG();
 #endif
 		break;
 	}
