@@ -134,7 +134,7 @@ xfs_read(
 	if (DM_EVENT_ENABLED(BHV_TO_VNODE(bdp)->v_vfsp, ip, DM_EVENT_READ) &&
 	    !(filp->f_flags & (O_INVISIBLE))) {
 
-		vrwlock_t locktype = VRWLOCK_READ;
+		/*vrwlock_t locktype = VRWLOCK_READ;*/
 
 		ret = xfs_dm_send_data_event(DM_EVENT_READ, bdp,
 					     *offsetp, size,
