@@ -69,8 +69,8 @@
  */
 STATIC void xfs_dir_leaf_add_work(buf_t *leaf_buffer, xfs_da_args_t *args,
 					int insertion_index, int freemap_index);
-STATIC void xfs_dir_leaf_compact(xfs_trans_t *trans, buf_t *leaf_buffer,
-					     int musthave);
+STATIC int xfs_dir_leaf_compact(xfs_trans_t *trans, buf_t *leaf_buffer,
+					     int musthave, int justcheck);
 STATIC void xfs_dir_leaf_rebalance(xfs_da_state_t *state,
 						  xfs_da_state_blk_t *blk1,
 						  xfs_da_state_blk_t *blk2);
@@ -268,6 +268,7 @@ xfs_dir_shortform_create(xfs_da_args_t *args, xfs_ino_t parent)
 	xfs_inode_t *dp;
 
 	dp = args->dp;
+	xfs_dir_ino_validate(dp->i_mount, parent);
 	ASSERT(dp != NULL);
 	ASSERT(dp->i_d.di_size == 0);
 	if (dp->i_d.di_format == XFS_DINODE_FMT_EXTENTS) {
@@ -301,6 +302,7 @@ xfs_dir_shortform_addname(xfs_da_args_t *args)
 	xfs_inode_t *dp;
 
 	dp = args->dp;
+	xfs_dir_ino_validate(dp->i_mount, args->inumber);
 	ASSERT(dp->i_df.if_flags & XFS_IFINLINE);
 	sf = (xfs_dir_shortform_t *)dp->i_df.if_u1.if_data;
 	sfe = &sf->list[0];
@@ -464,6 +466,7 @@ xfs_dir_shortform_to_leaf(xfs_da_args_t *iargs)
 	args.total = iargs->total;
 	args.whichfork = XFS_DATA_FORK;
 	args.trans = iargs->trans;
+	args.justcheck = 0;
 	retval = xfs_dir_leaf_addname(&args);
 	if (retval)
 		goto out;
@@ -670,6 +673,7 @@ xfs_dir_shortform_replace(xfs_da_args_t *args)
 	int i;
 
 	dp = args->dp;
+	xfs_dir_ino_validate(dp->i_mount, args->inumber);
 	ASSERT(dp->i_df.if_flags & XFS_IFINLINE);
 	sf = (xfs_dir_shortform_t *)dp->i_df.if_u1.if_data;
 	if (args->namelen == 2 &&
@@ -764,6 +768,7 @@ xfs_dir_leaf_to_shortform(xfs_da_args_t *iargs)
 	args.total = iargs->total;
 	args.whichfork = XFS_DATA_FORK;
 	args.trans = iargs->trans;
+	args.justcheck = 0;
 	for (i = 0; i < hdr->count; entry++, i++) {
 		if (entry->nameidx == 0)
 			continue;
@@ -932,7 +937,7 @@ xfs_dir_leaf_add(buf_t *bp, xfs_da_args_t *args, int index)
 	xfs_dir_leafblock_t *leaf;
 	xfs_dir_leaf_hdr_t *hdr;
 	xfs_dir_leaf_map_t *map;
-	int tablesize, entsize, sum, i, tmp;
+	int tablesize, entsize, sum, i, tmp, error;
 
 	leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
 	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
@@ -958,7 +963,8 @@ xfs_dir_leaf_add(buf_t *bp, xfs_da_args_t *args, int index)
 		if (map->base < hdr->firstused)
 			tmp += sizeof(xfs_dir_leaf_entry_t);
 		if (map->size >= tmp) {
-			xfs_dir_leaf_add_work(bp, args, index, i);
+			if (!args->justcheck)
+				xfs_dir_leaf_add_work(bp, args, index, i);
 			return(0);
 		}
 		sum += map->size;
@@ -974,11 +980,15 @@ xfs_dir_leaf_add(buf_t *bp, xfs_da_args_t *args, int index)
 
 	/*
 	 * Compact the entries to coalesce free space.
+	 * Pass the justcheck flag so the checking pass can return 
+	 * an error, without changing anything, if it won't fit.
 	 */
-	xfs_dir_leaf_compact(args->trans, bp,
+	error = xfs_dir_leaf_compact(args->trans, bp,
 			args->total == 0 ?
-				entsize + sizeof(xfs_dir_leaf_entry_t) : 0);
-
+				entsize + sizeof(xfs_dir_leaf_entry_t) : 0,
+			args->justcheck);
+	if (error)
+		return(error);
 	/*
 	 * After compaction, the block is guaranteed to have only one
 	 * free region, in freemap[0].  If it is not big enough, give up.
@@ -986,7 +996,8 @@ xfs_dir_leaf_add(buf_t *bp, xfs_da_args_t *args, int index)
 	if (hdr->freemap[0].size < (entsize + sizeof(xfs_dir_leaf_entry_t)))
 		return(XFS_ERROR(ENOSPC));
 
-	xfs_dir_leaf_add_work(bp, args, index, 0);
+	if (!args->justcheck)
+		xfs_dir_leaf_add_work(bp, args, index, 0);
 	return(0);
 }
 
@@ -1029,6 +1040,7 @@ xfs_dir_leaf_add_work(buf_t *bp, xfs_da_args_t *args, int index, int mapindex)
 	 */
 	map = &hdr->freemap[mapindex];
 	mp = args->trans->t_mountp;
+	xfs_dir_ino_validate(mp, args->inumber);
 	ASSERT(map->base < XFS_LBSIZE(mp));
 	ASSERT(map->size >= XFS_DIR_LEAF_ENTSIZE_BYNAME(args->namelen));
 	ASSERT(map->size < XFS_LBSIZE(mp));
@@ -1071,13 +1083,14 @@ xfs_dir_leaf_add_work(buf_t *bp, xfs_da_args_t *args, int index, int mapindex)
 /*
  * Garbage collect a leaf directory block by copying it to a new buffer.
  */
-STATIC void
-xfs_dir_leaf_compact(xfs_trans_t *trans, buf_t *bp, int musthave)
+STATIC int
+xfs_dir_leaf_compact(xfs_trans_t *trans, buf_t *bp, int musthave, int justcheck)
 {
 	xfs_dir_leafblock_t *leaf_s, *leaf_d;
 	xfs_dir_leaf_hdr_t *hdr_s, *hdr_d;
 	xfs_mount_t *mp;
 	char *tmpbuffer;
+	int rval;
 
 	mp = trans->t_mountp;
 	tmpbuffer = kmem_alloc(XFS_LBSIZE(mp), KM_SLEEP);
@@ -1109,11 +1122,16 @@ xfs_dir_leaf_compact(xfs_trans_t *trans, buf_t *bp, int musthave)
 	xfs_dir_leaf_moveents(leaf_s, 0, leaf_d, 0, (int)hdr_s->count, mp);
 
 	if (musthave && hdr_d->freemap[0].size < musthave)
+		rval = XFS_ERROR(ENOSPC);
+	else
+		rval = 0;
+	if (justcheck || rval == ENOSPC)
 		bcopy(tmpbuffer, bp->b_un.b_addr, XFS_LBSIZE(mp));
 	else
 		xfs_trans_log_buf(trans, bp, 0, XFS_LBSIZE(mp) - 1);
 
 	kmem_free(tmpbuffer, XFS_LBSIZE(mp));
+	return(rval);
 }
 
 /*
@@ -1184,7 +1202,8 @@ xfs_dir_leaf_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		max  = hdr2->firstused - sizeof(xfs_dir_leaf_hdr_t);
 		max -= hdr2->count * sizeof(xfs_dir_leaf_entry_t);
 		if (space > max) {
-			xfs_dir_leaf_compact(state->args->trans, blk2->bp, 0);
+			xfs_dir_leaf_compact(state->args->trans, blk2->bp,
+								 0, 0);
 		}
 
 		/*
@@ -1213,7 +1232,8 @@ xfs_dir_leaf_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		max  = hdr1->firstused - sizeof(xfs_dir_leaf_hdr_t);
 		max -= hdr1->count * sizeof(xfs_dir_leaf_entry_t);
 		if (space > max) {
-			xfs_dir_leaf_compact(state->args->trans, blk1->bp, 0);
+			xfs_dir_leaf_compact(state->args->trans, blk1->bp,
+								 0, 0);
 		}
 
 		/*
