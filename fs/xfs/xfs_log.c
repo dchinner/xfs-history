@@ -92,8 +92,7 @@ STATIC void		xlog_state_release_iclog(xlog_t *log,
 						 xlog_in_core_t *iclog);
 STATIC void		xlog_state_switch_iclogs(xlog_t *log,
 						 xlog_in_core_t *iclog,
-						 int eventual_size,
-						 int *spl);
+						 int eventual_size);
 STATIC int		xlog_state_sync(xlog_t *log, xfs_lsn_t lsn, uint flags);
 STATIC void		xlog_state_want_sync(xlog_t *log,
 					     xlog_in_core_t *iclog);
@@ -588,14 +587,9 @@ xlog_alloc(xlog_t *log)
 		head = &iclog->ic_header;
 		head->h_magicno = XLOG_HEADER_MAGIC_NUM;
 		head->h_version = 1;
-/*		head->h_lsn = 0;*/
+		head->h_lsn = 0;
 		head->h_tail_lsn = 0;
 
-/* XXXmiken: Need to make the size of an iclog at least 2x the size of
- *		a filesystem block.  This means some code will not be
- *		compilable.  Additional fields may be needed to precompute
- *		values.
- */
 		iclog->ic_size = XLOG_RECORD_BSIZE - XLOG_HEADER_SIZE;
 		iclog->ic_state = XLOG_STATE_ACTIVE;
 		iclog->ic_log = log;
@@ -1078,6 +1072,7 @@ xlog_state_do_callback(xlog_t *log)
 clean:
 	xlog_state_clean_log(log);
 	spunlockspl(log->l_icloglock, spl);
+	while (cvsema(&log->l_flushsema));
 }	/* xlog_state_do_callback */
 
 
@@ -1114,7 +1109,7 @@ xlog_state_done_syncing(xlog_in_core_t	*iclog)
 
 	iclog->ic_state = XLOG_STATE_DONE_SYNC;
 	spunlockspl(log->l_icloglock, spl);
-	xlog_state_do_callback(log);
+	xlog_state_do_callback(log);	/* also cleans log */
 }	/* xlog_state_done_syncing */
 
 
@@ -1172,7 +1167,7 @@ xlog_state_get_iclog_space(xlog_t	 *log,
 	xlog_rec_header_t *head;
 	xlog_in_core_t	  *iclog;
 
-	xlog_state_do_callback(log);
+	xlog_state_do_callback(log);	/* also cleans log */
 
 restart:
 	spl = splockspl(log->l_icloglock, splhi);
@@ -1183,14 +1178,8 @@ restart:
 		spunlockspl(log->l_icloglock, spl);
 		xlog_trace_iclog(iclog, XLOG_TRACE_SLEEP_FLUSH);
 		psema(&log->l_flushsema, PINOD);
-		xlog_trace_iclog(iclog, XLOG_TRACE_WAKE_FLUSH);
-		vsema(&log->l_flushsema);
 		goto restart;
 	}
-
-#if XXXmiken
-	xlog_state_clean_log(log);
-#endif
 	head = &iclog->ic_header;
 
 	iclog->ic_refcnt++;			/* prevents sync */
@@ -1218,8 +1207,7 @@ restart:
 	 */
 	if (iclog->ic_size - iclog->ic_offset < 2*sizeof(xlog_op_header_t)) {
 		if (iclog->ic_state == XLOG_STATE_ACTIVE)
-			xlog_state_switch_iclogs(log, iclog, iclog->ic_size,
-						 &spl);
+			xlog_state_switch_iclogs(log, iclog, iclog->ic_size);
 
 		if (iclog->ic_refcnt == 1) {		/* I'm the only one */
 			spunlockspl(log->l_icloglock, spl);
@@ -1236,8 +1224,7 @@ restart:
 	} else {	/* take as much as possible and write rest in next LR */
 		*continued_write = 1;
 		if (iclog->ic_state == XLOG_STATE_ACTIVE)
-			xlog_state_switch_iclogs(log, iclog, iclog->ic_size,
-						 &spl);
+			xlog_state_switch_iclogs(log, iclog, iclog->ic_size);
 		/* this iclog releases in xlog_write() */
 	}
 	*iclogp = iclog;
@@ -1401,8 +1388,7 @@ xlog_state_release_iclog(xlog_t		*log,
 STATIC void
 xlog_state_switch_iclogs(xlog_t		*log,
 			 xlog_in_core_t *iclog,
-			 int		eventual_size,
-			 int		*spl)
+			 int		eventual_size)
 {
 	if (!eventual_size)
 		eventual_size = iclog->ic_offset;
@@ -1419,9 +1405,6 @@ xlog_state_switch_iclogs(xlog_t		*log,
 		ASSERT(log->l_curr_block >= 0);
 	}
 	log->l_iclog = iclog->ic_next;
-	xlog_trace_iclog(iclog, XLOG_TRACE_GRAB_FLUSH);
-	spunlockspl_psema(log->l_icloglock, *spl, &log->l_flushsema, PINOD);
-	*spl = splockspl(log->l_icloglock, splhi);
 }	/* xlog_state_switch_iclogs */
 
 
@@ -1491,7 +1474,7 @@ xlog_state_sync(xlog_t	  *log,
 			iclog = iclog->ic_next;
 		} else {
 		    if (iclog->ic_state == XLOG_STATE_ACTIVE) {
-			    xlog_state_switch_iclogs(log, iclog, 0, &spl);
+			    xlog_state_switch_iclogs(log, iclog, 0);
 		    } else if (iclog->ic_state == XLOG_STATE_DIRTY) {
 			    spunlockspl(log->l_icloglock, spl);
 			    return 0;
@@ -1522,7 +1505,7 @@ xlog_state_want_sync(xlog_t *log, xlog_in_core_t *iclog)
 	spl = splockspl(log->l_icloglock, splhi);
 	
 	if (iclog->ic_state == XLOG_STATE_ACTIVE)
-		xlog_state_switch_iclogs(log, iclog, 0, &spl);
+		xlog_state_switch_iclogs(log, iclog, 0);
 	else if (iclog->ic_state != XLOG_STATE_WANT_SYNC)
 		xlog_panic("xlog_state_want_sync: bad state");
 	
@@ -1546,13 +1529,13 @@ xlog_alloc_tickets(xlog_t *log)
 {
 	caddr_t buf;
 	xlog_ticket_t *t_list;
-	uint i = (4096 / sizeof(xlog_ticket_t))-1;	/* XXXmiken */
+	uint i = (NBPP / sizeof(xlog_ticket_t))-1;
 
 	/*
 	 * XXXmiken: may want to account for differing sizes of pointers
 	 * or allocate one page at a time.
 	 */
-	buf = (caddr_t) kmem_zalloc(4096, 0);
+	buf = (caddr_t) kmem_zalloc(NBPP, 0);
 
 	t_list = log->l_freelist = (xlog_ticket_t *)buf;
 	for ( ; i > 0; i--) {
