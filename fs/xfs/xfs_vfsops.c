@@ -103,6 +103,7 @@
 #include "xfs_dir_btree.h"
 #include "xfs_rw.h"
 #include "xfs_buf_item.h"
+#include "xfs_extfree_item.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -193,6 +194,10 @@ xfs_init(vfssw_t	*vswp,
 	extern zone_t	*xfs_btree_cur_zone;
 	extern zone_t	*xfs_inode_zone;
 	extern zone_t	*xfs_trans_zone;
+	extern zone_t	*xfs_buf_item_zone;
+	extern zone_t	*xfs_efd_zone;
+	extern zone_t	*xfs_efi_zone;
+
 #ifndef SIM
 	extern lock_t	xfs_strat_lock;
 	extern lock_t	xfsd_lock;
@@ -240,6 +245,23 @@ xfs_init(vfssw_t	*vswp,
 #endif
 	xfs_dir_state_zone =
 		kmem_zone_init(sizeof(struct xfs_dir_state), "xfs_dir_state");
+
+	/*
+	 * The size of the zone allocated buf log item is the maximum
+	 * size possible under XFS.  This wastes a little bit of memory,
+	 * but it is much faster.
+	 */
+	xfs_buf_item_zone =
+		kmem_zone_init((sizeof(xfs_buf_log_item_t) +
+				(((XFS_MAX_BLOCKSIZE / XFS_BLI_CHUNK) /
+                                  NBWORD) * sizeof(int))),
+			       "xfs_buf_item");
+	xfs_efd_zone = kmem_zone_init((sizeof(xfs_efd_log_item_t) +
+				       (15 * sizeof(xfs_extent_t))),
+				      "xfs_efd_item");
+	xfs_efi_zone = kmem_zone_init((sizeof(xfs_efi_log_item_t) +
+				       (15 * sizeof(xfs_extent_t))),
+				      "xfs_efi_item");
 
 	/*
 	 * Allocate global trace buffers.
