@@ -80,18 +80,8 @@
 	((s)->u.generic_sbp = vfsp)
 
 
-struct xfs_mount_args;
-
 extern void
 linvfs_set_inode_ops(
 	struct inode	*inode);
-
-extern int
-spectodevs(
-	struct super_block *sb,
-	struct xfs_mount_args *args,
-	dev_t		*ddevp,
-	dev_t		*logdevp,
-	dev_t		*rtdevp);
 
 #endif	/* __XFS_SUPER_H__ */
