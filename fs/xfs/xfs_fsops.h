@@ -32,22 +32,6 @@
 #ifndef _FS_XFS_FSOPS_H
 #define	_FS_XFS_FSOPS_H
 
-#include <linux/xfs_fs.h>
-
-#ident	"$Revision: 1.15 $"
-
-/*
- * Minimum and maximum sizes need for growth checks
- */
-#define	XFS_MIN_LOG_BLOCKS	512
-#define	XFS_MIN_LOG_BYTES	(256 * 1024)
-#define	XFS_MIN_AG_BLOCKS	64
-#define	XFS_MAX_LOG_BLOCKS	(64 * 1024)
-#define	XFS_MAX_LOG_BYTES	(128 * 1024 * 1024)
-
-
-#ifdef _KERNEL
-
 int
 xfs_fs_geometry(
 	xfs_mount_t		*mp,
@@ -69,7 +53,6 @@ xfs_growfs_rt(
 	xfs_mount_t		*mp,
 	xfs_growfs_rt_t		*in);
 
-
 int
 xfs_fs_counts(
 	xfs_mount_t		*mp,
@@ -80,8 +63,5 @@ xfs_reserve_blocks(
 	xfs_mount_t *mp, 
 	__uint64_t *inval, 
 	xfs_fsop_resblks_t *outval);
-
-        
-#endif	/* _KERNEL */
 
 #endif	/* _FS_XFS_FSOPS_H */

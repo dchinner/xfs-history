@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision$"
+#ident	"$Revision: 1.60 $"
 
 /*
  * Free realtime space allocation for XFS.
@@ -81,7 +81,6 @@
 #include "xfs_bmap.h"
 #include "xfs_bit.h"
 #include "xfs_rtalloc.h"
-#include "xfs_fsops.h"
 #include "xfs_error.h"
 #include "xfs_rw.h"
 #include "xfs_inode_item.h"

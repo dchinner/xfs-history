@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.230 $"
+#ident	"$Revision: 1.231 $"
 
 #include <xfs_os_defs.h>
 
@@ -47,6 +47,7 @@
 #undef _KERNEL
 #endif /* SIM */
 #include <sys/kmem.h>
+#include <linux/xfs_fs.h>
 #include <linux/xfs_sema.h>
 #include <sys/cmn_err.h>
 #ifndef SIM
@@ -80,7 +81,6 @@
 #include "xfs_bit.h"
 #include "xfs_rw.h"
 #include "xfs_quota.h"
-#include "xfs_fsops.h"
 #include "xfs_cxfs.h"
 #include "xfs_arch.h"
 
