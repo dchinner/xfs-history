@@ -39,6 +39,7 @@
 #include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/kdev_t.h>
+#include <linux/bitops.h>
 #include <asm/page.h>
 #include <asm/param.h>
 #include <asm/uaccess.h>

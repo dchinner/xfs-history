@@ -73,7 +73,7 @@ xfs_delalloc_cleanup(
 	xfs_filblks_t	count_fsb);
 
 
-int				/* error (positive) */
+ssize_t				/* error (positive) */
 xfs_read(
         bhv_desc_t      *bdp,
         uio_t           *uiop,
@@ -572,7 +572,7 @@ out_lock:
 	return error;
 }
 
-int				/* error (positive) */
+ssize_t				/* error (positive) */
 xfs_write(
         bhv_desc_t      *bdp,
         uio_t           *uiop,
