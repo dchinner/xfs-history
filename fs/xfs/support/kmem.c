@@ -30,12 +30,10 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <linux/locks.h>
-#include <linux/smp_lock.h>
-#include <linux/time.h>
+#include <linux/sched.h>
+#include <linux/mm.h>
 #include <linux/vmalloc.h>
 #include <linux/slab.h>
-#include <linux/version.h>
 
 #include "time.h"
 #include "kmem.h"

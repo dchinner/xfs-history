@@ -30,10 +30,6 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <linux/locks.h>
-#include <linux/smp_lock.h>
-#include <linux/time.h>
-#include <linux/proc_fs.h>
 #include <linux/module.h>
 
 #include <xfs_types.h>

@@ -32,6 +32,8 @@
 #ifndef __XFS_H__
 #define __XFS_H__
 
+#include <linux/config.h>
+
 #include <xfs_types.h>
 
 #include <support/arch.h>
