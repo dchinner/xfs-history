@@ -112,7 +112,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	 * access to the superblock.
 	 */
 	bp = ngetrbuf(BBTOB(BTOBB(sizeof(xfs_sb_t))));
-	ASSERT(buf != NULL);
+	ASSERT(bp != NULL);
 	ASSERT((bp->b_flags & B_BUSY) && valusema(&bp->b_lock) <= 0);
 
 	/*

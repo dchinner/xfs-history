@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.15 $"
+#ident	"$Revision: 1.16 $"
 
 #include <sys/param.h>
 #include <sys/vnode.h>
@@ -646,7 +646,7 @@ xfs_bmbt_killroot(
 	 * instead of freeing the root you free the next level.
 	 */
 	cbuf = cur->bc_bufs[level - 1];
-	cblock = xfs_buf_to_bmbt_block(buf);
+	cblock = xfs_buf_to_bmbt_block(cbuf);
 	if (cblock->bb_numrecs > XFS_BMAP_BLOCK_DMAXRECS(level, cur))
 		return 1;
 	ASSERT(cblock->bb_leftsib == NULLDFSBNO);
@@ -670,7 +670,7 @@ xfs_bmbt_killroot(
 	bcopy((caddr_t)cpp, (caddr_t)pp, block->bb_numrecs * (int)sizeof(*pp));
 	tp = cur->bc_tp;
 	mp = cur->bc_mp;
-	xfs_bmap_add_free(xfs_daddr_to_fsb(mp, buf->b_blkno), 1,
+	xfs_bmap_add_free(xfs_daddr_to_fsb(mp, cbuf->b_blkno), 1,
 		cur->bc_private.b.flist, mp);
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_BROOT);
 	xfs_btree_setbuf(cur, level - 1, 0);
@@ -1862,6 +1862,7 @@ xfs_bmbt_update(
 	xfs_extlen_t		len)
 {
 	xfs_bmbt_block_t	*block;
+	buf_t			*buf;
 	int			first;
 	xfs_bmbt_key_t		key;
 	int			last;
