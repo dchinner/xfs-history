@@ -594,6 +594,7 @@ struct inode_operations linvfs_file_inode_operations =
   permission:		linvfs_permission,
   revalidate:		linvfs_revalidate,
   pagebuf_bmap:		linvfs_pb_bmap,
+  pagebuf_fileread:	pagebuf_file_read,
 };
 
 struct inode_operations linvfs_dir_inode_operations =
