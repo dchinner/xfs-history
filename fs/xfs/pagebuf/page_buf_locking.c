@@ -416,8 +416,9 @@ pagebuf_lock_enable(
 #endif
 	target->pbr_addrspace.a_ops = &pagebuf_aops;
 #endif
+	pagebuf_target_blocksize(target, 1 << PB_SECTOR_BITS);
 
-	return(target);
+	return target;
 }
 
 void
@@ -469,4 +470,3 @@ void pagebuf_locking_terminate(void)
 	if (pagebuf_registration_cache != NULL)
 		kmem_cache_destroy(pagebuf_registration_cache);
 }
-

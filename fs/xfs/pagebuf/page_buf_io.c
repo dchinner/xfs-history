@@ -57,9 +57,9 @@
 #define PAGE_CACHE_MASK_LL	(~((long long)(PAGE_CACHE_SIZE-1)))
 #define PAGE_CACHE_ALIGN_LL(addr) \
 			(((addr)+PAGE_CACHE_SIZE-1)&PAGE_CACHE_MASK_LL)
-#define MAX_BUF_PER_PAGE 	1 /* (PAGE_CACHE_SIZE / 512) */
+#define MAX_BUF_PER_PAGE 	(PAGE_CACHE_SIZE / 512)
 #define PBF_IO_CHUNKSIZE 	65536
-#define PBF_MAX_MAPS		1
+#define PBF_MAX_MAPS		1 /* TODO: XFS_BMAP_MAX_NMAP? */
 
 /*
  * Forward declarations.
@@ -611,6 +611,96 @@ STATIC void end_pb_buffer_io_sync(struct buffer_head *bh, int uptodate)
 
 
 /*
+ * match_offset_to_mapping
+ * Finds the corresponding mapping in block @map array of the
+ * given @offset within a @page.
+ * @index keeps track of where we were in @map after previous
+ * calls with earlier @offsets.
+ */
+STATIC page_buf_bmap_t *
+match_offset_to_mapping(
+	struct page		*page,
+	page_buf_bmap_t		*map,
+	int			nmaps,
+	unsigned long		offset,
+	int			*index)
+{
+	int			i;
+	loff_t			full_offset;	/* offset from start of file */
+
+	assert(*index <= nmaps);
+	assert(offset < PAGE_CACHE_SIZE);
+
+	full_offset = page->index << PAGE_CACHE_SHIFT;	/* from file start */
+	full_offset += offset;			/* include from page start */
+
+	for (i = *index; i < nmaps; i++) {
+		if (map[i].pbm_offset + map[i].pbm_bsize > full_offset)
+			break;
+	}
+	if ((*index = i) == nmaps)
+		return NULL;
+	return &map[i];
+}
+
+STATIC void
+map_buffer_at_offset(
+	struct pb_target	*target,
+	struct page		*page,
+	struct buffer_head	*bh,
+	unsigned long		offset,
+	page_buf_bmap_t		*mp)
+{
+	page_buf_daddr_t	bn;
+	loff_t			delta;
+	int			sector_shift;
+
+	assert(!(mp->pbm_flags & PBMF_HOLE));
+	assert(!(mp->pbm_flags & PBMF_DELAY));
+	assert(!(mp->pbm_flags & PBMF_UNWRITTEN));
+	assert(mp->pbm_bn != PAGE_BUF_DADDR_NULL);
+
+	delta = page->index;
+	delta <<= PAGE_CACHE_SHIFT;
+	delta -= mp->pbm_offset;
+	delta += offset;
+	delta >>= target->pbr_blocksize_bits;
+
+	sector_shift = target->pbr_blocksize_bits - 9;
+	bn = mp->pbm_bn >> sector_shift;
+	bn += delta;
+	assert((bn << sector_shift) >= mp->pbm_bn);
+
+	lock_buffer(bh);
+	bh->b_blocknr = bn;
+	bh->b_dev = target->pbr_device;
+	set_bit(BH_Mapped, &bh->b_state);
+	clear_bit(BH_Delay, &bh->b_state);
+	unlock_buffer(bh);
+}
+
+STATIC void
+zero_buffer_at_offset(
+	struct pb_target	*target,
+	struct page		*page,
+	struct buffer_head	*bh,
+	unsigned long		offset)
+{
+	assert(PageLocked(page));
+
+	memset(kmap(page) + offset, 0, target->pbr_blocksize);
+	flush_dcache_page(page);
+	kunmap(page);
+
+	lock_buffer(bh);
+	bh->b_dev = target->pbr_device;
+	set_bit(BH_Uptodate, &bh->b_state);
+	clear_bit(BH_Mapped, &bh->b_state);
+	clear_bit(BH_Delay, &bh->b_state);
+	unlock_buffer(bh);
+}
+
+/*
  * pagebuf_read_full_page
  * Originally derived from buffer.c::block_read_full_page
  */
@@ -621,47 +711,80 @@ pagebuf_read_full_page(
 	pagebuf_bmap_fn_t	 bmap)
 {
 	struct inode		*inode = page->mapping->host;
+	unsigned long		offset;
 	struct buffer_head	*bh, *head, *arr[MAX_BUF_PER_PAGE];
-	int			i, nr, error;
+	page_buf_bmap_t		*tmp, *mp = NULL, maps[PBF_MAX_MAPS];
+	int			err, index = 0, nmaps = 0, i = 0, nr = 0;
 
 	if (!PageLocked(page))
 		PAGE_BUG(page);
 
-	if (PageDelalloc(page)) {
-		SetPageUptodate(page);
-		UnlockPage(page);
-		return 0;
+	if (!page->buffers) {
+		/* shortcut, may not need a buffer_head here */
+		if (target->pbr_blocksize == PAGE_CACHE_SIZE) {
+			mp = maps;
+			err = bmap(inode,
+				((loff_t)page->index << PAGE_CACHE_SHIFT),
+				PAGE_CACHE_SIZE, maps, PBF_MAX_MAPS, &nmaps,
+			 	PBF_READ);
+			if (err) {
+				UnlockPage(page);
+				return err;
+			}
+			assert(nmaps == 1);
+			if (maps[0].pbm_flags & (PBMF_HOLE|PBMF_DELAY)) {
+				memset(kmap(page), 0, PAGE_CACHE_SIZE);
+				flush_dcache_page(page);
+				kunmap(page);
+				goto page_done;
+			}
+		}
+		create_empty_buffers(page, target->pbr_device,
+					   target->pbr_blocksize);
 	}
-
 	bh = head = page->buffers;
-	if (!bh || !buffer_mapped(bh)) {
-		page_buf_bmap_t	map;
-		int		nmaps;
-		
-		error = bmap(inode, ((loff_t)page->index << PAGE_CACHE_SHIFT),
-				PAGE_CACHE_SIZE, &map, 1, &nmaps, PBF_READ);
-		if (error) {
-			UnlockPage(page);
-			return error;
-		}
-		hook_buffers_to_page(target, inode, page, &map, nmaps);
-		bh = head = page->buffers;
-		if (map.pbm_flags & (PBMF_HOLE|PBMF_DELAY)) {
-			memset(kmap(page), 0, PAGE_CACHE_SIZE);
-			flush_dcache_page(page);
-			kunmap(page);
-			goto page_done;
-		}
-	}
 
-	nr = 0;
+	/* Stage 1: find buffers in need of IO */
 	do {
+		if (buffer_delay(bh))
+			continue;
 		if (buffer_uptodate(bh))
 			continue;
-		assert(buffer_mapped(bh));
-		arr[nr] = bh;
-		nr++;
-	} while ((bh = bh->b_this_page) != head);
+		if (buffer_mapped(bh))
+			continue;
+		offset = i << target->pbr_blocksize_bits;
+		if (!mp) {
+remap:
+			index = 0;
+			mp = maps;
+			err = bmap(inode,
+				((loff_t)page->index << PAGE_CACHE_SHIFT) +
+					offset,
+				PAGE_CACHE_SIZE - offset,
+				maps, PBF_MAX_MAPS, &nmaps, PBF_READ);
+			if (err) {
+				UnlockPage(page);
+				return err;
+			}
+		}
+		tmp = match_offset_to_mapping(page, mp, nmaps, offset, &index);
+		if (!tmp || tmp->pbm_flags & (PBMF_HOLE|PBMF_DELAY)) {
+			if (!tmp) {
+				/*
+				 * No mapping for this offset.  2 cases:
+				 * - last mapping was at eof (zero to end)
+				 * - we need more mappings (try, try again)
+				 */
+				if (!(mp[nmaps - 1].pbm_flags & PBMF_EOF)) {
+					goto remap;
+				}
+			}
+			zero_buffer_at_offset(target, page, bh, offset);
+			continue;
+		}
+		map_buffer_at_offset(target, page, bh, offset, tmp);
+		arr[nr++] = bh;
+	} while (i++, (bh = bh->b_this_page) != head);
 
 	if (!nr) {
 page_done:
@@ -676,13 +799,12 @@ page_done:
 
 	/* Stage two: lock the buffers */
 	for (i = 0; i < nr; i++) {
-		struct buffer_head * bh = arr[i];
-		lock_buffer(bh);
-		set_buffer_async_io(bh);
+		lock_buffer(arr[i]);
+		set_buffer_async_io(arr[i]);
 	}
 
 	/* Stage 3: start the IO */
-	for(i=0; i < nr; i++){
+	for (i = 0; i < nr; i++) {
 		submit_bh(READ, arr[i]);
 	}
 	return 0;
