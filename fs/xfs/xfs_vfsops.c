@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.68 $"
+#ident  "$Revision: 1.70 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -1028,7 +1028,7 @@ xfs_statdevvp(struct statvfs *sp, vnode_t *devvp)
 		sp->f_frsize = sbp->sb_blocksize;
 		lsize = sbp->sb_logstart ? sbp->sb_logblocks : 0;
 		sp->f_blocks = sbp->sb_dblocks - lsize;
-		sp->f_bfree = sp->f_bavail = sbp->sb_fdblocks - lsize;
+		sp->f_bfree = sp->f_bavail = sbp->sb_fdblocks;
 		fakeinos = sp->f_bfree << sbp->sb_inopblog;
 		sp->f_files = MIN(sbp->sb_icount + fakeinos, 0xffffffffULL);
 		sp->f_ffree = sp->f_favail =
@@ -1071,7 +1071,7 @@ xfs_statvfs(vfs_t	*vfsp,
 	statp->f_frsize = sbp->sb_blocksize;
 	lsize = sbp->sb_logstart ? sbp->sb_logblocks : 0;
 	statp->f_blocks = sbp->sb_dblocks - lsize;
-	statp->f_bfree = statp->f_bavail = sbp->sb_fdblocks - lsize;
+	statp->f_bfree = statp->f_bavail = sbp->sb_fdblocks;
 	fakeinos = statp->f_bfree << sbp->sb_inopblog;
 	statp->f_files = MIN(sbp->sb_icount + fakeinos, 0xffffffffULL);
 	statp->f_ffree = statp->f_favail =
