@@ -142,7 +142,7 @@ struct buffer_head		*pb_resv_bh = NULL;	/* list of bh */
 int				pb_resv_bh_cnt = 0;	/* # of bh available */
 
 STATIC void pagebuf_daemon_wakeup(int);
-STATIC int _pagebuf_segment_apply(page_buf_t *);
+STATIC void _pagebuf_ioapply(page_buf_t *);
 STATIC void pagebuf_delwri_queue(page_buf_t *, int);
 
 /*
@@ -810,8 +810,7 @@ found:
  *	are in memory.	The buffer may have unallocated holes, if
  *	some, but not all, of the blocks are in memory.	 Even where
  *	pages are present in the buffer, not all of every page may be
- *	valid.	The file system may use pagebuf_segment to visit the
- *	various segments of the buffer.
+ *	valid.
  */
 page_buf_t *
 pagebuf_find(				/* find buffer for block	*/
@@ -828,11 +827,10 @@ pagebuf_find(				/* find buffer for block	*/
  *	pagebuf_get
  *
  *	pagebuf_get assembles a buffer covering the specified range.
- *	Some or all of the blocks in the range may be valid.  The file
- *	system may use pagebuf_segment to visit the various segments
- *	of the buffer.	Storage in memory for all portions of the
- *	buffer will be allocated, although backing storage may not be.
- *	If PBF_READ is set in flags, pagebuf_read
+ *	Some or all of the blocks in the range may be valid.  Storage
+ *	in memory for all portions of the buffer will be allocated,
+ *	although backing storage may not be.  If PBF_READ is set in
+ *	flags, pagebuf_iostart is called also.
  */
 page_buf_t *
 pagebuf_get(				/* allocate a buffer		*/
@@ -1326,8 +1324,10 @@ pagebuf_iostart(			/* start I/O on a buffer	  */
 		return status;
 	}
 
-	pb->pb_flags &= ~(PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_DELWRI|PBF_READ_AHEAD);
-	pb->pb_flags |= flags & (PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_SYNC|PBF_READ_AHEAD);
+	pb->pb_flags &=
+		~(PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_DELWRI|PBF_READ_AHEAD);
+	pb->pb_flags |= flags &
+		(PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_SYNC|PBF_READ_AHEAD);
 
 	BUG_ON(pb->pb_bn == PAGE_BUF_DADDR_NULL);
 
@@ -1351,123 +1351,104 @@ pagebuf_iostart(			/* start I/O on a buffer	  */
 
 /*
  * Helper routines for pagebuf_iorequest (pagebuf I/O completion)
- * 
- * (different routines for locked/unlocked, and single/multi-bh pagebufs)
  */
 
-STATIC inline void
-_pb_io_done(
+STATIC __inline__ int
+_pagebuf_iolocked(
 	page_buf_t		*pb)
 {
+	ASSERT(pb->pb_flags & (PBF_READ|PBF_WRITE));
+	if (pb->pb_flags & PBF_READ)
+		return pb->pb_locked;
+	return ((pb->pb_flags & _PBF_LOCKABLE) == 0);
+}
+
+STATIC void
+_pagebuf_iodone(
+	page_buf_t		*pb,
+	int			fullpage,
+	int			schedule)
+{
 	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
+		struct page	*page;
+		int		i;
+
+		for (i = 0; i < pb->pb_page_count; i++) {
+			page = pb->pb_pages[i];
+			if (fullpage && !PageError(page))
+				SetPageUptodate(page);
+			if (_pagebuf_iolocked(pb))
+				unlock_page(page);
+		}
 		pb->pb_locked = 0;
-		pagebuf_iodone(pb, 1);
+		pagebuf_iodone(pb, schedule);
 	}
 }
 
 STATIC void
-_end_pagebuf_page_io(
-	struct buffer_head	*bh,
-	int			uptodate,
-	int			locked)
-{
-	struct page		*page;
-	page_buf_t		*pb = (page_buf_t *) bh->b_private;
-
-	mark_buffer_uptodate(bh, uptodate);
-	atomic_dec(&bh->b_count);
-
-	page = bh->b_page;
-	if (!test_bit(BH_Uptodate, &bh->b_state)) {
-		set_bit(PG_error, &page->flags);
-		pb->pb_error = EIO;
-	}
-
-	unlock_buffer(bh);
-	_pagebuf_free_bh(bh);
-
-	SetPageUptodate(page);
-	if (locked)
-		unlock_page(page);
-	_pb_io_done(pb);
-}
-
-STATIC void
-_end_io_locked(
-	struct buffer_head	*bh,
-	int			uptodate)
-{
-	_end_pagebuf_page_io(bh, uptodate, 1);
-}
-
-STATIC void
-_end_io_nolock(
-	struct buffer_head	*bh,
-	int			uptodate)
-{
-	_end_pagebuf_page_io(bh, uptodate, 0);
-}
-
-typedef struct {
-	page_buf_t	*pb;		/* pointer to pagebuf page is within */
-	int		locking;	/* are pages locked? */
-	atomic_t	remain;		/* count of remaining I/O requests */
-} pagesync_t;
-
-STATIC void
-_end_pagebuf_page_io_multi(
+_end_io_pagebuf(
 	struct buffer_head	*bh,
 	int			uptodate,
 	int			fullpage)
 {
-	pagesync_t		*psync = (pagesync_t *) bh->b_private;
-	page_buf_t		*pb = psync->pb;
-	struct page		*page;
+	struct page		*page = bh->b_page;
+	page_buf_t		*pb = (page_buf_t *)bh->b_private;
 
 	mark_buffer_uptodate(bh, uptodate);
 	put_bh(bh);
 
-	page = bh->b_page;
-	if (!test_bit(BH_Uptodate, &bh->b_state)) {
-		set_bit(PG_error, &page->flags);
+	if (!uptodate) {
+		SetPageError(page);
 		pb->pb_error = EIO;
 	}
 
-	unlock_buffer(bh);
-	if (fullpage)
+	if (fullpage) {
+		unlock_buffer(bh);
 		_pagebuf_free_bh(bh);
+	} else {
+		static spinlock_t page_uptodate_lock = SPIN_LOCK_UNLOCKED;
+		struct buffer_head *bp;
+		unsigned long flags;
 
-	if (atomic_dec_and_test(&psync->remain) == 1) {
-		if (fullpage)
+		spin_lock_irqsave(&page_uptodate_lock, flags);
+		clear_bit(BH_Async, &bh->b_state);
+		unlock_buffer(bh);
+		for (bp = bh->b_this_page; bp != bh; bp = bp->b_this_page) {
+			if (buffer_locked(bp)) {
+				if (buffer_async(bp))
+					break;
+			} else if (!buffer_uptodate(bp))
+				break;
+		}
+		spin_unlock_irqrestore(&page_uptodate_lock, flags);
+		if (bp == bh && !PageError(page))
 			SetPageUptodate(page);
-		if (psync->locking)
-			unlock_page(page);
-		kfree(psync);
-		_pb_io_done(pb);
 	}
+
+	_pagebuf_iodone(pb, fullpage, 1);
 }
 
 STATIC void
-_end_io_multi_full(
+_pagebuf_end_io_complete_pages(
 	struct buffer_head	*bh,
 	int			uptodate)
 {
-	_end_pagebuf_page_io_multi(bh, uptodate, 1);
+	_end_io_pagebuf(bh, uptodate, 1);
 }
 
 STATIC void
-_end_io_multi_part(
+_pagebuf_end_io_partial_pages(
 	struct buffer_head	*bh,
 	int			uptodate)
 {
-	_end_pagebuf_page_io_multi(bh, uptodate, 0);
+	_end_io_pagebuf(bh, uptodate, 0);
 }
 
 
 /*
  * Initiate I/O on part of a page we are interested in
  */
-STATIC int
+STATIC void
 _pagebuf_page_io(
 	struct page		*page,	/* Page structure we are dealing with */
 	pb_target_t		*pbr,	/* device parameters (bsz, ssz, dev) */
@@ -1483,7 +1464,7 @@ _pagebuf_page_io(
 	size_t			blk_length = 0;
 	struct buffer_head	*bh, *head, *bufferlist[MAX_BUF_PER_PAGE];
 	int			sector_shift = pbr->pbr_sshift;
-	int			i = 0, cnt = 0, err = 0;
+	int			i = 0, cnt = 0;
 	int			public_bh = 0;
 	int			multi_ok;
 
@@ -1497,10 +1478,10 @@ _pagebuf_page_io(
 		if (!page_has_buffers(page)) {
 			if (!locking) {
 				lock_page(page);
-				if (!page_has_buffers(page)) {
-					create_empty_buffers(page, pbr->pbr_kdev,
+				if (!page_has_buffers(page))
+					create_empty_buffers(page,
+							pbr->pbr_kdev,
 							1 << sector_shift);
-				}
 				unlock_page(page);
 			} else {
 				create_empty_buffers(page, pbr->pbr_kdev,
@@ -1521,8 +1502,6 @@ _pagebuf_page_io(
 
 			lock_buffer(bh);
 			get_bh(bh);
-			ASSERT(!waitqueue_active(&bh->b_wait));
-
 			bh->b_size = 1 << sector_shift;
 			bh->b_blocknr = bn + (i - (pg_offset >> sector_shift));
 			bufferlist[cnt++] = bh;
@@ -1576,14 +1555,8 @@ _pagebuf_page_io(
 
 	for (; blk_length > 0; blk_length--, pg_offset += sector) {
 		bh = kmem_cache_alloc(bh_cachep, SLAB_NOFS);
-		if (!bh) {
+		if (!bh)
 			bh = _pagebuf_get_prealloc_bh();
-			if (!bh) {
-				/* This should never happen */
-				err = -ENOMEM;
-				goto error;
-			}
-		}
 		memset(bh, 0, sizeof(*bh));
 		bh->b_size = sector;
 		bh->b_blocknr = bn++;
@@ -1597,28 +1570,14 @@ _pagebuf_page_io(
 
 request:
 	if (cnt) {
-		pagesync_t	*psync = NULL;
 		void		(*callback)(struct buffer_head *, int);
 
-		if (multi_ok) {
-			psync = kmalloc(sizeof(*psync), GFP_NOFS);
-			if (unlikely(!psync)) {
-				err = -ENOMEM;
-				goto error;
-			}
+		callback = (multi_ok && public_bh) ?
+				_pagebuf_end_io_partial_pages :
+				_pagebuf_end_io_complete_pages;
 
-			psync->pb = pb;
-			psync->locking = locking;
-			atomic_set(&psync->remain, cnt);
-
-			callback = public_bh ?
-				   _end_io_multi_part : _end_io_multi_full;
-		} else {
-			callback = locking ? _end_io_locked : _end_io_nolock;
-		}
-
-		/* Indicate that there is another page in progress */
-		atomic_inc(&pb->pb_io_remaining);
+		/* Account for additional buffers in progress */
+		atomic_add(cnt, &pb->pb_io_remaining);
 
 #ifdef RQ_WRITE_ORDERED
 		if (flush)
@@ -1627,41 +1586,24 @@ request:
 
 		for (i = 0; i < cnt; i++) {
 			bh = bufferlist[i];
-
-			/* Complete the buffer_head, then submit the IO */
-			if (psync) {
-				init_buffer(bh, callback, psync);
-			} else {
-				init_buffer(bh, callback, pb);
-			}
-
+			init_buffer(bh, callback, pb);
 			bh->b_rdev = bh->b_dev;
 			bh->b_rsector = bh->b_blocknr;
 			set_bit(BH_Mapped, &bh->b_state);
+			set_bit(BH_Async, &bh->b_state);
 			set_bit(BH_Req, &bh->b_state);
-
-			if (rw == WRITE) {
+			if (rw == WRITE)
 				set_bit(BH_Uptodate, &bh->b_state);
-			}
 			generic_make_request(rw, bh);
 		}
 	} else {
 		if (locking)
 			unlock_page(page);
 	}
-
-	return err;
-error:
-	/* If we ever do get here then clean up what we already did */
-	for (i = 0; i < cnt; i++) {
-		atomic_set_buffer_clean(bufferlist[i]);
-		bufferlist[i]->b_end_io(bufferlist[i], 0);
-	}
-	return err;
 }
 
-STATIC int
-_page_buf_page_apply(
+STATIC void
+_pagebuf_page_apply(
 	page_buf_t		*pb,
 	loff_t			offset,
 	struct page		*page,
@@ -1672,10 +1614,10 @@ _page_buf_page_apply(
 	page_buf_daddr_t	bn = pb->pb_bn;
 	pb_target_t		*pbr = pb->pb_target;
 	loff_t			pb_offset;
-	size_t			ret_len = pg_length;
-	int			err = 0;
+	int			locking;
 
 	ASSERT(page);
+	ASSERT(pb->pb_flags & (PBF_READ|PBF_WRITE));
 
 	if ((pbr->pbr_bsize == PAGE_CACHE_SIZE) &&
 	    (pb->pb_buffer_length < PAGE_CACHE_SIZE) &&
@@ -1690,21 +1632,17 @@ _page_buf_page_apply(
 		}
 	}
 
-	if (pb->pb_flags & PBF_READ) {
-		err = _pagebuf_page_io(page, pbr, pb, bn,
-			pg_offset, pg_length, pb->pb_locked, READ, 0);
-	} else if (pb->pb_flags & PBF_WRITE) {
-		int locking = (pb->pb_flags & _PBF_LOCKABLE) == 0;
-
-		/* Check we need to lock pages */
+	locking = _pagebuf_iolocked(pb);
+	if (pb->pb_flags & PBF_WRITE) {
 		if (locking && (pb->pb_locked == 0))
 			lock_page(page);
-		err = _pagebuf_page_io(page, pbr, pb, bn,
-			pg_offset, pg_length, locking, WRITE,
-			last && (pb->pb_flags & PBF_FLUSH));
+		_pagebuf_page_io(page, pbr, pb, bn,
+				pg_offset, pg_length, locking, WRITE,
+				last && (pb->pb_flags & PBF_FLUSH));
+	} else {
+		_pagebuf_page_io(page, pbr, pb, bn,
+				pg_offset, pg_length, locking, READ, 0);
 	}
-
-	return (err ? err : ret_len);
 }
 
 /*
@@ -1729,13 +1667,11 @@ int
 pagebuf_iorequest(			/* start real I/O		*/
 	page_buf_t		*pb)	/* buffer to convey to device	*/
 {
-	int			status = 0;
-
 	PB_TRACE(pb, PB_TRACE_REC(ioreq), 0);
 
 	if (pb->pb_flags & PBF_DELWRI) {
 		pagebuf_delwri_queue(pb, 1);
-		return status;
+		return 0;
 	}
 
 	if (pb->pb_flags & PBF_WRITE) {
@@ -1747,14 +1683,9 @@ pagebuf_iorequest(			/* start real I/O		*/
 	 * all the I/O from calling pagebuf_iodone too early.
 	 */
 	atomic_set(&pb->pb_io_remaining, 1);
-	status = _pagebuf_segment_apply(pb);
-
-	/* Drop our count and if everything worked we are done */
-	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
-		pagebuf_iodone(pb, 0);
-	}
-
-	return status < 0 ? status : 0;
+	_pagebuf_ioapply(pb);
+	_pagebuf_iodone(pb, 0, 0);
+	return 0;
 }
 
 /*
@@ -1849,18 +1780,18 @@ pagebuf_iomove(
 }
 
 /*
- *	_pagebuf_segment_apply
+ *	_pagebuf_ioapply
  *
- *	Applies _page_buf_page_apply to each segment of the page_buf_t.
+ *	Applies _pagebuf_page_apply to each page of the page_buf_t.
  */
-STATIC int
-_pagebuf_segment_apply(			/* apply function to segments	*/
+STATIC void
+_pagebuf_ioapply(			/* apply function to pages	*/
 	page_buf_t		*pb)	/* buffer to examine		*/
 {
-	int			buf_index, sval, status = 0;
+	int			buf_index;
 	loff_t			buffer_offset = pb->pb_file_offset;
 	size_t			buffer_len = pb->pb_count_desired;
-	size_t			page_offset, len, total = 0;
+	size_t			page_offset, len;
 	size_t			cur_offset, cur_len;
 
 	pagebuf_hold(pb);
@@ -1884,27 +1815,14 @@ _pagebuf_segment_apply(			/* apply function to segments	*/
 			len = cur_len;
 		cur_len -= len;
 
-		sval = _page_buf_page_apply(pb, buffer_offset,
+		_pagebuf_page_apply(pb, buffer_offset,
 				pb->pb_pages[buf_index], page_offset, len,
 				buf_index+1 == pb->pb_page_count);
-		if (sval <= 0) {
-			status = sval;
-			break;
-		} else {
-			len = sval;
-			total += len;
-		}
-
 		buffer_offset += len;
 		buffer_len -= len;
 	}
 
 	pagebuf_rele(pb);
-
-	if (!status)
-		status = total;
-
-	return (status);
 }
 
 
