@@ -1851,16 +1851,71 @@ xfs_iflush(
 		s = AIL_LOCK(mp);
 		iip->ili_flush_lsn = iip->ili_item.li_lsn;
 		AIL_UNLOCK(mp, s);
-	}
 
-	/*
-	 * Attach the function xfs_iflush_done to the inode's
-	 * buffer.  This will remove the inode from the AIL
-	 * and unlock the inode's flush lock when the inode is
-	 * completely written to disk.
-	 */
-	xfs_buf_attach_iodone(bp, (void(*)(buf_t*,xfs_log_item_t*))
-			      xfs_iflush_done, (xfs_log_item_t *)iip);
+		/*
+		 * Attach the function xfs_iflush_done to the inode's
+		 * buffer.  This will remove the inode from the AIL
+		 * and unlock the inode's flush lock when the inode is
+		 * completely written to disk.
+		 */
+		xfs_buf_attach_iodone(bp, (void(*)(buf_t*,xfs_log_item_t*))
+				      xfs_iflush_done, (xfs_log_item_t *)iip);
+
+		/*
+		 * As much as we'd like to, doing B_DELWRI flushes of the
+		 * inode while holding the inode flush lock is just a
+		 * bad idea.  If the inode gets reclaimed, then we get
+		 * stuck waiting in xfs_reclaim() for the flush lock on
+		 * an inode waiting for a DELWRI buffer to complete.  That
+		 * can be quite a while.
+		 */
+		switch (flags) {
+		case XFS_IFLUSH_DELWRI_ELSE_SYNC:
+		case XFS_IFLUSH_SYNC:
+			flags = 0;
+			break;
+		case XFS_IFLUSH_DELWRI_ELSE_ASYNC:
+		case XFS_IFLUSH_DELWRI:
+		case XFS_IFLUSH_ASYNC:
+			flags = B_ASYNC;
+			break;
+		default:
+			ASSERT(0);
+			flags = 0;
+			break;
+		}
+	} else {
+		/*
+		 * We're flushing an inode which is not in the AIL and has
+		 * not been logged but has i_update_core set.  For this
+		 * case we can use a B_DELWRI flush and immediately drop
+		 * the inode flush lock because we can avoid the whole
+		 * AIL state thing.  It's OK to drop the flush lock now,
+		 * because we've already locked the buffer and to do anything
+		 * you really need both.
+		 */
+		ASSERT(iip->ili_logged == 0);
+		ASSERT(iip->ili_last_fields == 0);
+		ASSERT((iip->ili_item.li_flags & XFS_LI_IN_AIL) == 0);
+		xfs_ifunlock(ip);
+		switch (flags) {
+		case XFS_IFLUSH_DELWRI_ELSE_SYNC:
+		case XFS_IFLUSH_DELWRI_ELSE_ASYNC:
+		case XFS_IFLUSH_DELWRI:
+			flags = B_DELWRI;
+			break;
+		case XFS_IFLUSH_ASYNC:
+			flags = B_ASYNC;
+			break;
+		case XFS_IFLUSH_SYNC:
+			flags = 0;
+			break;
+		default:
+			ASSERT(0);
+			flags = 0;
+			break;
+		}
+	}
 
 	/*
 	 * If the buffer is pinned then push on the log so we won't
