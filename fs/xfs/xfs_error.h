@@ -75,7 +75,8 @@ extern int	xfs_error_trap(int);
 #define	XFS_ERRTAG_IUNLINK_REMOVE			14
 #define	XFS_ERRTAG_DIR_INO_VALIDATE			15
 #define XFS_ERRTAG_BULKSTAT_READ_CHUNK			16
-#define XFS_ERRTAG_MAX					17
+#define	XFS_ERRTAG_IODONE_IOERR				17
+#define	XFS_ERRTAG_MAX					18
 
 /*
  * Random factors for above tags, 1 means always, 2 means 1/2 time, etc.
@@ -97,6 +98,7 @@ extern int	xfs_error_trap(int);
 #define	XFS_RANDOM_IUNLINK_REMOVE			XFS_RANDOM_DEFAULT
 #define	XFS_RANDOM_DIR_INO_VALIDATE			XFS_RANDOM_DEFAULT
 #define	XFS_RANDOM_BULKSTAT_READ_CHUNK			XFS_RANDOM_DEFAULT
+#define	XFS_RANDOM_IODONE_IOERR				(XFS_RANDOM_DEFAULT/10)
 
 #if (defined(DEBUG) || defined(INDUCE_IO_ERROR))
 extern int	xfs_error_test(int, int *, char *, int, char *, unsigned long);
