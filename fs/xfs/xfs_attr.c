@@ -1,32 +1,17 @@
-#ifdef SIM
-#define _KERNEL 1
-#endif /* SIM */
 #include <sys/param.h>
-#ifdef SIM
-#undef _KERNEL
-#endif /* SIM */
 #include <sys/errno.h>
 #include <sys/buf.h>
 #include <sys/kmem.h>
 #include <sys/uio.h>
 #include <sys/debug.h>
 #include <sys/proc.h>
-#ifdef SIM
-#define _KERNEL 1
-#endif /* SIM */
 #include <sys/vnode.h>
 #include <sys/dirent.h>
 #include <sys/user.h>
 #include <sys/grio.h>
 #include <sys/sysinfo.h>
 #include <sys/ksa.h>
-#ifdef SIM
-#undef _KERNEL
-#include <bstring.h>
-#include <stdio.h>
-#else
 #include <sys/systm.h>
-#endif
 #include <attributes.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -50,9 +35,6 @@
 #include "xfs_attr.h"
 #include "xfs_attr_leaf.h"
 #include "xfs_error.h"
-#ifdef SIM
-#include "sim.h"
-#endif
 
 /*
  * xfs_attr.c
@@ -73,14 +55,12 @@
  * Internal routines when attribute list size == XFS_LBSIZE(mp).
  */
 STATIC int xfs_attr_leaf_get(xfs_trans_t *trans, xfs_da_name_t *args);
-#ifndef SIM
 STATIC int xfs_attr_leaf_removename(xfs_trans_t *trans, xfs_da_name_t *args,
 						int *result);
 STATIC void xfs_attr_leaf_print(xfs_trans_t *trans, xfs_inode_t *dp);
 STATIC int xfs_attr_leaf_list(xfs_trans_t *trans, xfs_inode_t *dp,
 					  attrlist_t *alist,
 					  attrlist_cursor_kern_t *cursor);
-#endif	/* !SIM */
 
 /*
  * Internal routines when attribute list size > XFS_LBSIZE(mp).
@@ -88,13 +68,11 @@ STATIC int xfs_attr_leaf_list(xfs_trans_t *trans, xfs_inode_t *dp,
 STATIC int xfs_attr_node_addname(xfs_trans_t *trans, xfs_da_name_t *args);
 STATIC int xfs_attr_node_lookup(xfs_trans_t *trans, xfs_da_name_t *args);
 STATIC int xfs_attr_node_get(xfs_trans_t *trans, xfs_da_name_t *args);
-#ifndef SIM
 STATIC int xfs_attr_node_removename(xfs_trans_t *trans, xfs_da_name_t *args);
 STATIC void xfs_attr_node_print(xfs_trans_t *trans, xfs_inode_t *dp);
 STATIC int xfs_attr_node_list(xfs_trans_t *trans, xfs_inode_t *dp,
 					   attrlist_t *alist,
 					   attrlist_cursor_kern_t *cursor);
-#endif	/* !SIM */
 
 
 
@@ -209,9 +187,7 @@ xfs_attr_set(vnode_t *vp, char *name, char *value, int valuelen, int flags,
 		} else if (retval == EEXIST) {
 			if (flags & ATTR_CREATE)
 				goto out;
-#ifndef SIM
 			retval = xfs_attr_shortform_removename(trans, &args);
-#endif
 		}
 
 		newsize = XFS_ATTR_SF_ENTSIZE_BYNAME(args.namelen,
@@ -252,7 +228,6 @@ out:
 	return(retval);
 }
 
-#ifndef SIM
 /*
  * Generic handler routine to remove a name from an attribute list.
  * Transitions attribute list from Btree to shortform as necessary.
@@ -394,7 +369,6 @@ xfs_attr_list(vnode_t *vp, char *buffer, int bufsize, int flags,
 	xfsda_t_reinit("attr_list", "return value-4", error);
 	return(error);
 }
-#endif	/* !SIM */
 
 
 
@@ -419,7 +393,6 @@ xfs_attr_isempty(xfs_inode_t *dp)
 	return(hdr->count == 0);
 }
 
-#ifndef SIM
 /*
  * Print an attribute lists contents.
  * For debugging.
@@ -439,8 +412,6 @@ xfs_attr_print(xfs_trans_t *trans, xfs_inode_t *dp)
 		xfs_attr_node_print(trans, dp);
 	}
 }
-
-#endif	/* !SIM */
 
 
 /*========================================================================
@@ -468,17 +439,14 @@ xfs_attr_leaf_addname(xfs_trans_t *trans, xfs_da_name_t *args)
 	} else if (retval == EEXIST) {
 		if (args->flags & ATTR_CREATE)		/* pure create op */
 			return(EEXIST);
-#ifndef SIM
 		error = xfs_attr_leaf_remove(trans, bp, index, &retval);
 		if (error)
 			return(error);
-#endif
 	}
 	retval = xfs_attr_leaf_add(trans, bp, args, index);
 	return(retval);
 }
 
-#ifndef SIM
 /*
  * Remove a name from the leaf attribute list structure
  * This is the external routine.
@@ -505,7 +473,6 @@ xfs_attr_leaf_removename(xfs_trans_t *trans, xfs_da_name_t *args, int *result)
 	*result = xfs_attr_shortform_allfit(bp, args->dp);
 	return(0);
 }
-#endif	/* !SIM */
 
 /*
  * Look up a name in a leaf attribute list structure.
@@ -529,7 +496,6 @@ xfs_attr_leaf_get(xfs_trans_t *trans, xfs_da_name_t *args)
 	return(retval);
 }
 
-#ifndef SIM
 /*
  * Print the leaf attribute list.
  */
@@ -564,7 +530,6 @@ xfs_attr_leaf_list(xfs_trans_t *trans, xfs_inode_t *dp, attrlist_t *alist,
 	xfs_trans_brelse(trans, bp);
 	return(0);
 }
-#endif	/* !SIM */
 
 
 /*========================================================================
@@ -610,7 +575,6 @@ xfs_attr_node_addname(xfs_trans_t *trans, xfs_da_name_t *args)
 	} else if (retval == EEXIST) {
 		if (args->flags & ATTR_CREATE)
 			goto out;
-#ifndef SIM
 		error = xfs_attr_leaf_remove(trans, blk->bp, blk->index,
 						    &retval);
 		if (error) {
@@ -618,7 +582,6 @@ xfs_attr_node_addname(xfs_trans_t *trans, xfs_da_name_t *args)
 			goto out;
 		}
 		xfs_da_fixhashpath(state, &state->path);
-#endif
 	}
 		
 	retval = xfs_attr_leaf_add(state->trans, blk->bp, state->args,
@@ -640,7 +603,6 @@ out:
 	return(retval);
 }
 
-#ifndef SIM
 /*
  * Remove a name from a B-tree attribute list.
  *
@@ -696,7 +658,6 @@ out:
 		return(error);
 	return(0);
 }
-#endif	/* !SIM */
 
 /*
  * Look up a filename in a node attribute list.
@@ -736,7 +697,6 @@ xfs_attr_node_get(xfs_trans_t *trans, xfs_da_name_t *args)
 	return(retval);
 }
 
-#ifndef SIM
 /*
  * Print the B-tree attribute list.
  */
@@ -860,4 +820,3 @@ xfs_attr_node_list(xfs_trans_t *trans, xfs_inode_t *dp, attrlist_t *alist,
 	xfs_trans_brelse(trans, bp);
 	return(0);
 }
-#endif	/* !SIM */
