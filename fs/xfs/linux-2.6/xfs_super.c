@@ -607,7 +607,7 @@ linvfs_quotactl(
 	if (type == USRQUOTA)
 		type = XFS_DQ_USER;
 	else if (type == GRPQUOTA)
-		type = XFS_DQ_PROJ;     /* nathans TODO - need XFS_DQ_GROUP */
+		return sts;	/* type = XFS_DQ_GROUP; -- NYI */
 	else
 		return sts;
 
