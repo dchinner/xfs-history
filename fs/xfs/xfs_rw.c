@@ -38,6 +38,7 @@
  */
 xfs_zone_t		*xfs_gap_zone;
 
+#ifndef __linux__
 #ifndef DEBUG
 #define	xfs_check_gap_list(ip)
 #else /* DEBUG */
@@ -45,6 +46,7 @@ void
 xfs_check_gap_list(
 	xfs_iocore_t	*ip);
 #endif /* DEBUG */		      
+#endif
 
 int
 xfs_build_gap_list(
@@ -112,6 +114,7 @@ xfs_write_clear_setuid(
 	return 0;
 }
 
+#ifndef __linux__
 /*
  * Verify that the gap list is properly sorted and that no entries
  * overlap.
@@ -142,7 +145,6 @@ xfs_check_gap_list(
 }
 #endif
 
-#ifndef __linux__
 /*
  * For the given inode, offset, and count of bytes, build a list
  * of xfs_gap_t structures in the inode's gap list describing the
