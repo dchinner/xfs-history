@@ -1,4 +1,4 @@
-#ident "$Revision: 1.92 $"
+#ident "$Revision: 1.93 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -162,7 +162,7 @@ xfs_trans_dup(
 #else
 	ASSERT(tp->t_ticket != NULL);
 #endif
-	ntp->t_flags = XFS_TRANS_PERM_LOG_RES;
+	ntp->t_flags = XFS_TRANS_PERM_LOG_RES | (tp->t_flags & XFS_TRANS_RESERVE);
 	ntp->t_ticket = tp->t_ticket;
 	ntp->t_blk_res = tp->t_blk_res - tp->t_blk_res_used;
 	tp->t_blk_res = tp->t_blk_res_used;
@@ -202,8 +202,10 @@ xfs_trans_reserve(
 {
 	int		log_flags;
 	int		error;
+	int 	rsvd;
 
 	error = 0;
+	rsvd = (tp->t_flags & XFS_TRANS_RESERVE) != 0;
 	/*
 	 * Attempt to reserve the needed disk blocks by decrementing
 	 * the number needed from the number available.  This will
@@ -211,7 +213,7 @@ xfs_trans_reserve(
 	 */
 	if (blocks > 0) {
 		error = xfs_mod_incore_sb(tp->t_mountp, XFS_SBS_FDBLOCKS,
-					  -blocks);
+					  -blocks, rsvd);
 		if (error != 0) {
 			return (XFS_ERROR(ENOSPC));
 		}
@@ -257,7 +259,7 @@ xfs_trans_reserve(
 	 */
 	if (rtextents > 0) {
 		error = xfs_mod_incore_sb(tp->t_mountp, XFS_SBS_FREXTENTS,
-					  -rtextents);
+					  -rtextents, rsvd);
 		if (error) {
 			error = XFS_ERROR(ENOSPC);
 			goto undo_log;
@@ -287,7 +289,7 @@ undo_log:
 undo_blocks:
 	if (blocks > 0) {
 		(void) xfs_mod_incore_sb(tp->t_mountp, XFS_SBS_FDBLOCKS,
-					 blocks);
+					 blocks, rsvd);
 		tp->t_blk_res = 0;
 	}
 
@@ -427,7 +429,9 @@ xfs_trans_apply_sb_deltas(
 {
 	xfs_sb_t	*sbp;
 	buf_t		*bp;
+	xfs_mount_t *mp = tp->t_mountp;
 	int		whole = 0;
+	long 	res_used, rem, delta_sum;
 
 	bp = xfs_trans_getsb(tp, tp->t_mountp, 0);
 	sbp = XFS_BUF_TO_SBP(bp);
@@ -445,12 +449,27 @@ xfs_trans_apply_sb_deltas(
 	if (tp->t_ifree_delta != 0) {
 		sbp->sb_ifree += tp->t_ifree_delta;
 	}
-	if (tp->t_fdblocks_delta != 0) {
-		sbp->sb_fdblocks += tp->t_fdblocks_delta;
+
+	/*
+	 * return blocks to to the reserved pool if necessary
+	 * Sum up the total blocks being returned by both
+	 * t_fdblocks_delta and t_res_fdblocks_delta and 
+	 * return them to either the reserved free pool (if depleted)
+	 * or the free pool
+  	 */
+
+	delta_sum = tp->t_fdblocks_delta + tp->t_res_fdblocks_delta;
+
+	if ((res_used = mp->m_resblks - mp->m_resblks_avail) == 0) {
+		sbp->sb_fdblocks += delta_sum;
+	} else if (res_used > delta_sum) {
+		mp->m_resblks_avail += delta_sum;
+	} else {
+		rem = delta_sum - res_used;
+		mp->m_resblks_avail = mp->m_resblks;
+		sbp->sb_fdblocks += rem;
 	}
-	if (tp->t_res_fdblocks_delta != 0) {
-		sbp->sb_fdblocks += tp->t_res_fdblocks_delta;
-	}
+
 	if (tp->t_frextents_delta != 0) {
 		sbp->sb_frextents += tp->t_frextents_delta;
 	}
@@ -517,8 +536,10 @@ xfs_trans_unreserve_and_mod_sb(
 	xfs_mod_sb_t	*msbp;
 	/* REFERENCED */
 	int		error;
+	int		rsvd;
 
 	msbp = msb;
+	rsvd = (tp->t_flags & XFS_TRANS_RESERVE) != 0;
 
 	/*
 	 * Release any reserved blocks.  Any that were allocated
@@ -613,7 +634,7 @@ xfs_trans_unreserve_and_mod_sb(
 	 * If we need to change anything, do it.
 	 */
 	if (msbp > msb) {
-		error = xfs_mod_incore_sb_batch(tp->t_mountp, msb, msbp - msb);
+		error = xfs_mod_incore_sb_batch(tp->t_mountp, msb, msbp - msb, rsvd);
 		ASSERT(error == 0);
 	}
 }
