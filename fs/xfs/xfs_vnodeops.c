@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.215 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -32,6 +32,7 @@
 #include <sys/cred.h>
 #include <sys/debug.h>
 #include <sys/errno.h>
+#include <sys/flock.h>
 #include <sys/fs_subr.h>
 #include <sys/fcntl.h>
 #include <sys/ktrace.h>
@@ -116,7 +117,8 @@ STATIC int	xfs_close(vnode_t	*vp,
 			  int		flag,
 			  lastclose_t	lastclose,
 			  off_t		offset,
-			  cred_t	*credp);
+			  cred_t	*credp,
+			  struct flid	*fl);
 
 STATIC int	xfs_getattr(vnode_t	*vp,
 			    vattr_t	*vap,
@@ -148,7 +150,7 @@ STATIC int	xfs_lookup(vnode_t	*dir_vp,
 STATIC int	xfs_create(vnode_t	*dir_vp,
 			   char		*name,
 			   vattr_t	*vap,
-			   enum vcexcl	excl,
+			   int		flags,
 			   int		mode,
 			   vnode_t	**vpp,
 			   cred_t	*credp);
@@ -353,7 +355,8 @@ xfs_close(
 	int		flag,
 	lastclose_t	lastclose,
 	off_t		offset,
-	cred_t		*credp)
+	cred_t		*credp,
+	struct flid	*fl)
 {
 
 	extern 	int	grio_remove_reservation( pid_t, dev_t, gr_ino_t);
@@ -408,7 +411,7 @@ xfs_close(
 
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
-	cleanlocks(vp, curprocp->p_epid, curprocp->p_sysid);
+	cleanlocks(vp, fl);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
 	return 0;
@@ -1012,10 +1015,6 @@ xfs_readlink(
 	offset = uiop->uio_offset;
         count = uiop->uio_resid;
 
-	if (MANDLOCK(vp, ip->i_d.di_mode)
-            && (error = chklock(vp, FREAD, offset, count, uiop->uio_fmode))) {
-                goto error_return;
-        }
 	if (offset < 0) {
                 error = XFS_ERROR(EINVAL);
 		goto error_return;
@@ -2088,7 +2087,7 @@ xfs_create(
 	vnode_t		*dir_vp,
 	char		*name,
 	vattr_t		*vap,
-	enum vcexcl	excl,
+	int		flags,
 	int		I_mode,
 	vnode_t		**vpp,
 	cred_t		*credp)
@@ -2188,7 +2187,7 @@ xfs_create(
 		 * XPG4 says create cannot allocate a file if the
 		 * file size limit is set to 0.
 		 */
-		if (u.u_rlimit[RLIMIT_FSIZE].rlim_cur == 0) {
+		if (flags & VZFS) {
 			error = XFS_ERROR(EFBIG);
 			goto error_return;
 		}
@@ -2285,7 +2284,7 @@ xfs_create(
 		 * obvious problems and get out if they occur.
 		 */
 		vp = XFS_ITOV(ip);
-		if (excl == EXCL) {
+		if (flags & VEXCL) {
                         error = XFS_ERROR(EEXIST);
 		} else if (vp->v_type == VDIR) {
                         error = XFS_ERROR(EISDIR);
@@ -6114,12 +6113,12 @@ xfs_error(
 	case 1:
 		dev = mp->m_dev;
 		prdev("Process [%s] ran out of disk space",
-		      dev, curthreadp->k_name);
+		      dev, get_current_name());
 		break;
 	case 2:
 		dev = mp->m_rtdev;
 		prdev("Process [%s] ran out of disk space",
-		      dev, curthreadp->k_name);
+		      dev, get_current_name());
 		break;
 	}
 }
