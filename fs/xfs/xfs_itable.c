@@ -1,4 +1,4 @@
-#ident	"$Revision$"
+#ident	"$Revision: 1.34 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -12,6 +12,7 @@
 #include <sys/time.h>
 #include <sys/debug.h>
 #include <sys/file.h>
+#include <ksys/fdt.h>
 #include <sys/vfs.h>
 #include <sys/syssgi.h>
 #include <sys/capability.h>

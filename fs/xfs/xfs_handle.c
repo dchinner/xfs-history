@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.20 $"
+#ident "$Revision: 1.21 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -18,6 +18,7 @@
 #include <sys/errno.h>
 #include <sys/cred.h>
 #include <sys/file.h>
+#include <ksys/fdt.h>
 #include <sys/kabi.h>
 #include <sys/kmem.h>
 #include <sys/proc.h>

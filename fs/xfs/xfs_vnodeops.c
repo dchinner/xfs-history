@@ -1,4 +1,4 @@
-#ident "$Revision: 1.223 $"
+#ident "$Revision: 1.224 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -59,6 +59,8 @@
 #include <string.h>
 #include <sys/dirent.h>
 #include <sys/attributes.h>
+#include <ksys/fdt.h>
+#include <ksys/fdt_private.h>
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -362,46 +364,39 @@ xfs_close(
 {
 
 	extern 	int	grio_remove_reservation( pid_t, dev_t, gr_ino_t);
-	int		isshd, nofiles, vpcount, i;
+	int		isshd, vpcount, i;
 	proc_t		*p = curprocp;
-	shaddr_t	*sa;
         xfs_inode_t	*ip;
 	struct file	*fp;
-	struct ufchunk	*ufp;
+	struct fdt	*fdt;
 	vnode_t 	*vp = PVN_TO_VN(pvp);
 
 	vn_trace_entry(vp, "xfs_close");
 	ip = XFS_VTOI(vp);
 
 	/*
-	 * if this is the last close of a file,
-	 * remove any outstanding an i/o rate guarantees
+	 * If this is the last close of a file,
+	 * remove any outstanding i/o rate guarantees.
 	 */
 	if ( lastclose && ( ip->i_d.di_flags & XFS_DIFLAG_REALTIME) ) {
-
 		vpcount = 0;
 
 		if (isshd = ISSHDFD(p)) {
-			sa = p->p_shaddr;
-			mrlock(&sa->s_fsync, MR_ACCESS, PZERO);
-			ufp = sa->s_flist;
-			nofiles  = sa->s_nofiles;
-		} else {
-			ufp = p->p_user->u_flist;
-			nofiles = p->p_user->u_nofiles;
-		}
+			fdt = p->p_shaddr->s_fdt;
+			FDT_READ_LOCK(fdt);
+		} else
+			fdt = p->p_user->u_fdt;
 
-		for (i = 0 ; i < nofiles; i++ ) {
-			if ((fp = ufgetfast( i,nofiles, ufp))) {
+		for (i = 0 ; i < fdt->fd_nofiles; i++ ) {
+			if ((fp = fdt_getfast(fdt, i))) {
 				if ((fp->f_vnode == vp) && (fp->f_count > 0)) {
 					vpcount++;
 				}
 			}
 		}
 
-		if (isshd) {
-			mrunlock(&sa->s_fsync);
-		}
+		if (isshd)
+			FDT_UNLOCK(fdt);
 
 		/*
 		 * If this process is nolonger accessing
