@@ -162,8 +162,6 @@ int linvfs_ioctl (
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return (EIO);
 
-printk("linvfs_ioctl: cmd/0x%x: inode/%p, filp/%p, arg/%lu, vp/%p, xip/%p\n",
-cmd, inode, filp, arg, vp, ip);
 	switch (cmd) {
 	case XFS_IOC_ALLOCSP:
 	case XFS_IOC_FREESP:
