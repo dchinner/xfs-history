@@ -1,13 +1,13 @@
-#ident	"$Revision: 1.73 $"
+#ident	"$Revision: 1.74 $"
 
 /*
  * Free space allocation for xFS.
  */
 
-#include <sys/param.h>
 #ifdef SIM
 #define _KERNEL 1
 #endif
+#include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
 #include <sys/ksa.h>

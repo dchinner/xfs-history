@@ -1,6 +1,12 @@
-#ident	"$Revision: 1.51 $"
+#ident	"$Revision: 1.52 $"
 
+#ifdef SIM
+#define _KERNEL 1
+#endif
 #include <sys/param.h>
+#ifdef SIM
+#undef _KERNEL
+#endif
 #include <sys/vnode.h>
 #include <sys/debug.h>
 #include <sys/kmem.h>
@@ -13,7 +19,7 @@
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #ifdef SIM
-#define _KERNEL
+#define _KERNEL 1
 #endif
 #include <sys/buf.h>
 #include <sys/grio.h>
