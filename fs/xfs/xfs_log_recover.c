@@ -3446,7 +3446,7 @@ xlog_recover_print_item(xlog_recover_item_t *item)
 		break;
 	    } 
 	    default: {
-		cmn_err_tag(84,CE_PANIC, "xlog_recover_print_item: illegal type\n");
+		cmn_err(CE_PANIC, "xlog_recover_print_item: illegal type\n");
 		break;
 	    }
 	}
