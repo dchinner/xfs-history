@@ -765,8 +765,9 @@ xfs_attr_leaf_add_work(xfs_trans_t *trans, buf_t *bp, xfs_da_args_t *args,
 		bcopy(args->name, (char *)name_rmt->name, args->namelen);
 		name_rmt->valuelen = 0;	/* just in case grow_inode() fails */
 		name_rmt->valueblk = 0;
-		tmp = xfs_da_grow_inode(trans, args,
-				  XFS_B_TO_FSB(mp, args->valuelen), &blkno);
+		tmp = xfs_bmap_first_unused(trans, args->dp,
+				 (xfs_extlen_t)XFS_B_TO_FSB(mp, args->valuelen),
+				 &blkno, args->whichfork);
 		if (tmp)
 			return(tmp);
 		name_rmt->valuelen = args->valuelen;
@@ -1902,8 +1903,40 @@ xfs_attr_put_listent(attrlist_t *alist, char *name, int namelen, int valuelen,
 int
 xfs_attr_leaf_clearflag(xfs_da_args_t *args)
 {
+	xfs_attr_leafblock_t *leaf;
+	xfs_attr_leaf_entry_t *entry;
+	xfs_trans_t *trans;
+	xfs_inode_t *dp;
+	buf_t *bp;
+	int error;
 
-	/* GROT: put something here */
+	/*
+	 * Set up the transaction envelope.
+	 */
+	dp = args->dp;
+	trans = xfs_trans_alloc(dp->i_mount, XFS_TRANS_MKDIR);
+	if (error = xfs_trans_reserve(trans, 1,
+/* GROT: make attr log_res macros */  XFS_MKDIR_LOG_RES(dp->i_mount),
+				      0, XFS_TRANS_PERM_LOG_RES,
+				      XFS_MKDIR_LOG_COUNT)) {
+		xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
+		return(error);
+	}
+	error = xfs_da_read_buf(trans, dp, args->aleaf_blkno, &bp,
+				       XFS_ATTR_FORK);
+	if (error)
+		return(error);
+	ASSERT(bp != NULL);
 
-	return(args != NULL);
+	leaf = (xfs_attr_leafblock_t *)bp->b_un.b_addr;
+	ASSERT(leaf->hdr.info.magic == XFS_ATTR_LEAF_MAGIC);
+	ASSERT(args->aleaf_index < leaf->hdr.count);
+	ASSERT(args->aleaf_index >= 0);
+	entry = &leaf->entries[ args->aleaf_index ];
+	entry->flags &= ~XFS_ATTR_INCOMPLETE;
+	xfs_trans_log_buf(trans, bp,
+			 XFS_DA_LOGRANGE(leaf, entry, sizeof(*entry)));
+
+	xfs_trans_commit(trans, XFS_TRANS_RELEASE_LOG_RES);
+	return(error);
 }

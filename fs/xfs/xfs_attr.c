@@ -129,7 +129,7 @@ xfs_attr_get(vnode_t *vp, char *name, char *value, int *valuelenp, int flags,
 			error = xfs_attr_leaf_get(NULL, &args);
 		else
 			error = xfs_attr_node_get(NULL, &args);
-		if ((error == EEXIST) && (args.aleaf_rmtblkno > 0)) {
+		if ((error == 0) && (args.aleaf_rmtblkno > 0)) {
 			error = xfs_attr_rmtval_get(&args);
 		}
 	}
@@ -199,6 +199,7 @@ xfs_attr_set(vnode_t *vp, char *name, char *value, int valuelen, int flags,
 	VN_HOLD(vp);
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
 	xfs_trans_ijoin(trans, dp, XFS_ILOCK_EXCL);
+	xfs_trans_ihold(trans, dp);
 	XFS_BMAP_INIT(&flist, &firstblock);
 
 	/*
@@ -212,13 +213,13 @@ xfs_attr_set(vnode_t *vp, char *name, char *value, int valuelen, int flags,
 		if (retval == ENOSPC) {
 			retval = xfs_attr_shortform_to_leaf(trans, &args);
 			if (retval != 0)
-				goto out;
+				goto out1;
 /* GROT: another possible req'mt for a double-split btree operation */
 			retval = xfs_attr_leaf_addname(trans, &args);
 			if (retval == ENOSPC) {
 				retval = xfs_attr_leaf_to_node(trans, &args);
 				if (retval != 0)
-					goto out;
+					goto out1;
 				retval = xfs_attr_node_addname(trans, &args);
 			}
 		}
@@ -227,14 +228,14 @@ xfs_attr_set(vnode_t *vp, char *name, char *value, int valuelen, int flags,
 		if (retval == ENOSPC) {
 			retval = xfs_attr_leaf_to_node(trans, &args);
 			if (retval != 0)
-				goto out;
+				goto out1;
 			retval = xfs_attr_node_addname(trans, &args);
 		}
 	} else {
 		retval = xfs_attr_node_addname(trans, &args);
 	}
 
-out:
+out1:
 	error = xfs_bmap_finish(&trans, &flist, firstblock, &committed);
 	if (error) {
 		xfs_bmap_cancel(&flist);
@@ -253,11 +254,13 @@ out:
 	if ((retval == 0) && (args.aleaf_rmtblkno > 0)) {
 		error = xfs_attr_rmtval_set(&args);
 		if (error)
-			return(error);
+			goto out2;
 		error = xfs_attr_leaf_clearflag(&args);
 		if (error)
-			return(error);
+			goto out2;
 	}
+out2:
+	xfs_iunlock(dp, XFS_ILOCK_EXCL);
 	return(retval);
 }
 
@@ -530,7 +533,7 @@ xfs_attr_leaf_get(xfs_trans_t *trans, xfs_da_args_t *args)
 	ASSERT(bp != NULL);
 
 	error = xfs_attr_leaf_lookup_int(bp, args);
-	if (error == EEXIST) {
+	if (error == EEXIST)  {
 		error = xfs_attr_leaf_getvalue(bp, args);
 	}
 	xfs_trans_brelse(trans, bp);
@@ -880,16 +883,16 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 	src = args->value;
 	valuelen = args->valuelen;
 	blkno = args->aleaf_rmtblkno;
-	xfs_ilock(dp, XFS_ILOCK_EXCL);
 	for (i = 0; (i < ATTR_RMTVALUE_MAXMAPS) && (valuelen > 0); i++) {
 		/*
 		 * Set up the transaction envelope.
 		 */
 		trans = xfs_trans_alloc(dp->i_mount, XFS_TRANS_MKDIR);
-		if (error = xfs_trans_reserve(trans, 10,
-/* GROT: make attr log_res macros */	     XFS_MKDIR_LOG_RES(dp->i_mount),
-					     0, XFS_TRANS_PERM_LOG_RES,
-					     XFS_MKDIR_LOG_COUNT)) {
+		if (error = xfs_trans_reserve(trans,
+					      XFS_B_TO_FSB(mp, args->valuelen),
+/* GROT: make attr log_res macros */	      XFS_MKDIR_LOG_RES(dp->i_mount),
+					      0, XFS_TRANS_PERM_LOG_RES,
+					      XFS_MKDIR_LOG_COUNT)) {
 			goto out1;
 		}
 		XFS_BMAP_INIT(&flist, &firstblock);
@@ -916,6 +919,7 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 			tmp = (valuelen < bp->b_bufsize) ? valuelen
 							 : bp->b_bufsize;
 			bcopy(src, bp->b_un.b_addr, tmp);
+			xfs_trans_log_buf(trans, bp, 0, XFS_LBSIZE(dp->i_mount) - 1);
 			src += tmp;
 			valuelen -= tmp;
 			blkno += map[j].br_blockcount;
@@ -926,7 +930,6 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 			goto out2;
 		xfs_trans_commit(trans, XFS_TRANS_RELEASE_LOG_RES);
 	}
-	xfs_iunlock(dp, XFS_ILOCK_EXCL);
 	ASSERT(valuelen == 0);
 	return(0);
 
@@ -934,7 +937,6 @@ out2:
 	xfs_bmap_cancel(&flist);
 out1:
 	xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
-	xfs_iunlock(dp, XFS_ILOCK_EXCL);
 	return(error);
 }
 
@@ -948,5 +950,5 @@ xfs_attr_rmtval_remove(xfs_da_args_t *args)
 
 	/* GROT: put something here */
 
-	return(args != NULL);
+	return(args == NULL);
 }
