@@ -76,7 +76,7 @@ xfs_iflush_fork(
 	int			whichfork,
 	buf_t			*bp);
 
-STATIC void
+STATIC int
 xfs_iformat(
 	xfs_inode_t	*ip,
 	xfs_dinode_t	*dip);
@@ -340,7 +340,7 @@ xfs_itobp(
  * brought in-core.  The rest will be in-lined in if_extents when it
  * is first referenced (see xfs_iread_extents()).
  */
-STATIC void
+STATIC int
 xfs_iformat(
 	xfs_inode_t		*ip,
 	xfs_dinode_t		*dip)
@@ -355,7 +355,8 @@ xfs_iformat(
 	case IFCHR:
 	case IFBLK:
 	case IFSOCK:
-		ASSERT(dip->di_core.di_format == XFS_DINODE_FMT_DEV);
+		if (dip->di_core.di_format != XFS_DINODE_FMT_DEV)
+			return XFS_ERROR(EINVAL);
 		ip->i_d.di_size = 0;
 		ip->i_df.if_u2.if_rdev = dip->di_u.di_dev;
 		break;
@@ -375,17 +376,15 @@ xfs_iformat(
 			xfs_iformat_btree(ip, dip, XFS_DATA_FORK);
 			break;
 		default:
-			ASSERT(0);
-			break;
+			return XFS_ERROR(EINVAL);
 		}
 		break;
 
 	default:
-		ASSERT(0);
-		return;
+		return XFS_ERROR(EINVAL);
 	}
 	if (!XFS_DFORK_Q(dip))
-		return;
+		return 0;
 	ASSERT(ip->i_afp == NULL);
 	ip->i_afp = kmem_zone_zalloc(xfs_ifork_zone, KM_SLEEP);
 	ip->i_afp->if_ext_max =
@@ -403,8 +402,12 @@ xfs_iformat(
 		xfs_iformat_btree(ip, dip, XFS_ATTR_FORK);
 		break;
 	default:
-		ASSERT(0);
+		kmem_zone_free(xfs_ifork_zone, ip->i_afp);
+		ip->i_afp = NULL;
+		return XFS_ERROR(EINVAL);
 	}
+
+	return 0;
 }
 
 /*
@@ -605,7 +608,12 @@ xfs_iread(
 	 */
 	if (dip->di_core.di_mode != 0) {
 		bcopy(&(dip->di_core), &(ip->i_d),sizeof(xfs_dinode_core_t));
-		xfs_iformat(ip, dip);
+		error = xfs_iformat(ip, dip);
+		if (error)  {
+			kmem_zone_free(xfs_inode_zone, ip);
+			xfs_trans_brelse(tp, bp);
+			return error;
+		}
 	} else {
 		ip->i_d.di_magic = dip->di_core.di_magic;
 		ip->i_d.di_version = dip->di_core.di_version;
@@ -684,7 +692,8 @@ xfs_iread_extents(
 	xfs_ifork_t	*ifp;
 	size_t		size;
 
-	ASSERT(XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_BTREE);
+	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE)
+		return XFS_ERROR(EIO);
 	size = XFS_IFORK_NEXTENTS(ip, whichfork) * sizeof(xfs_bmbt_rec_t);
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	ifp->if_u1.if_extents = kmem_alloc(size, KM_SLEEP);
