@@ -2421,12 +2421,10 @@ static int	kdbm_vn(
 
 static char	*pb_flag_vals[] = {
 /*  0 */ "READ", "WRITE", "MAPPED", "PARTIAL", "ASYNC",
-/*  5 */ "NONE", "DELWRI", "INVALID0x07", "INVALID0x08", "INVALID0x09",
-/* 10 */ "STALE", "FS_MANAGED", "FS_DATAIOD", "LOCK", "TRYLOCK",
-/* 15 */ "DONT_BLOCK", "PAGECACHE", "PRIVATE_BH", "ALL_PAGES_MAPPED", 
-	 "ADDR_ALLOCATED",
-/* 20 */ "MEM_ALLOCATED", "MEM_SLAB", "FORCEIO", "FLUSH", "READ_AHEAD",
-/* 25 */ "RUN_QUEUES", "DIRECTIO",
+/*  5 */ "NONE", "DELWRI",  "STALE", "FS_MANAGED", "FS_DATAIOD",
+/* 10 */ "FORCEIO", "FLUSH", "READ_AHEAD", "DIRECTIO", "LOCK",
+/* 15 */ "TRYLOCK", "DONT_BLOCK", "PAGE_CACHE", "KMEM_ALLOC", "RUN_QUEUES",
+/* 20 */ "PRIVATE_BH",
 	 NULL };
 
 static char	*iomap_flag_vals[] = {
