@@ -1,4 +1,4 @@
-#ident "$Revision: 1.186 $"
+#ident "$Revision: 1.187 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -33,6 +33,7 @@
 #include <sys/sema.h>
 #include <ksys/vfile.h>
 #include <sys/flock.h>
+#include <sys/fs_subr.h>
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
 #include <sys/schedctl.h>
@@ -1164,8 +1165,8 @@ xfs_read(
 
 #ifndef SIM
 	if (MANDLOCK(vp, ip->i_d.di_mode) &&
-	    (error = chklock(vp, FREAD, offset, count, uiop->uio_fmode,
-					credp, fl))) {
+	    (error = fs_checklock(vp, FREAD, offset, count, uiop->uio_fmode,
+				credp, fl))) {
 		goto out;
 	}
 #endif
@@ -2454,8 +2455,8 @@ start:
 
 #ifndef SIM
 	if (MANDLOCK(vp, ip->i_d.di_mode) &&
-	    (error = chklock(vp, FWRITE, offset, count, uiop->uio_fmode,
-			     credp, fl))) {
+	    (error = fs_checklock(vp, FWRITE, offset, count, uiop->uio_fmode,
+				credp, fl))) {
 		goto out;
 	}
 #endif
