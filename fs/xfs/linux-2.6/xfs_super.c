@@ -380,8 +380,9 @@ linvfs_put_inode(
 {
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 
-	if (vp)
+	if (vp) {
 		VN_RELE(vp);
+	}
 }
 
 
@@ -548,13 +549,6 @@ linvfs_remount(
 }
 
 
-void
-linvfs_clear_inode(
-	struct inode	*inode)
-{
-}
-
-
 
 static struct super_operations linvfs_sops = {
 	linvfs_read_inode,
@@ -566,7 +560,7 @@ static struct super_operations linvfs_sops = {
 	linvfs_write_super,
 	linvfs_statfs,
 	linvfs_remount,
-	linvfs_clear_inode,
+	NULL,			/*  clear inode */
 	NULL			/*  unmount_begin  */
 };
 
