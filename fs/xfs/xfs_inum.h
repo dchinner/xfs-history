@@ -3,17 +3,38 @@
 
 #ident	"$Revision$"
 
-#define	XFS_INODE_LOWBITS	32
-#define	XFS_INODE_HIGHBITS	32
-
+/*
+ * Inode number format:
+ * low inopblog bits - offset in block
+ * next 32-blocklog bits - block number in ag
+ * next 32 bits - ag number
+ * high blocklog-inopblog bits - 0
+ */
 typedef	__uint64_t	xfs_ino_t;	/* inode number */
 typedef	__uint32_t	xfs_agino_t;	/* within allocation grp inode number */
 
 #define	NULLFSINO	((xfs_ino_t)-1)
 #define	NULLAGINO	((xfs_agino_t)-1)
 
-#define xfs_ino_to_agno(i)	((xfs_agnumber_t)((i) >> XFS_INODE_LOWBITS))
-#define	xfs_ino_to_agino(i)	((xfs_agino_t)((i) & ((1LL << XFS_INODE_LOWBITS) - 1LL)))
-#define	xfs_agino_to_ino(a,i)	((((xfs_ino_t)(a)) << XFS_INODE_LOWBITS) | (i))
+#define	xfs_mask(k)	((1 << k) - 1)
+#define	xfs_ino_offset_bits(s)	((s)->sb_inopblog)
+#define	xfs_ino_agbno_bits(s)	(32 - (s)->sb_blocklog)
+#define	xfs_ino_agino_bits(s)	(xfs_ino_offset_bits(s) + xfs_ino_agbno_bits(s))
+#define	xfs_ino_agno_bits(s)	32
+
+#define	xfs_ino_to_agno(s,i)	((xfs_agnumber_t)((i) >> xfs_ino_agino_bits(s)))
+#define	xfs_ino_to_agino(s,i)	\
+	((xfs_agino_t)(i) & xfs_mask(xfs_ino_agino_bits(s)))
+#define	xfs_ino_to_agbno(s,i)	\
+	(((xfs_agblock_t)(i) >> xfs_ino_offset_bits(s)) & \
+	 xfs_mask(xfs_ino_agbno_bits(s)))
+#define	xfs_ino_to_offset(s,i)	((int)(i) & xfs_mask(xfs_ino_offset_bits(s)))
+
+#define	xfs_agino_to_ino(s,a,i)	(((xfs_ino_t)(a) << xfs_ino_agino_bits(s)) | (i))
+#define	xfs_agino_to_agbno(s,i)	((i) >> xfs_ino_offset_bits(s))
+#define	xfs_agino_to_offset(s,i)	((i) & xfs_mask(xfs_ino_offset_bits(s)))
+
+#define	xfs_offbno_to_agino(s,b,o)	\
+	((xfs_agino_t)(((b) << xfs_ino_offset_bits(s)) | (o)))
 
 #endif	/* !_FS_XFS_INUM_H */
