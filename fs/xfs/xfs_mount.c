@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.79 $"
+#ident	"$Revision: 1.81 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -404,6 +404,7 @@ xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 	vfsp->vfs_data = mp;
 	mp->m_dev = dev;
 	mp->m_rtdev = rtdev;
+	mp->m_logdev = logdev;
 	vfsp->vfs_dev = dev;
 
 
