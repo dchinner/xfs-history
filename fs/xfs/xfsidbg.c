@@ -79,6 +79,7 @@
 #include "xfs_bit.h"
 #include "xfs_quota.h"
 #include "quota/xfs_qm.h"
+#include "xfs_iomap.h"
 
 MODULE_AUTHOR("Silicon Graphics, Inc.");
 MODULE_DESCRIPTION("Additional kdb commands for debugging XFS");
@@ -2427,9 +2428,9 @@ static char	*pb_flag_vals[] = {
 /* 20 */ "MEM_ALLOCATED", "FORCEIO", "FLUSH", "READ_AHEAD",
 	 NULL };
 
-static char	*pbm_flag_vals[] = {
+static char	*iomap_flag_vals[] = {
 	"EOF", "HOLE", "DELAY", "INVALID0x08",
-	"INVALID0x10", "UNWRITTEN", "INVALID0x40", "INVALID0x80",
+	"INVALID0x10", "UNWRITTEN", "NEW", "INVALID0x80",
 	NULL };
 
 
@@ -2592,12 +2593,12 @@ kdbm_pbdelay(int argc, const char **argv, const char **envp,
 }
 
 static int
-kdbm_pbmap(int argc, const char **argv, const char **envp,
+kdbm_iomap(int argc, const char **argv, const char **envp,
 	struct pt_regs *regs)
 {
-	page_buf_bmap_t	pbm;
+	xfs_iomap_t iomap;
 	unsigned long addr;
-	long	offset=0;
+	long offset=0;
 	int nextarg;
 	int diag;
 
@@ -2606,14 +2607,14 @@ kdbm_pbmap(int argc, const char **argv, const char **envp,
 
 	nextarg = 1;
 	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)) ||
-	    (diag = kdb_getarea(pbm, addr)))
+	    (diag = kdb_getarea(iomap, addr)))
 
-	kdb_printf("page_buf_bmap_t at 0x%lx\n", addr);
-	kdb_printf("  pbm_bn 0x%llx pbm_offset 0x%Lx pbm_delta 0x%lx pbm_bsize 0x%lx\n",
-		(long long) pbm.pbm_bn, pbm.pbm_offset,
-		(unsigned long) pbm.pbm_delta, (unsigned long) pbm.pbm_bsize);
+	kdb_printf("iomap_t at 0x%lx\n", addr);
+	kdb_printf("  iomap_bn 0x%llx iomap_offset 0x%Lx iomap_delta 0x%lx iomap_bsize 0x%lx\n",
+		(long long) iomap.iomap_bn, iomap.iomap_offset,
+		(unsigned long) iomap.iomap_delta, (unsigned long) iomap.iomap_bsize);
 
-	kdb_printf("  pbm_flags %s\n", map_flags(pbm.pbm_flags, pbm_flag_vals));
+	kdb_printf("  iomap_flags %s\n", map_flags(iomap.iomap_flags, iomap_flag_vals));
 
 	return 0;
 }
@@ -2979,7 +2980,7 @@ static struct xif xfsidbg_funcs[] = {
 static struct xif pb_funcs[] = {
   {  "pb",	kdbm_pb,	"<vaddr>",	"Display page_buf_t" },
   {  "pbflags",	kdbm_pb_flags,	"<flags>",	"Display page_buf flags" },
-  {  "pbmap",	kdbm_pbmap,	"<page_buf_bmap_t *>",	"Display Bmap" },
+  {  "iomapap",	kdbm_iomap,	"<iomap_t *>",	"Display IOmap" },
   {  "pbdelay",	kdbm_pbdelay,	"0|1",		"Display delwri pagebufs" },
 #ifdef PAGEBUF_TRACE
   {  "pbtrace",	kdbm_pbtrace,	"<vaddr>|<count>",	"page_buf_t trace" },
