@@ -3108,11 +3108,12 @@ xfs_prdinode_core(xfs_dinode_core_t *dip, int convert)
 		INT_GET(dip->di_format, convert),
 		xfs_fmtformat(
 		    (xfs_dinode_fmt_t)INT_GET(dip->di_format, convert)));
-	kdb_printf("nlink %d uid %d gid %d projid %d\n",
+	kdb_printf("nlink %d uid %d gid %d projid %d flushiter %u\n",
 		INT_GET(dip->di_nlink, convert),
 		INT_GET(dip->di_uid, convert),
 		INT_GET(dip->di_gid, convert),
-		(uint)INT_GET(dip->di_projid, convert));
+		(uint)INT_GET(dip->di_projid, convert),
+		(uint)INT_GET(dip->di_flushiter, convert));
 	kdb_printf("atime %u:%u mtime %ud:%u ctime %u:%u\n",
 		INT_GET(dip->di_atime.t_sec, convert),
 		INT_GET(dip->di_atime.t_nsec, convert),
