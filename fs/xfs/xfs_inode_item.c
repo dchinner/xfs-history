@@ -596,10 +596,14 @@ xfs_iflush_done(
 	    (iip->ili_item.li_lsn == iip->ili_flush_lsn)) {
 		s = AIL_LOCK(ip->i_mount);
 		if (iip->ili_item.li_lsn == iip->ili_flush_lsn) {
+			/*
+			 * xfs_trans_delete_ail() drops the AIL lock.
+			 */
 			xfs_trans_delete_ail(ip->i_mount,
-					     (xfs_log_item_t*)iip);
+					     (xfs_log_item_t*)iip, s);
+		} else {
+			AIL_UNLOCK(ip->i_mount, s);
 		}
-		AIL_UNLOCK(ip->i_mount, s);
 	}
 	
 	iip->ili_logged = 0;
