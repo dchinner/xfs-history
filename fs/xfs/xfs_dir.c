@@ -430,7 +430,7 @@ static int							/* error */
 xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 {
 	xfs_dirent_t *dbp;
-	int  alignment, retval, is32;
+	int  alignment, retval;
 	xfs_dir_put_t put;
 
 	XFS_STATS_INC(xfsstats.xs_dir_getdents);
@@ -441,8 +441,7 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	 * just work directly within that buffer.  If it's in user memory,
 	 * lock it down first.
 	 */
-	is32 = ABI_IS_IRIX5(GETDENTS_ABI(get_current_abi(), uio));
-	alignment = (is32 ? sizeof(xfs32_off_t) : sizeof(xfs_off_t)) - 1;
+	alignment = sizeof(xfs_off_t) - 1;
 	if ((uio->uio_iovcnt == 1) &&
 #if CELL_CAPABLE
 	    !KT_CUR_ISXTHREAD() &&
@@ -450,18 +449,10 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	    (((__psint_t)uio->uio_iov[0].iov_base & alignment) == 0) &&
 	    ((uio->uio_iov[0].iov_len & alignment) == 0)) {
 		dbp = NULL;
-		if (uio->uio_segflg == UIO_SYSSPACE) {
-			put = xfs_dir_put_dirent64_direct;
-		} else {
-			put = is32 ?
-				xfs_dir_put_dirent32_direct :
-				xfs_dir_put_dirent64_direct;
-		}
+		put = xfs_dir_put_dirent64_direct;
 	} else {
 		dbp = kmem_alloc(sizeof(*dbp) + MAXNAMELEN, KM_SLEEP);
-		put = is32 ?
-			xfs_dir_put_dirent32_uio :
-			xfs_dir_put_dirent64_uio;
+		put = xfs_dir_put_dirent64_uio;
 	}
 
 	/*
