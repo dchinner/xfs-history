@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.74 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -20,7 +20,6 @@
 #include <stddef.h>
 #ifndef SIM
 #include <sys/conf.h>
-#include <sys/user.h>
 #include <sys/systm.h>
 #endif
 #include "xfs_macros.h"

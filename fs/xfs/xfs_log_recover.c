@@ -1,5 +1,5 @@
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.82 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -31,7 +31,6 @@
 #include <sys/kmem.h>
 #include <sys/debug.h>
 #include <sys/ktrace.h>
-#include <sys/user.h>
 #include <sys/vfs.h>
 #include <sys/uuid.h>
 #include <stddef.h>
