@@ -60,11 +60,27 @@ struct xfs_dir_state {
 /*
  * Overall external interface routines.
  */
-int	xfs_dir_createname(char *name_string, int name_length,
-				xfs_ino_t *inode_number);
-int	xfs_dir_removename(char *name_string, int name_length);
-int	xfs_dir_lookup(char *name_string, int name_length,
-			    xfs_ino_t *inode_number);
+int	xfs_dir_isempty(xfs_inode_t *dp);
+
+int	xfs_dir_init (xfs_trans_t *tp,
+		      xfs_inode_t *dir,
+		      xfs_inode_t *parent_dir);
+
+int	xfs_dir_createname(xfs_trans_t *tp,
+			   xfs_inode_t *dp,
+			   char *name_string,
+			   xfs_ino_t inode_number);
+
+int	xfs_dir_removename(xfs_trans_t *tp,
+			   xfs_inode_t *dp,
+			   char *name_string);
+
+int	xfs_dir_lookup(xfs_trans_t *tp,
+		       xfs_inode_t *dp,
+		       char *name_string,
+		       int name_length,
+		       xfs_ino_t *inode_number);
+
 int	xfs_dir_getdents();
 
 /*
