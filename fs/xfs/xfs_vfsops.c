@@ -70,7 +70,6 @@ xfs_init(int	fstype)
 	extern xfs_zone_t	*xfs_dabuf_zone;
 	extern mutex_t	        xfs_uuidtabmon;
 	extern mutex_t	        xfs_Gqm_lock;
-	extern xfs_zone_t	*xfs_gap_zone;
 #ifdef DEBUG_NOT
 	extern ktrace_t	        *xfs_alloc_trace_buf;
 	extern ktrace_t	        *xfs_bmap_trace_buf;
@@ -102,7 +101,6 @@ xfs_init(int	fstype)
 					    "xfs_btree_cur");
 	xfs_inode_zone = kmem_zone_init(sizeof(xfs_inode_t), "xfs_inode");
 	xfs_trans_zone = kmem_zone_init(sizeof(xfs_trans_t), "xfs_trans");
-	xfs_gap_zone = kmem_zone_init(sizeof(xfs_gap_t), "xfs_gap");
 	xfs_da_state_zone =
 		kmem_zone_init(sizeof(xfs_da_state_t), "xfs_da_state");
 	xfs_dabuf_zone = kmem_zone_init(sizeof(xfs_dabuf_t), "xfs_dabuf");
@@ -203,7 +201,6 @@ xfs_cleanup(void)
 	extern xfs_zone_t	*xfs_btree_cur_zone;
 	extern xfs_zone_t	*xfs_inode_zone;
 	extern xfs_zone_t	*xfs_trans_zone;
-	extern xfs_zone_t	*xfs_gap_zone;
 	extern xfs_zone_t	*xfs_da_state_zone;
 	extern xfs_zone_t	*xfs_dabuf_zone;
 	extern xfs_zone_t	*xfs_efd_zone;
@@ -216,7 +213,6 @@ xfs_cleanup(void)
 	kmem_cache_destroy(xfs_btree_cur_zone);
 	kmem_cache_destroy(xfs_inode_zone);
 	kmem_cache_destroy(xfs_trans_zone);
-	kmem_cache_destroy(xfs_gap_zone);
 	kmem_cache_destroy(xfs_da_state_zone);
 	kmem_cache_destroy(xfs_dabuf_zone);
 	kmem_cache_destroy(xfs_buf_item_zone);
