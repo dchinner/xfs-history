@@ -17,6 +17,7 @@
 #include <sys/kmem.h>
 #include <sys/debug.h>
 #include <sys/dirent.h>
+#include <sys/uuid.h>
 #ifdef SIM
 #include <bstring.h>
 #include <stdio.h>
