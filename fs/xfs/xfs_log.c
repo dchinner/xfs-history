@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.116 $"
+#ident	"$Revision: 1.120 $"
 
 /*
  * High level interface routines for log manager
@@ -44,7 +44,6 @@
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_mount.h"		/* depends on xfs_trans.h & xfs_sb.h */
-#include "xfs_inode_item.h"
 #include "xfs_error.h"
 #include "xfs_log_priv.h"	/* depends on all above */
 #include "xfs_buf_item.h"

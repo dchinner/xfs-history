@@ -30,7 +30,6 @@
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
 #include "xfs_dinode.h"
-#include "xfs_inode_item.h"
 #include "xfs_inode.h"
 #include "xfs_ialloc.h"
 #include "xfs_itable.h"
