@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.118 $"
+#ident "$Revision: 1.119 $"
 
 struct bhv_desc;
 struct buf;
@@ -104,7 +104,21 @@ typedef struct xfs_ifork {
  *
  * Generally, we do not want to hold the i_rlock while holding the 
  * i_ilock. Hierarchy is i_iolock followed by i_rlock. 
+ *
+ * xfs_iptr_t contains all the inode fields upto and including the
+ * i_mnext and i_mprev fields, it is used as a marker in the inode
+ * chain off the mount structure by xfs_sync calls.
  */
+
+typedef struct {
+	struct xfs_ihash	*ip_hash;	/* pointer to hash header */
+	struct xfs_inode	*ip_next;	/* inode hash link forw */
+	struct xfs_inode	**ip_prevp;	/* ptr to prev i_next */
+	struct xfs_mount	*ip_mount;	/* fs mount struct ptr */
+	struct xfs_inode	*ip_mnext;	/* next inode in mount list */
+	struct xfs_inode	*ip_mprev;	/* ptr to prev inode */
+} xfs_iptr_t;
+
 typedef struct xfs_inode {
 	/* Inode linking and identification information. */
 	struct xfs_ihash	*i_hash;	/* pointer to hash header */
