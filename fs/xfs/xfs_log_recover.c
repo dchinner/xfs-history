@@ -296,7 +296,9 @@ xlog_find_verify_cycle( xlog_t 		*log,
     	xfs_buf_t		*bp;
     	char                    *buf        = NULL;
 	int			error       = 0;
-	xfs_daddr_t		bufblks	    = nbblks;
+	xfs_daddr_t		bufblks;
+
+	bufblks = 1 << ffs(nbblks);
 
 	while (!(bp = xlog_get_bp(bufblks, log->l_mp))) {
                 /* can't get enough memory to do everything in one big buffer */
@@ -1009,9 +1011,10 @@ xlog_write_log_records(
 	int			error       = 0;
 	xfs_buf_t		*bp;
 	char		        *buf;
-	int			bufblks	    = blocks;
+	int			bufblks;
 
-        while (!(bp = xlog_get_bp(bufblks, log->l_mp))) {
+	bufblks = 1 << ffs(blocks);
+	while (!(bp = xlog_get_bp(bufblks, log->l_mp))) {
 		bufblks >>= 1;
                 if (!bufblks)
 		        return ENOMEM;
