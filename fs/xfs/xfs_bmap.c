@@ -799,12 +799,9 @@ xfs_bmap_alloc(
 	xfs_fsblock_t	bno;
 	xfs_agnumber_t	fb_agno;
 	xfs_fsblock_t	firstb;
-	xfs_fsblock_t	gotbno;
-	xfs_fsblock_t	gotdiff;
 	xfs_mount_t	*mp;
 	int		nullfb;
-	xfs_fsblock_t	prevbno;
-	xfs_fsblock_t	prevdiff;
+	xfs_extlen_t	prod;
 	int		rt;
 	xfs_sb_t	*sbp;
 	xfs_alloctype_t	type;
@@ -828,6 +825,11 @@ xfs_bmap_alloc(
 		    (rt && bno >= sbp->sb_rextents))
 			bno = prevp->br_startblock + prevp->br_blockcount;
 	} else if (!eof) {
+		xfs_fsblock_t	gotbno;
+		xfs_fsblock_t	gotdiff;
+		xfs_fsblock_t	prevbno;
+		xfs_fsblock_t	prevdiff;
+
 		if (prevp->br_startoff != NULLFSBLOCK &&
 		    prevp->br_startblock != NULLSTARTBLOCK) {
 			prevdiff = off - (prevp->br_startoff + prevp->br_blockcount);
@@ -873,11 +875,30 @@ xfs_bmap_alloc(
 	if (rt) {
 		type = askbno == 0 ?
 			XFS_ALLOCTYPE_ANY_AG : XFS_ALLOCTYPE_NEAR_BNO;
-		abno = xfs_rtallocate_extent(tp, askbno, 1, asklen, alen, type, wasdel);
+		if (ip->i_d.di_extsize)
+			prod = ip->i_d.di_extsize / sbp->sb_rextsize;
+		else
+			prod = 1;
+		abno = xfs_rtallocate_extent(tp, askbno, 1, asklen, alen, type,
+			wasdel, prod);
 	} else {
+		xfs_extlen_t	mod;
+
 		type = nullfb ?
 			XFS_ALLOCTYPE_START_BNO : XFS_ALLOCTYPE_NEAR_BNO;
-		abno = xfs_alloc_vextent(tp, askbno, 1, asklen, alen, type, total, wasdel);
+		if (ip->i_d.di_extsize) {
+			prod = ip->i_d.di_extsize;
+			mod = 0;
+		} else if (sbp->sb_blocksize >= NBPP) {
+			prod = 1;
+			mod = 0;
+		} else {
+			prod = NBPP >> sbp->sb_blocklog;
+			if (mod = off % prod)
+				mod = prod - mod;
+		}
+		abno = xfs_alloc_vextent(tp, askbno, 1, asklen, alen, type,
+			total, wasdel, mod, prod);
 		if (nullfb)
 			*firstblock = abno;
 	}
@@ -1566,6 +1587,7 @@ xfs_bmapi(
 	int			logflags;
 	xfs_mount_t		*mp;
 	int			n;
+	xfs_extnum_t		nextents;
 	xfs_bmbt_irec_t		prev;
 	xfs_sb_t		*sbp;
 	int			trim;
@@ -1604,6 +1626,7 @@ xfs_bmapi(
 	if (!(ip->i_flags & XFS_IEXTENTS))
 		xfs_iread_extents(tp, ip);
 	ep = xfs_bmap_search_extents(ip, bno, &eof, &lastx, &got, &prev);
+	nextents = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
 	mp = ip->i_mount;
 	sbp = &mp->m_sb;
 	logflags = n = 0;
@@ -1629,16 +1652,21 @@ xfs_bmapi(
 				 xfs_extlen_min(got.br_startoff - bno, len));
 			aoff = wasdelay ? got.br_startoff : bno;
 			if (delay) {
-				if (xfs_mod_incore_sb(mp, XFS_SB_FDBLOCKS, -alen))
+				if (xfs_mod_incore_sb(mp, XFS_SB_FDBLOCKS,
+						      -alen))
 					break;
 				abno = NULLSTARTBLOCK;
 			} else {
-				abno = xfs_bmap_alloc(tp, ip, eof, &prev, &got, &firstblock, &alen, total, aoff, wasdelay);
+				abno = xfs_bmap_alloc(tp, ip, eof, &prev, &got,
+					&firstblock, &alen, total, aoff,
+					wasdelay);
 				if (abno == NULLFSBLOCK)
 					break;
 				if ((ip->i_flags & XFS_IBROOT) && !cur) {
-					cur = xfs_btree_init_cursor(mp, tp, NULL, 0, XFS_BTNUM_BMAP, ip);
-					cur->bc_private.b.firstblock = firstblock;
+					cur = xfs_btree_init_cursor(mp, tp,
+						NULL, 0, XFS_BTNUM_BMAP, ip);
+					cur->bc_private.b.firstblock =
+						firstblock;
 					cur->bc_private.b.flist = flist;
 				}
 			}
@@ -1648,6 +1676,7 @@ xfs_bmapi(
 			logflags |= xfs_bmap_add_extent(ip, lastx, cur, &got);
 			lastx = ip->i_lastex;
 			ep = &ip->i_u1.iu_extents[lastx];
+			nextents = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
 			xfs_bmbt_get_all(ep, got);
 			/*
 			 * Fall down into the found allocated space case.
@@ -1685,8 +1714,10 @@ xfs_bmapi(
 		len = end - bno;
 		if (n > 0 && mval->br_startblock != NULLSTARTBLOCK &&
 		    mval[-1].br_startblock != NULLSTARTBLOCK &&
-		    mval->br_startblock == mval[-1].br_startblock + mval[-1].br_blockcount) {
-			ASSERT(mval->br_startoff == mval[-1].br_startoff + mval[-1].br_blockcount);
+		    mval->br_startblock ==
+		    mval[-1].br_startblock + mval[-1].br_blockcount) {
+			ASSERT(mval->br_startoff ==
+			       mval[-1].br_startoff + mval[-1].br_blockcount);
 			mval[-1].br_blockcount += mval->br_blockcount;
 		} else {
 			mval++;
@@ -1702,7 +1733,7 @@ xfs_bmapi(
 		 */
 		ep++;
 		lastx++;
-		if (lastx >= ip->i_lastex) {
+		if (lastx >= nextents) {
 			eof = 1;
 			prev = got;
 		} else
@@ -1715,7 +1746,8 @@ xfs_bmapi(
 	 */
 	if (ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS &&
 	    ip->i_d.di_nextents > XFS_BMAP_EXT_MAXRECS(sbp->sb_inodesize)) {
-		firstblock = xfs_bmap_extents_to_btree(tp, ip, firstblock, flist);
+		firstblock = xfs_bmap_extents_to_btree(tp, ip, firstblock,
+			flist);
 		logflags |= XFS_ILOG_CORE;
 	}
 	/*
