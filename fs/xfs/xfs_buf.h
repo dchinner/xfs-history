@@ -590,7 +590,7 @@ extern int _xfs_incore_relse(buftarg_t *, int, int);
 
 #define xfs_baread(target, rablkno, ralen)  \
 		pagebuf_get((target)->inode, (rablkno) << 9, (ralen) << 9, \
-				PBF_TRYLOCK | PBF_READ | PBF_ASYNC)
+			PBF_TRYLOCK | PBF_READ | PBF_ASYNC | PBF_MAPPABLE)
 	
 
 #define XFS_pdflush(vnode,flags) printk("XFS_pdflush not implemeneted\n")
