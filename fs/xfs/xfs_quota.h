@@ -1,6 +1,6 @@
 #ifndef __XFS_QUOTA_H__
 #define __XFS_QUOTA_H__
-#ident "$Revision: 7.0 $"
+#ident "$Revision: 1.1 $"
 /*
  * External Interface to the XFS disk quota subsystem.
  */
@@ -109,7 +109,8 @@ typedef __uint16_t      xfs_qwarncnt_t;
 
 #define XFS_PROC_PROJID(c)	  ((c)->p_arsess->as_prid)
 #define XFS_IS_REALTIME_INODE(ip) ((ip)->i_d.di_flags & XFS_DIFLAG_REALTIME)
-
+#define XFS_QM_SB_HAS_QUOTA(mp)	  ((mp)->m_sb.sb_versionnum >= \
+				   XFS_SB_VERSION_HASQUOTA)
 
 extern struct xfs_qm   *xfs_qm_init(void);
 extern void 		xfs_qm_destroy(struct xfs_qm *xqm);
