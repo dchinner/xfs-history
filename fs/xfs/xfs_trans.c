@@ -1,4 +1,4 @@
-#ident "$Revision: 1.78 $"
+#ident "$Revision: 1.79 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -45,6 +45,7 @@
 #include "xfs_inode.h"
 #include "xfs_da_btree.h"
 #include "xfs_quota.h"
+#include "xfs_dqblk.h" /* XFS_DQUOT_LOGRES(mp) */
 
 #ifdef SIM
 #include "sim.h"
@@ -73,23 +74,24 @@ xfs_trans_init(
 	xfs_trans_reservations_t	*resp;
 
 	resp = &(mp->m_reservations);
-	resp->tr_write = XFS_CALC_WRITE_LOG_RES(mp);
-	resp->tr_itruncate = XFS_CALC_ITRUNCATE_LOG_RES(mp);
-	resp->tr_rename = XFS_CALC_RENAME_LOG_RES(mp);
+	resp->tr_write = XFS_CALC_WRITE_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
+	resp->tr_itruncate = XFS_CALC_ITRUNCATE_LOG_RES(mp) + 
+		XFS_DQUOT_LOGRES(mp);
+	resp->tr_rename = XFS_CALC_RENAME_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
 	resp->tr_link = XFS_CALC_LINK_LOG_RES(mp);
-	resp->tr_remove = XFS_CALC_REMOVE_LOG_RES(mp);
-	resp->tr_symlink = XFS_CALC_SYMLINK_LOG_RES(mp);
-	resp->tr_create = XFS_CALC_CREATE_LOG_RES(mp);
-	resp->tr_mkdir = XFS_CALC_MKDIR_LOG_RES(mp);
-	resp->tr_ifree = XFS_CALC_IFREE_LOG_RES(mp);
-	resp->tr_ichange = XFS_CALC_ICHANGE_LOG_RES(mp);
+	resp->tr_remove = XFS_CALC_REMOVE_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
+	resp->tr_symlink = XFS_CALC_SYMLINK_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
+	resp->tr_create = XFS_CALC_CREATE_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
+	resp->tr_mkdir = XFS_CALC_MKDIR_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
+	resp->tr_ifree = XFS_CALC_IFREE_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
+	resp->tr_ichange = XFS_CALC_ICHANGE_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
 	resp->tr_growdata = XFS_CALC_GROWDATA_LOG_RES(mp);
 	resp->tr_swrite = XFS_CALC_SWRITE_LOG_RES(mp);
 	resp->tr_writeid = XFS_CALC_WRITEID_LOG_RES(mp);
-	resp->tr_addafork = XFS_CALC_ADDAFORK_LOG_RES(mp);
+	resp->tr_addafork = XFS_CALC_ADDAFORK_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
 	resp->tr_attrinval = XFS_CALC_ATTRINVAL_LOG_RES(mp);
-	resp->tr_attrset = XFS_CALC_ATTRSET_LOG_RES(mp);
-	resp->tr_attrrm = XFS_CALC_ATTRRM_LOG_RES(mp);
+	resp->tr_attrset = XFS_CALC_ATTRSET_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
+	resp->tr_attrrm = XFS_CALC_ATTRRM_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
 	resp->tr_clearagi = XFS_CALC_CLEAR_AGI_BUCKET_LOG_RES(mp);
 }
 
