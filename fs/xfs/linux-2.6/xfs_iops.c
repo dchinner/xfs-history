@@ -735,11 +735,12 @@ int linvfs_bmap(struct address_space *mapping, long block)
 		}
 	}
 
-	VOP_BMAP(vp, block << 9, 1, PBF_READ, NULL,
-		&bmap, &nbm, error);
+	VOP_BMAP(vp, block << 9, 1, PBF_READ, NULL, &bmap, &nbm, error);
 	VOP_RWUNLOCK(vp, VRWLOCK_READ);
 	if (error)
 		return -error;
+	if (bmap.pbm_bn < 0)
+		return 0;
 	return (int)(bmap.pbm_bn + (bmap.pbm_delta >> 9));
 }
  
