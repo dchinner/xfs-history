@@ -1,7 +1,7 @@
 #ifndef	_XFS_LOG_RECOVER_H
 #define _XFS_LOG_RECOVER_H
 
-#ident	"$Revision: 1.2 $"
+#ident	"$Revision: 1.5 $"
 
 /*
  * Macros, structures, prototypes for internal log manager use.
@@ -34,8 +34,8 @@ typedef struct xlog_recover {
 	xlog_tid_t	    r_log_tid;		/* log's transaction id */
 	xfs_trans_header_t  r_theader;		/* trans header for partial */
 	int		    r_state;		/* not needed */
-	xlog_recover_item_t *r_itemq;		/* q for everything */
-	xlog_recover_item_t *r_buf_inq;		/* q for buffers & inodes */
+	xfs_lsn_t	    r_lsn;		/* xact lsn */
+	xlog_recover_item_t *r_itemq;		/* q for items */
 } xlog_recover_t;
 
 #define ITEM_TYPE(i)	(*(ushort *)(i)->ri_buf[0].i_addr)
