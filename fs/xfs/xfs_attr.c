@@ -12,7 +12,7 @@
 #include <sys/sysinfo.h>
 #include <sys/ksa.h>
 #include <sys/systm.h>
-#include <attributes.h>
+#include <sys/attributes.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -44,6 +44,7 @@
 
 /*
  * Max number of extents needed for directory create + symlink.
+ * GROT: make new log reservation #defines to attribute operations.
  */
 #define MAX_EXT_NEEDED 9
 
@@ -56,10 +57,9 @@
  */
 STATIC int xfs_attr_leaf_get(xfs_trans_t *trans, xfs_da_name_t *args);
 STATIC int xfs_attr_leaf_removename(xfs_trans_t *trans, xfs_da_name_t *args,
-						int *result);
-STATIC void xfs_attr_leaf_print(xfs_trans_t *trans, xfs_inode_t *dp);
+						buf_t **bpp);
 STATIC int xfs_attr_leaf_list(xfs_trans_t *trans, xfs_inode_t *dp,
-					  attrlist_t *alist,
+					  attrlist_t *alist, int flags,
 					  attrlist_cursor_kern_t *cursor);
 
 /*
@@ -68,9 +68,8 @@ STATIC int xfs_attr_leaf_list(xfs_trans_t *trans, xfs_inode_t *dp,
 STATIC int xfs_attr_node_addname(xfs_trans_t *trans, xfs_da_name_t *args);
 STATIC int xfs_attr_node_get(xfs_trans_t *trans, xfs_da_name_t *args);
 STATIC int xfs_attr_node_removename(xfs_trans_t *trans, xfs_da_name_t *args);
-STATIC void xfs_attr_node_print(xfs_trans_t *trans, xfs_inode_t *dp);
 STATIC int xfs_attr_node_list(xfs_trans_t *trans, xfs_inode_t *dp,
-					   attrlist_t *alist,
+					   attrlist_t *alist, int flags,
 					   attrlist_cursor_kern_t *cursor);
 
 
@@ -107,12 +106,11 @@ xfs_attr_get(vnode_t *vp, char *name, char *value, int *valuelenp, int flags,
 	 * Decide on what work routines to call based on the inode size.
 	 */
 	xfs_ilock(args.dp, XFS_ILOCK_SHARED);
-	if (args.dp->i_d.di_size == 0) {
-		error = XFS_ERROR(ENXIO);
-		args.valuelen = 0;
-	} else if (args.dp->i_d.di_size <= XFS_LITINO(args.dp->i_mount)) {
+	if (XFS_IFORK_Q(args.dp) == 0) {
+		error = ENXIO;
+	} else if (args.dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL) {
 		error = xfs_attr_shortform_getvalue(NULL, &args);
-	} else if (args.dp->i_d.di_size == XFS_LBSIZE(args.dp->i_mount)) {
+	} else if (xfs_bmap_one_block(args.dp, XFS_ATTR_FORK)) {
 		error = xfs_attr_leaf_get(NULL, &args);
 	} else {
 		error = xfs_attr_node_get(NULL, &args);
@@ -179,11 +177,12 @@ xfs_attr_set(vnode_t *vp, char *name, char *value, int valuelen, int flags,
 	XFS_BMAP_INIT(&flist, &firstblock);
 
 	/*
-	 * Decide on what work routines to call based on the inode size.
+	 * Decide on what work routines to call.
 	 */
-	if (dp->i_d.di_size <= XFS_LITINO(dp->i_mount)) {
-		if (dp->i_d.di_size == 0)
-			(void)xfs_attr_shortform_create(trans, dp);
+	if (XFS_IFORK_Q(dp) == 0) {
+		(void)xfs_attr_shortform_create(trans, dp);
+	}
+	if (dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL) {
 		retval = xfs_attr_shortform_lookup(trans, &args);
 		if ((flags & ATTR_REPLACE) && (retval == ENXIO)) {
 			goto out;
@@ -193,9 +192,12 @@ xfs_attr_set(vnode_t *vp, char *name, char *value, int valuelen, int flags,
 			retval = xfs_attr_shortform_removename(trans, &args);
 		}
 
-		newsize = XFS_ATTR_SF_ENTSIZE_BYNAME(args.namelen,
-						     args.valuelen);
-		if ((dp->i_d.di_size + newsize) <= XFS_LITINO(dp->i_mount)) {
+		newsize = XFS_ATTR_SF_TOTSIZE(dp);
+		newsize += XFS_ATTR_SF_ENTSIZE_BYNAME(args.namelen,
+						      args.valuelen);
+		if ((newsize <= XFS_IFORK_ASIZE(dp)) &&
+		    (args.namelen < XFS_ATTR_SF_ENTSIZE_MAX) &&
+		    (args.valuelen < XFS_ATTR_SF_ENTSIZE_MAX)) {
 			retval = xfs_attr_shortform_addname(trans, &args);
 			ASSERT(retval == 0);
 		} else {
@@ -205,7 +207,7 @@ xfs_attr_set(vnode_t *vp, char *name, char *value, int valuelen, int flags,
 			retval = xfs_attr_leaf_addname(trans, &args);
 /* GROT: another possible req'mt for a double-split btree operation */
 		}
-	} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
+	} else if (xfs_bmap_one_block(dp, XFS_ATTR_FORK)) {
 		retval = xfs_attr_leaf_addname(trans, &args);
 		if (retval == ENOSPC) {
 			retval = xfs_attr_leaf_to_node(trans, &args);
@@ -245,12 +247,13 @@ xfs_attr_remove(vnode_t *vp, char *name, int flags, struct cred *cred)
 	xfs_bmap_free_t flist;
 	xfs_da_name_t args;
 	int error, retval, committed;
+	buf_t *bp;
 
 	xfsda_t_reinit("attr_remove", __FILE__, __LINE__);
 
 	XFSSTATS.xs_attr_remove++;
 	dp = XFS_VTOI(vp);
-	if (dp->i_d.di_size == 0) {
+	if (XFS_IFORK_Q(dp) == 0) {
 		xfsda_t_reinit("attr_remove", "return value-1", ENXIO);
 		return(XFS_ERROR(ENXIO));
 	}
@@ -289,19 +292,16 @@ xfs_attr_remove(vnode_t *vp, char *name, int flags, struct cred *cred)
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (dp->i_d.di_size == 0) {
-		retval = XFS_ERROR(ENXIO);
-	} else if (dp->i_d.di_size <= XFS_LITINO(dp->i_mount)) {
+	if (XFS_IFORK_Q(args.dp) == 0) {
+		error = ENXIO;
+	} else if (dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL) {
 		retval = xfs_attr_shortform_removename(trans, &args);
-	} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
-		error = xfs_attr_leaf_removename(trans, &args, &retval);
-		if (error) {
-			retval = error;
+	} else if (xfs_bmap_one_block(dp, XFS_ATTR_FORK)) {
+		retval = xfs_attr_leaf_removename(trans, &args, &bp);
+		if (retval)
 			goto out;
-		}
-		if (retval) {
-			retval = xfs_attr_leaf_to_shortform(trans, &args);
-		}
+		if (xfs_attr_shortform_allfit(bp, args.dp))
+			retval = xfs_attr_leaf_to_shortform(trans, bp, &args);
 	} else {
 		retval = xfs_attr_node_removename(trans, &args);
 	}
@@ -337,12 +337,10 @@ xfs_attr_list(vnode_t *vp, char *buffer, int bufsize, int flags,
 	alist->al_more = 0;
 	alist->al_offset[0] = bufsize;
 	dp = XFS_VTOI(vp);
-	if (dp->i_d.di_size == 0) {
+	if (XFS_IFORK_Q(dp) == 0) {
 		xfsda_t_reinit("attr_list", "return value-1", 0);
 		return(0);
 	}
-
-/* GROT: Add code to support "ROOT-ONLY" attributes */
 
 	/*
 	 * Validate the cursor.
@@ -361,14 +359,14 @@ xfs_attr_list(vnode_t *vp, char *buffer, int bufsize, int flags,
 	 * Decide on what work routines to call based on the inode size.
 	 */
 	xfs_ilock(dp, XFS_ILOCK_SHARED);
-	if (dp->i_d.di_size == 0) {
+	if (XFS_IFORK_Q(dp) == 0) {
 		error = 0;
-	} else if (dp->i_d.di_size <= XFS_LITINO(dp->i_mount)) {
-		error = xfs_attr_shortform_list(dp, alist, cursor);
-	} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
-		error = xfs_attr_leaf_list(NULL, dp, alist, cursor);
+	} else if (dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL) {
+		error = xfs_attr_shortform_list(dp, alist, flags, cursor);
+	} else if (xfs_bmap_one_block(dp, XFS_ATTR_FORK)) {
+		error = xfs_attr_leaf_list(NULL, dp, alist, flags, cursor);
 	} else {
-		error = xfs_attr_node_list(NULL, dp, alist, cursor);
+		error = xfs_attr_node_list(NULL, dp, alist, flags, cursor);
 	}
 	xfs_iunlock(dp, XFS_ILOCK_SHARED);
 
@@ -377,55 +375,8 @@ xfs_attr_list(vnode_t *vp, char *buffer, int bufsize, int flags,
 }
 
 
-
 /*========================================================================
- * Overall external interface routines.
- *========================================================================*/
-
-/*
- * Return 1 if attribute list is empty.
- */
-int
-xfs_attr_isempty(xfs_inode_t *dp)
-{
-	xfs_attr_sf_hdr_t *hdr;
-
-	/* FIXME */
-	ASSERT((dp->i_d.di_mode & IFMT) == IFREG);
-	if (dp->i_d.di_size == 0)
-		return(1);
-	/* FIXME */
-	if (dp->i_d.di_size > XFS_IFORK_ASIZE(dp))
-		return(0);
-	hdr = (xfs_attr_sf_hdr_t *)dp->i_af.if_u1.if_data;
-	return(hdr->count == 0);
-}
-
-/*
- * Print an attribute lists contents.
- * For debugging.
- */
-void
-xfs_attr_print(xfs_trans_t *trans, xfs_inode_t *dp)
-{
-	/*
-	 * Decide on what work routines to call based on the inode size.
-	 */
-	/* FIXME */
-	ASSERT((dp->i_d.di_mode & IFMT) == IFREG);
-	/* FIXME */
-	if (dp->i_d.di_size <= XFS_IFORK_ASIZE(dp)) {
-		xfs_attr_shortform_print(trans, dp);
-	} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
-		xfs_attr_leaf_print(trans, dp);
-	} else {
-		xfs_attr_node_print(trans, dp);
-	}
-}
-
-
-/*========================================================================
- * External routines when attribute list == XFS_LBSIZE(dp->i_mount).
+ * External routines when attribute list is one block
  *========================================================================*/
 
 /*
@@ -438,7 +389,7 @@ xfs_attr_leaf_addname(xfs_trans_t *trans, xfs_da_name_t *args)
 	int index, retval, error;
 	buf_t *bp;
 
-	error = xfs_da_read_buf(trans, args->dp, 0, &bp);
+	error = xfs_da_read_buf(trans, args->dp, 0, &bp, XFS_ATTR_FORK);
 	if (error)
 		return(error);
 	ASSERT(bp != NULL);
@@ -462,25 +413,24 @@ xfs_attr_leaf_addname(xfs_trans_t *trans, xfs_da_name_t *args)
  * This is the external routine.
  */
 STATIC int
-xfs_attr_leaf_removename(xfs_trans_t *trans, xfs_da_name_t *args, int *result)
+xfs_attr_leaf_removename(xfs_trans_t *trans, xfs_da_name_t *args, buf_t **bpp)
 {
 	int index, retval, error;
 	buf_t *bp;
 
-	error = xfs_da_read_buf(trans, args->dp, 0, &bp);
+	error = xfs_da_read_buf(trans, args->dp, 0, &bp, XFS_ATTR_FORK);
 	if (error)
 		return(error);
 
 	ASSERT(bp != NULL);
-	retval = xfs_attr_leaf_lookup_int(bp, args, &index);
-	if (retval == ENXIO)
+	error = xfs_attr_leaf_lookup_int(bp, args, &index);
+	if (error == ENXIO)
 		return(ENXIO);
 
 	error = xfs_attr_leaf_remove(trans, bp, index, &retval);
 	if (error)
 		return(error);
-
-	*result = xfs_attr_shortform_allfit(bp, args->dp);
+	*bpp = bp;
 	return(0);
 }
 
@@ -494,30 +444,16 @@ xfs_attr_leaf_get(xfs_trans_t *trans, xfs_da_name_t *args)
 	int index, error;
 	buf_t *bp;
 
-	error = xfs_da_read_buf(trans, args->dp, 0, &bp);
+	error = xfs_da_read_buf(trans, args->dp, 0, &bp, XFS_ATTR_FORK);
 	if (error)
 		return(error);
 	ASSERT(bp != NULL);
 	error = xfs_attr_leaf_lookup_int(bp, args, &index);
 	if (error == EEXIST) {
-		error = xfs_attr_leaf_getvalue(bp, args, index);
+		error = xfs_attr_leaf_getvalue(trans, bp, args, index);
 	}
 	xfs_trans_brelse(trans, bp);
 	return(error);
-}
-
-/*
- * Print the leaf attribute list.
- */
-STATIC void
-xfs_attr_leaf_print(xfs_trans_t *trans, xfs_inode_t *dp)
-{
-	buf_t *bp;
-
-	(void) xfs_da_read_buf(trans, dp, 0, &bp);
-	ASSERT(bp != NULL);
-	xfs_attr_leaf_print_int(bp, dp);
-	xfs_trans_brelse(trans, bp);
 }
 
 /*
@@ -525,18 +461,18 @@ xfs_attr_leaf_print(xfs_trans_t *trans, xfs_inode_t *dp)
  */
 STATIC int
 xfs_attr_leaf_list(xfs_trans_t *trans, xfs_inode_t *dp, attrlist_t *alist,
-			       attrlist_cursor_kern_t *cursor)
+			       int flags, attrlist_cursor_kern_t *cursor)
 {
 	buf_t *bp;
 	int error;
 
 	if (cursor->blkno > 0)
 		cursor->blkno = cursor->index = 0;
-	error = xfs_da_read_buf(trans, dp, 0, &bp);
+	error = xfs_da_read_buf(trans, dp, 0, &bp, XFS_ATTR_FORK);
 	if (error)
 		return(error);
 	ASSERT(bp != NULL);
-	(void)xfs_attr_leaf_list_int(bp, alist, cursor);
+	(void)xfs_attr_leaf_list_int(bp, alist, flags, cursor);
 	xfs_trans_brelse(trans, bp);
 	return(0);
 }
@@ -707,49 +643,11 @@ xfs_attr_node_get(xfs_trans_t *trans, xfs_da_name_t *args)
 	return(retval);
 }
 
-/*
- * Print the B-tree attribute list.
- */
-STATIC void
-xfs_attr_node_print(xfs_trans_t *trans, xfs_inode_t *dp)
-{
-	__uint32_t bno;
-	buf_t *bp;
-
-	bno = 0;
-	for (;;) {
-		xfs_da_intnode_t *node;
-		xfs_da_node_entry_t *btree;
-
-		(void) xfs_da_read_buf(trans, dp, bno, &bp);
-		ASSERT(bp != NULL);
-		node = (xfs_da_intnode_t *)bp->b_un.b_addr;
-		if (node->hdr.info.magic != XFS_DA_NODE_MAGIC)
-			break;
-		btree = &node->btree[0];
-		bno = btree->before;
-		xfs_trans_brelse(trans, bp);
-	}
-	for (;;) {
-		xfs_attr_leafblock_t *leaf;
-
-		xfs_attr_leaf_print_int(bp, dp);
-		leaf = (xfs_attr_leafblock_t *)bp->b_un.b_addr;
-		bno = leaf->hdr.info.forw;
-		xfs_trans_brelse(trans, bp);
-		if (bno == 0)
-			break;
-		(void) xfs_da_read_buf(trans, dp, bno, &bp);
-		ASSERT(bp != NULL);
-	}
-}
-
 STATIC int							/* error */
 xfs_attr_node_list(xfs_trans_t *trans, xfs_inode_t *dp, attrlist_t *alist,
-			       attrlist_cursor_kern_t *cursor)
+			       int flags, attrlist_cursor_kern_t *cursor)
 {
 	xfs_da_blkinfo_t *info;
-	__uint32_t maxbno;
 	int error, i;
 	buf_t *bp;
 
@@ -757,27 +655,23 @@ xfs_attr_node_list(xfs_trans_t *trans, xfs_inode_t *dp, attrlist_t *alist,
 	 * Do all sorts of validation on the passed-in cursor structure.
 	 * If anything is amiss, ignore the cursor and look up the hashval
 	 * starting from the btree root.
+	 * GROT: this change-attr-list recovery code needs looking at.
 	 */
 	bp = NULL;
 	if (cursor->blkno > 0) {
-/* GROT: this change-attr-list recovery code needs looking at */
-		maxbno = XFS_B_TO_FSBT(dp->i_mount, dp->i_d.di_size);
-		if (cursor->blkno >= maxbno) {
-			cursor->blkno = cursor->index = 0;
-		} else {
-			error = xfs_da_read_buf(trans, dp, cursor->blkno, &bp);
-			if (error)
-				return(error);
-			if (bp) {
-				info = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
-				if (info->magic != XFS_ATTR_LEAF_MAGIC) {
-					xfs_trans_brelse(trans, bp);
-					bp = NULL;
-					cursor->blkno = cursor->index = 0;
-				}
-			} else {
+		error = xfs_da_read_buf(trans, dp, cursor->blkno, &bp,
+					       XFS_ATTR_FORK);
+		if (error)
+			return(error);
+		if (bp) {
+			info = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
+			if (info->magic != XFS_ATTR_LEAF_MAGIC) {
+				xfs_trans_brelse(trans, bp);
+				bp = NULL;
 				cursor->blkno = cursor->index = 0;
 			}
+		} else {
+			cursor->blkno = cursor->index = 0;
 		}
 	}
 	if (cursor->blkno == 0) {
@@ -786,7 +680,8 @@ xfs_attr_node_list(xfs_trans_t *trans, xfs_inode_t *dp, attrlist_t *alist,
 			xfs_da_intnode_t *node;
 			xfs_da_node_entry_t *btree;
 
-			error = xfs_da_read_buf(trans, dp, cursor->blkno, &bp);
+			error = xfs_da_read_buf(trans, dp, cursor->blkno, &bp,
+						       XFS_ATTR_FORK);
 			if (error)
 				return(error);
 			ASSERT(bp != NULL);
@@ -812,7 +707,7 @@ xfs_attr_node_list(xfs_trans_t *trans, xfs_inode_t *dp, attrlist_t *alist,
 	 * adding the information.
 	 */
 	for (;;) {
-		error = xfs_attr_leaf_list_int(bp, alist, cursor);
+		error = xfs_attr_leaf_list_int(bp, alist, flags, cursor);
 		if (error)
 			break;
 		info = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
@@ -822,7 +717,8 @@ xfs_attr_node_list(xfs_trans_t *trans, xfs_inode_t *dp, attrlist_t *alist,
 		cursor->blkno = info->forw;
 		cursor->index = 0;
 		xfs_trans_brelse(trans, bp);
-		error = xfs_da_read_buf(trans, dp, cursor->blkno, &bp);
+		error = xfs_da_read_buf(trans, dp, cursor->blkno, &bp,
+					       XFS_ATTR_FORK);
 		if (error)
 			return(error);
 		ASSERT(bp != NULL);
