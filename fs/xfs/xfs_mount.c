@@ -223,11 +223,11 @@ xfs_mount_validate_sb(
         /* SIM can specify m_logdev == 0 for no logging */
 #endif
 	if (sbp->sb_logstart == 0 && mp->m_logdev == mp->m_dev) {
-		cmn_err(CE_WARN, "XFS: filesystem is marked as having an external log; specify logdev on the\nmount command line.");
+		cmn_err(CE_WARN, "XFS: filesystem is marked as having an external log; specify logdev on the\nmount command line.\n");
 		return XFS_ERROR(EFSCORRUPTED);
 	}
-	if (sbp->sb_logstart != 0 && mp->m_logdev != mp->m_dev) {
-		cmn_err(CE_WARN, "XFS: filesystem is marked as having an internal log; don't specify logdev on\nthe mount command line.");
+	if (sbp->sb_logstart != 0 && mp->m_logdev && mp->m_logdev != mp->m_dev) {
+		cmn_err(CE_WARN, "XFS: filesystem is marked as having an internal log; don't specify logdev on\nthe mount command line.\n");
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 #ifdef SIM
