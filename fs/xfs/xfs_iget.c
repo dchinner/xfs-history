@@ -361,6 +361,7 @@ finish_inode:
 			delay(1);
 		}
 		vn_alloc_used = 1;
+		preallocated_vnode = vp;
 	}
 
 	vn_trace_exit(vp, "xfs_iget.alloc", (inst_t *)__return_address);
@@ -393,10 +394,15 @@ finish_inode:
 		for (iq = ih->ih_next; iq != NULL; iq = iq->i_next) {
 			if (iq->i_ino == ino) {
 				mrunlock(&ih->ih_lock);
-				vn_bhv_remove(VN_BHV_HEAD(vp),
-					&(ip->i_bhv_desc));
-				if (preallocated_vnode == NULL)
+				if (vn_alloc_used) {
+					vn_bhv_remove(VN_BHV_HEAD(vp),
+						&(ip->i_bhv_desc));
 					vn_free(vp);
+					vn_alloc_used = 0;
+					preallocated_vnode = NULL;
+				} else {
+					vn_rele(vp);
+				}
 				xfs_idestroy(ip);
 
 				XFS_STATS_INC(xs_ig_dup);
