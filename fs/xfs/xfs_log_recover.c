@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.117 $"
+#ident	"$Revision: 1.118 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -82,11 +82,6 @@ int		xlog_find_cycle_start(struct log *log,
 STATIC int	xlog_clear_stale_blocks(xlog_t	*log, xfs_lsn_t tail_lsn);
 STATIC void	xlog_recover_insert_item_backq(xlog_recover_item_t **q,
 					       xlog_recover_item_t *item);
-STATIC void	xlog_recover_print_trans(xlog_recover_t	    *trans,
-					 xlog_recover_item_t *itemq,
-					 int		     print);
-STATIC void	xlog_recover_print_item(xlog_recover_item_t *item);
-
 #ifndef SIM
 STATIC void	xlog_recover_insert_item_frontq(xlog_recover_item_t **q,
 						xlog_recover_item_t *item);
@@ -104,7 +99,13 @@ STATIC void	xlog_recover_check_ail(xfs_mount_t *mp, xfs_log_item_t *lip,
 #ifdef SIM
 extern void 	xlog_recover_print_trans_head(xlog_recover_t *tr);
 extern void	xlog_recover_print_logitem(xlog_recover_item_t *item);
+
+STATIC void	xlog_recover_print_trans(xlog_recover_t	    *trans,
+					 xlog_recover_item_t *itemq,
+					 int		     print);
+STATIC void	xlog_recover_print_item(xlog_recover_item_t *item);
 #endif
+
 
 buf_t *
 xlog_get_bp(int num_bblks)
@@ -2318,15 +2319,18 @@ xlog_recover_do_trans(xlog_t	     *log,
 #ifdef _KERNEL
 	xlog_recover_item_t *item, *first_item;
 #endif
-
+#ifdef SIM
 	if (pass == XLOG_RECOVER_PASS1)
 		xlog_recover_print_trans(trans, trans->r_itemq, xlog_debug);
+#endif
+
 #ifdef _KERNEL
 	if (error = xlog_recover_reorder_trans(log, trans))
 		return error;
+#ifdef SIM
 	if (pass == XLOG_RECOVER_PASS1)
 		xlog_recover_print_trans(trans, trans->r_itemq, xlog_debug+1);
-
+#endif
 	first_item = item = trans->r_itemq;
 	do {
 		/*
@@ -3334,6 +3338,8 @@ xlog_recover_check_summary(xlog_t	*log)
 #endif /* DEBUG && !SIM */
 
 
+#ifdef SIM
+
 STATIC void
 xlog_recover_print_item(xlog_recover_item_t *item)
 {
@@ -3396,10 +3402,7 @@ xlog_recover_print_item(xlog_recover_item_t *item)
 		       item->ri_buf[i].i_addr, item->ri_buf[i].i_len);
 	}
 	printf("\n");
-
-#ifdef SIM
 	xlog_recover_print_logitem(item);
-#endif
 }	/* xlog_recover_print_item */
 
 /*ARGSUSED*/
@@ -3414,13 +3417,11 @@ xlog_recover_print_trans(xlog_recover_t	     *trans,
 		return;
 
 	printf("======================================\n");
-#ifdef SIM
 	xlog_recover_print_trans_head(trans);
-#endif
 	item = first_item = itemq;
 	do {
 		xlog_recover_print_item(item);
 		item = item->ri_next;
 	} while (first_item != item);
 }	/* xlog_recover_print_trans */
-
+#endif

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.83 $"
+#ident "$Revision: 1.84 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -153,7 +153,12 @@ xfs_trans_dup(
 	XFS_LIC_INIT(&(ntp->t_items));
 
 	ASSERT(tp->t_flags & XFS_TRANS_PERM_LOG_RES);
-	ASSERT(!xlog_debug || (tp->t_ticket != NULL));
+
+#if defined(SIM) || defined(XLOG_NOLOG) || defined(DEBUG)
+	ASSERT(!xlog_debug || tp->t_ticket != NULL);
+#else
+	ASSERT(tp->t_ticket != NULL);
+#endif
 	ntp->t_flags = XFS_TRANS_PERM_LOG_RES;
 	ntp->t_ticket = tp->t_ticket;
 	ntp->t_blk_res = tp->t_blk_res - tp->t_blk_res_used;
@@ -568,8 +573,9 @@ xfs_trans_commit(
 	int			sync;
 #define	XFS_TRANS_LOGVEC_COUNT	16
 	xfs_log_iovec_t		log_vector_fast[XFS_TRANS_LOGVEC_COUNT];
+#if defined(SIM) || defined(XLOG_NOLOG) || defined(DEBUG)
 	static xfs_lsn_t	trans_lsn = 1;
-
+#endif
 	/*
 	 * XFS disk error handling mechanism is not based on a transaction
 	 * abort mechanism. We may let the commit succeed knowing full well
@@ -618,7 +624,9 @@ xfs_trans_commit(
 		XFSSTATS.xs_trans_empty++;
 		return 0;
 	}
-#ifndef SIM
+#if defined(SIM) || defined(XLOG_NOLOG) || defined(DEBUG)
+	ASSERT(!xlog_debug || tp->t_ticket != NULL);
+#else
 	ASSERT(tp->t_ticket != NULL);
 #endif
 
@@ -656,14 +664,21 @@ xfs_trans_commit(
 	 */
 	xfs_trans_fill_vecs(tp, log_vector);
 	error = xfs_log_write(mp, log_vector, nvec, tp->t_ticket,
-			      &(tp->t_lsn));
+				      &(tp->t_lsn));
+	
 	if (!error) {
+#if defined(SIM) || defined(XLOG_NOLOG) || defined(DEBUG)
 		if (xlog_debug) {
-			commit_lsn = xfs_log_done(mp, tp->t_ticket, log_flags);
+			commit_lsn = xfs_log_done(mp, tp->t_ticket,
+						  log_flags);
 		} else {
 			commit_lsn = 0;
 			tp->t_lsn = trans_lsn++;
 		}
+#else
+		/* This is the regular case */
+		commit_lsn = xfs_log_done(mp, tp->t_ticket, log_flags);
+#endif
 	}
 	
 	if (nvec > XFS_TRANS_LOGVEC_COUNT) {
@@ -707,6 +722,7 @@ xfs_trans_commit(
 	 * After this call we cannot reference tp, because the call
 	 * can happen at any time and tp can be freed.
 	 */
+#if defined(SIM) || defined(XLOG_NOLOG) || defined(DEBUG)
 	if (xlog_debug) {
 		tp->t_logcb.cb_func = (void(*)(void*))xfs_trans_committed;
 		tp->t_logcb.cb_arg = tp;
@@ -714,7 +730,11 @@ xfs_trans_commit(
 	} else {
 		xfs_trans_committed(tp);
 	}
-
+#else
+	tp->t_logcb.cb_func = (void(*)(void*))xfs_trans_committed;
+	tp->t_logcb.cb_arg = tp;
+	xfs_log_notify(mp, commit_lsn, &(tp->t_logcb));
+#endif
 	/*
 	 * If the transaction needs to be synchronous, then force the
 	 * log out now and wait for it.

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.142 $"
+#ident	"$Revision: 1.143 $"
 
 /*
  * High level interface routines for log manager
@@ -126,6 +126,7 @@ STATIC xlog_ticket_t	*xlog_ticket_get(xlog_t *log,
 STATIC void		xlog_ticket_put(xlog_t *log, xlog_ticket_t *ticket);
 
 /* local debug functions */
+#if defined(DEBUG) && !defined(XLOG_NOLOG)
 STATIC void	xlog_verify_dest_ptr(xlog_t *log, __psint_t ptr);
 #ifdef XFSDEBUG
 STATIC void	xlog_verify_disk_cycle_no(xlog_t *log, xlog_in_core_t *iclog);
@@ -135,6 +136,14 @@ STATIC void	xlog_verify_iclog(xlog_t *log, xlog_in_core_t *iclog,
 				  int count, boolean_t syncing);
 STATIC void	xlog_verify_tail_lsn(xlog_t *log, xlog_in_core_t *iclog,
 				     xfs_lsn_t tail_lsn);
+#else
+#define xlog_verify_dest_ptr(a,b)
+#define xlog_verify_disk_cycle_no(a,b)
+#define xlog_verify_grant_head(a,b)
+#define xlog_verify_iclog(a,b,c,d)
+#define xlog_verify_tail_lsn(a,b,c)
+#endif
+
 #ifdef DEBUG
 int xlog_do_error = 0;
 dev_t xlog_err_dev = 0x3000004;
@@ -173,9 +182,16 @@ xlog_bwrite(
 		mp = ((xlog_in_core_t *)bp->b_fsprivate)->ic_log->l_mp;
 		xfs_force_shutdown(mp);
 #ifdef DEBUG
+		/*
+		 * This is only for error recovery debugging.
+		 */
 		if (flag) {
 			buftrace("XLOGBWRITE IOERROR", bp);
+			bp->b_flags |= B_STALE;
+			bp->b_flags &= ~(B_DELWRI|B_DONE);
 			biodone(bp);
+			
+#if 0
 			if (flag & B_ASYNC) {
 				if (!(flag & B_DELWRI)) {
 					error = geterror(bp);
@@ -188,6 +204,7 @@ xlog_bwrite(
 					brelse(bp);
 				}
 			}
+#endif
 		}
 #endif
 	}
@@ -200,9 +217,10 @@ xlog_bwrite(
  * 1 => enable log manager
  * 2 => enable log manager and log debugging
  */
+#if defined(SIM) || defined(XLOG_NOLOG) || defined(DEBUG)
 int   xlog_debug = 1;
 dev_t xlog_devt  = 0;
-
+#endif
 
 #if defined(XFS_LOG_TRACE)
 void
@@ -527,11 +545,12 @@ xfs_log_mount(xfs_mount_t	*mp,
 
 	mp->m_log = log = xlog_alloc_log(mp, log_dev, blk_offset, num_bblks);
 
+#if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
 	if (! xlog_debug) {
 		cmn_err(CE_NOTE, "log dev: 0x%x", log_dev);
 		return 0;
 	}
-
+#endif
 	if ((error = xlog_recover(log, XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY,
 				clean)) != NULL) {
 		xlog_unalloc_log(log);
@@ -952,11 +971,13 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 		else
 			log->l_iclog_bufs = mp->m_logbufs;
 
+#if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
 		/* We are reactivating a filesystem after it was active */
 		if (log->l_dev == xlog_devt) {
 			xlog_devt = 1;
 			xlog_debug = 1;
 		}
+#endif
 	}
 
 	/*
@@ -1652,8 +1673,26 @@ xlog_state_clean_log(xlog_t *log)
 {
 	xlog_in_core_t	*iclog;
 
+#ifdef DEBUG
+	int niclogws = 0;
+#endif
 	iclog = log->l_iclog;
 	do {
+#ifdef DEBUG
+		/*
+		 * This is to track down an elusive log bug
+		 * where processes sleeping on ic_forcesema don't
+		 * get woken up. #459136
+		 */
+		if (iclog->ic_state & (XLOG_STATE_DIRTY|
+				       XLOG_STATE_ACTIVE)) {
+			if ((kthread_t *)((&(iclog->ic_forcesema))->sv_queue & 
+					  ~(0x7))) {
+				if (++niclogws > 1)
+					debug("iclog");
+			}
+		}
+#endif
 		if (iclog->ic_state == XLOG_STATE_DIRTY) {
 			iclog->ic_state	= XLOG_STATE_ACTIVE;
 			iclog->ic_offset       = 0;
@@ -2761,18 +2800,16 @@ xlog_ticket_get(xlog_t		*log,
  *
  ******************************************************************************
  */
-
+#if defined(DEBUG) && !defined(XLOG_NOLOG)
 /*
  * Make sure that the destination ptr is within the valid data region of
  * one of the iclogs.  This uses backup pointers stored in a different
  * part of the log in case we trash the log structure.
  */
-/* ARGSUSED */
 void
 xlog_verify_dest_ptr(xlog_t     *log,
 		     __psint_t  ptr)
 {
-#ifdef DEBUG
 	int i;
 	int good_ptr = 0;
 
@@ -2783,7 +2820,6 @@ xlog_verify_dest_ptr(xlog_t     *log,
 	}
 	if (! good_ptr)
 		xlog_panic("xlog_verify_dest_ptr: invalid ptr");
-#endif /* DEBUG */
 }	/* xlog_verify_dest_ptr */
 
 
@@ -2810,7 +2846,6 @@ xlog_verify_disk_cycle_no(xlog_t	 *log,
 }	/* xlog_verify_disk_cycle_no */
 #endif
 
-/*ARGSUSED*/
 STATIC void
 xlog_verify_grant_head(xlog_t *log, int equals)
 {
@@ -2825,15 +2860,12 @@ xlog_verify_grant_head(xlog_t *log, int equals)
     }
 }	/* xlog_verify_grant_head */
 
-
 /* check if it will fit */
-/*ARGSUSED*/
 STATIC void
 xlog_verify_tail_lsn(xlog_t	    *log,
 		     xlog_in_core_t *iclog,
 		     xfs_lsn_t	    tail_lsn)
 {
-#ifdef DEBUG
     int blocks;
 
     if (CYCLE_LSN(tail_lsn) == log->l_prev_cycle) {
@@ -2851,9 +2883,7 @@ xlog_verify_tail_lsn(xlog_t	    *log,
 	if (blocks < BTOBB(iclog->ic_offset) + 1)
 	    xlog_panic("xlog_verify_tail_lsn: ran out of log space");
     }
-#endif /* DEBUG */
 }	/* xlog_verify_tail_lsn */
-
 
 /*
  * Perform a number of checks on the iclog before writing to disk.
@@ -2870,14 +2900,12 @@ xlog_verify_tail_lsn(xlog_t	    *log,
  *	log, check the preceding blocks of the physical log to make sure all
  *	the cycle numbers agree with the current cycle number.
  */
-/*ARGSUSED*/
 STATIC void
 xlog_verify_iclog(xlog_t	 *log,
 		  xlog_in_core_t *iclog,
 		  int		 count,
 		  boolean_t	 syncing)
 {
-#ifdef DEBUG
 	xlog_op_header_t	*ophead;
 	xlog_in_core_t		*icptr;
 #ifndef _KERNEL
@@ -2957,8 +2985,8 @@ xlog_verify_iclog(xlog_t	 *log,
 	if (len != 0)
 		xlog_panic("xlog_verify_iclog: illegal iclog");
 
-#endif /* DEBUG */
 }	/* xlog_verify_iclog */
+#endif /* DEBUG && !XLOG_NOLOG */
 
 
 /*
@@ -2978,9 +3006,7 @@ xfs_log_force_umount(
 	xlog_ticket_t	*tic;
 	int 		spl, spl2;
 	xlog_t		*log;
-#if 0
-	xlog_in_core_t	*first_iclog, *iclog;
-#endif
+
 	log = mp->m_log;
 	
 	/*	
