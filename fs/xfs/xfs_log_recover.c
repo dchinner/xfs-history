@@ -266,6 +266,8 @@ bad_blk:
 
 /*
  * Start is defined to be the block pointing to the oldest valid log record.
+ * Used by log print code.  Don't put in xfs_log_print.c since most of the
+ * bread routines live in this module only.
  */
 daddr_t
 xlog_print_find_oldest(xlog_t *log)
@@ -344,14 +346,6 @@ xlog_find_tail(xlog_t  *log,
 			found = 1;
 			break;
 		}
-#if 0
- else if (*(uint *)(bp->b_dmaaddr == 0)) {
-			if (zeroed_log)
-				goto exit;
-			zeroed_log = 1;
-			tail_blk = i;
-		}
-#endif
 	}
 	if (!found) {		/* search from end of log */
 		for (i=log->l_logBBsize-1; i>=(*head_blk); i--) {
@@ -360,14 +354,6 @@ xlog_find_tail(xlog_t  *log,
 				found = 1;
 				break;
 			}
-#if 0
- else if (*(uint *)(bp->b_dmaaddr == 0)) {
-				if (zeroed_log)
-					goto exit;
-				zeroed_log = 1;
-				tail_blk = i;
-			}
-#endif
 		}
 	}
 	if (!found)
@@ -525,7 +511,7 @@ xlog_recover_add_to_cont_trans(xlog_recover_t	*trans,
 	caddr_t			ptr, old_ptr;
 	int			old_len;
 	
-	item = trans->r_transq;
+	item = trans->r_itemq;
 	item = item->ri_prev;
 
 	old_ptr = item->ri_buf[item->ri_cnt-1].i_addr;
@@ -552,9 +538,9 @@ xlog_recover_add_to_trans(xlog_recover_t	*trans,
 	bcopy(dp, ptr, len);
 	
 	in_f = (xfs_inode_log_format_t *)ptr;
-	item = trans->r_transq;
+	item = trans->r_itemq;
 	if (item == 0) {
-		xlog_recover_add_item(&trans->r_transq);
+		xlog_recover_add_item(&trans->r_itemq);
 		ASSERT(*(uint *)dp == XFS_TRANS_HEADER_MAGIC);
 		thead			= (xfs_trans_header_t *)dp;
 		trans->r_type		= thead->th_type;
@@ -564,9 +550,9 @@ xlog_recover_add_to_trans(xlog_recover_t	*trans,
 	}
 	if (item->ri_prev->ri_total != 0 &&
 	     item->ri_prev->ri_total == item->ri_prev->ri_cnt) {
-		xlog_recover_add_item(&trans->r_transq);
+		xlog_recover_add_item(&trans->r_itemq);
 	}
-	item = trans->r_transq;
+	item = trans->r_itemq;
 	item = item->ri_prev;
 
 	if (item->ri_total == 0) {		/* first region to be added */
@@ -591,7 +577,7 @@ xlog_recover_new_tid(xlog_recover_t	**q,
 	trans->r_tid   = tid;
 	trans->r_type  = 0;
 	trans->r_state = 0;
-	trans->r_transq = 0;
+	trans->r_itemq = 0;
 	xlog_recover_put_hashq(q, trans);
 }	/* xlog_recover_new_tid */
 
@@ -622,13 +608,13 @@ xlog_recover_delete_tid(xlog_recover_t	**q,
 
 
 static void
-xlog_recover_print_trans(xlog_recover_t *tr)
+xlog_recover_print_trans_info(xlog_recover_t *tr)
 {
     cmn_err(CE_CONT,
 	    "TRANS: tid: 0x%x type: %d #: %d trans: 0x%x q: 0x%x\n",
 	    tr->r_tid, tr->r_type, tr->r_items, tr->r_trans_tid,
-	    tr->r_transq);
-}	/* xlog_recover_print_trans */
+	    tr->r_itemq);
+}	/* xlog_recover_print_trans_info */
 
 static void
 xlog_recover_print_item(xlog_recover_item_t *item)
@@ -646,18 +632,24 @@ xlog_recover_print_item(xlog_recover_item_t *item)
 }	/* xlog_recover_print_item */
 
 static void
-xlog_recover_do_trans(xlog_recover_t *trans)
+xlog_recover_print_trans(xlog_recover_t *trans)
 {
 	xlog_recover_item_t *first_item, *item;
 
 	if (xlog_debug < 2)
 		return;
 	xlog_recover_print_trans(trans);
-	item = first_item = trans->r_transq;
+	item = first_item = trans->r_itemq;
 	do {
 		xlog_recover_print_item(item);
 		item = item->ri_next;
 	} while (first_item != item);
+}	/* xlog_recover_print_trans */
+
+static void
+xlog_recover_do_trans(xlog_recover_t *trans)
+{
+	xlog_recover_print_trans(trans);
 }	/* xlog_recover_do_trans */
 
 
@@ -666,7 +658,7 @@ xlog_recover_free_trans(xlog_recover_t *trans)
 {
 	xlog_recover_item_t *first_item, *item, *free_item;
 
-	item = first_item = trans->r_transq;
+	item = first_item = trans->r_itemq;
 	do {
 		free_item = item;
 		item = item->ri_next;
