@@ -79,16 +79,19 @@ extern int	uiomove (void *, size_t, uio_rw_t, uio_t *);
  * map these directly... trying to use a #define causes
  * many strange side affects
  */
+/*
+ * copyin/copyout on irix return 0 on success, -1 on failure
+ */
 static __inline__ int
 copyout( void* from, void* to, int size ) 
 {
-	return copy_to_user(to, from, size );
+	return copy_to_user(to, from, size ) ? -1 : 0;
 }
 
 static __inline__ int
 copyin( void* from, void* to, int size ) 
 {
-	return copy_from_user (to, from, size );
+	return copy_from_user(to, from, size ) ? -1 : 0;
 }
 
 #endif  /* __XFS_SUPPORT_MOVE_H__ */

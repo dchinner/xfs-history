@@ -693,8 +693,11 @@ xfs_ioctl(
 		 */
 		da.d_maxiosz = XFS_FSB_TO_B(mp, XFS_B_TO_FSBT(mp, 1));
 
-		return copy_to_user((struct dioattr *)arg, &da,
-						sizeof(struct dioattr));
+		if (copy_to_user((struct dioattr *)arg, &da,
+						sizeof(struct dioattr)))
+                    return -XFS_ERROR(EFAULT);
+                
+                return 0;
 
 	case XFS_IOC_FSBULKSTAT_SINGLE:
 	case XFS_IOC_FSBULKSTAT: {
@@ -761,8 +764,11 @@ xfs_ioctl(
 		if (error)
 			return -error;
 
-		return copy_to_user((xfs_fsop_geom_t *)arg, &fsgeo,
-						sizeof(xfs_fsop_geom_t));
+		if (copy_to_user((xfs_fsop_geom_t *)arg, &fsgeo,
+						sizeof(xfs_fsop_geom_t)))
+		        return -XFS_ERROR(EFAULT);
+                
+                return 0;
 
 	case XFS_IOC_FSGETXATTR:
 		va.va_mask = AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS;
@@ -776,8 +782,11 @@ xfs_ioctl(
 		fa.fsx_extsize  = va.va_extsize;
 		fa.fsx_nextents = va.va_nextents;
 
-		return copy_to_user((struct fsxattr *)arg, &fa,
-						sizeof(struct fsxattr));
+		if (copy_to_user((struct fsxattr *)arg, &fa,
+						sizeof(struct fsxattr)))
+		        return -XFS_ERROR(EFAULT);
+                    
+                return 0;
 
 	case XFS_IOC_FSSETXATTR: {
 		int	attr_flags;
@@ -814,17 +823,22 @@ xfs_ioctl(
 		fa.fsx_extsize  = va.va_extsize;
 		fa.fsx_nextents = va.va_anextents;
 
-		return copy_to_user((struct fsxattr *)arg, &fa,
-						sizeof(struct fsxattr));
-
+		if (copy_to_user((struct fsxattr *)arg, &fa,
+						sizeof(struct fsxattr)))
+			return -XFS_ERROR(EFAULT);
+                    
+                return 0;
+                
 	case XFS_IOC_GETBIOSIZE:
 		error = xfs_get_uiosize(mp, ip, &bs, &cred);
-
 		if (error)
 			return -error;
 
-		return copy_to_user((struct biosize *)arg, &bs,
-						sizeof(struct biosize));
+		if (copy_to_user((struct biosize *)arg, &bs,
+						sizeof(struct biosize)))
+			return -XFS_ERROR(EFAULT);
+                
+                return 0;
 
 	case XFS_IOC_SETBIOSIZE:
 		if (copy_from_user(&bs, (struct biosize *)arg,
@@ -873,7 +887,11 @@ xfs_ioctl(
 		if (error)
 			return -error;
 
-		return copy_to_user((struct getbmap *)arg, &bm, sizeof(bm));
+		if (copy_to_user((struct getbmap *)arg, &bm, sizeof(bm)))
+                        return -XFS_ERROR(EFAULT);
+                
+                return 0;
+                    
 	}
 
 	case XFS_IOC_GETBMAPX: {
@@ -909,7 +927,10 @@ xfs_ioctl(
 
 		GETBMAP_CONVERT(bm, bmx);
 
-		return copy_to_user((struct getbmapx *)arg, &bmx, sizeof(bmx));
+		if (copy_to_user((struct getbmapx *)arg, &bmx, sizeof(bmx)))
+                    	return -XFS_ERROR(EFAULT);
+                
+                return 0;
 	}
 
 	case XFS_IOC_PATH_TO_FSHANDLE:
@@ -949,8 +970,11 @@ xfs_ioctl(
 
 	case XFS_IOC_GETFSUUID: {
 
-		return copy_to_user((char *)arg, (char *)&mp->m_sb.sb_uuid,
-						sizeof(uuid_t));
+		if (copy_to_user((char *)arg, (char *)&mp->m_sb.sb_uuid,
+						sizeof(uuid_t)))
+                    	return -XFS_ERROR(EFAULT);
+                        
+                return 0;
 	}
         
         case XFS_IOC_FSCOUNTS: {
@@ -960,7 +984,10 @@ xfs_ioctl(
                 if (error)
                         return -error;
             
-                return copy_to_user((char *)arg, &out, sizeof(xfs_fsop_counts_t));
+                if (copy_to_user((char *)arg, &out, sizeof(xfs_fsop_counts_t)))
+                    	return -XFS_ERROR(EFAULT);
+                        
+                return 0;
         }
         
         case XFS_IOC_SET_RESBLKS: {
@@ -969,13 +996,16 @@ xfs_ioctl(
                               
 		error = copy_from_user(&inout, (char *)arg, sizeof(xfs_fsop_resblks_t));
                 if (error)
-                        return -error;
+                        return -XFS_ERROR(EFAULT);
                 
                 /* input parameter is passed in resblks field of structure */
                 in=inout.resblks;
 		error = xfs_reserve_blocks(mp, &in, &inout);
                 
-                return copy_to_user((char *)arg, &inout, sizeof(xfs_fsop_resblks_t));
+                if (copy_to_user((char *)arg, &inout, sizeof(xfs_fsop_resblks_t)))
+                    	return -XFS_ERROR(EFAULT);
+                        
+                return 0;          
         }
             
         case XFS_IOC_GET_RESBLKS: {
@@ -985,7 +1015,10 @@ xfs_ioctl(
                 if (error)
                         return -error;
         
-                return copy_to_user((char *)arg, &out, sizeof(xfs_fsop_resblks_t));
+                if (copy_to_user((char *)arg, &out, sizeof(xfs_fsop_resblks_t)))
+                    	return -XFS_ERROR(EFAULT);
+                        
+                return 0;          
         }
 
 	case XFS_IOC_FSGROWFSDATA: {
@@ -994,9 +1027,9 @@ xfs_ioctl(
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 
-		error = copy_from_user(&in, (char *)arg, sizeof(xfs_growfs_data_t));
-		if (error)
-			return -error;
+		if (copy_from_user(&in, (char *)arg, sizeof(xfs_growfs_data_t)))
+			return -XFS_ERROR(EFAULT);
+                
 		error = xfs_growfs_data(mp, &in);
 		if (error)
 			return -error;
@@ -1009,9 +1042,9 @@ xfs_ioctl(
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 
-		error = copy_from_user(&in, (char *)arg, sizeof(xfs_growfs_log_t));
-		if (error)
-			return -error;
+		if (copy_from_user(&in, (char *)arg, sizeof(xfs_growfs_log_t)))
+			return -XFS_ERROR(EFAULT);
+                
 		error = xfs_growfs_log(mp, &in);
 		if (error)
 			return -error;
@@ -1024,9 +1057,9 @@ xfs_ioctl(
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 
-		error = copy_from_user(&in, (char *)arg, sizeof(xfs_growfs_rt_t));
-		if (error)
-			return -error;
+		if (copy_from_user(&in, (char *)arg, sizeof(xfs_growfs_rt_t)))
+			return -XFS_ERROR(EFAULT);
+                
 		error = xfs_growfs_rt(mp, &in);
 		if (error)
 			return -error;
