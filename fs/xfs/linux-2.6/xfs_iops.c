@@ -111,7 +111,7 @@ linvfs_mknod(
 		va.va_mask |= AT_RDEV;
 		/*FALLTHROUGH*/
 	case S_IFREG:
-		VOP_CREATE(dvp, dentry, &va, 0, 0, &vp, NULL, error);
+		VOP_CREATE(dvp, dentry, &va, &vp, NULL, error);
 		break;
 	case S_IFDIR:
 		VOP_MKDIR(dvp, dentry, &va, &vp, NULL, error);

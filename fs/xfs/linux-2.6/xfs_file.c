@@ -113,14 +113,13 @@ linvfs_open(
 	struct file	*filp)
 {
 	vnode_t		*vp = LINVFS_GET_VP(inode);
-	vnode_t		*newvp;
 	int		error;
 
 	if (!(filp->f_flags & O_LARGEFILE) && inode->i_size > MAX_NON_LFS)
 		return -EFBIG;
 
 	ASSERT(vp);
-	VOP_OPEN(vp, &newvp, 0, NULL, error);
+	VOP_OPEN(vp, NULL, error);
 	return -error;
 }
 

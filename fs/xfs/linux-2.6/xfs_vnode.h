@@ -138,13 +138,6 @@ typedef enum vrwlock	{ VRWLOCK_NONE, VRWLOCK_READ,
 			  VRWLOCK_TRY_READ, VRWLOCK_TRY_WRITE } vrwlock_t;
 
 /*
- * flags for vn_create/VOP_CREATE/vn_open
- */
-#define VEXCL	0x0001
-#define VZFS	0x0002		/* caller has a 0 RLIMIT_FSIZE */
-
-
-/*
  * Return values for VOP_INACTIVE.  A return value of
  * VN_INACTIVE_NOCACHE implies that the file system behavior
  * has disassociated its state and bhv_desc_t from the vnode.
@@ -196,7 +189,7 @@ struct vattr;
 struct page_buf_bmap_s;
 struct attrlist_cursor_kern;
 
-typedef int	(*vop_open_t)(bhv_desc_t *, vnode_t **, mode_t, struct cred *);
+typedef int	(*vop_open_t)(bhv_desc_t *, struct cred *);
 typedef ssize_t (*vop_read_t)(bhv_desc_t *, struct file *, char *, size_t,
 				loff_t *, struct cred *);
 typedef ssize_t (*vop_write_t)(bhv_desc_t *, struct file *, const char *, size_t,
@@ -210,7 +203,7 @@ typedef int	(*vop_access_t)(bhv_desc_t *, int, struct cred *);
 typedef int	(*vop_lookup_t)(bhv_desc_t *, struct dentry *, vnode_t **,
 				int, vnode_t *, struct cred *);
 typedef int	(*vop_create_t)(bhv_desc_t *, struct dentry *, struct vattr *,
-				int, int, vnode_t **, struct cred *);
+				vnode_t **, struct cred *);
 typedef int	(*vop_remove_t)(bhv_desc_t *, struct dentry *, struct cred *);
 typedef int	(*vop_link_t)(bhv_desc_t *, vnode_t *, struct dentry *,
 				struct cred *);
@@ -323,11 +316,10 @@ typedef struct vnodeops {
 	rv = _VOP_(vop_strategy, vp)((vp)->v_fbhv,of,sz,rw,cr,b,n);	\
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
-#define VOP_OPEN(vp, vpp, mode, cr, rv)					\
+#define VOP_OPEN(vp, cr, rv)						\
 {									\
-	ASSERT(&(vp) != vpp);						\
 	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
-	rv = _VOP_(vop_open, vp)((vp)->v_fbhv, vpp, mode, cr);		\
+	rv = _VOP_(vop_open, vp)((vp)->v_fbhv, cr);			\
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_GETATTR(vp, vap, f, cr, rv)					\
@@ -354,10 +346,10 @@ typedef struct vnodeops {
 	rv = _VOP_(vop_lookup, vp)((vp)->v_fbhv,d,vpp,f,rdir,cr);	\
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
-#define VOP_CREATE(dvp,d,vap,ex,mode,vpp,cr,rv)				\
+#define VOP_CREATE(dvp,d,vap,vpp,cr,rv)					\
 {									\
 	VN_BHV_READ_LOCK(&(dvp)->v_bh);					\
-	rv = _VOP_(vop_create, dvp)((dvp)->v_fbhv,d,vap,ex,mode,vpp,cr);\
+	rv = _VOP_(vop_create, dvp)((dvp)->v_fbhv,d,vap,vpp,cr);	\
 	VN_BHV_READ_UNLOCK(&(dvp)->v_bh);				\
 }
 #define VOP_REMOVE(dvp,d,cr,rv)						\
