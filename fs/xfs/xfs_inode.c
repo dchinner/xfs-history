@@ -3710,7 +3710,7 @@ xfs_iaccess(
 		return XFS_ERROR(EACCES);
 	}
 #endif
-	return 0;
+	return XFS_ERROR(EACCES);
 }
 
 /*

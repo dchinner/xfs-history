@@ -516,11 +516,11 @@ int linvfs_permission(struct inode *ip, int mode)
         vnode_t *vp;
 	int	error;
 
-	mode <<= 6;
+	mode <<= 6;		/* convert from linux to xfs access bits */
         vp = LINVFS_GET_VP(ip);
 	VOP_ACCESS(vp, mode, &cred, error);
 
-	return error;
+	return error ? -error : 0;
 }
 
 /* Brute force approach for now - copy data into linux inode
