@@ -215,7 +215,7 @@ extern void		xfs_trans_log_buf(xfs_trans_t *trans, buf_t *bp,
 					  uint first, uint last);
 extern void		xfs_trans_log_inode(xfs_trans_t *trans,
 					    struct xfs_inode *ip,
-					    uint fieldmask);
+					    uint flags, int first, int last);
 extern void		xfs_trans_log_op(xfs_trans_t *trans,
 					 xfs_log_item_t *op);
 extern xfs_trans_id_t	xfs_trans_id(xfs_trans_t *trans);
