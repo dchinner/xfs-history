@@ -411,11 +411,14 @@ vn_revalidate(struct vnode *vp, int flags)
 			inode->i_mtime      = va.va_mtime.tv_sec;
 			inode->i_ctime      = va.va_ctime.tv_sec;
 		}
+		if (flags & ATTR_LAZY)
+			vp->v_flag &= ~VMODIFIED;
+		else
+			VUNMODIFY(vp);
 	} else {
 		vn_trace_exit(vp, "vn_revalidate.error",
 					(inst_t *)__return_address);
 	}
-	VUNMODIFY(vp);
 
 	return -error;
 }
