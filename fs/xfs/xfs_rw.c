@@ -1618,6 +1618,7 @@ xfs_iomap_write(
 	unsigned int	writing_bytes;
 	short		filled_bmaps;
 	short		x;
+	short		small_write;
 	size_t		count_remaining;
 	xfs_mount_t	*mp;
 	struct bmapval	*curr_bmapp;
@@ -1717,11 +1718,14 @@ xfs_iomap_write(
 		iosize = mp->m_writeio_blocks;
 		aligned_offset = XFS_WRITEIO_ALIGN(mp, offset);
 		ioalign = XFS_B_TO_FSBT(mp, aligned_offset);
+		small_write = 0;
 	} else {
 		/*
 		 * For small sync writes try to minimize the amount
 		 * of I/O we do.  Round down and up to the larger of
-		 * page or block boundaries.
+		 * page or block boundaries.  Set the small_write
+		 * variable to 1 to indicate to the code below that
+		 * we are not using the normal buffer alignment scheme.
 		 */
 		if (NBPP > mp->m_sb.sb_blocksize) {
 			aligned_offset = ctooff(offtoct(offset));
@@ -1733,6 +1737,7 @@ xfs_iomap_write(
 			ioalign = offset_fsb;
 			iosize = last_fsb - offset_fsb;
 		}
+		small_write = 1;
 	}
 
 	/*
@@ -1798,6 +1803,18 @@ xfs_iomap_write(
 				 */
 				break;
 			}
+			if (small_write) {
+				iosize -= curr_bmapp->length;
+				ASSERT((iosize > 0) ||
+				       (curr_imapp == last_imapp));
+				/*
+				 * We have nothing more to write, so
+				 * we're done.
+				 */
+				if (iosize == 0) {
+					break;
+				}
+			}
 			if (next_offset_fsb <
 			    (curr_imapp->br_startoff +
 			     curr_imapp->br_blockcount)) {
@@ -1824,18 +1841,26 @@ xfs_iomap_write(
 					 * down to a writeio_blocks boundary
 					 * before calling xfs_write_bmap().
 					 *
+					 * For small, sync writes we don't
+					 * bother with the alignment stuff.
+					 *
 					 * XXXajs
 					 * Adding a macro to writeio align
 					 * fsblocks would be good to reduce
 					 * the bit shifting here.
 					 */
-					aligned_offset = XFS_FSB_TO_B(mp,
-					                    next_offset_fsb);
-					aligned_offset =
-						XFS_WRITEIO_ALIGN(mp,
-							aligned_offset);
-					ioalign = XFS_B_TO_FSBT(mp,
-							aligned_offset);
+					if (small_write) {
+						ioalign = next_offset_fsb;
+					} else {
+						aligned_offset =
+							XFS_FSB_TO_B(mp,
+							    next_offset_fsb);
+						aligned_offset =
+							XFS_WRITEIO_ALIGN(mp,
+							    aligned_offset);
+						ioalign = XFS_B_TO_FSBT(mp,
+							    aligned_offset);
+					}
 					xfs_write_bmap(mp, curr_imapp,
 						       next_bmapp, iosize,
 						       ioalign, isize);
