@@ -418,12 +418,13 @@ xfs_attr_shortform_list(xfs_attr_list_context_t *context)
 			int ns = (sfe->flags & XFS_ATTR_ROOT)?
 						ROOT_NAMES : USER_NAMES;
 			if (((context->flags & ATTR_ROOT) != 0) !=
-			    ((sfe->flags & XFS_ATTR_ROOT) != 0)) {
+			    ((sfe->flags & XFS_ATTR_ROOT) != 0) &&
+			    !(context->flags & ATTR_KERNFULLS)) {
 				sfe = XFS_ATTR_SF_NEXTENTRY(sfe);
 				continue;
 			}
 			if (context->flags & ATTR_KERNOVAL) {
-				ASSERT(context->flags & ATTR_KERNAMES);
+				ASSERT(context->flags & ATTR_KERNAMELS);
 				context->count += xfs_namespaces[ns].namelen +
 					INT_GET(sfe->namelen, ARCH_CONVERT) + 1;
 			}
@@ -462,7 +463,8 @@ xfs_attr_shortform_list(xfs_attr_list_context_t *context)
 			return XFS_ERROR(EFSCORRUPTED);
 		}
 		if (((context->flags & ATTR_ROOT) != 0) !=
-		    ((sfe->flags & XFS_ATTR_ROOT) != 0)) {
+		    ((sfe->flags & XFS_ATTR_ROOT) != 0) &&
+		    !(context->flags & ATTR_KERNFULLS)) {
 			sfe = XFS_ATTR_SF_NEXTENTRY(sfe);
 			continue;
 		}
@@ -510,14 +512,13 @@ xfs_attr_shortform_list(xfs_attr_list_context_t *context)
 	 * Loop putting entries into the user buffer.
 	 */
 	for ( ; i < nsbuf; i++, sbp++) {
-		int ns = (sbp->flags & XFS_ATTR_ROOT)?
-					ROOT_NAMES : USER_NAMES;
+		int ns = (sbp->flags & XFS_ATTR_ROOT)? ROOT_NAMES:USER_NAMES;
 		if (cursor->hashval != INT_GET(sbp->hash, ARCH_CONVERT)) {
 			cursor->hashval = INT_GET(sbp->hash, ARCH_CONVERT);
 			cursor->offset = 0;
 		}
 		if (context->flags & ATTR_KERNOVAL) {
-			ASSERT(context->flags & ATTR_KERNAMES);
+			ASSERT(context->flags & ATTR_KERNAMELS);
 			context->count += xfs_namespaces[ns].namelen
 					+ sbp->namelen + 1;
 		}
@@ -2235,6 +2236,8 @@ xfs_attr_leaf_list_int(xfs_dabuf_t *bp, xfs_attr_list_context_t *context)
 	retval = 0;
 	for (  ; (i < INT_GET(leaf->hdr.count, ARCH_CONVERT))
 	     && (retval == 0); entry++, i++) {
+		int ns = (entry->flags & XFS_ATTR_ROOT)? ROOT_NAMES:USER_NAMES;
+
 		if (INT_GET(entry->hashval, ARCH_CONVERT) != cursor->hashval) {
 			cursor->hashval = INT_GET(entry->hashval, ARCH_CONVERT);
 			cursor->offset = 0;
@@ -2243,15 +2246,14 @@ xfs_attr_leaf_list_int(xfs_dabuf_t *bp, xfs_attr_list_context_t *context)
 		if (entry->flags & XFS_ATTR_INCOMPLETE)
 			continue;		/* skip incomplete entries */
 		if (((context->flags & ATTR_ROOT) != 0) !=
-		    ((entry->flags & XFS_ATTR_ROOT) != 0))
+		    ((entry->flags & XFS_ATTR_ROOT) != 0) &&
+		    !(context->flags & ATTR_KERNFULLS))
 			continue;		/* skip non-matching entries */
 
 		if (entry->flags & XFS_ATTR_LOCAL) {
-			int ns = (entry->flags & XFS_ATTR_ROOT)?
-						ROOT_NAMES : USER_NAMES;
 			name_loc = XFS_ATTR_LEAF_NAME_LOCAL(leaf, i);
 			if (context->flags & ATTR_KERNOVAL) {
-				ASSERT(context->flags & ATTR_KERNAMES);
+				ASSERT(context->flags & ATTR_KERNAMELS);
 				context->count += xfs_namespaces[ns].namelen
 						+ (int)name_loc->namelen + 1;
 			} else {
@@ -2262,11 +2264,9 @@ xfs_attr_leaf_list_int(xfs_dabuf_t *bp, xfs_attr_list_context_t *context)
 								ARCH_CONVERT));
 			}
 		} else {
-			int ns = (entry->flags & XFS_ATTR_ROOT)?
-						ROOT_NAMES : USER_NAMES;
 			name_rmt = XFS_ATTR_LEAF_NAME_REMOTE(leaf, i);
 			if (context->flags & ATTR_KERNOVAL) {
-				ASSERT(context->flags & ATTR_KERNAMES);
+				ASSERT(context->flags & ATTR_KERNAMELS);
 				context->count += xfs_namespaces[ns].namelen
 						+ (int)name_rmt->namelen + 1;
 			} else {
@@ -2305,8 +2305,7 @@ xfs_attr_put_listent(xfs_attr_list_context_t *context,
 	int arraytop;
 
 	ASSERT(!(context->flags & ATTR_KERNOVAL));
-	if (context->flags & ATTR_KERNAMES) {	/* simple name list (Linux) */
-		char *tmp;	/* TODO - remove */
+	if (context->flags & ATTR_KERNAMELS) {
 		char *offset;
 		xattr_namespace_t *nsp;
 
@@ -2318,7 +2317,7 @@ xfs_attr_put_listent(xfs_attr_list_context_t *context,
 			context->count = -1;	/* insufficient space */
 			return(1);
 		}
-		tmp = offset = (char *)context->alist + context->count;
+		offset = (char *)context->alist + context->count;
 		strncpy(offset, nsp->name, nsp->namelen);	/* namespace */
 		offset += nsp->namelen;
 		strncpy(offset, name, namelen);			/* real name */

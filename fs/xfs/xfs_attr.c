@@ -626,7 +626,7 @@ xfs_attr_list(bhv_desc_t *bdp, char *buffer, int bufsize, int flags,
 	context.dupcnt = 0;
 	context.resynch = 1;
 	context.flags = flags;
-	if (!(flags & ATTR_KERNAMES)) {
+	if (!(flags & ATTR_KERNAMELS)) {
 		context.bufsize = (bufsize & ~(sizeof(int)-1));  /* align */
 		context.firstu = context.bufsize;
 		context.alist = (attrlist_t *)buffer;
@@ -669,7 +669,7 @@ xfs_attr_list(bhv_desc_t *bdp, char *buffer, int bufsize, int flags,
 	xfs_iunlock(dp, XFS_ILOCK_SHARED);
 	xfs_attr_trace_l_c("syscall end", &context);
 
-	if (!(context.flags & (ATTR_KERNOVAL|ATTR_KERNAMES))) {
+	if (!(context.flags & (ATTR_KERNOVAL|ATTR_KERNAMELS))) {
 		ASSERT(error >= 0);
 	}
 	else {	/* must return negated buffer size or the error */

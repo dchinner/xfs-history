@@ -63,7 +63,8 @@
 #define ATTR_REPLACE	0x0004	/* pure set: fail if attr does not exist */
 #define ATTR_KERNOTIME	0x0008	/* [kernel] don't update inode timestamps */
 #define ATTR_KERNOVAL	0x0010	/* [kernel] get attr size only, not value */
-#define ATTR_KERNAMES	0x0020	/* [kernel] list attr names (simple list) */
+#define ATTR_KERNAMELS	0x0020	/* [kernel] list attr names (simple list) */
+#define ATTR_KERNFULLS	0x0040	/* [kernel] full attr list, ie. root+user */
 
 /*
  * The maximum size (into the kernel or returned from the kernel) of an
