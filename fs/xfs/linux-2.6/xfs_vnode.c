@@ -139,7 +139,7 @@ vn_wait(struct vnode *vp)
 }
 
 struct vnode *
-vn_initialize(vfs_t *vfsp, struct inode *inode)
+vn_initialize(struct inode *inode)
 {
 	struct vnode	*vp = LINVFS_GET_VP(inode);
 
@@ -171,7 +171,7 @@ vn_initialize(vfs_t *vfsp, struct inode *inode)
  * Get a reference on a vnode.
  */
 vnode_t *
-vn_get(struct vnode *vp, vmap_t *vmap, uint flags)
+vn_get(struct vnode *vp, vmap_t *vmap)
 {
 	struct inode	*inode;
 

@@ -616,7 +616,7 @@ typedef struct vattr {
 
 extern void	vn_init(void);
 extern int	vn_wait(struct vnode *);
-extern vnode_t	*vn_initialize(struct vfs *, struct inode *);
+extern vnode_t	*vn_initialize(struct inode *);
 
 /*
  * Acquiring and invalidating vnodes:
@@ -645,7 +645,7 @@ typedef struct vnode_map {
 				 (vmap).v_number = (vp)->v_number,	\
 				 (vmap).v_ino	 = (ip)->i_ino; }
 extern void	vn_purge(struct vnode *, vmap_t *);
-extern vnode_t	*vn_get(struct vnode *, vmap_t *, uint);
+extern vnode_t	*vn_get(struct vnode *, vmap_t *);
 extern int	vn_revalidate(struct vnode *, int);
 extern void	vn_remove(struct vnode *);
 

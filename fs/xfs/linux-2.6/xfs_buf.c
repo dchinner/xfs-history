@@ -1570,8 +1570,7 @@ pagebuf_segment(
 	struct page		**spage_p, /* page (updated)		*/
 					/* (NULL if not in page array)	*/
 	size_t			*soff_p,/* offset in page (updated)	*/
-	size_t			*ssize_p, /* segment length (updated)	*/
-	page_buf_flags_t	flags)	/* unused			*/
+	size_t			*ssize_p) /* segment length (updated)	*/
 {
 	loff_t			kpboff;	/* offset in pagebuf		*/
 	int			kpi;	/* page index in pagebuf	*/
@@ -1614,7 +1613,7 @@ pagebuf_iomove(
 	boff += bsize; /* last */
 
 	while (cboff < boff) {
-		pagebuf_segment(pb, &cboff, &page, &cpoff, &csize, 0);
+		pagebuf_segment(pb, &cboff, &page, &cpoff, &csize);
 		assert(((csize + cpoff) <= PAGE_CACHE_SIZE));
 
 		switch (mode) {
