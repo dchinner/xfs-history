@@ -1,4 +1,4 @@
-#ident "$Revision: 1.71 $"
+#ident "$Revision: 1.72 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -39,6 +39,7 @@
 #include "xfs_dir_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode.h"
+#include "xfs_quota.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -269,6 +270,7 @@ again:
 	ip->i_next = iq;
 	ip->i_prevp = &ih->ih_next;
 	ih->ih_next = ip;
+	ip->i_udquot = ip->i_pdquot = NULL;
 	ih->ih_version++;
 	XFS_IHUNLOCK(ih);
 
@@ -416,6 +418,13 @@ xfs_ireclaim(xfs_inode_t *ip)
 			mp->m_inodes = iq;
 		}
 	}
+	/*
+	 * Release dquots (and their references) if any
+	 */
+	if (ip->i_udquot || ip->i_pdquot) {
+		xfs_qm_dqdettach_inode(ip);
+	}
+	
 	mp->m_ireclaims++;
 	XFS_MOUNT_IUNLOCK(mp);
 
