@@ -1,9 +1,12 @@
 #ifndef _FS_XFS_ALLOC_H
 #define	_FS_XFS_ALLOC_H
 
-#ident	"$Revision: 1.34 $"
+#ident	"$Revision: 1.35 $"
 
+struct buf;
+struct xfs_mount;
 struct xfs_perag;
+struct xfs_trans;
 
 /*
  * Freespace allocation types.  Argument to xfs_alloc_[v]extent.
@@ -38,10 +41,10 @@ typedef enum xfs_alloctype
  * down several levels of the stack.
  */
 typedef struct xfs_alloc_arg {
-	xfs_trans_t	*tp;		/* transaction pointer */
-	xfs_mount_t	*mp;		/* file system mount point */
+	struct xfs_trans *tp;		/* transaction pointer */
+	struct xfs_mount *mp;		/* file system mount point */
 	xfs_fsblock_t	fsbno;		/* file system block number */
-	buf_t		*agbp;		/* buffer for a.g. freelist header */
+	struct buf	*agbp;		/* buffer for a.g. freelist header */
 	xfs_agnumber_t	agno;		/* allocation group number */
 	xfs_agblock_t	agbno;		/* allocation group-relative block # */
 	xfs_extlen_t	minlen;		/* minimum size of extent */
@@ -80,16 +83,16 @@ typedef struct xfs_alloc_arg {
  */
 void
 xfs_alloc_compute_maxlevels(
-	xfs_mount_t	*mp);		/* file system mount structure */
+	struct xfs_mount	*mp);	/* file system mount structure */
 
 /*
  * Decide whether to use this allocation group for this allocation.
  * If so, fix up the btree freelist's size.
  * This is external so mkfs can call it, too.
  */
-buf_t *				/* buffer for the a.g. freelist header */
+struct buf *			/* buffer for the a.g. freelist header */
 xfs_alloc_fix_freelist(
-	xfs_trans_t	*tp,	/* transaction pointer */
+	struct xfs_trans *tp,	/* transaction pointer */
 	xfs_agnumber_t	agno,	/* allocation group number */
 	xfs_extlen_t	minlen,	/* minimum extent length, else reject */
 	xfs_extlen_t	total,	/* total free blocks, else reject */
@@ -103,16 +106,16 @@ xfs_alloc_fix_freelist(
  */
 xfs_agblock_t			/* block address retrieved from freelist */
 xfs_alloc_get_freelist(
-	xfs_trans_t	*tp,	/* transaction pointer */
-	buf_t		*agbp);	/* buffer containing the agf structure */
+	struct xfs_trans *tp,	/* transaction pointer */
+	struct buf	*agbp);	/* buffer containing the agf structure */
 
 /*
  * Log the given fields from the agf structure.
  */
 void
 xfs_alloc_log_agf(
-	xfs_trans_t	*tp,	/* transaction pointer */
-	buf_t		*bp,	/* buffer for a.g. freelist header */
+	struct xfs_trans *tp,	/* transaction pointer */
+	struct buf	*bp,	/* buffer for a.g. freelist header */
 	int		fields);/* mask of fields to be logged (XFS_AGF_...) */
 
 /*
@@ -120,8 +123,8 @@ xfs_alloc_log_agf(
  */
 void
 xfs_alloc_pagf_init(
-	xfs_mount_t	*mp,	/* file system mount structure */
-	xfs_trans_t	*tp,	/* transaction pointer */
+	struct xfs_mount *mp,	/* file system mount structure */
+	struct xfs_trans *tp,	/* transaction pointer */
 	xfs_agnumber_t	agno,	/* allocation group number */
 	int		flags);	/* XFS_ALLOC_FLAGS_... */
 
@@ -130,18 +133,18 @@ xfs_alloc_pagf_init(
  */
 void
 xfs_alloc_put_freelist(
-	xfs_trans_t	*tp,	/* transaction pointer */
-	buf_t		*agbp,	/* buffer for a.g. freelist header */
-	buf_t		*agflbp,/* buffer for a.g. free block array */
+	struct xfs_trans *tp,	/* transaction pointer */
+	struct buf	*agbp,	/* buffer for a.g. freelist header */
+	struct buf	*agflbp,/* buffer for a.g. free block array */
 	xfs_agblock_t	bno);	/* block being freed */
 
 /*
  * Read in the allocation group header (free/alloc section).
  */
-buf_t *					/* buffer for the ag freelist header */
+struct buf *				/* buffer for the ag freelist header */
 xfs_alloc_read_agf(
-	xfs_mount_t	*mp,		/* mount point structure */
-	xfs_trans_t	*tp,		/* transaction pointer */
+	struct xfs_mount *mp,		/* mount point structure */
+	struct xfs_trans *tp,		/* transaction pointer */
 	xfs_agnumber_t	agno,		/* allocation group number */
 	int		flags);		/* XFS_ALLOC_FLAG_... */
 
@@ -158,7 +161,7 @@ xfs_alloc_vextent(
  */
 int				/* success/failure; will become void */
 xfs_free_extent(
-	xfs_trans_t	*tp,	/* transaction pointer */
+	struct xfs_trans *tp,	/* transaction pointer */
 	xfs_fsblock_t	bno,	/* starting block number of extent */
 	xfs_extlen_t	len);	/* length of extent */
 #endif	/* !SIM */

@@ -1,10 +1,11 @@
 #ifndef _FS_XFS_BMAP_BTREE_H
 #define	_FS_XFS_BMAP_BTREE_H
 
-#ident "$Revision: 1.19 $"
+#ident "$Revision: 1.23 $"
 
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 
+struct buf;
 struct xfs_btree_cur;
 struct xfs_btree_lblock;
 
@@ -223,7 +224,7 @@ xfs_bmbt_block_t *
 xfs_bmbt_get_block(
 	struct xfs_btree_cur	*cur,
 	int			level,
-	buf_t			**bpp);
+	struct buf		**bpp);
 
 xfs_filblks_t
 xfs_bmbt_get_blockcount(
@@ -257,13 +258,13 @@ xfs_bmbt_kcheck(
 void
 xfs_bmbt_log_block(
 	struct xfs_btree_cur *,
-	buf_t *,
+	struct buf *,
 	int);
 
 void
 xfs_bmbt_log_recs(
 	struct xfs_btree_cur *,
-	buf_t *,
+	struct buf *,
 	int,
 	int);
 

@@ -1,11 +1,12 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.43 $"
+#ident "$Revision: 1.45 $"
 
 struct getbmap;
 struct xfs_bmbt_irec;
 struct xfs_inode;
+struct xfs_mount;
 struct xfs_trans;
 
 /*
@@ -90,7 +91,7 @@ xfs_bmap_add_free(
 	xfs_fsblock_t		bno,		/* fs block number of extent */
 	xfs_filblks_t		len,		/* length of extent */
 	xfs_bmap_free_t		*flist,		/* list of extents */
-	xfs_mount_t		*mp);		/* mount point structure */
+	struct xfs_mount	*mp);		/* mount point structure */
 
 /* 
  * Compute and fill in the value of the maximum depth of a bmap btree
@@ -98,7 +99,7 @@ xfs_bmap_add_free(
  */
 void
 xfs_bmap_compute_maxlevels(
-	xfs_mount_t	*mp);		/* file system mount structure */
+	struct xfs_mount	*mp);	/* file system mount structure */
 
 /*
  * Routine to be called at transaction's end by xfs_bmapi, xfs_bunmapi 
@@ -110,7 +111,7 @@ xfs_bmap_compute_maxlevels(
  */
 int
 xfs_bmap_finish(
-	xfs_trans_t		**tp,		/* transaction pointer addr */
+	struct xfs_trans	**tp,		/* transaction pointer addr */
 	xfs_bmap_free_t		*flist,		/* i/o: list extents to free */
 	xfs_fsblock_t		firstblock);	/* controlled a.g. for allocs */
 
@@ -121,7 +122,7 @@ xfs_bmap_finish(
  */
 xfs_fileoff_t
 xfs_bmap_first_unused(
-	xfs_trans_t		*tp,		/* transaction pointer */
+	struct xfs_trans	*tp,		/* transaction pointer */
 	struct xfs_inode	*ip);		/* incore inode */
 
 /*
@@ -131,7 +132,7 @@ xfs_bmap_first_unused(
  */
 xfs_fileoff_t
 xfs_bmap_last_offset(
-	xfs_trans_t		*tp,		/* transaction pointer */
+	struct xfs_trans	*tp,		/* transaction pointer */
 	struct xfs_inode	*ip);		/* incore inode */
 
 /*
@@ -141,7 +142,7 @@ xfs_bmap_last_offset(
  */
 void
 xfs_bmap_read_extents(
-	xfs_trans_t		*tp,		/* transaction pointer */
+	struct xfs_trans	*tp,		/* transaction pointer */
 	struct xfs_inode	*ip);		/* incore inode */
 
 #if defined(DEBUG) && !defined(SIM)
@@ -172,14 +173,14 @@ xfs_bmap_trace_exlist(
  */
 xfs_fsblock_t					/* first allocated block */
 xfs_bmapi(
-	xfs_trans_t		*tp,		/* transaction pointer */
+	struct xfs_trans	*tp,		/* transaction pointer */
 	struct xfs_inode	*ip,		/* incore inode */
 	xfs_fileoff_t		bno,		/* starting file offs. mapped */
 	xfs_filblks_t		len,		/* length to map in file */
 	int			flags,		/* XFS_BMAPI_... */
 	xfs_fsblock_t		firstblock,	/* controls a.g. for allocs */
 	xfs_extlen_t		total,		/* total blocks needed */
-	xfs_bmbt_irec_t		*mval,		/* output: map values */
+	struct xfs_bmbt_irec	*mval,		/* output: map values */
 	int			*nmap,		/* i/o: mval size/count */
 	xfs_bmap_free_t		*flist);	/* i/o: list extents to free */
 
@@ -192,7 +193,7 @@ xfs_bmapi(
  */
 xfs_fsblock_t					/* first allocated block */
 xfs_bunmapi(
-	xfs_trans_t		*tp,		/* transaction pointer */
+	struct xfs_trans	*tp,		/* transaction pointer */
 	struct xfs_inode	*ip,		/* incore inode */
 	xfs_fileoff_t		bno,		/* starting offset to unmap */
 	xfs_filblks_t		len,		/* length to unmap in file */
