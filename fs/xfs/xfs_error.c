@@ -11,7 +11,7 @@
 #include "xfs_error.h"
 
 #ifdef DEBUG
-int	xfs_etrap[XFS_ERROR_NTRAP] = { ENOSPC };
+int	xfs_etrap[XFS_ERROR_NTRAP] = { EIO };
 
 #ifndef SIM
 extern void panicspin(void);
@@ -26,6 +26,8 @@ xfs_error_trap(int e)
 	int id;
 #endif
 
+	if (!e)
+		return 0;
 	for (i = 0; i < XFS_ERROR_NTRAP; i++) {
 		if (xfs_etrap[i] == 0)
 			break;
