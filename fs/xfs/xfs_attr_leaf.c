@@ -497,7 +497,7 @@ xfs_attr_leaf_to_node(xfs_trans_t *trans, xfs_da_args_t *args)
 	error = xfs_da_grow_inode(trans, args, 1, &blkno);
 	if (error)
 		return(error);
-	error = xfs_da_read_buf(trans, dp, 0, &bp1, XFS_ATTR_FORK);
+	error = xfs_da_read_buf(trans, dp, 0, -1, &bp1, XFS_ATTR_FORK);
 	if (error)
 		return(error);
 	ASSERT(bp1 != NULL);
@@ -1189,7 +1189,7 @@ xfs_attr_leaf_toosmall(xfs_da_state_t *state, int *action)
 		if (blkno == 0)
 			continue;
 		error = xfs_da_read_buf(state->trans, state->args->dp, blkno,
-						      &bp, XFS_ATTR_FORK);
+						      -1, &bp, XFS_ATTR_FORK);
 		if (error)
 			return(error);
 		ASSERT(bp != NULL);
@@ -1981,7 +1981,7 @@ xfs_attr_leaf_clearflag(xfs_da_args_t *args)
 		xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
 		return(error);
 	}
-	error = xfs_da_read_buf(trans, dp, args->blkno, &bp,
+	error = xfs_da_read_buf(trans, dp, args->blkno, -1, &bp,
 				       XFS_ATTR_FORK);
 	if (error) {
 		xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
@@ -2053,7 +2053,7 @@ xfs_attr_leaf_setflag(xfs_da_args_t *args)
 		xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
 		return(error);
 	}
-	error = xfs_da_read_buf(trans, dp, args->blkno, &bp,
+	error = xfs_da_read_buf(trans, dp, args->blkno, -1, &bp,
 				       XFS_ATTR_FORK);
 	if (error) {
 		xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
@@ -2116,7 +2116,8 @@ xfs_attr_leaf_flipflags(xfs_da_args_t *args)
 	/*
 	 * Read the block containing the "old" attr
 	 */
-	error = xfs_da_read_buf(trans, dp, args->blkno, &bp1, XFS_ATTR_FORK);
+	error = xfs_da_read_buf(trans, dp, args->blkno, -1, &bp1,
+				       XFS_ATTR_FORK);
 	if (error) {
 		xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
 		return(error);
@@ -2127,7 +2128,7 @@ xfs_attr_leaf_flipflags(xfs_da_args_t *args)
 	 * Read the block containing the "new" attr, if it is different
 	 */
 	if (args->blkno2 != args->blkno) {
-		error = xfs_da_read_buf(trans, dp, args->blkno2, &bp2,
+		error = xfs_da_read_buf(trans, dp, args->blkno2, -1, &bp2,
 					       XFS_ATTR_FORK);
 		if (error) {
 			xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
@@ -2219,7 +2220,7 @@ xfs_attr_root_inactive(xfs_inode_t *dp)
 	/*
 	 * Read block 0 to see what we have to work with.
 	 */
-	error = xfs_da_read_buf(NULL, dp, 0, &bp, XFS_ATTR_FORK);
+	error = xfs_da_read_buf(NULL, dp, 0, -1, &bp, XFS_ATTR_FORK);
 	if (error)
 		return(error);
 	if (error = geterror(bp))
@@ -2322,7 +2323,7 @@ xfs_attr_node_inactive(xfs_inode_t *dp, buf_t *bp, int level)
 		/*
 		 * Read the subsidiary block to see what we have to work with.
 		 */
-		error = xfs_da_read_buf(NULL, dp, btree->before, &bp2,
+		error = xfs_da_read_buf(NULL, dp, btree->before, -1, &bp2,
 					      XFS_ATTR_FORK);
 		if (error)
 			return(error);

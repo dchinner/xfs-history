@@ -519,7 +519,7 @@ xfs_attr_leaf_addname(xfs_da_args_t *args)
 	 * Read the (only) block in the attribute list in.
 	 */
 	args->blkno = 0;
-	error = xfs_da_read_buf(trans, dp, args->blkno, &bp, XFS_ATTR_FORK);
+	error = xfs_da_read_buf(trans, dp, args->blkno, -1, &bp, XFS_ATTR_FORK);
 	if (error)
 		goto out;
 	ASSERT(bp != NULL);
@@ -642,7 +642,7 @@ xfs_attr_leaf_addname(xfs_da_args_t *args)
 		 * Read in the block containing the "old" attr, then
 		 * remove the "old" attr from that block (neat, huh!)
 		 */
-		error = xfs_da_read_buf(trans, dp, args->blkno, &bp,
+		error = xfs_da_read_buf(trans, dp, args->blkno, -1, &bp,
 					       XFS_ATTR_FORK);
 		if (error)
 			goto out;
@@ -705,7 +705,7 @@ xfs_attr_leaf_removename(xfs_da_args_t *args)
 	 * Remove the attribute.
 	 */
 	args->blkno = 0;
-	error = xfs_da_read_buf(trans, dp, args->blkno, &bp, XFS_ATTR_FORK);
+	error = xfs_da_read_buf(trans, dp, args->blkno, -1, &bp, XFS_ATTR_FORK);
 	if (error) {
 		xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
 		return(error);
@@ -752,7 +752,7 @@ xfs_attr_leaf_get(xfs_da_args_t *args)
 	int error;
 
 	args->blkno = 0;
-	error = xfs_da_read_buf(NULL, args->dp, args->blkno, &bp,
+	error = xfs_da_read_buf(NULL, args->dp, args->blkno, -1, &bp,
 				       XFS_ATTR_FORK);
 	if (error)
 		return(error);
@@ -778,7 +778,7 @@ xfs_attr_leaf_list(xfs_inode_t *dp, attrlist_t *alist, int flags,
 
 	if (cursor->blkno > 0)
 		cursor->blkno = cursor->index = 0;
-	error = xfs_da_read_buf(NULL, dp, 0, &bp, XFS_ATTR_FORK);
+	error = xfs_da_read_buf(NULL, dp, 0, -1, &bp, XFS_ATTR_FORK);
 	if (error)
 		return(error);
 	ASSERT(bp != NULL);
@@ -1123,7 +1123,7 @@ xfs_attr_node_removename(xfs_da_args_t *args)
 	 * If the result is small enough, push it all into the inode.
 	 */
 	if (xfs_bmap_one_block(dp, XFS_ATTR_FORK)) {
-		error = xfs_da_read_buf(trans, dp, 0, &bp, XFS_ATTR_FORK);
+		error = xfs_da_read_buf(trans, dp, 0, -1, &bp, XFS_ATTR_FORK);
 		if (error)
 			goto out1;
 		ASSERT(((xfs_attr_leafblock_t *)bp->b_un.b_addr)->hdr.info.magic
@@ -1218,7 +1218,7 @@ xfs_attr_node_list(xfs_inode_t *dp, attrlist_t *alist, int flags,
 	 */
 	bp = NULL;
 	if (cursor->blkno > 0) {
-		error = xfs_da_read_buf(NULL, dp, cursor->blkno, &bp,
+		error = xfs_da_read_buf(NULL, dp, cursor->blkno, -1, &bp,
 					      XFS_ATTR_FORK);
 		if (error)
 			return(error);
@@ -1239,8 +1239,8 @@ xfs_attr_node_list(xfs_inode_t *dp, attrlist_t *alist, int flags,
 			xfs_da_intnode_t *node;
 			xfs_da_node_entry_t *btree;
 
-			error = xfs_da_read_buf(NULL, dp, cursor->blkno, &bp,
-						      XFS_ATTR_FORK);
+			error = xfs_da_read_buf(NULL, dp, cursor->blkno, -1,
+						      &bp, XFS_ATTR_FORK);
 			if (error)
 				return(error);
 			ASSERT(bp != NULL);
@@ -1277,7 +1277,7 @@ xfs_attr_node_list(xfs_inode_t *dp, attrlist_t *alist, int flags,
 		cursor->blkno = info->forw;
 		cursor->index = 0;
 		xfs_trans_brelse(NULL, bp);
-		error = xfs_da_read_buf(NULL, dp, cursor->blkno, &bp,
+		error = xfs_da_read_buf(NULL, dp, cursor->blkno, -1, &bp,
 					      XFS_ATTR_FORK);
 		if (error)
 			return(error);
