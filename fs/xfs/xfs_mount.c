@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.141 $"
+#ident	"$Revision: 1.142 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -843,15 +843,15 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	xfs_log_unmount(mp);			/* Done! No more fs ops. */
 
 	if (mp->m_ddevp) {
-		VOP_CLOSE(mp->m_ddevp, vfs_flags, L_TRUE, 0, cr, NULL, unused);
+		VOP_CLOSE(mp->m_ddevp, vfs_flags, L_TRUE, cr, NULL, unused);
 		VN_RELE(mp->m_ddevp);
 	}
 	if (mp->m_rtdevp) {
-		VOP_CLOSE(mp->m_rtdevp, vfs_flags, L_TRUE, 0, cr, NULL, unused);
+		VOP_CLOSE(mp->m_rtdevp, vfs_flags, L_TRUE, cr, NULL, unused);
 		VN_RELE(mp->m_rtdevp);
 	}
 	if (mp->m_logdevp && mp->m_logdevp != mp->m_ddevp) {
-		VOP_CLOSE(mp->m_logdevp, vfs_flags, L_TRUE, 0, cr, NULL, unused);
+		VOP_CLOSE(mp->m_logdevp, vfs_flags, L_TRUE, cr, NULL, unused);
 		VN_RELE(mp->m_logdevp);
 	}
 

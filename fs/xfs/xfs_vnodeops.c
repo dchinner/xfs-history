@@ -138,7 +138,6 @@ xfs_close(
 	bhv_desc_t	*bdp,
 	int		flag,
 	lastclose_t	lastclose,
-	off_t		offset,
 	cred_t		*credp,
 	struct flid	*fl);
 
@@ -424,7 +423,6 @@ xfs_close(
 	bhv_desc_t	*bdp,
 	int		flag,
 	lastclose_t	lastclose,
-	off_t		offset,
 	cred_t		*credp,
 	struct flid	*fl)
 {
