@@ -3134,7 +3134,7 @@ cluster_corrupt_out:
 		 * mark the buffer as an error and call them.  Otherwise
 		 * mark it as stale and brelse.
 		 */
-		if (bp->b_iodone) {
+		if (XFS_BUF_IODONE_FUNC(bp)) {
 			bp->b_bdstrat = NULL;
 			bp->b_target = NULL;
 			bp->b_flags &= ~(B_DONE);
@@ -3362,8 +3362,8 @@ xfs_iflush_int(
 		xfs_buf_attach_iodone(bp, (void(*)(xfs_buf_t*,xfs_log_item_t*))
 				      xfs_iflush_done, (xfs_log_item_t *)iip);
 
-		ASSERT(bp->b_fsprivate != NULL);
-		ASSERT(bp->b_iodone != NULL);
+		ASSERT(XFS_BUF_FSPRIVATE(bp, void *) != NULL);
+		ASSERT(XFS_BUF_IODONE_FUNC(bp) != NULL);
 	} else {
 		/*
 		 * We're flushing an inode which is not in the AIL and has

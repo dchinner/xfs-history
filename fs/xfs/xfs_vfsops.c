@@ -2647,7 +2647,7 @@ xfs_syncsub(
 		if (flags & SYNC_BDFLUSH) {
 			bp = xfs_getsb(mp, BUF_TRYLOCK);
 			if (bp != NULL) {
-				bip = (xfs_buf_log_item_t *)bp->b_fsprivate;
+				bip = XFS_BUF_FSPRIVATE(bp,xfs_buf_log_item_t*);
 				if ((bip != NULL) &&
 				    xfs_buf_item_dirty(bip)) {
 					if (bp->b_pincount == 0) {

@@ -953,9 +953,9 @@ xlog_iodone(xfs_buf_t *bp)
 	xlog_in_core_t *iclog;
 	int		aborted;
 
-	iclog = (xlog_in_core_t *)(bp->b_fsprivate);
-	ASSERT(bp->b_fsprivate2 == (void *)((unsigned long)2));
-	bp->b_fsprivate2 = (void *)((unsigned long)1);
+	iclog = XFS_BUF_FSPRIVATE(bp, xlog_in_core_t *);
+	ASSERT(XFS_BUF_FSPRIVATE2(bp, unsigned long) == (unsigned long) 2);
+	XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)1);
 	aborted = 0;
 
 	/*
@@ -1000,7 +1000,7 @@ xlog_bdstrat_cb(struct xfs_buf *bp)
 {
 	xlog_in_core_t *iclog;
 
-	iclog = (xlog_in_core_t *)(bp->b_fsprivate);
+	iclog = XFS_BUF_FSPRIVATE(bp, xlog_in_core_t *);
 
 	if ((iclog->ic_state & XLOG_STATE_IOERROR) == 0) {
 		struct bdevsw	*my_bdevsw;
@@ -1179,9 +1179,9 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	bp->b_edev	   = log_dev;
 	bp->b_target	   = &mp->m_logdev_targ;
 	bp->b_bufsize	   = log->l_iclog_size;
-	bp->b_iodone	   = xlog_iodone;
+	XFS_BUF_SET_IODONE_FUNC(bp, xlog_iodone);
 	bp->b_bdstrat	   = xlog_bdstrat_cb;
-	bp->b_fsprivate2   = (void *)((unsigned long)1);
+	XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)1);
 	ASSERT(log->l_xbuf->b_flags & B_BUSY);
 	ASSERT(valusema(&log->l_xbuf->b_lock) <= 0);
 	spinlock_init(&log->l_icloglock, "iclog");
@@ -1223,9 +1223,9 @@ xlog_alloc_log(xfs_mount_t	*mp,
 		bp->b_edev = log_dev;
 		bp->b_target = &mp->m_logdev_targ;
 		bp->b_bufsize = log->l_iclog_size;
-		bp->b_iodone = xlog_iodone;
+		XFS_BUF_SET_IODONE_FUNC(bp, xlog_iodone);
 		bp->b_bdstrat = xlog_bdstrat_cb;
-		bp->b_fsprivate2 = (void *)((unsigned long)1);
+		XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)1);
 
 		iclog->ic_size = bp->b_bufsize - XLOG_HEADER_SIZE;
 		iclog->ic_state = XLOG_STATE_ACTIVE;
@@ -1386,8 +1386,8 @@ xlog_sync(xlog_t		*log,
 	iclog->ic_header.h_len = iclog->ic_offset;	/* real byte length */
 
 	bp	    = iclog->ic_bp;
-	ASSERT(bp->b_fsprivate2 == (void *)((unsigned long)1));
-	bp->b_fsprivate2 = (void *)((unsigned long)2);
+	ASSERT(XFS_BUF_FSPRIVATE2(bp, unsigned long) == (unsigned long)1);
+	XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)2);
 	bp->b_blkno = BLOCK_LSN(iclog->ic_header.h_lsn);
 
 	/* Round byte count up to a BBSIZE chunk */
@@ -1417,7 +1417,7 @@ xlog_sync(xlog_t		*log,
 	}
 	bp->b_dmaaddr	= (caddr_t) &(iclog->ic_header);
 	bp->b_bcount	= count;
-	bp->b_fsprivate	= iclog;		/* save for later */
+	XFS_BUF_SET_FSPRIVATE(bp, iclog);	/* save for later */
 	if (flags & XFS_LOG_SYNC)
 		bp->b_flags |= (B_BUSY | B_HOLD);
 	else
@@ -1442,13 +1442,14 @@ xlog_sync(xlog_t		*log,
 	}
 	if (split) {
 		bp		= iclog->ic_log->l_xbuf;
-		ASSERT(bp->b_fsprivate2 == (void *)((unsigned long)1));
-		bp->b_fsprivate2 = (void *)((unsigned long)2);
+		ASSERT(XFS_BUF_FSPRIVATE2(bp, unsigned long) ==
+							(unsigned long)1);
+		XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)2);
 		bp->b_blkno	= 0;		     /* logical 0 */
 		bp->b_bcount	= split;
 		bp->b_dmaaddr	= (caddr_t)((__psint_t)&(iclog->ic_header)+
 					    (__psint_t)count);
-		bp->b_fsprivate = iclog;
+		XFS_BUF_SET_FSPRIVATE(bp, iclog);
 		bp->b_flags |= (B_BUSY | B_ASYNC);
 		ASSERT(bp->b_bdstrat == xlog_bdstrat_cb);
 		dptr = bp->b_dmaaddr;

@@ -202,18 +202,18 @@ xlog_recover_iodone(
 	struct xfs_buf 	*bp)
 {
 	xfs_mount_t	*mp;
-	ASSERT(bp->b_fsprivate);
+	ASSERT(XFS_BUF_FSPRIVATE(bp, void *));
 	
 	if (geterror(bp)) {
 		/*
 		 * We're not going to bother about retrying 
 		 * this during recovery. One strike!
 		 */
-		mp = (xfs_mount_t *)bp->b_fsprivate;
+		mp = XFS_BUF_FSPRIVATE(bp, xfs_mount_t *);
 		xfs_force_shutdown(mp, XFS_METADATA_IO_ERROR);
 	}
-	bp->b_fsprivate = NULL;
-	bp->b_iodone = NULL;
+	XFS_BUF_SET_FSPRIVATE(bp, NULL);
+	XFS_BUF_CLR_IODONE_FUNC(bp);
 	biodone(bp);
 }
 #endif
@@ -1861,9 +1861,10 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 		bp->b_flags |= B_STALE;
 	        error = xfs_bwrite(mp, bp);
 	} else {
-		ASSERT(bp->b_fsprivate == NULL || bp->b_fsprivate == mp);
-		bp->b_fsprivate = mp;
-		bp->b_iodone = xlog_recover_iodone;
+		ASSERT(XFS_BUF_FSPRIVATE(bp, void *) == NULL ||
+		       XFS_BUF_FSPRIVATE(bp, xfs_mount *) == mp);
+		XFS_BUF_SET_FSPRIVATE(bp, mp);
+		XFS_BUF_SET_IODONE_FUNC(bp, xlog_recover_iodone);
 		xfs_bdwrite(mp, bp);
 	}
 
@@ -2085,9 +2086,10 @@ write_inode_buffer:
 #endif
 	xfs_inobp_check(mp, bp);
 	if (ITEM_TYPE(item) == XFS_LI_INODE) {
-		ASSERT(bp->b_fsprivate == NULL || bp->b_fsprivate == mp);
-		bp->b_fsprivate = mp;
-		bp->b_iodone = xlog_recover_iodone;
+		ASSERT(XFS_BUF_FSPRIVATE(bp, void *) == NULL ||
+		       XFS_BUF_FSPRIVATE(bp, xfs_mount *) == mp);
+		XFS_BUF_SET_FSPRIVATE(bp, mp);
+		XFS_BUF_SET_IODONE_FUNC(bp, xlog_recover_iodone);
 		xfs_bdwrite(mp, bp);
 	} else {
 		bp->b_flags |= B_STALE;
@@ -2224,9 +2226,10 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 	bcopy(recddq, ddq, item->ri_buf[1].i_len);
 
 	ASSERT(dq_f->qlf_size == 2);
-	ASSERT(bp->b_fsprivate == NULL || bp->b_fsprivate == mp);
-	bp->b_fsprivate = mp;
-	bp->b_iodone = xlog_recover_iodone;
+	ASSERT(XFS_BUF_FSPRIVATE(bp, void *) == NULL ||
+	       XFS_BUF_FSPRIVATE(bp, xfs_mount *) == mp);
+	XFS_BUF_SET_FSPRIVATE(bp, mp);
+	XFS_BUF_SET_IODONE_FUNC(bp, xlog_recover_iodone);
 	xfs_bdwrite(mp, bp);
 
 	return (0);
