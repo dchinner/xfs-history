@@ -244,6 +244,7 @@ again:
 		vfsp->vfs_busycnt++;
 	}
 	spin_unlock_irqrestore(&vfslock, s);
+	drop_super(sb);
 	return vfsp;
 }
 
@@ -297,7 +298,6 @@ vfs_unbusy(struct vfs *vfsp)
 {
 	long s;
 
-	drop_super(vfsp->vfs_super);
 	spin_lock_irqsave(&vfslock, s);
 	ASSERT(!(vfsp->vfs_flag & (VFS_MLOCK|VFS_OFFLINE)));
 	ASSERT(vfsp->vfs_busycnt > 0);
