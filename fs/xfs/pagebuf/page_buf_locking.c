@@ -576,7 +576,6 @@ pagebuf_lock_enable(
 	}
 	spin_lock_init(&target->pbr_lock);
 	target->pbr_device = kdev;
-	target->pbr_sector = sb->s_blocksize;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,13)
 	target->pbr_inode = bdev->bd_inode;
 	bdput(bdev);
@@ -607,11 +606,11 @@ pagebuf_lock_enable(
 
 void
 pagebuf_target_blocksize(
-	pb_target_t     *target,
-	unsigned int    blocksize)
+	pb_target_t	*target,
+	unsigned int	blocksize)
 {
 	target->pbr_blocksize = blocksize;
-	target->pbr_blocksize_bits = (unsigned short) ffs(blocksize) - 1;
+	target->pbr_blocksize_bits = ffs(blocksize) - 1;
 }
 
 int

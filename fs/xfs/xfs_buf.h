@@ -225,12 +225,11 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
 #define xfs_bunpin(bp)		pagebuf_unpin(bp)
 
 #ifdef PAGEBUF_TRACE
-#define PB_DEFINE_TRACES
-#include <pagebuf/page_buf_trace.h>
-
-#define xfs_buftrace(id, bp)	PB_TRACE(bp, (void *)id)
+# define PB_DEFINE_TRACES
+# include <pagebuf/page_buf_trace.h>
+# define xfs_buftrace(id, bp)	PB_TRACE(bp, PB_TRACE_REC(external), (void *)id)
 #else
-#define xfs_buftrace(id, bp)
+# define xfs_buftrace(id, bp)	do { } while (0)
 #endif
 
 
@@ -285,10 +284,9 @@ static inline int xfs_bdwrite(void *mp, page_buf_t *bp)
 	return pagebuf_iostart(bp, PBF_DELWRI | PBF_ASYNC);
 }
 
-#define XFS_bdstrat(bp)  pagebuf_iorequest(bp)
+#define XFS_bdstrat(bp)	pagebuf_iorequest(bp)
 
-#define xfs_iowait(pb)              \
-	    pagebuf_iowait(pb)
+#define xfs_iowait(pb)	pagebuf_iowait(pb)
 
 
 /*

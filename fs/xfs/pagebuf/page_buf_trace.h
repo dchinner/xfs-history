@@ -30,8 +30,8 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#ifndef _PAGEBUF_TRACE_INC_
-#define _PAGEBUF_TRACE_INC_
+#ifndef __PAGEBUF_TRACE__
+#define __PAGEBUF_TRACE__
 
 #ifdef PB_DEFINE_TRACES
 #define PB_TRACE_START	typedef enum {
@@ -80,26 +80,16 @@ PB_TRACE_REC(delwri_uq),
 PB_TRACE_REC(pin),
 PB_TRACE_REC(unpin),
 PB_TRACE_REC(file_write),
+PB_TRACE_REC(external),
 PB_TRACE_END
 
 extern void pb_trace_func(page_buf_t *, int, void *, void *);
 #ifdef PAGEBUF_TRACE
-#ifdef _PAGE_BUF_INTERNAL_
-#define PB_TRACE(pb, event, misc)       \
-        pb_trace_func(pb, event, (void *) misc, \
-                (void *)__builtin_return_address(0))
+# define PB_TRACE(pb, event, misc)		\
+	pb_trace_func(pb, event, (void *) misc,	\
+			(void *)__builtin_return_address(0))
 #else
-#define PB_TRACE(pb, misc)       \
-	pb_trace_func(pb, pb_trace_point_external, (void *) misc, NULL)
+# define PB_TRACE(pb, event, misc)	do { } while (0)
 #endif
 
-#define pb_trace_point_external	1000
-
-#else
-
-#define PB_TRACE(pb, event, misc)
-
-#endif
-
-
-#endif
+#endif	/* __PAGEBUF_TRACE__ */

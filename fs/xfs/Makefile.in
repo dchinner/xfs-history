@@ -84,6 +84,9 @@ XFS_EXTRA_CFLAGS	:= $(src_includelist /fs/xfs)
 ifsel(CONFIG_XFS_DEBUG)
   XFS_EXTRA_CFLAGS	+= -g -DSTATIC="" -DDEBUG -DXFSDEBUG
 endif
+ifsel(CONFIG_PAGEBUF_DEBUG)
+  XFS_EXTRA_CFLAGS	+= -DPAGEBUF_TRACE
+endif
 extra_cflags_all($(XFS_EXTRA_CFLAGS))
 
 extra_cflags(xfsidbg.o $(src_includelist /arch/$(ARCH)/kdb))

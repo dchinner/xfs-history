@@ -65,15 +65,17 @@
 /*
  * Forward declarations.
  */
-STATIC void __pb_block_commit_write_async(struct inode *,
-		struct page *, int);
-STATIC int __pb_block_prepare_write_async(struct inode *, struct page *,
-		unsigned, unsigned, int, pagebuf_bmap_fn_t,
+STATIC void __pb_block_commit_write_async(
+		pb_target_t *, struct inode *, struct page *, int);
+STATIC int  __pb_block_prepare_write_async(
+		pb_target_t *, struct inode *, struct page *, unsigned,
+		unsigned, int, pagebuf_bmap_fn_t, page_buf_bmap_t *, int, int);
+STATIC int  pagebuf_delalloc_convert(
+		pb_target_t *, struct inode *, struct page *, unsigned long,
+		pagebuf_bmap_fn_t, int);
+STATIC void hook_buffers_to_page(
+		pb_target_t *, struct inode *, struct page *,
 		page_buf_bmap_t *, int);
-STATIC int pagebuf_delalloc_convert(struct inode *, struct page *,
-		unsigned long, pagebuf_bmap_fn_t, int);
-STATIC void hook_buffers_to_page(struct inode *, struct page *,
-		page_buf_bmap_t *);
 
 /*
  * The following structure is used to communicate between various levels
@@ -104,15 +106,15 @@ typedef struct {
 
 static inline int
 pagebuf_commit_write_core(
-	struct inode *inode,
-	struct page *page,
-	unsigned from,
-	unsigned to)
+	pb_target_t	*target,
+	struct inode	*inode,
+	struct page	*page,
+	unsigned	from,
+	unsigned	to)
 {
-	int partial = (from - to) != PAGE_CACHE_SIZE;
+	int		partial = (from - to) != PAGE_CACHE_SIZE;
 
-	__pb_block_commit_write_async(inode, page, partial);
-
+	__pb_block_commit_write_async(target, inode, page, partial);
 	kunmap(page);
 
 	return 0;
@@ -120,16 +122,15 @@ pagebuf_commit_write_core(
 
 int
 pagebuf_commit_write(
-	struct file *file,
-	struct page *page,
-	unsigned from,
-	unsigned to)
+	pb_target_t	*target,
+	struct page	*page,
+	unsigned	from,
+	unsigned	to)
 {
 	struct inode *inode = (struct inode*)page->mapping->host;
 	loff_t pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
 
-	pagebuf_commit_write_core(inode, page, from, to);
-
+	pagebuf_commit_write_core(target, inode, page, from, to);
 	if (pos > inode->i_size)
 		inode->i_size = pos;
 
@@ -274,14 +275,15 @@ int _pagebuf_handle_iovecs(
  *	valid before the operation, it will be read from disk before
  *	being partially zeroed. 
  */
-
-int pagebuf_iozero(		/* zero contents of buffer      */
-    struct inode *ip,		/* inode owning buffer		*/
-    page_buf_t * pb,		/* buffer to zero               */
-    off_t boff,			/* offset in buffer             */
-    size_t bsize,		/* size of data to zero         */
-    loff_t end_size,		/* maximum file size to set	*/
-    pb_bmap_t *pbmapp)		/* pointer to pagebuf bmap	*/
+int
+pagebuf_iozero(
+	struct inode	*ip,		/* inode owning buffer		*/
+	page_buf_t	*pb,		/* buffer to zero               */
+	off_t		boff,		/* offset in buffer             */
+	size_t		bsize,		/* size of data to zero         */
+	loff_t		end_size,	/* maximum file size to set	*/
+	pb_bmap_t	*pbmapp,	/* pointer to pagebuf bmap	*/
+	int		nmaps)
 {
 	loff_t cboff;
 	size_t cpoff;
@@ -307,12 +309,13 @@ int pagebuf_iozero(		/* zero contents of buffer      */
 
 		at_eof = page->index >= (ip->i_size >> PAGE_CACHE_SHIFT);
 
-		__pb_block_prepare_write_async(ip, page,
+		__pb_block_prepare_write_async(pb->pb_target, ip, page,
 			cpoff, cpoff+csize, at_eof, NULL,
-			pbmapp, PBF_WRITE);
+			pbmapp, nmaps, PBF_WRITE);
 		/* __pb_block_prepare_write already kmap'd the page */
 		memset((void *) (page_address(page) + cpoff), 0, csize);
-		pagebuf_commit_write_core(ip, page, cpoff, cpoff + csize);
+		pagebuf_commit_write_core(pb->pb_target, ip, page,
+			cpoff, cpoff + csize);
 		pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) +
 			cpoff + csize;
 		if (pos > ip->i_size)
@@ -335,13 +338,14 @@ int pagebuf_iozero(		/* zero contents of buffer      */
 
 size_t
 _pb_direct_io(
-	struct inode	*inode,
-	loff_t		rounded_offset,
-	size_t		pb_size,
-	page_buf_bmap_t	*mp,
-	void		*user_addr,
-	pb_io_desc_t	*rdp,
-	int		rdwr)
+	struct pb_target	*target,
+	struct inode		*inode,
+	loff_t			rounded_offset,
+	size_t			pb_size,
+	page_buf_bmap_t		*mp,
+	void			*user_addr,
+	pb_io_desc_t		*rdp,
+	int			rdwr)
 {
 	page_buf_t	*pb;
 	struct kiobuf	*kp;
@@ -355,7 +359,7 @@ _pb_direct_io(
 
 	pb_flags = (rdwr ? PBF_WRITE : PBF_READ) | PBF_FORCEIO | _PBF_LOCKABLE;
 
-	pb = pagebuf_lookup(inode, rounded_offset, pb_size, pb_flags);
+	pb = pagebuf_lookup(target, inode, rounded_offset, pb_size, pb_flags);
 	if (!pb) {
 		if (rdp)
 			rdp->io_error = -ENOMEM;
@@ -363,7 +367,7 @@ _pb_direct_io(
 	}
 
 	offset = mp->pbm_delta >> inode->i_sb->s_blocksize_bits;
-	pb->pb_dev = mp->pbm_dev;
+	pb->pb_dev = target->pbr_device;
 	pb->pb_bn = mp->pbm_bn + offset;
 
 	/* Do our own allocation to avoid the buffer_head overhead */
@@ -429,11 +433,12 @@ size_t pagebuf_max_direct()
 
 ssize_t
 pagebuf_direct_file_read(
-    struct file * filp,		/* file to read                 */
-    char *buf,			/* buffer address               */
-    size_t len,			/* size of buffer               */
-    loff_t * lp,		/* file offset to use and update */
-    pagebuf_bmap_fn_t bmap)	/* bmap function		*/
+	struct pb_target	*target,
+	struct file		*filp,	/* file to read                 */
+	char			*buf,	/* buffer address               */
+	size_t			len,	/* size of buffer               */
+	loff_t			*lp,	/* file offset to use and update*/
+	pagebuf_bmap_fn_t	bmap)	/* bmap function		*/
 {
 	pb_io_desc_t iodp, *rdp=&iodp;
 	struct iovec iovec, *iovp = &iovec;
@@ -465,7 +470,7 @@ pagebuf_direct_file_read(
 	mask = ~(loff_t)(rounding - 1);
 
 	/*
-	 * while we have data to do, get a bunch of mapping for this
+	 * while we have data to do, get a bunch of mappings for this
 	 * file to blocks on disk (or in delalloc or holes or ...).
 	 *  For each map entry,
 	 *      get a pagebuf. Note that pagebuf's are limited in size
@@ -559,7 +564,7 @@ pagebuf_direct_file_read(
 				pb_done = 0;
 
 				while (pb_done < size) {
-					pb_size = _pb_direct_io(inode,
+					pb_size = _pb_direct_io(target, inode,
 							rounded_offset,
 							pb_size, mp,
 							NULL, rdp, 0);
@@ -604,25 +609,18 @@ STATIC void end_pb_buffer_io_sync(struct buffer_head *bh, int uptodate)
 
 
 /*
- * Generic "read page" function for block devices that have the normal
- * get_block functionality. This is most of the block device filesystems.
- * Reads the page asynchronously --- the unlock_buffer() and
- * mark_buffer_uptodate() functions propagate buffer state into the
- * page struct once IO has completed.
- *
- *	pagebuf_read_full_page
+ * pagebuf_read_full_page
+ * Originally derived from buffer.c::block_read_full_page
  */
-
-int pagebuf_read_full_page(
-	struct file		*filp,
+int
+pagebuf_read_full_page(
+	pb_target_t		*target,
 	struct page		*page,
 	pagebuf_bmap_fn_t	 bmap)
 {
-	struct inode	*inode = (struct inode*)page->mapping->host;
-	/* arr is sized for worst case */
-	struct buffer_head *bh, *head, *arr[MAX_BUF_PER_PAGE];
-	int blocksize, bbits = inode->i_sb->s_blocksize_bits;
-	long nr, i, status = 0;
+	struct inode		*inode = page->mapping->host;
+	struct buffer_head	*bh, *head, *arr[MAX_BUF_PER_PAGE];
+	int			i, nr, error;
 
 	if (!PageLocked(page))
 		PAGE_BUG(page);
@@ -630,7 +628,7 @@ int pagebuf_read_full_page(
 	if (DelallocPage(page)) {
 		SetPageUptodate(page);
 		UnlockPage(page);
-		return status;
+		return 0;
 	}
 
 	bh = head = page->buffers;
@@ -638,11 +636,12 @@ int pagebuf_read_full_page(
 		page_buf_bmap_t	map;
 		int		nmaps;
 		
-		status = bmap(inode, ((loff_t)page->index << PAGE_CACHE_SHIFT),
+		error = bmap(inode, ((loff_t)page->index << PAGE_CACHE_SHIFT),
 				PAGE_CACHE_SIZE, &map, 1, &nmaps, PBF_READ);
-
+		if (error)
+			BUG();
 		if (map.pbm_bn >= 0) {
-			hook_buffers_to_page(inode, page, &map);
+			hook_buffers_to_page(target, inode, page, &map, nmaps);
 			bh = head = page->buffers;
 		} else if (map.pbm_flags & (PBMF_HOLE|PBMF_DELAY)) {
 			memset(kmap(page), 0, PAGE_CACHE_SIZE);
@@ -653,17 +652,13 @@ int pagebuf_read_full_page(
 	}
 
 	nr = 0;
-	i = 0;
-
 	do {
-		blocksize = bh->b_size;
-
 		if (buffer_uptodate(bh))
 			continue;
 
 		arr[nr] = bh;
 		nr++;
-	}  while (i += blocksize >> bbits, (bh = bh->b_this_page) != head);
+	} while ((bh = bh->b_this_page) != head);
 
 	if (!nr) {
 page_done:
@@ -690,7 +685,11 @@ page_done:
 	return 0;
 }
 
-void pagebuf_release_page(struct page *page, pagebuf_bmap_fn_t bmap)
+void
+pagebuf_release_page(
+	pb_target_t		*target,
+	struct page		*page,
+	pagebuf_bmap_fn_t	bmap)
 {
 	struct inode *inode = (struct inode*)page->mapping->host;
 	unsigned long pb_flags;
@@ -699,14 +698,18 @@ void pagebuf_release_page(struct page *page, pagebuf_bmap_fn_t bmap)
 		pb_flags = PBF_WRITE|PBF_FILE_ALLOCATE;
 	else
 		pb_flags = PBF_WRITE|PBF_DIRECT;
-	pagebuf_delalloc_convert(inode, page, pb_flags, bmap, 0);
+	pagebuf_delalloc_convert(target, inode, page, pb_flags, bmap, 0);
 }
 
 /*
- *	pagebuf_write_full_page
+ * pagebuf_write_full_page
+ * Originally derived from buffer.c::block_write_full_page
  */
-
-int pagebuf_write_full_page(struct page *page, pagebuf_bmap_fn_t bmap)
+int
+pagebuf_write_full_page(
+	pb_target_t		*target,
+	struct page		*page,
+	pagebuf_bmap_fn_t	bmap)
 {
 	struct inode *inode = (struct inode*)page->mapping->host;
 	unsigned long end_index = inode->i_size >> PAGE_CACHE_SHIFT, pb_flags;
@@ -727,7 +730,7 @@ int pagebuf_write_full_page(struct page *page, pagebuf_bmap_fn_t bmap)
 		}
 	}
 
-	ret = pagebuf_delalloc_convert(inode, page, pb_flags, bmap, 1);
+	ret = pagebuf_delalloc_convert(target, inode, page, pb_flags, bmap, 1);
 out:
 	if (ret < 0) {
 		/*
@@ -744,13 +747,16 @@ out:
 }
 
 STATIC void
-hook_buffers_to_page_delay(struct inode *inode, struct page *page)
+hook_buffers_to_page_delay(
+	pb_target_t		*target,
+	struct inode		*inode,
+	struct page		*page)
 {
 	struct buffer_head 	*bh;
 
 	if (page->buffers)
 		BUG();
-	create_empty_buffers(page, inode->i_dev, PAGE_CACHE_SIZE);
+	create_empty_buffers(page, target->pbr_device, PAGE_CACHE_SIZE);
 	bh = page->buffers;
 	bh->b_state = (1 << BH_Delay) | (1 << BH_Mapped);
 	__mark_buffer_dirty(bh);
@@ -759,15 +765,19 @@ hook_buffers_to_page_delay(struct inode *inode, struct page *page)
 }
 
 STATIC void
-hook_buffers_to_page(struct inode *inode,
-	struct page *page, page_buf_bmap_t *mp)
+hook_buffers_to_page(
+	pb_target_t		*target,
+	struct inode		*inode,
+	struct page		*page,
+	page_buf_bmap_t		*mp,
+	int			nmaps)
 {
 	struct buffer_head 	*bh;
 	page_buf_daddr_t	bn;
 	loff_t			delta;
 
 	if (!page->buffers)
-		create_empty_buffers(page, mp->pbm_dev, PAGE_CACHE_SIZE);
+		create_empty_buffers(page, target->pbr_device, PAGE_CACHE_SIZE);
 	bh = page->buffers;
 	/*
 	 * pbm_offset:pbm_bn :: (page's offset):???
@@ -783,8 +793,8 @@ hook_buffers_to_page(struct inode *inode,
 		(PAGE_CACHE_SHIFT - inode->i_sb->s_blocksize_bits);
 	bn += (delta >> PAGE_CACHE_SHIFT);
 	lock_buffer(bh);
-	bh->b_blocknr = bn; 
-	bh->b_dev = mp->pbm_dev;
+	bh->b_blocknr = bn;
+	bh->b_dev = target->pbr_device;
 	set_bit(BH_Mapped, &bh->b_state);
 	clear_bit(BH_Delay, &bh->b_state);
 	unlock_buffer(bh);
@@ -805,7 +815,7 @@ set_buffer_dirty_uptodate(
 	 * or something is seriously wrong!
 	 */
 	if ((bh->b_blocknr < 0) || 
-	    (bh->b_blocknr == 0) && (inode->i_dev == bh->b_dev)) {
+	    ((bh->b_blocknr == 0) && (inode->i_dev == bh->b_dev))) {
 		printk("Warning: buffer 0x%p with weird blockno (%ld)\n",
 			bh, bh->b_blocknr);
 	}
@@ -824,16 +834,23 @@ set_buffer_dirty_uptodate(
 }
 
 STATIC int
-__pb_block_prepare_write_async(struct inode *inode, struct page *page,
-		unsigned from, unsigned to, int at_eof,
-		pagebuf_bmap_fn_t  bmap, page_buf_bmap_t *mp, int flags)
+__pb_block_prepare_write_async(
+	pb_target_t		*target,
+	struct inode		*inode,
+	struct page		*page,
+	unsigned		from,
+	unsigned		to,
+	int			at_eof,
+	pagebuf_bmap_fn_t	bmap,
+	page_buf_bmap_t		*mp,
+	int			nmaps,
+	int			flags)
 {
-	struct buffer_head 	*bh;
+	struct buffer_head	*bh;
 	int 			err = 0;
-	int			nmaps, dp = DelallocPage(page);
+	int			dp = DelallocPage(page);
 	char			*kaddr = kmap(page);
-	page_buf_bmap_t		map;
-
+	page_buf_bmap_t		map[PBF_MAX_MAPS];
 
 	/*
 	 * Create & map buffer.
@@ -846,7 +863,7 @@ __pb_block_prepare_write_async(struct inode *inode, struct page *page,
 	if ((!bh || buffer_delay(bh)) && (!dp || (flags & PBF_FILE_ALLOCATE)))
 	{
 		if (!mp) {
-			mp = &map;
+			mp = map;
 			err = bmap(inode, ((loff_t)page->index << PAGE_CACHE_SHIFT),
 				PAGE_CACHE_SIZE, mp, 1, &nmaps, flags);
 			if (err < 0) {
@@ -854,7 +871,7 @@ __pb_block_prepare_write_async(struct inode *inode, struct page *page,
 			}
 		}
 		if (mp->pbm_bn >= 0) {
-			hook_buffers_to_page(inode, page, mp);
+			hook_buffers_to_page(target, inode, page, mp, nmaps);
 			bh = page->buffers;
 		}
 	}
@@ -876,7 +893,7 @@ __pb_block_prepare_write_async(struct inode *inode, struct page *page,
 		(mp && (mp->pbm_flags & (PBMF_DELAY|PBMF_UNWRITTEN)))) {
 
 		/*
-		 * Zero the parts of page not coverd by this I/O
+		 * Zero the parts of page not covered by this I/O
 		 */
 		if (PAGE_CACHE_SIZE > to) {
 			memset(kaddr+to, 0, PAGE_CACHE_SIZE-to);
@@ -909,18 +926,18 @@ out:
 
 int
 pagebuf_prepare_write(
-	struct file *file,
-	struct page *page,
-	unsigned from,
-	unsigned to,
-	pagebuf_bmap_fn_t  bmap)
+	pb_target_t		*target,
+	struct page 		*page,
+	unsigned		from,
+	unsigned		to,
+	pagebuf_bmap_fn_t	bmap)
 {
-	struct inode *inode = (struct inode*)page->mapping->host;
-	int at_eof = page->index >= (inode->i_size >> PAGE_CACHE_SHIFT);
-	int err;
+	struct inode		*inode = page->mapping->host;
+	int			err, at_eof;
 
-	err = __pb_block_prepare_write_async(inode, page, from, to,
-					at_eof, bmap, NULL, PBF_WRITE);
+	at_eof = page->index >= (inode->i_size >> PAGE_CACHE_SHIFT);
+	err = __pb_block_prepare_write_async(target, inode, page, from, to,
+					at_eof, bmap, NULL, 0, PBF_WRITE);
 	if (err) {
 		ClearPageUptodate(page);
 		kunmap(page);
@@ -931,9 +948,11 @@ pagebuf_prepare_write(
 
 
 STATIC void
-__pb_block_commit_write_async(struct inode 	*inode,
-				struct page 	*page,
-				int		partial)
+__pb_block_commit_write_async(
+	pb_target_t		*target,
+	struct inode 		*inode,
+	struct page 		*page,
+	int			partial)
 {
 	struct buffer_head	*bh;
 
@@ -945,26 +964,28 @@ __pb_block_commit_write_async(struct inode 	*inode,
 	if ((bh = page->buffers) && !buffer_delay(bh)) {
 		set_buffer_dirty_uptodate(inode, page->buffers, partial);
 	} else if (!DelallocPage(page)) {
-		hook_buffers_to_page_delay(inode, page);
+		hook_buffers_to_page_delay(target, inode, page);
 	}
 }
 
-int
+STATIC int
 __pagebuf_do_delwri(
-	struct file	*filp,		/* file to write                */
-	loff_t 		rounded_offset, /* offset in file, page aligned	     */
-	unsigned long 	size,		/* size to write, constrained by wdp */
-	char		*buf,
-	size_t		len,
-	loff_t		*lp,
-	page_buf_bmap_t *mp)		/* bmap for page		     */
+	pb_target_t		*target,
+	struct file		*filp,		/* file to write */
+	loff_t 			rounded_offset,	/* page-aligned file offset */
+	unsigned long 		size,		/* size to write */
+	char			*buf,
+	size_t			len,
+	loff_t			*lp,
+	page_buf_bmap_t		*mp,		/* bmap for page */
+	int			nmaps)
 {
-	struct inode *inode = filp->f_dentry->d_inode;
-	struct page *page;
-	unsigned long done;
-	int err = 0, written = 0;
-	loff_t foff = *lp;
-	char *kaddr;
+	struct inode		*inode = filp->f_dentry->d_inode;
+	struct page		*page;
+	unsigned long		done;
+	int			err = 0, written = 0;
+	loff_t			foff = *lp;
+	char			*kaddr;
 
 	for (done = 0; (done < size) && len;
 		done += PAGE_CACHE_SIZE, rounded_offset += PAGE_CACHE_SIZE)
@@ -1000,10 +1021,9 @@ __pagebuf_do_delwri(
 
 		at_eof = foff == inode->i_size;
 
-		err = __pb_block_prepare_write_async(inode, page,
+		err = __pb_block_prepare_write_async(target, inode, page,
 			offset, offset + bytes,
-			at_eof, NULL, mp, PBF_WRITE);
-		
+			at_eof, NULL, mp, nmaps, PBF_WRITE);
 		if (err)
 			goto unlock;
 		kaddr = page_address(page);
@@ -1016,7 +1036,7 @@ __pagebuf_do_delwri(
 			goto unlock;
 		}
 
-		pagebuf_commit_write(filp, page, offset, offset + bytes);
+		pagebuf_commit_write(target, page, offset, offset + bytes);
 
 		foff += bytes;
 		len -= bytes;
@@ -1035,27 +1055,26 @@ unlock:
 
 int
 _pagebuf_file_write(
-	struct file * filp,	/* file to write                */
-	char *buf,		/* buffer address               */
-	size_t len,		/* size of buffer               */
-	loff_t * lp,		/* file offset to use and update */
-	pagebuf_bmap_fn_t  bmap,	/* bmap function */
-	int pb_flags)		/* flags to pass to bmap calls	*/
+	struct pb_target	*target,
+	struct file		*filp,	/* file to write                */
+	char			*buf,	/* buffer address               */
+	size_t			len,	/* size of buffer               */
+	loff_t			*lp,	/* file offset to use and update */
+	pagebuf_bmap_fn_t	bmap,	/* bmap function */
+	int			pb_flags)	/* flags to bmap calls	*/
 {
-	struct inode *inode = filp->f_dentry->d_inode;
-	page_buf_bmap_t map;
-	int maps_returned;
-	unsigned long map_size, size;
-	int status = 0, written = 0;
-	loff_t foff = *lp;
-	int sync;
-
-	sync = filp->f_flags & (O_SYNC|O_DIRECT);
+	struct inode		*inode = filp->f_dentry->d_inode;
+	page_buf_bmap_t		map[PBF_MAX_MAPS];
+	int			maps_returned;
+	unsigned long		map_size, size;
+	int			status = 0, written = 0;
+	loff_t			foff = *lp;
+	int			sync = filp->f_flags & (O_SYNC|O_DIRECT);
 
 	/*
-	 * while we have data to do, get a bunch of mapping for this
+	 * While we have data to do, get a bunch of mappings for this
 	 * file to blocks on disk (or in delalloc or holes or ...).
-	 *  For each map entry,
+	 * For each map entry,
 	 *      get a pagebuf. Note that pagebuf's are limited in size
 	 *              so we need to loop again for each chunksize
 	 *              within the mapping the file system returned.
@@ -1069,7 +1088,7 @@ _pagebuf_file_write(
 		/*
 		 * Let's start by calling bmap for the offset/len we have.
 		 * This will return the on disk representation
-		 * (or dealalloc/holes).
+		 * (or delalloc/holes).
 		 *
 		 * Once we know the on disk and/or in memory representation,
 		 * we can better do the I/Os in chunks or ...
@@ -1104,8 +1123,7 @@ _pagebuf_file_write(
 			size = PBF_IO_CHUNKSIZE;
 
 		status = bmap(inode, rounded_offset, size,
-				&map, 1, &maps_returned, pb_flags);
-
+				map, PBF_MAX_MAPS, &maps_returned, pb_flags);
 		if (status) {
 			break;
 		}
@@ -1117,7 +1135,7 @@ _pagebuf_file_write(
 		 * piece in the map.
 		 */
 
-		map_size = map.pbm_bsize - map.pbm_delta;
+		map_size = map[0].pbm_bsize - map[0].pbm_delta;
 		size = min((unsigned long)map_size, size);
 
 		/*
@@ -1125,23 +1143,23 @@ _pagebuf_file_write(
 		 * from the file system. We need to go back and ask for
 		 * more space.
 		 */
-		if (map.pbm_flags & PBMF_HOLE) {
+		if (map[0].pbm_flags & PBMF_HOLE) {
 			printk("pbfwa: HOLE ro 0x%Lx size 0x%lx mp 0x%p\n",
-				rounded_offset, size, &map);
+				rounded_offset, size, &map[0]);
 			break;
 		}
 		/*
 		 * Handle delwri or direct I/O
 		 */
 		if ((filp->f_flags & O_DIRECT) == 0) {
-			status = __pagebuf_do_delwri(filp,
+			status = __pagebuf_do_delwri(target, filp,
 					rounded_offset, size, buf,
-					len, &foff, &map);
+					len, &foff, map, maps_returned);
 		} else {
 			int	io_size = (int)min(size, (unsigned long) len);
 
-			status = _pb_direct_io(inode, rounded_offset,
-					io_size, &map, buf, NULL, 1);
+			status = _pb_direct_io(target, inode, rounded_offset,
+					io_size, map, buf, NULL, 1);
 			if (status > 0)
 				foff += status;
 			if (foff > inode->i_size)
@@ -1159,11 +1177,12 @@ _pagebuf_file_write(
 
 ssize_t
 pagebuf_generic_file_write(
-    struct file * filp,		/* file to write                */
-    char *buf,			/* buffer address               */
-    size_t len,			/* size of buffer               */
-    loff_t * lp,		/* file offset to use and update */
-    pagebuf_bmap_fn_t  bmap)	/* bmap function */
+	pb_target_t		*target,
+	struct file		*filp,	/* file to write                */
+	char			*buf,	/* buffer address               */
+	size_t			len,	/* size of buffer               */
+	loff_t			*lp,	/* file offset to use and update */
+	pagebuf_bmap_fn_t	bmap)	/* bmap function */
 {
 	struct inode *inode = filp->f_dentry->d_inode;
 	unsigned long index;
@@ -1224,7 +1243,7 @@ pagebuf_generic_file_write(
 		}
 
 		if (!page) {
-			status = _pagebuf_file_write(filp,
+			status = _pagebuf_file_write(target, filp,
 					buf, len, &foff, bmap, pb_flags);
 			if (status > 0)
 				written += status;
@@ -1237,9 +1256,9 @@ pagebuf_generic_file_write(
 
 		at_eof = foff == inode->i_size;
 
-		status = __pb_block_prepare_write_async(inode, page,
+		status = __pb_block_prepare_write_async(target, inode, page,
 			offset, offset + bytes, at_eof, bmap,
-			NULL, pb_flags);
+			NULL, 0, pb_flags);
 			
 		if (status)
 			goto unlock;
@@ -1254,7 +1273,7 @@ pagebuf_generic_file_write(
 			goto unlock;
 		}
 
-		pagebuf_commit_write(filp, page, offset, offset + bytes);
+		pagebuf_commit_write(target, page, offset, offset + bytes);
 
 		len -= bytes;
 		buf += bytes;
@@ -1330,13 +1349,14 @@ submit_page_io(struct page *page)
  * delalloc pages only, for the original page it is possible that 
  * the page has no mapping at all.
  */
-
 STATIC void
 convert_page(
-	struct inode *inode,
-	struct page *page,
-	page_buf_bmap_t *mp,
-	int async_write)
+	pb_target_t		*target,
+	struct inode		*inode,
+	struct page		*page,
+	page_buf_bmap_t		*mp,
+	int			nmaps,
+	int			async_write)
 {
 	struct buffer_head *bh = page->buffers;
 
@@ -1344,7 +1364,7 @@ convert_page(
 	 * page with real buffers, or page with no buffers (mmap)
 	 */
 	if (!bh || DelallocPage(page)) {
-		hook_buffers_to_page(inode, page, mp);
+		hook_buffers_to_page(target, inode, page, mp, nmaps);
 	}
 
 	if (async_write) {
@@ -1360,10 +1380,13 @@ convert_page(
  * by mp and surrounding the start page.
  */
 STATIC int
-cluster_write(struct inode *inode,
-	      struct page *startpage,
-	      page_buf_bmap_t *mp,
-	      int async_write)
+cluster_write(
+	pb_target_t		*target,
+	struct inode		*inode,
+	struct page		*startpage,
+	page_buf_bmap_t		*mp,
+	int			nmaps,
+	int			async_write)
 {
 	unsigned long tindex, tlast;
 	struct page *page;
@@ -1373,27 +1396,28 @@ cluster_write(struct inode *inode,
 		for (tindex = startpage->index-1; tindex >= tlast; tindex--) {
 			if (!(page = probe_page(inode, tindex)))
 				break;
-			convert_page(inode, page, mp, 1);
+			convert_page(target, inode, page, mp, nmaps, 1);
 		}
 	}
-	convert_page(inode, startpage, mp, async_write);
+	convert_page(target, inode, startpage, mp, nmaps, async_write);
 	tlast = PAGE_CACHE_ALIGN_LL(mp->pbm_offset + mp->pbm_bsize) >>
 							PAGE_CACHE_SHIFT;
 	for (tindex = startpage->index + 1; tindex < tlast; tindex++) {
 		if (!(page = probe_page(inode, tindex)))
 			break;
-		convert_page(inode, page, mp, 1);
+		convert_page(target, inode, page, mp, nmaps, 1);
 	}
 	return 0;
 }
 
 STATIC int
 pagebuf_delalloc_convert(
-	struct inode *inode,
-	struct page *page,	/* delalloc page to convert - locked */
-	unsigned long flags,	/* allocation mode to use */
-	pagebuf_bmap_fn_t  bmap,/* bmap function */
-	int async_write)
+	pb_target_t		*target,
+	struct inode		*inode,
+	struct page		*page,	/* delalloc page to convert - locked */
+	unsigned long		flags,	/* allocation mode to use */
+	pagebuf_bmap_fn_t	bmap,	/* bmap function */
+	int			async_write)
 {
 	page_buf_bmap_t maps[PBF_MAX_MAPS];
 	int maps_returned, error;
@@ -1429,6 +1453,7 @@ pagebuf_delalloc_convert(
 	 * which is a locked page with an extra reference.
 	 */
 	page_cache_get(page);
-	return cluster_write(inode, page, &maps[0], async_write);
+	return cluster_write(target, inode, page,
+				&maps[0], maps_returned, async_write);
 }
 

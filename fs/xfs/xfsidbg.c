@@ -1913,10 +1913,14 @@ kdbm_pbmap(int argc, const char **argv, const char **envp,
 	return 0;
 }
 
-#ifdef	PAGEBUF_TRACE
-#undef _PAGEBUF_TRACE_INC_
-#undef PB_DEFINE_TRACES
-
+#ifdef PAGEBUF_TRACE
+# ifdef __PAGEBUF_TRACE__
+# undef __PAGEBUF_TRACE__
+# undef PB_DEFINE_TRACES
+# undef PB_TRACE_START
+# undef PB_TRACE_REC
+# undef PB_TRACE_END
+# endif
 #include "pagebuf/page_buf_trace.h"
 
 #define EV_SIZE	(sizeof(event_names)/sizeof(char *))
