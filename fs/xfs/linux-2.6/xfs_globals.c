@@ -56,7 +56,7 @@ xfs_param_t xfs_params = {
 	.symlink_mode	= {	0,		0,		1	},
 	.panic_mask	= {	0,		0,		127	},
 	.error_level	= {	0,		3,		11	},
-	.sync_interval	= {	USER_HZ,	30*USER_HZ,	60*USER_HZ },
+	.sync_interval	= {	USER_HZ,	30*USER_HZ,	7200*USER_HZ },
 	.probe_dmapi	= {	0,		1,		1	},
 	.probe_ioops	= {	0,		0,		1	},
 	.probe_quota	= {	0,		1,		1	},
@@ -65,7 +65,7 @@ xfs_param_t xfs_params = {
 	.inherit_nodump	= {	0,		1,		1	},
 	.inherit_noatim = {	0,		1,		1	},
 	.flush_interval	= {	USER_HZ/2,	USER_HZ,	30*USER_HZ },
-	.age_buffer	= {	1*USER_HZ,	15*USER_HZ,	300*USER_HZ },
+	.age_buffer	= {	1*USER_HZ,	15*USER_HZ,	7200*USER_HZ },
 };
 
 /*
