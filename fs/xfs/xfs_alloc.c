@@ -1323,6 +1323,7 @@ xfs_free_ag_extent(
 
 /*
  * Return the number of free blocks left in the allocation group.
+ * Return 0 if flags has XFS_ALLOC_FLAG_TRYLOCK and the lock fails.
  */
 xfs_extlen_t			/* number of remaining free blocks */
 xfs_alloc_ag_freeblks(
@@ -1336,6 +1337,8 @@ xfs_alloc_ag_freeblks(
 	xfs_extlen_t	freeblks;/* return value */
 
 	agbuf = xfs_alloc_read_agf(mp, tp, agno, flags);
+	if (!agbuf)
+		return 0;
 	agf = xfs_buf_to_agf(agbuf);
 	freeblks = agf->agf_freeblks;
 	xfs_trans_brelse(tp, agbuf);
