@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+# Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of version 2 of the GNU General Public License as
@@ -50,6 +50,9 @@ ifeq ($(CONFIG_XFS_TRACE),y)
 	EXTRA_CFLAGS += -DXFS_DIR2_TRACE
 	EXTRA_CFLAGS += -DPAGEBUF_TRACE
 	# EXTRA_CFLAGS += -DXFS_VNODE_TRACE
+endif
+ifeq ($(CONFIG_XFS_DMAPI),y)
+	EXTRA_CFLAGS += -I $(TOPDIR)/fs/dmapi
 endif
 
 # fs/Makefile enters fs/xfs twice if CONFIG_XFS_FS is y, once for kernel and
@@ -131,11 +134,10 @@ obj-y				+= linux-2.4/linux_xfs.o \
 				   support/support_xfs.o
 
 subdir-$(CONFIG_XFS_FS)		+= linux-2.4 support
-subdir-$(CONFIG_XFS_DMAPI)	+= dmapi
 subdir-$(CONFIG_XFS_QUOTA)	+= quota
 
-ifeq ($(CONFIG_XFS_FS)$(CONFIG_XFS_DMAPI),yy)
-  obj-y				+= dmapi/xfs_dmapi.o
+ifneq ($(CONFIG_XFS_DMAPI),)
+  obj-y				+= dmapi/dmapi_xfs.o
 endif
 
 ifeq ($(CONFIG_XFS_FS)$(CONFIG_XFS_QUOTA),yy)
