@@ -5,7 +5,7 @@
 WORKAREA ?= `pwd`
 
 KERN_SPEC = kernel-2.4.spec
-KERNEL_VERSION = 2.4.0-test9
+KERNEL_VERSION = 2.4.0-test10
 
 SGI_VERSION = `cat $(WORKAREA)/SPECS/_sgi_kvers_`
 
