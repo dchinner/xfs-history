@@ -43,6 +43,8 @@ typedef struct xfs_inode {
 	struct xfs_inode	*i_mnext;	/* next inode in mount list */
 	struct xfs_inode	**i_mprevp;	/* ptr to prev i_next */
 	struct vnode		*i_vnode;	/* ptr to associated vnode */
+	grio_ticket_t		*i_ticket;	/* grio ticket list */
+	mrlock_t		i_ticketlock;
 	dev_t			i_dev;		/* dev for this inode */
 	xfs_ino_t		i_ino;		/* inode number (agno/agino)*/
 
