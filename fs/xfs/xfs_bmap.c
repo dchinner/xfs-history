@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.142 $"
+#ident	"$Revision: 1.144 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -2839,7 +2839,8 @@ xfs_bmap_cancel(
 }
 
 /*
- * Returns the file-relative block number of the first unused block in the file.
+ * Returns the file-relative block number of the first unused block(s)
+ * in the file with at least "len" logically contiguous blocks free.
  * This is the lowest-address hole if the file has holes, else the first block
  * past the end of file.
  * Return 0 if the file is currently local (in-inode).
@@ -2848,6 +2849,7 @@ int						/* error */
 xfs_bmap_first_unused(
 	xfs_trans_t	*tp,			/* transaction pointer */
 	xfs_inode_t	*ip,			/* incore inode */
+	xfs_extlen_t	len,			/* size of hole to find */
 	xfs_fileoff_t	*first_unused,		/* unused block */
 	int		whichfork)		/* data or attr fork */
 {
@@ -2876,7 +2878,7 @@ xfs_bmap_first_unused(
 	nextents = ifp->if_bytes / sizeof(xfs_bmbt_rec_t);
 	base = &ifp->if_u1.if_extents[0];
 	for (lastaddr = 0, ep = base; ep < &base[nextents]; ep++) {
-		if (lastaddr < (off = xfs_bmbt_get_startoff(ep))) {
+		if ((lastaddr + len) < (off = xfs_bmbt_get_startoff(ep))) {
 			*first_unused = lastaddr;
 			return 0;
 		}

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.47 $"
+#ident "$Revision: 1.49 $"
 
 struct getbmap;
 struct xfs_bmbt_irec;
@@ -135,6 +135,7 @@ int						/* error */
 xfs_bmap_first_unused(
 	struct xfs_trans	*tp,		/* transaction pointer */
 	struct xfs_inode	*ip,		/* incore inode */
+	xfs_extlen_t		len,		/* size of hole to find */
 	xfs_fileoff_t		*unused,	/* unused block num */
 	int			whichfork);	/* data or attr fork */
 
