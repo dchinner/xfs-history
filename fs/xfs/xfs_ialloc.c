@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.12 $"
+#ident	"$Revision: 1.13 $"
 
 #include <sys/param.h>
 #include <sys/stat.h>		/* should really? */
@@ -315,7 +315,7 @@ xfs_dialloc_next_free(xfs_mount_t *mp, xfs_trans_t *tp, buf_t *agbuf, xfs_agino_
 /*
  * Free disk inode.
  */
-int
+xfs_agino_t
 xfs_difree(xfs_trans_t *tp, xfs_ino_t inode)
 {
 	xfs_agblock_t agbno;
@@ -332,28 +332,23 @@ xfs_difree(xfs_trans_t *tp, xfs_ino_t inode)
 	mp = tp->t_mountp;
 	sbp = &mp->m_sb;
 	agno = xfs_ino_to_agno(sbp, inode);
-	if (agno >= sbp->sb_agcount)
-		return 0;
+	ASSERT(agno < sbp->sb_agcount);
 	agbno = xfs_ino_to_agbno(sbp, inode);
 	off = xfs_ino_to_offset(sbp, inode);
 	agino = xfs_offbno_to_agino(sbp, agbno, off);
 	agbuf = xfs_btree_bread(mp, tp, agno, XFS_AGH_BLOCK);
 	agp = xfs_buf_to_agp(agbuf);
-	if (agbno >= agp->ag_length)
-		return 0;
+	ASSERT(agbno < agp->ag_length);
 	fbuf = xfs_btree_bread(mp, tp, agno, agbno);
 	free = xfs_make_iptr(sbp, fbuf, off);
 	ASSERT(free->di_core.di_magic == XFS_DINODE_MAGIC);
-	ASSERT(free->di_core.di_mode != 0);
-	free->di_core.di_mode = 0;
-	free->di_core.di_format = XFS_DINODE_FMT_AGINO;
 	free->di_u.di_next = agp->ag_iflist;
-	xfs_ialloc_log_di(tp, fbuf, off, XFS_DI_MODE | XFS_DI_FORMAT | XFS_DI_U);
+	xfs_ialloc_log_di(tp, fbuf, off, XFS_DI_U);
 	agp->ag_iflist = agino;
 	agp->ag_ifcount++;
 	xfs_btree_log_ag(tp, agbuf, XFS_AG_IFLIST | XFS_AG_IFCOUNT);
 	xfs_trans_mod_sb(tp, XFS_SB_IFREE, 1);
-	return 1;
+	return free->di_u.di_next;
 }
 
 /*
