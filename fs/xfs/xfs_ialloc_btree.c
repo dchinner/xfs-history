@@ -111,7 +111,7 @@ xfs_inobt_insrec(
 STATIC void
 xfs_inobt_log_block(
 	xfs_trans_t	*tp,		/* transaction pointer */
-	xfs_buf_t		*bp,		/* buffer containing btree block */
+	xfs_buf_t	*bp,		/* buffer containing btree block */
 	int		fields);	/* mask of fields: XFS_BB_... */
 
 /*
@@ -120,7 +120,7 @@ xfs_inobt_log_block(
 STATIC void
 xfs_inobt_log_keys(
 	xfs_btree_cur_t	*cur,		/* btree cursor */
-	xfs_buf_t		*bp,		/* buffer containing btree block */
+	xfs_buf_t	*bp,		/* buffer containing btree block */
 	int		kfirst,		/* index of first key to log */
 	int		klast);		/* index of last key to log */
 
@@ -130,7 +130,7 @@ xfs_inobt_log_keys(
 STATIC void
 xfs_inobt_log_ptrs(
 	xfs_btree_cur_t	*cur,		/* btree cursor */
-	xfs_buf_t		*bp,		/* buffer containing btree block */
+	xfs_buf_t	*bp,		/* buffer containing btree block */
 	int		pfirst,		/* index of first pointer to log */
 	int		plast);		/* index of last pointer to log */
 
@@ -140,7 +140,7 @@ xfs_inobt_log_ptrs(
 STATIC void
 xfs_inobt_log_recs(
 	xfs_btree_cur_t	*cur,		/* btree cursor */
-	xfs_buf_t		*bp,		/* buffer containing btree block */
+	xfs_buf_t	*bp,		/* buffer containing btree block */
 	int		rfirst,		/* index of first record to log */
 	int		rlast);		/* index of last record to log */
 
@@ -222,19 +222,19 @@ xfs_inobt_delrec(
 	int			level,	/* level removing record from */
 	int			*stat)	/* fail/done/go-on */
 {
-	xfs_buf_t			*agbp;	/* buffer for a.g. inode header */
+	xfs_buf_t		*agbp;	/* buffer for a.g. inode header */
 	xfs_agnumber_t		agfbno;	/* agf block of freed btree block */
-	xfs_buf_t			*agfbp;	/* bp of agf block of freed block */
+	xfs_buf_t		*agfbp;	/* bp of agf block of freed block */
 	xfs_agi_t		*agi;	/* allocation group inode header */
 	xfs_inobt_block_t	*block;	/* btree block record/key lives in */
 	xfs_agblock_t		bno;	/* btree block number */
-	xfs_buf_t			*bp;	/* buffer for block */
+	xfs_buf_t		*bp;	/* buffer for block */
 	int			error;	/* error return value */
 	int			i;	/* loop index */
 	xfs_inobt_key_t		key;	/* kp points here if block is level 0 */
 	xfs_inobt_key_t		*kp;	/* pointer to btree keys */
 	xfs_agblock_t		lbno;	/* left block's block number */
-	xfs_buf_t			*lbp;	/* left block's buffer pointer */
+	xfs_buf_t		*lbp;	/* left block's buffer pointer */
 	xfs_inobt_block_t	*left;	/* left btree block */
 	xfs_inobt_key_t		*lkp;	/* left block key pointer */
 	xfs_inobt_ptr_t		*lpp;	/* left block address pointer */
@@ -243,7 +243,7 @@ xfs_inobt_delrec(
 	xfs_inobt_ptr_t		*pp;	/* pointer to btree addresses */
 	int			ptr;	/* index in btree block for this rec */
 	xfs_agblock_t		rbno;	/* right block's block number */
-	xfs_buf_t			*rbp;	/* right block's buffer pointer */
+	xfs_buf_t		*rbp;	/* right block's buffer pointer */
 	xfs_inobt_block_t	*right;	/* right btree block */
 	xfs_inobt_key_t		*rkp;	/* right block key pointer */
 	xfs_inobt_rec_t		*rp;	/* pointer to btree records */
@@ -251,7 +251,9 @@ xfs_inobt_delrec(
 	int			rrecs;	/* number of records in right block */
 	xfs_inobt_rec_t		*rrp;	/* right block record pointer */
 	xfs_btree_cur_t		*tcur;	/* temporary btree cursor */
+	xfs_arch_t		arch;	/* on-disk architecture type */
 
+	arch = ARCH_GET(cur->bc_mp->m_arch);
 	/*
 	 * Get the index of the entry being deleted, check for nothing there.
 	 */
@@ -341,9 +343,9 @@ xfs_inobt_delrec(
 			 * pp is still set to the first pointer in the block.
 			 * Make it the new root of the btree.
 			 */
-			bno = agi->agi_root;
-			agi->agi_root = *pp;
-			agi->agi_level--;
+			bno = INT_GET(agi->agi_root, arch);
+			INT_SET(agi->agi_root, arch, *pp);
+			INT_MOD(agi->agi_level, arch, -1);
 			/*
 			 * Free the block.
 			 */
@@ -633,7 +635,7 @@ xfs_inobt_delrec(
 	 */
 	if (left->bb_rightsib != NULLAGBLOCK) {
 		xfs_inobt_block_t	*rrblock;
-		xfs_buf_t			*rrbp;
+		xfs_buf_t		*rrbp;
 
 		if (error = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
 				cur->bc_private.i.agno, left->bb_rightsib, 0,
@@ -715,7 +717,7 @@ xfs_inobt_insrec(
 	int			*stat)	/* success/failure */
 {
 	xfs_inobt_block_t	*block;	/* btree block record/key lives in */
-	xfs_buf_t			*bp;	/* buffer for block */
+	xfs_buf_t		*bp;	/* buffer for block */
 	int			error;	/* error return value */
 	int			i;	/* loop index */
 	xfs_inobt_key_t		key;	/* key value being inserted */
@@ -914,7 +916,7 @@ xfs_inobt_insrec(
 STATIC void
 xfs_inobt_log_block(
 	xfs_trans_t		*tp,	/* transaction pointer */
-	xfs_buf_t			*bp,	/* buffer containing btree block */
+	xfs_buf_t		*bp,	/* buffer containing btree block */
 	int			fields)	/* mask of fields: XFS_BB_... */
 {
 	int			first;	/* first byte offset logged */
@@ -938,7 +940,7 @@ xfs_inobt_log_block(
 STATIC void
 xfs_inobt_log_keys(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
-	xfs_buf_t			*bp,	/* buffer containing btree block */
+	xfs_buf_t		*bp,	/* buffer containing btree block */
 	int			kfirst,	/* index of first key to log */
 	int			klast)	/* index of last key to log */
 {
@@ -960,7 +962,7 @@ xfs_inobt_log_keys(
 STATIC void
 xfs_inobt_log_ptrs(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
-	xfs_buf_t			*bp,	/* buffer containing btree block */
+	xfs_buf_t		*bp,	/* buffer containing btree block */
 	int			pfirst,	/* index of first pointer to log */
 	int			plast)	/* index of last pointer to log */
 {
@@ -982,7 +984,7 @@ xfs_inobt_log_ptrs(
 STATIC void
 xfs_inobt_log_recs(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
-	xfs_buf_t			*bp,	/* buffer containing btree block */
+	xfs_buf_t		*bp,	/* buffer containing btree block */
 	int			rfirst,	/* index of first record to log */
 	int			rlast)	/* index of last record to log */
 {
@@ -1027,8 +1029,8 @@ xfs_inobt_lookup(
 		xfs_agi_t	*agi;	/* a.g. inode header */
 
 		agi = XFS_BUF_TO_AGI(cur->bc_private.i.agbp);
-		agno = agi->agi_seqno;
-		agbno = agi->agi_root;
+		agno = INT_GET(agi->agi_seqno, mp->m_arch);
+		agbno = INT_GET(agi->agi_root, mp->m_arch);
 	}
 	/*
 	 * Iterate over each level in the btree, starting at the root.
@@ -1037,8 +1039,8 @@ xfs_inobt_lookup(
 	 * pointer down to the next level.
 	 */
 	for (level = cur->bc_nlevels - 1, diff = 1; level >= 0; level--) {
-		xfs_buf_t	*bp;		/* buffer pointer for btree block */
-		daddr_t	d;		/* disk address of btree block */
+		xfs_buf_t	*bp;	/* buffer pointer for btree block */
+		daddr_t		d;	/* disk address of btree block */
 
 		/*
 		 * Get the disk address we're looking for.
@@ -1220,13 +1222,13 @@ xfs_inobt_lshift(
 	int			i;	/* loop index */
 #endif
 	xfs_inobt_key_t		key;	/* key value for leaf level upward */
-	xfs_buf_t			*lbp;	/* buffer for left neighbor block */
+	xfs_buf_t		*lbp;	/* buffer for left neighbor block */
 	xfs_inobt_block_t	*left;	/* left neighbor btree block */
 	xfs_inobt_key_t		*lkp;	/* key pointer for left block */
 	xfs_inobt_ptr_t		*lpp;	/* address pointer for left block */
 	xfs_inobt_rec_t		*lrp;	/* record pointer for left block */
 	int			nrec;	/* new number of left block entries */
-	xfs_buf_t			*rbp;	/* buffer for right (current) block */
+	xfs_buf_t		*rbp;	/* buffer for right (current) block */
 	xfs_inobt_block_t	*right;	/* right (current) btree block */
 	xfs_inobt_key_t		*rkp;	/* key pointer for right block */
 	xfs_inobt_ptr_t		*rpp;	/* address pointer for right block */
@@ -1358,22 +1360,24 @@ xfs_inobt_newroot(
 	xfs_agi_t		*agi;	/* a.g. inode header */
 	xfs_alloc_arg_t		args;	/* allocation argument structure */
 	xfs_inobt_block_t	*block;	/* one half of the old root block */
-	xfs_buf_t			*bp;	/* buffer containing block */
+	xfs_buf_t		*bp;	/* buffer containing block */
 	int			error;	/* error return value */
 	xfs_inobt_key_t		*kp;	/* btree key pointer */
 	xfs_agblock_t		lbno;	/* left block number */
-	xfs_buf_t			*lbp;	/* left buffer pointer */
+	xfs_buf_t		*lbp;	/* left buffer pointer */
 	xfs_inobt_block_t	*left;	/* left btree block */
-	xfs_buf_t			*nbp;	/* new (root) buffer */
+	xfs_buf_t		*nbp;	/* new (root) buffer */
 	xfs_inobt_block_t	*new;	/* new (root) btree block */
 	int			nptr;	/* new value for key index, 1 or 2 */
 	xfs_inobt_ptr_t		*pp;	/* btree address pointer */
 	xfs_agblock_t		rbno;	/* right block number */
-	xfs_buf_t			*rbp;	/* right buffer pointer */
+	xfs_buf_t		*rbp;	/* right buffer pointer */
 	xfs_inobt_block_t	*right;	/* right btree block */
 	xfs_inobt_rec_t		*rp;	/* btree record pointer */
+	xfs_arch_t		arch;	/* on-disk architecture type */
 
 	ASSERT(cur->bc_nlevels < XFS_IN_MAXLEVELS(cur->bc_mp));
+	arch = ARCH_GET(cur->bc_mp->m_arch);
 	/*
 	 * Get a block & a buffer.
 	 */
@@ -1381,7 +1385,7 @@ xfs_inobt_newroot(
 	args.tp = cur->bc_tp;
 	args.mp = cur->bc_mp;
 	args.fsbno = XFS_AGB_TO_FSB(args.mp, cur->bc_private.i.agno,
-		agi->agi_root);
+		INT_GET(agi->agi_root, arch));
 	args.mod = args.minleft = args.alignment = args.total = args.wasdel =
 		args.isfl = args.userdata = args.minalignslop = 0;
 	args.minlen = args.maxlen = args.prod = 1;
@@ -1401,8 +1405,8 @@ xfs_inobt_newroot(
 	/*
 	 * Set the root data in the a.g. inode structure.
 	 */
-	agi->agi_root = args.agbno;
-	agi->agi_level++;
+	INT_SET(agi->agi_root, arch, args.agbno);
+	INT_MOD(agi->agi_level, arch, 1);
 	xfs_ialloc_log_agi(args.tp, cur->bc_private.i.agbp,
 		XFS_AGI_ROOT | XFS_AGI_LEVEL);
 	/*
@@ -1505,12 +1509,12 @@ xfs_inobt_rshift(
 	int			error;	/* error return value */
 	int			i;	/* loop index */
 	xfs_inobt_key_t		key;	/* key value for leaf level upward */
-	xfs_buf_t			*lbp;	/* buffer for left (current) block */
+	xfs_buf_t		*lbp;	/* buffer for left (current) block */
 	xfs_inobt_block_t	*left;	/* left (current) btree block */
 	xfs_inobt_key_t		*lkp;	/* key pointer for left block */
 	xfs_inobt_ptr_t		*lpp;	/* address pointer for left block */
 	xfs_inobt_rec_t		*lrp;	/* record pointer for left block */
-	xfs_buf_t			*rbp;	/* buffer for right neighbor block */
+	xfs_buf_t		*rbp;	/* buffer for right neighbor block */
 	xfs_inobt_block_t	*right;	/* right neighbor btree block */
 	xfs_inobt_key_t		*rkp;	/* key pointer for right block */
 	xfs_inobt_ptr_t		*rpp;	/* address pointer for right block */
@@ -1639,12 +1643,12 @@ xfs_inobt_split(
 	int			error;	/* error return value */
 	int			i;	/* loop index/record number */
 	xfs_agblock_t		lbno;	/* left (current) block number */
-	xfs_buf_t			*lbp;	/* buffer for left block */
+	xfs_buf_t		*lbp;	/* buffer for left block */
 	xfs_inobt_block_t	*left;	/* left (current) btree block */
 	xfs_inobt_key_t		*lkp;	/* left btree key pointer */
 	xfs_inobt_ptr_t		*lpp;	/* left btree address pointer */
 	xfs_inobt_rec_t		*lrp;	/* left btree record pointer */
-	xfs_buf_t			*rbp;	/* buffer for right block */
+	xfs_buf_t		*rbp;	/* buffer for right block */
 	xfs_inobt_block_t	*right;	/* right (new) btree block */
 	xfs_inobt_key_t		*rkp;	/* right btree key pointer */
 	xfs_inobt_ptr_t		*rpp;	/* right btree address pointer */
@@ -1746,7 +1750,7 @@ xfs_inobt_split(
 	 */
 	if (right->bb_rightsib != NULLAGBLOCK) {
 		xfs_inobt_block_t	*rrblock;	/* rr btree block */
-		xfs_buf_t			*rrbp;		/* buffer for rrblock */
+		xfs_buf_t		*rrbp;		/* buffer for rrblock */
 
 		if (error = xfs_btree_read_bufs(args.mp, args.tp, args.agno,
 				right->bb_rightsib, 0, &rrbp,
@@ -1799,7 +1803,7 @@ xfs_inobt_updkey(
 	 * at the first entry in the block.
 	 */
 	for (ptr = 1; ptr == 1 && level < cur->bc_nlevels; level++) {
-		xfs_buf_t			*bp;	/* buffer for block */
+		xfs_buf_t		*bp;	/* buffer for block */
 		xfs_inobt_block_t	*block;	/* btree block */
 #ifdef DEBUG
 		int			error;	/* error return value */
@@ -1890,7 +1894,7 @@ xfs_inobt_decrement(
 	 */
 	for (block = XFS_BUF_TO_INOBT_BLOCK(cur->bc_bufs[lev]); lev > level; ) {
 		xfs_agblock_t	agbno;	/* block number of btree block */
-		xfs_buf_t		*bp;	/* buffer containing btree block */
+		xfs_buf_t	*bp;	/* buffer containing btree block */
 
 		agbno = *XFS_INOBT_PTR_ADDR(block, cur->bc_ptrs[lev], cur);
 		if (error = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
@@ -1958,7 +1962,7 @@ xfs_inobt_get_rec(
 	int			*stat)	/* output: success/failure */
 {
 	xfs_inobt_block_t	*block;	/* btree block */
-	xfs_buf_t			*bp;	/* buffer containing btree block */
+	xfs_buf_t		*bp;	/* buffer containing btree block */
 #ifdef DEBUG
 	int			error;	/* error return value */
 #endif
@@ -2001,7 +2005,7 @@ xfs_inobt_increment(
 	int			*stat)	/* success/failure */
 {
 	xfs_inobt_block_t	*block;	/* btree block */
-	xfs_buf_t			*bp;	/* buffer containing btree block */
+	xfs_buf_t		*bp;	/* buffer containing btree block */
 	int			error;	/* error return value */
 	int			lev;	/* btree level */
 
@@ -2206,7 +2210,7 @@ xfs_inobt_update(
 	xfs_inofree_t		free)	/* free inode mask */
 {
 	xfs_inobt_block_t	*block;	/* btree block to update */
-	xfs_buf_t			*bp;	/* buffer containing btree block */
+	xfs_buf_t		*bp;	/* buffer containing btree block */
 	int			error;	/* error return value */
 	int			ptr;	/* current record number (updating) */
 	xfs_inobt_rec_t		*rp;	/* pointer to updated record */

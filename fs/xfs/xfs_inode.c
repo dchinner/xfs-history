@@ -1870,8 +1870,8 @@ xfs_iunlink(
 	xfs_mount_t	*mp;
 	xfs_agi_t	*agi;
 	xfs_dinode_t	*dip;
-	xfs_buf_t		*agibp;
-	xfs_buf_t		*ibp;
+	xfs_buf_t	*agibp;
+	xfs_buf_t	*ibp;
 	xfs_agnumber_t	agno;
 	daddr_t		agdaddr;
 	xfs_agino_t	agino;
@@ -1879,12 +1879,14 @@ xfs_iunlink(
 	int		offset;
 	int		error;
 	int		agi_ok;
+	xfs_arch_t	arch;
 	
 	ASSERT(ip->i_d.di_nlink == 0);
 	ASSERT(ip->i_d.di_mode != 0);
 	ASSERT(ip->i_transp == tp);
 
 	mp = tp->t_mountp;
+	arch = ARCH_GET(mp->m_arch);
 	agno = XFS_INO_TO_AGNO(mp, ip->i_ino);
 	agdaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
 
@@ -1902,8 +1904,8 @@ xfs_iunlink(
 	 */
 	agi = XFS_BUF_TO_AGI(agibp);
 	agi_ok =
-		agi->agi_magicnum == XFS_AGI_MAGIC &&
-		XFS_AGI_GOOD_VERSION(agi->agi_versionnum);
+		INT_GET(agi->agi_magicnum, arch) == XFS_AGI_MAGIC &&
+		XFS_AGI_GOOD_VERSION(INT_GET(agi->agi_versionnum, arch));
 	if (XFS_TEST_ERROR(!agi_ok, mp, XFS_ERRTAG_IUNLINK,
 			XFS_RANDOM_IUNLINK)) {
 		xfs_trans_brelse(tp, agibp);
@@ -1916,10 +1918,10 @@ xfs_iunlink(
 	agino = XFS_INO_TO_AGINO(mp, ip->i_ino);
 	ASSERT(agino != 0);
 	bucket_index = agino % XFS_AGI_UNLINKED_BUCKETS;
-	ASSERT(agi->agi_unlinked[bucket_index] != 0);
-	ASSERT(agi->agi_unlinked[bucket_index] != agino);
+	ASSERT(INT_GET(agi->agi_unlinked[bucket_index], arch) != 0);
+	ASSERT(INT_GET(agi->agi_unlinked[bucket_index], arch) != agino);
 
-	if (agi->agi_unlinked[bucket_index] != NULLAGINO) {
+	if (INT_GET(agi->agi_unlinked[bucket_index], arch) != NULLAGINO) {
 		/*
 		 * There is already another inode in the bucket we need
 		 * to add ourselves to.  Add us at the front of the list.
@@ -1932,7 +1934,7 @@ xfs_iunlink(
 		}
 		ASSERT(dip->di_next_unlinked == NULLAGINO);
 		ASSERT(dip->di_next_unlinked != 0);
-		dip->di_next_unlinked = agi->agi_unlinked[bucket_index];
+		dip->di_next_unlinked = INT_GET(agi->agi_unlinked[bucket_index], arch);
 		offset = ((char *)dip - (char *)(XFS_BUF_PTR(ibp))) +
 			offsetof(xfs_dinode_t, di_next_unlinked);
 		xfs_trans_inode_buf(tp, ibp);
@@ -1945,7 +1947,7 @@ xfs_iunlink(
 	 * Point the bucket head pointer at the inode being inserted.
 	 */
 	ASSERT(agino != 0);
-	agi->agi_unlinked[bucket_index] = agino;
+	INT_SET(agi->agi_unlinked[bucket_index], arch, agino);
 	offset = offsetof(xfs_agi_t, agi_unlinked) +
 		(sizeof(xfs_agino_t) * bucket_index);
 	xfs_trans_log_buf(tp, agibp, offset,
@@ -1966,23 +1968,25 @@ xfs_iunlink_remove(
 	xfs_mount_t	*mp;
 	xfs_agi_t	*agi;
 	xfs_dinode_t	*dip;
-	xfs_buf_t		*agibp;
-	xfs_buf_t		*ibp;
+	xfs_buf_t	*agibp;
+	xfs_buf_t	*ibp;
 	xfs_agnumber_t	agno;
 	daddr_t		agdaddr;
 	xfs_agino_t	agino;
 	xfs_agino_t	next_agino;
-	xfs_buf_t		*last_ibp;
+	xfs_buf_t	*last_ibp;
 	xfs_dinode_t	*last_dip;
 	short		bucket_index;
 	int		offset;
 	int		error;
 	int		agi_ok;
+	xfs_arch_t	arch;
 
 	/*
 	 * First pull the on-disk inode from the AGI unlinked list.
 	 */
 	mp = tp->t_mountp;
+	arch = ARCH_GET(mp->m_arch);
 	agno = XFS_INO_TO_AGNO(mp, ip->i_ino);
 	agdaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
 
@@ -2000,8 +2004,8 @@ xfs_iunlink_remove(
 	 */
 	agi = XFS_BUF_TO_AGI(agibp);
 	agi_ok =
-		agi->agi_magicnum == XFS_AGI_MAGIC &&
-		XFS_AGI_GOOD_VERSION(agi->agi_versionnum);
+		INT_GET(agi->agi_magicnum, arch) == XFS_AGI_MAGIC &&
+		XFS_AGI_GOOD_VERSION(INT_GET(agi->agi_versionnum, arch));
 	if (XFS_TEST_ERROR(!agi_ok, mp, XFS_ERRTAG_IUNLINK_REMOVE,
 			XFS_RANDOM_IUNLINK_REMOVE)) {
 		xfs_trans_brelse(tp, agibp);
@@ -2014,10 +2018,10 @@ xfs_iunlink_remove(
 	agino = XFS_INO_TO_AGINO(mp, ip->i_ino);
 	ASSERT(agino != 0);
 	bucket_index = agino % XFS_AGI_UNLINKED_BUCKETS;
-	ASSERT(agi->agi_unlinked[bucket_index] != NULLAGINO);
-	ASSERT(agi->agi_unlinked[bucket_index] != 0);
+	ASSERT(INT_GET(agi->agi_unlinked[bucket_index], arch) != NULLAGINO);
+	ASSERT(INT_GET(agi->agi_unlinked[bucket_index], arch) != 0);
 
-	if (agi->agi_unlinked[bucket_index] == agino) {
+	if (INT_GET(agi->agi_unlinked[bucket_index], arch) == agino) {
 		/*
 		 * We're at the head of the list.  Get the inode's
 		 * on-disk buffer to see if there is anyone after us
@@ -2048,7 +2052,7 @@ xfs_iunlink_remove(
 		 */
 		ASSERT(next_agino != 0);
 		ASSERT(next_agino != agino);
-		agi->agi_unlinked[bucket_index] = next_agino;
+		INT_SET(agi->agi_unlinked[bucket_index], arch, next_agino);
 		offset = offsetof(xfs_agi_t, agi_unlinked) +
 			(sizeof(xfs_agino_t) * bucket_index);
 		xfs_trans_log_buf(tp, agibp, offset,
@@ -2057,7 +2061,7 @@ xfs_iunlink_remove(
 		/*
 		 * We need to search the list for the inode being freed.
 		 */
-		next_agino = agi->agi_unlinked[bucket_index];
+		next_agino = INT_GET(agi->agi_unlinked[bucket_index], arch);
 		last_ibp = NULL;
 		while (next_agino != agino) {
 			/*

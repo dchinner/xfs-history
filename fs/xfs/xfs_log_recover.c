@@ -2835,6 +2835,7 @@ xlog_recover_clear_agi_bucket(
 	xfs_agi_t	*agi;
 	daddr_t		agidaddr;
 	xfs_buf_t	*agibp;
+	xfs_arch_t	arch;
 	int		offset;
 	int		error;
 
@@ -2848,14 +2849,15 @@ xlog_recover_clear_agi_bucket(
 		xfs_trans_cancel(tp, XFS_TRANS_ABORT);
 		return;
 	}
+	arch = mp->m_arch;
 	agi = XFS_BUF_TO_AGI(agibp);
-	if (agi->agi_magicnum != XFS_AGI_MAGIC) {
+	if (INT_GET(agi->agi_magicnum, arch) != XFS_AGI_MAGIC) {
 		xfs_trans_cancel(tp, XFS_TRANS_ABORT);
 		return;
 	}
-	ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
+	ASSERT(INT_GET(agi->agi_magicnum, arch) == XFS_AGI_MAGIC);
 
-	agi->agi_unlinked[bucket] = NULLAGINO;
+	INT_SET(agi->agi_unlinked[bucket], arch, NULLAGINO);
 	offset = offsetof(xfs_agi_t, agi_unlinked) +
 		 (sizeof(xfs_agino_t) * bucket);
 	xfs_trans_log_buf(tp, agibp, offset,
@@ -2884,15 +2886,17 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 	xfs_agnumber_t	agno;
 	xfs_agi_t	*agi;
 	daddr_t		agidaddr;
-	xfs_buf_t		*agibp;
+	xfs_buf_t	*agibp;
 	xfs_inode_t	*ip;
 	xfs_agino_t	agino;
 	xfs_ino_t	ino;
 	int		bucket;
 	int		error;
 	xfs_ino_t	last_ino;
+	xfs_arch_t	arch;
 
 	mp = log->l_mp;
+	arch = ARCH_GET(mp->m_arch);
 	last_ino = 0;
 	for (agno = 0; agno < mp->m_sb.sb_agcount; agno++) {
 		/*
@@ -2901,7 +2905,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 		agidaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
 		agibp = xfs_buf_read(mp->m_ddev_targp, agidaddr, 1, 0);
 		agi = XFS_BUF_TO_AGI(agibp);
-		ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
+		ASSERT(INT_GET(agi->agi_magicnum, arch) == XFS_AGI_MAGIC);
 
 		bucket = 0;
 		while (bucket < XFS_AGI_UNLINKED_BUCKETS) {
@@ -2909,7 +2913,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 			 * If there is nothing in the current bucket,
 			 * then continue on to the next one.
 			 */
-			agino = agi->agi_unlinked[bucket];
+			agino = INT_GET(agi->agi_unlinked[bucket], arch);
 			if (agino == NULLAGINO) {
 				bucket++;
 				continue;
@@ -2972,7 +2976,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 			agibp = xfs_buf_read(mp->m_ddev_targp,
 					 agidaddr, 1, 0);
 			agi = XFS_BUF_TO_AGI(agibp);
-			ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
+			ASSERT(INT_GET(agi->agi_magicnum, arch) == XFS_AGI_MAGIC);
 		}
 
 		/*
@@ -3272,13 +3276,7 @@ xlog_do_recover(xlog_t	*log,
 	}
 
 #ifdef _KERNEL
-#ifdef __linux__
 	XFS_bflush(log->l_mp->m_ddev_targ);
-#else
-	bfid.bfid_dev = log->l_mp->m_dev;
-	bfid.bfid_flags = BFID_NOVNBUF;
-	bflush_dev(&bfid);    /* Flush out the delayed write buffers */
-#endif
 
 	/*
 	 * If IO errors happened during recovery, bail out.
@@ -3478,12 +3476,12 @@ xlog_recover_check_summary(xlog_t	*log)
 		agidaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
 		agibp = xfs_buf_read(mp->m_ddev_targp, agidaddr, 1, 0);
 		agip = XFS_BUF_TO_AGI(agibp);
-		ASSERT(agip->agi_magicnum == XFS_AGI_MAGIC);
-		ASSERT(XFS_AGI_GOOD_VERSION(agip->agi_versionnum));
-		ASSERT(agip->agi_seqno == agno);
+		ASSERT(INT_GET(agip->agi_magicnum, arch) == XFS_AGI_MAGIC);
+		ASSERT(XFS_AGI_GOOD_VERSION(INT_GET(agip->agi_versionnum, arch)));
+		ASSERT(INT_GET(agip->agi_seqno, arch) == agno);
 
-		itotal += agip->agi_count;
-		ifree += agip->agi_freecount;
+		itotal += INT_GET(agip->agi_count, arch);
+		ifree += INT_GET(agip->agi_freecount, arch);
 		xfs_buf_relse(agibp);
 	}
 

@@ -245,7 +245,7 @@ xfs_bulkstat(
 	int			*done)	/* 1 if there're more stats to get */
 {
 	xfs_agblock_t		agbno;	/* allocation group block number */
-	xfs_buf_t			*agbp;	/* agi header buffer */
+	xfs_buf_t		*agbp;	/* agi header buffer */
 	xfs_agi_t		*agi;	/* agi header data */
 	xfs_agino_t		agino;	/* inode # in allocation group */
 	xfs_agnumber_t		agno;	/* allocation group number */
@@ -275,14 +275,14 @@ xfs_bulkstat(
 	int			ubcount; /* size of user's buffer */
 	int			ubleft;	/* spaces left in user's buffer */
 	caddr_t			ubufp;	/* current pointer into user's buffer */
-	xfs_buf_t			*bp;	/* ptr to on-disk inode cluster buf */
+	xfs_buf_t		*bp;	/* ptr to on-disk inode cluster buf */
 	xfs_dinode_t		*dip;	/* ptr into bp for specific inode */
 	xfs_inode_t		*ip;	/* ptr to in-core inode struct */
+        xfs_arch_t		arch;	/* on-disk architecture type */
 	vfs_t			*vfsp;
 	int			vfs_unbusy_needed = 0;
-        xfs_arch_t  arch;
         
-        arch=ARCH_GET(mp->m_arch);
+        arch = ARCH_GET(mp->m_arch);
 
 	/*
 	 * Check that the device is valid/mounted and mark it busy
@@ -440,7 +440,7 @@ xfs_bulkstat(
 			while (error) {
 				agino += XFS_INODES_PER_CHUNK;
 				if (XFS_AGINO_TO_AGBNO(mp, agino) >=
-				    agi->agi_length)
+						INT_GET(agi->agi_length, arch))
 					break;
 				error = xfs_inobt_lookup_ge(cur, agino, 0, 0,
 							    &tmp);
@@ -705,7 +705,7 @@ xfs_inumbers(
 	int		*count,		/* size of buffer/count returned */
 	caddr_t		ubuffer)	/* buffer with inode descriptions */
 {
-	xfs_buf_t		*agbp;
+	xfs_buf_t	*agbp;
 	xfs_agino_t	agino;
 	xfs_agnumber_t	agno;
 	int		bcount;

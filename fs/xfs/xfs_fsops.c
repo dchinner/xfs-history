@@ -233,18 +233,18 @@ xfs_growfs_data(
 				  sectbb, 0);
 		agi = XFS_BUF_TO_AGI(bp);
 		bzero(agi, mp->m_sb.sb_sectsize);
-		agi->agi_magicnum = XFS_AGI_MAGIC;
-		agi->agi_versionnum = XFS_AGI_VERSION;
-		agi->agi_seqno = agno;
-		agi->agi_length = agsize;
-		agi->agi_count = 0;
-		agi->agi_root = XFS_IBT_BLOCK(mp);
-		agi->agi_level = 1;
-		agi->agi_freecount = 0;
-		agi->agi_newino = NULLAGINO;
-		agi->agi_dirino = NULLAGINO;
+		INT_SET(agi->agi_magicnum, arch, XFS_AGI_MAGIC);
+		INT_SET(agi->agi_versionnum, arch, XFS_AGI_VERSION);
+		INT_SET(agi->agi_seqno, arch, agno);
+		INT_SET(agi->agi_length, arch, agsize);
+		INT_SET(agi->agi_count, arch, 0);
+		INT_SET(agi->agi_root, arch, XFS_IBT_BLOCK(mp));
+		INT_SET(agi->agi_level, arch, 1);
+		INT_SET(agi->agi_freecount, arch, 0);
+		INT_SET(agi->agi_newino, arch, NULLAGINO);
+		INT_SET(agi->agi_dirino, arch, NULLAGINO);
 		for (bucket = 0; bucket < XFS_AGI_UNLINKED_BUCKETS; bucket++)
-			agi->agi_unlinked[bucket] = NULLAGINO;
+			INT_SET(agi->agi_unlinked[bucket], arch, NULLAGINO);
 		error = xfs_bwrite(mp, bp);
 		if (error) {
 			goto error0;
@@ -321,9 +321,9 @@ xfs_growfs_data(
 		}
 		ASSERT(bp);
 		agi = XFS_BUF_TO_AGI(bp);
-		agi->agi_length += new;
+		INT_MOD(agi->agi_length, arch, new);
 		ASSERT(agno < mp->m_sb.sb_agcount - 1 ||
-		       agi->agi_length == mp->m_sb.sb_agblocks);
+		       INT_GET(agi->agi_length, arch) == mp->m_sb.sb_agblocks);
 		xfs_ialloc_log_agi(tp, bp, XFS_AGI_LENGTH);
 		/*
 		 * Change agf length.
@@ -335,7 +335,8 @@ xfs_growfs_data(
 		ASSERT(bp);
 		agf = XFS_BUF_TO_AGF(bp);
 		INT_MOD(agf->agf_length, arch, new);
-		ASSERT(INT_GET(agf->agf_length, arch) == agi->agi_length);
+		ASSERT(INT_GET(agf->agf_length, arch) ==
+				INT_GET(agi->agi_length, arch));
 		/*
 		 * Free the new space.
 		 */

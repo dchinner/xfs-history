@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.15 $"
+#ident	"$Revision: 1.16 $"
 
 /*
  * This is meant to be used by only the user level log-print code, and
@@ -299,17 +299,21 @@ xlog_recover_print_buffer(
 			printf("		sunit:%u  swidth:%u\n", 
 			       *(uint *)(p+56),
 			       *(uint *)(p+60));
-		} else if (*(uint *)p == XFS_AGI_MAGIC) {
+		} else if (INT_GET(*(uint *)p, ARCH_UNKNOWN) == XFS_AGI_MAGIC) {
 			agi = (xfs_agi_t *)p;
 			printf("	AGI Buffer: (XAGI)\n");
 			if (!print_buffer) continue;
-			printf("		ver:%d  ", agi->agi_versionnum);
+			printf("		ver:%d  ",
+				INT_GET(agi->agi_versionnum, ARCH_UNKNOWN));
 			printf("seq#:%d  len:%d  cnt:%d  root:%d\n",
-			       agi->agi_seqno, agi->agi_length,
-			       agi->agi_count, agi->agi_root);
+				INT_GET(agi->agi_seqno, ARCH_UNKNOWN),
+				INT_GET(agi->agi_length, ARCH_UNKNOWN),
+				INT_GET(agi->agi_count, ARCH_UNKNOWN),
+				INT_GET(agi->agi_root, ARCH_UNKNOWN));
 			printf("		level:%d  free#:0x%x  newino:0x%x\n",
-			       agi->agi_level, agi->agi_freecount,
-			       agi->agi_newino);
+				INT_GET(agi->agi_level, ARCH_UNKNOWN),
+				INT_GET(agi->agi_freecount, ARCH_UNKNOWN),
+				INT_GET(agi->agi_newino, ARCH_UNKNOWN));
 		} else if (INT_GET(*(uint *)p, ARCH_UNKNOWN) == XFS_AGF_MAGIC) {
 			agf = (xfs_agf_t *)p;
 			printf("	AGF Buffer: (XAGF)\n");

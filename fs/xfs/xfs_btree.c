@@ -139,7 +139,7 @@ xfs_btree_check_block(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	xfs_btree_block_t	*block,	/* generic btree block pointer */
 	int			level,	/* level of the btree block */
-	xfs_buf_t			*bp)	/* buffer containing block, if any */
+	xfs_buf_t		*bp)	/* buffer containing block, if any */
 {
 	if (XFS_BTREE_LONG_PTRS(cur->bc_btnum))
 		xfs_btree_check_lblock(cur, (xfs_btree_lblock_t *)block, level,
@@ -197,6 +197,8 @@ xfs_btree_check_key(
 		ASSERT(k1->ir_startino < k2->ir_startino);
 		break;
 	    }
+	default:
+		ASSERT(0);
 	}
 }
 #endif	/* DEBUG */
@@ -210,7 +212,7 @@ xfs_btree_check_lblock(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	xfs_btree_lblock_t	*block,	/* btree long form block pointer */
 	int			level,	/* level of the btree block */
-	xfs_buf_t			*bp)	/* buffer for block, if any */
+	xfs_buf_t		*bp)	/* buffer for block, if any */
 {
 	int			lblock_ok; /* block passes checks */
 	xfs_mount_t		*mp;	/* file system mount point */
@@ -309,6 +311,8 @@ xfs_btree_check_rec(
 		       r2->ir_startino);
 		break;
 	    }
+	default:
+		ASSERT(0);
 	}
 }
 #endif	/* DEBUG */
@@ -422,7 +426,7 @@ xfs_btree_dup_cursor(
 	xfs_btree_cur_t	*cur,		/* input cursor */
 	xfs_btree_cur_t	**ncur)		/* output cursor */
 {
-	xfs_buf_t		*bp;		/* btree block's buffer pointer */
+	xfs_buf_t	*bp;		/* btree block's buffer pointer */
 	int 		error;		/* error return value */
 	int		i;		/* level number of btree block */
 	xfs_mount_t	*mp;		/* mount structure for filesystem */
@@ -484,7 +488,7 @@ xfs_btree_firstrec(
 	int			level)	/* level to change */
 {
 	xfs_btree_block_t	*block;	/* generic btree block pointer */
-	xfs_buf_t			*bp;	/* buffer containing block */
+	xfs_buf_t		*bp;	/* buffer containing block */
 
 	/*
 	 * Get the block pointer for this level.
@@ -511,10 +515,10 @@ xfs_btree_block_t *			/* generic btree block pointer */
 xfs_btree_get_block(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	int			level,	/* level in btree */
-	xfs_buf_t			**bpp)	/* buffer containing the block */
+	xfs_buf_t		**bpp)	/* buffer containing the block */
 {
 	xfs_btree_block_t	*block;	/* return value */
-	xfs_buf_t			*bp;	/* return buffer */
+	xfs_buf_t		*bp;	/* return buffer */
 	xfs_ifork_t		*ifp;	/* inode fork pointer */
 	int			whichfork; /* data or attr fork */
 
@@ -536,14 +540,14 @@ xfs_btree_get_block(
  * Get a buffer for the block, return it with no data read.
  * Long-form addressing.
  */
-xfs_buf_t *					/* buffer for fsbno */
+xfs_buf_t *				/* buffer for fsbno */
 xfs_btree_get_bufl(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_fsblock_t	fsbno,		/* file system block number */
 	uint		lock)		/* lock flags for get_buf */
 {
-	xfs_buf_t		*bp;		/* buffer pointer (return value) */
+	xfs_buf_t	*bp;		/* buffer pointer (return value) */
 	daddr_t		d;		/* real disk block address */
 
 	ASSERT(fsbno != NULLFSBLOCK);
@@ -558,7 +562,7 @@ xfs_btree_get_bufl(
  * Get a buffer for the block, return it with no data read.
  * Short-form addressing.
  */
-xfs_buf_t *					/* buffer for agno/agbno */
+xfs_buf_t *				/* buffer for agno/agbno */
 xfs_btree_get_bufs(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -566,7 +570,7 @@ xfs_btree_get_bufs(
 	xfs_agblock_t	agbno,		/* allocation group block number */
 	uint		lock)		/* lock flags for get_buf */
 {
-	xfs_buf_t		*bp;		/* buffer pointer (return value) */
+	xfs_buf_t	*bp;		/* buffer pointer (return value) */
 	daddr_t		d;		/* real disk block address */
 
 	ASSERT(agno != NULLAGNUMBER);
@@ -619,7 +623,7 @@ xfs_btree_init_cursor(
 		break;
 	case XFS_BTNUM_INO:
 		agi = XFS_BUF_TO_AGI(agbp);
-		nlevels = agi->agi_level;
+		nlevels = INT_GET(agi->agi_level, mp->m_arch);
 		break;
 	default:
 		ASSERT(0);
@@ -678,7 +682,7 @@ xfs_btree_islastblock(
 	int			level)	/* level to check */
 {
 	xfs_btree_block_t	*block;	/* generic btree block pointer */
-	xfs_buf_t			*bp;	/* buffer containing block */
+	xfs_buf_t		*bp;	/* buffer containing block */
 
 	block = xfs_btree_get_block(cur, level, &bp);
 	xfs_btree_check_block(cur, block, level, bp);
@@ -698,7 +702,7 @@ xfs_btree_lastrec(
 	int			level)	/* level to change */
 {
 	xfs_btree_block_t	*block;	/* generic btree block pointer */
-	xfs_buf_t			*bp;	/* buffer containing block */
+	xfs_buf_t		*bp;	/* buffer containing block */
 
 	/*
 	 * Get the block pointer for this level.
@@ -943,10 +947,10 @@ void
 xfs_btree_setbuf(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	int			lev,	/* level in btree */
-	xfs_buf_t			*bp)	/* new buffer to set */
+	xfs_buf_t		*bp)	/* new buffer to set */
 {
 	xfs_btree_block_t	*b;	/* btree block */
-	xfs_buf_t			*obp;	/* old buffer pointer */
+	xfs_buf_t		*obp;	/* old buffer pointer */
 
 	obp = cur->bc_bufs[lev];
 	if (obp)
