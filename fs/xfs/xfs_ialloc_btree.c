@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.11 $"
+#ident	"$Revision: 1.14 $"
 
 /*
  * Inode allocation management for xFS.
@@ -1269,7 +1269,7 @@ xfs_inobt_lshift(
 	 */
 	left->bb_numrecs++;
 	xfs_inobt_log_block(cur->bc_tp, lbp, XFS_BB_NUMRECS);
-#ifdef XFSDEBUG
+#ifdef DEBUG
 	if (level > 0)
 		xfs_btree_check_key(cur->bc_btnum, lkp - 1, lkp);
 	else
@@ -1653,7 +1653,7 @@ xfs_inobt_rshift(
 	left->bb_numrecs--;
 	xfs_inobt_log_block(cur->bc_tp, lbp, XFS_BB_NUMRECS);
 	right->bb_numrecs++;
-#ifdef XFSDEBUG
+#ifdef DEBUG
 	if (level > 0)
 		xfs_btree_check_key(cur->bc_btnum, rkp, rkp + 1);
 	else

@@ -503,6 +503,18 @@ xfs_dialloc(
 	 */
 	if (!pagino)
 		pagino = agi->agi_newino;
+#ifdef DEBUG
+	if (cur->bc_nlevels == 1) {
+		int freecount = 0;
+
+		xfs_inobt_lookup_ge(cur, 0, 0, 0);
+		while (xfs_inobt_get_rec(cur, &rec.ir_startino, &rec.ir_freecount, &rec.ir_free)) {
+			freecount += rec.ir_freecount;
+			xfs_inobt_increment(cur, 0);
+		}
+		ASSERT(freecount == agi->agi_freecount);
+	}
+#endif
 	/*
 	 * If in the same a.g. as the parent, try to get near the parent.
 	 */
@@ -652,11 +664,23 @@ xfs_dialloc(
 	XFS_INOBT_CLR_FREE(&rec, offset);
 	rec.ir_freecount--;
 	xfs_inobt_update(cur, rec.ir_startino, rec.ir_freecount, rec.ir_free);
-	xfs_btree_del_cursor(cur);
 	agi->agi_freecount--;
 	mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
 	mp->m_perag[tagno].pagi_freecount--;
 	mrunlock(&mp->m_peraglock);
+#ifdef DEBUG
+	if (cur->bc_nlevels == 1) {
+		int freecount = 0;
+
+		xfs_inobt_lookup_ge(cur, 0, 0, 0);
+		while (xfs_inobt_get_rec(cur, &rec.ir_startino, &rec.ir_freecount, &rec.ir_free)) {
+			freecount += rec.ir_freecount;
+			xfs_inobt_increment(cur, 0);
+		}
+		ASSERT(freecount == agi->agi_freecount);
+	}
+#endif
+	xfs_btree_del_cursor(cur);
 	xfs_ialloc_log_agi(tp, agbp, XFS_AGI_FREECOUNT);
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, -1);
 	return ino;
@@ -707,6 +731,18 @@ xfs_difree(
 	 */
 	cur = xfs_btree_init_cursor(mp, tp, agbp, agno, XFS_BTNUM_INO,
 		(xfs_inode_t *)0);
+#ifdef DEBUG
+	if (cur->bc_nlevels == 1) {
+		int freecount = 0;
+
+		xfs_inobt_lookup_ge(cur, 0, 0, 0);
+		while (xfs_inobt_get_rec(cur, &rec.ir_startino, &rec.ir_freecount, &rec.ir_free)) {
+			freecount += rec.ir_freecount;
+			xfs_inobt_increment(cur, 0);
+		}
+		ASSERT(freecount == agi->agi_freecount);
+	}
+#endif
 	/*
 	 * Look for the entry describing this inode.
 	 */
@@ -729,7 +765,6 @@ xfs_difree(
 	i = xfs_inobt_update(cur, rec.ir_startino, rec.ir_freecount,
 		rec.ir_free);
 	ASSERT(i == 1);
-	xfs_btree_del_cursor(cur);
 	/*
 	 * Change the inode free counts and log the ag/sb changes.
 	 */
@@ -737,6 +772,19 @@ xfs_difree(
 	mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
 	mp->m_perag[agno].pagi_freecount++;
 	mrunlock(&mp->m_peraglock);
+#ifdef DEBUG
+	if (cur->bc_nlevels == 1) {
+		int freecount = 0;
+
+		xfs_inobt_lookup_ge(cur, 0, 0, 0);
+		while (xfs_inobt_get_rec(cur, &rec.ir_startino, &rec.ir_freecount, &rec.ir_free)) {
+			freecount += rec.ir_freecount;
+			xfs_inobt_increment(cur, 0);
+		}
+		ASSERT(freecount == agi->agi_freecount);
+	}
+#endif
+	xfs_btree_del_cursor(cur);
 	xfs_ialloc_log_agi(tp, agbp, XFS_AGI_FREECOUNT);
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, 1);
 }
