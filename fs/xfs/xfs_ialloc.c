@@ -74,14 +74,12 @@ xfs_ialloc_ag_alloc(
 
 /*
  * Select an allocation group to look for a free inode in, based on the parent
- * inode and then mode.  sameag==1 forces the allocation to the same group
- * as the parent.  Return the allocation group buffer.
+ * inode and then mode.  Return the allocation group buffer.
  */
 STATIC buf_t *				/* allocation group buffer */
 xfs_ialloc_ag_select(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	parent,		/* parent directory inode number */
-	int		sameag,		/* =1 to force to same ag. as parent */
 	mode_t		mode);		/* bits set to indicate file type */
 
 /*
@@ -283,27 +281,22 @@ xfs_ialloc_ag_alloc(
 
 /*
  * Select an allocation group to look for a free inode in, based on the parent
- * inode and then mode.  sameag==1 forces the allocation to the same group
- * as the parent.  Return the allocation group buffer.
+ * inode and then mode.  Return the allocation group buffer.
  */
 STATIC buf_t *				/* allocation group buffer */
 xfs_ialloc_ag_select(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	parent,		/* parent directory inode number */
-	int		sameag,		/* =1 to force to same ag. as parent */
 	mode_t		mode)		/* bits set to indicate file type */
 {
 	buf_t		*agbp;		/* allocation group header buffer */
 	xfs_agnumber_t	agcount;	/* number of ag's in the filesystem */
 	xfs_agnumber_t	agno;		/* current ag number */
-	int		agoff;		/* ag number relative to parent's */
 	xfs_agi_t	*agi;		/* allocation group header */
-	int		doneleft;	/* done searching lower numbered ag's */
-	int		doneright;	/* done "" higher numbered ag's */
 	int		flags;		/* alloc buffer locking flags */
 	xfs_mount_t	*mp;		/* mount point structure */
 	int		needspace;	/* file mode implies space allocated */
-	xfs_agnumber_t	pagno;		/* parent ag number */
+	xfs_agnumber_t	pagno;		/* parent (starting) ag number */
 
 	/*
 	 * Files of these types need at least one block if length > 0
@@ -311,7 +304,10 @@ xfs_ialloc_ag_select(
 	 */
 	needspace = S_ISDIR(mode) || S_ISREG(mode) || S_ISLNK(mode);
 	mp = tp->t_mountp;
-	pagno = XFS_INO_TO_AGNO(mp, parent);
+	if (S_ISDIR(mode))
+		pagno = mp->m_agirotor;
+	else
+		pagno = XFS_INO_TO_AGNO(mp, parent);
 	agcount = mp->m_sb.sb_agcount;
 	ASSERT(pagno < agcount);
 	/*
@@ -320,47 +316,10 @@ xfs_ialloc_ag_select(
 	 * Instead, we include whether there is a need to allocate inodes
 	 * to mean that at least one block must be allocated for them, 
 	 * if none are currently free.
-	 *
-	 * We iterate to the left (lower numbered allocation groups) and
-	 * to the right (higher numbered) of the parent allocation group,
-	 * alternating left and right.
 	 */
-	for (agoff = S_ISDIR(mode) != 0 && !sameag, doneleft = doneright = 0,
-	     flags = sameag ? 0 : XFS_ALLOC_FLAG_TRYLOCK;
-	     !doneleft || !doneright;
-	     agoff = -agoff + (agoff <= 0)) {
-		/*
-		 * Skip this if we're already done going in that direction.
-		 */
-		if ((agoff > 0 && doneright) || (agoff < 0 && doneleft))
-			continue;
-		/*
-		 * If this one is off the end to the right, stop there.
-		 */
-		if (agoff >= 0 && pagno + agoff >= agcount) {
-			doneright = 1;
-			if (doneleft && flags) {
-				flags = 0;
-				agoff = S_ISDIR(mode) != 0 && !sameag;
-				doneleft = doneright = 0;
-			}
-			continue;
-		/*
-		 * If this one is off the end to the left, stop there.
-		 */
-		} else if (agoff < 0 && pagno < -agoff) {
-			doneleft = 1;
-			if (doneright && flags) {
-				flags = 0;
-				agoff = S_ISDIR(mode) != 0 && !sameag;
-				doneleft = doneright = 0;
-			}
-			continue;
-		}
-		/*
-		 * Must be a valid allocation group.
-		 */
-		agno = pagno + agoff;
+	agno = pagno;
+	flags = XFS_ALLOC_FLAG_TRYLOCK;
+	while (1) {
 		agbp = xfs_ialloc_read_agi(mp, tp, agno);
 		agi = XFS_BUF_TO_AGI(agbp);
 		/*
@@ -371,13 +330,22 @@ xfs_ialloc_ag_select(
 		 */
 		if (xfs_alloc_ag_freeblks(mp, tp, agno, flags) >=
 		    needspace +
-		    (agi->agi_freecount ? 0 : XFS_IALLOC_BLOCKS(mp)))
+		    (agi->agi_freecount ? 0 : XFS_IALLOC_BLOCKS(mp))) {
+			if (S_ISDIR(mode))
+				mp->m_agirotor =
+					agno + 1 == agcount ? 0 : agno + 1;
 			return agbp;
+		}
 		xfs_trans_brelse(tp, agbp);
-		if (sameag)
-			break;
+		agno++;
+		if (agno == agcount)
+			agno = 0;
+		if (agno == pagno)
+			if (flags)
+				flags = 0;
+			else
+				return (buf_t *)0;
 	}
-	return (buf_t *)0;
 }
 
 /* 
@@ -388,8 +356,6 @@ xfs_ialloc_ag_select(
  * Allocate an inode on disk.
  * Mode is used to tell whether the new inode will need space, and whether
  * it is a directory.
- * The sameag flag is used by mkfs only, to force the root directory
- * inode into the first allocation group.
  *
  * The arguments IO_agbp and alloc_done are defined to work within
  * the constraint of one allocation per transaction.
@@ -415,7 +381,6 @@ xfs_ino_t				/* inode number allocated */
 xfs_dialloc(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	parent,		/* parent inode (directory) */
-	int		sameag,		/* 1 => must be in same a.g. */
 	mode_t		mode,		/* mode bits for new inode */
 	buf_t		**IO_agbp,	/* in/out ag header's buffer */
 	boolean_t	*alloc_done)	/* true if we needed to replenish
@@ -430,17 +395,22 @@ xfs_dialloc(
 	int		flags;		/* flags for logging agi */
 	int		i;		/* result code */
 	xfs_ino_t	ino;		/* fs-relative inode to be returned */
+	int		j;		/* result code */
 	xfs_mount_t	*mp;		/* file system mount structure */
 	int		offset;		/* index of inode in chunk */
+	xfs_agino_t	pagino;		/* parent's a.g. relative inode # */
+	xfs_agnumber_t	pagno;		/* parent's allocation group number */
 	xfs_inobt_rec_t	rec;		/* inode allocation record */
 	xfs_agnumber_t	tagno;		/* testing allocation group number */
+	xfs_btree_cur_t	*tcur;		/* temp cursor */
+	xfs_inobt_rec_t	trec;		/* temp inode allocation record */
 
 	if (*IO_agbp == NULL) {
 		/*
 		 * We do not have an agbp, so select an initial allocation
 		 * group for inode allocation.
 		 */
-		agbp = xfs_ialloc_ag_select(tp, parent, sameag, mode);
+		agbp = xfs_ialloc_ag_select(tp, parent, mode);
 		/*
 		 * Couldn't find an allocation group satisfying the 
 		 * criteria, give up.
@@ -463,6 +433,8 @@ xfs_dialloc(
 	agcount = mp->m_sb.sb_agcount;
 	agno = agi->agi_seqno;
 	tagno = agno;
+	pagno = XFS_INO_TO_AGNO(mp, parent);
+	pagino = XFS_INO_TO_AGINO(mp, parent);
 	/*
 	 * Loop until we find an allocation group that either has free inodes
 	 * or in which we can allocate some inodes.  Iterate through the
@@ -490,11 +462,6 @@ xfs_dialloc(
 		 */
 		xfs_trans_brelse(tp, agbp);
 		/*
-		 * Can't try any other ag's, so give up.
-		 */
-		if (sameag)
-			return NULLFSINO;
-		/*
 		 * Go on to the next ag: get its ag header.
 		 */
 		if (++tagno == agcount)
@@ -511,14 +478,142 @@ xfs_dialloc(
 	*IO_agbp = NULL;
 	cur = xfs_btree_init_cursor(mp, tp, agbp, agi->agi_seqno, XFS_BTNUM_INO,
 		(xfs_inode_t *)0);
-	if (xfs_inobt_lookup_eq(cur, agi->agi_newino, 0, 0) &&
-	    xfs_inobt_get_rec(cur, &rec.ir_startino, &rec.ir_freecount,
-		    &rec.ir_free) &&
+	/*
+	 * If pagino is 0 (this is the root inode allocation) use newino.
+	 * This must work because we've just allocated some.
+	 */
+	if (!pagino)
+		pagino = agi->agi_newino;
+	/*
+	 * If in the same a.g. as the parent, try to get near the parent.
+	 */
+	if (pagno == agno &&
+	    (i = xfs_inobt_lookup_le(cur, pagino, 0, 0)) &&
+	    (j = xfs_inobt_get_rec(cur, &rec.ir_startino, &rec.ir_freecount,
+			&rec.ir_free)) &&
 	    rec.ir_freecount > 0) {
-		/* nothing */
-	} else {
+		/*
+		 * Found a free inode in the same chunk as parent, done.
+		 */
+	}
+	/*
+	 * In the same a.g. as parent, but parent's chunk is full.
+	 */
+	else if (pagno == agno) {
+		int	doneleft;	/* done, searching to the left */
+		int	doneright;	/* done, searching to the right */
+
+		ASSERT(i == 1);
+		ASSERT(j == 1);
+		/*
+		 * Duplicate the cursor, search left & right simultaneously.
+		 */
+		tcur = xfs_btree_dup_cursor(cur);
+		/*
+		 * Search left with tcur, back up 1 record.
+		 */
+		doneleft = !xfs_inobt_decrement(tcur, 0);
+		if (!doneleft) {
+			i = xfs_inobt_get_rec(tcur, &trec.ir_startino,
+				&trec.ir_freecount, &trec.ir_free);
+			ASSERT(i);
+		}
+		/* 
+		 * Search right with cur, go forward 1 record.
+		 */
+		doneright = !xfs_inobt_increment(cur, 0);
+		if (!doneright) {
+			i = xfs_inobt_get_rec(cur, &rec.ir_startino,
+				&rec.ir_freecount, &rec.ir_free);
+			ASSERT(i);
+		}
+		/*
+		 * Loop until we find the closest inode chunk with a free one.
+		 */
+		while (!doneleft || !doneright) {
+			int	useleft;  /* using left inode chunk this time */
+
+			/*
+			 * Figure out which block is closer, if both are valid.
+			 */
+			if (!doneleft && !doneright)
+				useleft =
+					pagino -
+					    (trec.ir_startino +
+					     XFS_INODES_PER_CHUNK - 1) <
+					rec.ir_startino - pagino;
+			else
+				useleft = !doneleft;
+			/*
+			 * If checking the left, does it have free inodes?
+			 */
+			if (useleft && trec.ir_freecount) {
+				/*
+				 * Yes, set it up as the chunk to use.
+				 */
+				rec = trec;
+				xfs_btree_del_cursor(cur);
+				cur = tcur;
+				break;
+			}
+			/*
+			 * If checking the right, does it have free inodes?
+			 */
+			if (!useleft && rec.ir_freecount) {
+				/*
+				 * Yes, it's already set up.
+				 */
+				xfs_btree_del_cursor(tcur);
+				break;
+			}
+			/*
+			 * If used the left, get another one further left.
+			 */
+			if (useleft) {
+				doneleft = !xfs_inobt_decrement(tcur, 0);
+				if (!doneleft) {
+					i = xfs_inobt_get_rec(tcur,
+						&trec.ir_startino,
+						&trec.ir_freecount,
+						&trec.ir_free);
+					ASSERT(i);
+				}
+			}
+			/*
+			 * If used the right, get another one further right.
+			 */
+			else {
+				doneright = !xfs_inobt_increment(cur, 0);
+				if (!doneright) {
+					i = xfs_inobt_get_rec(cur,
+						&rec.ir_startino,
+						&rec.ir_freecount,
+						&rec.ir_free);
+					ASSERT(i);
+				}
+			}
+		}
+		ASSERT(!doneleft || !doneright);
+	}
+	/*
+	 * In a different a.g. from the parent.
+	 * See if the most recently allocated block has any free.
+	 */
+	else if (agi->agi_newino != NULLAGINO &&
+		   xfs_inobt_lookup_eq(cur, agi->agi_newino, 0, 0) &&
+		   xfs_inobt_get_rec(cur, &rec.ir_startino, &rec.ir_freecount,
+			   &rec.ir_free) &&
+		   rec.ir_freecount > 0) {
+		/*
+		 * The last chunk allocated in the group still has a free inode.
+		 */
+	}
+	/*
+	 * None left in the last group, search the whole a.g.
+	 */
+	else {
 		i = xfs_inobt_lookup_ge(cur, 0, 0, 0);
-		ASSERT(i);
+		ASSERT(i == 1);
 		while (1) {
 			i = xfs_inobt_get_rec(cur, &rec.ir_startino,
 				&rec.ir_freecount, &rec.ir_free);
@@ -537,13 +632,8 @@ xfs_dialloc(
 	rec.ir_freecount--;
 	xfs_inobt_update(cur, rec.ir_startino, rec.ir_freecount, rec.ir_free);
 	xfs_btree_del_cursor(cur);
-	flags = XFS_AGI_FREECOUNT;
 	agi->agi_freecount--;
-	if (rec.ir_freecount == 0) {
-		agi->agi_newino = NULLAGINO;
-		flags |= XFS_AGI_NEWINO;
-	}
-	xfs_ialloc_log_agi(tp, agbp, flags);
+	xfs_ialloc_log_agi(tp, agbp, XFS_AGI_FREECOUNT);
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, -1);
 	return ino;
 }

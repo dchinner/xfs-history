@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.29 $"
+#ident	"$Revision: 1.30 $"
 
 struct xfs_ihash;
 
@@ -21,7 +21,8 @@ typedef struct xfs_mount {
 	dev_t			m_logdev;	/* dev of fs log data */
 	dev_t			m_rtdev;	/* dev of fs realtime data */
 	int			m_bsize;	/* fs logical block size */
-	xfs_agnumber_t		m_agrotor;	/* last ag where space found */
+	xfs_agnumber_t		m_agfrotor;	/* last ag where space found */
+	xfs_agnumber_t		m_agirotor;	/* last ag dir inode alloced */
 	lock_t			m_ipinlock;	/* inode pinning mutex */
 	struct xfs_ihash	*m_ihash;	/* fs private inode hash table*/
 	ulong			m_ihashmask;	/* fs inode hash size - 1 */

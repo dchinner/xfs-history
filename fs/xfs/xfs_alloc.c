@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.42 $"
+#ident	"$Revision: 1.43 $"
 
 /*
  * Free space allocation for xFS.
@@ -1727,7 +1727,7 @@ xfs_alloc_vextent(
 			/*
 			 * Start with the last place we left off.
 			 */
-			tagno = agno = mp->m_agrotor;
+			tagno = agno = mp->m_agfrotor;
 			flags = XFS_ALLOC_FLAG_TRYLOCK;
 		} else if (type == XFS_ALLOCTYPE_FIRST_AG) {
 			/*
@@ -1779,7 +1779,7 @@ xfs_alloc_vextent(
 			}
 		}
 		agno = tagno;
-		mp->m_agrotor = (agno + 1) % sbp->sb_agcount;
+		mp->m_agfrotor = (agno + 1) % sbp->sb_agcount;
 		break;
 	default:
 		ASSERT(0);
