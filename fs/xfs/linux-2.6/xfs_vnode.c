@@ -240,9 +240,8 @@ vn_alloc(struct vfs *vfsp, __uint64_t ino, enum vtype type, int flags)
 	inode = get_empty_inode();
 	current->flags = save_flags;
 
-	if (inode == NULL) {
-		panic("vn_alloc: ENOMEM inode!");
-	}
+	if (inode == NULL)
+		return NULL;
 
 	inode->i_sb    = vfsp->vfs_super;
 	inode->i_dev   = vfsp->vfs_super->s_dev;

@@ -221,6 +221,8 @@ again:
 						      tp != NULL);
 
 					preallocated_vnode = vp;
+					if (!vp && vn_alloc_used)
+						delay(1);
 					vn_alloc_used = 1;
 					goto again;
 				}
@@ -353,8 +355,11 @@ finish_inode:
 
 		xfs_iget_vnode_init(mp, vp, ip);
 	} else {
-		vp = vn_alloc(XFS_MTOVFS(mp), ino, IFTOVT(ip->i_d.di_mode),
-			      tp != NULL);
+		while (!(vp = vn_alloc(XFS_MTOVFS(mp), ino, IFTOVT(ip->i_d.di_mode),
+			      tp != NULL)))
+		{
+			delay(1);
+		}
 		vn_alloc_used = 1;
 	}
 
