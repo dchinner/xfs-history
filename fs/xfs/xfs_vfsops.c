@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.76 $"
+#ident  "$Revision: 1.77 $"
 
 #include <strings.h>
 #include <limits.h>
@@ -75,6 +75,7 @@
 #include <sys/xlv_tab.h>
 #include <sys/xlv_lock.h>
 #endif
+#include <sys/xlate.h>
 
 #include "xfs_clnt.h"
 #include "xfs_types.h"
@@ -496,6 +497,29 @@ xfs_get_vfsmount(struct vfs	*vfsp,
 	return mp;
 }	/* end of xfs_get_vfsmount() */
 
+/*
+ * irix5_to_xfs_args
+ * 
+ * This is used with copyin_xlate() to copy a xfs_args structure
+ * in from user space from a 32 bit application into a 64 bit kernel.
+ */
+int
+irix5_to_xfs_args(
+	enum xlate_mode	mode,
+	void		*to,
+	int		count,
+	xlate_info_t	*info)
+{
+	COPYIN_XLATE_PROLOGUE(irix5_xfs_args, xfs_args);
+
+	target->version = source->version;
+	target->flags = source->flags;
+	target->logbufs = source->logbufs;
+	target->logbufsize = source->logbufsize;
+	target->fsname = (char*)(__psint_t)source->fsname;
+
+	return 0;
+}
 
 /*
  * xfs_vfsmount
@@ -533,7 +557,8 @@ xfs_vfsmount(vfs_t		*vfsp,
 	 * Copy in XFS-specific arguments.
 	 */
 	bzero(&args, sizeof args);
-	if (copyin(uap->dataptr, &args, MIN(uap->datalen, sizeof args)))
+	if (copyin_xlate(uap->dataptr, &args, sizeof(args),
+			 irix5_to_xfs_args, u.u_procp->p_abi, 1))
 		return XFS_ERROR(EFAULT);
 
 	/*
