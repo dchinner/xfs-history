@@ -44,6 +44,7 @@
   
 #define ARCH_MIPS	0
 #define ARCH_INTEL_IA32	1
+#define ARCH_SPARC	2
 #define ARCH_UNKNOWN    127
 
 /*
@@ -94,8 +95,10 @@
   
 #ifdef CONFIG_X86
 #define ARCH_NOCONVERT ARCH_INTEL_IA32
+#elif defined(__sparc__)
+#define ARCH_NOCONVERT ARCH_SPARC
 #else
-#error support for XFS on non X86 architectures not yet implemented
+#error attempt to define XFS native architecture on non-supported platform
 #endif
 
 /* check for multiple defines */

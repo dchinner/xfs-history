@@ -42,6 +42,7 @@
 #undef  NODEV
 #include <linux/version.h>
 #include <linux/fs.h>
+#include <linux/bitops.h>
 #include <linux/sched.h>
 #include <linux/locks.h>
 #include <linux/slab.h>

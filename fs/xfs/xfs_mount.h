@@ -362,7 +362,7 @@ typedef struct xfs_mount {
 #define XFS_MIN_IO_LOG		13	/* 8K for simulation */
 #define	XFS_UIO_MIN_WRITEIO_LOG	13
 #define	XFS_UIO_MIN_READIO_LOG	13
-#elif _PAGESZ == 16384
+#elif (_PAGESZ == 16384) || (_PAGESZ == 8192)
 #define XFS_MIN_IO_LOG		14	/* 16K */
 #define	XFS_UIO_MIN_WRITEIO_LOG	14
 #define	XFS_UIO_MIN_READIO_LOG	14

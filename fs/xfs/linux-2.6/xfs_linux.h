@@ -85,6 +85,15 @@
 #ifndef STATIC
 #define STATIC
 #endif
+
+#ifdef	__KERNEL__
+# include <asm/types.h>		/* Need BITS_PER_LONG */
+#else	/* __KERNEL__ */
+# define __KERNEL__
+# include <asm/types.h>		/* Need BITS_PER_LONG */
+# undef  __KERNEL__
+#endif	/* __KERNEL__ */
+
 #include <sys/types.h>
 
 #ifndef SIM
@@ -167,7 +176,10 @@ extern ksa_t *ksaptr;
 
 #define	get_bdevsw(dev)	((struct bdevsw *)(__psint_t)(dev))
 
+#undef bzero
 #define bzero(p,s) memset((p), 0, (s))
+
+#undef bcopy
 #define bcopy(s,d,n) memcpy((d),(s),(n))
 
 extern void *kern_malloc(size_t);

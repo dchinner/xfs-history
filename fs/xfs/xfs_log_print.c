@@ -29,12 +29,15 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.13 $"
+#ident	"$Revision: 1.14 $"
 
 /*
  * This is meant to be used by only the user level log-print code, and
  * the simulator. Not a part of the XFS kernel.
  */
+
+#include <xfs_os_defs.h>
+
 #ifdef SIM
 #define _KERNEL 1
 #define __KERNEL__ 1
