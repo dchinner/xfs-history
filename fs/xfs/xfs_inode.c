@@ -1,4 +1,4 @@
-#ident "$Revision: 1.192 $"
+#ident "$Revision: 1.193 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -130,8 +130,10 @@ xfs_itrunc_trace(
 #define	xfs_itrunc_trace(tag, ip, flag, new_size, toss_start, toss_finish)
 #endif /* DEBUG */		     
 
+#ifndef SIM
 xfs_inode_t *
 xfs_get_inode(dev_t , xfs_ino_t);
+#endif /* SIM */
 
 /*
  * Check that none of the inode's in the buffer have a next
@@ -3290,6 +3292,7 @@ xfs_ichgtime(xfs_inode_t *ip,
 	ip->i_update_core = 1;
 }
 
+#ifndef SIM
 /*
  * xfs_get_inode()
  *
@@ -3369,3 +3372,4 @@ xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
 #endif /* PRIO_DEBUG */
         return( ip );
 }
+#endif /* SIM */
