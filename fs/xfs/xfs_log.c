@@ -1422,7 +1422,9 @@ log_print_record(int		  fd,
 	int		 i = 1;
 	
 	/* read_len must read up to some block boundary */
-	read_len = BBTOB(BTOBB(len+sizeof(log_op_header_t)));
+	read_len = BBTOB(BTOBB(len));
+
+	/* partial_read => don't malloc() new buffer, use old one */
 	if (*partial_read != -1) {
 		read_len -= *partial_read;
 		buf = (caddr_t)((psint)(*partial_buf) + (psint)(*partial_read));
@@ -1434,6 +1436,8 @@ log_print_record(int		  fd,
 		printf("log_print_record: read error\n");
 		exit(1);
 	}
+
+	/* Did we read everything? */
 	if (ret == 0 || ret != read_len) {
 		*partial_read = ret;
 		*partial_buf = buf;
@@ -1441,6 +1445,8 @@ log_print_record(int		  fd,
 	}
 	if (*partial_read != -1)
 		read_len += *partial_read;
+
+	/* Everything read in.  Start from beginning of buffer */
 	buf = ptr;
 	for (i = 0; ptr < buf + read_len; ptr += BBSIZE, i++) {
 		rechead = (log_rec_header_t *)ptr;
