@@ -1,4 +1,4 @@
-
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL	1

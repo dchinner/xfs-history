@@ -1,3 +1,4 @@
+#ident "$Revision$"
 
 #include <sys/debug.h>
 #ifdef SIM
