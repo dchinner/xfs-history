@@ -6106,7 +6106,6 @@ vnodeops_t xfs_vnodeops = {
 	xfs_fsync,
 	xfs_inactive,
 	xfs_fid2,
-	xfs_release,
 	xfs_rwlock,
 	xfs_rwunlock,
 	xfs_seek,
@@ -6127,4 +6126,5 @@ vnodeops_t xfs_vnodeops = {
 	fs_flushinval_pages,
 	fs_flush_pages,
 	fs_pages_sethole,
+	xfs_release,
 };

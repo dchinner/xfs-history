@@ -214,7 +214,7 @@ typedef	int	(*vop_rwlock_t)(bhv_desc_t *, vrwlock_t);
 typedef	void	(*vop_rwunlock_t)(bhv_desc_t *, vrwlock_t);
 typedef	int	(*vop_seek_t)(bhv_desc_t *, xfs_off_t, xfs_off_t*);
 typedef	int	(*vop_realvp_t)(bhv_desc_t *, vnode_t **);
-typedef	int	(*vop_bmap_t)(bhv_desc_t *, loff_t, ssize_t, int, struct cred *, struct page_buf_bmap_s *, int *);
+typedef	int	(*vop_bmap_t)(bhv_desc_t *, xfs_off_t, ssize_t, int, struct cred *, struct page_buf_bmap_s *, int *);
 #ifdef CELL_CAPABLE
 typedef int     (*vop_allocstore_t)(bhv_desc_t *, xfs_off_t, size_t, struct cred *);
 #endif
@@ -261,10 +261,6 @@ typedef struct vnodeops {
 	vop_fsync_t		vop_fsync;
 	vop_inactive_t		vop_inactive;
 	vop_fid2_t		vop_fid2;
-#ifndef CELL_CAPABLE
-        /* XXX - we don't have this on irix so undefine it if we're CELL_CAPABLE */
-	vop_release_t		vop_release;
-#endif
 	vop_rwlock_t		vop_rwlock;
 	vop_rwunlock_t		vop_rwunlock;
 	vop_seek_t		vop_seek;
@@ -285,6 +281,7 @@ typedef struct vnodeops {
 	vop_pflushinvalvp_t	vop_flushinval_pages;
 	vop_pflushvp_t		vop_flush_pages;
 	vop_sethole_t		vop_pages_sethole;
+	vop_release_t		vop_release;
 } vnodeops_t;
 
 /*

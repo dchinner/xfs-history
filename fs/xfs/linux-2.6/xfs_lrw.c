@@ -794,7 +794,7 @@ retry:
  */
 int
 xfs_bmap(bhv_desc_t	*bdp,
-	loff_t		offset,
+	xfs_off_t	offset,
 	ssize_t		count,
 	int		flags, 
         struct cred     *cred,
