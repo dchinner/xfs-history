@@ -1,4 +1,4 @@
-#ident "$Revision: 1.139 $"
+#ident "$Revision: 1.143 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1849,9 +1849,6 @@ void
 xfs_idestroy(
 	xfs_inode_t	*ip)
 {
-#ifndef SIM
-	extern void xfs_free_remaining_tickets( xfs_inode_t *);
-#endif
 
 	switch (ip->i_d.di_mode & IFMT) {
 	case IFREG:
@@ -1897,10 +1894,6 @@ xfs_idestroy(
 #endif /* NOTYET */
 	mrfree(&ip->i_lock);
 	mrfree(&ip->i_iolock);
-#ifndef SIM
-	xfs_free_remaining_tickets( ip );
-#endif
-	freesplock(ip->i_ticketlock);
 #ifdef NOTYET
 	freesplock(ip->i_range_lock.r_splock);
 #endif /* NOTYET */
