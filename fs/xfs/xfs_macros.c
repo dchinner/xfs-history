@@ -85,9 +85,9 @@ xfs_ag_daddr(xfs_mount_t *mp, xfs_agnumber_t agno, xfs_daddr_t d)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_AG_BEST_BLOCKS)
 xfs_extlen_t
-xfs_ag_best_blocks(int bl)
+xfs_ag_best_blocks(int bl, xfs_drfsbno_t blks)
 {
-	return XFS_AG_BEST_BLOCKS(bl);
+	return XFS_AG_BEST_BLOCKS(bl, blks);
 }
 #endif
 
