@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.44 $"
+#ident	"$Revision: 1.49 $"
 
 /*
  * High level interface routines for log manager
@@ -543,8 +543,8 @@ xlog_get_bp(int num_bblks)
 	bp = getrbuf(0);
 	unaligned = (daddr_t)kmem_alloc(BBTOB(num_bblks+1), 0);
 	bp->b_dmaaddr = (caddr_t)((unaligned+BBSIZE-1) & ~(BBSIZE-1));
-	bp->b_bcount = BBTOB(num_bblks);
-	bp->b_private = (caddr_t)unaligned;
+	bp->b_bufsize = bp->b_bcount = BBTOB(num_bblks);
+	bp->b_fsprivate = (caddr_t)unaligned;
 	return bp;
 }	/* xlog_get_bp */
 
@@ -552,7 +552,7 @@ xlog_get_bp(int num_bblks)
 static void
 xlog_put_bp(buf_t *bp, int num_bblks)
 {
-	kmem_free(bp->b_private, BBTOB(num_bblks+1));
+	kmem_free(bp->b_fsprivate, BBTOB(num_bblks+1));
 	freerbuf(bp);
 }	/* xlog_get_bp */
 
@@ -571,13 +571,13 @@ xlog_bread(xlog_t	*log,
 	bp->b_blkno	= blk_no + log->l_logBBstart;
 	bp->b_flags	= B_READ|B_BUSY;
 	bp->b_bcount	= BBTOB(nbblks);
+	bp->b_bufsize	= bp->b_bcount;
 	bp->b_edev	= log->l_dev;
 
 	bdstrat(bmajor(bp->b_edev), bp);
 	iowait(bp);
 
 	if (bp->b_flags & B_ERROR) {
-		brelse(bp);
 		xlog_panic("xlog_bread: bread error");
 	}
 }	/* xlog_bread */
@@ -770,7 +770,6 @@ xlog_find_oldest(dev_t log_dev,
 	while (block_no < log_bbnum) {
 		bp = bread(log_dev, block_no, 1);
 		if (bp->b_flags & B_ERROR) {
-			brelse(bp);
 			xlog_panic("xlog_find_oldest");
 		}
 		head = (xlog_rec_header_t *)bp->b_dmaaddr;
@@ -888,7 +887,6 @@ exit:
 	while (block_no < log_bbnum) {
 		bp = bread(log_dev, block_no+blk_offset, 1);
 		if (bp->b_flags & B_ERROR) {
-			brelse(bp);
 			xlog_panic("xlog_find_sync");
 		}
 		head = (xlog_rec_header_t *)bp->b_dmaaddr;
@@ -917,7 +915,6 @@ exit:
 	
 	bp = bread(log_dev, last_log_rec_blk+blk_offset, 1);
 	if (bp->b_flags & B_ERROR) {
-		brelse(bp);
 		xlog_panic("xlog_find_sync");
 	}
 	brelse(bp);
