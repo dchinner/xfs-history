@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.188 $"
+#ident  "$Revision: 1.189 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -1247,6 +1247,7 @@ xfs_unmount(
 	struct vfs 	*vfsp = bhvtovfs(bdp);
 	int		unmount_event_wanted = 0;
 	int		unmount_event_flags = 0;
+	int		xfs_unmountfs_needed = 0;
 	int		error;
 
 	if (!_CAP_CRABLE(credp, CAP_MOUNT_MGT))
@@ -1343,11 +1344,6 @@ xfs_unmount(
 	vn_purge(rvp, &vmap);
 
 	error = 0;
-	/*
-	 * Call common unmount function to flush to disk
-	 * and free the super block buffer & mount structures.
-	 */
-	vfs_flags = (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE;
 
 	/*
 	 * If we're forcing a shutdown, typically because of a media error,
@@ -1359,14 +1355,30 @@ xfs_unmount(
 			 (SYNC_WAIT | SYNC_CLOSE), credp);
 		ASSERT(error != EFSCORRUPTED);
 	}
-	xfs_unmountfs(mp, vfs_flags, credp);	
+	xfs_unmountfs_needed = 1;	
+
 out:
+	/*	Send DMAPI event, if required.
+	 *	Then do xfs_unmountfs() if needed.
+	 *	Then return error (or zero).
+	 */
 #ifndef SIM
 	if (unmount_event_wanted) {
+		/* Note: mp structure must still exist for 
+		 * dm_send_unmount_event() call.
+		 */
 		dm_send_unmount_event(vfsp, error == 0 ? rvp : NULL,
 			DM_RIGHT_NULL, 0, error, unmount_event_flags);
 	}
 #endif
+	if (xfs_unmountfs_needed) {
+		/*
+		 * Call common unmount function to flush to disk
+		 * and free the super block buffer & mount structures.
+		 */
+		vfs_flags = (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE;
+		xfs_unmountfs(mp, vfs_flags, credp);
+	}
 	return XFS_ERROR(error);
 
 fscorrupt_out:
@@ -1375,7 +1387,8 @@ fscorrupt_out:
 fscorrupt_out2:
 	xfs_iunlock(rip, XFS_ILOCK_EXCL);
 
-	return XFS_ERROR(EFSCORRUPTED);
+	error = EFSCORRUPTED;
+	goto out;
 }
 
 
