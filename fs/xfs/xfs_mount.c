@@ -203,12 +203,12 @@ xfs_mount_validate_sb(
 		return XFS_ERROR(EWRONGFS);
 	}
 
-	if (sbp->sb_logstart == 0 && mp->m_logdev == mp->m_dev) {
+	if (sbp->sb_logstart == 0 && mp->m_logdev_targp == mp->m_ddev_targp) {
 		cmn_err(CE_WARN, "XFS: filesystem is marked as having an external log; specify logdev on the\nmount command line.");
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
-	if (sbp->sb_logstart != 0 && mp->m_logdev && mp->m_logdev != mp->m_dev) {
+	if (sbp->sb_logstart != 0 && mp->m_logdev_targp != mp->m_ddev_targp) {
 		cmn_err(CE_WARN, "XFS: filesystem is marked as having an internal log; don't specify logdev on\nthe mount command line.");
 		return XFS_ERROR(EFSCORRUPTED);
 	}
@@ -764,7 +764,7 @@ xfs_mountfs(
 	}
 
 	if (!noio && ((mfsi_flags & XFS_MFSI_CLIENT) == 0) &&
-	    mp->m_logdev && mp->m_logdev != mp->m_dev) {
+	    mp->m_logdev_targp != mp->m_ddev_targp) {
 		d = (xfs_daddr_t)XFS_FSB_TO_BB(mp, mp->m_sb.sb_logblocks);
 		if (XFS_BB_TO_FSB(mp, d) != mp->m_sb.sb_logblocks) {
 			cmn_err(CE_WARN, "XFS: size check 3 failed");
@@ -882,7 +882,7 @@ xfs_mountfs(
 	 * log's mount-time initialization. Perform 1st part recovery if needed
 	 */
 	if (sbp->sb_logblocks > 0) {		/* check for volume case */
-		error = xfs_log_mount(mp, mp->m_logdev,
+		error = xfs_log_mount(mp, mp->m_logdev_targp->pbr_dev,
 				      XFS_FSB_TO_DADDR(mp, sbp->sb_logstart),
 				      XFS_FSB_TO_BB(mp, sbp->sb_logblocks));
 		if (error) {
@@ -935,7 +935,7 @@ xfs_mountfs(
 
 	if (((quotaondisk && !XFS_IS_QUOTA_ON(mp)) ||
 	      (!quotaondisk && XFS_IS_QUOTA_ON(mp))) &&
-	    (is_read_only(mp->m_dev) || is_read_only(mp->m_logdev))) {
+	    (is_read_only(mp->m_dev) || is_read_only(mp->m_logdev_targp->pbr_dev))) {
 		cmn_err(CE_WARN,
 			"XFS: device %s is read-only, cannot change "
 			"quota state.  Please mount with%s quota option.",

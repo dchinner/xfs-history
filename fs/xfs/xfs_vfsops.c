@@ -1616,7 +1616,7 @@ xfs_syncsub(
 	 */
 	if ((flags & (SYNC_CLOSE|SYNC_WAIT)) == (SYNC_CLOSE|SYNC_WAIT)) {
 		XFS_bflush(mp->m_ddev_targp);
-		if (mp->m_rtdev != 0) {
+		if (mp->m_rtdev_targp) {
 			XFS_bflush(mp->m_rtdev_targp);
 		}
 	}

@@ -4437,8 +4437,10 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	kdb_printf("ail_gen 0x%x &sb 0x%p\n",
 		mp->m_ail_gen, &mp->m_sb);
 	kdb_printf("sb_lock 0x%p sb_bp 0x%p dev 0x%x logdev 0x%x rtdev 0x%x\n",
-		&mp->m_sb_lock, mp->m_sb_bp, mp->m_dev, mp->m_logdev,
-		mp->m_rtdev);
+		&mp->m_sb_lock, mp->m_sb_bp,
+		mp->m_ddev_targp->pbr_dev,
+		mp->m_logdev_targp->pbr_dev,
+		mp->m_rtdev_targp->pbr_dev);
 	kdb_printf("bsize %d agfrotor %d agirotor %d ihash 0x%p ihsize %d\n",
 		mp->m_bsize, mp->m_agfrotor, mp->m_agirotor,
 		mp->m_ihash, mp->m_ihsize);
