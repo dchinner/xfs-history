@@ -1,4 +1,4 @@
-#ident "$Revision: 1.405 $"
+#ident "$Revision$"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -445,11 +445,15 @@ xfs_getattr(
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 
-	xfs_ilock(ip, XFS_ILOCK_SHARED);
+	ASSERT(!((flags & ATTR_LAZY) && (vap->va_mask != AT_SIZE)));
+
+	if (!(flags & ATTR_LAZY))
+		xfs_ilock(ip, XFS_ILOCK_SHARED);
 
 	vap->va_size = ip->i_d.di_size;
         if (vap->va_mask == AT_SIZE) {
-		xfs_iunlock(ip, XFS_ILOCK_SHARED);
+		if (!(flags & ATTR_LAZY))
+			xfs_iunlock(ip, XFS_ILOCK_SHARED);
                 return 0;
 	}
         vap->va_fsid = ip->i_dev;
@@ -464,7 +468,8 @@ xfs_getattr(
 	 * Quick exit for non-stat callers
 	 */
 	if ((vap->va_mask & ~(AT_SIZE|AT_FSID|AT_NODEID|AT_NLINK)) == 0) {
-		xfs_iunlock(ip, XFS_ILOCK_SHARED);
+		if (!(flags & ATTR_LAZY))
+			xfs_iunlock(ip, XFS_ILOCK_SHARED);
                 return 0;
 	}
 
@@ -536,7 +541,8 @@ xfs_getattr(
 	if ((vap->va_mask &
 	     (AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS|AT_ANEXTENTS|
 	      AT_GENCOUNT|AT_VCODE)) == 0) {
-		xfs_iunlock(ip, XFS_ILOCK_SHARED);
+		if (!(flags & ATTR_LAZY))
+			xfs_iunlock(ip, XFS_ILOCK_SHARED);
                 return 0;
 	}
 	/*
@@ -562,6 +568,7 @@ xfs_getattr(
 	vap->va_gencount = ip->i_d.di_gen;
 	vap->va_vcode = 0L;
 
+	ASSERT(!(flags & ATTR_LAZY));
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 	return 0;
 }
