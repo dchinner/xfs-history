@@ -305,6 +305,7 @@ xfs_trans_free_items(
 	 * Reset the transaction structure's free item count.
 	 */
 	tp->t_items_free = XFS_LIC_NUM_SLOTS;
+	tp->t_items.lic_next = NULL;
 }
 
 
@@ -320,6 +321,7 @@ xfs_trans_unlock_items(xfs_trans_t *tp)
 {
 	xfs_log_item_chunk_t	*licp;
 	xfs_log_item_chunk_t	*next_licp;
+	xfs_log_item_chunk_t	**licpp;
 	int			freed;
 
 	freed = 0;
@@ -331,6 +333,7 @@ xfs_trans_unlock_items(xfs_trans_t *tp)
 	if (!XFS_LIC_ARE_ALL_FREE(licp)) {
 		freed = xfs_trans_unlock_chunk(licp, 0, 0);
 	}
+	licpp = &(tp->t_items.lic_next);
 	licp = licp->lic_next;
 
 	/*
@@ -342,9 +345,13 @@ xfs_trans_unlock_items(xfs_trans_t *tp)
 		freed += xfs_trans_unlock_chunk(licp, 0, 0);
 		next_licp = licp->lic_next;
 		if (XFS_LIC_ARE_ALL_FREE(licp)) {
+			*licpp = next_licp;
 			kmem_free(licp, sizeof(xfs_log_item_chunk_t));
 			freed -= XFS_LIC_NUM_SLOTS;
+		} else {
+			licpp = &(licp->lic_next);
 		}
+		ASSERT(*licpp == next_licp);
 		licp = next_licp;
 	}
 
