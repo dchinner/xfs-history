@@ -2555,6 +2555,7 @@ xfs_diostrat( buf_t *bp)
 			bytes_this_req  = XFS_FSB_TO_B(mp,
 				imapp->br_blockcount) - BBTOB(blk_algn);
 
+			ASSERT(bytes_this_req);
 
 			offset_this_req = XFS_FSB_TO_B(mp,
 				imapp->br_startoff) + BBTOB(blk_algn); 
@@ -2582,6 +2583,10 @@ xfs_diostrat( buf_t *bp)
 					bytes_this_req = ip->i_d.di_size - 
 						offset_this_req;
 					end_of_file = 1;
+
+					if (!bytes_this_req) {
+						break;
+					}
 				}
 			}
 
@@ -2621,6 +2626,7 @@ xfs_diostrat( buf_t *bp)
 						imapp->br_startblock) + 
 						blk_algn;
 				}
+				ASSERT(bytes_this_req);
 	     			nbp->b_bcount    = bytes_this_req;
 	     			nbp->b_un.b_addr = base;
 				/*
