@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.205 $"
+#ident  "$Revision: 1.206 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -531,7 +531,19 @@ xfs_cmountfs(
 				error = XFS_ERROR(EINVAL);
 				goto error3;
 			}
+			if (ap->logbufs != 0 &&
+			    ap->logbufs != -1 &&
+			    (ap->logbufs < 2 || ap->logbufs > 8)) {
+				error = XFS_ERROR(EINVAL);
+				goto error3;
+			}
 			mp->m_logbufs = ap->logbufs;
+			if (ap->logbufsize != -1 &&
+			    ap->logbufsize != 16 * 1024 &&
+			    ap->logbufsize != 32 * 1024) {
+				error = XFS_ERROR(EINVAL);
+				goto error3;
+			}
 			mp->m_logbsize = ap->logbufsize;
 			tmp_fsname_buffer = kmem_alloc(PATH_MAX, KM_SLEEP);
 			if (error = copyinstr(ap->fsname, tmp_fsname_buffer,
@@ -603,7 +615,7 @@ xfs_cmountfs(
 			if (ap->version < 3 ||
 			    ap->iosizelog > XFS_MAX_IO_LOG ||
 			    ap->iosizelog < XFS_MIN_IO_LOG) {
-				error = EINVAL;
+				error = XFS_ERROR(EINVAL);
 				goto error3;
 			}
 
@@ -616,7 +628,7 @@ xfs_cmountfs(
 		 */
 		if (ap->flags & XFSMNT_NORECOVERY) {
 			if (!(vfsp->vfs_flag & VFS_RDONLY)) {
-				error = EINVAL;
+				error = XFS_ERROR(EINVAL);
 				goto error3;
 			}
 			mp->m_flags |= XFS_MOUNT_NORECOVERY;
@@ -626,7 +638,7 @@ xfs_cmountfs(
 	if (ap && (ap->flags & XFSMNT_TESTUUID)) {
 		error = 0;
 		if (copyin(ap->uuid, &mp->m_sb.sb_uuid, sizeof(uuid_t))) {
-			error = EFAULT;
+			error = XFS_ERROR(EFAULT);
 			goto error3;
 		}
 	}
@@ -646,7 +658,7 @@ xfs_cmountfs(
 	 */
 	if (mp->m_sb.sb_flags & XFS_SBF_READONLY &&
 	    !(vfsp->vfs_flag & VFS_RDONLY)) {
-		error = EROFS;
+		error = XFS_ERROR(EROFS);
 		xfs_freesb(mp);
 		goto error3;
 	}
@@ -656,7 +668,7 @@ xfs_cmountfs(
 	 */
 	if (ap && ap->flags & XFSMNT_SHARED) {
 		if (!XFS_SB_VERSION_HASSHARED(&mp->m_sb)) {
-			error = EINVAL;
+			error = XFS_ERROR(EINVAL);
 			xfs_freesb(mp);
 			goto error3;
 		}
@@ -670,7 +682,7 @@ xfs_cmountfs(
 		if (!(vfsp->vfs_flag & VFS_RDONLY) ||
 		    !(mp->m_sb.sb_flags & XFS_SBF_READONLY) ||
 		    mp->m_sb.sb_shared_vn != 0) {
-			error = EINVAL;
+			error = XFS_ERROR(EINVAL);
 			xfs_freesb(mp);
 			goto error3;
 		}
@@ -681,7 +693,7 @@ xfs_cmountfs(
 		 * Shared XFS V0 can't deal with DMI.  Return EINVAL.
 		 */
 		if (mp->m_sb.sb_shared_vn == 0 && (args->flags & MS_DMI)) {
-			error = EINVAL;
+			error = XFS_ERROR(EINVAL);
 			xfs_freesb(mp);
 			goto error3;
 		}
@@ -1412,7 +1424,7 @@ xfs_unmount(
 	 * Make sure there are no active users.
 	 */
 	if (xfs_ibusy(mp)) {
-		error = EBUSY;
+		error = XFS_ERROR(EBUSY);
 		goto out;
 	}
 	
@@ -1515,7 +1527,7 @@ fscorrupt_out:
 fscorrupt_out2:
 	xfs_iunlock(rip, XFS_ILOCK_EXCL);
 
-	error = EFSCORRUPTED;
+	error = XFS_ERROR(EFSCORRUPTED);
 	goto out;
 }
 
