@@ -88,6 +88,23 @@
 #include <asm/uaccess.h> /* For copy_from_user */
 
 /*
+ * Pull the link count and size up from the xfs inode to the linux inode
+ */
+
+static void validate_fields(struct inode *ip)
+{
+	vnode_t	*vp = LINVFS_GET_VP(ip);
+	vattr_t va;
+	int	error;
+
+	va.va_mask = AT_NLINK|AT_SIZE;
+	VOP_GETATTR(vp, &va, ATTR_LAZY, NULL, error);
+	ip->i_nlink = va.va_nlink;
+	ip->i_size = va.va_size;
+}
+
+
+/*
  * Common code used to create/instantiate various things in a directory.
  */
 
@@ -144,8 +161,10 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 		}
 		linvfs_set_inode_ops(ip);
 		error = linvfs_revalidate_core(ip);
+		validate_fields(dir);
 		d_instantiate(dentry, ip);
 	}
+
 	return -error;
 }
 
@@ -201,27 +220,26 @@ struct dentry * linvfs_lookup(struct inode *dir, struct dentry *dentry)
 int linvfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *dentry)
 {
 	int		error;
-	struct inode	*inode = old_dentry->d_inode;
 	vnode_t		*tdvp;	/* Target directory for new name/link */
 	vnode_t		*vp;	/* vp of name being linked */
 	struct inode	*ip;	/* inode of guy being linked to */
 
-	if (S_ISDIR(inode->i_mode))
+	ip = old_dentry->d_inode;	/* inode being linked to */
+	if (S_ISDIR(ip->i_mode))
 		return -EPERM;
 
 	tdvp = LINVFS_GET_VP(dir);
 	ASSERT(tdvp);
 
-	ip = old_dentry->d_inode;	/* inode being linked to */
 	vp = LINVFS_GET_VP(ip);
 	ASSERT(vp);
 
 	error = 0;
 	VOP_LINK(tdvp, vp, (char *)dentry->d_name.name, NULL, error);
 	if (!error) {
-		ip->i_nlink++;
 		ip->i_ctime = CURRENT_TIME;
 		VN_HOLD(vp);
+		validate_fields(ip);
 		d_instantiate(dentry, ip);
 	}
 	return -error;
@@ -250,10 +268,9 @@ int linvfs_unlink(struct inode *dir, struct dentry *dentry)
 		dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 		dir->i_version = ++event;
 
-		inode->i_nlink--;
 		inode->i_ctime = dir->i_ctime;
-
-		d_delete(dentry);       /* del and free inode */
+		validate_fields(dir);	/* For size only */
+		validate_fields(inode);
 	}
 
 	return -error;
@@ -328,12 +345,10 @@ int linvfs_rmdir(struct inode *dir, struct dentry *dentry)
 	error = 0;
 	VOP_RMDIR(dvp, vp, (char *)dentry->d_name.name, pwd_vp, NULL, error);
 	if (!error) {
-		inode->i_nlink = 0;
-		inode->i_size = 0;
+		validate_fields(inode);
+		validate_fields(dir);
 		inode->i_version = ++event;
-		dir->i_nlink--;
 		dir->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
-		d_delete(dentry);       /* del and free inode */
 	}
 	return -error;
 }
@@ -395,11 +410,15 @@ int linvfs_rename(struct inode *odir, struct dentry *odentry,
 	ndir->i_version = ++event;
 	odir->i_version = ++event;
 	if (new_inode) {
-		new_inode->i_nlink--;
 		new_inode->i_ctime = CURRENT_TIME;
+		validate_fields(new_inode);
 	}
 
 	odir->i_ctime = odir->i_mtime = CURRENT_TIME;
+
+	validate_fields(odir);
+	if (ndir != odir)
+		validate_fields(ndir);
 	return 0;
 }
 
@@ -536,7 +555,7 @@ linvfs_notify_change(
 	inode = dentry->d_inode;
 	error = inode_change_ok(inode, attr);
 	if (error){
-	  return(error);
+		return(error);
 	}
 
 	memset(&vattr, 0, sizeof(vattr_t));
@@ -596,7 +615,6 @@ linvfs_pb_bmap(struct inode *inode,
 			   int flags/* page_buf_flags_t */)
 {
 	vnode_t		*vp;
-	int		block_shift = inode->i_sb->s_blocksize_bits;
 	pb_bmap_t	pbmap;
 	int		npbmaps = 1;
 	int		error;
