@@ -91,12 +91,29 @@ xfs_attr_get(bhv_desc_t *bdp, char *name, char *value, int *valuelenp,
 	xfs_da_args_t   args;
 	int             error;
         int             namelen;
+	xfs_inode_t	*ip = XFS_BHVTOI(bdp);
         
         ASSERT(MAXNAMELEN-1<=0xff); /* length is stored in uint8 */
         namelen=strlen(name);
         if (namelen>=MAXNAMELEN) return EFAULT; /* match irix behaviour */
 
 	XFS_STATS_INC(xfsstats.xs_attr_get);
+
+	if (XFS_IFORK_Q(ip) == 0)
+		return ENOATTR;
+
+
+	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
+		return (EIO);
+
+	/*
+	 * Do we answer them, or ignore them?
+	 */
+	xfs_ilock(ip, XFS_ILOCK_SHARED);
+	if ((error = xfs_iaccess(XFS_BHVTOI(bdp), IREAD, cred))) {
+		xfs_iunlock(ip, XFS_ILOCK_SHARED);
+                return(XFS_ERROR(error));
+	}
 
 	/*
 	 * Fill in the arg structure for this request.
@@ -108,37 +125,25 @@ xfs_attr_get(bhv_desc_t *bdp, char *name, char *value, int *valuelenp,
 	args.valuelen = *valuelenp;
 	args.flags = flags;
 	args.hashval = xfs_da_hashname(args.name, args.namelen);
-	args.dp = XFS_BHVTOI(bdp);
+	args.dp = ip;
 	args.whichfork = XFS_ATTR_FORK;
 	args.trans = NULL;
-
-	if (XFS_FORCED_SHUTDOWN(args.dp->i_mount))
-		return (EIO);
-
-	/*
-	 * Do we answer them, or ignore them?
-	 */
-	xfs_ilock(args.dp, XFS_ILOCK_SHARED);
-	if ((error = xfs_iaccess(XFS_BHVTOI(bdp), IREAD, cred))) {
-		xfs_iunlock(args.dp, XFS_ILOCK_SHARED);
-                return(XFS_ERROR(error));
-	}
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (XFS_IFORK_Q(args.dp) == 0 ||
-	    (args.dp->i_d.di_aformat == XFS_DINODE_FMT_EXTENTS &&
-	     args.dp->i_d.di_anextents == 0)) {
+	if (XFS_IFORK_Q(ip) == 0 ||
+	    (ip->i_d.di_aformat == XFS_DINODE_FMT_EXTENTS &&
+	     ip->i_d.di_anextents == 0)) {
 		error = XFS_ERROR(ENOATTR);
-	} else if (args.dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL) {
+	} else if (ip->i_d.di_aformat == XFS_DINODE_FMT_LOCAL) {
 		error = xfs_attr_shortform_getvalue(&args);
-	} else if (xfs_bmap_one_block(args.dp, XFS_ATTR_FORK)) {
+	} else if (xfs_bmap_one_block(ip, XFS_ATTR_FORK)) {
 		error = xfs_attr_leaf_get(&args);
 	} else {
 		error = xfs_attr_node_get(&args);
 	}
-	xfs_iunlock(args.dp, XFS_ILOCK_SHARED);
+	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
 	/*
 	 * Return the number of bytes in the value to the caller.

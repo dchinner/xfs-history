@@ -38,6 +38,8 @@ xfs_attr_fetch(xfs_inode_t *ip, char *name, char *value, int valuelen)
 	xfs_da_args_t args;
 	int error;
 
+	if (XFS_IFORK_Q(ip) == 0)
+		return ENOATTR;
 	/*
 	 * Do the argument setup for the xfs_attr routines.
 	 */
@@ -55,9 +57,7 @@ xfs_attr_fetch(xfs_inode_t *ip, char *name, char *value, int valuelen)
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (XFS_IFORK_Q(args.dp) == 0)
-		error = ENOATTR;
-	else if (args.dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL)
+	if (args.dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL)
 		error = xfs_attr_shortform_getvalue(&args);
 	else if (xfs_bmap_one_block(args.dp, XFS_ATTR_FORK))
 		error = xfs_attr_leaf_get(&args);
