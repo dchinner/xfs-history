@@ -1,4 +1,4 @@
-#ident "$Revision: 1.304 $"
+#ident "$Revision: 1.305 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1003,6 +1003,13 @@ xfs_setattr(
 				
 			}
 			ip->i_d.di_projid = projid;
+			/*
+			 * We may have to rev the inode as well as
+			 * the superblock version number since projids didn't
+			 * exist before DINODE_VERSION_2 and SB_VERSION_NLINK.
+			 */
+			if (ip->i_d.di_version == XFS_DINODE_VERSION_1)
+				xfs_bump_ino_vers2(tp, ip);
 		}
 		if (igid != gid)
 			ip->i_d.di_gid = gid;
