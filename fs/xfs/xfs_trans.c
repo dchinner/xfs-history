@@ -128,6 +128,7 @@ xfs_trans_dup(xfs_trans_t *tp)
 	ASSERT(tp->t_ticket != NULL);
 	ntp->t_flags = XFS_TRANS_PERM_LOG_RES;
 	ntp->t_ticket = tp->t_ticket;
+	ntp->t_log_res = tp->t_log_res;
 
 	return ntp;
 }
