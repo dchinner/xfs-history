@@ -256,6 +256,54 @@ xfs_retrieved(int	available,
 	return retrieved;
 }
 
+/*
+ * xfs_iomap_extra()
+ *
+ * This is called to fill in the bmapval for a page which is beyond
+ * the end of the file.  We map the entire fs block that the page
+ * resides on here.  That is because all XFS buffers should be a
+ * multiple of the fs block size.  If the fs block size is less than
+ * the size of a page, then map all of the fs blocks in the given
+ * range.  We may get partial pages here if the fs block size is less
+ * than the page size and this page overlaps the EOF.  The first part
+ * of the page would have been handled in the normal path, and the
+ * rest of the page is passed off to here.
+ */
+STATIC void
+xfs_iomap_extra(xfs_inode_t	*ip,
+		off_t		offset,
+		size_t		count,
+		struct bmapval	*bmapp,
+		int		*nbmaps)
+{
+	xfs_fsblock_t	offset_fsb;
+	xfs_fsblock_t	count_fsb;
+	xfs_mount_t	*mp;
+	xfs_sb_t	*sbp;
+
+	ASSERT(((dpoff(offset) == 0) && (count == NBPP)) ||
+	       ((offset == ip->i_d.di_size) && (count < NBPP)));
+	ASSERT(offset >= ip->i_d.di_size);
+
+	mp = ip->i_mount;
+	sbp = &(mp->m_sb);
+	offset_fsb = xfs_b_to_fsbt(sbp, offset);
+	count_fsb = xfs_b_to_fsb(sbp, count);
+
+	*nbmaps = 1;
+	bmapp->eof = BMAP_HOLE | BMAP_EOF;
+	bmapp->bn = -1;
+	bmapp->offset = xfs_fsb_to_bb(sbp, offset_fsb);
+	bmapp->length = xfs_fsb_to_bb(sbp, count_fsb);
+	bmapp->bsize = xfs_fsb_to_b(sbp, count_fsb);
+	bmapp->pboff = offset - xfs_fsb_to_b(sbp, offset_fsb);
+	bmapp->pbsize = count;
+	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
+		bmapp->pbdev = mp->m_rtdev;
+	} else {
+		bmapp->pbdev = mp->m_dev;
+	}
+}
 
 void
 xfs_iomap_read(xfs_inode_t	*ip,
@@ -300,6 +348,18 @@ xfs_iomap_read(xfs_inode_t	*ip,
 	offset_fsb = xfs_b_to_fsbt(sbp, offset);
 	nimaps = XFS_READ_IMAPS;
 	last_fsb = xfs_b_to_fsb(sbp, nisize);
+	if (last_fsb <= offset_fsb) {
+		/*
+		 * One of the pages beyond the EOF created by the
+		 * write code is being pushed out by the VM system.
+		 * Handle it here so it does not interfere with the
+		 * normal path code.  If the fs block size is less
+		 * than the page size then this may even be only a
+		 * part of a page.
+		 */
+		xfs_iomap_extra(ip, offset, count, bmapp, nbmaps);
+		return;
+	}
 	(void)xfs_bmapi(NULL, ip, offset_fsb,
 			(xfs_extlen_t)(last_fsb - offset_fsb),
 			XFS_BMAPI_ENTIRE, NULLFSBLOCK, 0, imap,
@@ -1685,7 +1745,9 @@ xfs_strat_read(vnode_t	*vp,
  * and delayed allocation extents beneath the buffer, but there
  * should only be a hole (if any) at the end of the buffer.
  * The hole would be the result of the aggressive buffer allocation
- * we do (past the EOF) when writing a file.
+ * we do (past the EOF) when writing a file.  It may even be that
+ * the entire buffer sits over a hole.  This is from the case where
+ * pdflush() turns one of our extra pages into a buffer.
  */
 STATIC xfs_extlen_t
 xfs_strat_write_count(xfs_inode_t	*ip,
@@ -1716,12 +1778,9 @@ xfs_strat_write_count(xfs_inode_t	*ip,
 				/*
 				 * We've hit the hole at the end of the
 				 * buffer, so that's it.  We assert
-				 * that there was at least some space
-				 * underlying the buffer and that the
-				 * hole we've found extends all the way
-				 * to the end of the buffer.
+				 * that the hole we've found extends
+				 * all the way to the end of the buffer.
 				 */
-				ASSERT(count_fsb > 0);
 				ASSERT((imap[n].br_startoff +
 					imap[n].br_blockcount) ==
 				       (offset_fsb + buf_fsb));
@@ -1867,6 +1926,15 @@ xfs_strat_write(vnode_t	*vp,
 	count_fsb = xfs_strat_write_count(ip, offset_fsb, count_fsb, imap,
 					  XFS_STRAT_WRITE_IMAPS);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+
+	if (count_fsb == 0) {
+		/*
+		 * The buffer sits entirely over a hole.  Just mark
+		 * it done and return.
+		 */
+		iodone(bp);
+		return;
+	}
 
 	map_start_fsb = offset_fsb;
 	while (count_fsb != 0) {
