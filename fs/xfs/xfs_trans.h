@@ -32,7 +32,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.105 $"
 
 struct xfs_buf;
 struct buftarg;
@@ -619,10 +619,12 @@ typedef struct xfs_trans {
  *    the parent directory inode: inode size
  *    the new inode: inode size
  *    the inode btree entry: block size
+ *    the superblock for the nlink flag: sector size
  *    the directory btree: (max depth + v2) * dir block size
  *    the directory inode\'s bmap btree: (max depth + v2) * block size
  * Or in the first xact we allocate some inodes giving:
  *    the agi and agf of the ag getting the new inodes: 2 * sectorsize
+ *    the superblock for the nlink flag: sector size
  *    the inode blocks allocated: XFS_IALLOC_BLOCKS * blocksize
  *    the inode btree: max depth * blocksize
  *    the allocation btrees: 2 trees * (max depth - 1) * block size
@@ -631,10 +633,11 @@ typedef struct xfs_trans {
 	(MAX( \
 	 ((mp)->m_sb.sb_inodesize + \
 	  (mp)->m_sb.sb_inodesize + \
+	  (mp)->m_sb.sb_sectsize + \
 	  XFS_FSB_TO_B(mp, 1) + \
 	  XFS_DIROP_LOG_RES(mp) + \
 	  (128 * (3 + XFS_DIROP_LOG_COUNT(mp)))), \
-	 (2 * (mp)->m_sb.sb_sectsize + \
+	 (3 * (mp)->m_sb.sb_sectsize + \
 	  XFS_FSB_TO_B((mp), XFS_IALLOC_BLOCKS((mp))) + \
 	  XFS_FSB_TO_B((mp), XFS_IN_MAXLEVELS(mp)) + \
 	  XFS_ALLOCFREE_LOG_RES(mp, 1) + \

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.288 $"
+#ident "$Revision: 1.289 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -1142,6 +1142,14 @@ xfs_ialloc(
 		 * and the pad field.
 		 */
 	}
+
+#ifndef SIM
+	/*
+	 * Project ids won't be stored on disk if we are using a version 1 inode.
+	 */ 
+	if ( (prid != 0) && (ip->i_d.di_version == XFS_DINODE_VERSION_1))
+		xfs_bump_ino_vers2(tp, ip);
+#endif /* SIM */
 
 	/*
 	 * For multiple groups support: if ISGID bit is set in the parent

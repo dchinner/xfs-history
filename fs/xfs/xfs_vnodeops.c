@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.454 $"
+#ident "$Revision: 1.455 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -5550,7 +5550,6 @@ xfs_finish_reclaim(
 	return 0;
 }
 
-#ifndef SIM
 /*
  * xfs_alloc_file_space()
  *      This routine allocates disk space for the given file.
@@ -5616,12 +5615,14 @@ xfs_alloc_file_space(
         } else
                 rtextsize = 0;
 
+#ifndef SIM
 	if (XFS_IS_QUOTA_ON(mp)) {
 		if (XFS_NOT_DQATTACHED(mp, ip)) {
 			if (error = xfs_qm_dqattach(ip, 0))
 				return error;
 		}
 	}
+#endif
 
 	if (len <= 0)
 		return XFS_ERROR(EINVAL);
@@ -5634,6 +5635,7 @@ xfs_alloc_file_space(
 	startoffset_fsb	= XFS_B_TO_FSBT(mp, offset);
 	allocatesize_fsb = XFS_B_TO_FSB(mp, count);
 
+#ifndef SIM
 /*	Generate a DMAPI event if needed.	*/
 
 	if (alloc_type != 0 && offset < ip->i_d.di_size &&
@@ -5650,11 +5652,14 @@ xfs_alloc_file_space(
 		if (error)
 			return(error);
 	}
+#endif
 
 	/*
 	 * allocate file space until done or until there is an error	
  	 */
+#ifndef SIM
 retry:
+#endif
 	while (allocatesize_fsb && !error) {
 		/*
 		 * determine if reserving space on
@@ -5667,7 +5672,7 @@ retry:
 			s *= rtextsize;
 			e = roundup(startoffset_fsb + allocatesize_fsb,
 				rtextsize);
-			numrtextents = (e - s) / mp->m_sb.sb_rextsize;
+			numrtextents = (int)(e - s) / mp->m_sb.sb_rextsize;
 			datablocks = 0;
 		} else {
 			datablocks = allocatesize_fsb;
@@ -5678,7 +5683,7 @@ retry:
 		 * allocate and setup the transaction
 		 */
 		tp = xfs_trans_alloc(mp, XFS_TRANS_DIOSTRAT);
-		resblks = XFS_DIOSTRAT_SPACE_RES(mp, datablocks);
+		resblks = (uint)XFS_DIOSTRAT_SPACE_RES(mp, datablocks);
 		error = xfs_trans_reserve(tp,
 					  resblks,
 					  XFS_WRITE_LOG_RES(mp),
@@ -5698,6 +5703,7 @@ retry:
 			break;
 		}
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
+#ifndef SIM
 		if (XFS_IS_QUOTA_ON(mp)) {
 			if (xfs_trans_reserve_quota(tp, 
 						    ip->i_udquot, 
@@ -5707,6 +5713,7 @@ retry:
 				goto error1;
 			}
 		}	
+#endif
 
 		xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 		xfs_trans_ihold(tp, ip);
@@ -5767,12 +5774,15 @@ dmapi_enospc_check:
 
  error0:
 	xfs_bmap_cancel(&free_list);
+#ifndef SIM
  error1:
+#endif
 	xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES | XFS_TRANS_ABORT);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	goto dmapi_enospc_check;
 }
 
+#ifndef SIM
 /*
  * Zero file bytes between startoff and endoff inclusive.
  * The iolock is held exclusive and no blocks are buffered.

@@ -1269,21 +1269,18 @@ xfs_iomap_write_delay(
 
 	/*
 	 * roundup the allocation request to m_dalign boundary if file size
-	 * is greater that 512K and we are allocating past the allocation eof
+	 * is greater than a stripe width and we are allocating past the
+	 * allocation eof.
 	 */
-	if (mp->m_dalign && (XFS_SIZE(mp, io) >= 524288) && aeof) {
+	if (mp->m_dalign && (XFS_SIZE(mp, io) >= mp->m_swidth) && aeof) {
 		int eof;
 		xfs_fileoff_t new_last_fsb;
-		new_last_fsb = roundup(last_fsb, mp->m_dalign);
-		printk("xfs_iomap_write_delay XFS_BMAP_EOF m_dalign %d to %Ld\n",
-			mp->m_dalign, new_last_fsb);
+		new_last_fsb = roundup(last_fsb, mp->m_swidth);
 		error = XFS_BMAP_EOF(mp, io, new_last_fsb, XFS_DATA_FORK, &eof);
 		if (error) {
 			return error;
 		}
 		if (eof) {
-			printk("xfs_iomap_write_delay XFS_BMAP_EOF changing last from %Ld to %Ld\n",
-				last_fsb, new_last_fsb);
 			last_fsb = new_last_fsb;
 		}
 	}

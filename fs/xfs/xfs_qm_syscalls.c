@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.37 $"
+#ident "$Revision: 1.38 $"
 
 #include <sys/param.h>
 #include "xfs_buf.h"
@@ -850,7 +850,8 @@ xfs_qm_scall_setqlim(
 	if (id == 0) {
 		/*
 		 * Timelimits for the super user set the relative time
-		 * the other users can be over the quota for this file system.
+		 * the other users can be over quota for this file system.
+		 * If it is zero a default is used.
 		 */
 		if (newlim.d_fieldmask & FS_DQ_BTIMER) {
 			mp->m_quotainfo->qi_btimelimit = newlim.d_btimer;
@@ -883,7 +884,7 @@ xfs_qm_scall_setqlim(
 #endif
 	} else /* if (XFS_IS_QUOTA_ENFORCED(mp)) */ {
 		/*
-		 * If the user is now over the quota, start the timelimit.
+		 * If the user is now over quota, start the timelimit.
 		 * The user will not be 'warned'. Warnings increase only
 		 * by request via Q_WARN.
 		 * Note that we keep the timers ticking, whether enforcement
@@ -930,7 +931,9 @@ xfs_qm_scall_getquota(
 	fs_disk_quota_t	out;
 	int 		error;
 
-	if ((id != current->uid) && !capable(CAP_SYS_ADMIN))
+	if ((type == XFS_DQ_USER) &&
+			(id != current->uid &&
+			!capable(CAP_SYS_ADMIN)))
 		return XFS_ERROR(EPERM);
 	/*
 	 * Try to get the dquot. We don't want it allocated on disk, so

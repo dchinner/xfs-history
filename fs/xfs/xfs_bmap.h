@@ -32,7 +32,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.72 $"
 
 struct getbmap;
 struct xfs_bmbt_irec;
@@ -146,6 +146,7 @@ typedef struct xfs_bmalloca {
 	int			userdata;/* set if is user data */
 	int			low;	/* low on space, using seq'l ags */
 	int			aeof;   /* allocated space at eof */
+	int			prealloc;/* pre-allocate request */
 } xfs_bmalloca_t;
 
 /*

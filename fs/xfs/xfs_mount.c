@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.224 $"
+#ident	"$Revision: 1.225 $"
 
 #include <xfs_os_defs.h>
 
@@ -490,6 +490,7 @@ xfs_mountfs_int(
 	xfs_daddr_t		d;
 	extern dev_t	rootdev;		/* from sys/systm.h */
 	extern xfs_ioops_t xfs_iocore_xfs;	/* from xfs_iocore.c */
+	uint_t		status;
 #ifndef SIM
 	__uint64_t	ret64;
 	uint		quotaflags, quotaondisk, rootqcheck, needquotacheck;
@@ -536,20 +537,36 @@ xfs_mountfs_int(
 				error = XFS_ERROR(EINVAL);
 				goto error1;
 			}
+
+#ifdef	DEBUG
+			xfs_fs_cmn_err(CE_WARN, mp,
+"XFS:  File system stripe alignment turned off: dalign(%d)/swidth(%d) not compatible with fsblksize(%d)\n",
+					mp->m_dalign, mp->m_swidth,
+					mp->m_blockmask +1);
+#endif	/* DEBUG */
 			mp->m_dalign = mp->m_swidth = 0;
+
 		} else {
 			/*
 			 * Convert the stripe unit and width to FSBs.
 			 */
 			mp->m_dalign = XFS_BB_TO_FSBT(mp, mp->m_dalign);
+
 			if (mp->m_dalign && (sbp->sb_agblocks % mp->m_dalign)) {
 				if (mp->m_flags & XFS_MOUNT_RETERR) {
-  		                        cmn_err(CE_WARN, "XFS: alignment check 2 failed\n");
 					error = XFS_ERROR(EINVAL);
 					goto error1;
 				}
+
+#ifdef	DEBUG
+				xfs_fs_cmn_err(CE_WARN, mp,
+"XFS:  File system stripe alignment turned off: dalign(%d)/swidth(%d) not compatible with agsize(%d)\n",
+					mp->m_dalign, mp->m_swidth,
+					sbp->sb_agblocks);
+#endif	/* DEBUG */
 				mp->m_dalign = 0;
 				mp->m_swidth = 0;
+
 			} else if (mp->m_dalign) {
 				mp->m_swidth = XFS_BB_TO_FSBT(mp, mp->m_swidth);
 			} else {
@@ -558,6 +575,12 @@ xfs_mountfs_int(
 					error = XFS_ERROR(EINVAL);
 					goto error1;
 				}
+
+#ifdef	DEBUG
+				xfs_fs_cmn_err(CE_WARN, mp,
+"XFS:  File system stripe alignment turned off: dalign(%d) less than fsblksize(%d)\n",
+					mp->m_dalign, mp->m_blockmask +1);
+#endif	/* DEBUG */
 				mp->m_swidth = 0;
 			}
 		}
@@ -739,8 +762,8 @@ xfs_mountfs_int(
 	 * If we are using stripe alignment, check whether
 	 * the stripe unit is a multiple of the inode alignment
 	 */
-	if (mp->m_dalign && mp->m_inoalign_mask &&
-	    !(mp->m_dalign & mp->m_inoalign_mask))
+	if (   mp->m_dalign
+	    && mp->m_inoalign_mask && !(mp->m_dalign & mp->m_inoalign_mask))
 		mp->m_sinoalign = mp->m_dalign;
 	else
 		mp->m_sinoalign = 0;
@@ -930,6 +953,25 @@ xfs_mountfs_int(
 
 	
 #ifndef SIM 
+	/*
+	 * Check if a new uuid was created, and if the new uuid was
+	 * overwritten by replaying the log
+	 */
+	if ((mfsi_flags & XFS_MFSI_SECOND) == 0) {
+		if (!uuid_is_nil(&mp->m_newuuid, &status)) {
+			if (!uuid_equal(&mp->m_sb.sb_uuid, &mp->m_newuuid,
+				&status)) {
+				bcopy(&mp->m_newuuid, &mp->m_sb.sb_uuid,
+					sizeof(uuid_t));
+			}
+			/*
+			 * uuid was updated... log it...
+			 */
+			update_flags |= XFS_SB_UUID;
+		}
+	}
+
+
 	/*
 	 * If fs is not mounted readonly, then update the superblock
 	 * unit and width changes.
@@ -1652,6 +1694,7 @@ xfs_uuid_mount(xfs_mount_t *mp)
 	int	i;
 	uint_t	status;
 
+	uuid_create_nil(&mp->m_newuuid, &status);
 	mutex_lock(&xfs_uuidtabmon, PVFS);
 	for (i = 0, hole = -1; i < xfs_uuidtab_size; i++) {
 		if (uuid_is_nil(&xfs_uuidtab[i], &status)) {
@@ -1661,7 +1704,9 @@ xfs_uuid_mount(xfs_mount_t *mp)
 		if (!uuid_equal(&mp->m_sb.sb_uuid, &xfs_uuidtab[i], &status))
 			continue;
 		uuid_create(&mp->m_sb.sb_uuid, &status);
+		bcopy(&mp->m_sb.sb_uuid, &mp->m_newuuid, sizeof(uuid_t));
 		XFS_BUF_TO_SBP(mp->m_sb_bp)->sb_uuid = mp->m_sb.sb_uuid;
+		xfs_fs_cmn_err(CE_NOTE, mp, "Created a new filesystem uuid.");
 		i = -1;
 		/* restart loop from the top */
 	}
@@ -1750,10 +1795,7 @@ xfs_mount_log_sbunit(
 {
 	xfs_trans_t *tp;
 
-	ASSERT(fields & (XFS_SB_UNIT|XFS_SB_WIDTH));
-
-	if (mp->m_sb.sb_unit == 0 && mp->m_sb.sb_width == 0)
-		return;
+	ASSERT(fields & (XFS_SB_UNIT|XFS_SB_WIDTH|XFS_SB_UUID));
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_SB_UNIT);
 	if (xfs_trans_reserve(tp, 0, mp->m_sb.sb_sectsize + 128, 0, 0, 

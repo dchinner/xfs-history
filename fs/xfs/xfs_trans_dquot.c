@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.23 $"
+#ident	"$Revision: 1.24 $"
 #include <sys/param.h>
 #include "xfs_buf.h"
 #include <sys/vnode.h>
@@ -157,6 +157,14 @@ xfs_trans_dup_dqinfo(
 	xfs_trans_alloc_dqinfo(ntp);
 	oqa = otp->t_dqinfo->dqa_usrdquots;
 	nqa = ntp->t_dqinfo->dqa_usrdquots;
+
+	/*
+	 * Because the quota blk reservation is carried forward,
+	 * it is also necessary to carry forward the DQ_DIRTY flag.
+	 */
+	if(otp->t_flags & XFS_TRANS_DQ_DIRTY)
+		ntp->t_flags |= XFS_TRANS_DQ_DIRTY;
+
 	for (j = 0; j < 2; j++) {
 		for (i = 0; i < XFS_QM_TRANS_MAXDQS; i++) {
 			if (oqa[i].qt_dquot == NULL)

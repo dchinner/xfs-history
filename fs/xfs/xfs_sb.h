@@ -32,7 +32,7 @@
 #ifndef _FS_XFS_SB_H
 #define	_FS_XFS_SB_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.46 $"
 
 /*
  * Super block
@@ -167,6 +167,7 @@ typedef enum {
  * Only define the ones we're using.
  */
 #define	XFS_SB_MVAL(x)		(1LL << XFS_SBS_ ## x)
+#define	XFS_SB_UUID		XFS_SB_MVAL(UUID)
 #define	XFS_SB_ROOTINO		XFS_SB_MVAL(ROOTINO)
 #define	XFS_SB_RBMINO		XFS_SB_MVAL(RBMINO)
 #define	XFS_SB_RSUMINO		XFS_SB_MVAL(RSUMINO)
@@ -180,9 +181,9 @@ typedef enum {
 #define	XFS_SB_NUM_BITS		((int)XFS_SBS_FIELDCOUNT)
 #define	XFS_SB_ALL_BITS		((1LL << XFS_SB_NUM_BITS) - 1)
 #define	XFS_SB_MOD_BITS		\
-	(XFS_SB_ROOTINO | XFS_SB_RBMINO | XFS_SB_RSUMINO | XFS_SB_VERSIONNUM | \
-	 XFS_SB_UQUOTINO | XFS_SB_PQUOTINO | XFS_SB_QFLAGS | \
-	 XFS_SB_SHARED_VN | XFS_SB_UNIT | XFS_SB_WIDTH)
+	(XFS_SB_UUID | XFS_SB_ROOTINO | XFS_SB_RBMINO | XFS_SB_RSUMINO | \
+	 XFS_SB_VERSIONNUM | XFS_SB_UQUOTINO | XFS_SB_PQUOTINO | \
+	 XFS_SB_QFLAGS | XFS_SB_SHARED_VN | XFS_SB_UNIT | XFS_SB_WIDTH)
 
 /*
  * Misc. Flags - warning - these will be cleared by xfs_repair unless

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.49 $"
+#ident "$Revision: 1.50 $"
 
 
 #include <sys/param.h>
@@ -2018,25 +2018,20 @@ xfs_qm_quotacheck(
 	 */
 	ASSERT(XFS_QI_MPLNDQUOTS(mp) == 0);
 	
+	/* 
+	 * XXX warn just for user quotas for now, until we figure out
+	 * what to do ..
+	 */
+	cmn_err(CE_NOTE, "XFS quotacheck %s: Please wait.",mp->m_fsname);
+
 	/*
 	 * First we go thru all the dquots on disk, USR and PRJ, and reset
 	 * their counters to zero. We need a clean slate.
 	 * We don't log our changes till later.
 	 */
 	if (uip = XFS_QI_UQIP(mp)) {
-		/* 
-		 * XXX warn just for user quotas for now, until we figure out
-		 * what to do ..
-		 */
-		if (uip->i_d.di_nblocks > XFS_QM_BIG_QCHECK_NBLKS) {
-			cmn_err(CE_NOTE, "XFS quotacheck %s: Please wait.",
-				mp->m_fsname);
-		}
 		if (error = xfs_qm_dqiterate(mp, uip, XFS_QMOPT_UQUOTA))
 			goto error_return;
-		if (uip->i_d.di_nblocks > XFS_QM_BIG_QCHECK_NBLKS) 
-			cmn_err(CE_NOTE, "XFS quotacheck %s: Done.",
-				mp->m_fsname);
 		flags |= XFS_UQUOTA_CHKD;
 	}
 	
@@ -2100,6 +2095,7 @@ xfs_qm_quotacheck(
 #endif
 
  error_return:
+	cmn_err(CE_NOTE, "XFS quotacheck %s: Done.", mp->m_fsname);
 	mp->m_flags &= ~(XFS_MOUNT_ROOTQCHECK);
 	return (error);
 }
@@ -2161,6 +2157,8 @@ xfs_qm_init_quotainos(
 					      sbflags | XFS_SB_UQUOTINO,
 					      flags | XFS_QMOPT_UQUOTA))
 			return XFS_ERROR(error);
+
+		flags &= ~XFS_QMOPT_SBVERSION;
 	}
 	if (XFS_IS_PQUOTA_ON(mp) && pip == NULL) {
 		if (XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY) {

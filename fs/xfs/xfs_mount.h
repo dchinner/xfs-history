@@ -32,7 +32,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.113 $"
 
 struct cred;
 struct mounta;
@@ -124,7 +124,7 @@ typedef struct xfs_ioops {
 #ifndef SIM
 	xfs_dio_write_t		xfs_dio_write_func;
 	xfs_dio_read_t		xfs_dio_read_func;
-    xfs_strat_write_t	xfs_strat_write_func;
+	xfs_strat_write_t	xfs_strat_write_func;
 #endif
 	xfs_bmapi_t		xfs_bmapi_func;
 	xfs_bmap_eof_t		xfs_bmap_eof_func;
@@ -300,6 +300,7 @@ typedef struct xfs_mount {
 						/* which bits matter in rpc
 						   log item pin masks */
 	uint			m_cxfstype;	/* mounted shared, etc. */
+	uuid_t			m_newuuid;	/* saved copy of new uuid */
 } xfs_mount_t;
 
 /*
