@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.3 $"
+#ident "$Revision: 1.4 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -393,5 +393,10 @@ gethandle (
 		return EINVAL;
 	if (copyin (hanp, handlep, hlen))
 		return EFAULT;
+	if (hlen < sizeof *handlep)
+		bzero (((char *) handlep) + hlen, sizeof *handlep - hlen);
+	if (handlep->ha_fid.fid_len >
+	    (sizeof handlep->ha_fid - sizeof handlep->ha_fid.fid_len))
+		return EINVAL;
 	return 0;
 }
