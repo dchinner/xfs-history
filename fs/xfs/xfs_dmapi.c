@@ -92,10 +92,9 @@ xfs_dm_send_data_event(
 	vrwlock_t	*locktype)
 {
 	int		error;
-	vnode_t		*vp;
 	xfs_inode_t	*ip = XFS_BHVTOI(bdp);
+	uint16_t	dmstate;
 
-	vp = BHV_TO_VNODE(bdp);
 	/*
 	 * Now we need to simulate VOP_RWLOCK/VOP_RWLOCK.   We can't
 	 * just call the VOP though, or we'll wind up going through
@@ -104,13 +103,18 @@ xfs_dm_send_data_event(
 	 */
 	ASSERT(BHV_IS_XFS(bdp));
 	do {
+		dmstate = ip->i_iocore.io_dmstate;
 		if (locktype)
 			xfs_rwunlock(bdp, *locktype);
 		error = dm_send_data_event(event, bdp, DM_RIGHT_NULL,
 				offset, length, flags);
 		if (locktype)
 			xfs_rwlock(bdp, *locktype);
-	}  while (!error && DM_EVENT_ENABLED(vp->v_vfsp, ip, event));
+
+		if(!error && (ip->i_iocore.io_dmstate != dmstate))
+			printk("xfs_dm_send_data_event: go around again\n");
+
+	} while (!error && (ip->i_iocore.io_dmstate != dmstate));
 
 	return error;
 }
@@ -2145,6 +2149,9 @@ xfs_dm_punch_hole(
 	xfs_igrow_start(ip, realsize, NULL);
 	xfs_trans_ijoin(tp2, ip, lock_flags);
 	xfs_igrow_finish(tp2, ip, realsize, 0);
+
+	/* Let threads in send_data_event know we punched the file. */
+	ip->i_iocore.io_dmstate++;
 
 	VN_HOLD(vp);
 	if (mp->m_flags & XFS_MOUNT_WSYNC) {
