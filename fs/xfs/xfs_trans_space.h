@@ -1,0 +1,56 @@
+#ifndef _XFS_TRANS_SPACE_H
+#define _XFS_TRANS_SPACE_H
+
+#ident "$Revision$"
+
+/*
+ * Components of space reservations.
+ */
+#define	XFS_EXTENTADD_SPACE_RES(mp,w)	(XFS_BM_MAXLEVELS(mp,w) - 1)
+#define	XFS_DAENTER_SPACE_RES(mp,w)	\
+	((XFS_DA_NODE_MAXDEPTH + 1) * XFS_EXTENTADD_SPACE_RES(mp, w))
+#define	XFS_DAREMOVE_SPACE_RES(mp,w)	\
+	(XFS_DA_NODE_MAXDEPTH * XFS_EXTENTADD_SPACE_RES(mp, w))
+#define	XFS_DIRENTER_MAX_SPLIT(mp,n)	\
+	((mp->m_sb.sb_blocksize == 512 && \
+	  strlen(n) >= XFS_DIR_LEAF_CAN_DOUBLE_SPLIT_LEN) ? 2 : 1)
+#define	XFS_DIRENTER_SPACE_RES(mp,n)	\
+	(XFS_DAENTER_SPACE_RES(mp, XFS_DATA_FORK) * \
+	 XFS_DIRENTER_MAX_SPLIT(mp,n))
+#define	XFS_DIRREMOVE_SPACE_RES(mp)	\
+	XFS_DAREMOVE_SPACE_RES(mp, XFS_DATA_FORK)
+#define	XFS_IALLOC_SPACE_RES(mp)	\
+	(XFS_IALLOC_BLOCKS(mp) + XFS_IN_MAXLEVELS(mp)-1)
+
+/*
+ * Space reservation values for various transactions.
+ */
+#define	XFS_ADDAFORK_SPACE_RES(mp)	\
+	(1)
+#define	XFS_ATTRRM_SPACE_RES(mp)	\
+	XFS_DAREMOVE_SPACE_RES(mp, XFS_ATTR_FORK)
+#define	XFS_ATTRSET_SPACE_RES(mp, v)	\
+	(XFS_DAENTER_SPACE_RES(mp, XFS_ATTR_FORK) + XFS_B_TO_FSB(mp, v))
+#define	XFS_CREATE_SPACE_RES(mp,n)	\
+	(XFS_IALLOC_SPACE_RES(mp) + XFS_DIRENTER_SPACE_RES(mp,n))
+#define	XFS_DIOSTRAT_SPACE_RES(mp, v)	\
+	(XFS_EXTENTADD_SPACE_RES(mp, XFS_DATA_FORK) + (v))
+#define	XFS_GROWFS_SPACE_RES(mp)	\
+	(2 * XFS_AG_MAXLEVELS(mp))
+#define	XFS_LINK_SPACE_RES(mp,n)	\
+	XFS_DIRENTER_SPACE_RES(mp,n)
+#define	XFS_MKDIR_SPACE_RES(mp,n)	\
+	(XFS_IALLOC_SPACE_RES(mp) + XFS_DIRENTER_SPACE_RES(mp,n))
+#define	XFS_QM_DQALLOC_SPACE_RES(mp)	\
+	(XFS_EXTENTADD_SPACE_RES(mp, XFS_DATA_FORK) + \
+	 XFS_DQUOT_CLUSTER_SIZE_FSB)
+#define	XFS_QM_QINOCREATE_SPACE_RES(mp)	\
+	XFS_IALLOC_SPACE_RES(mp)
+#define	XFS_REMOVE_SPACE_RES(mp)	\
+	XFS_DIRREMOVE_SPACE_RES(mp)
+#define	XFS_RENAME_SPACE_RES(mp,n)	\
+	(XFS_DIRREMOVE_SPACE_RES(mp) + XFS_DIRENTER_SPACE_RES(mp,n))
+#define	XFS_SYMLINK_SPACE_RES(mp,n,b)	\
+	(XFS_IALLOC_SPACE_RES(mp) + XFS_DIRENTER_SPACE_RES(mp,n) + (b))
+
+#endif	/* _XFS_TRANS_SPACE_H */
