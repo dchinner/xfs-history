@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 3
-SUBLEVEL = 24
+SUBLEVEL = 25
 EXTRAVERSION =
 
 ARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*/arm/ -e s/sa110/arm/)
@@ -250,9 +250,6 @@ vmlinux: $(CONFIGURATION) init/main.o init/version.o linuxsubdirs
 symlinks:
 	rm -f include/asm
 	( cd include ; ln -sf asm-$(ARCH) asm)
-	@if [ ! -d modules ]; then \
-		mkdir modules; \
-	fi
 	@if [ ! -d include/linux/modules ]; then \
 		mkdir include/linux/modules; \
 	fi
@@ -331,7 +328,11 @@ endif
 
 modules: $(patsubst %, _mod_%, $(SUBDIRS))
 
-$(patsubst %, _mod_%, $(SUBDIRS)) : include/linux/version.h include/config/MARKER
+modules/MARKER:
+	mkdir modules
+	touch modules/MARKER
+
+$(patsubst %, _mod_%, $(SUBDIRS)) : include/linux/version.h include/config/MARKER modules/MARKER
 	$(MAKE) -C $(patsubst _mod_%, %, $@) CFLAGS="$(CFLAGS) $(MODFLAGS)" MAKING_MODULES=1 modules
 
 modules_install:
@@ -392,10 +393,8 @@ clean:	archclean
 	rm -f drivers/sound/bin2hex drivers/sound/hex2hex
 	rm -f net/khttpd/make_times_h
 	rm -f net/khttpd/times.h
-	if [ -d modules ]; then \
-		rm -f core `find modules/ -type f -print`; \
-	fi
 	rm -f submenu*
+	rm -rf modules
 
 mrproper: clean archmrproper
 	rm -f include/linux/autoconf.h include/linux/version.h
@@ -416,7 +415,6 @@ mrproper: clean archmrproper
 	rm -f .hdepend scripts/mkdep scripts/split-include
 	rm -f $(TOPDIR)/include/linux/modversions.h
 	rm -rf $(TOPDIR)/include/linux/modules
-	rm -rf modules
 
 distclean: mrproper
 	rm -f core `find . \( -name '*.orig' -o -name '*.rej' -o -name '*~' \
