@@ -3,11 +3,11 @@
 
 #ident	"$Revision: 1.3 $"
 
+#include <sys/types.h>
+
 /*
  * xFS types
  */
-
-#include <sys/types.h>
 
 typedef int8_t		__int8_t;
 typedef	u_int8_t	__uint8_t;
@@ -19,13 +19,9 @@ typedef __uint64_t	xfs_fsblock_t;	/* blockno in filesystem */
 typedef __uint32_t	xfs_agblock_t;	/* blockno in alloc. group */
 typedef	__uint32_t	xfs_extlen_t;	/* extent length in blocks */
 typedef	__uint32_t	xfs_agnumber_t;	/* allocation group number */
-typedef	__uint64_t	xfs_ino_t;	/* inode number */
-typedef	__uint32_t	xfs_agino_t;	/* within allocation grp inode number */
 
 #define	NULLFSBLOCK	((xfs_fsblock_t)-1)
 #define	NULLAGBLOCK	((xfs_agblock_t)-1)
-#define	NULLFSINO	((xfs_ino_t)-1)
-#define	NULLAGINO	((xfs_agino_t)-1)
 
 typedef struct xfs_uuid
 {
