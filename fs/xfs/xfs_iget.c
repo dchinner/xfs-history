@@ -62,13 +62,18 @@ xfs_ihash_init(xfs_mount_t *mp)
 	int	i;
 	ulong	hsize;	
 	char	name[8];
+	extern int	ncsize;
 
 	/*
 	 * For now just use a fixed size hash table per file system.
 	 * This MUST be changed eventually so we don't waste so much
 	 * memory.
 	 */
-	hsize = 512;
+	if (ncsize < 5000) {
+		hsize = 512;
+	} else {
+		hsize = 1024;
+	}
 	mp->m_ihashmask = hsize - 1;
 	mp->m_ihash = (xfs_ihash_t *)kmem_zalloc(hsize * sizeof(xfs_ihash_t),
 						 KM_SLEEP);
