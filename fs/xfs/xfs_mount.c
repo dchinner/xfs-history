@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.145 $"
+#ident	"$Revision: 1.146 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -641,10 +641,10 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 				xfs_mount_reset_sbqflags(mp, clean);
 		} else {
 			/*
-			 * Clear the quota flags, but remember them. This 
+			 * Clear the quota flags, but remember them. This
 			 * is so that the quota code doesn't get invoked
-			 * before we're ready. This can happen when an 
-			 * inode goes inactive and wants to free blocks, 
+			 * before we're ready. This can happen when an
+			 * inode goes inactive and wants to free blocks,
 			 * or via xfs_log_mount_finish.
 			 */
 			quotaflags = mp->m_qflags;
