@@ -437,7 +437,9 @@ xfs_ialloc(
 	ip->i_d.di_mtime.t_sec = curr_time;
 	ip->i_d.di_ctime.t_sec = curr_time;
 	uuid_create(&ip->i_d.di_uuid, &status);
-	/* di_gen??? */
+	/*
+	 * di_gen will have been taken care of in xfs_iread.
+	 */
 	ip->i_d.di_extsize = 0;
 	ip->i_d.di_flags = 0;
 	flags = XFS_ILOG_CORE;
@@ -718,6 +720,11 @@ xfs_ifree(
 	ip->i_d.di_format = XFS_DINODE_FMT_AGINO;
 	ip->i_d.di_mode = 0;
 	ip->i_d.di_flags = 0;
+	/*
+	 * Bump the generation count so noone will be confused
+	 * by reincarnations of this inode.
+	 */
+	ip->i_d.di_gen++;
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 }
 
