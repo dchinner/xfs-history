@@ -156,7 +156,7 @@ typedef struct buf xfs_buf_t;
 			((bp)->b_bcount = cnt)
 #define XFS_BUF_PTR(bp)	((bp)->b_un.b_addr)
 #define XFS_BUF_SET_PTR(bp, val, count)		\
-			((bp)->b_un.b_addr = (val)) \
+			((bp)->b_un.b_addr = (val)); \
 			XFS_BUF_SET_COUNT(bp, count)
 
 #define XFS_BUF_SIZE(bp)	((bp)->b_bufsize)
