@@ -1,4 +1,4 @@
-#ident "$Revision: 1.77 $"
+#ident "$Revision: 1.78 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -305,7 +305,7 @@ xfs_buf_item_unpin(
 	if ((refcount == 0) && (bip->bli_flags & XFS_BLI_STALE)) {
 		ASSERT(valusema(&bp->b_lock) <= 0);
 		ASSERT(!(XFS_BUF_ISDELAYWRITE(bp)));
-		ASSERT(XFS_BUF_ISTALE(bp));
+		ASSERT(XFS_BUF_ISSTALE(bp));
 		ASSERT(bp->b_pincount == 0);
 		ASSERT(bip->bli_format.blf_flags & XFS_BLI_CANCEL);
 		xfs_buf_item_trace("UNPIN STALE", bip);
@@ -1135,7 +1135,7 @@ xfs_buf_item_relse(
 	XFS_BUF_SET_FSPRIVATE(bp, bip->bli_item.li_bio_list);
 	if ((XFS_BUF_FSPRIVATE(bp, void *) == NULL) &&
 	    (XFS_BUF_IODONE_FUNC(bp) != NULL)) {
-		ASSERT((XFS_BUF_ISUNINTIAL(bp)) == 0);
+		ASSERT((XFS_BUF_ISUNINITIAL(bp)) == 0);
 		XFS_BUF_CLR_IODONE_FUNC(bp);
 	}
 
