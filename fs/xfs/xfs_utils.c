@@ -21,7 +21,7 @@
  * this program; if not, write the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.19 $"
+#ident "$Revision: 1.20 $"
 
 #include <sys/types.h>
 #include "xfs_buf.h"
@@ -149,6 +149,13 @@ xfs_dir_lookup_int(
 	}
 	dp = XFS_BHVTOI(dir_bdp);
 
+	/*
+	 * On Linux we have already done lookups into the dcache at
+	 * this point, no need to dive into a non-existent DNLC
+	 * implementation.
+	 */
+
+#ifndef __linux__
         /*
          * Try the directory name lookup cache.  We can't wait on
 	 * inactive/reclaim in the inode we're looking for because
@@ -208,6 +215,7 @@ retry_dnlc:
 			goto retry_dnlc;
 		}
         } else
+#endif /* !__linux__ */
 		bdp = NULL;
 
 	/*
@@ -324,8 +332,10 @@ retry_dnlc:
 			error = XFS_ERROR(ENOENT);
 		} else {
 			bdp = XFS_ITOBHV(*ipp);
+#ifndef __linux__
 			ASSERT(!(flags & DLF_NODNLC));
 			dnlc_enter_fast(dir_vp, fd, bdp, NOCRED);
+#endif /* !__linux__ */
 			bdp = NULL;
 		}
 	}
