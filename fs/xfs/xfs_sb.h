@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_SB_H
 #define	_FS_XFS_SB_H
 
-#ident	"$Revision: 1.3 $"
+#ident	"$Revision: 1.6 $"
 
 /*
  * Super block
@@ -40,11 +40,17 @@ typedef struct xfs_sb
 	__uint8_t	sb_smallfiles;	/* set if small files in inodes */
 					/* other inode config information? */
 					/* statistics */
-	xfs_ino_t	sb_icount;	/* allocated inodes */
-	xfs_ino_t	sb_ifree;	/* free inodes */
-	xfs_fsblock_t	sb_fdblocks;	/* free data blocks */
+	/*
+	 * These fields must remain contiguous.  If you really
+	 * want to change their layout, make sure you fix the
+	 * code in xfs_trans_apply_sb_deltas().
+	 */
+	__uint64_t	sb_icount;	/* allocated inodes */
+	__uint64_t	sb_ifree;	/* free inodes */
+	__uint64_t	sb_fdblocks;	/* free data blocks */
 	__uint32_t	sb_frextents;	/* free realtime extents */
 } xfs_sb_t;
+
 
 #define	XFS_SB_UUID		0x0000001
 #define	XFS_SB_DBLOCKS		0x0000002
