@@ -49,7 +49,6 @@
 
 #include "page_buf_internal.h"
 
-#define MAX_BUF_PER_PAGE	(PAGE_CACHE_SIZE / 512)
 #define PBF_MAX_MAPS		1 /* TODO: XFS_BMAP_MAX_NMAP? */
 
 /*
