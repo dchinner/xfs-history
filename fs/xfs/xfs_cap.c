@@ -93,8 +93,10 @@ posix_cap_xattr_to_xfs(
 			int	bit = xfs_cap_lookup_xattr(setbit);
 
 			if (bit == -1) {
+#ifdef DEBUG
 				printk("XFS cannot map VFS capability bit %u\n",
 					setbit);
+#endif
 				return EINVAL;
 			}
 			*dest_value |= (1 << bit);
@@ -138,8 +140,10 @@ posix_cap_xfs_to_xattr(
 			int	bit = xfs_cap_lookup_xfs(setbit);
 
 			if (bit == -1) {
+#ifdef DEBUG
 				printk("XFS cannot map XFS capability bit %u\n",
 					setbit);
+#endif
 				return -EINVAL;
 			}
 			*dest_value |= (1 << bit);
@@ -251,37 +255,22 @@ xfs_cap_allow_set(
 /*
  * This translates between the XFS (ondisk) capability bits and the
  * corresponding VFS equivalents.
- * TODO:
- * 	CAP_DAC_OVERRIDE?? =>
- * 		[XFS_CAP_DAC_WRITE|XFS_CAP_DAC_READ_SEARCH|XFS_CAP_FOWNER??]
- * 	CAP_FSMASK  => 0x1f?
  * 
- * TODO:
- * No direct mapping (need to create new XFS_CAP_XXX bits where necessary)
- * 	CAP_LINUX_IMMUTABLE	=> 9
- * 	CAP_NET_BIND_SERVICE	=> 10
- * 	CAP_NET_BROADCAST	=> 11
- * 	CAP_NET_RAW		=> 13
- * 	CAP_IPC_LOCK		=> 14
- * 	CAP_IPC_OWNER		=> 15
- * 	CAP_SYS_MODULE		=> 16
- * 	CAP_SYS_RAWIO		=> 17
- * 	CAP_SYS_PTRACE		=> 19
- * 	CAP_SYS_ADMIN		=> 21
- * 	CAP_SYS_RESOURCE	=> 24
- * 	CAP_SYS_TTY_CONFIG	=> 26
- * 	CAP_MKNOD		=> 27
- * 	CAP_LEASE		=> 28
+ * On IRIX, CAP_DAC_OVERRIDE is defined as:
+ * 	(CAP_DAC_WRITE|CAP_DAC_READ_SEARCH|CAP_FOWNER)
+ * But theres no CAP_DAC_WRITE under Linux and CAP_DAC_OVERRIDE is a
+ * distinct bit.  So, we'll just define a XFS_CAP_LINUX_DAC_OVERRIDE
+ * but we may need to revisit this I guess.
  */
 STATIC const char xfs_to_xattr_capbits[] = {
-	-1,			/* 0 - unused? */
+	-1,			/* Currently unused		0 */
 	CAP_CHOWN,		/* XFS_CAP_CHOWN		1 */
 	-1,			/* XFS_CAP_DAC_WRITE		2 */
 	CAP_DAC_READ_SEARCH,	/* XFS_CAP_DAC_READ_SEARCH	3 */
 	CAP_FOWNER,		/* XFS_CAP_FOWNER		4 */
 	CAP_FSETID,		/* XFS_CAP_FSETID		5 */
 	CAP_KILL,		/* XFS_CAP_KILL			6 */
-	-1,			/* XFS_CAP_LINK_DIR		7 */
+	-1,			/* Currently unused		7 */
 	-1,			/* XFS_CAP_SETFPRIV		8 */
 	CAP_SETPCAP,		/* XFS_CAP_SETPPRIV		9 */
 	CAP_SETGID,		/* XFS_CAP_SETGID		10 */
@@ -291,11 +280,11 @@ STATIC const char xfs_to_xattr_capbits[] = {
 	-1,			/* XFS_CAP_MAC_RELABEL_SUBJ	14 */
 	-1,			/* XFS_CAP_MAC_WRITE		15 */
 	-1,			/* XFS_CAP_MAC_UPGRADE		16 */
-	-1,			/* XFS_CAP_INF_NOFLOAT_OBJ	17 */
-	-1,			/* XFS_CAP_INF_NOFLOAT_SUBJ	18 */
-	-1,			/* XFS_CAP_INF_DOWNGRADE	19 */
-	-1,			/* XFS_CAP_INF_UPGRADE		20 */
-	-1,			/* XFS_CAP_INF_RELABEL_SUBJ	21 */
+	-1,			/* Currently unused		17 */
+	-1,			/* Currently unused		18 */
+	-1,			/* Currently unused		19 */
+	-1,			/* Currently unused		20 */
+	-1,			/* Currently unused		21 */
 	-1,			/* XFS_CAP_AUDIT_CONTROL	22 */
 	-1,			/* XFS_CAP_AUDIT_WRITE		23 */
 	-1,			/* XFS_CAP_MAC_MLD		24 */
@@ -311,15 +300,29 @@ STATIC const char xfs_to_xattr_capbits[] = {
 	-1,			/* XFS_CAP_PROC_MGT		34 */
 	-1,			/* XFS_CAP_SVIPC_MGT		35 */
 	CAP_NET_ADMIN,		/* XFS_CAP_NETWORK_MGT		36 */
-	-1,			/* XFS_CAP_DEVICE_MGT		37 */
+	CAP_MKNOD,		/* XFS_CAP_DEVICE_MGT		37 */
 	CAP_SYS_PACCT,		/* XFS_CAP_ACCT_MGT		38 */
 	CAP_SYS_BOOT,		/* XFS_CAP_SHUTDOWN		39 */
 	CAP_SYS_CHROOT,		/* XFS_CAP_CHROOT		40 */
 	-1,			/* XFS_CAP_DAC_EXECUTE		41 */
 	-1,			/* XFS_CAP_MAC_RELABEL_OPEN	42 */
-	-1,			/* XFS_CAP_SIGMASK		43 */
+	-1,			/* Currently unused		43 */
 	-1,			/* XFS_CAP_XTCB			44 */
-	/* 45->63 - unused? - slot any missing Linux bits in here?*/
+	CAP_DAC_OVERRIDE,	/* XFS_CAP_LINUX_DAC_OVERRIDE	45 */
+	CAP_LINUX_IMMUTABLE,	/* XFS_CAP_LINUX_IMMUTABLE	46 */
+	CAP_NET_BIND_SERVICE,	/* XFS_CAP_LINUX_NET_BIND_SERVICE 47 */
+	CAP_NET_BROADCAST,	/* XFS_CAP_LINUX_NET_BROADCAST	48 */
+	CAP_NET_RAW,		/* XFS_CAP_LINUX_NET_RAW	49 */
+	CAP_IPC_LOCK,		/* XFS_CAP_LINUX_IPC_LOCK	50 */
+	CAP_IPC_OWNER,		/* XFS_CAP_LINUX_IPC_OWNER	51 */
+	CAP_SYS_MODULE,		/* XFS_CAP_LINUX_SYS_MODULE	52 */
+	CAP_SYS_RAWIO,		/* XFS_CAP_LINUX_SYS_RAWIO	53 */
+	CAP_SYS_PTRACE,		/* XFS_CAP_LINUX_SYS_PTRACE	54 */
+	CAP_SYS_ADMIN,		/* XFS_CAP_LINUX_SYS_ADMIN	55 */
+	CAP_SYS_RESOURCE,	/* XFS_CAP_LINUX_SYS_RESOURCE	56 */
+	CAP_SYS_TTY_CONFIG,	/* XFS_CAP_LINUX_SYS_TTY_CONFIG	57 */
+	CAP_LEASE,		/* XFS_CAP_LINUX_LEASE		58 */
+				/* Currently unused	59 ---> 63 */
 };
 
 STATIC int inline
@@ -337,7 +340,7 @@ xfs_cap_lookup_xfs(uint bit)
  */
 STATIC const char xattr_to_xfs_capbits[] = {
 	XFS_CAP_CHOWN,			/* CAP_CHOWN            0 */
-	-1,				/* CAP_DAC_OVERRIDE     1 */
+	XFS_CAP_LINUX_DAC_OVERRIDE,	/* CAP_DAC_OVERRIDE     1 */
 	XFS_CAP_DAC_READ_SEARCH,	/* CAP_DAC_READ_SEARCH  2 */
 	XFS_CAP_FOWNER,			/* CAP_FOWNER           3 */
 	XFS_CAP_FSETID,			/* CAP_FSETID           4 */
@@ -345,27 +348,27 @@ STATIC const char xattr_to_xfs_capbits[] = {
 	XFS_CAP_SETGID,			/* CAP_SETGID           6 */
 	XFS_CAP_SETUID,			/* CAP_SETUID           7 */
 	XFS_CAP_SETPPRIV,		/* CAP_SETPCAP          8 */
-	-1,				/* CAP_LINUX_IMMUTABLE  9 */
-	-1,				/* CAP_NET_BIND_SERVICE 10 */
-	-1,				/* CAP_NET_BROADCAST    11 */
+	XFS_CAP_LINUX_IMMUTABLE,	/* CAP_LINUX_IMMUTABLE  9 */
+	XFS_CAP_LINUX_NET_BIND_SERVICE,	/* CAP_NET_BIND_SERVICE 10 */
+	XFS_CAP_LINUX_NET_BROADCAST,	/* CAP_NET_BROADCAST    11 */
 	XFS_CAP_NETWORK_MGT,		/* CAP_NET_ADMIN        12 */
-	-1,				/* CAP_NET_RAW          13 */
-	-1,				/* CAP_IPC_LOCK         14 */
-	-1,				/* CAP_IPC_OWNER        15 */
-	-1,				/* CAP_SYS_MODULE       16 */
-	-1,				/* CAP_SYS_RAWIO        17 */
+	XFS_CAP_LINUX_NET_RAW,		/* CAP_NET_RAW          13 */
+	XFS_CAP_LINUX_IPC_LOCK,		/* CAP_IPC_LOCK         14 */
+	XFS_CAP_LINUX_IPC_OWNER,	/* CAP_IPC_OWNER        15 */
+	XFS_CAP_LINUX_SYS_MODULE,	/* CAP_SYS_MODULE       16 */
+	XFS_CAP_LINUX_SYS_RAWIO,	/* CAP_SYS_RAWIO        17 */
 	XFS_CAP_CHROOT,			/* CAP_SYS_CHROOT       18 */
-	-1,				/* CAP_SYS_PTRACE       19 */
+	XFS_CAP_LINUX_SYS_PTRACE,	/* CAP_SYS_PTRACE       19 */
 	XFS_CAP_ACCT_MGT,		/* CAP_SYS_PACCT        20 */
-	-1,				/* CAP_SYS_ADMIN        21 */
+	XFS_CAP_LINUX_SYS_ADMIN,	/* CAP_SYS_ADMIN        21 */
 	XFS_CAP_SHUTDOWN,		/* CAP_SYS_BOOT         22 */
 	XFS_CAP_SCHED_MGT,		/* CAP_SYS_NICE         23 */
-	-1,				/* CAP_SYS_RESOURCE     24 */
+	XFS_CAP_LINUX_SYS_RESOURCE,	/* CAP_SYS_RESOURCE     24 */
 	XFS_CAP_TIME_MGT,		/* CAP_SYS_TIME         25 */
-	-1,				/* CAP_SYS_TTY_CONFIG   26 */
-	-1,				/* CAP_MKNOD            27 */
-	-1,				/* CAP_LEASE            28 */
-	/* 29->31 - unused? */
+	XFS_CAP_LINUX_SYS_TTY_CONFIG,	/* CAP_SYS_TTY_CONFIG   26 */
+	XFS_CAP_DEVICE_MGT,		/* CAP_MKNOD            27 */
+	XFS_CAP_LINUX_LEASE,		/* CAP_LEASE            28 */
+					/* Currently unused 29->31 */
 };
 
 STATIC int inline

@@ -54,7 +54,7 @@ typedef struct xfs_cap_set {
 #define	XFS_CAP_FOWNER			4
 #define	XFS_CAP_FSETID			5
 #define	XFS_CAP_KILL			6
-#define	XFS_CAP_LINK_DIR		7
+#define	XFS_CAP_LINK_DIR		7	/* Currently unused */
 #define	XFS_CAP_SETFPRIV		8
 #define	XFS_CAP_SETPPRIV		9
 #define	XFS_CAP_SETGID			10
@@ -90,8 +90,24 @@ typedef struct xfs_cap_set {
 #define	XFS_CAP_CHROOT			40
 #define	XFS_CAP_DAC_EXECUTE		41
 #define	XFS_CAP_MAC_RELABEL_OPEN	42
-#define	XFS_CAP_SIGMASK			43	/* Not implemented */
+#define	XFS_CAP_SIGMASK			43	/* Currently unused */
 #define	XFS_CAP_XTCB			44	/* X11 Trusted Client */
+
+/* On-disk bitfield positions of additional Linux capabilities */
+#define XFS_CAP_LINUX_DAC_OVERRIDE	45
+#define XFS_CAP_LINUX_IMMUTABLE		46
+#define XFS_CAP_LINUX_NET_BIND_SERVICE	47
+#define XFS_CAP_LINUX_NET_BROADCAST	48
+#define XFS_CAP_LINUX_NET_RAW		49
+#define XFS_CAP_LINUX_IPC_LOCK		50
+#define XFS_CAP_LINUX_IPC_OWNER		51
+#define XFS_CAP_LINUX_SYS_MODULE	52
+#define XFS_CAP_LINUX_SYS_RAWIO		53
+#define XFS_CAP_LINUX_SYS_PTRACE	54
+#define XFS_CAP_LINUX_SYS_ADMIN		55
+#define XFS_CAP_LINUX_SYS_RESOURCE	56
+#define XFS_CAP_LINUX_SYS_TTY_CONFIG	57
+#define XFS_CAP_LINUX_LEASE		58
 
 
 #ifdef __KERNEL__
