@@ -2947,7 +2947,7 @@ xfs_iflush(
 				ip->i_d.di_nblocks, mp, XFS_ERRTAG_IFLUSH_5,
 				XFS_RANDOM_IFLUSH_5)) {
 		xfs_cmn_err(XFS_PTAG_IFLUSH, CE_ALERT, mp,
-			"xfs_iflush: detected corrupt incore inode %llu, total extents = %d, nblocks = %ld, ptr 0x%p",
+			"xfs_iflush: detected corrupt incore inode %llu, total extents = %d, nblocks = %lld, ptr 0x%p",
 			ip->i_ino,
 			ip->i_d.di_nextents + ip->i_d.di_anextents,
 			ip->i_d.di_nblocks,
