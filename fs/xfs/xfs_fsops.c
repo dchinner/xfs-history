@@ -31,6 +31,7 @@
 #include "xfs_itable.h"
 #include "xfs_rw.h"
 #include "xfs_trans_space.h"
+#include "xfs_rtalloc.h"
 
 /*
  * File system operations
@@ -91,7 +92,7 @@ xfs_growfs_data(
 	error = xfs_read_buf(mp, mp->m_dev, XFS_FSB_TO_BB(mp, nb) - 1, 1, 0, 
 			     &bp);
 	if (error)
-		return XFS_ERROR(error);
+		return error;
 	ASSERT(bp);
 	brelse(bp);
 
@@ -336,26 +337,6 @@ xfs_growfs_log(
 	 * the log first, hold off all activity while moving it.
 	 * Can have shorter or longer log in the same space,
 	 * or transform internal to external log or vice versa.
-	 */
-	return XFS_ERROR(ENOSYS);
-}
-
-STATIC int
-xfs_growfs_rt(
-	xfs_mount_t	*mp,		/* mount point for filesystem */
-	xfs_growfs_rt_t	*in)		/* growfs rt input struct */
-{
-	xfs_rfsblock_t	nb;
-
-	nb = in->newblocks;
-	if (nb <= mp->m_sb.sb_rblocks)
-		return XFS_ERROR(EINVAL);
-	if (mp->m_sb.sb_rblocks && (in->extsize != mp->m_sb.sb_rextsize))
-		return XFS_ERROR(EINVAL);
-	/*
-	 * If a realtime area is being added to the fs for the first time
-	 * then it won't have been opened at mount, so we need to do
-	 * that here.  Otherwise we can check the device size as for data.
 	 */
 	return XFS_ERROR(ENOSYS);
 }
