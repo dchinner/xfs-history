@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.45 $"
+#ident  "$Revision: 1.46 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -694,7 +694,7 @@ xfs_mountroot(vfs_t		*vfsp,
 		 * that can be stub'ed when xlv does not exist.
 		 */
 		if (xlv_tab == NULL) {
-			printf("logical volume info not present \n");
+			cmn_err(CE_WARN, "logical volume info not present");
 			ddev = rootdev;
 			logdev = rtdev = 0;
 		} else {
@@ -722,7 +722,6 @@ xfs_mountroot(vfs_t		*vfsp,
 		/*
 		 * block device
 		 */
-		printf("mount xfs - block device \n");
 		ddev = logdev = rootdev;
 		rtdev = 0;
 	}
