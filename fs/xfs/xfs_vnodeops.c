@@ -278,6 +278,9 @@ xfs_close(vnode_t	*vp,
 	shaddr_t	*sa = p->p_shaddr;
 	int		isshd, nofiles;
 	int		i, vpcount, ret;
+#ifdef REDWOOD
+	int		err;
+#endif
 
 	vn_trace_entry(vp, "xfs_close");
         ip = XFS_VTOI(vp);
@@ -290,26 +293,58 @@ xfs_close(vnode_t	*vp,
 
 		vpcount = 0;
 
+#ifdef REDWOOD
+		/*
+		 * redwood uses a different mechanism for
+		 * handling shared file descriptors. shdflock()
+		 * is a no-op for single-threaded processes but
+		 * we test first since we need to know what to
+		 * set ufp and nofiles to.
+		 */
+		if (u.u_procp->p_shaddr)  {
+			shdflock();
+			ufp = &sa->s_flist;
+#else
 		if (isshd = ISSHDFD(p, sa)) {
 			mrlock(&sa->s_fsync, MR_ACCESS, PZERO);
 			ufp = sa->s_flist;
+#endif
 			nofiles  = sa->s_nofiles;
 		} else {
+#ifdef REDWOOD
+			ufp = &u.u_flist;
+#else
 			ufp = u.u_flist;
+#endif
 			nofiles = u.u_nofiles;
 		}
 
 		for (i = 0 ; i < nofiles; i++ ) {
+#ifdef REDWOOD
+			/* ufgetfast depends on the 5.3 shfd handling */
+
+			err = ufget(i, nofiles, &ufp, &fp);
+			ASSERT(err == 0);
+
+			if (fp)  {
+#else
 			if ((fp = ufgetfast( i,nofiles, ufp))) {
+#endif
 				if ((fp->f_vnode == vp) && (fp->f_count > 0)) {
 					vpcount++;
 				}
 			}
 		}
 
+#ifdef REDWOOD
+		if (u.u_procp->p_shaddr)  {
+			shdfunlock();
+		}
+#else
 		if (isshd) {
 			mrunlock(&sa->s_fsync);
 		}
+#endif
 
 		/*
 		 * If this process is nolonger accessing 
