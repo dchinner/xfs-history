@@ -510,24 +510,7 @@ int linvfs_revalidate_core(struct inode *inode)
         vp = LINVFS_GET_VP(inode);
 	ASSERT(vp);
 
-        va.va_mask = AT_STAT;
-        VOP_GETATTR(vp, &va, 0, NULL, error);
-
-	if (!error) {
-		inode->i_mode = VTTOIF(va.va_type) | va.va_mode;
-		inode->i_nlink = va.va_nlink;
-		inode->i_uid = va.va_uid;
-		inode->i_gid = va.va_gid;
-		inode->i_rdev = va.va_rdev;
-		inode->i_size = va.va_size;
-		inode->i_blocks = va.va_nblocks;
-		inode->i_blksize = va.va_blksize;
-		inode->i_atime = va.va_atime.tv_sec;
-		inode->i_mtime = va.va_mtime.tv_sec;
-		inode->i_ctime = va.va_ctime.tv_sec;
-	}
-
-        return -error;
+	return vn_revalidate(vp, 0);
 }
 
 int linvfs_revalidate(struct dentry *dentry)

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.116 $"
+#ident "$Revision: 1.117 $"
 
 #include <xfs_os_defs.h>
 #include <linux/stat.h>
@@ -553,7 +553,7 @@ finish_inode:
 #endif
 
 #ifndef SIM
-	vn_revalidate(vp);	/* Update linux inode */
+	error = vn_revalidate(vp, ATTR_LAZY);	/* Update the linux inode */
 #endif
 
 	*ipp = ip;

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.25 $"
+#ident	"$Revision: 1.26 $"
 
 #include <xfs_os_defs.h>
 
@@ -71,6 +71,11 @@
 #include <xfs_attr_sf.h>	/* for XFS_BHVTOI */
 #include <xfs_dinode.h>		/* for XFS_BHVTOI */
 #include <xfs_inode.h>		/* for XFS_BHVTOI */
+
+#include <xfs_log.h>
+#include <xfs_trans.h>
+#include <xfs_sb.h>
+#include <xfs_mount.h>
 
 #ifdef	CONFIG_XFS_VNODE_TRACING
 #include <sys/ktrace.h>
@@ -236,30 +241,53 @@ vn_wakeup(struct vnode *vp)
 
 
 struct vnode *
-vn_address(struct inode *ip)
+vn_address(struct inode *inode)
 {
-	vnode_t	*vp;
+	vnode_t		*vp;
+	vfs_t		*vfsp;
+	xfs_inode_t	*ip;
+	xfs_mount_t	*mp;
 
 
-	vp = (vnode_t *)(&((ip)->u.xfs_i.vnode));
+	vp = (vnode_t *)(&((inode)->u.xfs_i.vnode));
 
-	if ((vp->v_type != VNON) && vp->v_number && vp->v_inode)
+	if ((vp->v_type != VNON) && vp->v_number && vp->v_inode) {
+
+		/*
+		 * Catch half-constructed linux-inode/vnode/xfs-inode
+		 * setups.
+		 */
+		if (vp->v_fbhv == NULL) {
+panic("vn_address: vp/0x%p inode/0x%p bh_first = NULL!", vp, inode);
+			vfsp = LINVFS_GET_VFS(inode->i_sb);	ASSERT(vfsp);
+			mp = XFS_BHVTOM(vfsp->vfs_fbhv);	ASSERT(mp);
+
+			if (xfs_iget(mp, NULL, (xfs_ino_t)inode->i_ino,
+							0, &ip, 0)) {
+panic("vn_address: vp/0x%p inode/0x%p bad xfs_iget!", vp, inode);
+				return NULL;
+			}
+
+			VN_RELE(vp);		/* Drop xfs_iget reference */
+		}
+
 		return vp;
+	}
 	
 	return NULL;
 }
 
 
 struct vnode *
-vn_initialize(struct inode *ip)
+vn_initialize(struct inode *inode)
 {
 	struct vnode	*vp;
 	
 	VOPINFO.vn_active++;
 
-	vp = LINVFS_GET_VN_ADDRESS(ip);
+	vp = LINVFS_GET_VN_ADDRESS(inode);
 
-	vp->v_inode = ip;
+	vp->v_inode = inode;
 
 	vp->v_flag = 0;
 
@@ -290,22 +318,22 @@ vn_initialize(struct inode *ip)
 struct vnode *
 vn_alloc(struct vfs *vfsp, __uint64_t ino, enum vtype type, dev_t dev)
 {
-	struct inode	*ip;
+	struct inode	*inode;
 	struct vnode	*vp;
 	xfs_ino_t	inum = (xfs_ino_t) ino;
 
 	VOPINFO.vn_alloc++;
 
-	ip = iget(vfsp->vfs_super, inum);
+	inode = iget(vfsp->vfs_super, inum);
 
-	vp = LINVFS_GET_VN_ADDRESS(ip);
+	vp = LINVFS_GET_VN_ADDRESS(inode);
 
 	ASSERT((vp->v_flag & VPURGE) == 0);
 
 	vp->v_vfsp  = vfsp;
 	vp->v_type  = type;
 	vp->v_rdev  = dev;
-	vp->v_inode = ip;
+	vp->v_inode = inode;
 
 	vn_trace_exit(vp, "vn_alloc", (inst_t *)__return_address);
 
@@ -474,8 +502,8 @@ vn_cached(struct vnode *vp)
 /*
  * "revalidate" the linux inode.
  */
-void
-vn_revalidate(struct vnode *vp)
+int
+vn_revalidate(struct vnode *vp, int flags)
 {
 	int		error;
 	struct inode	*inode;
@@ -484,32 +512,35 @@ vn_revalidate(struct vnode *vp)
 
 	vn_trace_entry(vp, "vn_revalidate", (inst_t *)__return_address);
 
-	va.va_mask = AT_STAT|ATTR_LAZY;
+	va.va_mask = AT_STAT|AT_GENCOUNT;
 
 	ASSERT(vp->v_bh.bh_first != NULL);
 
-	VOP_GETATTR(vp, &va, ATTR_LAZY, &cred, error);
+	VOP_GETATTR(vp, &va, flags, &cred, error);
 
 	if (! error) {
 		inode = LINVFS_GET_IP(vp);
 
 		ASSERT(inode);
 
-		inode->i_mode    = VTTOIF(va.va_type) | va.va_mode;
-		inode->i_nlink   = va.va_nlink;
-		inode->i_uid     = va.va_uid;
-		inode->i_gid     = va.va_gid;
-		inode->i_rdev    = va.va_rdev;
-		inode->i_size    = va.va_size;
-		inode->i_blocks  = va.va_nblocks;
-		inode->i_blksize = va.va_blksize;
-		inode->i_atime   = va.va_atime.tv_sec;
-		inode->i_mtime   = va.va_mtime.tv_sec;
-		inode->i_ctime   = va.va_ctime.tv_sec;
+		inode->i_mode       = VTTOIF(va.va_type) | va.va_mode;
+		inode->i_nlink      = va.va_nlink;
+		inode->i_uid        = va.va_uid;
+		inode->i_gid        = va.va_gid;
+		inode->i_rdev       = va.va_rdev;
+		inode->i_size       = va.va_size;
+		inode->i_blocks     = va.va_nblocks;
+		inode->i_blksize    = va.va_blksize;
+		inode->i_atime      = va.va_atime.tv_sec;
+		inode->i_mtime      = va.va_mtime.tv_sec;
+		inode->i_ctime      = va.va_ctime.tv_sec;
+		inode->i_generation = va.va_gencount;
 	} else {
 		vn_trace_exit(vp, "vn_revalidate.error",
 					(inst_t *)__return_address);
 	}
+
+	return -error;
 }
 
 
