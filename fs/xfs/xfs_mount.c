@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.131 $"
+#ident	"$Revision: 1.132 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -209,7 +209,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	 */
 	sbp = XFS_BUF_TO_SBP(bp);
 	if ((sbp->sb_magicnum != XFS_SB_MAGIC)		||
-	    !XFS_SB_GOOD_VERSION(sbp->sb_versionnum)	||
+	    !XFS_SB_GOOD_VERSION(sbp)			||
 	    (sbp->sb_logstart == 0 && mp->m_logdev == mp->m_dev)) {
 		error = XFS_ERROR(EINVAL);
 		goto error0;
@@ -376,6 +376,15 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 #else
 	mp->m_inode_cluster_size = XFS_INODE_BIG_CLUSTER_SIZE;
 #endif
+	/*
+	 * Set whether we're using inode alignment.
+	 */
+	if (XFS_SB_VERSION_HASALIGN(&mp->m_sb) &&
+	    mp->m_sb.sb_inoalignmt >=
+	    XFS_B_TO_FSBT(mp, mp->m_inode_cluster_size))
+		mp->m_inoalign = mp->m_sb.sb_inoalignmt;
+	else
+		mp->m_inoalign = 0;
 
 	/*
 	 * Check that the data (and log if separate) are an ok size.
@@ -588,7 +597,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 
 #ifndef SIM 
 	if ((XFS_IS_QUOTA_ON(mp)) ||
-	    (XFS_QM_SB_HAS_QUOTA(mp) &&
+	    (XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
 	     mp->m_sb.sb_qflags & (XFS_MOUNT_UDQ_ACCT|XFS_MOUNT_PDQ_ACCT))) {
 #ifdef DEBUG
 		cmn_err(CE_NOTE, "Attempting to turn on disk quotas.");
@@ -860,15 +869,35 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
 		offsetof(xfs_sb_t, sb_uquotino),
 		offsetof(xfs_sb_t, sb_pquotino),
 		offsetof(xfs_sb_t, sb_qflags),
+		offsetof(xfs_sb_t, sb_inoalignmt),
 		sizeof(xfs_sb_t)
 	};
  
+	ASSERT(fields);
+	if (!fields)
+		return;
 	mp = tp->t_mountp;
 	bp = xfs_trans_getsb(tp, 0);
 	sbp = XFS_BUF_TO_SBP(bp);
-	xfs_btree_offsets(fields, offsets, XFS_SB_NUM_BITS, &first, &last);
-	bcopy((caddr_t)&mp->m_sb + first, (caddr_t)sbp + first,
-		last - first + 1);
+	first = sizeof(xfs_sb_t);
+	last = 0;
+	while (fields) {
+		xfs_sb_field_t	f;
+		int		first1;
+		int		last1;
+
+		f = (xfs_sb_field_t)xfs_lowbit64((__uint64_t)fields);
+		ASSERT((1LL << f) & XFS_SB_MOD_BITS);
+		first1 = offsets[f];
+		last1 = offsets[f + 1] - 1;
+		bcopy((caddr_t)&mp->m_sb + first1, (caddr_t)sbp + first1,
+			last1 - first1 + 1);
+		if (first1 < first)
+			first = first1;
+		if (last1 > last)
+			last = last1;
+		fields &= ~(1LL << f);
+	}
 	xfs_trans_log_buf(tp, bp, first, last);
 }
 

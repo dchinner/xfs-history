@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.69 $"
+#ident	"$Revision: 1.70 $"
 
 struct buf;
 struct cred;
@@ -104,6 +104,7 @@ typedef struct xfs_mount {
 	int			m_ialloc_inos;	/* inodes in inode allocation */
 	int			m_ialloc_blks;	/* blocks in inode allocation */
 	int			m_litino;	/* size of inode union area */
+	uint			m_inoalign;	/* doing inode alignment */
 	xfs_trans_reservations_t m_reservations; /* precomputed res values */
 	__uint64_t		m_maxicount;	/* maximum inode count */
 #if XFS_BIG_FILESYSTEMS
@@ -181,14 +182,6 @@ typedef struct xfs_mod_sb {
 
 #define	AIL_LOCK(mp)		mutex_spinlock(&(mp)->m_ail_lock)
 #define	AIL_UNLOCK(mp,s)	mutex_spinunlock(&(mp)->m_ail_lock, s)
-
-#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_HAS_ATTRIBUTES)
-int xfs_has_attributes(xfs_mount_t *mp);
-#define	XFS_HAS_ATTRIBUTES(mp)	xfs_has_attributes(mp)
-#else
-#define	XFS_HAS_ATTRIBUTES(mp)	\
-	((mp)->m_sb.sb_versionnum >= XFS_SB_VERSION_HASATTR)
-#endif
 
 #ifdef SIM
 xfs_mount_t	*xfs_mount(dev_t, dev_t, dev_t);
