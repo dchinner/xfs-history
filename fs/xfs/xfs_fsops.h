@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_GROW_H
 #define	_FS_XFS_GROW_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.5 $"
 
 /*
  * File system growth interfaces
@@ -43,6 +43,8 @@ typedef struct xfs_fsop_geom
 	__uint64_t	rtextents;
 	__uint64_t	logstart;
 	uuid_t		uuid;
+	__uint32_t	sunit;
+	__uint32_t	swidth;	
 } xfs_fsop_geom_t;
 
 /* Output for XFS_FS_COUNTS */
