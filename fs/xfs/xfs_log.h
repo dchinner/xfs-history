@@ -15,6 +15,12 @@
 #define XFS_LOG_RECOVER		0x1
 
 /*
+ * Flags to xfs_log_done()
+ */
+#define XFS_LOG_REL_PERM_RESERV	0x1
+
+
+/*
  * Flags to xfs_log_reserve()
  *
  *	XFS_LOG_SLEEP:	 If space is not available, sleep
@@ -81,9 +87,10 @@ int  xfs_log_write(struct xfs_mount *mp, xfs_log_iovec_t region[], int nentries,
 /* Log manager utility interfaces */
 void xfs_log_print(struct xfs_mount *mp, dev_t log_dev);
 
-#define XFS_ERECOVER	1	/* Failure to recover log */
+#define XFS_ERECOVER	4	/* Failure to recover log */
 #define XFS_ELOGSTAT	2	/* Failure to stat log in user space */
 #define XFS_ENOLOGSPACE	3	/* Reservation too large */
-#define XFS_ENOTSUP	4
+#define XFS_ENOTSUP	1
+#define XFS_ENOLSN	5	/* Can't find the lsn you asked for */
 
 #endif	/* _XFS_LOG_H */

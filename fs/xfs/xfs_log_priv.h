@@ -27,12 +27,12 @@
 /*
  * In core log state
  */
-#define LOG_ACTIVE	1	/* Current IC log being written to */
-#define LOG_WANT_SYNC	2	/* Want to sync this iclog; no more writes */
-#define LOG_SYNCING	3	/* This IC log is syncing */
-#define LOG_CALLBACK	4	/* Callback functions now */
-#define LOG_DIRTY	5	/* Need to clean this IC log */
-#define LOG_NOTUSED	6	/* This IC log not being used */
+#define LOG_STATE_ACTIVE    1 /* Current IC log being written to */
+#define LOG_STATE_WANT_SYNC 2 /* Want to sync this iclog; no more writes */
+#define LOG_STATE_SYNCING   3 /* This IC log is syncing */
+#define LOG_STATE_CALLBACK  4 /* Callback functions now */
+#define LOG_STATE_DIRTY	    5 /* Dirty IC log, not ready for ACTIVE status */
+#define LOG_STATE_NOTUSED   6 /* This IC log not being used */
 
 /*
  * Flags to log operation header
@@ -99,6 +99,7 @@ typedef struct log_in_core {
 	struct log_in_core	*ic_next;
 	buf_t	  		*ic_bp;
 	struct log		*ic_log;	/* back ptr to log */
+	xfs_log_callback_t	*ic_callback;	/* callback list */
 	int	  		ic_size;
 	int	  		ic_offset;
 	int	  		ic_refcnt;
