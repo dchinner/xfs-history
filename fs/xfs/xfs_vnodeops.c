@@ -1,4 +1,4 @@
-#ident "$Revision: 1.348 $"
+#ident "$Revision: 1.349 $"
 
 
 #ifdef SIM
@@ -2161,12 +2161,15 @@ xfs_inactive(
 	 * use the read ahead state.  Also reset the read/writ io
 	 * sizes.  Like read-ahead, only regular files override the
 	 * default read/write io sizes.
+	 * Bug 516806: We do not need the ilock around the clearing
+	 * of the readahead state since it is protected by its own
+	 * mutex now. vfs_sync->buffer_cache->read path we also take 
+	 * this mutex so this is not dangerous.
 	 */
 	if (vp->v_type == VREG) {
-		xfs_ilock(ip, XFS_ILOCK_EXCL);
-
 		XFS_INODE_CLEAR_READ_AHEAD(ip);
 
+		xfs_ilock(ip, XFS_ILOCK_EXCL);
 #ifndef SIM
 		ASSERT(mp->m_readio_log <= 0xff);
 		ASSERT(mp->m_writeio_log <= 0xff);
@@ -5468,8 +5471,8 @@ xfs_alloc_file_space(
 		}
 
 		error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
-		XFS_INODE_CLEAR_READ_AHEAD(ip);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+		XFS_INODE_CLEAR_READ_AHEAD(ip);
 		if (error) {
 			break;
 		}
@@ -5690,8 +5693,8 @@ xfs_free_file_space(
 		}
 
 		error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
-		XFS_INODE_CLEAR_READ_AHEAD(ip);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+		XFS_INODE_CLEAR_READ_AHEAD(ip);
 	}
 
 	xfs_iunlock(ip, XFS_IOLOCK_EXCL);
