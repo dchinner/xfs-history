@@ -113,7 +113,6 @@ xfs_read(
 
 	XFS_ILOCK(mp, io, XFS_IOLOCK_SHARED);
 
-#ifdef CONFIG_HAVE_XFS_DMAPI
 	if (DM_EVENT_ENABLED(BHV_TO_VNODE(bdp)->v_vfsp, ip, DM_EVENT_READ) &&
 	    !(file->f_mode & FINVIS)) {
 		int error;
@@ -128,7 +127,6 @@ xfs_read(
 			return -error;
 		}
 	}
-#endif /* CONFIG_HAVE_XFS_DMAPI */
 
 	ret = generic_file_read(file, buf, size, offset);
 	XFS_IUNLOCK(mp, io, XFS_IOLOCK_SHARED);
@@ -434,10 +432,8 @@ xfs_write(
 	vnode_t		*vp;
 	int		iolock;
 	int		direct = file->f_flags & O_DIRECT;
-#ifdef CONFIG_HAVE_XFS_DMAPI
 	int		eventsent = 0;
 	loff_t		savedsize = *offset;
-#endif
 	vrwlock_t	locktype;
 	unsigned int	mode;
 
@@ -473,9 +469,7 @@ xfs_write(
 	xfs_ilock(xip, XFS_ILOCK_EXCL|iolock);
 	isize = xip->i_d.di_size;
 
-#ifdef CONFIG_HAVE_XFS_DMAPI
 start:
-#endif
 	n = limit - *offset;
 	if (n <= 0) {
 		xfs_iunlock(xip, XFS_ILOCK_EXCL|iolock);
@@ -489,7 +483,6 @@ start:
 		io->io_new_size = new_size;
 	}
 
-#ifdef CONFIG_HAVE_XFS_DMAPI
 	if ((DM_EVENT_ENABLED_IO(vp->v_vfsp, io, DM_EVENT_WRITE) &&
 	    !(file->f_mode & FINVIS) && !eventsent)) {
 
@@ -518,8 +511,6 @@ start:
 			goto start;
 		}
 	}
-
-#endif /* CONFIG_HAVE_XFS_DMAPI */
 
 	/*
 	 * On Linux, generic_file_write updates the times even if
@@ -551,9 +542,7 @@ start:
 	}
 	xfs_iunlock(xip, XFS_ILOCK_EXCL);
 
-#ifdef CONFIG_HAVE_XFS_DMAPI
 retry:
-#endif
 	if (direct) {
 		xfs_inval_cached_pages(vp, &xip->i_iocore, *offset,
 			(xfs_off_t) size, (void *)vp, 1);
@@ -573,7 +562,6 @@ retry:
 	ret = generic_file_write(file, buf, size, offset);
 #endif
 
-#ifdef CONFIG_HAVE_XFS_DMAPI
 	if ((ret == -ENOSPC) &&
 	    DM_EVENT_ENABLED_IO(vp->v_vfsp, io, DM_EVENT_NOSPACE) &&
 	    !(file->f_mode & FINVIS)) {
@@ -589,7 +577,6 @@ retry:
 		goto retry;
 		
 	}
-#endif /* CONFIG_HAVE_XFS_DMAPI */
 
 	if (ret <=0) {	/*
 			 * ret from pagebuf_generic_file_write <= 0, it's
