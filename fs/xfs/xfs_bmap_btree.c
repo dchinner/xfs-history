@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.92 $"
+#ident	"$Revision: 1.93 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -3040,5 +3040,32 @@ xfs_bmbt_update(
 		return error;
 	}
 	XFS_BMBT_TRACE_CURSOR(cur, EXIT);
+	return 0;
+}
+
+/*
+ * Check an extent list, which has just been read, for
+ * any bit in the extent flag field. ASSERT on debug
+ * kernels, as this condition should not occur.
+ * Return an error condition (1) if any flags found,
+ * otherwise return 0.
+ */
+int
+xfs_check_nostate_extents(
+	xfs_bmbt_rec_t		*ep,
+	xfs_extnum_t		num)
+{
+	for (; num > 0; num--, ep++) {
+		if (
+#if BMBT_USE_64
+			((ep->l0) >> (64 - BMBT_EXNTFLAG_BITLEN)) != 0
+#else	/* !BMBT_USE_64 */
+			((ep->l0) >> (32 - BMBT_EXNTFLAG_BITLEN)) != 0
+#endif	/* BMBT_USE_64 */
+		) {
+			ASSERT(0);
+			return 1;
+		}
+	}
 	return 0;
 }

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.241 $"
+#ident "$Revision: 1.242 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -119,7 +119,8 @@ xfs_iunlink_remove(
 STATIC void
 xfs_validate_extents(
 	xfs_bmbt_rec_32_t	*ep,
-	int			nrecs);
+	int			nrecs,
+	xfs_exntfmt_t		fmt);
 
 #ifdef XFS_RW_TRACE
 STATIC void
@@ -134,7 +135,7 @@ xfs_itrunc_trace(
 #define	xfs_itrunc_trace(tag, ip, flag, new_size, toss_start, toss_finish)
 #endif /* XFS_RW_TRACE */
 #else /* DEBUG */
-#define xfs_validate_extents(ep, nrecs)
+#define xfs_validate_extents(ep, nrecs, fmt)
 #define	xfs_itrunc_trace(tag, ip, flag, new_size, toss_start, toss_finish)
 #endif /* DEBUG */		     
 
@@ -652,11 +653,16 @@ xfs_iformat_extents(
 	if (size) {
 		xfs_validate_extents(
 			(xfs_bmbt_rec_32_t *)XFS_DFORK_PTR(dip, whichfork),
-			nex);
+			nex, XFS_EXTFMT_INODE(ip));
 		bcopy(XFS_DFORK_PTR(dip, whichfork), ifp->if_u1.if_extents,
 		      size);
 		xfs_bmap_trace_exlist("xfs_iformat_extents", ip, nex,
 			whichfork);
+		if (whichfork != XFS_DATA_FORK ||
+			XFS_EXTFMT_INODE(ip) == XFS_EXTFMT_NOSTATE)
+				if (xfs_check_nostate_extents(
+				    ifp->if_u1.if_extents, nex))
+					return XFS_ERROR(EFSCORRUPTED);
 	}
 	ifp->if_flags |= XFS_IFEXTENTS;
 	return 0;
@@ -918,7 +924,7 @@ xfs_iread_extents(
 		return error;
 	}
 	xfs_validate_extents((xfs_bmbt_rec_32_t *)ifp->if_u1.if_extents,
-		XFS_IFORK_NEXTENTS(ip, whichfork));
+		XFS_IFORK_NEXTENTS(ip, whichfork), XFS_EXTFMT_INODE(ip));
 	return 0;
 }
 
@@ -2586,7 +2592,8 @@ xfs_iunpin_wait(
 STATIC void
 xfs_validate_extents(
 	xfs_bmbt_rec_32_t	*ep,
-	int			nrecs)
+	int			nrecs,
+	xfs_exntfmt_t		fmt)
 {
 	xfs_bmbt_irec_t		irec;
 	int			i;
@@ -2595,6 +2602,8 @@ xfs_validate_extents(
 	for (i = 0; i < nrecs; i++) {
 		bcopy(ep, &rec, sizeof(rec));
 		xfs_bmbt_get_all(&rec, &irec);
+		if (fmt == XFS_EXTFMT_NOSTATE)
+			ASSERT(irec.br_state == XFS_EXT_NORM);
 		ep++;
 	}
 }
@@ -2620,6 +2629,7 @@ xfs_iextents_copy(
 	int			copied;
 	xfs_bmbt_rec_32_t	*dest_ep;
 	xfs_bmbt_rec_t		*ep;
+	xfs_exntfmt_t		fmt = XFS_EXTFMT_INODE(ip);
 #ifdef XFS_BMAP_TRACE
 	static char		fname[] = "xfs_iextents_copy";
 #endif
@@ -2645,7 +2655,7 @@ xfs_iextents_copy(
 		       (XFS_IFORK_NEXTENTS(ip, whichfork) *
 		        sizeof(xfs_bmbt_rec_t)));
 		bcopy(ifp->if_u1.if_extents, buffer, ifp->if_bytes);
-		xfs_validate_extents(buffer, nrecs);
+		xfs_validate_extents(buffer, nrecs, fmt);
 		return ifp->if_bytes;
 	}
 
@@ -2678,7 +2688,7 @@ xfs_iextents_copy(
 	ASSERT(copied != 0);
 	ASSERT(copied == ip->i_d.di_nextents);
 	ASSERT((copied * sizeof(xfs_bmbt_rec_t)) <= XFS_IFORK_DSIZE(ip));
-	xfs_validate_extents(buffer, copied);
+	xfs_validate_extents(buffer, copied, fmt);
 
 	return (copied * sizeof(xfs_bmbt_rec_t));
 }		  
@@ -3381,7 +3391,8 @@ xfs_iaccess(
  * Return whether or not it is OK to swap to the given file in the
  * given range.  Return 0 for OK and otherwise return the error.
  *
- * It is only OK to swap to a file if it has no holes.
+ * It is only OK to swap to a file if it has no holes, and all
+ * extents have been initialized.
  *
  * We use the vnode behavior chain prevent and allow primitives
  * to ensure that the vnode chain stays coherent while we do this.
@@ -3392,29 +3403,14 @@ int
 xfs_swappable(
 	bhv_desc_t	*bdp)
 {
-	xfs_fileoff_t	end_fsb;
-	xfs_fileoff_t	first_hole_offset_fsb;
 	xfs_inode_t	*ip;
-	xfs_mount_t	*mp;
-	int		error;
 
 	ip = XFS_BHVTOI(bdp);
-	mp = ip->i_mount;
 	/*
 	 * Verify that the file does not have any
-	 * holes.
+	 * holes or unwritten exents.
 	 */
-	error = 0;
-	xfs_ilock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
-	end_fsb = XFS_B_TO_FSB(mp, ip->i_d.di_size);
-	error = xfs_bmap_first_unused(NULL, ip, 1, &first_hole_offset_fsb,
-		XFS_DATA_FORK);
-	if ((error == 0) && (first_hole_offset_fsb < end_fsb)) {
-		error = XFS_ERROR(EINVAL);
-	}
-	xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
-
-	return error;
+	return xfs_bmap_check_swappable(ip);
 }
 
 /*

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.66 $"
+#ident "$Revision: 1.67 $"
 
 struct getbmap;
 struct xfs_bmbt_irec;
@@ -139,6 +139,13 @@ xfs_bmap_add_free(
 void
 xfs_bmap_cancel(
 	xfs_bmap_free_t		*flist);	/* free list to clean up */
+
+/*
+ * Routine to check if a specified inode is swap capable.
+ */
+int
+xfs_bmap_check_swappable(
+	struct xfs_inode	*ip);		/* incore inode */
 
 /* 
  * Compute and fill in the value of the maximum depth of a bmap btree
@@ -321,5 +328,14 @@ xfs_bmap_eof(
         xfs_fileoff_t           endoff,
         int                     whichfork,
         int                     *eof);
+
+/*
+ * Check an extent list, which has just been read, for
+ * any bit in the extent flag field.
+ */
+int
+xfs_check_nostate_extents(
+	xfs_bmbt_rec_t		*ep,
+	xfs_extnum_t		num);
 
 #endif	/* _FS_XFS_BMAP_H */

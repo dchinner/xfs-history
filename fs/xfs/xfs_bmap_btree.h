@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_BTREE_H
 #define	_FS_XFS_BMAP_BTREE_H
 
-#ident "$Revision: 1.36 $"
+#ident "$Revision: 1.37 $"
 
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 
@@ -9,6 +9,7 @@ struct buf;
 struct xfs_btree_cur;
 struct xfs_btree_lblock;
 struct xfs_mount;
+struct xfs_inode;
 
 /*
  * Bmap root header, on-disk form only.
@@ -97,7 +98,14 @@ xfs_filblks_t startblockval(xfs_fsblock_t x);
 #else
 #define	STARTBLOCKVAL(x)	((xfs_filblks_t)((x) & ~STARTBLOCKMASK))
 #endif
-#define	ISUNWRITTEN(x)		((x) == XFS_EXT_UNWRITTEN)
+
+/*
+ * Possible extent formats.
+ */
+typedef	enum {
+	XFS_EXTFMT_NOSTATE = 0,
+	XFS_EXTFMT_HASSTATE
+} xfs_exntfmt_t;
 
 /*
  * Possible extent states.
@@ -107,6 +115,18 @@ typedef	enum {
 	XFS_EXT_DMAPI_OFFLINE
 } xfs_exntst_t;
 
+/*
+ * Extent state and extent format macros.
+ */
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_EXTFMT_INODE )
+xfs_exntfmt_t xfs_extfmt_inode(struct xfs_inode *ip);
+#define	XFS_EXTFMT_INODE(x)	xfs_extfmt_inode(x)
+#else
+#define	XFS_EXTFMT_INODE(x) \
+  (XFS_SB_VERSION_HASEXTFLGBIT(&((x)->i_mount->m_sb)) ? \
+	XFS_EXTFMT_HASSTATE : XFS_EXTFMT_NOSTATE)
+#endif
+#define	ISUNWRITTEN(x)		((x) == XFS_EXT_UNWRITTEN)
 
 /*
  * Incore version of above.

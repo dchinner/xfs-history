@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.217 $"
+#ident	"$Revision: 1.218 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -3929,6 +3929,57 @@ xfs_bmap_cancel(
 }
 
 /*
+ * Returns EINVAL if the specified file is not swappable.
+ */
+int						/* error */
+xfs_bmap_check_swappable(
+	xfs_inode_t	*ip)			/* incore inode */
+{
+	xfs_bmbt_rec_t	*base;			/* base of extent array */
+	xfs_bmbt_rec_t	*ep;			/* pointer to an extent entry */
+	xfs_fileoff_t	end_fsb;		/* last block of file within size */
+	xfs_bmbt_irec_t	ext;			/* extent list entry, decoded */
+	xfs_ifork_t	*ifp;			/* inode fork pointer */
+	xfs_fileoff_t	lastaddr;		/* last block number seen */
+	xfs_extnum_t	nextents;		/* number of extent entries */
+	int		retval = 0;		/* return value */
+
+	xfs_ilock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
+	ASSERT(XFS_IFORK_FORMAT(ip, XFS_DATA_FORK) == XFS_DINODE_FMT_BTREE ||
+	       XFS_IFORK_FORMAT(ip, XFS_DATA_FORK) == XFS_DINODE_FMT_EXTENTS);
+
+	ifp = XFS_IFORK_PTR(ip, XFS_DATA_FORK);
+	if (!(ifp->if_flags & XFS_IFEXTENTS) &&
+	    (retval = xfs_iread_extents(NULL, ip, XFS_DATA_FORK)))
+		goto check_done;
+	/*
+	 * Scan extents until the file size is reached. Look for
+	 * holes or unwritten extents, since I/O to these would cause
+	 * a transaction.
+	 */
+	end_fsb = XFS_B_TO_FSB(ip->i_mount, ip->i_d.di_size);
+	nextents = ifp->if_bytes / sizeof(xfs_bmbt_rec_t);
+	base = &ifp->if_u1.if_extents[0];
+	for (lastaddr = 0, ep = base; ep < &base[nextents]; ep++) {
+		xfs_bmbt_get_all(ep, &ext);
+		if (lastaddr < ext.br_startoff ||
+		    ext.br_state != XFS_EXT_NORM) {
+			goto error_done;
+		}
+		if (end_fsb <= (lastaddr = ext.br_startoff +
+						ext.br_blockcount))
+			goto check_done;
+	}
+error_done:
+	retval = XFS_ERROR(EINVAL);
+
+
+check_done:
+	xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
+	return retval;
+}
+
+/*
  * Returns the file-relative block number of the first unused block(s)
  * in the file with at least "len" logically contiguous blocks free.
  * This is the lowest-address hole if the file has holes, else the first block
@@ -4053,7 +4104,8 @@ xfs_bmap_one_block(
 /*
  * Read in the extents to if_extents.
  * All inode fields are set up by caller, we just traverse the btree
- * and copy the records in.
+ * and copy the records in. If the file system cannot contain unwritten
+ * extents, the records are checked for no "state" flags.
  */
 int					/* error */
 xfs_bmap_read_extents(
@@ -4065,6 +4117,7 @@ xfs_bmap_read_extents(
 	xfs_fsblock_t		bno;	/* block # of "block" */
 	buf_t			*bp;	/* buffer for "block" */
 	int			error;	/* error return value */
+	xfs_exntfmt_t		exntf;	/* XFS_EXTFMT_NOSTATE, if checking */
 #ifdef XFS_BMAP_TRACE
 	static char		fname[] = "xfs_bmap_read_extents";
 #endif
@@ -4080,6 +4133,8 @@ xfs_bmap_read_extents(
 	bno = NULLFSBLOCK;
 	mp = ip->i_mount;
 	ifp = XFS_IFORK_PTR(ip, whichfork);
+	exntf = (whichfork != XFS_DATA_FORK) ? XFS_EXTFMT_NOSTATE :
+					XFS_EXTFMT_INODE(ip);
 	block = ifp->if_broot;
 	/*
 	 * Root level must use BMAP_BROOT_PTR_ADDR macro to get ptr out.
@@ -4125,6 +4180,7 @@ xfs_bmap_read_extents(
 		xfs_fsblock_t	nextbno;
 		xfs_extnum_t	num_recs;
 
+
 		num_recs = block->bb_numrecs;
 		if (i + num_recs > room) {
 			ASSERT(i + num_recs <= room);
@@ -4145,11 +4201,21 @@ xfs_bmap_read_extents(
 		/*
 		 * Copy records into the extent list.
 		 */
-		frp = XFS_BTREE_REC_ADDR(mp->m_sb.sb_blocksize, xfs_bmbt, block,
-			1, mp->m_bmap_dmxr[0]);
-		bcopy(frp, trp, block->bb_numrecs * sizeof(*frp));
-		trp += block->bb_numrecs;
-		i += block->bb_numrecs;
+		frp = XFS_BTREE_REC_ADDR(mp->m_sb.sb_blocksize, xfs_bmbt,
+			block, 1, mp->m_bmap_dmxr[0]);
+		bcopy(frp, trp, num_recs * sizeof(*frp));
+		if (exntf == XFS_EXTFMT_NOSTATE) {
+			/*
+			 * Check all attribute bmap btree records and
+			 * any "older" data bmap btree records for a 
+			 * set bit in the "extent flag" position.
+			 */
+			if (xfs_check_nostate_extents(trp, num_recs)) {
+				goto error0;
+			}
+		}
+		trp += num_recs;
+		i += num_recs;
 		xfs_trans_brelse(tp, bp);
 		bno = nextbno;
 		/*
@@ -4543,8 +4609,7 @@ xfs_bmapi(
 			 * A wasdelay extent has been initialized, so 
 			 * shouldn't be flagged as unwritten.
 			 */
-			if (wr && mp->m_sb.sb_versionnum &
-			    XFS_SB_VERSION_EXTFLGBIT) {
+			if (wr && XFS_SB_VERSION_HASEXTFLGBIT(&mp->m_sb)) {
 				if (!wasdelay && (flags & XFS_BMAPI_PREALLOC))
 					got.br_state = XFS_EXT_UNWRITTEN;
 			}

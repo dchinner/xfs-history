@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.20 $"
+#ident	"$Revision: 1.21 $"
 
 #define	XFS_MACRO_C
 
@@ -1040,6 +1040,14 @@ xfs_dir_sf_put_dirino(xfs_ino_t *from, xfs_dir_ino_t *to)
 }
 #endif
 
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_EXTFMT_INODE )
+xfs_exntfmt_t
+xfs_extfmt_inode(struct xfs_inode *ip)
+{
+	return XFS_EXTFMT_INODE(ip);
+}
+#endif
+
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_EXTLEN_MAX)
 xfs_extlen_t
 xfs_extlen_max(xfs_extlen_t a, xfs_extlen_t b)
@@ -1760,6 +1768,14 @@ int
 xfs_sb_version_hasdalign(xfs_sb_t *sbp)
 {
 	return XFS_SB_VERSION_HASDALIGN(sbp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_HASEXTFLGBIT)
+int
+xfs_sb_version_hasextflgbit(xfs_sb_t *sbp)
+{
+	return XFS_SB_VERSION_HASEXTFLGBIT(sbp);
 }
 #endif
 
