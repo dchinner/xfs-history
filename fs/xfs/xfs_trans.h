@@ -300,7 +300,7 @@ typedef struct xfs_trans {
  *    the super block free block counter: sector size
  *    the allocation btrees: 2 * 2 * max depth * block size
  */
-#define XFS_WRITE_LOG_RES(mp) \
+#define XFS_CALC_WRITE_LOG_RES(mp) \
 	(MAX( \
 	 ((mp)->m_sb.sb_inodesize + \
 	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp)) + \
@@ -312,6 +312,8 @@ typedef struct xfs_trans {
 	  (mp)->m_sb.sb_sectsize + \
 	  (2 * 2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp))) + \
 	  (128 * (3 + (4 * XFS_AG_MAXLEVELS(mp)))))))
+
+#define	XFS_WRITE_LOG_RES(mp)	((mp)->m_reservations.tr_write)
      
 /*
  * In truncating a file we can modify:
@@ -324,7 +326,7 @@ typedef struct xfs_trans {
  *    worst case split in allocation btrees per extent assuming 4 extents:
  *		4 exts * 2 trees * 2 * max depth * block size
  */
-#define	XFS_ITRUNCATE_LOG_RES(mp) \
+#define	XFS_CALC_ITRUNCATE_LOG_RES(mp) \
 	(MAX( \
 	 ((mp)->m_sb.sb_inodesize + \
 	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp)) + \
@@ -334,6 +336,8 @@ typedef struct xfs_trans {
 	  (mp)->m_sb.sb_sectsize + \
 	  (4 * 2 * 2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp))) + \
 	  (128 * (5 + (4 * XFS_AG_MAXLEVELS(mp)))))))
+
+#define	XFS_ITRUNCATE_LOG_RES(mp)   ((mp)->m_reservations.tr_itruncate)
      
 /*
  * In renaming a files we can modify:
@@ -345,7 +349,7 @@ typedef struct xfs_trans {
  *    the superblock for the free block count: sector size
  *    the allocation btrees: 2 * 2 * max depth * block size
  */
-#define	XFS_RENAME_LOG_RES(mp) \
+#define	XFS_CALC_RENAME_LOG_RES(mp) \
 	(MAX( \
 	 ((4 * (mp)->m_sb.sb_inodesize) + \
 	  (2 * XFS_FSB_TO_B((mp), XFS_DIR_NODE_MAXDEPTH)) + \
@@ -356,7 +360,9 @@ typedef struct xfs_trans {
 	  (mp)->m_sb.sb_sectsize + \
 	  (2 * 2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp))) + \
 	  (128 * (3 + (4 * XFS_AG_MAXLEVELS(mp)))))))
-
+     
+#define	XFS_RENAME_LOG_RES(mp)	((mp)->m_reservations.tr_rename)
+     
 /*
  * For creating a link to an inode:
  *    the parent directory inode: inode size
@@ -368,7 +374,7 @@ typedef struct xfs_trans {
  *    the superblock for the free block count: sector size
  *    the allocation btrees: 2 * max depth * block size
  */
-#define	XFS_LINK_LOG_RES(mp) \
+#define	XFS_CALC_LINK_LOG_RES(mp) \
 	(MAX( \
 	 ((mp)->m_sb.sb_inodesize + \
  	  (mp)->m_sb.sb_inodesize + \
@@ -380,7 +386,8 @@ typedef struct xfs_trans {
 	  (2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp)))) + \
 	  (128 * (2 + (2 * XFS_AG_MAXLEVELS(mp))))))
 
-
+#define	XFS_LINK_LOG_RES(mp)	((mp)->m_reservations.tr_link)
+     
 /*
  * For removing a directory entry we can modify:
  *    the parent directory inode: inode size
@@ -392,7 +399,7 @@ typedef struct xfs_trans {
  *    the superblock for the free block count: sector size
  *    the allocation btrees: 2 * max depth * block size
  */
-#define	XFS_REMOVE_LOG_RES(mp)	\
+#define	XFS_CALC_REMOVE_LOG_RES(mp)	\
 	(MAX( \
 	 ((mp)->m_sb.sb_inodesize + \
  	  (mp)->m_sb.sb_inodesize + \
@@ -403,7 +410,8 @@ typedef struct xfs_trans {
 	  (mp)->m_sb.sb_sectsize + \
 	  (2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp)))) + \
 	  (128 * (2 + (2 * XFS_AG_MAXLEVELS(mp))))))
-		  
+
+#define	XFS_REMOVE_LOG_RES(mp)	((mp)->m_reservations.tr_remove)		  
 /*
  * For symlink we can modify:
  *    the parent directory inode: inode size
@@ -418,7 +426,7 @@ typedef struct xfs_trans {
  *    the inode btree: max depth * blocksize
  *    the allocation btrees: 2 * max depth * block size
  */
-#define	XFS_SYMLINK_LOG_RES(mp)		\
+#define	XFS_CALC_SYMLINK_LOG_RES(mp)		\
 	(MAX( \
 	 ((mp)->m_sb.sb_inodesize + \
 	  (mp)->m_sb.sb_inodesize + \
@@ -434,6 +442,8 @@ typedef struct xfs_trans {
 	  (128 * (2 + XFS_IALLOC_BLOCKS(mp) + XFS_IN_MAXLEVELS(mp) + \
 	   (2 * XFS_AG_MAXLEVELS(mp))))))
 
+#define	XFS_SYMLINK_LOG_RES(mp)	((mp)->m_reservations.tr_symlink)
+     
 /*
  * For create we can modify:
  *    the parent directory inode: inode size
@@ -447,7 +457,7 @@ typedef struct xfs_trans {
  *    the inode btree: max depth * blocksize
  *    the allocation btrees: 2 * max depth * block size
  */
-#define	XFS_CREATE_LOG_RES(mp)		\
+#define	XFS_CALC_CREATE_LOG_RES(mp)		\
 	(MAX( \
 	 ((mp)->m_sb.sb_inodesize + \
 	  (mp)->m_sb.sb_inodesize + \
@@ -462,10 +472,14 @@ typedef struct xfs_trans {
 	  (128 * (2 + XFS_IALLOC_BLOCKS(mp) + XFS_IN_MAXLEVELS(mp) + \
 	   (2 * XFS_AG_MAXLEVELS(mp))))))
 
+#define	XFS_CREATE_LOG_RES(mp)	((mp)->m_reservations.tr_create)
+     
 /*
  * Making a new directory is the same as creating a new file.
  */
-#define	XFS_MKDIR_LOG_RES(mp)		XFS_CREATE_LOG_RES(mp)
+#define	XFS_CALC_MKDIR_LOG_RES(mp)		XFS_CREATE_LOG_RES(mp)
+
+#define	XFS_MKDIR_LOG_RES(mp)	((mp)->m_reservations.tr_mkdir)
 
 /*
  * In freeing an inode we can modify:
@@ -475,7 +489,7 @@ typedef struct xfs_trans {
  *    the inode btree entry: block size
  *    the on disk inode before ours in the agi hash list: block size
  */
-#define	XFS_IFREE_LOG_RES(mp) \
+#define	XFS_CALC_IFREE_LOG_RES(mp) \
 	((mp)->m_sb.sb_inodesize + \
 	 (mp)->m_sb.sb_sectsize + \
 	 (mp)->m_sb.sb_sectsize + \
@@ -483,31 +497,38 @@ typedef struct xfs_trans {
 	 XFS_FSB_TO_B((mp), 1) + \
 	 (128 * 5))
 
+#define	XFS_IFREE_LOG_RES(mp)	((mp)->m_reservations.tr_ifree)
+     
 /*
  * When only changeing the inode we log the inode and we add a
  * bit of slop for the transaction stuff.
  */
-#define	XFS_ICHANGE_LOG_RES(mp)		((mp)->m_sb.sb_inodesize + 512)     
+#define	XFS_CALC_ICHANGE_LOG_RES(mp)	((mp)->m_sb.sb_inodesize + 512)     
 
-
+#define	XFS_ICHANGE_LOG_RES(mp)	((mp)->m_reservations.tr_ichange)
+     
 /*
  * Growing the data section of the filesystem.
  *	superblock
  *	agi and agf
  *	allocation btrees
  */
-#define	XFS_GROWDATA_LOG_RES(mp) \
+#define	XFS_CALC_GROWDATA_LOG_RES(mp) \
 	((mp)->m_sb.sb_sectsize * 3 + \
 	 (2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp))) + \
 	 (128 * (3 + (2 * XFS_AG_MAXLEVELS(mp)))))
 
+#define	XFS_GROWDATA_LOG_RES(mp)    ((mp)->m_reservations.tr_growdata)
+     
 /*
  * Logging the inode modification timestamp on a synchronous write.
  *	inode
  */
-#define	XFS_SWRITE_LOG_RES(mp) \
+#define	XFS_CALC_SWRITE_LOG_RES(mp) \
      	((mp)->m_sb.sb_inodesize + 128)
 
+#define	XFS_SWRITE_LOG_RES(mp)	((mp)->m_reservations.tr_swrite)
+     
 /*
  * Various log count values.
  */
@@ -521,6 +542,22 @@ typedef struct xfs_trans {
 #define	XFS_LINK_LOG_COUNT		2
 #define	XFS_RENAME_LOG_COUNT		2
 #define	XFS_WRITE_LOG_COUNT		2     
+
+
+/*
+ * Here we centralize the specification of XFS meta-data buffer
+ * reference count values.  This determine how hard the buffer
+ * cache tries to hold onto the buffer.
+ */
+#define	XFS_AGF_REF		4
+#define	XFS_AGI_REF		4
+#define	XFS_AGFL_REF		2
+#define	XFS_ALLOC_BTREE_REF	2
+#define	XFS_BMAP_BTREE_REF	2
+#define	XFS_GEN_LBTREE_REF	2
+#define	XFS_GEN_SBTREE_REF	2
+#define	XFS_INO_BTREE_REF	2
+#define	XFS_INO_REF		1     
      
 struct xfs_inode;
 struct xfs_mount;
@@ -549,6 +586,7 @@ struct xfs_efd_log_item;
 /*
  * xFS transaction mechanism exported interfaces.
  */
+void		xfs_trans_init(struct xfs_mount *);
 xfs_trans_t	*xfs_trans_alloc(struct xfs_mount *, uint);
 xfs_trans_t	*xfs_trans_dup(xfs_trans_t *);
 int		xfs_trans_reserve(xfs_trans_t *, uint, uint, uint,
