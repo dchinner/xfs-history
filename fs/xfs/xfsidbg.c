@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.68 $"
+#ident	"$Revision: 1.70 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -909,9 +909,9 @@ xfs_buf_item_print(xfs_buf_log_item_t *blip, int summary)
 		blip->bli_buf, blip->bli_recur, blip->bli_refcount);
 	printflags(blip->bli_flags, bli_flags, NULL);
 	qprintf("\n");
-	qprintf("size %d blkno 0x%llx len 0x%hx map size %d map 0x%x\n",
+	qprintf("size %d blkno 0x%llx len 0x%x map size %d map 0x%x\n",
 		blip->bli_format.blf_size, blip->bli_format.blf_blkno,
-		blip->bli_format.blf_len, blip->bli_format.blf_map_size,
+		(uint) blip->bli_format.blf_len, blip->bli_format.blf_map_size,
 		&(blip->bli_format.blf_data_map[0]));
 	qprintf("blf flags: ");
 	printflags((uint)blip->bli_format.blf_flags, blf_flags, NULL);
@@ -4041,8 +4041,6 @@ xfsidbg_xrangelocks(xfs_inode_t *ip)
 #endif /* NOTYET */
 
 #ifdef DEBUG
-int	rwentries = 64;
-
 /*
  * Print out the read/write trace buffer attached to the given inode.
  */
@@ -4051,16 +4049,24 @@ xfsidbg_xrwtrace(xfs_inode_t *ip)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
+#if 0
 	int		nentries;
 	int		skip_entries;
 	int		count;
-
+#endif
 	if (ip->i_rwtrace == NULL) {
 		qprintf("The inode trace buffer is not initialized\n");
 		return;
 	}
+	qprintf("i_rwtrace = 0x%x\n", ip->i_rwtrace);
+
+#if 0
 	nentries = ktrace_nentries(ip->i_rwtrace);
-	count = rwentries;
+	/*
+	 * for specifying the last N entries in idbg
+	 *
+	 * count = num_entries;
+	 */
 	if (count == -1) {
 		count = nentries;
 	}
@@ -4068,20 +4074,22 @@ xfsidbg_xrwtrace(xfs_inode_t *ip)
 		qprintf("Invalid count.  There are %d entries.\n", nentries);
 		return;
 	}
-
+#endif
 	ktep = ktrace_first(ip->i_rwtrace, &kts);
+#if 0
 	if (count != nentries) {
 		/*
 		 * Skip the total minus the number to look at minus one
 		 * for the entry returned by ktrace_first().
 		 */
-		skip_entries = nentries - count - 1;
+		skip_entries = count - nentries - 1;
 		ktep = ktrace_skip(ip->i_rwtrace, skip_entries, &kts);
 		if (ktep == NULL) {
 			qprintf("Skipped them all\n");
 			return;
 		}
 	}
+#endif
 	while (ktep != NULL) {
 		DELAY(1000);
 		if (xfs_rw_trace_entry(ktep))
