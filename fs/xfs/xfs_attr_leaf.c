@@ -72,6 +72,11 @@ STATIC void xfs_attr_leaf_moveents(xfs_attr_leafblock_t *src_leaf,
 					 xfs_attr_leafblock_t *dst_leaf,
 					 int dst_start, int move_count,
 					 xfs_mount_t *mp);
+/*
+ * External.
+ */
+void qsort (void* base, size_t nel, size_t width,
+		  int (*compar)(const void *, const void *));
 
 
 /*========================================================================
@@ -315,6 +320,8 @@ xfs_attr_shortform_to_leaf(xfs_trans_t *trans, xfs_da_args_t *iargs)
 		args.hashval = xfs_da_hashname((char *)sfe->nameval,
 					       sfe->namelen);
 		args.flags = (sfe->flags & XFS_ATTR_ROOT) ? ATTR_ROOT : 0;
+		error = xfs_attr_leaf_lookup_int(bp, &args); /* set a->index */
+		ASSERT(error == ENOATTR);
 		error = xfs_attr_leaf_add(trans, bp, &args);
 		ASSERT(error != ENOSPC);
 		if (error)
@@ -328,68 +335,152 @@ out:
 	return(error);
 }
 
+STATIC int
+xfs_attr_shortform_compare(const void *a, const void *b)
+{
+	xfs_attr_sf_sort_t *sa, *sb;
+
+	sa = (xfs_attr_sf_sort_t *)a;
+	sb = (xfs_attr_sf_sort_t *)b;
+	if (sa->hash < sb->hash) {
+		return(-1);
+	} else if (sa->hash > sb->hash) {
+		return(1);
+	} else {
+		return(sa->entno - sb->entno);
+	}
+}
+
 /*
- * Copy out entries for attr_list(), for shortform attribute lists.
+ * Copy out entries of shortform attribute lists for attr_list().
+ * Shortform atrtribute lists are not stored in hashval sorted order.
+ * If the output buffer is not large enough to hold them all, then we
+ * we have to calculate each entries' hashvalue and sort them before
+ * we can begin returning them to the user.
  */
 /*ARGSUSED*/
 int
-xfs_attr_shortform_list(xfs_inode_t *dp, attrlist_t *alist, int flags,
-				    attrlist_cursor_kern_t *cursor)
+xfs_attr_shortform_list(xfs_attr_list_context_t *context)
 {
+	attrlist_cursor_kern_t *cursor;
+	xfs_attr_sf_sort_t *sbuf, *sbp;
 	xfs_attr_shortform_t *sf;
 	xfs_attr_sf_entry_t *sfe;
-	int i;
+	xfs_inode_t *dp;
+	int sbsize, nsbuf, count, i;
 
+	ASSERT(context != NULL);
+	dp = context->dp;
+	ASSERT(dp != NULL);
+	ASSERT(dp->i_afp != NULL);
 	sf = (xfs_attr_shortform_t *)dp->i_afp->if_u1.if_data;
+	ASSERT(sf != NULL);
 	if (sf->hdr.count == 0)
 		return(0);
-	sfe = &sf->list[0];
-	if (cursor->initted == 0) {
-		cursor->initted = 1;
-		cursor->blkno = cursor->index = i = 0;
-	} else if ((cursor->blkno != 0) || (cursor->index >= sf->hdr.count)) {
-		cursor->initted = 1;
-		cursor->blkno = cursor->index = i = 0;
-	} else {		/* GROT: check this code */
-		for (i = 0; i < cursor->index-1; i++) {
+	cursor = context->cursor;
+	ASSERT(cursor != NULL);
+
+	xfs_attr_trace_l_c("sf start", context);
+
+	/*
+	 * If the buffer is large enough, do not bother with sorting.
+	 * Note the generous fudge factor of 16 overhead bytes per entry.
+	 */
+	if ((dp->i_afp->if_bytes + sf->hdr.count * 16) < context->bufsize) {
+		for (i = 0, sfe = &sf->list[0]; i < sf->hdr.count; i++) {
+			if (((context->flags & ATTR_ROOT) != 0) !=
+			    ((sfe->flags & XFS_ATTR_ROOT) != 0)) {
+				sfe = XFS_ATTR_SF_NEXTENTRY(sfe);
+				continue;
+			}
+			(void)xfs_attr_put_listent(context,
+						   (char *)sfe->nameval, 
+						   (int)sfe->namelen,
+						   (int)sfe->valuelen);
 			sfe = XFS_ATTR_SF_NEXTENTRY(sfe);
 		}
-		if (cursor->hashval != xfs_da_hashname((char *)sfe->nameval,
-						       sfe->namelen)) {
-			sfe = &sf->list[0];
-			for (i = 0; i < sf->hdr.count; i++) {
-				if (cursor->hashval == 
-					xfs_da_hashname((char *)sfe->nameval,
-							sfe->namelen)) {
-					break;
-				}
-				sfe = XFS_ATTR_SF_NEXTENTRY(sfe);
-			}
-			if (i == sf->hdr.count) {
-				sfe = &sf->list[0];
-				for (i = 0; i < cursor->index-1; i++) {
-					sfe = XFS_ATTR_SF_NEXTENTRY(sfe);
-				}
-			}
-		}
-		sfe = XFS_ATTR_SF_NEXTENTRY(sfe);
-		i++;
+		xfs_attr_trace_l_c("sf big-gulp", context);
+		return(0);
 	}
 
-	for (  ; i < sf->hdr.count; i++, cursor->index++) {
-		cursor->hashval = xfs_da_hashname((char *)sfe->nameval,
-						  sfe->namelen);
-		if (((flags & ATTR_ROOT) != 0) !=
-		    ((sfe->flags & XFS_ATTR_ROOT) != 0)) {
-			;
-		} else if (xfs_attr_put_listent(alist, (char *)sfe->nameval, 
-						(int)sfe->namelen,
-						(int)sfe->valuelen,
-						cursor)) {
-			return(0);
+	/*
+	 * It didn't all fit, so we have to sort everything on hashval.
+	 */
+	sbsize = sf->hdr.count * sizeof(*sbuf);
+	sbp = sbuf = kmem_alloc(sbsize, KM_SLEEP);
+
+	/*
+	 * Scan the attribute list for the rest of the entries, storing
+	 * the relevant info from only those that match into a buffer.
+	 */
+	nsbuf = 0;
+	for (i = 0, sfe = &sf->list[0]; i < sf->hdr.count; i++) {
+		if (((char *)sfe < (char *)sf) ||
+		    ((char *)sfe >= ((char *)sf + dp->i_afp->if_bytes)) ||
+		    (sfe->namelen >= MAXNAMELEN)) {
+			xfs_attr_trace_l_c("sf corrupted", context);
+			kmem_free(sbuf, sbsize);
+			return XFS_ERROR(EDIRCORRUPTED);
 		}
+		if (((context->flags & ATTR_ROOT) != 0) !=
+		    ((sfe->flags & XFS_ATTR_ROOT) != 0)) {
+			sfe = XFS_ATTR_SF_NEXTENTRY(sfe);
+			continue;
+		}
+		sbp->entno = i;
+		sbp->hash = xfs_da_hashname((char *)sfe->nameval, sfe->namelen);
+		sbp->name = (char *)sfe->nameval;
+		sbp->namelen = sfe->namelen;
+		sbp->valuelen = sfe->valuelen;
 		sfe = XFS_ATTR_SF_NEXTENTRY(sfe);
+		sbp++;
+		nsbuf++;
 	}
+
+	/*
+	 * Sort the entries on hash then entno.
+	 */
+	qsort(sbuf, nsbuf, sizeof(*sbuf), xfs_attr_shortform_compare);
+
+	/*
+	 * Re-find our place IN THE SORTED LIST.
+	 */
+	count = 0;
+	cursor->initted = 1;
+	cursor->blkno = 0;
+	for (sbp = sbuf, i = 0; i < nsbuf; i++, sbp++) {
+		if (sbp->hash == cursor->hashval) {
+			if (cursor->offset == count) {
+				break;
+			}
+			count++;
+		} else if (sbp->hash > cursor->hashval) {
+			break;
+		}
+	}
+	if (i == nsbuf) {
+		kmem_free(sbuf, sbsize);
+		xfs_attr_trace_l_c("blk end", context);
+		return(0);
+	}
+
+	/*
+	 * Loop putting entries into the user buffer.
+	 */
+	for ( ; i < nsbuf; i++, sbp++) {
+		if (cursor->hashval != sbp->hash) {
+			cursor->hashval = sbp->hash;
+			cursor->offset = 0;
+		}
+		if (xfs_attr_put_listent(context, sbp->name, sbp->namelen,
+						  sbp->valuelen)) {
+			break;
+		}
+		cursor->offset++;
+	}
+
+	kmem_free(sbuf, sbsize);
+	xfs_attr_trace_l_c("sf E-O-F", context);
 	return(0);
 }
 
@@ -757,6 +848,9 @@ xfs_attr_leaf_add_work(xfs_trans_t *trans, buf_t *bp, xfs_da_args_t *args,
 	}
 	xfs_trans_log_buf(trans, bp, XFS_DA_LOGRANGE(leaf, entry,
 							   sizeof(*entry)));
+	ASSERT((args->index == 0) || (entry->hashval >= (entry-1)->hashval));
+	ASSERT((args->index == hdr->count-1) ||
+	       (entry->hashval <= ((entry+1)->hashval)));
 
 	/*
 	 * Copy the attribute name and value into the new space.
@@ -1796,7 +1890,7 @@ xfs_attr_leaf_order(buf_t *leaf1_bp, buf_t *leaf2_bp)
 /*
  * Pick up the last hashvalue from a leaf block.
  */
-uint
+xfs_dahash_t
 xfs_attr_leaf_lasthash(buf_t *bp, int *count)
 {
 	xfs_attr_leafblock_t *leaf;
@@ -1862,9 +1956,9 @@ xfs_attr_leaf_newentsize(xfs_da_args_t *args, int blocksize, int *local)
  * Copy out attribute list entries for attr_list(), for leaf attribute lists.
  */
 int
-xfs_attr_leaf_list_int(buf_t *bp, attrlist_t *alist, int flags,
-			     attrlist_cursor_kern_t *cursor)
+xfs_attr_leaf_list_int(buf_t *bp, xfs_attr_list_context_t *context)
 {
+	attrlist_cursor_kern_t *cursor;
 	xfs_attr_leafblock_t *leaf;
 	xfs_attr_leaf_entry_t *entry;
 	xfs_attr_leaf_name_local_t *name_loc;
@@ -1873,40 +1967,72 @@ xfs_attr_leaf_list_int(buf_t *bp, attrlist_t *alist, int flags,
 
 	ASSERT(bp != NULL);
 	leaf = (xfs_attr_leafblock_t *)bp->b_un.b_addr;
-	ASSERT(leaf->hdr.info.magic == XFS_ATTR_LEAF_MAGIC);
-	if (cursor->index >= leaf->hdr.count)
-		cursor->index = 0;
+	cursor = context->cursor;
 	cursor->initted = 1;
-	entry = &leaf->entries[ cursor->index ];
+
+	xfs_attr_trace_l_cl("blk start", context, leaf);
+
+	/*
+	 * Re-find our place in the leaf block if this is a new syscall.
+	 */
+	if (context->resynch) {
+		entry = &leaf->entries[0];
+		for (i = 0; i < leaf->hdr.count; entry++, i++) {
+			if (entry->hashval == cursor->hashval) {
+				if (cursor->offset == context->dupcnt) {
+					context->dupcnt = 0;
+					break;	
+				}
+				context->dupcnt++;
+			} else if (entry->hashval > cursor->hashval) {
+				context->dupcnt = 0;
+				break;
+			}
+		}
+		if (i == leaf->hdr.count) {
+			xfs_attr_trace_l_c("not found", context);
+			return(0);
+		}
+	} else {
+		entry = &leaf->entries[0];
+		i = 0;
+	}
+	context->resynch = 0;
+
+	/*
+	 * We have found our place, start copying out the new attributes.
+	 */
 	retval = 0;
-	for (i = cursor->index; i < leaf->hdr.count; entry++, i++) {
-		if (entry->hashval < cursor->hashval)
-			continue;
+	for (  ; (i < leaf->hdr.count) && (retval == 0); entry++, i++) {
+		if (entry->hashval != cursor->hashval) {
+			cursor->hashval = entry->hashval;
+			cursor->offset = 0;
+		}
+
 		if (entry->flags & XFS_ATTR_INCOMPLETE)
 			continue;		/* skip incomplete entries */
-		cursor->hashval = entry->hashval;
-		cursor->index = i;
-/* GROT: check this changed-attr-list recovery code */
-		if (((flags & ATTR_ROOT) != 0) !=
+		if (((context->flags & ATTR_ROOT) != 0) !=
 		    ((entry->flags & XFS_ATTR_ROOT) != 0))
-			continue;
+			continue;		/* skip non-matching entries */
 
 		if (entry->flags & XFS_ATTR_LOCAL) {
 			name_loc = XFS_ATTR_LEAF_NAME_LOCAL(leaf, i);
-			retval = xfs_attr_put_listent(alist,
+			retval = xfs_attr_put_listent(context,
 					(char *)name_loc->nameval,
 					(int)name_loc->namelen, 
-					(int)name_loc->valuelen, cursor);
+					(int)name_loc->valuelen);
 		} else {
 			name_rmt = XFS_ATTR_LEAF_NAME_REMOTE(leaf, i);
-			retval = xfs_attr_put_listent(alist,
+			retval = xfs_attr_put_listent(context,
 					(char *)name_rmt->name,
 					(int)name_rmt->namelen, 
-					(int)name_rmt->valuelen, cursor);
+					(int)name_rmt->valuelen);
 		}
-		if (retval)
-			break;
+		if (retval == 0) {
+			cursor->offset++;
+		}
 	}
+	xfs_attr_trace_l_cl("blk end", context, leaf);
 	return(retval);
 }
 
@@ -1917,40 +2043,39 @@ xfs_attr_leaf_list_int(buf_t *bp, attrlist_t *alist, int flags,
 	 & ~(sizeof(u_int32_t)-1))
 
 /*
- * Format an attribute and copy it out the the user's buffer.
+ * Format an attribute and copy it out to the user's buffer.
+ * Take care to check values and protect against them changing later,
+ * we may be reading them directly out of a user buffer.
  */
 /*ARGSUSED*/
 int
-xfs_attr_put_listent(attrlist_t *alist, char *name, int namelen, int valuelen,
-				attrlist_cursor_kern_t *cursor)
+xfs_attr_put_listent(xfs_attr_list_context_t *context,
+		     char *name, int namelen, int valuelen)
 {
 	attrlist_ent_t *aep;
-	int firstused, arraytop;
+	int arraytop;
 
-	ASSERT(alist->al_count >= 0);
-	ASSERT(alist->al_count < (ATTR_MAX_VALUELEN/8));
-	if (alist->al_count == 0) {
-		firstused = alist->al_offset[ 0 ];
-	} else {
-		firstused = alist->al_offset[ alist->al_count-1 ];
-	}
-	ASSERT(firstused > sizeof(*alist));
-	ASSERT(firstused <= alist->al_offset[0]);
-	arraytop = sizeof(*alist) +
-		   (alist->al_count-1) * sizeof(alist->al_offset[0]);
-	ASSERT(arraytop > 0);
-	ASSERT(arraytop <= firstused);
-	firstused -= ATTR_ENTSIZE(namelen);
-	if (firstused <= arraytop) {
-		alist->al_more = 1;
+	ASSERT(context->count >= 0);
+	ASSERT(context->count < (ATTR_MAX_VALUELEN/8));
+	ASSERT(context->firstu >= sizeof(*context->alist));
+	ASSERT(context->firstu <= context->bufsize);
+
+	arraytop = sizeof(*context->alist) +
+			context->count * sizeof(context->alist->al_offset[0]);
+	context->firstu -= ATTR_ENTSIZE(namelen);
+	if (context->firstu < arraytop) {
+		xfs_attr_trace_l_c("buffer full", context);
+		context->alist->al_more = 1;
 		return(1);
 	}
-	ASSERT(firstused > 0);
-	aep = (attrlist_ent_t *)&(((char *)alist)[firstused]);
+
+	aep = (attrlist_ent_t *)&(((char *)context->alist)[ context->firstu ]);
 	aep->a_valuelen = valuelen;
 	bcopy(name, aep->a_name, namelen);
 	aep->a_name[ namelen ] = 0;
-	alist->al_offset[ alist->al_count++ ] = firstused;
+	context->alist->al_offset[ context->count++ ] = context->firstu;
+	context->alist->al_count = context->count;
+	xfs_attr_trace_l_c("add", context);
 	return(0);
 }
 
