@@ -215,7 +215,7 @@ int	xfs_attr_shortform_allfit(struct buf *bp, struct xfs_inode *dp);
  * Internal routines when dirsize == XFS_LBSIZE(mp).
  */
 int	xfs_attr_leaf_to_node(struct xfs_da_args *args);
-int	xfs_attr_leaf_to_shortform(buf_t *bp, struct xfs_da_args *args);
+int	xfs_attr_leaf_to_shortform(struct buf *bp, struct xfs_da_args *args);
 int	xfs_attr_leaf_clearflag(struct xfs_da_args *args);
 int	xfs_attr_leaf_setflag(struct xfs_da_args *args);
 int	xfs_attr_leaf_flipflags(xfs_da_args_t *args);
