@@ -1,4 +1,4 @@
-#ident "$Revision: 1.296 $"
+#ident "$Revision: 1.297 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -21,6 +21,7 @@
 #include <sys/prctl.h>
 #include <sys/cred.h>
 #include <sys/uuid.h>
+#include <sys/unistd.h>
 #include <sys/grio.h>
 #include <sys/pfdat.h>
 #include <sys/sysinfo.h>
@@ -266,6 +267,13 @@ xfs_allocstore(
 	off_t		offset,
 	size_t		len,
 	cred_t		*credp);
+
+STATIC int
+xfs_pathconf(
+	bhv_desc_t	*bdp,
+	int		cmd,
+	u_long		*valp,
+	struct cred 	*credp);
 
 STATIC int
 xfs_fcntl(
@@ -4458,6 +4466,26 @@ xfs_allocstore(
 	return error;
 }
 
+STATIC int
+xfs_pathconf(
+	bhv_desc_t	*bdp,
+	int		cmd,
+	u_long		*valp,
+	struct cred 	*credp)
+{
+	int error = 0;
+
+	switch (cmd) {
+	case _PC_FILESIZEBITS:
+		*valp = 64;
+		break;
+	default:
+		error = fs_pathconf(bdp, cmd, valp, credp);
+		break;
+	}
+	return error;
+}
+
 #ifdef DATAPIPE
 /*
  * xfs_fspe_dioinfo: called by file system pipe end.
@@ -5526,7 +5554,7 @@ vnodeops_t xfs_vnodeops = {
 	(vop_delmap_t)fs_noerr,
 	fs_poll,
 	(vop_dump_t)fs_nosys,
-	fs_pathconf,
+	xfs_pathconf,
 	xfs_allocstore,
 	xfs_fcntl,
 	xfs_reclaim,
