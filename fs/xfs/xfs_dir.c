@@ -814,8 +814,10 @@ xfs_dir_leaf_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fsblock_t blkno)
 	hdr = &leaf->hdr;
 	hdr->info.magic = XFS_DIR_LEAF_MAGIC;
 	hdr->firstused = XFS_LBSIZE(dp->i_mount);
+	if (hdr->firstused == 0)
+		hdr->firstused = XFS_LBSIZE(dp->i_mount) - 1;
 	hdr->freemap[0].base = sizeof(struct xfs_dir_leaf_hdr);
-	hdr->freemap[0].size = XFS_LBSIZE(dp->i_mount) - hdr->freemap[0].base;
+	hdr->freemap[0].size = hdr->firstused - hdr->freemap[0].base;
 
 	xfs_trans_log_buf(trans, bp, 0, XFS_LBSIZE(dp->i_mount) - 1);
 	return(bp);

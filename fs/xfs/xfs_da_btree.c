@@ -494,6 +494,8 @@ xfs_dir_leaf_compact(xfs_trans_t *trans, buf_t *bp)
 	hdr_d = &leaf_d->hdr;
 	hdr_d->info = hdr_s->info;	/* struct copy */
 	hdr_d->firstused = XFS_LBSIZE(mp);
+	if (hdr_d->firstused == 0)
+		hdr_d->firstused = XFS_LBSIZE(mp) - 1;
 	hdr_d->namebytes = 0;
 	hdr_d->count = 0;
 	hdr_d->holes = 0;
@@ -1355,6 +1357,8 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *bp, int index)
 				tmp = entry->nameidx;
 		}
 		hdr->firstused = tmp;
+		if (hdr->firstused == 0)
+			hdr->firstused = tmp - 1;
 	} else {
 		hdr->holes = 1;		/* mark as needing compaction */
 	}
@@ -1440,6 +1444,8 @@ xfs_dir_leaf_unbalance(struct xfs_dir_state *state,
 		tmp_hdr->info = save_hdr->info;	/* struct copy */
 		tmp_hdr->count = 0;
 		tmp_hdr->firstused = state->blocksize;
+		if (tmp_hdr->firstused == 0)
+			tmp_hdr->firstused = state->blocksize - 1;
 		tmp_hdr->namebytes = 0;
 		if ((drop_leaf->leaves[ 0 ].hashval <
 		     save_leaf->leaves[ 0 ].hashval) ||
@@ -2640,6 +2646,8 @@ xfsdir_leaf_check(struct xfsdir_context *con, xfs_fsblock_t blkno,
 	 */
 	bytes = 0;
 	lowest = XFS_LBSIZE(con->dp->i_mount);
+	if (lowest == 64*1024)
+		lowest = XFS_LBSIZE(con->dp->i_mount) - 1;
 	entry = &leaf->leaves[0];
 	if (leaf->hdr.count == 0)
 		BADNEWS1("zero entry count: leaf 0x%x\n", blkno);
