@@ -92,10 +92,8 @@ acl_ext_attr_to_xfs(acl_ea_header *src, size_t size, xfs_acl_t *dest)
 	 * acl_set_file(3) may request that we set default ACLs with
 	 * zero length -- defend (gracefully) against that here.
 	 */
-	if (!dest->acl_cnt) {
-		dest->acl_cnt = 0;
+	if (!dest->acl_cnt)
 		return 0;
-	}
 
         src_entry = (acl_ea_entry*) (src_acl + sizeof(acl_ea_header));
         dest_entry = &dest->acl_entry[0];
