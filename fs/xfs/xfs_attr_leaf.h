@@ -165,7 +165,7 @@ int xfs_attr_leaf_entsize_local_max(int bsize);
 	xfs_attr_leaf_entsize_local_max(bsize)
 #else
 #define XFS_ATTR_LEAF_ENTSIZE_LOCAL_MAX(bsize)	/* max local struct size */ \
-	((bsize) >> 1)
+	(((bsize) >> 1) + ((bsize) >> 2))
 #endif
 
 
