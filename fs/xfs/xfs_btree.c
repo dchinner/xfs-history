@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision$"
+#ident	"$Revision: 1.85 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -870,7 +870,7 @@ xfs_btree_reada_bufs(
 	ASSERT(agbno != NULLAGBLOCK);
 #ifndef SIM
 	d = XFS_AGB_TO_DADDR(mp, agno, agbno);
-    xfs_baread(mp->m_ddev_targp, d, mp->m_bsize * count);
+	xfs_baread(mp->m_ddev_targp, d, mp->m_bsize * count);
 #endif
 }
 

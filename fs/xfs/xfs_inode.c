@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.297 $"
+#ident "$Revision: 1.298 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -2892,11 +2892,6 @@ xfs_iflush_fork(
 			ASSERT(ifp->if_u1.if_data != NULL);
 			ASSERT(ifp->if_bytes <= XFS_IFORK_SIZE(ip, whichfork));
 			bcopy(ifp->if_u1.if_data, cp, ifp->if_bytes);
-#ifdef XFS_TRANS_DEBUG
-			first = cp - XFS_BUF_PTR(bp);
-			xfs_buf_item_flush_log_debug(bp, first,
-				(first + ifp->if_bytes - 1));
-#endif
 		}
 		if (whichfork == XFS_DATA_FORK) {
 			if (XFS_DIR_SHORTFORM_VALIDATE_ONDISK(mp, dip)) {
@@ -2915,15 +2910,6 @@ xfs_iflush_fork(
 			ASSERT(XFS_IFORK_NEXTENTS(ip, whichfork) > 0);
 			(void)xfs_iextents_copy(ip, (xfs_bmbt_rec_32_t *)cp,
 				whichfork);
-#ifdef XFS_TRANS_DEBUG
-			/*
-			 * Just give up and assume we wrote over the entire
-			 * fork.
-			 */
-			first = cp - XFS_BUF_PTR(bp);
-			xfs_buf_item_flush_log_debug(bp, first,
-				(first + XFS_IFORK_SIZE(ip, whichfork) - 1));
-#endif
 		}
 		break;
 
@@ -2937,15 +2923,6 @@ xfs_iflush_fork(
 			xfs_bmbt_to_bmdr(ifp->if_broot, ifp->if_broot_bytes,
 				(xfs_bmdr_block_t *)cp,
 				XFS_DFORK_SIZE_ARCH(dip, mp, whichfork, ARCH_CONVERT));
-#ifdef XFS_TRANS_DEBUG
-			/*
-			 * Just give up and assume we wrote over the entire
-			 * fork.
-			 */
-			first = cp - XFS_BUF_PTR(bp);
-			xfs_buf_item_flush_log_debug(bp, first,
-				(first + XFS_IFORK_SIZE(ip, whichfork) - 1));
-#endif
 		}
 		break;
 
@@ -2953,12 +2930,6 @@ xfs_iflush_fork(
 		if (iip->ili_format.ilf_fields & XFS_ILOG_DEV) {
 			ASSERT(whichfork == XFS_DATA_FORK);
 			INT_SET(dip->di_u.di_dev, ARCH_CONVERT, ip->i_df.if_u2.if_rdev);
-#ifdef XFS_TRANS_DEBUG
-			first = (char*)&(dip->di_u.di_dev) -
-				XFS_BUF_PTR(bp);
-			xfs_buf_item_flush_log_debug(bp, first,
-				(first + sizeof(dip->di_u.di_dev) - 1));
-#endif
 		}
 		break;
 		
@@ -2966,12 +2937,6 @@ xfs_iflush_fork(
 		if (iip->ili_format.ilf_fields & XFS_ILOG_UUID) {
 			ASSERT(whichfork == XFS_DATA_FORK);
 			dip->di_u.di_muuid = ip->i_df.if_u2.if_uuid;
-#ifdef XFS_TRANS_DEBUG
-			first = (char*)&(dip->di_u.di_muuid) -
-				XFS_BUF_PTR(bp);
-			xfs_buf_item_flush_log_debug(bp, first,
-				(first + sizeof(dip->di_u.di_muuid) - 1));
-#endif
 		}
 		break;
 
@@ -3377,11 +3342,6 @@ xfs_iflush_int(
 	 */
         xfs_xlate_dinode_core((xfs_caddr_t)&(dip->di_core), &(ip->i_d),
                 -1, ARCH_CONVERT);
-#ifdef XFS_TRANS_DEBUG
-	first = (char*)&(dip->di_core) - XFS_BUF_PTR(bp);
-	xfs_buf_item_flush_log_debug(bp, first,
-				     (first + sizeof(xfs_dinode_core_t) - 1));
-#endif
 
 	/*
 	 * If this is really an old format inode and the superblock version

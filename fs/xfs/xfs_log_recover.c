@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.181 $"
 
 #include <xfs_os_defs.h>
 
@@ -739,10 +739,10 @@ xlog_find_tail(xlog_t  *log,
 {
 	xlog_rec_header_t	*rhead;
 	xlog_op_header_t	*op_head;
-	xfs_buf_t			*bp;
+	xfs_buf_t		*bp;
 	int			error, i, found;
-	xfs_daddr_t			umount_data_blk;
-	xfs_daddr_t			after_umount_blk;
+	xfs_daddr_t		umount_data_blk;
+	xfs_daddr_t		after_umount_blk;
 #ifdef SIM
 	/* REFERENCED */
 #endif
@@ -1071,7 +1071,7 @@ xlog_clear_stale_blocks(
 	int			tail_distance;
 	int			max_distance;
 	int			distance;
-	xfs_buf_t			*bp;
+	xfs_buf_t		*bp;
 	int			error;
 
 	tail_cycle = CYCLE_LSN(tail_lsn, ARCH_NOCONVERT);
@@ -1276,7 +1276,7 @@ xlog_recover_add_to_trans(xlog_recover_t	*trans,
 {
 	xfs_inode_log_format_t	 *in_f;			/* any will do */
 	xlog_recover_item_t	 *item;
-	xfs_caddr_t			 ptr;
+	xfs_caddr_t		 ptr;
 
 	if (!len)
 		return 0;
@@ -1446,7 +1446,7 @@ xlog_recover_do_buffer_pass1(xlog_t			*log,
 	xfs_buf_cancel_t	*prevp;
 	xfs_buf_cancel_t	**bucket;
 	xfs_buf_log_format_v1_t	*obuf_f;
-	xfs_daddr_t			blkno;
+	xfs_daddr_t		blkno;
 	uint			len;
 	ushort			flags;
 
@@ -1542,7 +1542,7 @@ xlog_recover_do_buffer_pass2(xlog_t			*log,
 	xfs_buf_cancel_t	*prevp;
 	xfs_buf_cancel_t	**bucket;
 	xfs_buf_log_format_v1_t	*obuf_f;
-	xfs_daddr_t			blkno;
+	xfs_daddr_t		blkno;
 	ushort			flags;
 	uint			len;
 
@@ -1737,7 +1737,7 @@ xlog_recover_do_inode_buffer(xfs_mount_t		*mp,
 			return XFS_ERROR(EFSCORRUPTED);
 		}
 
-		buffer_nextp = (xfs_agino_t *)((char *)(XFS_BUF_PTR(bp)) +
+		buffer_nextp = (xfs_agino_t *)xfs_buf_offset(bp,
 					      next_unlinked_offset);
 		INT_SET(*buffer_nextp, ARCH_CONVERT, *logged_nextp);
 	}
@@ -1805,7 +1805,7 @@ xlog_recover_do_reg_buffer(xfs_mount_t		*mp,
 		}
 		if (!error)
 		    bcopy(item->ri_buf[i].i_addr,	           /* source */
-		      XFS_BUF_PTR(bp)+((uint)bit << XFS_BLI_SHIFT),  /* dest */
+		      xfs_buf_offset(bp, (uint)bit << XFS_BLI_SHIFT), /* dest */
 		      nbits<<XFS_BLI_SHIFT);			   /* length */
 		i++;
 		bit += nbits;
@@ -1827,7 +1827,7 @@ xlog_recover_do_dquot_buffer(
 	xfs_mount_t		*mp,
 	xlog_t			*log,
 	xlog_recover_item_t 	*item,
-	xfs_buf_t			*bp,
+	xfs_buf_t		*bp,
 	xfs_buf_log_format_t	*buf_f)
 {
 	uint type;
@@ -1889,10 +1889,10 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	xfs_buf_log_format_t	*buf_f;
 	xfs_buf_log_format_v1_t	*obuf_f;
 	xfs_mount_t	     	*mp;
-	xfs_buf_t		     	*bp;
+	xfs_buf_t	     	*bp;
 	int		     	error;
 	int		     	cancel;
-	xfs_daddr_t			blkno;
+	xfs_daddr_t		blkno;
 	int			len;
 	ushort			flags;
 
@@ -1939,7 +1939,12 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	}
 
 	mp = log->l_mp;
-	bp = xfs_buf_read(mp->m_ddev_targp, blkno, len, 0);
+	if (flags & XFS_BLI_INODE_BUF) {
+		bp = xfs_buf_read_flags(mp->m_ddev_targp, blkno, len,
+								XFS_BUF_LOCK);
+	} else {
+		bp = xfs_buf_read(mp->m_ddev_targp, blkno, len, 0);
+	}
 	if (XFS_BUF_ISERROR(bp)) {
 		xfs_ioerror_alert("xlog_recover_do..(read)", log->l_mp, 
 				  mp->m_dev, blkno);
@@ -1975,7 +1980,7 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	 * overlap with future reads of those inodes.
 	 */
 	error = 0;
-	if ((INT_GET(*((__uint16_t *)(XFS_BUF_PTR(bp))), ARCH_CONVERT) == XFS_DINODE_MAGIC) &&
+	if ((INT_GET(*((__uint16_t *)(xfs_buf_offset(bp, 0))), ARCH_CONVERT) == XFS_DINODE_MAGIC) &&
 	    (XFS_BUF_COUNT(bp) != MAX(log->l_mp->m_sb.sb_blocksize,
 							 XFS_INODE_CLUSTER_SIZE(log->l_mp)))) { 
 	  XFS_BUF_STALE(bp);
@@ -1998,13 +2003,13 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 {
 	xfs_inode_log_format_t	*in_f;
 	xfs_mount_t		*mp;
-	xfs_buf_t			*bp;
+	xfs_buf_t		*bp;
 	xfs_imap_t		imap;
 	xfs_dinode_t		*dip;
 	xfs_ino_t		ino;
 	int			len;
-	xfs_caddr_t			src;
-	xfs_caddr_t			dest;
+	xfs_caddr_t		src;
+	xfs_caddr_t		dest;
 	int			error;
 	int			attr_index;
 	uint			fields;
@@ -2035,7 +2040,8 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		imap.im_blkno = 0;
 		xfs_imap(log->l_mp, 0, ino, &imap, 0);
 	}
-	bp = xfs_buf_read(mp->m_ddev_targp, imap.im_blkno, imap.im_len, 0);
+	bp = xfs_buf_read_flags(mp->m_ddev_targp, imap.im_blkno, imap.im_len,
+								XFS_BUF_LOCK);
 	if (XFS_BUF_ISERROR(bp)) {
 		xfs_ioerror_alert("xlog_recover_do..(read)", mp, 
 				  mp->m_dev, imap.im_blkno);
@@ -2046,7 +2052,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	error = 0;
 	xfs_inobp_check(mp, bp);
 	ASSERT(in_f->ilf_fields & XFS_ILOG_CORE);
-	dip = (xfs_dinode_t *)(XFS_BUF_PTR(bp)+imap.im_boffset);
+	dip = (xfs_dinode_t *)xfs_buf_offset(bp, imap.im_boffset);
 
 	/*
 	 * Make sure the place we're flushing out to really looks
@@ -2111,8 +2117,10 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
+#ifndef __linux__
 	ASSERT((xfs_caddr_t)dip+item->ri_buf[1].i_len <=
 			XFS_BUF_PTR(bp)+XFS_BUF_COUNT(bp));
+#endif
         
         /* The core is in in-core format */
         xfs_xlate_dinode_core((xfs_caddr_t)&dip->di_core, 
@@ -2138,8 +2146,10 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	switch (fields & (XFS_ILOG_DFORK | XFS_ILOG_DEV | XFS_ILOG_UUID)) {
 	case XFS_ILOG_DDATA:
 	case XFS_ILOG_DEXT:
+#ifndef __linux__
 		ASSERT((xfs_caddr_t)&dip->di_u+len <=
 			XFS_BUF_PTR(bp)+XFS_BUF_COUNT(bp));
+#endif
 		bcopy(src, &dip->di_u, len);
 		break;
 
@@ -2187,7 +2197,9 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		case XFS_ILOG_ADATA:
 		case XFS_ILOG_AEXT:
 			dest = XFS_DFORK_APTR(dip);
+#ifndef __linux__
 			ASSERT(dest+len <= XFS_BUF_PTR(bp)+XFS_BUF_COUNT(bp));
+#endif
 			ASSERT(len <= XFS_DFORK_ASIZE(dip, mp));
 			bcopy(src, dest, len);
 			break;
@@ -2339,8 +2351,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 		return error;
 	}
 	ASSERT(bp);
-	ddq = (xfs_disk_dquot_t *) ((char *)XFS_BUF_PTR(bp) + 
-				    dq_f->qlf_boffset);
+	ddq = (xfs_disk_dquot_t *) xfs_buf_offset(bp, dq_f->qlf_boffset);
 	
 	/* 
 	 * At least the magic num portion should be on disk because this
@@ -2352,8 +2363,10 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 		xfs_buf_relse(bp);
 		return XFS_ERROR(EIO);
 	}
+#ifndef __linux__
 	ASSERT((xfs_caddr_t)ddq + item->ri_buf[1].i_len <=
 	       XFS_BUF_PTR(bp) + XFS_BUF_COUNT(bp));
+#endif
 
 	bcopy(recddq, ddq, item->ri_buf[1].i_len);
 

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.86 $"
+#ident	"$Revision: 1.87 $"
 
 #include <xfs_os_defs.h>
 #include <sys/sysmacros.h>
@@ -561,8 +561,7 @@ xfs_bulkstat(
 								   XFS_RANDOM_BULKSTAT_READ_CHUNK)) {
 							break;
 						}
-						clustidx = ((xfs_caddr_t)dip - 
-						          XFS_BUF_PTR(bp))/
+						clustidx = ip->i_boffset /
 						          mp->m_sb.sb_inodesize;
 					}
 				}
@@ -579,7 +578,7 @@ xfs_bulkstat(
 				ino = XFS_AGINO_TO_INO(mp, agno, agino);
 				bno = XFS_AGB_TO_DADDR(mp, agno, agbno);
 				if (flags & BULKSTAT_FG_QUICK) {
-					dip = (xfs_dinode_t *)(XFS_BUF_PTR(bp) + 
+					dip = (xfs_dinode_t *)xfs_buf_offset(bp, 
 					      (clustidx << mp->m_sb.sb_inodelog));
 
 					if (INT_GET(dip->di_core.di_magic, ARCH_CONVERT)

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.105 $"
+#ident "$Revision: 1.106 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -118,6 +118,7 @@ xfs_buf_item_size(
 	uint	nvecs;
 	int	next_bit;
 	int	last_bit;
+	xfs_buf_t	*bp;
 
 	ASSERT(atomic_read(&bip->bli_refcount) > 0);
 	if (bip->bli_flags & XFS_BLI_STALE) {
@@ -131,6 +132,7 @@ xfs_buf_item_size(
 		return 1;
 	}
 
+	bp = bip->bli_buf;
 	ASSERT(bip->bli_flags & XFS_BLI_LOGGED);
 	nvecs = 1;
 	last_bit = xfs_buf_item_next_bit(bip->bli_format.blf_data_map,
@@ -155,6 +157,11 @@ xfs_buf_item_size(
 		if (next_bit == -1) {
 			last_bit = -1;
 		} else if (next_bit != last_bit + 1) {
+			last_bit = next_bit;	
+			nvecs++;
+		} else if (xfs_buf_offset(bp, next_bit * XFS_BLI_CHUNK) !=
+			   (xfs_buf_offset(bp, last_bit * XFS_BLI_CHUNK) +
+			    XFS_BLI_CHUNK)) {
 			last_bit = next_bit;	
 			nvecs++;
 		} else {
@@ -263,6 +270,16 @@ xfs_buf_item_format(
 			first_bit = next_bit;
 			last_bit = next_bit;	
 			nbits = 1;
+		} else if (xfs_buf_offset(bp, next_bit * XFS_BLI_CHUNK) !=
+			   (xfs_buf_offset(bp, last_bit * XFS_BLI_CHUNK) +
+			    XFS_BLI_CHUNK)) {
+			buffer_offset = first_bit * XFS_BLI_CHUNK;
+			vecp->i_addr = xfs_buf_offset(bp, buffer_offset);
+			vecp->i_len = nbits * XFS_BLI_CHUNK;
+			nvecs++;
+			vecp++;
+			first_bit = next_bit;
+			last_bit = next_bit;
 		} else {
 			last_bit++;
 			nbits++;

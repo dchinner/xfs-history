@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.148 $"
+#ident	"$Revision: 1.149 $"
 
 #undef	DEBUG
 #undef	XFSDEBUG
@@ -2595,9 +2595,9 @@ xfs_inodebuf(xfs_buf_t *bp)
 	bdp = VFS_BHVHEAD(vfsp)->bh_first;
 	mp = XFS_BHVTOM(bdp);
 	n = XFS_BUF_COUNT(bp) >> mp->m_sb.sb_inodelog;
-	for (i = 0, di = (xfs_dinode_t *)XFS_BUF_PTR(bp);
-	     i < n;
-	     i++, di = (xfs_dinode_t *)((char *)di + mp->m_sb.sb_inodesize)) {
+	for (i = 0; i < n; i++) {
+		di = (xfs_dinode_t *)xfs_buf_offset(bp,
+					i * mp->m_sb.sb_inodesize);
 		xfs_prdinode(di, 0, ARCH_CONVERT);
 	}
 }

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.137 $"
+#ident	"$Revision: 1.138 $"
 
 #include <xfs_os_defs.h>
 #include <linux/stat.h>
@@ -335,7 +335,7 @@ xfs_ialloc_ag_alloc(
 				     args.agbno + (j * blks_per_cluster));
 		fbuf = xfs_trans_get_buf(tp, args.mp->m_ddev_targp, d,
 					 args.mp->m_bsize * blks_per_cluster,
-					 XFS_BUF_MAPPED | XFS_BUF_LOCK);
+					 XFS_BUF_LOCK);
 		ASSERT(fbuf);
 		ASSERT(!XFS_BUF_GETERROR(fbuf));		
 		/*

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.88 $"
+#ident "$Revision: 1.89 $"
 
 #include <xfs_os_defs.h>
 
@@ -116,8 +116,6 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 
 	if (flags == 0)
 		flags = XFS_BUF_LOCK | XFS_BUF_MAPPED;
-	else
-		flags |= XFS_BUF_MAPPED;
 
 	/*
 	 * Default to a normal get_buf() call if the tp is NULL.
@@ -354,8 +352,6 @@ xfs_trans_read_buf(
 	
 	if (flags == 0)
 		flags = XFS_BUF_LOCK | XFS_BUF_MAPPED;
-	else
-		flags |= XFS_BUF_MAPPED;
 
 	/*
 	 * Default to a normal get_buf() call if the tp is NULL.
