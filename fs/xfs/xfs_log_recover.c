@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.84 $"
+#ident	"$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2246,6 +2246,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	int			error;
 	int			attr_index;
 	uint			fields;
+	xfs_dinode_core_t	*dicp;
 
 	if (pass == XLOG_RECOVER_PASS1) {
 		return 0;
@@ -2285,6 +2286,52 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	ASSERT(in_f->ilf_fields & XFS_ILOG_CORE);
 	dip = (xfs_dinode_t *)(bp->b_un.b_addr+imap.im_boffset);
 
+	/*
+	 * Make sure the place we're flushing out to really looks
+	 * like an inode!
+	 */
+	if (dip->di_core.di_magic != XFS_DINODE_MAGIC) {
+		cmn_err(CE_PANIC,
+			"xfs_inode_recover: Bad inode pointer 0x%x",
+			dip);
+	}
+	dicp = (xfs_dinode_core_t*)(item->ri_buf[1].i_addr);
+	if (dicp->di_magic != XFS_DINODE_MAGIC) {
+		cmn_err(CE_PANIC,
+			"xfs_inode_recover: Bad inode record 0x%x",
+			item);
+	}
+	if ((dicp->di_mode & IFMT) == IFREG) {
+		if ((dicp->di_format != XFS_DINODE_FMT_EXTENTS) &&
+		    (dicp->di_format != XFS_DINODE_FMT_BTREE)) {
+			cmn_err(CE_PANIC,
+				"xfs_inode_recover: Bad reg inode 0x%x\n",
+				item);
+		}
+	} else if ((dicp->di_mode & IFMT) == IFDIR) {
+		if ((dicp->di_format != XFS_DINODE_FMT_EXTENTS) &&
+		    (dicp->di_format != XFS_DINODE_FMT_BTREE) &&
+		    (dicp->di_format != XFS_DINODE_FMT_LOCAL)) {
+			cmn_err(CE_PANIC,
+				"xfs_inode_recover: Bad dir inode 0x%x\n",
+				item);
+		}
+	}
+	if (dicp->di_nextents > dicp->di_nblocks) {
+		cmn_err(CE_PANIC,
+			"xfs_inode_recover: Bad inode nblocks 0x%x\n",
+			item);
+	}
+	if (dicp->di_forkoff > mp->m_sb.sb_inodesize) {
+		cmn_err(CE_PANIC,
+			"xfs_inode_recover: Bad inode forkoff 0x%x\n",
+			item);
+	}
+	if (item->ri_buf[1].i_len > sizeof(xfs_dinode_core_t)) {
+		cmn_err(CE_PANIC,
+			"xfs_inode_recover: Bad inode record length 0x%x",
+			item);
+	}
 
 	ASSERT((caddr_t)dip+item->ri_buf[1].i_len <= bp->b_dmaaddr+bp->b_bcount);
 	bcopy(item->ri_buf[1].i_addr, dip, item->ri_buf[1].i_len);
