@@ -1658,7 +1658,7 @@ xfs_da_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,
 		}
 		if (fsb == NULLFSBLOCK) {
 			*bpp = NULL;
-			return 0;
+			return XFS_ERROR(EDIRCORRUPTED);
 		}
 		ASSERT(map.br_startblock == fsb);
 		mappedbno = XFS_FSB_TO_DADDR(dp->i_mount, fsb);
