@@ -439,6 +439,75 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	return error;
 }
 
+
+/*
+ * xfs_mount_common
+ *
+ * Mount initialization code establishing various mount
+ * fields from the superblock associated with the given
+ * mount structure
+ */
+void
+xfs_mount_common(xfs_mount_t *mp, xfs_sb_t *sbp)
+{
+	int	i;
+
+	mp->m_agfrotor = mp->m_agirotor = 0;
+	mp->m_blkbit_log = sbp->sb_blocklog + XFS_NBBYLOG;
+	mp->m_blkbb_log = sbp->sb_blocklog - BBSHIFT;
+	mp->m_agno_log = xfs_highbit32(sbp->sb_agcount - 1) + 1;
+	mp->m_agino_log = sbp->sb_inopblog + sbp->sb_agblklog;
+	mp->m_litino = sbp->sb_inodesize -
+		((uint)sizeof(xfs_dinode_core_t) + (uint)sizeof(xfs_agino_t));
+	mp->m_blockmask = sbp->sb_blocksize - 1;
+	mp->m_blockwsize = sbp->sb_blocksize >> XFS_WORDLOG;
+	mp->m_blockwmask = mp->m_blockwsize - 1;
+
+	/*
+	 * Setup for attributes, in case they get created.
+	 * This value is for inodes getting attributes for the first time,
+	 * the per-inode value is for old attribute values.
+	 */
+	ASSERT(sbp->sb_inodesize >= 256 && sbp->sb_inodesize <= 2048);
+	switch (sbp->sb_inodesize) {
+	case 256:
+		mp->m_attroffset = XFS_LITINO(mp) - XFS_BMDR_SPACE_CALC(2);
+		break;
+	case 512:
+	case 1024:
+	case 2048:
+		mp->m_attroffset = XFS_BMDR_SPACE_CALC(12);
+		break;
+	default:
+		ASSERT(0);
+	}
+	ASSERT(mp->m_attroffset < XFS_LITINO(mp));
+
+	for (i = 0; i < 2; i++) {
+		mp->m_alloc_mxr[i] = XFS_BTREE_BLOCK_MAXRECS(sbp->sb_blocksize,
+			xfs_alloc, i == 0);
+		mp->m_alloc_mnr[i] = XFS_BTREE_BLOCK_MINRECS(sbp->sb_blocksize,
+			xfs_alloc, i == 0);
+	}
+	for (i = 0; i < 2; i++) {
+		mp->m_bmap_dmxr[i] = XFS_BTREE_BLOCK_MAXRECS(sbp->sb_blocksize,
+			xfs_bmbt, i == 0);
+		mp->m_bmap_dmnr[i] = XFS_BTREE_BLOCK_MINRECS(sbp->sb_blocksize,
+			xfs_bmbt, i == 0);
+	}
+	for (i = 0; i < 2; i++) {
+		mp->m_inobt_mxr[i] = XFS_BTREE_BLOCK_MAXRECS(sbp->sb_blocksize,
+			xfs_inobt, i == 0);
+		mp->m_inobt_mnr[i] = XFS_BTREE_BLOCK_MINRECS(sbp->sb_blocksize,
+			xfs_inobt, i == 0);
+	}
+
+	mp->m_bsize = XFS_FSB_TO_BB(mp, 1);
+	mp->m_ialloc_inos = (int)MAX(XFS_INODES_PER_CHUNK, sbp->sb_inopblock);
+	mp->m_ialloc_blks = mp->m_ialloc_inos >> sbp->sb_inopblog;
+}
+
+
 /*
  * xfs_mountfs_int
  *
@@ -478,16 +547,15 @@ xfs_mountfs_int(
 	dev_t 		dev, 
 	int             mfsi_flags)
 {
-	xfs_buf_t		*bp;
+	xfs_buf_t	*bp;
 	xfs_sb_t	*sbp = &(mp->m_sb);
 	int		error = 0;
-	int		i;
 	xfs_inode_t	*rip;
 	vnode_t		*rvp = 0;
 	int		readio_log;
 	int		writeio_log;
 	vmap_t		vmap;
-	xfs_daddr_t		d;
+	xfs_daddr_t	d;
 	extern dev_t	rootdev;		/* from sys/systm.h */
 	extern xfs_ioops_t xfs_iocore_xfs;	/* from xfs_iocore.c */
 	uint_t		status;
@@ -505,19 +573,10 @@ xfs_mountfs_int(
 			return (error);
 		}
 	}
-	mp->m_agfrotor = mp->m_agirotor = 0;
-	mp->m_blkbit_log = sbp->sb_blocklog + XFS_NBBYLOG;
-	mp->m_blkbb_log = sbp->sb_blocklog - BBSHIFT;
-	mp->m_agno_log = xfs_highbit32(sbp->sb_agcount - 1) + 1;
-	mp->m_agino_log = sbp->sb_inopblog + sbp->sb_agblklog;
-	mp->m_litino = sbp->sb_inodesize -
-		((uint)sizeof(xfs_dinode_core_t) + (uint)sizeof(xfs_agino_t));
-	mp->m_blockmask = sbp->sb_blocksize - 1;
-	mp->m_blockwsize = sbp->sb_blocksize >> XFS_WORDLOG;
-	mp->m_blockwmask = mp->m_blockwsize - 1;
+	xfs_mount_common(mp, sbp);
 
 	/*
-	 * Check is sb_agblocks is aligned at stripe boundary
+	 * Check if sb_agblocks is aligned at stripe boundary
 	 * If sb_agblocks is NOT aligned turn off m_dalign since
 	 * allocator alignment is within an ag, therefore ag has
 	 * to be aligned at stripe boundary.
@@ -607,53 +666,13 @@ xfs_mountfs_int(
 			mp->m_swidth = sbp->sb_width;
 	}
 
-
-	/*
-	 * Setup for attributes, in case they get created.
-	 * This value is for inodes getting attributes for the first time,
-	 * the per-inode value is for old attribute values.
-	 */
-	ASSERT(sbp->sb_inodesize >= 256 && sbp->sb_inodesize <= 2048);
-	switch (sbp->sb_inodesize) {
-	case 256:
-		mp->m_attroffset = XFS_LITINO(mp) - XFS_BMDR_SPACE_CALC(2);
-		break;
-	case 512:
-	case 1024:
-	case 2048:
-		mp->m_attroffset = XFS_BMDR_SPACE_CALC(12);
-		break;
-	default:
-		ASSERT(0);
-	}
-	ASSERT(mp->m_attroffset < XFS_LITINO(mp));
-
-	for (i = 0; i < 2; i++) {
-		mp->m_alloc_mxr[i] = XFS_BTREE_BLOCK_MAXRECS(sbp->sb_blocksize,
-			xfs_alloc, i == 0);
-		mp->m_alloc_mnr[i] = XFS_BTREE_BLOCK_MINRECS(sbp->sb_blocksize,
-			xfs_alloc, i == 0);
-	}
-	for (i = 0; i < 2; i++) {
-		mp->m_bmap_dmxr[i] = XFS_BTREE_BLOCK_MAXRECS(sbp->sb_blocksize,
-			xfs_bmbt, i == 0);
-		mp->m_bmap_dmnr[i] = XFS_BTREE_BLOCK_MINRECS(sbp->sb_blocksize,
-			xfs_bmbt, i == 0);
-	}
-	for (i = 0; i < 2; i++) {
-		mp->m_inobt_mxr[i] = XFS_BTREE_BLOCK_MAXRECS(sbp->sb_blocksize,
-			xfs_inobt, i == 0);
-		mp->m_inobt_mnr[i] = XFS_BTREE_BLOCK_MINRECS(sbp->sb_blocksize,
-			xfs_inobt, i == 0);
-	}
 	xfs_alloc_compute_maxlevels(mp);
 	xfs_bmap_compute_maxlevels(mp, XFS_DATA_FORK);
 	xfs_bmap_compute_maxlevels(mp, XFS_ATTR_FORK);
 	xfs_ialloc_compute_maxlevels(mp);
-	mp->m_bsize = XFS_FSB_TO_BB(mp, 1);
+
 	vfsp->vfs_bsize = (u_int)XFS_FSB_TO_B(mp, 1);
-	mp->m_ialloc_inos = (int)MAX(XFS_INODES_PER_CHUNK, sbp->sb_inopblock);
-	mp->m_ialloc_blks = mp->m_ialloc_inos >> sbp->sb_inopblog;
+
 	if (sbp->sb_imax_pct) {
 		/* Make sure the maximum inode count is a multiple of the
 		 * units we allocate inodes in.
@@ -673,8 +692,9 @@ xfs_mountfs_int(
 	 */
 #ifndef SIM
 	if ((mfsi_flags & XFS_MFSI_SECOND) == 0) {
+		uint	i;
 		xfs_uuid_mount(mp);	/* make sure it's really unique */
-		ret64 = uuid_hash64(&sbp->sb_uuid, (uint *)&i);
+		ret64 = uuid_hash64(&sbp->sb_uuid, &i);
 		bcopy(&ret64, &vfsp->vfs_fsid, sizeof(ret64));
 	}
 #endif
