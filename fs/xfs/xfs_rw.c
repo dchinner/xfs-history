@@ -1,4 +1,4 @@
-#ident "$Revision: 1.275 $"
+#ident "$Revision$"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -249,8 +249,8 @@ STATIC int
 xfs_dio_write_zero_rtarea(
 	xfs_inode_t	*ip,
 	struct buf	*bp,
-	xfs_fileoff_t	*off_fsb,
-	xfs_filblks_t	*cnt_fsb);
+	xfs_fileoff_t	offset_fsb,
+	xfs_filblks_t	count_fsb);
 #if defined(__sgi__)
 extern int
 grio_io_is_guaranteed(
@@ -2516,7 +2516,7 @@ xfs_zero_last_block(
 	 * Since if such a page is in memory it will be marked P_DONE
 	 * and may now be fully accessible, we need to zero any part of
 	 * it which is beyond the old file size.  We don't need to send
-	 * this out to disk, we're just iniitializing it to zeroes like
+	 * this out to disk, we're just initializing it to zeroes like
 	 * we would have done in xfs_strat_read() had the size been bigger.
 	 */
 	if ((mp->m_sb.sb_blocksize < NBPP) && ((i = poff(isize)) != 0)) {
@@ -2837,8 +2837,8 @@ xfs_zero_eof(
 		} else
 #endif
 		{	
-		bp_mapin(bp);
-		bzero(bp->b_un.b_addr, bp->b_bcount);
+			bp_mapin(bp);
+			bzero(bp->b_un.b_addr, bp->b_bcount);
 	        }
 		ASSERT(bp->b_vp);
 		buftrace("XFS ZERO EOF", bp);
@@ -7271,26 +7271,25 @@ xfs_inval_cached_pages(
 }
 
 /*
- * A user has written some portion of a realtime extent. We need to zero
+ * A user has written some portion of a realtime extent.  We need to zero
  * what remains, so the caller can mark the entire realtime extent as
- * written.
+ * written.  This is only used for filesystems that don't support unwritten
+ * extents.
  */
 STATIC int
 xfs_dio_write_zero_rtarea(
 	xfs_inode_t	*ip,
 	struct buf	*bp,
-	xfs_fileoff_t	*off_fsb,
-	xfs_filblks_t	*cnt_fsb)
+	xfs_fileoff_t	offset_fsb,
+	xfs_filblks_t	count_fsb)
 {
 	char		*buf;
 	long		bufsize, remain_count;
-	xfs_filblks_t	count_fsb = *cnt_fsb;
 	int		error;
 	xfs_mount_t	*mp;
 	struct bdevsw	*my_bdevsw;
 	xfs_bmbt_irec_t	imaps[XFS_BMAP_MAX_NMAP], *imapp;
 	buf_t		*nbp;
-	xfs_fileoff_t	offset_fsb = *off_fsb;
 	int		reccount, sbrtextsize;
 	xfs_fsblock_t	firstfsb;
 	xfs_fileoff_t	zero_offset_fsb, limit_offset_fsb;
@@ -7312,14 +7311,12 @@ xfs_dio_write_zero_rtarea(
 	orig_zero_offset_fsb = zero_offset_fsb;
 	zero_count_fsb = limit_offset_fsb - zero_offset_fsb;
 	reccount = 1;
-	xfs_ilock(ip, XFS_ILOCK_EXCL);
 
 	/* Discover the full realtime extent affected */
 
 	error = xfs_bmapi(NULL, ip, zero_offset_fsb, 
 			  zero_count_fsb, 0, &firstfsb, 0, imaps, 
 			  &reccount, 0);
-	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	imapp = &imaps[0];
 	if (error)
 		return error;
@@ -7374,11 +7371,7 @@ xfs_dio_write_zero_rtarea(
 	nbp->b_grio_private	= 0;	/* b_iopri */
  	putphysbuf( nbp );
 	kmem_free(buf, bufsize);
-	if (!error) {
-		*off_fsb = orig_zero_offset_fsb;
-		*cnt_fsb = zero_count_fsb;
-	}
-				
+
 	return error;
 }
 
@@ -7688,10 +7681,10 @@ xfs_dio_write(
 	caddr_t		base;
 	ssize_t		resid, count, totxfer;
 	off_t		offset, offset_this_req, bytes_this_req;
-	int		error, reccount, bmapi_flag;
+	int		error, reccount, bmapi_flag, ioexcl;
 	int		end_of_file, totresid, exist;
 	int		blk_algn, rt, numrtextents, sbrtextsize, iprtextsize;
-	int		committed, unwritten, using_quotas;
+	int		committed, unwritten, using_quotas, nounwritten;
 	xfs_fsize_t	new_size;
 	int		nres;
 
@@ -7703,29 +7696,26 @@ xfs_dio_write(
 	ip = XFS_IO_INODE(io);
 
 	base = bp->b_un.b_addr;
-	error = resid = totxfer = end_of_file = 0;
+	error = resid = totxfer = end_of_file = ioexcl = 0;
 	offset = BBTOOFF((off_t)bp->b_blkno);
-	rt = using_quotas = 0;
 	numrtextents = iprtextsize = sbrtextsize = 0;
 	totresid = count = bp->b_bcount;
 
 	/*
  	 * Determine if this file is using the realtime volume.
 	 */
-	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
-		rt = 1;
-		iprtextsize = sbrtextsize = mp->m_sb.sb_rextsize;
-		if (ip->i_d.di_extsize) {
-			iprtextsize = ip->i_d.di_extsize;
-		}
+	if ((rt = ip->i_d.di_flags & XFS_DIFLAG_REALTIME)) {
+		sbrtextsize = mp->m_sb.sb_rextsize;
+		iprtextsize =
+			ip->i_d.di_extsize ? ip->i_d.di_extsize : sbrtextsize;
 	}
-	if (XFS_IS_QUOTA_ON(mp)) {
-		using_quotas = 1;
+	if (using_quotas = XFS_IS_QUOTA_ON(mp)) {
 		if (XFS_NOT_DQATTACHED(mp, ip)) {
 			if (error = xfs_qm_dqattach(ip, 0)) 
 				goto error0;
 		}
 	}
+	nounwritten = XFS_SB_VERSION_HASEXTFLGBIT(&mp->m_sb) == 0;
 
 	/*
 	 * Process the request until:
@@ -7739,8 +7729,6 @@ xfs_dio_write(
 		count_fsb  = XFS_B_TO_FSB(mp, count);
 
 		tp = NULL;
-		exist = 1;
-		unwritten = 0;
 retry:
 		XFS_BMAP_INIT(&free_list, &firstfsb);
 
@@ -7774,12 +7762,8 @@ retry:
 		/*
 		 * Check if the file extents already exist
 		 */
-		if ((imapp->br_startblock == DELAYSTARTBLOCK) ||
-		    (imapp->br_startblock == HOLESTARTBLOCK)) {
-			exist = 0;
-		} else if (imapp->br_state == XFS_EXT_UNWRITTEN) {
-			unwritten = 1;
-		}
+		exist = imapp->br_startblock != DELAYSTARTBLOCK &&
+			imapp->br_startblock != HOLESTARTBLOCK;
 
 		reccount = 1;
 		count_fsb = imapp->br_blockcount;
@@ -7793,11 +7777,16 @@ retry:
 			if (rt) {
 				/*
 				 * Round up to even number of extents.
+				 * Need the worst case, aligning the start
+				 * offset down and the end offset up.
 				 */
-				numrtextents = 
-					(count_fsb + iprtextsize - 1)/
-						sbrtextsize;
+				xfs_fileoff_t	s, e;
 
+				s = offset_fsb / iprtextsize;
+				s *= iprtextsize;
+				e = roundup(offset_fsb + count_fsb,
+					    iprtextsize);
+				numrtextents = (e - s) / sbrtextsize;
 				datablocks = 0;
 			} else {
 				/*
@@ -7810,9 +7799,15 @@ retry:
 			/*
  			 * Setup transaction.
  			 */
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
+			if (rt && nounwritten && !ioexcl) {
+				xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+				xfs_ilock(ip, XFS_IOLOCK_EXCL);
+				ioexcl = 1;
+				goto retry;
+			}
 			tp = xfs_trans_alloc(mp, XFS_TRANS_DIOSTRAT);
 
-			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 			nres = XFS_DIOSTRAT_SPACE_RES(mp, datablocks);
 			error = xfs_trans_reserve(tp, nres,
 				   XFS_WRITE_LOG_RES(mp), numrtextents,
@@ -7834,20 +7829,17 @@ retry:
 			/* 
 			 * quota reservations
 			 */
-			if (using_quotas) {
-				if (xfs_trans_reserve_blkquota(tp, ip,
-							nres)) {
-					error = XFS_ERROR(EDQUOT);
-					xfs_trans_cancel(tp, 
-					     XFS_TRANS_RELEASE_LOG_RES);
-					xfs_iunlock(ip, XFS_ILOCK_EXCL);
-					break;
-				}
+			if (using_quotas &&
+			    xfs_trans_reserve_blkquota(tp, ip, nres)) {
+				error = XFS_ERROR(EDQUOT);
+				xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES);
+				xfs_iunlock(ip, XFS_ILOCK_EXCL);
+				break;
 			}
 			xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 			xfs_trans_ihold(tp, ip);
 
-			if (offset < ip->i_d.di_size)
+			if (offset < ip->i_d.di_size || rt)
 				bmapi_flag |= XFS_BMAPI_PREALLOC;
 
 			/*
@@ -7875,6 +7867,9 @@ retry:
 
 			xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES,
 				     NULL);
+		} else if (ioexcl) {
+			xfs_ilock_demote(ip, XFS_IOLOCK_EXCL);
+			ioexcl = 0;
 		}
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
@@ -7885,11 +7880,15 @@ retry:
 		 * to map the correct portion of the file.
                  */
                 if ((!error) && (reccount == 0)) {
+			if (ioexcl) {
+				xfs_ilock_demote(ip, XFS_IOLOCK_EXCL);
+				ioexcl = 0;
+			}
 			goto retry;
                 }
 
 		imapp = &imaps[0];
-		unwritten = !(imapp->br_state == XFS_EXT_NORM);
+		unwritten = imapp->br_state != XFS_EXT_NORM;
 
 		bytes_this_req = XFS_FSB_TO_B(mp, imapp->br_blockcount) -
 				BBTOB(blk_algn);
@@ -7930,6 +7929,25 @@ retry:
 		}
 
 		/*
+		 * For realtime extents in filesystems that don't support
+		 * unwritten extents we need to zero the part of the
+		 * extent we're not writing.  If unwritten extents are
+		 * supported the transaction after the write will leave
+		 * the unwritten piece of the extent marked as such.
+		 */
+		if (ioexcl) {
+			ASSERT(!unwritten);
+			offset_fsb = XFS_B_TO_FSBT(mp, offset_this_req);
+			count_fsb = XFS_B_TO_FSB(mp, bytes_this_req);
+			error = xfs_dio_write_zero_rtarea(ip, bp, offset_fsb,
+					count_fsb);
+			xfs_ilock_demote(ip, XFS_IOLOCK_EXCL);
+			ioexcl = 0;
+			if (error)
+				goto error0;
+		}
+
+		/*
  		 * Setup I/O request for this extent.
 		 */
 		CHECK_GRIO_TIMESTAMP(bp, 40);
@@ -7942,13 +7960,8 @@ retry:
 
 	     	nbp->b_error     = 0;
 		nbp->b_target    = bp->b_target;
-		if (rt) {
-	     		nbp->b_blkno = XFS_FSB_TO_BB(mp, imapp->br_startblock);
-		} else {
-	     		nbp->b_blkno =
-				XFS_FSB_TO_DADDR(mp, imapp->br_startblock) +
-				blk_algn;
-		}
+		nbp->b_blkno	 = XFS_FSB_TO_DB(ip, imapp->br_startblock) +
+				   blk_algn;
 		ASSERT(bytes_this_req);
 	     	nbp->b_bcount    = bytes_this_req;
 	     	nbp->b_un.b_addr = base;
@@ -7998,12 +8011,6 @@ retry:
 		if (unwritten) {
 			offset_fsb = XFS_B_TO_FSBT(mp, offset_this_req);
 			count_fsb = XFS_B_TO_FSB(mp, bytes_this_req);
-			if (rt && ((count_fsb % sbrtextsize) != 0)) {
-				error = xfs_dio_write_zero_rtarea(ip, bp,
-						&offset_fsb, &count_fsb);
-				if (error)
-					break;
-			}
 			/*
 			 * Set up the xfs_bmapi() call to change the 
 			 * extent from unwritten to written.
@@ -8092,6 +8099,8 @@ retry:
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
  error0:
+	if (ioexcl)
+		xfs_ilock_demote(ip, XFS_IOLOCK_EXCL);
 	return (error);
 
  error_on_bmapi_transaction:
@@ -8214,6 +8223,8 @@ xfs_diordwr(
 
 	vp = BHV_TO_VNODE(bdp);
 	mp = io->io_mount;
+	xfs_rw_enter_trace(rw & B_READ ? XFS_DIORD_ENTER : XFS_DIOWR_ENTER,
+		XFS_BHVTOI(bdp), uiop, ioflag);
 
 	/*
  	 * Check that the user buffer address is on a secondary cache

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.2 $"
+#ident "$Revision$"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -155,6 +155,8 @@ xfs_frlock2(
 {
 	xfs_inode_t	*ip;
 	int		dolock, error;
+	/* REFERENCED */
+	int		need_vn_chg = 0;
 
 	ASSERT(BHV_IS_XFS(bdp));
 
@@ -172,7 +174,7 @@ xfs_frlock2(
 		ismrlocked(&ip->i_iolock, MR_UPDATE));
 
 	error = fs_frlock2(bdp, cmd, flockp, flag, offset, vrwlock,
-			credp, ioflag);
+			credp, ioflag, 1, &need_vn_chg);
 	if (dolock)
 		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 	return error;

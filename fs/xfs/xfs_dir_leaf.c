@@ -1,4 +1,4 @@
-#ident "$Revision: 1.68 $"
+#ident "$Revision$"
 
 /*
  * xfs_dir_leaf.c
@@ -1949,7 +1949,10 @@ xfs_dir_leaf_getdents_int(xfs_dabuf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 	xfs_dir_leaf_name_t *namest;
 	int entno, want_entno, i, nextentno;
 	xfs_mount_t *mp;
-	xfs_dahash_t cookhash, lasthash;
+	xfs_dahash_t cookhash;
+#if (_MIPS_SIM == _ABIN32)
+	xfs_dahash_t lasthash;
+#endif
 	xfs_dir_put_args_t p;
 
 	mp = dp->i_mount;
@@ -1982,6 +1985,9 @@ xfs_dir_leaf_getdents_int(xfs_dabuf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 				 * run of equal-hashval entries.
 				 */
 				entno++;
+			} else if (want_entno > 0 && entno == want_entno && 
+				entry->hashval == cookhash) {
+				break;
 			} else {
 				entno = 0;
 				break;
@@ -2009,7 +2015,11 @@ xfs_dir_leaf_getdents_int(xfs_dabuf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 	/*
 	 * We're synchronized, start copying entries out to the user.
 	 */
-	for (lasthash = XFS_DA_MAXHASH;
+	for (
+#if (_MIPS_SIM == _ABIN32)
+		lasthash = XFS_DA_MAXHASH
+#endif
+	     ;
 	     entno >= 0 && i < leaf->hdr.count;
 	     entry++, i++, (entno = nextentno)) {
 		int lastresid, retval;
@@ -2073,18 +2083,31 @@ xfs_dir_leaf_getdents_int(xfs_dabuf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 		}
 
 		/*
-		 * Save the first cookie in a run of equal-hashval entries
-		 * so that we can back them out if they don't all fit.
+		 * Save off the cookie so we can fall back should the
+		 * 'put' into the outgoing buffer fails.  To handle a run
+		 * of equal-hashvals, the off_t structure on 64bit 
+		 * builds has entno built into the cookie to ID the
+		 * entry.  On 32bit builds, we only have space for the 
+		 * hashval so we can't ID specific entries within a group
+		 * of same hashval entries.   For this, lastoffset is set 
+		 * to the first in the run of equal hashvals so we don't 
+		 * include any entries unless we can include all entries
+		 * that share the same hashval.  Hopefully the buffer 
+		 * provided is big enough to handle it (see pv763517).
 		 */
+#if (_MIPS_SIM == _ABIN32)
 		if (entry->hashval != lasthash) {
+#endif
 			XFS_PUT_COOKIE(lastoffset, mp, bno, entno,
 				entry->hashval);
 			lastresid = uio->uio_resid;
+#if (_MIPS_SIM == _ABIN32)
 			lasthash = entry->hashval;
 		} else {
 			xfs_dir_trace_g_duc("leaf: DUP COOKIES, skipped",
 						   dp, uio, p.cook.o);
 		}
+#endif
 
 		/*
 		 * Put the current entry into the outgoing buffer.  If we fail

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.44 $"
+#ident "$Revision$"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -436,13 +436,12 @@ xfs_trans_next_ail(
 {
 	xfs_log_item_t	*nlip;
 
+	ASSERT(mp && lip && gen);
 	if (mp->m_ail_gen == *gen) {
 		nlip = xfs_ail_next(&(mp->m_ail), lip);
 	} else {
 		nlip = xfs_ail_min(&(mp->m_ail));
-		if (gen != NULL) {
-			*gen = (int)mp->m_ail_gen;
-		}
+		*gen = (int)mp->m_ail_gen;
 		if (restarts != NULL) {
 			XFSSTATS.xs_push_ail_restarts++;
 			(*restarts)++;

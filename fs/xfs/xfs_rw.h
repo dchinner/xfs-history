@@ -104,6 +104,8 @@ daddr_t xfs_fsb_to_db(struct xfs_inode *ip, xfs_fsblock_t fsb);
 #define	XFS_CTRUNC6		16     
 #define	XFS_BUNMAPI		17
 #define	XFS_INVAL_CACHED	18
+#define	XFS_DIORD_ENTER		19
+#define	XFS_DIOWR_ENTER		20
 
 #define	XFS_STRAT_ENTER		1
 #define	XFS_STRAT_FAST		2

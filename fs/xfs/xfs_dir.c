@@ -1,4 +1,4 @@
-#ident "$Revision: 1.108 $"
+#ident "$Revision$"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -212,12 +212,6 @@ STATIC int xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 #if defined(XFS_REPAIR_SIM) || !defined(SIM)
 STATIC int xfs_dir_node_replace(xfs_da_args_t *args);
 #endif /* XFS_REPAIR_SIM || !SIM */
-
-/*
- * Utility routines.
- */
-xfs_dahash_t xfs_dir_hashname(char *name_string, int name_length);
-uint xfs_dir_log2_roundup(uint i);
 
 #if defined(DEBUG) && !defined(SIM)
 ktrace_t *xfs_dir_trace_buf;

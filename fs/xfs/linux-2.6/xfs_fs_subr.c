@@ -216,7 +216,9 @@ fs_frlock2(
 	off_t offset,
 	vrwlock_t vrwlock,
 	cred_t *cr,
-	int ioflag)
+	int ioflag,
+	int want_vn_chg,
+	int *need_vn_chg)
 {
 	printk("XFS: fs_frlock2() NOT IMPLEMENTED\n");
 	return 0;
@@ -250,7 +252,9 @@ fs_tosspages(
 	off_t		last,
 	int		fiopt)
 {
+/***
 	printk("XFS: fs_tosspages() NOT IMPLEMENTED\n");
+***/
 }
 
 

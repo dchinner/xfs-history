@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.39 $"
+#ident	"$Revision$"
 
 /*
  * Inode allocation management for XFS.
@@ -649,7 +649,7 @@ xfs_inobt_delrec(
 	 * us, increment the cursor at that level.
 	 */
 	else if (level + 1 < cur->bc_nlevels &&
-		 (error = xfs_inobt_increment(cur, level + 1, &i)))
+		 (error = xfs_inobt_increment(cur, level + 1, &i))) {
 		return error;
 	}
 	/*

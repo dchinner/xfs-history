@@ -2074,7 +2074,7 @@ xfs_da_do_buf(
 	int		caller,
 	inst_t		*ra)
 {
-	buf_t		*bp;
+	buf_t		*bp = 0;
 	buf_t		**bplist;
 	int		error;
 	int		i;

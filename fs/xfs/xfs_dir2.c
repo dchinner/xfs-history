@@ -1,4 +1,4 @@
-#ident "$Revision: 1.3 $"
+#ident "$Revision$"
 
 /*
  * XFS v2 directory implmentation.

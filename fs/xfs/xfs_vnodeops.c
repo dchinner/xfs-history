@@ -1,4 +1,4 @@
-#ident "$Revision: 1.410 $"
+#ident "$Revision$"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -6341,9 +6341,12 @@ xfs_alloc_file_space(
 	/*
 	 * determine if this is a realtime file
 	 */
-        if (rt = (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0)
-                rtextsize = mp->m_sb.sb_rextsize;
-        else
+        if (rt = (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0) {
+		if (ip->i_d.di_extsize)
+			rtextsize = ip->i_d.di_extsize;
+		else
+			rtextsize = mp->m_sb.sb_rextsize;
+        } else
                 rtextsize = 0;
 
 	if (XFS_IS_QUOTA_ON(mp)) {
@@ -6354,14 +6357,13 @@ xfs_alloc_file_space(
 	}
 
 	if (len <= 0)
-		return error;
+		return XFS_ERROR(EINVAL);
 
 	count = len;
 	error = 0;
 	imapp = &imaps[0];
 	reccount = 1;
-	xfs_bmapi_flags = (alloc_type == 0) ? XFS_BMAPI_WRITE :
-				XFS_BMAPI_WRITE | XFS_BMAPI_PREALLOC;
+	xfs_bmapi_flags = XFS_BMAPI_WRITE | (alloc_type ? XFS_BMAPI_PREALLOC : 0);
 	startoffset_fsb	= XFS_B_TO_FSBT(mp, offset);
 	allocatesize_fsb = XFS_B_TO_FSB(mp, count);
 
@@ -6392,8 +6394,13 @@ retry:
 		 * the data or realtime partition.
 		 */
 		if (rt) {
-			numrtextents = (allocatesize_fsb + rtextsize - 1) /
-					rtextsize;
+			xfs_fileoff_t s, e;
+
+			s = startoffset_fsb / rtextsize;
+			s *= rtextsize;
+			e = roundup(startoffset_fsb + allocatesize_fsb,
+				rtextsize);
+			numrtextents = (e - s) / mp->m_sb.sb_rextsize;
 			datablocks = 0;
 		} else {
 			datablocks = allocatesize_fsb;
@@ -6511,7 +6518,7 @@ xfs_zero_remaining_bytes(
 {
 	buf_t			*bp;
 	int			error;
-	xfs_bmbt_irec_t		imap[1];
+	xfs_bmbt_irec_t		imap;
 	off_t			lastoffset;
 	xfs_mount_t		*mp;
 	int			nimap;
@@ -6533,30 +6540,29 @@ xfs_zero_remaining_bytes(
 	for (offset = startoff; offset <= endoff; offset = lastoffset + 1) {
 		offset_fsb = XFS_B_TO_FSBT(mp, offset);
 		nimap = 1;
-		error = xfs_bmapi(NULL, ip, offset_fsb, 1, 0, NULL, 0, imap,
+		error = xfs_bmapi(NULL, ip, offset_fsb, 1, 0, NULL, 0, &imap,
 			&nimap, NULL);
 		if (error || nimap < 1)
 			break;
-		ASSERT(imap[0].br_blockcount >= 1);
-		ASSERT(imap[0].br_startoff == offset_fsb);
-		lastoffset = XFS_FSB_TO_B(mp, imap[0].br_startoff + 1) - 1;
+		ASSERT(imap.br_blockcount >= 1);
+		ASSERT(imap.br_startoff == offset_fsb);
+		lastoffset = XFS_FSB_TO_B(mp, imap.br_startoff + 1) - 1;
 		if (lastoffset > endoff)
 			lastoffset = endoff;
-		if (imap[0].br_startblock == HOLESTARTBLOCK)
+		if (imap.br_startblock == HOLESTARTBLOCK)
 			continue;
-		ASSERT(imap[0].br_startblock != DELAYSTARTBLOCK);
+		ASSERT(imap.br_startblock != DELAYSTARTBLOCK);
+		if (imap.br_state == XFS_EXT_UNWRITTEN)
+			continue;
 		bp->b_flags &= ~(B_DONE | B_WRITE);
 		bp->b_flags |= B_READ;
-		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
-			bp->b_blkno = XFS_FSB_TO_BB(mp,imap[0].br_startblock);
-		else
-			bp->b_blkno = XFS_FSB_TO_DADDR(mp,imap[0].br_startblock);
+		bp->b_blkno = XFS_FSB_TO_DB(ip, imap.br_startblock);
 		bp_dcache_wbinval(bp);
 		xfsbdstrat(mp, bp); 
 		if (error = iowait(bp))
 			break;
 		bzero(bp->b_un.b_addr +
-		       (offset - XFS_FSB_TO_B(mp, imap[0].br_startoff)),
+			(offset - XFS_FSB_TO_B(mp, imap.br_startoff)),
 		      lastoffset - offset + 1);
 		bp->b_flags &= ~(B_DONE | B_READ);
 		bp->b_flags |= B_WRITE;
@@ -6589,19 +6595,21 @@ xfs_free_file_space(
 {
 	int			committed;
 	int			done;
-	xfs_fileoff_t		endoffset_fsb, endzero_fsb;
+	off_t			end_dmi_offset;
+	xfs_fileoff_t		endoffset_fsb;
 	int			error;
 	xfs_fsblock_t		firstfsb;
 	xfs_bmap_free_t		free_list;
 	off_t			ilen;
+	xfs_bmbt_irec_t		imap;
 	off_t			ioffset;
+	xfs_extlen_t		mod;
 	xfs_mount_t		*mp;
+	int			nimap;
 	uint			resblks;
 	int			rounding;
-	int			rtextsize;
-	int			rt;
-	xfs_fileoff_t		startoffset_fsb, startzero_fsb;
-	off_t			end_dmi_offset;
+	int			specrt;
+	xfs_fileoff_t		startoffset_fsb;
 	xfs_trans_t		*tp;
 
 	vn_trace_entry(XFS_ITOV(ip), "xfs_free_file_space",
@@ -6619,14 +6627,16 @@ xfs_free_file_space(
 	error = 0;
 	if (len <= 0)	/* if nothing being freed */
 		return error;
-
-	startoffset_fsb	= startzero_fsb = XFS_B_TO_FSB(mp, offset);
+	specrt =
+		(ip->i_d.di_flags & XFS_DIFLAG_REALTIME) &&
+		!XFS_SB_VERSION_HASEXTFLGBIT(&mp->m_sb);
+	startoffset_fsb	= XFS_B_TO_FSB(mp, offset);
 	end_dmi_offset = offset + len;
-	endoffset_fsb = endzero_fsb = XFS_B_TO_FSBT(mp, end_dmi_offset);
+	endoffset_fsb = XFS_B_TO_FSBT(mp, end_dmi_offset);
 
-	if ( offset < ip->i_d.di_size &&
-		(attr_flags&ATTR_DMI) == 0  &&
-		DM_EVENT_ENABLED(XFS_MTOVFS(mp), ip, DM_EVENT_WRITE)) {
+	if (offset < ip->i_d.di_size &&
+	    (attr_flags&ATTR_DMI) == 0  &&
+	    DM_EVENT_ENABLED(XFS_MTOVFS(mp), ip, DM_EVENT_WRITE)) {
 		if (end_dmi_offset > ip->i_d.di_size)
 			end_dmi_offset = ip->i_d.di_size;
 		error = xfs_dm_send_data_event(DM_EVENT_WRITE, XFS_ITOBHV(ip),
@@ -6637,25 +6647,46 @@ xfs_free_file_space(
 	}
 
 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
-	if (rt = ((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0)) {
-		rtextsize = mp->m_sb.sb_rextsize;
-	}
-	rounding = MAX((rt ? mp->m_sb.sb_rextsize : 1) << mp->m_sb.sb_blocklog,
-		       NBPP);
+	rounding = MAX(1 << mp->m_sb.sb_blocklog, NBPP);
 	ilen = len + (offset & (rounding - 1));
 	ioffset = offset & ~(rounding - 1);
 	if (ilen & (rounding - 1))
 		ilen = (ilen + rounding) & ~(rounding - 1);
 	xfs_inval_cached_pages(XFS_ITOV(ip), &(ip->i_iocore),
 				ioffset, ilen, NULL);
-	if (rt) {
-		startzero_fsb = startoffset_fsb + rtextsize;
-		endzero_fsb = endoffset_fsb < rtextsize ? 0 :
-				endoffset_fsb - rtextsize;
+	/*
+	 * Need to zero the stuff we're not freeing, on disk.
+	 * If its specrt (realtime & can't use unwritten extents) then
+	 * we actually need to zero the extent edges.  Otherwise xfs_bunmapi
+	 * will take care of it for us.
+	 */
+	if (specrt) {
+		nimap = 1;
+		error = xfs_bmapi(NULL, ip, startoffset_fsb, 1, 0, NULL, 0,
+			&imap, &nimap, NULL);
+		if (error)
+			return error;
+		ASSERT(nimap == 0 || nimap == 1);
+		if (nimap && imap.br_startblock != HOLESTARTBLOCK) {
+			ASSERT(imap.br_startblock != DELAYSTARTBLOCK);
+			mod = imap.br_startblock % mp->m_sb.sb_rextsize;
+			if (mod)
+				startoffset_fsb += mp->m_sb.sb_rextsize - mod;
+		}
+		nimap = 1;
+		error = xfs_bmapi(NULL, ip, endoffset_fsb - 1, 1, 0, NULL, 0,
+			&imap, &nimap, NULL);
+		if (error)
+			return error;
+		ASSERT(nimap == 0 || nimap == 1);
+		if (nimap && imap.br_startblock != HOLESTARTBLOCK) {
+			ASSERT(imap.br_startblock != DELAYSTARTBLOCK);
+			mod = (imap.br_startblock + 1) % mp->m_sb.sb_rextsize;
+			if (mod)
+				endoffset_fsb -= mod;
+		}
 	}
-	/* need to zero the stuff we're not freeing, on disk */
-	if ((done = endoffset_fsb <= startoffset_fsb) ||
-	    (endzero_fsb <= startzero_fsb))
+	if (done = endoffset_fsb <= startoffset_fsb)
 		/*
 		 * One contiguous piece to clear
 		 */
@@ -6664,13 +6695,13 @@ xfs_free_file_space(
 		/*
 		 * Some full blocks, possibly two pieces to clear
 		 */
-		if (offset < XFS_FSB_TO_B(mp, startzero_fsb))
+		if (offset < XFS_FSB_TO_B(mp, startoffset_fsb))
 			error = xfs_zero_remaining_bytes(ip, offset,
-				XFS_FSB_TO_B(mp, startzero_fsb) - 1);
-		if (!error && !done &&
-		    XFS_FSB_TO_B(mp, endzero_fsb) < offset + len)
+				XFS_FSB_TO_B(mp, startoffset_fsb) - 1);
+		if (!error &&
+		    XFS_FSB_TO_B(mp, endoffset_fsb) < offset + len)
 			error = xfs_zero_remaining_bytes(ip,
-				XFS_FSB_TO_B(mp, endzero_fsb),
+				XFS_FSB_TO_B(mp, endoffset_fsb),
 				offset + len - 1);
 	}
 
@@ -6722,8 +6753,7 @@ xfs_free_file_space(
 		XFS_BMAP_INIT(&free_list, &firstfsb);
 		error = xfs_bunmapi(tp, ip, startoffset_fsb, 
 				  endoffset_fsb - startoffset_fsb,
-				  XFS_BMAPI_METADATA, 2, &firstfsb, &free_list,
-				  &done);
+				  0, 2, &firstfsb, &free_list, &done);
 		if (error) {
 			goto error0;
 		}

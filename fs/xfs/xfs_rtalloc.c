@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.46 $"
+#ident	"$Revision$"
 
 /*
  * Free realtime space allocation for XFS.
@@ -510,7 +510,6 @@ xfs_rtallocate_extent_block(
 	xfs_rtblock_t	next;		/* next rtblock to try */
 	int		stat;		/* status from internal calls */
 
-	ASSERT(minlen % prod == 0 && maxlen % prod == 0);
 	/*
 	 * Loop over all the extents starting in this bitmap block, 
 	 * looking for one that's long enough.

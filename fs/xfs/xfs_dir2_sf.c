@@ -1,4 +1,4 @@
-#ident "$Revision: 1.2 $"
+#ident "$Revision$"
 
 /*
  * xfs_dir2_sf.c

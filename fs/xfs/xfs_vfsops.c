@@ -1380,6 +1380,7 @@ xfs_mountroot(
 	case ROOT_UNMOUNT:
 		mp = XFS_BHVTOM(bdp);
 		if (xfs_ibusy(mp)) {
+			bflush(mp->m_dev);
 			/*
 			 * There are still busy vnodes in the file system.
 			 * Flush what we can and then get out without
@@ -2182,7 +2183,11 @@ xfs_syncsub(
 	 * Sync out the log.  This ensures that the log is periodically
 	 * flushed even if there is not enough activity to fill it up.
 	 */
-	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
+	if (flags & SYNC_WAIT) {
+		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
+	} else {
+		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
+	}
 
 	XFS_MOUNT_ILOCK(mp);
 	ip = mp->m_inodes;
@@ -2716,6 +2721,18 @@ xfs_syncsub(
 		error = xfs_trans_commit(tp, 0, NULL);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	}
+
+	/*
+	 * When shutting down, we need to insure that the AIL is pushed
+	 * to disk or the filesystem can appear corrupt from the PROM.
+	 */
+	if ((flags & (SYNC_CLOSE|SYNC_WAIT)) == (SYNC_CLOSE|SYNC_WAIT)) {
+		bflush(mp->m_dev);
+		if (mp->m_rtdev != NODEV) {
+			bflush(mp->m_rtdev);
+		}
+	}
+
 	kmem_free(ipointer, sizeof(xfs_iptr_t));
 	return XFS_ERROR(last_error);
 }

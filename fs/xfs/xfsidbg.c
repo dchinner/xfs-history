@@ -1678,6 +1678,14 @@ xfs_rw_trace_entry(ktrace_entry_t *ktep)
 		qprintf("INVAL CACHED:\n");
 		xfs_inval_cached_trace_entry(ktep);
 		break;
+	case XFS_DIORD_ENTER:
+		qprintf("DIORD ENTER:\n");
+		xfs_rw_enter_trace_entry(ktep);
+		break;
+	case XFS_DIOWR_ENTER:
+		qprintf("DIOWR ENTER:\n");
+		xfs_rw_enter_trace_entry(ktep);
+		break;
 
 	default:
 		return 0;

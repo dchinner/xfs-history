@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.16 $"
+#ident	"$Revision: 1.17 $"
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
@@ -618,7 +618,7 @@ xfs_trans_unreserve_and_mod_dquots(
 					(xfs_qcnt_t)qtrx->qt_rtblk_res; 
 #ifdef _SHAREII
 				if (SHR_ACTIVE)
-					blkunres += (int)qtrx->qt_blk_res;
+					blkunres += (int)qtrx->qt_rtblk_res;
 #endif /* _SHAREII */
 			}
 #ifdef _SHAREII
