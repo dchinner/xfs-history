@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.173 $"
+#ident  "$Revision: 1.174 $"
 
 
 #include <limits.h>
@@ -1269,9 +1269,8 @@ devvptoxfs(
 	int		error;
 	xfs_sb_t	*fs;
 	vnode_t		*openvp;
-#if     !UNIKERNEL
 	bhv_desc_t	*vfs_bdp;
-#endif  /* !UNIKERNEL */
+
 	if (devvp->v_type != VBLK)
 		return XFS_ERROR(ENOTBLK);
 	openvp = devvp;
@@ -1281,7 +1280,6 @@ devvptoxfs(
 	dev = devvp->v_rdev;
 	VOP_RWLOCK(devvp, VRWLOCK_WRITE);
 
-#if     !UNIKERNEL
 	/*
 	 * Ask specfs to check for the SMOUNTED flag in the common snode.
 	 */
@@ -1312,7 +1310,6 @@ devvptoxfs(
 		fs = (xfs_sb_t *)bp->b_un.b_addr;
 		bcopy(&XFS_BHVTOM(vfs_bdp)->m_sb, fs, sizeof(*fs));
 	} else {
-#endif  /* !UNIKERNEL */
 		/*
 		 * If the buffer is already in core, it might be stale.
 		 * User might have been doing block reads, then mkfs.
@@ -1335,9 +1332,7 @@ devvptoxfs(
 			bp = NULL;
 		} else
 			fs = (xfs_sb_t *)bp->b_un.b_addr;
-#if     !UNIKERNEL
 	}
-#endif  /* !UNIKERNEL */
 	VOP_RWUNLOCK(devvp, VRWLOCK_WRITE);
 	*bpp = bp;
 	*fsp = fs;

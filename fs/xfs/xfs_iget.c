@@ -1,4 +1,4 @@
-#ident "$Revision: 1.82 $"
+#ident "$Revision: 1.83 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -232,7 +232,6 @@ again:
 		      ip->i_df.if_u2.if_rdev);
 	bhv_desc_init(&(ip->i_bhv_desc), ip, vp, &xfs_vnodeops);
 	vn_bhv_insert_initial(VN_BHV_HEAD(vp), &(ip->i_bhv_desc));
-	VN_CELL_SUPPORT(vp);
 
 	mrlock_init(&ip->i_lock, MRLOCK_DEFAULT, "xfsino", (long)vp->v_number);
 	mrlock_init(&ip->i_iolock, MRLOCK_DEFAULT, "xfsio", (long)vp->v_number);
