@@ -32,6 +32,7 @@
 
 #include <xfs.h>
 
+struct xfsstats xfsstats;
 
 /*
  * Test the sticky attribute of a directory.  We can unlink from a sticky
