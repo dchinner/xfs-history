@@ -17,7 +17,7 @@
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
 
-#ident	"$Revision: 1.152 $"
+#ident	"$Revision: 1.153 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -1881,7 +1881,7 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	  error = xfs_bwrite(mp, bp);
 	} else {
 		ASSERT(XFS_BUF_FSPRIVATE(bp, void *) == NULL ||
-		       XFS_BUF_FSPRIVATE(bp, xfs_mount *) == mp);
+		       XFS_BUF_FSPRIVATE(bp, xfs_mount_t *) == mp);
 		XFS_BUF_SET_FSPRIVATE(bp, mp);
 		XFS_BUF_SET_IODONE_FUNC(bp, xlog_recover_iodone);
 		xfs_bdwrite(mp, bp);
@@ -2108,7 +2108,7 @@ write_inode_buffer:
 	xfs_inobp_check(mp, bp);
 	if (ITEM_TYPE(item) == XFS_LI_INODE) {
 		ASSERT(XFS_BUF_FSPRIVATE(bp, void *) == NULL ||
-		       XFS_BUF_FSPRIVATE(bp, xfs_mount *) == mp);
+		       XFS_BUF_FSPRIVATE(bp, xfs_mount_t *) == mp);
 		XFS_BUF_SET_FSPRIVATE(bp, mp);
 		XFS_BUF_SET_IODONE_FUNC(bp, xlog_recover_iodone);
 		xfs_bdwrite(mp, bp);
@@ -2248,7 +2248,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 
 	ASSERT(dq_f->qlf_size == 2);
 	ASSERT(XFS_BUF_FSPRIVATE(bp, void *) == NULL ||
-	       XFS_BUF_FSPRIVATE(bp, xfs_mount *) == mp);
+	       XFS_BUF_FSPRIVATE(bp, xfs_mount_t *) == mp);
 	XFS_BUF_SET_FSPRIVATE(bp, mp);
 	XFS_BUF_SET_IODONE_FUNC(bp, xlog_recover_iodone);
 	xfs_bdwrite(mp, bp);

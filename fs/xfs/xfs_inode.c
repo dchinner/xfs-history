@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.264 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -420,8 +420,8 @@ xfs_itobp(
 		if (XFS_TEST_ERROR(!di_ok, mp, XFS_ERRTAG_ITOBP_INOTOBP,
 				 XFS_RANDOM_ITOBP_INOTOBP)) {
 #ifdef DEBUG
-			prdev("bad inode magic/vsn daddr 0x%x #%d", (int)dev,
-			      imap.im_blkno, i);
+			prdev("bad inode magic/vsn daddr 0x%x #%d",
+				mp->m_dev, imap.im_blkno, i);
 #endif
 			xfs_trans_brelse(tp, bp);
 			return XFS_ERROR(EFSCORRUPTED);

@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.192 $"
+#ident	"$Revision: 1.193 $"
 
 /*
  * High level interface routines for log manager
@@ -1022,11 +1022,7 @@ xlog_bdstrat_cb(struct xfs_buf *bp)
 
 	if ((iclog->ic_state & XLOG_STATE_IOERROR) == 0) {
 #if !defined(_USING_PAGEBUF_T)
-		struct bdevsw	*my_bdevsw;
-
-		my_bdevsw = bp->b_target->bdevsw;
-		ASSERT(my_bdevsw != NULL);
-		bdstrat(my_bdevsw, bp);
+		bdstrat(NULL, bp);
 #elif defined(_USING_PAGEBUF_T)
 		pagebuf_iostart(bp,0);
 #endif

@@ -42,6 +42,7 @@ typedef struct buf xfs_buf_t;
 #define XFS_B_ASYNC  B_ASYNC
 #define XFS_B_DELWRI B_DELWRI
 #define XFS_B_READ   B_READ
+#define XFS_B_WRITE   B_WRITE
 #define XFS_BUF_TRYLOCK	BUF_TRYLOCK
 #define XFS_INCORE_TRYLOCK	INCORE_TRYLOCK
 
@@ -272,6 +273,7 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define XFS_B_ASYNC  PBF_ASYNC
 #define XFS_B_DELWRI PBF_DELWRI
 #define XFS_B_READ   PBF_READ
+#define XFS_B_WRITE  PBF_WRITE
 #define XFS_B_STALE (1 << 31)
 #define XFS_BUF_TRYLOCK		PBF_TRYLOCK
 #define XFS_INCORE_TRYLOCK	PBF_TRYLOCK

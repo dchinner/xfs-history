@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.297 $"
+#ident "$Revision: 1.298 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -458,6 +458,7 @@ xfs_inval_cached_trace(
 #endif	/* XFS_RW_TRACE */
 
 #ifdef DEBUG
+#ifndef __linux__
 /* ARGSUSED */
 void
 debug_print_vnmaps(vnmap_t *vnmap, int numvnmaps, int vnmap_flags)
@@ -475,6 +476,7 @@ debug_print_vnmaps(vnmap_t *vnmap, int numvnmaps, int vnmap_flags)
 			vnmap->vnmap_ovoffset);
 	}
 }
+#endif /* __linux__ */
 #endif
 
 /*
@@ -6636,7 +6638,7 @@ xfs_bwrite(
 	 * XXXsup how does this work for quotas.
 	 */
 	ASSERT(bp->b_target);
-	ASSERT(bp->b_vp == #NULL);
+	ASSERT(bp->b_vp == NULL);
 	XFS_BUF_SET_BDSTRAT_FUNC(bp, xfs_bdstrat_cb);
 	XFS_BUF_SET_FSPRIVATE3(bp, mp);
 

@@ -611,7 +611,7 @@ xfs_bmap(bhv_desc_t	*bdp,
 
 /*	printk("ENTER xfs_bmap\n"); */
 	ip = XFS_BHVTOI(bdp);
-	ASSERT((ip->i_d.di_mode & FMT) == IFREG);
+	ASSERT((ip->i_d.di_mode & IFMT) == IFREG);
 	ASSERT(((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0) ==
 	       ((ip->i_iocore.io_flags & XFS_IOCORE_RT) != 0));
 	ASSERT((flags == XFS_B_READ) || (flags == XFS_B_WRITE));

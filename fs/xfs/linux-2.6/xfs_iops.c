@@ -531,8 +531,12 @@ int linvfs_readpage(struct file *filp, struct page *page)
 	VOP_BMAP(vp, page->offset, PAGE_SIZE, B_READ, pbmapp, &npbmaps, error);
 	VOP_RWUNLOCK(vp, VRWLOCK_READ);
 
-	if (error)
+	if (error) {
+		set_bit(PG_error, &page->flags);
+		clear_bit(PG_locked, &page->flags);
+		atomic_dec(&page->count);
 		return -EIO;
+	}
 
 	/*
 	 * While the page isn't done, move through the mappings either zero'ing
