@@ -1500,7 +1500,7 @@ xfs_attr_leaf_remove(buf_t *bp, xfs_da_args_t *args)
 	tmp  = sizeof(xfs_attr_leaf_hdr_t);
 	tmp += leaf->hdr.count * sizeof(xfs_attr_leaf_entry_t);
 	tmp += leaf->hdr.usedbytes;
-	return(tmp < (XFS_LBSIZE(mp)*37/100)); /* leaf is < 37% full */
+	return(tmp < mp->m_da_magicpct); /* leaf is < 37% full */
 }
 
 /*

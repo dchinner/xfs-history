@@ -1631,7 +1631,7 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *bp, int index)
 	tmp += leaf->hdr.count * sizeof(xfs_dir_leaf_entry_t);
 	tmp += leaf->hdr.count * (sizeof(xfs_dir_leaf_name_t) - 1);
 	tmp += leaf->hdr.namebytes;
-	if (tmp < (XFS_LBSIZE(mp)*37/100))
+	if (tmp < mp->m_da_magicpct)
 		return(1);			/* leaf is < 37% full */
 	return(0);
 }
