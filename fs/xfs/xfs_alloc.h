@@ -86,15 +86,15 @@ typedef struct xfs_alloc_arg {
 	char		userdata;	/* set if this is user data */
 } xfs_alloc_arg_t;
 
-
-#ifdef __KERNEL__
-
 /*
  * Defines for userdata
  */
-
 #define XFS_ALLOC_USERDATA		1	/* allocation is for user data*/
 #define XFS_ALLOC_INITIAL_USER_DATA	2	/* special case start of file */
+
+
+#ifdef __KERNEL__
+
 /*
  * Types for alloc tracing.
  */
