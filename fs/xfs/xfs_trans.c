@@ -622,8 +622,8 @@ xfs_trans_do_commit(xfs_trans_t	*tp,
 	xfs_trans_fill_vecs(tp, log_vector);
 	error = xfs_log_write(tp->t_mountp, log_vector, nvec, tp->t_ticket);
 	ASSERT(error == 0);
-	commit_lsn = log_vector[0].i_lsn;
-	xfs_log_done(tp->t_mountp, tp->t_ticket);
+	tp->t_lsn = log_vector[0].i_lsn;
+	commit_lsn = xfs_log_done(tp->t_mountp, tp->t_ticket);
 
 	kmem_free(log_vector, nvec * sizeof(xfs_log_iovec_t));
 
@@ -658,6 +658,10 @@ STATIC void
 xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
 /* ARGSUSED */
 {
+	xfs_log_iovec_t		*log_vector;
+	uint			nvec;
+	int			error;
+	static xfs_lsn_t	trans_lsn = 1;
 	/*
 	 * If there is nothing to be logged by the transaction,
 	 * then unlock all of the items associated with the
@@ -680,6 +684,34 @@ xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
 	}
 
 	/*
+	 * Ask each log item how many log_vector entries it will
+	 * need so we can figure out how many to allocate.
+	 */
+	nvec = xfs_trans_count_vecs(tp);
+	ASSERT(nvec > 1);
+
+	log_vector = (xfs_log_iovec_t *)kmem_alloc(nvec *
+						   sizeof(xfs_log_iovec_t),
+						   KM_SLEEP);
+
+	/*
+	 * Fill in the log_vector and pin the logged items, and
+	 * then write the transaction to the log.
+	 */
+	xfs_trans_fill_vecs(tp, log_vector);
+	error = xfs_log_write(tp->t_mountp, log_vector, nvec, tp->t_ticket);
+	ASSERT(error == 0);
+/*
+	tp->t_lsn = log_vector[0].i_lsn;
+*/
+	tp->t_lsn = trans_lsn++;
+/*
+	commit_lsn = xfs_log_done(tp->t_mountp, tp->t_ticket);
+*/
+
+	kmem_free(log_vector, nvec * sizeof(xfs_log_iovec_t));
+
+	/*
 	 * Instead of writing items into the log, just release
 	 * them delayed write. They'll be written out eventually. 
 	 */
@@ -694,9 +726,20 @@ xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
 	xfs_trans_unreserve_and_mod_sb(tp);
 
 	/*
+ 	 * Tell the LM to call the transaction completion routine
+	 * when the log write with LSN commit_lsn completes.
+	 * After this call we cannot reference tp, because the call
+	 * can happen at any time and tp can be freed.
+	xfs_log_notify((void(*)(void*))xfs_trans_committed, tp, commit_lsn);
+	 */
+	xfs_trans_committed(tp);
+
+#if 0
+	/*
 	 * Free the transaction structure now that it has been committed.
 	 */
 	xfs_trans_free(tp);
+#endif
 }
 #endif
 
@@ -728,6 +771,7 @@ xfs_trans_count_vecs(xfs_trans_t *tp)
 		lidp = xfs_trans_next_item(tp, lidp);
 	}
 
+	return nvecs;
 }
 
 /*
@@ -900,9 +944,8 @@ xfs_trans_chunk_committed(xfs_log_item_chunk_t	*licp,
 	int			s;
 
 	lidp = licp->lic_descs;
-	for (i = 0; i <= XFS_LIC_MAX_SLOT; i++) {
+	for (i = 0; i <= XFS_LIC_MAX_SLOT; i++, lidp++) {
 		if (XFS_LIC_ISFREE(licp, i)) {
-			lidp++;
 			continue;
 		}
 
