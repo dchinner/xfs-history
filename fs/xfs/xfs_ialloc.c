@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.108 $"
+#ident	"$Revision: 1.109 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -20,6 +20,7 @@
 #endif
 #include <sys/stat.h>
 #include <sys/errno.h>
+#include <sys/atomic_ops.h>
 #include <stddef.h>
 #include "xfs_macros.h"
 #include "xfs_types.h"
@@ -407,11 +408,11 @@ xfs_ialloc_ag_select(
 	 */
 	needspace = S_ISDIR(mode) || S_ISREG(mode) || S_ISLNK(mode);
 	mp = tp->t_mountp;
+	agcount = mp->m_sb.sb_agcount;
 	if (S_ISDIR(mode))
-		pagno = mp->m_agirotor;
+		pagno = atomicIncWithWrap((int *)&mp->m_agirotor, agcount);
 	else
 		pagno = XFS_INO_TO_AGNO(mp, parent);
-	agcount = mp->m_sb.sb_agcount;
 	ASSERT(pagno < agcount);
 	/*
 	 * Loop through allocation groups, looking for one with a little
@@ -461,10 +462,6 @@ xfs_ialloc_ag_select(
 					goto nextag;
 				}
 				mraccunlock(&mp->m_peraglock);
-				if (S_ISDIR(mode))
-					mp->m_agirotor =
-						(agno + 1 == agcount) ?
-						0 : (agno + 1);
 				return agbp;
 			}
 		}
