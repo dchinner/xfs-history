@@ -66,10 +66,10 @@ typedef struct xfs_agi
 	 * mapping data is needed here.
 	 */
 	xfs_agino_t	agi_count;	/* count of allocated inodes */
-	xfs_agino_t	agi_first;	/* first allocated inode */
-	xfs_agino_t	agi_last;	/* last allocated inode */
-	xfs_agino_t	agi_freelist;	/* first free inode */
+	xfs_agblock_t	agi_root;	/* root of inode btree */
+	__uint32_t	agi_level;	/* levels in inode btree */
 	xfs_agino_t	agi_freecount;	/* number of free inodes */
+	xfs_agino_t	agi_newino;	/* new inode just allocated */
 } xfs_agi_t;
 
 #define	XFS_AGI_MAGICNUM	0x00000001
@@ -77,10 +77,10 @@ typedef struct xfs_agi
 #define	XFS_AGI_SEQNO		0x00000004
 #define	XFS_AGI_LENGTH		0x00000008
 #define	XFS_AGI_COUNT		0x00000010
-#define	XFS_AGI_FIRST		0x00000020
-#define	XFS_AGI_LAST		0x00000040
-#define	XFS_AGI_FREELIST	0x00000080
-#define	XFS_AGI_FREECOUNT	0x00000100
+#define	XFS_AGI_ROOT		0x00000020
+#define	XFS_AGI_LEVEL		0x00000040
+#define	XFS_AGI_FREECOUNT	0x00000080
+#define	XFS_AGI_NEWINO		0x00000100
 #define	XFS_AGI_NUM_BITS	9
 #define	XFS_AGI_ALL_BITS	((1 << XFS_AGI_NUM_BITS) - 1)
 
