@@ -542,6 +542,8 @@ xfs_bmbt_delrec(
 	}
 	xfs_bmap_add_free(XFS_DADDR_TO_FSB(l->mp, l->rbp->b_blkno), 1,
 		cur->bc_private.b.flist, l->mp);
+	cur->bc_private.b.ip->i_d.di_nblocks--;
+	xfs_trans_log_inode(cur->bc_tp, cur->bc_private.b.ip, XFS_ILOG_CORE);
 	xfs_trans_binval(cur->bc_tp, l->rbp);
 	if (l->bp != l->lbp) {
 		cur->bc_bufs[level] = l->lbp;
@@ -886,10 +888,11 @@ xfs_bmbt_killroot(
 	bcopy((caddr_t)cpp, (caddr_t)pp, block->bb_numrecs * (int)sizeof(*pp));
 	xfs_bmap_add_free(XFS_DADDR_TO_FSB(cur->bc_mp, cbp->b_blkno), 1,
 		cur->bc_private.b.flist, cur->bc_mp);
+	ip->i_d.di_nblocks--;
 	xfs_trans_binval(cur->bc_tp, cbp);
 	cur->bc_bufs[level - 1] = NULL;
 	block->bb_level--;
-	xfs_trans_log_inode(cur->bc_tp, ip, XFS_ILOG_BROOT);
+	xfs_trans_log_inode(cur->bc_tp, ip, XFS_ILOG_CORE | XFS_ILOG_BROOT);
 	cur->bc_nlevels--;
 	xfs_bmbt_rcheck(cur);
 	xfs_bmbt_trace_cursor("xfs_bmbt_killroot exit3", cur);

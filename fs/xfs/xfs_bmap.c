@@ -1540,6 +1540,7 @@ xfs_bmap_btree_to_extents(
 	cblock = XFS_BUF_TO_BMBT_BLOCK(cbp);
 	ASSERT(cblock->bb_level == 0);
 	xfs_bmap_add_free(cbno, 1, cur->bc_private.b.flist, mp);
+	ip->i_d.di_nblocks--;
 	xfs_trans_binval(tp, cbp);
 	if (cur->bc_bufs[0] == cbp)
 		cur->bc_bufs[0] = NULL;
