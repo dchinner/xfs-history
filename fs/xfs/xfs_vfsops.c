@@ -489,8 +489,8 @@ void
 xfs_fill_buftarg(buftarg_t *btp, dev_t dev, vnode_t *vp)
 {
 	btp->dev    = dev;
-	btp->specvp = vp;
 #ifndef __linux__
+	btp->specvp = vp;
 	btp->bdevsw = get_bdevsw(dev);
 #endif
 }
@@ -571,6 +571,22 @@ xfs_cmountfs(
 	xfs_fill_buftarg(&mp->m_ddev_targ, ddev, NULL);
 	mp->m_ddev_targp = &mp->m_ddev_targ;
 	mp->m_rtdev = NODEV;
+
+	/* Values are in BBs */
+	if ((ap != NULL) && (ap->version >= 2) && 
+	    (ap->flags & XFSMNT_NOALIGN) != XFSMNT_NOALIGN) {
+		/*
+		 * At this point the superblock has not been read
+		 * in, therefore we do not know the block size.
+		 * Before, the mount call ends we will convert
+		 * these to FSBs.
+		 */
+		mp->m_dalign = ap->sunit;
+		mp->m_swidth = ap->swidth;
+	} else {
+		mp->m_dalign = 0;
+		mp->m_swidth = 0;
+	}
 #else
 	if (ddev != 0) {
 		vnode_t *openvp;

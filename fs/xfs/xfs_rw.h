@@ -73,12 +73,6 @@ daddr_t xfs_fsb_to_db(struct xfs_inode *ip, xfs_fsblock_t fsb);
 		 XFS_FSB_TO_BB((io)->io_mount, (fsb)) : \
 		 XFS_FSB_TO_DADDR((io)->io_mount, (fsb)))
 
-#define	xfs_bdwrite(mp, bp) \
-          { ((bp)->b_vp == NULL) ? (bp)->b_bdstrat = xfs_bdstrat_cb: 0; \
-		    (bp)->b_fsprivate3 = (mp); bdwrite(bp);}
-#define	xfs_bawrite(mp, bp) \
-	  { ((bp)->b_vp == NULL) ? (bp)->b_bdstrat = xfs_bdstrat_cb: 0; \
-		    (bp)->b_fsprivate3 = (mp); bawrite(bp);}
 /*
  * Defines for the trace mechanisms in xfs_rw.c.
  */
@@ -287,9 +281,6 @@ xfs_read_buf(
         int              len,
         uint             flags,
 	struct xfs_buf	 **bpp);
-
-int
-xfs_bdstrat_cb(struct xfs_buf *bp);
 
 void
 xfs_ioerror_alert(

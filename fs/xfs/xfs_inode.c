@@ -200,9 +200,9 @@ xfs_inobp_bwcheck(xfs_buf_t *bp)
 	xfs_dinode_t	*dip;
 
 	ASSERT(bp->b_bvtype == B_FS_INO);
-	ASSERT(bp->b_fsprivate3 != NULL);
+	ASSERT(XFS_BUF_FSPRIVATE3(bp, void *) != NULL);
 
-	mp = bp->b_fsprivate3;
+	mp = XFS_BUF_FSPRIVATE3(bp, xfs_mount_t *);
 
 	j = mp->m_inode_cluster_size >> mp->m_sb.sb_inodelog;
 	dip = (xfs_dinode_t *) bp->b_un.b_addr;
@@ -3135,7 +3135,7 @@ cluster_corrupt_out:
 		 * mark it as stale and brelse.
 		 */
 		if (XFS_BUF_IODONE_FUNC(bp)) {
-			bp->b_bdstrat = NULL;
+			XFS_BUF_CLR_BDSTRAT_FUNC(bp);
 			bp->b_target = NULL;
 			bp->b_flags &= ~(B_DONE);
 			bp->b_flags |= B_STALE|B_ERROR|B_XFS_SHUT;

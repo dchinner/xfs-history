@@ -1180,7 +1180,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	bp->b_target	   = &mp->m_logdev_targ;
 	bp->b_bufsize	   = log->l_iclog_size;
 	XFS_BUF_SET_IODONE_FUNC(bp, xlog_iodone);
-	bp->b_bdstrat	   = xlog_bdstrat_cb;
+	XFS_BUF_SET_BDSTRAT_FUNC(bp, xlog_bdstrat_cb);
 	XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)1);
 	ASSERT(log->l_xbuf->b_flags & B_BUSY);
 	ASSERT(valusema(&log->l_xbuf->b_lock) <= 0);
@@ -1224,7 +1224,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 		bp->b_target = &mp->m_logdev_targ;
 		bp->b_bufsize = log->l_iclog_size;
 		XFS_BUF_SET_IODONE_FUNC(bp, xlog_iodone);
-		bp->b_bdstrat = xlog_bdstrat_cb;
+		XFS_BUF_SET_BDSTRAT_FUNC(bp, xlog_bdstrat_cb);
 		XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)1);
 
 		iclog->ic_size = bp->b_bufsize - XLOG_HEADER_SIZE;
@@ -1425,7 +1425,6 @@ xlog_sync(xlog_t		*log,
 
 	ASSERT(bp->b_blkno <= log->l_logBBsize-1);
 	ASSERT(bp->b_blkno + BTOBB(count) <= log->l_logBBsize);
-	ASSERT(bp->b_bdstrat == xlog_bdstrat_cb);
 
 	xlog_verify_iclog(log, iclog, count, B_TRUE);
 
@@ -1451,7 +1450,6 @@ xlog_sync(xlog_t		*log,
 					    (__psint_t)count);
 		XFS_BUF_SET_FSPRIVATE(bp, iclog);
 		bp->b_flags |= (B_BUSY | B_ASYNC);
-		ASSERT(bp->b_bdstrat == xlog_bdstrat_cb);
 		dptr = bp->b_dmaaddr;
 		/*
 		 * Bump the cycle numbers at the start of each block

@@ -136,7 +136,7 @@ xfs_alloc_read_agfl(
 	xfs_mount_t	*mp,		/* mount point structure */
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_agnumber_t	agno,		/* allocation group number */
-	xfs_buf_t		**bpp);		/* buffer for the ag free block array */
+	xfs_buf_t	**bpp);		/* buffer for the ag free block array */
 
 #if defined(XFS_ALLOC_TRACE)
 /*

@@ -6540,8 +6540,8 @@ xfs_bwrite(
 	 */
 	ASSERT(bp->b_target);
 	ASSERT(bp->b_vp == NULL);
-	bp->b_bdstrat = xfs_bdstrat_cb;
-	bp->b_fsprivate3 = mp;
+	XFS_BUF_SET_BDSTRAT_FUNC(bp, xfs_bdstrat_cb);
+	XFS_BUF_SET_FSPRIVATE3(bp, mp);
 
 	if (error = bwrite(bp)) {
 		ASSERT(mp);
