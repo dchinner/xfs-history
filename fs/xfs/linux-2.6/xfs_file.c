@@ -39,13 +39,13 @@
 
 STATIC long long linvfs_file_lseek(
 	struct file *file,
-	long long offset,
+	loff_t offset,
 	int origin)
 {
 	struct inode *inode = file->f_dentry->d_inode;
 	vnode_t *vp;
 	struct vattr vattr;
-	long long old_off = offset;
+	loff_t old_off = offset;
 	int error;
 
 	vp = LINVFS_GET_VP(inode);

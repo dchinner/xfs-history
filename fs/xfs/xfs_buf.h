@@ -451,7 +451,7 @@ extern inline xfs_caddr_t xfs_buf_offset(page_buf_t *bp, off_t offset)
 #define XFS_BUF_ADDR(bp)	((bp)->pb_bn)
 #define XFS_BUF_OFFSET(bp)	((bp)->pb_file_offset >> 9)
 #define XFS_BUF_SET_ADDR(bp, blk)		\
-			((bp)->pb_bn = (__kernel_daddr_t)(blk))
+			((bp)->pb_bn = (page_buf_daddr_t)(blk))
 #define XFS_BUF_COUNT(bp)	((bp)->pb_count_desired)
 #define XFS_BUF_SET_COUNT(bp, cnt)		\
 			((bp)->pb_count_desired = cnt)
