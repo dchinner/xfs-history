@@ -11,15 +11,19 @@
 #define XLOG_NUM_ICLOGS		8
 #define XLOG_CALLBACK_SIZE	10
 #define XLOG_HEADER_MAGIC_NUM	0xFEEDbabe	/* need to outlaw as cycle XXX*/
-#define XLOG_RECORD_BSIZE	(4*1024)	/* eventually 32k */
-#define XLOG_RECORD_BSHIFT	12		/* 4096 == 1 << 12 */
+#define XLOG_RECORD_BSIZE	(32*1024)	/* eventually 32k */
+#define XLOG_RECORD_BSHIFT	15		/* 4096 == 1 << 12 */
+#define XLOG_BTOLRBB(b)		((b)+XLOG_RECORD_BSIZE-1 >> XLOG_RECORD_BSHIFT)
+
 #define XLOG_HEADER_SIZE	512
+#if 0
 #define XLOG_BBSHIFT		12
 #define XLOG_BBSIZE		(1<<XLOG_BBSHIFT)	/* 4096 */
 #define XLOG_BBMASK		(XLOG_BBSIZE-1)
 #define XLOGBB_TO_BB(x)		(((x) << XLOG_BBSHIFT) >> BBSHIFT)
 
 #define XLOG_NBLKS(size)	((size)+XLOG_BBSIZE-1 >> XLOG_BBSHIFT)
+#endif /* 0 */
 
 #define ASSIGN_LSN(lsn,log)	{ ((uint *)&(lsn))[0] = (log)->l_curr_cycle; \
 				  ((uint *)&(lsn))[1] = (log)->l_curr_block; }
@@ -30,6 +34,10 @@
 
 #define BLK_AVG(blk1, blk2)	((blk1+blk2) >> 1)
 
+#define GRANT_LOCK(l)		splockspl((l)->l_grant_lock, splhi)
+#define GRANT_UNLOCK(l, s)	spunlockspl((l)->l_grant_lock, s)
+#define LOG_LOCK(l)		splockspl((l)->l_icloglock, splhi)
+#define LOG_UNLOCK(l,s)		spunlockspl((l)->l_icloglock, s)
 
 #ifdef _KERNEL
 #define xlog_panic(s)		{cmn_err(CE_PANIC, s); }
@@ -79,18 +87,23 @@
  */
 #define XLOG_TIC_INITED		0x1	/* has been initialized */
 #define XLOG_TIC_PERM_RESERV	0x2	/* permanent reservation */
+#define XLOG_TIC_IN_Q		0x4
 
 #define XLOG_UNMOUNT_TYPE	0x556e	/* Un for Unmount */
 
 typedef void * xlog_tid_t;
 
 typedef struct xlog_ticket {
-	struct xlog_ticket *t_next;	/*			         : 4 */
-	xlog_tid_t	   t_tid;	/* transaction identifier	 : 4 */
-	uint		   t_curr_reserv;/* current reservation in bytes : 4 */
-	uint		   t_orig_reserv;/* original reservation in bytes: 4 */
+	sema_t		   t_sema;	 /* sleep on this semaphore	 :20 */
+	struct xlog_ticket *t_next;	 /*			         : 4 */
+	struct xlog_ticket *t_prev;	 /*				 : 4 */
+	xlog_tid_t	   t_tid;	 /* transaction identifier	 : 4 */
+	int		   t_curr_res;	 /* current reservation in bytes : 4 */
+	int		   t_unit_res;	 /* unit reservation in bytes    : 4 */
+	char		   t_ocnt;	 /* original count		 : 1 */
+	char		   t_cnt;	 /* current count		 : 1 */
 	char		   t_clientid;	 /* who does this belong to;	 : 1 */
-	char		   t_flags;	 /* 				 : 1 */
+	char		   t_flags;	 /* properties of reservation	 : 1 */
 } xlog_ticket_t;
 
 
@@ -107,9 +120,9 @@ typedef struct xlog_rec_header {
 	uint	  h_magicno;	/* log record (LR) identifier		:  4 */
 	uint	  h_cycle;	/* write cycle of log			:  4 */
 	int	  h_version;	/* LR version				:  4 */
+	int	  h_len;	/* len in bytes; should be 64-bit aligned: 4 */
 	xfs_lsn_t h_lsn;	/* lsn of this LR			:  8 */
 	xfs_lsn_t h_tail_lsn;	/* lsn of 1st LR w/ buffers not committed: 8 */
-	int	  h_len;	/* len in bytes; should be 64-bit aligned: 4 */
 	uint	  h_chksum;	/* may not be used; non-zero if used	:  4 */
 	int	  h_prev_block; /* block number to previous LR		:  4 */
 	int	  h_num_logops;	/* number of log operations in this LR	:  4 */
@@ -141,6 +154,7 @@ typedef struct xlog_in_core {
 	char			ic_data[XLOG_RECORD_BSIZE-XLOG_HEADER_SIZE];
 	sema_t			ic_forcesema;
 	struct xlog_in_core	*ic_next;
+	struct xlog_in_core	*ic_prev;
 	buf_t	  		*ic_bp;
 	struct log		*ic_log;
 	xfs_log_callback_t	*ic_callback;
@@ -149,30 +163,19 @@ typedef struct xlog_in_core {
 	int	  		ic_size;
 	int	  		ic_offset;
 	int	  		ic_refcnt;
+	int			ic_roundoff;
 	int			ic_bwritecnt;
 	uchar_t	  		ic_state;
 } xlog_in_core_t;
 
 #define ic_header	ic_h.hic_header
 
-typedef struct xlog_in_core_core {
-	sema_t			ic_forcesema;
-	struct xlog_in_core	*ic_next;
-	buf_t	  		*ic_bp;
-	struct log		*ic_log;
-	xfs_log_callback_t	*ic_callback;
-	xfs_log_callback_t	**ic_callback_tail;
-	int	  		ic_size;
-	int	  		ic_offset;
-	ktrace_t		*ic_trace;
-	int	  		ic_refcnt;
-	int			ic_bwritecnt;
-	uchar_t	  		ic_state;
-} xlog_in_core_core_t;
-
 
 /*
- *
+ * The reservation head lsn is not made up of a cycle number and block number.
+ * Instead, it uses a cycle number and byte number.  Logs don't expect to
+ * overflow 31 bits worth of byte offset, so using a byte number will mean
+ * that round off problems won't occur when releasing partial reservations.
  */
 struct xlog_recover_item;
 typedef struct log {
@@ -183,22 +186,32 @@ typedef struct log {
     lock_t		l_icloglock;    /* grab to change iclog state */
     xfs_lsn_t		l_tail_lsn;     /* lsn of 1st LR w/ unflush buffers */
     xfs_lsn_t		l_last_sync_lsn;/* lsn of last LR on disk */
-    xfs_lsn_t		l_reshead_lsn;	/* lsn of reservation head */
     xfs_mount_t		*l_mp;	        /* mount point */
     buf_t		*l_xbuf;        /* extra buffer for log wrapping */
     dev_t		l_dev;	        /* dev_t of log */
     int			l_logBBstart;   /* start block of log */
     int			l_logsize;      /* size of log in bytes */
     int			l_logBBsize;    /* size of log in 512 byte chunks */
+    int			l_roundoff;	/* round off error of all iclogs */
     int			l_curr_cycle;   /* Cycle number of log writes */
     int			l_prev_cycle;   /* Cycle # b4 last block increment */
     int			l_curr_block;   /* current logical block of log */
     int			l_prev_block;   /* previous logical block of log */
-    int			l_logreserved;  /* log space reserved */
     struct xlog_recover_item *l_recover_extq;       /* recover q for extents */
     struct xlog_recover_item *l_recover_iunlinkq; /* rec q 4 unlink inde */
     xlog_in_core_t	*l_iclog_bak[XLOG_NUM_ICLOGS];/* for debuggin */
     int			l_iclog_size;   /* size of log in bytes; repeat */
+
+    lock_t		l_grant_lock;		/* protects below fields */
+    xlog_ticket_t	*l_reserve_headq;	/* */
+    xlog_ticket_t	*l_write_headq;		/* */
+    int			l_grant_reserve_cycle;	/* */
+    int			l_grant_reserve_bytes;	/* */
+    int			l_grant_write_cycle;	/* */
+    int			l_grant_write_bytes;	/* */
+
+    ktrace_t		*l_trace;
+    ktrace_t		*l_grant_trace;
 } xlog_t;
 
 
@@ -215,6 +228,5 @@ extern void	xlog_bread(xlog_t *, daddr_t blkno, int bblks, buf_t *bp);
 #define XLOG_TRACE_REL_FLUSH   2
 #define XLOG_TRACE_SLEEP_FLUSH 3
 #define XLOG_TRACE_WAKE_FLUSH  4
-
 
 #endif	/* _XFS_LOG_PRIV_H */
