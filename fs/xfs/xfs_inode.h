@@ -98,6 +98,7 @@ typedef struct xfs_inode {
 	unsigned long		i_update_core;	/* timestamps are dirty */
 	unsigned long		i_gen;		/* generation count */
 	unsigned long		i_delayed_blks;	/* count of delay alloc blks */
+	int			i_queued_bufs;	/* count of xfsd queued bufs*/
 
 	/* File incore extent information. */
 	size_t			i_bytes; 	/* bytes in i_u1 */

@@ -35,6 +35,7 @@
 #include <sys/region.h>
 #include <sys/runq.h>
 #include <sys/schedctl.h>
+#include <sys/atomic_ops.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -95,6 +96,12 @@ zone_t		*xfs_bmap_zone;
  */
 zone_t		*xfs_strat_write_zone;
 
+STATIC void
+xfs_zero_last_block(
+	xfs_inode_t	*ip,
+	off_t		offset,
+	xfs_fsize_t	isize,
+	cred_t		*credp);
 
 STATIC void
 xfs_zero_bp(
@@ -172,11 +179,13 @@ xfs_next_bmap(
 	int		last_iosize,
 	xfs_fileoff_t	ioalign,
 	xfs_fileoff_t	last_offset,
-	xfs_fileoff_t	req_offset)
+	xfs_fileoff_t	req_offset,
+	xfs_fsize_t	isize)
 {
 	int		extra_blocks;
 	xfs_fileoff_t	size_diff;
 	xfs_fileoff_t	ext_offset;
+	xfs_fileoff_t	last_file_fsb;
 	xfs_fsblock_t	start_block;
 
 	/*
@@ -280,6 +289,21 @@ xfs_next_bmap(
 	    	bmapp->length -= extra_blocks;
 		ASSERT(bmapp->length > 0);
 	}
+
+	/*
+	 * If the iosize from our offset extends beyond the end
+	 * of the file, then trim down the length to match the
+	 * size of the file.  The extent may go beyond the end,
+	 * but all data beyond the EOF must be inaccessible.
+	 */
+	last_file_fsb = XFS_B_TO_FSB(mp, isize);
+	extra_blocks = bmapp->offset + bmapp->length - last_file_fsb;
+	if (extra_blocks > 0) {
+		bmapp->length -= extra_blocks;
+		ASSERT(bmapp->length > 0);
+	}
+	ASSERT((bmapp->offset + bmapp->length) <= last_file_fsb);
+
 	bmapp->bsize = XFS_FSB_TO_B(mp, bmapp->length);
 }
 
@@ -402,8 +426,8 @@ xfs_iomap_read(
 	xfs_fileoff_t	ioalign;
 	xfs_fileoff_t	last_offset;
 	xfs_fileoff_t	last_required_offset;
-	xfs_fileoff_t	last_fsb;
 	xfs_fileoff_t	next_offset;
+	xfs_fileoff_t	last_fsb;
 	xfs_fsize_t	nisize;
 	off_t		offset_page;
 	off_t		aligned_offset;
@@ -427,6 +451,7 @@ xfs_iomap_read(
 #define	XFS_READ_IMAPS	XFS_BMAP_MAX_NMAP
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE) != 0);
+	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE | MR_ACCESS) != 0);
 
 	mp = ip->i_mount;
 	nisize = ip->i_new_size;
@@ -519,7 +544,7 @@ xfs_iomap_read(
 	 * buffers.
 	 */
 	xfs_next_bmap(mp, imap, bmapp, iosize, iosize, ioalign,
-		      last_offset, offset_fsb);
+		      last_offset, offset_fsb, nisize);
 	ASSERT((bmapp->length > 0) &&
 	       (offset >= XFS_FSB_TO_B(mp, bmapp->offset)));
 	
@@ -540,6 +565,8 @@ xfs_iomap_read(
 	 * point where we need to initiate more read ahead or we didn't get
 	 * the whole request in the first bmap.
 	 */
+	last_fsb = XFS_B_TO_FSB(mp, nisize);
+	ASSERT((bmapp->offset + bmapp->length) <= last_fsb);
 	filled_bmaps = 1;
 	last_required_offset = bmapp[0].offset;
 	first_read_ahead_bmapp = NULL;
@@ -561,20 +588,31 @@ xfs_iomap_read(
 		while (next_bmapp <= last_bmapp) {
 			next_offset = curr_bmapp->offset +
 				      curr_bmapp->length;
+			if (next_offset >= last_fsb) {
+				/*
+				 * We've mapped all the way to the EOF.
+				 * Everything beyond there is inaccessible,
+				 * so get out now.
+				 */
+				break;
+			}
+
 			last_iosize = curr_bmapp->length;
 			if (next_offset <
 			    (curr_imapp->br_startoff +
 			     curr_imapp->br_blockcount)) {
 				xfs_next_bmap(mp, curr_imapp,
 					 next_bmapp, iosize, last_iosize, -1,
-					 curr_bmapp->offset, next_offset);
+					 curr_bmapp->offset, next_offset,
+					 nisize);
 			} else {
 				curr_imapp++;
 				if (curr_imapp <= last_imapp) {
 					xfs_next_bmap(mp,
 					    curr_imapp, next_bmapp,
 					    iosize, last_iosize, -1,
-					    curr_bmapp->offset, next_offset);
+					    curr_bmapp->offset, next_offset,
+					    nisize);	      
 				} else {
 					/*
 					 * We're out of imaps.  We
@@ -942,6 +980,7 @@ xfs_write_bmap(
 	int		extra_blocks;
 	xfs_fileoff_t	size_diff;
 	xfs_fileoff_t	ext_offset;
+	xfs_fileoff_t	last_file_fsb;
 	xfs_fsblock_t	start_block;
 	off_t		last_imap_byte;
 	
@@ -988,6 +1027,22 @@ xfs_write_bmap(
 		bmapp->length -= extra_blocks;
 		ASSERT(bmapp->length > 0);
 	}
+
+	/*
+	 * If the iosize from our offset extends beyond the last block
+	 * covered by isize, then trim down the length to match the
+	 * file size.  This counts on the given size being new_size
+	 * rather than the old size.
+	 */
+	last_file_fsb = XFS_B_TO_FSB(mp, isize);
+	extra_blocks = (int)((bmapp->offset + bmapp->length) - last_file_fsb);
+
+	if (extra_blocks > 0) {
+		bmapp->length -= extra_blocks;
+		ASSERT(bmapp->length > 0);
+	}
+	ASSERT((bmapp->offset + bmapp->length) <= last_file_fsb);
+
 	bmapp->bsize = XFS_FSB_TO_B(mp, bmapp->length);
 }
 
@@ -998,8 +1053,8 @@ xfs_write_bmap(
  * size is being increased without writing anything to that block
  * and we don't want anyone to read the garbage on the disk.
  */
-void
-xfs_zero_eof(
+STATIC void
+xfs_zero_last_block(
 	xfs_inode_t	*ip,
 	off_t		offset,
 	xfs_fsize_t	isize,
@@ -1072,9 +1127,126 @@ xfs_zero_eof(
 	zero_offset = isize_fsb_offset;
 	zero_len = mp->m_sb.sb_blocksize - isize_fsb_offset;
 	xfs_zero_bp(bp, zero_offset, zero_len);
-	bwrite(bp);
+	/*
+	 * We don't want to start a transaction here, so don't
+	 * push out a buffer over a delayed allocation extent.
+	 * Also, we can get away with it since the space isn't
+	 * allocated so it's faster anyway.
+	 */
+	if (imap.br_startblock == DELAYSTARTBLOCK) {
+		bdwrite(bp);
+	} else {
+		bwrite(bp);
+	}
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	return;
+}
+
+/*
+ * Zero any on disk space between the current EOF and the new,
+ * larger EOF.  This handles the normal case of zeroing the remainder
+ * of the last block in the file and the unusual case of zeroing blocks
+ * out beyond the size of the file.  This second case only happens
+ * with fixed size extents and when the system crashes before the inode
+ * size was updated but after blocks were allocated.
+ */
+void
+xfs_zero_eof(
+	xfs_inode_t	*ip,
+	off_t		offset,
+	xfs_fsize_t	isize,
+	cred_t		*credp)
+{
+	xfs_fileoff_t	start_zero_fsb;
+	xfs_fileoff_t	end_zero_fsb;
+	xfs_fileoff_t	zero_count_fsb;
+	xfs_fileoff_t	last_fsb;
+	xfs_extlen_t	buf_len_fsb;
+	xfs_mount_t	*mp;
+	buf_t		*bp;
+	int		nimaps;
+	xfs_bmbt_irec_t	imap;
+
+	ASSERT(ismrlocked(&(ip->i_lock), MR_UPDATE));
+	ASSERT(ismrlocked(&(ip->i_iolock), MR_UPDATE));
+
+	mp = ip->i_mount;
+
+	/*
+	 * First handle zeroing the block on which isize resides.
+	 * We only zero a part of that block so it is handled specially.
+	 */
+	xfs_zero_last_block(ip, offset, isize, credp);
+
+	/*
+	 * Calculate the range between the new size and the old
+	 * where blocks needing to be zeroed may exist.  To get the
+	 * block where the last byte in the file currently resides,
+	 * we need to subtrace one from the size and truncate back
+	 * to a block boundary.  We subtract 1 in case the size is
+	 * exactly on a block boundary.
+	 */
+	last_fsb = XFS_B_TO_FSBT(mp, isize - 1);
+	start_zero_fsb = XFS_B_TO_FSB(mp, isize);
+	end_zero_fsb = XFS_B_TO_FSBT(mp, offset - 1);
+	ASSERT(last_fsb < start_zero_fsb);
+	if (last_fsb == end_zero_fsb) {
+		/*
+		 * The size was only incremented on its last block.
+		 * We took care of that above, so just return.
+		 */
+		return;
+	}
+
+	ASSERT(start_zero_fsb <= end_zero_fsb);
+	while (start_zero_fsb <= end_zero_fsb) {
+		nimaps = 1;
+		zero_count_fsb = end_zero_fsb - start_zero_fsb + 1;
+		(void) xfs_bmapi(NULL, ip, start_zero_fsb, zero_count_fsb,
+				 0, NULLFSBLOCK, 0, &imap, &nimaps, NULL);
+		ASSERT(nimaps > 0);
+		ASSERT(imap.br_startblock != DELAYSTARTBLOCK);
+
+		if (imap.br_startblock == HOLESTARTBLOCK) {
+			start_zero_fsb = imap.br_startoff +
+				         imap.br_blockcount;
+			ASSERT(start_zero_fsb <= (end_zero_fsb + 1));
+			continue;
+		}
+
+		/*
+		 * Drop the inode lock while we're doing the I/O.
+		 * We'll still have the iolock to protect us.
+		 */
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+
+		/*
+		 * There are real blocks in the range requested.
+		 * Zero them a single write at a time.  We actually
+		 * don't zero the entire range returned if it is
+		 * too big and simply loop around to get the rest.
+		 * That is not the most efficient thing to do, but it
+		 * is simple and this path should not be exercised often.
+		 */
+		buf_len_fsb = XFS_EXTLEN_MIN(imap.br_blockcount,
+					      mp->m_writeio_blocks);
+		bp = ngetrbuf(XFS_FSB_TO_B(mp, buf_len_fsb));
+		bzero(bp->b_un.b_addr, bp->b_bcount);
+		bp->b_blkno = XFS_FSB_TO_DADDR(mp, imap.br_startblock);
+		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
+			bp->b_edev = mp->m_rtdev;
+		} else {
+			bp->b_edev = mp->m_dev;
+		}
+		bp->b_flags |= B_HOLD;
+		bwrite(bp);
+		nfreerbuf(bp);
+
+		start_zero_fsb = imap.br_startoff + buf_len_fsb;
+		ASSERT(start_zero_fsb <= (end_zero_fsb + 1));
+
+		xfs_ilock(ip, XFS_ILOCK_EXCL);
+	}
 }
 
 STATIC int
@@ -1090,6 +1262,7 @@ xfs_iomap_write(
 	xfs_fileoff_t	next_offset_fsb;
 	xfs_fileoff_t	last_fsb;
 	xfs_fileoff_t	bmap_end_fsb;
+	xfs_fileoff_t	last_file_fsb;
 	off_t		next_offset;
 	off_t		aligned_offset;
 	xfs_fsize_t	isize;
@@ -1111,7 +1284,11 @@ xfs_iomap_write(
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE) != 0);
 
 	mp = ip->i_mount;
-	isize = ip->i_d.di_size;
+	if (ip->i_new_size > ip->i_d.di_size) {
+		isize = ip->i_new_size;
+	} else {
+		isize = ip->i_d.di_size;
+	}
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	nimaps = XFS_WRITE_IMAPS;
 	imap = (xfs_bmbt_irec_t *)kmem_zone_alloc(xfs_irec_zone, KM_SLEEP);
@@ -1142,16 +1319,11 @@ xfs_iomap_write(
 	       (offset >= XFS_FSB_TO_B(mp, bmapp->offset)));
 
 	/*
-	 * A bmap is the EOF bmap when it reaches to or beyond the current
-	 * inode size AND it encompasses the last block allocated to the
-	 * file.  Beyond the inode size is not good enough, because we
-	 * could be writing more in this very request beyond what we
-	 * are willing to describe in a single bmap.
+	 * A bmap is the EOF bmap when it reaches to or beyond the new
+	 * inode size.
 	 */
 	bmap_end_fsb = bmapp->offset + bmapp->length;
-	if ((nimaps == 1) &&
-	    (bmap_end_fsb >= imap[0].br_startoff + imap[0].br_blockcount) &&
-	    (XFS_FSB_TO_B(mp, bmap_end_fsb) >= isize)) {
+	if ((nimaps == 1) && (XFS_FSB_TO_B(mp, bmap_end_fsb) >= isize)) {
 		bmapp->eof |= BMAP_EOF;
 	}
 	bmapp->pboff = offset - XFS_FSB_TO_B(mp, bmapp->offset);
@@ -1169,8 +1341,12 @@ xfs_iomap_write(
 	/*
 	 * Map more buffers if the first does not map the entire
 	 * request.  We do this until we run out of bmaps, imaps,
-	 * or bytes to write.
+	 * or bytes to write.  We also stop if the mappings go beyond
+	 * the end of the file.  There may be more blocks beyond the
+	 * EOF for which we have imaps, but they are inaccessible.
 	 */
+	last_file_fsb = XFS_B_TO_FSB(mp, isize);
+	ASSERT((bmapp->offset + bmapp->length) <= last_file_fsb);
 	filled_bmaps = 1;
 	if ((*nbmaps > 1) &&
 	    ((nimaps > 1) || (bmapp->offset + bmapp->length <
@@ -1191,6 +1367,16 @@ xfs_iomap_write(
 		while (next_bmapp <= last_bmapp) {
 			next_offset_fsb = curr_bmapp->offset +
 					  curr_bmapp->length;
+			ASSERT(next_offset_fsb <= last_file_fsb);
+			if (next_offset_fsb == last_file_fsb) {
+				/*
+				 * Anything left is beyond the EOF
+				 * and therefore inaccessible, so
+				 * get out now.
+				 */
+				break;
+			}
+
 			if (next_offset_fsb <
 			    (curr_imapp->br_startoff +
 			     curr_imapp->br_blockcount)) {
@@ -1268,18 +1454,11 @@ xfs_iomap_write(
 			next_bmapp++;
 			/*
 			 * A bmap is the EOF bmap when it reaches to
-			 * or beyond the current inode size AND it
-			 * encompasses the last block allocated to the
-			 * file.  Beyond the inode size is not good
-			 * enough, because we could be writing more
-			 * in this very request beyond what we
-			 * are willing to describe in a single bmap.
+			 * or beyond the new inode size.
 			 */
 			bmap_end_fsb = curr_bmapp->offset +
 				       curr_bmapp->length;
 			if ((curr_imapp == last_imapp) &&
-			    (bmap_end_fsb >= curr_imapp->br_startoff +
-			     curr_imapp->br_blockcount) &&
 			    (XFS_FSB_TO_B(mp, bmap_end_fsb) >= isize)) {
 				curr_bmapp->eof |= BMAP_EOF;
 			}					
@@ -1478,7 +1657,6 @@ xfs_write_file(
 	 * file is truncated since it only matters if new_size > size?
 	 */
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
-	xfs_isize_check(ip->i_mount, ip, ip->i_d.di_size);
 	ip->i_new_size = 0;
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
@@ -2086,24 +2264,6 @@ xfs_strat_write(
 		xfs_trans_ihold(locals->tp, locals->ip);
 		
 		/*
-		 * If new_size is greater than the actual size at this
-		 * point, then raise the inode size to equal the new
-		 * size in this transaction.  Before unlocking the inode
-		 * put it back to where it was so it can be moved up
-		 * normally.  We need to do this so that we don't allocate
-		 * space beyond the inode size here, crash, and then
-		 * come back with blocks beyond the EOF.  We don't
-		 * leave it so that error recovery in xfs_write_file()
-		 * can work.
-		 */
-		locals->real_size = locals->ip->i_d.di_size;
-		if (locals->ip->i_new_size > locals->ip->i_d.di_size) {
-			locals->ip->i_d.di_size = locals->ip->i_new_size;
-			xfs_trans_log_inode(locals->tp, locals->ip,
-					    XFS_ILOG_CORE);
-		}
-
-		/*
 		 * Allocate the backing store for the file.
 		 */
 		XFS_BMAP_INIT(&(locals->free_list), &(locals->first_block));
@@ -2130,13 +2290,12 @@ xfs_strat_write(
 		 * invalid.
 		 */
 		XFS_INODE_CLEAR_READ_AHEAD(locals->ip);
-		locals->ip->i_d.di_size = locals->real_size;
 		xfs_iunlock(locals->ip, XFS_ILOCK_EXCL);
 
 		/*
 		 * This is a quick check to see if the first time through
 		 * was able to allocate a single extent over which to
-		 * write
+		 * write.
 		 */
 		if ((locals->map_start_fsb == locals->offset_fsb) &&
 		    (locals->imap[0].br_blockcount == locals->count_fsb)) {
@@ -2146,6 +2305,11 @@ xfs_strat_write(
 			bp->b_bcount = XFS_FSB_TO_B(locals->mp,
 						    locals->count_fsb);
 			bdstrat(bmajor(bp->b_edev), bp);
+			/*
+			 * Drop the count of queued buffers.
+			 */
+			atomicAddInt(&(locals->ip->i_queued_bufs), -1);
+			ASSERT(locals->ip->i_queued_bufs >= 0);
 			kmem_zone_free(xfs_strat_write_zone, (void *)locals);
 			return;
 		}
@@ -2225,8 +2389,12 @@ xfs_strat_write(
 	 * if they've all completed.  If they have then mark the buffer
 	 * as done, otherwise clear the B_PARTIAL flag in the buffer to
 	 * indicate that the last subordinate buffer to complete should
-	 * mark the buffer done.
+	 * mark the buffer done.  Also, drop the count of queued buffers
+	 * now that we know that all the space underlying the buffer has
+	 * been allocated and it has really been sent out to disk.
 	 */
+	atomicAddInt(&(locals->ip->i_queued_bufs), -1);
+	ASSERT(locals->ip->i_queued_bufs >= 0);
 	locals->s = splockspl(xfs_strat_lock, splhi);
 	ASSERT((bp->b_flags & (B_DONE | B_PARTIAL)) == B_PARTIAL);
 	ASSERT(bp->b_flags & B_LEADER);
@@ -2301,6 +2469,7 @@ xfs_strategy(
 		s = splock(xfsd_lock);
 		/*
 		 * Queue the buffer at the end of the list.
+		 * Bump the inode count of the number of queued buffers.
 		 */
 		if (xfsd_list == NULL) {
 			bp->av_forw = bp;
@@ -2313,9 +2482,18 @@ xfs_strategy(
 			bp->av_forw = xfsd_list;
 		}
 		xfsd_bufcount++;
+		ASSERT(XFS_VTOI(vp)->i_queued_bufs >= 0);
+		atomicAddInt(&(XFS_VTOI(vp)->i_queued_bufs), 1);
 		cvsema(&xfsd_wait);
 		spunlock(xfsd_lock, s);
 	} else {
+		/*
+		 * We're not going to queue it for the xfsds, but bump the
+		 * inode's count anyway so that we can tell that this
+		 * buffer is still on its way out.
+		 */
+		ASSERT(XFS_VTOI(vp)->i_queued_bufs >= 0);
+		atomicAddInt(&(XFS_VTOI(vp)->i_queued_bufs), 1);
 		xfs_strat_write(vp, bp);
 	}
 }
