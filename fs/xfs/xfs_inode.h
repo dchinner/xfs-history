@@ -2,32 +2,6 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-struct xfs_inode;
-
-typedef struct xfs_inode_log_item {
-	xfs_log_item_t		ili_item;
-	struct xfs_inode	*ili_inode;
-	unsigned int		ili_recur;
-	unsigned int		ili_flags;
-	unsigned int		ili_field_mask;
-} xfs_inode_log_item_t;
-
-#define	XFS_ILI_HOLD	0x1
-
-/*
- * Flags to indicate fields to be logged for xfs_trans_log_inode().
- */
-#define	XFS_I_MODE	0x0001
-#define	XFS_I_FORMAT	0x0002
-#define	XFS_I_NLINK	0x0004
-#define	XFS_I_UID	0x0008
-#define	XFS_I_GID	0x0010
-#define	XFS_I_SIZE	0x0020
-#define	XFS_I_UUID	0x0040
-#define	XFS_I_ATIME	0x0080
-#define	XFS_I_MTIME	0x0100
-#define	XFS_I_CTIME	0x0200
-#define	XFS_I_GEN	0x0400
 
 struct xfs_inode;
 	
@@ -77,6 +51,7 @@ typedef struct xfs_inode {
 	xfs_trans_t		*i_transp;	/* ptr to owning transaction */
 	xfs_inode_log_item_t	i_item;		/* logging information */
 	mrlock_t		i_lock;		/* inode lock */
+	sema_t			i_flock;	/* inode flush lock */
 
 	/* Miscellaneous state. */
 	unsigned short		i_flags;	/* see defined flags below */
@@ -140,19 +115,29 @@ typedef struct xfs_inode {
 /*
  * xfs_iget.c prototypes.
  */
-extern xfs_inode_t	*xfs_inode_incore(xfs_mount_t *, xfs_ino_t, void *);
+extern xfs_inode_t	*xfs_inode_incore(xfs_mount_t *, xfs_ino_t,
+					  xfs_trans_t *);
 extern xfs_inode_t	*xfs_iget(xfs_mount_t *, xfs_trans_t *, xfs_ino_t,uint);
+extern void		xfs_iput(xfs_inode_t *);
 extern void		xfs_ilock(xfs_inode_t *, int);
 extern int		xfs_ilock_nowait(xfs_inode_t *, int);
 extern void		xfs_iunlock(xfs_inode_t *);
+extern void		xfs_iflock(xfs_inode_t *);
+extern int		xfs_iflock_nowait(xfs_inode_t *);
+extern void		xfs_ifunlock(xfs_inode_t *);
 
 /*
  * xfs_inode.c prototypes.
  */
 extern xfs_inode_t	*xfs_iread(xfs_mount_t *, xfs_trans_t *, xfs_ino_t);
+extern xfs_inode_t	*xfs_ialloc(xfs_trans_t	*, xfs_inode_t *, mode_t,
+				    ushort, dev_t, struct cred *);
 extern void		xfs_idestroy(xfs_inode_t *);
 extern void		xfs_idata_realloc(xfs_inode_t *, int);
 extern void		xfs_iext_realloc(xfs_inode_t *, int);
 extern void		xfs_iroot_realloc(xfs_inode_t *, int);
+extern void		xfs_ipin(xfs_inode_t *);
+extern void		xfs_iunpin(xfs_inode_t *);
+extern void		xfs_iflush(xfs_inode_t *);
 
 #endif	/* _XFS_INODE_H */
