@@ -24,7 +24,7 @@ ifneq ($(MAKECMDGOALS),modules_install)
   obj-m                         := $(O_TARGET)
 endif
 
-export_obj			:= page_buf.o
+export-objs			+= page_buf.o
 obj-y				+= page_buf.o \
 				   page_buf_io.o \
 				   page_buf_locking.o
