@@ -144,7 +144,7 @@ xfs_change_file_space(
 	bhv_desc_t	*bdp,
 	int		cmd,
 	xfs_flock64_t	*bf,
-	off_t           offset,
+	xfs_off_t       offset,
 	cred_t		*credp,
 	int		attr_flags);
 
