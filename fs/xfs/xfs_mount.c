@@ -257,8 +257,10 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	 * since a single partition filesystem is identical to a single
 	 * partition volume/filesystem.
 	 */
+#ifndef SIM
 	ret64 = uuid_hash64(&sbp->sb_uuid, (uint *)&i);
 	bcopy(&ret64, &vfsp->vfs_fsid, sizeof(ret64));
+#endif
 
 	/*
 	 * Set the default minimum read and write sizes.
