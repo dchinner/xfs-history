@@ -2,7 +2,7 @@
 #
 # Makefile for SGI XFS File System
 #
-# $Revision: 1.55 $
+# $Revision: 1.56 $
 DEPTH?=../..
 include ${DEPTH}/kcommondefs
 KPATH=$(TOP)/fs/xfs
@@ -154,8 +154,8 @@ HFILES=	xfs_ag.h \
 	xfs_trans_priv.h \
 	xfs_trans_space.h \
 	xfs_types.h \
-	xfs_utils.h
-
+	xfs_utils.h \
+        cxfs_clnt.h
 
 #
 # Rules
