@@ -2715,7 +2715,6 @@ xfs_dm_send_mmap_event(
 	/* Figure out how much of the file is being requested by the user. */
 	maprq.length = 0; /* whole file, for now */
 
-	VN_BHV_READ_LOCK(VN_BHV_HEAD(vp));
 	XFS_BHV_LOOKUP(vp, bdp);
 	ip = XFS_BHVTOI(bdp);
 
@@ -2723,7 +2722,6 @@ xfs_dm_send_mmap_event(
 		xfs_dm_mapevent(bdp, 0, 0, &maprq);
 		ret = maprq.error;
 	}
-	VN_BHV_READ_UNLOCK(VN_BHV_HEAD(vp));
 
 	return -ret;
 }
