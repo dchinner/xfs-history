@@ -49,6 +49,7 @@
 #include <linux/sched.h>	/* To get current */
 #include <linux/locks.h>
 #include <linux/slab.h>
+#include <linux/mm.h>
 
 #include <linux/linux_to_xfs.h>
 
@@ -64,6 +65,17 @@
 #include <linux/xfs_file.h>
 #include <linux/page_buf.h>
 #include <xfs_buf.h>
+#include <xfs_types.h>
+#include <xfs_inum.h>
+#include <xfs_bmap_btree.h>
+#include <xfs_bmap.h>
+#include <xfs_dir.h>
+#include <xfs_dir_sf.h>
+#include <xfs_dir2.h>
+#include <xfs_dir2_sf.h>
+#include <xfs_attr_sf.h>
+#include <xfs_dinode.h>
+#include <xfs_inode.h>
 
 #include <asm/uaccess.h> /* For copy_from_user */
 
@@ -443,56 +455,6 @@ struct dentry * linvfs_follow_link(struct dentry *dentry,
 	return base;
 }
 
-
-int linvfs_get_block(struct inode *inode, long block, struct buffer_head *bh_result, int create)
-{
-	vnode_t		*vp;
-	int		block_shift = inode->i_sb->s_blocksize_bits;
-	loff_t		offset = block << block_shift;
-	ssize_t		count = inode->i_sb->s_blocksize;
-	pb_bmap_t	pbmap;
-	int		npbmaps = 1;
-	int		error;
-	long		blockno;
-
-	if (block < 0) {
-		printk(__FUNCTION__": called with block of -1\n");
-		return -EIO;
-	}
-
-	vp = LINVFS_GET_VP(inode);
-
-	VOP_RWLOCK(vp, VRWLOCK_READ);
-	VOP_BMAP(vp, offset, count, XFS_B_READ,(struct page_buf_bmap_s *) &pbmap, &npbmaps, error);
-	VOP_RWUNLOCK(vp, VRWLOCK_READ);
-	if (error)
-		return -EIO;
-	/*
-	 * JIMJIM This interface needs to be fixed to support 64 bit
-	 * block numbers.
-	 */
-	
-	blockno = (long)pbmap.pbm_bn;
-	if (blockno < 0) return 0;
-	if (pbmap.pbm_offset) {
-		if ( pbmap.pbm_offset % count) {
-			printk("linvfs_bmap: this shouldn't happen %Ld %d!\n",
-				pbmap.pbm_offset,
-				count);
-		}
-		blockno += pbmap.pbm_offset >> block_shift;
-	}
-
-	if (!create) {
-		bh_result->b_blocknr = blockno >> (block_shift - 9);
-		bh_result->b_state |= (1UL << BH_Mapped);
-
-		return 0;
-	}
-
-	return -EIO;
-}
-
 int linvfs_permission(struct inode *ip, int mode)
 {
 	cred_t	cred;		/* Temporary cred workaround */
@@ -617,40 +579,111 @@ linvfs_pb_bmap(struct inode *inode,
 	int		block_shift = inode->i_sb->s_blocksize_bits;
 	pb_bmap_t	pbmap;
 	int		npbmaps = 1;
-	int		error, vop_flags;
+	int		error;
 	long		blockno;
-
-	/*
-	 * First map the flags into vop_flags.
-	 */
-
-	switch(flags) {
-	case PBF_READ:
-		vop_flags = XFS_B_READ;
-		break;
-
-	case PBF_WRITE:
-		vop_flags = XFS_B_WRITE;
-		break;
-	
-	default:
-		printk("linvfs_pb_bmap: flag %x not implemented\n", flags);
-		return -EINVAL;
-	}
 
 	vp = LINVFS_GET_VP(inode);
 
 	*retpbbm = maxpbbm;
 
-	VOP_BMAP(vp, offset, count, vop_flags,
+	VOP_BMAP(vp, offset, count, flags,
 			(struct page_buf_bmap_s *) pbmapp, retpbbm, error);
 
 	return error;
 }
 
+extern int xfs_ilock_nowait(xfs_inode_t *, uint lock_flags);
+
+int xfs_hit_full_page, xfs_hit_nowait, xfs_hit_nowait_done;
+
+int
+linvfs_read_full_page(
+	struct dentry *dentry,
+	mem_map_t *page)
+{
+	vnode_t		*vp;
+	struct inode	*inode = dentry->d_inode;
+	int		error;
+	bhv_desc_t	*bdp;
+	xfs_inode_t	*ip;
+
+	xfs_hit_full_page++;
+	vp = LINVFS_GET_VP(inode);
+	ASSERT(vp);
+	bdp = VNODE_TO_FIRST_BHV(vp);
+	ASSERT(bdp);
+	ip = XFS_BHVTOI(bdp);
+	if (!xfs_ilock_nowait(ip, XFS_IOLOCK_SHARED)) {
+		xfs_hit_nowait++;
+		ASSERT(atomic_read(&page->count));
+		UnlockPage(page);
+		xfs_ilock(ip, XFS_IOLOCK_SHARED);
+		LockPage(page);
+		if (Page_Uptodate(page)) {
+			UnlockPage(page);
+			xfs_hit_nowait_done++;
+			xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+			return 0;
+		}
+	}
+	error = pagebuf_read_full_page(dentry, page);
+	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+	return error;
+}
+
+int
+linvfs_write_full_page(
+	struct dentry *dentry,
+	struct page *page)
+{
+	vnode_t		*vp;
+	struct inode	*inode = dentry->d_inode;
+	int		error;
+	bhv_desc_t	*bdp;
+	xfs_inode_t	*ip;
+
+	xfs_hit_full_page++;
+	vp = LINVFS_GET_VP(inode);
+	ASSERT(vp);
+	bdp = VNODE_TO_FIRST_BHV(vp);
+	ASSERT(bdp);
+	ip = XFS_BHVTOI(bdp);
+	if (!xfs_ilock_nowait(ip, XFS_IOLOCK_EXCL)) {
+		xfs_hit_nowait++;
+		ASSERT(atomic_read(&page->count));
+		UnlockPage(page);
+		xfs_ilock(ip, XFS_IOLOCK_EXCL);
+		LockPage(page);
+		if (Page_Uptodate(page)) {
+			xfs_hit_nowait_done++;
+			xfs_iunlock(ip, XFS_IOLOCK_EXCL);
+			return 0;
+		}
+	}
+	error = pagebuf_write_full_page(dentry, page);
+	xfs_iunlock(ip, XFS_IOLOCK_EXCL);
+	return error;
+}
+
+void linvfs_file_read(
+	struct file *filp,
+	void * desc)
+{
+	struct dentry *dentry = filp->f_dentry;
+	struct inode *inode = dentry->d_inode;
+	vnode_t		*vp;
+	int error;
+
+	vp = LINVFS_GET_VP(inode);
+	VOP_RWLOCK(vp, VRWLOCK_READ);
+	pagebuf_file_read(filp, desc);
+	VOP_RWUNLOCK(vp, VRWLOCK_READ);
+	return;
+}
+
 struct address_space_operations linvfs_aops = {
-  readpage:		pagebuf_read_full_page,
-  writepage:		pagebuf_write_full_page,
+  readpage:		linvfs_read_full_page,
+  writepage:		linvfs_write_full_page,
 
 	/* prepare_write: ext2_prepare_write,   */
 	/* commit_write: generic_commit_write,  */
@@ -664,7 +697,7 @@ struct inode_operations linvfs_file_inode_operations =
   revalidate:		linvfs_revalidate,
   setattr:		linvfs_notify_change,
   pagebuf_bmap:		linvfs_pb_bmap,
-  pagebuf_fileread:	pagebuf_file_read,
+  pagebuf_fileread:	linvfs_file_read,
 };
 
 struct inode_operations linvfs_dir_inode_operations =
