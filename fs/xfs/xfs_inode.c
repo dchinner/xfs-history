@@ -482,6 +482,33 @@ xfs_ialloc(
 	ip->i_d.di_nlink = (__int16_t)nlink;
 	ip->i_d.di_uid = (__uint16_t)cr->cr_uid;
 	ip->i_d.di_gid = (__uint16_t)cr->cr_gid;
+
+	/*
+	 * For multiple groups support: if ISGID bit is set in the parent
+	 * directory, group of new file is set to that of the parent, and
+	 * new subdirectory gets ISGID bit from parent.
+	 */
+	if ((vp->v_vfsp->vfs_flag & VFS_GRPID) || (pip->i_d.di_mode & ISGID)) {
+		ip->i_d.di_gid = pip->i_d.di_gid;
+		if ((pip->i_d.di_mode & ISGID) && (mode & IFMT) == IFDIR)
+			ip->i_d.di_mode |= ISGID;
+	}
+
+	/*
+	 * If the group ID of the new file does not match the effective group
+	 * ID or one of the supplementary group IDs, the ISGID bit is
+	 * cleared.
+	 */
+	if (ip->i_d.di_mode & ISGID) {
+		int i;
+
+		for (i = 0; i < cr->cr_ngroups; i++)
+			if (ip->i_d.di_gid == cr->cr_groups[i])
+				break;
+		if (ip->i_d.di_gid != cr->cr_gid && i >= cr->cr_ngroups)
+			ip->i_d.di_mode &= ~ISGID;
+	}
+
 	ip->i_d.di_size = 0;
 	ip->i_d.di_nextents = 0;
 	curr_time = (__int32_t)time;
