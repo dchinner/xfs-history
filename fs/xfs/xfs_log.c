@@ -375,7 +375,7 @@ log_alloc(xfs_mount_t	*mp,
 /*	log->l_logreserved = 0; done with kmem_zalloc()*/
 /*	log->l_curr_block  = 0; done with kmem_zalloc()*/
 	log->l_prev_block  = -1;
-	log->l_sync_lsn    = 0x100000000;  /* cycle=1;current block=0*/
+	log->l_sync_lsn    = 0x100000000LL;  /* cycle=1;current block=0*/
 	log->l_curr_cycle  = 1;	      /* 0 is bad since this is initial value */
 	log->l_xbuf	   = getrbuf(0);
 	psema(&log->l_xbuf->b_lock, PINOD);	/* it's mine */
