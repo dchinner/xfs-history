@@ -137,8 +137,11 @@ xfs_parseargs(
 
 	args->flags |= XFSMNT_32BITINODES;
 
-	if (!options)
+	if (!options) {
+		args->logbufs = logbufs;
+		args->logbufsize = logbufsize;
 		return 0;
+	}
 	
 	for (this_char = strtok (options, ",");
 	     this_char != NULL;
