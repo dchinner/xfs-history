@@ -41,7 +41,6 @@
 #include "xfs_inode.h"
 #include "xfs_buf_item.h"
 #include "xfs_bio.h"
-#include "xfs_print.h"
 #include "xfs_rw.h"
 
 #ifdef SIM
@@ -1334,9 +1333,9 @@ xfs_iprint(xfs_inode_t *ip)
 			xfs_bmbt_irec_t rec;
 
 			xfs_bmbt_get_all(ep, &rec);
-			printf("\t%d: startoff %lld, startblock %s, blockcount %d\n",
-				i, rec.br_startoff,
-				xfs_print_startblock(mp, rec.br_startblock),
+			printf("\t%d: startoff %lld, startblock 0x%llx, blockcount %d\n",
+				i, (xfs_dfiloff_t)rec.br_startoff,
+				(xfs_dfsbno_t)rec.br_startblock,
 				rec.br_blockcount);
 		}
 	}
