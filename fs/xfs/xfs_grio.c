@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.45 1995/01/31 18:58:53 doucette Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.46 1995/03/17 00:52:24 tap Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -457,6 +457,13 @@ retry_request:
 				 * next second, then check again.
 				 */
 				delay_ticks = HZ - (snap_lbolt % HZ);
+
+				/*
+				 * delay one more ticket to make sure
+				 * lbolt is advanced to the next second
+				 * when the process returns from delay()
+				 */
+				delay_ticks++;
                         	ticket_unlock(ip, s );
 		                delay( delay_ticks );
 				goto retry_request;
