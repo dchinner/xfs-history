@@ -460,6 +460,8 @@ xfs_ialloc(
 	 * di_gen will have been taken care of in xfs_iread.
 	 */
 	ip->i_d.di_extsize = 0;
+	ip->i_d.di_dmevmask = 0;
+	ip->i_d.di_dmstate = 0;
 	ip->i_d.di_flags = 0;
 	flags = XFS_ILOG_CORE;
 	switch (mode & IFMT) {

@@ -251,6 +251,8 @@ again:
 	ih->ih_version++;
 	XFS_IHUNLOCK(ih);
 
+	ip->i_dmevents = 0;
+
 	/*
 	 * Link ip to its mount and thread it on the mount's inode list.
 	 */

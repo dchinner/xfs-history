@@ -106,7 +106,10 @@ typedef struct xfs_inode {
 	/* Trace buffers per inode. */
 	struct ktrace		*i_xtrace;	/* inode extent list trace */
 	struct ktrace		*i_btrace;	/* inode bmap btree trace */
-	
+
+	/* DMI state */
+	unsigned int		i_dmevents;	/* events enabled on file */
+
 	xfs_dinode_core_t	i_d;		/* most of ondisk inode */
 } xfs_inode_t;
 

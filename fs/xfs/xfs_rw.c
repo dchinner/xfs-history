@@ -31,6 +31,7 @@
 #include <sys/kmem.h>
 #include <sys/sema.h>
 #include <sys/file.h>
+#include <sys/dmi.h>
 #include <sys/region.h>
 #include <sys/runq.h>
 #include <sys/schedctl.h>
@@ -838,6 +839,7 @@ xfs_read(
 	off_t		offset;
 	size_t		count;
 	int		error;
+	timestruc_t	tv;
 
 
 	ip = XFS_VTOI(vp);
@@ -880,9 +882,24 @@ xfs_read(
 		id.pid = MAKE_REQ_PID(u.u_procp->p_pid, 0);
 #endif
 		id.ino = ip->i_ino;
-		error  = xfs_grio_req(ip, &id, uiop, ioflag, credp, offset, UIO_READ);
+		if (!(ioflag&IO_INVIS) && DM_EVENT_ENABLED (ip, DM_READ)) {
+			if (error = dm_data_event (vp, DM_READ, offset, count))
+				return error;
+		}
+		error = xfs_grio_req (ip, &id, uiop, ioflag, credp, offset,
+					UIO_READ);
 		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
-
+		/* don't update timestamps if doing invisible I/O */
+		if (!(ioflag&IO_INVIS)) {
+			nanotime (&tv);
+			ip->i_d.di_atime.t_sec = tv.tv_sec;
+			ip->i_update_core = 1;
+		}
+		if (!(ioflag&IO_INVIS) && !error &&
+		    DM_EVENT_ENABLED (ip, DM_POSTREAD)) {
+			(void) dm_data_event (vp, DM_POSTREAD, offset,
+					count - uiop->uio_resid);
+		}
 		break;
 
 	case IFDIR:
@@ -1538,14 +1555,18 @@ xfs_write(
 		id.pid = MAKE_REQ_PID(u.u_procp->p_pid, 0);
 #endif
 		id.ino = ip->i_ino;
-		error = xfs_grio_req( ip, &id, uiop, ioflag, credp, offset, UIO_WRITE);
 
+		if (!(ioflag&IO_INVIS) && DM_EVENT_ENABLED (ip, DM_WRITE)) {
+			if (error = dm_data_event (vp, DM_WRITE, offset, count))
+				return error;
+		}
+		error = xfs_grio_req (ip, &id, uiop, ioflag, credp, offset,
+					UIO_WRITE);
 		/*
 		 * Add back whatever we refused to do because of
 		 * uio_limit.
 		 */
 		uiop->uio_resid += resid;
-
 
 		/*
 		 * We've done at least a partial write, so don't
@@ -1557,10 +1578,13 @@ xfs_write(
 		 */
 		if (count != uiop->uio_resid) {
 			error = 0;
-			nanotime(&tv);
-			ip->i_d.di_mtime.t_sec = tv.tv_sec;
-			ip->i_d.di_ctime.t_sec = tv.tv_sec;
-			ip->i_update_core = 1;
+			/* don't update timestamps if doing invisible I/O */
+			if (!(ioflag&IO_INVIS)) {
+				nanotime(&tv);
+				ip->i_d.di_mtime.t_sec = tv.tv_sec;
+				ip->i_d.di_ctime.t_sec = tv.tv_sec;
+				ip->i_update_core = 1;
+			}
 		}
 
 		/*
@@ -1576,6 +1600,11 @@ xfs_write(
 			xfs_log_force(ip->i_mount, (xfs_lsn_t)0,
 				      XFS_LOG_FORCE | XFS_LOG_SYNC);
 		}
+		if (!(ioflag&IO_INVIS) && !error &&
+		    DM_EVENT_ENABLED (ip, DM_POSTWRITE)) {
+			(void) dm_data_event (vp, DM_POSTWRITE, offset,
+					count - uiop->uio_resid);
+		}
 		break;
 
 	case IFDIR:
@@ -1589,7 +1618,7 @@ xfs_write(
 		ASSERT(0);
 		return XFS_ERROR(EINVAL);
 	}
-	
+
 	return error;
 }
 
