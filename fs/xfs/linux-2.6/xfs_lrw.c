@@ -188,6 +188,7 @@ xfs_zero_last_block(
 	xfs_iocore_t	*io,
 	xfs_off_t	offset,
 	xfs_fsize_t	isize,
+	xfs_fsize_t	end_size,
 	struct pm	*pmp)
 {
 	xfs_fileoff_t	last_fsb;
@@ -356,7 +357,7 @@ xfs_zero_last_block(
 	}
 
 
-	if ((error = -pagebuf_iozero(ip, pb, zero_offset, zero_len))) {
+	if ((error = -pagebuf_iozero(ip, pb, zero_offset, zero_len, end_size))) {
 		pagebuf_rele(pb);
 		goto out_lock;
 	}
@@ -404,8 +405,9 @@ int					/* error (positive) */
 xfs_zero_eof(
 	vnode_t		*vp,
 	xfs_iocore_t	*io,
-	xfs_off_t	offset,
-	xfs_fsize_t	isize,
+	xfs_off_t	offset,		/* starting I/O offset */
+	xfs_fsize_t	isize,		/* current inode size */
+	xfs_fsize_t	end_size,	/* terminal inode size */
 	struct pm       *pmp)
 {
 	struct inode	*ip = vp->v_inode;
@@ -434,7 +436,7 @@ xfs_zero_eof(
 	 * First handle zeroing the block on which isize resides.
 	 * We only zero a part of that block so it is handled specially.
 	 */
-	error = xfs_zero_last_block(ip, io, offset, isize, pmp);
+	error = xfs_zero_last_block(ip, io, offset, isize, end_size, pmp);
 	if (error) {
 		ASSERT(ismrlocked(io->io_lock, MR_UPDATE));
 		ASSERT(ismrlocked(io->io_iolock, MR_UPDATE));
@@ -535,7 +537,7 @@ xfs_zero_eof(
 		}
 
 		/* pagebuf_iozero returns negative error */
-		if ((error = -pagebuf_iozero(ip, pb, 0, lsize))) {
+		if ((error = -pagebuf_iozero(ip, pb, 0, lsize, end_size))) {
 			pagebuf_rele(pb);
 			goto out_lock;
 		}
@@ -699,7 +701,7 @@ start:
 	if (!direct && (*offsetp > isize && isize)) {
 		io->io_writeio_blocks = mp->m_writeio_blocks;
 		error = xfs_zero_eof(BHV_TO_VNODE(bdp), io, *offsetp,
-			isize, NULL);
+			isize, *offsetp + size, NULL);
 		if (error) {
 			xfs_iunlock(xip, XFS_ILOCK_EXCL|iolock);
 			return(error);
