@@ -35,6 +35,9 @@
 #include "sim.h"
 #endif
 
+zone_t	*xfs_efi_zone;
+zone_t	*xfs_efd_zone;
+
 STATIC void	xfs_efi_release(xfs_efi_log_item_t *, uint);
 STATIC uint	xfs_efi_item_size(xfs_efi_log_item_t *);
 STATIC void	xfs_efi_item_format(xfs_efi_log_item_t *, xfs_log_iovec_t *);
@@ -192,9 +195,14 @@ xfs_efi_init(xfs_mount_t	*mp,
 	uint			size;
 
 	ASSERT(nextents > 0);
-	size = sizeof(xfs_efi_log_item_t) +
-	       ((nextents - 1) * sizeof(xfs_extent_t));
-	efip = (xfs_efi_log_item_t*)kmem_zalloc(size, KM_SLEEP);
+	if (nextents > XFS_EFI_MAX_FAST_EXTENTS) {
+		size = sizeof(xfs_efi_log_item_t) +
+			((nextents - 1) * sizeof(xfs_extent_t));
+		efip = (xfs_efi_log_item_t*)kmem_zalloc(size, KM_SLEEP);
+	} else {
+		efip = (xfs_efi_log_item_t*)kmem_zone_zalloc(xfs_efi_zone,
+							     KM_SLEEP);
+	}
 
 	efip->efi_item.li_type = XFS_LI_EFI;
 	efip->efi_item.li_ops = &xfs_efi_item_ops;
@@ -224,6 +232,7 @@ xfs_efi_release(xfs_efi_log_item_t	*efip,
 	int		s;
 	int		extents_left;
 	uint		size;
+	int		nexts;
 
 	ASSERT(efip->efi_next_extent > 0);
 
@@ -233,15 +242,23 @@ xfs_efi_release(xfs_efi_log_item_t	*efip,
 	efip->efi_next_extent -= nextents;
 	extents_left = efip->efi_next_extent;
 	if (extents_left == 0) {
-		xfs_trans_delete_ail(mp, (xfs_log_item_t *)efip);
+		/*
+		 * xfs_trans_delete_ail() drops the AIL lock.
+		 */
+		xfs_trans_delete_ail(mp, (xfs_log_item_t *)efip, s);
+	} else {
+		AIL_UNLOCK(mp, s);
 	}
-	AIL_UNLOCK(mp, s);
 
 	if (extents_left == 0) {
-		size = sizeof(xfs_efi_log_item_t);
-		size += (efip->efi_format.efi_nextents - 1) *
-			sizeof(xfs_extent_t);
-		kmem_free(efip, size);
+		nexts = efip->efi_format.efi_nextents;
+		if (nexts > XFS_EFI_MAX_FAST_EXTENTS) {
+			size = sizeof(xfs_efi_log_item_t);
+			size += (nexts - 1) * sizeof(xfs_extent_t);
+			kmem_free(efip, size);
+		} else {
+			kmem_zone_free(xfs_efi_zone, efip);
+		}
 	}
 }
 
@@ -346,12 +363,18 @@ STATIC xfs_lsn_t
 xfs_efd_item_committed(xfs_efd_log_item_t *efdp, xfs_lsn_t lsn)
 {
 	uint	size;
+	int	nexts;
 
 	xfs_efi_release(efdp->efd_efip, efdp->efd_format.efd_nextents);
 
-	size = sizeof(xfs_efd_log_item_t);
-	size += (efdp->efd_format.efd_nextents - 1) * sizeof(xfs_extent_t);
-	kmem_free(efdp, size);
+	nexts = efdp->efd_format.efd_nextents;
+	if (nexts > XFS_EFD_MAX_FAST_EXTENTS) {
+		size = sizeof(xfs_efd_log_item_t);
+		size += (nexts - 1) * sizeof(xfs_extent_t);
+		kmem_free(efdp, size);
+	} else {
+		kmem_zone_free(xfs_efd_zone, efdp);
+	}
 
 	return (xfs_lsn_t)-1;
 }
@@ -396,9 +419,14 @@ xfs_efd_init(xfs_mount_t	*mp,
 	uint			size;
 
 	ASSERT(nextents > 0);
-	size = sizeof(xfs_efd_log_item_t) +
-	       ((nextents - 1) * sizeof(xfs_extent_t));
-	efdp = (xfs_efd_log_item_t*)kmem_zalloc(size, KM_SLEEP);
+	if (nextents > XFS_EFD_MAX_FAST_EXTENTS) {
+		size = sizeof(xfs_efd_log_item_t) +
+			((nextents - 1) * sizeof(xfs_extent_t));
+		efdp = (xfs_efd_log_item_t*)kmem_zalloc(size, KM_SLEEP);
+	} else {
+		efdp = (xfs_efd_log_item_t*)kmem_zone_zalloc(xfs_efd_zone,
+							     KM_SLEEP);
+	}
 
 	efdp->efd_item.li_type = XFS_LI_EFD;
 	efdp->efd_item.li_ops = &xfs_efd_item_ops;
