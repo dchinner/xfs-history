@@ -179,13 +179,16 @@ xfs_trans_reserve(
 		if (error != 0) {
 			return (XFS_ERROR(ENOSPC));
 		}
-		tp->t_blk_res = blocks;
+		tp->t_blk_res += blocks;
 	}
 
 	/*
 	 * Reserve the log space needed for this transaction.
 	 */
 	if (logspace > 0) {
+		ASSERT((tp->t_log_res == 0) || (tp->t_log_res == logspace));
+		ASSERT((tp->t_log_count == 0) ||
+			(tp->t_log_count == logcount));
 		if (flags & XFS_TRANS_PERM_LOG_RES) {
 			log_flags = XFS_LOG_PERM_RESERV;
 			tp->t_flags |= XFS_TRANS_PERM_LOG_RES;
@@ -223,7 +226,7 @@ xfs_trans_reserve(
 			error = XFS_ERROR(ENOSPC);
 			goto undo_log;
 		}
-		tp->t_rtx_res = rtextents;
+		tp->t_rtx_res += rtextents;
 	}
 
 	return 0;
