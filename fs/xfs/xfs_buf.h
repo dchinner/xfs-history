@@ -315,7 +315,15 @@ extern void pdflush(struct vnode *, uint64_t);
 static inline void xfs_buf_undelay(page_buf_t *pb)
 {
 	if (pb->pb_list.next != &pb->pb_list) {
-		pagebuf_delwri_dequeue(pb);
+	    pagebuf_delwri_dequeue(pb);
+		/* hold count should be at least 2 here.
+		 * 1 for the lookup 2 when the thing was queued. 
+		 */
+		if(pb->pb_hold > 1 ){
+		  pagebuf_rele(pb);
+		} else {
+		  printk("hmm this doesn't seem right hold count should be > 1 xfs_buf_undelay pb:0x%p hold %d\n",pb,pb->pb_hold);
+		}
 	} else {
 		pb->pb_flags &= ~PBF_DELWRI;
 	}
@@ -348,8 +356,9 @@ static inline void xfs_buf_undelay(page_buf_t *pb)
 
 
 #define XFS_BUF_HOLD(x)		pagebuf_hold(x)  
-#define XFS_BUF_UNHOLD(x)       printk("XFS_BUF_UNHOLD not implemented yet\n")
-#define XFS_BUF_ISHOLD(x)       (1)
+/*#define XFS_BUF_UNHOLD(x)       printk("XFS_BUF_UNHOLD not implemented yet\n")
+  #define XFS_BUF_ISHOLD(x)       (1)
+*/
 /* this may go away... calling iostart will define read or write */
 /* used for irix at the moment not needed for linux? */
 #define XFS_BUF_READ(x)         ((x)->pb_flags |= PBF_READ)
