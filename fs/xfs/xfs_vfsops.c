@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.189 $"
+#ident  "$Revision: 1.190 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -461,6 +461,7 @@ xfs_cmountfs(
 			goto error0;
 		}
 		mp->m_ddevp = ddevvp;
+		mp->m_ddev_targ.bdevsw = get_bdevsw(ddev);
 
                 /* Values are in BBs */
                 if ((ap != NULL) && (ap->version >= 2) && 
@@ -477,6 +478,7 @@ xfs_cmountfs(
                         mp->m_dalign = 0;
                         mp->m_swidth = 0;
                 }
+		mp->m_ddev_targp = &mp->m_ddev_targ;
 	} else {
 		ddevvp = NULL;
 	}
@@ -491,6 +493,7 @@ xfs_cmountfs(
 			goto error1;
 		}
 		mp->m_rtdevp = rdevvp;
+		mp->m_rtdev_targ.bdevsw = get_bdevsw(rtdev);
 	} else {
 		mp->m_rtdev = NODEV;
 		rdevvp = NULL;
@@ -498,7 +501,7 @@ xfs_cmountfs(
 	if (logdev != 0) {
 		if (logdev == ddev) {
 			ldevvp = NULL;
-			mp->m_logdevp = ddevvp;
+			mp->m_logdev_targ = mp->m_ddev_targ;
 		} else {
 			vnode_t *openvp;
 
@@ -510,6 +513,7 @@ xfs_cmountfs(
 				goto error2;
 			}
 			mp->m_logdevp = ldevvp;
+			mp->m_logdev_targ.bdevsw = get_bdevsw(logdev);
 		}
 		if (ap != NULL && ap->version != 0) {
 			/* Called through the mount system call */
@@ -597,11 +601,8 @@ xfs_cmountfs(
 	else
 #endif
 
-	if (error = xfs_readsb(mp, ddev)) {
-		goto error3;
-	}
 #if CELL || NOTYET
-	error = cxfs_mount(mp, ap, &client);
+	error = cxfs_mount(mp, ap, ddev, &client);
 	if (error || client) {
 #if TEST_UUID_STUFF
 	        if (ap && (ap->flags & XFSMNT_TESTUUID)) 
@@ -613,7 +614,7 @@ xfs_cmountfs(
 	
 #endif /* CELL || NOTYET */
 
-	if (error = xfs_mountfs(vfsp, mp)) {
+	if (error = xfs_mountfs(vfsp, mp, ddev)) {
 		goto error3;
 	}
 
@@ -1433,6 +1434,7 @@ devvptoxfs(
 	xfs_sb_t	*fs;
 	vnode_t		*openvp;
 	bhv_desc_t	*vfs_bdp;
+	buftarg_t	target;
 
 	if (devvp->v_type != VBLK)
 		return XFS_ERROR(ENOTBLK);
@@ -1441,6 +1443,10 @@ devvptoxfs(
 	if (error)
 		return error;
 	dev = devvp->v_rdev;
+
+	target.specvp = devvp;
+	target.dev = dev;
+	target.bdevsw = get_bdevsw(dev);
 	VOP_RWLOCK(devvp, VRWLOCK_WRITE);
 
 	/*
@@ -1488,8 +1494,10 @@ devvptoxfs(
 			brelse(bp);
 			bp = NULL;
 		}
-		if (!bp)
-			bp = bread(dev, XFS_SB_DADDR, BLKDEV_BB);
+		if (!bp) {
+			bp = read_buf_targ(&target, XFS_SB_DADDR, BLKDEV_BB, 0);
+			bp->b_target = NULL;
+		}
 		if (bp->b_flags & B_ERROR) {
 			error = bp->b_error;
 			brelse(bp);
@@ -2261,6 +2269,10 @@ xfs_vget(
         return 0;
 }
 
+#if CELL_IRIX
+extern	int	cxfs_import(vfs_t *);
+#endif /* CELL_IRIX */
+
 int
 xfs_force_pinned(bdp)
 bhv_desc_t	*bdp;
@@ -2286,7 +2298,11 @@ vfsops_t xfs_vfsops = {
 	xfs_vget,
 	xfs_vfsmountroot,
 	fs_realvfsops,	
-	fs_import,	/* import */
+#if	CELL_IRIX
+	cxfs_import,	/* setup cxfs filesystem */
+#else	/* CELL_IRIX */
+	fs_import,	/* noop import */
+#endif	/* CELL_IRIX */
 	xfs_quotactl,
 	xfs_force_pinned,
 };
