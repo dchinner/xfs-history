@@ -63,13 +63,13 @@ STATIC void	 xlog_init_log(xlog_t *log);
 STATIC xfs_lsn_t xlog_assign_tail_lsn(xfs_mount_t *mp, xlog_in_core_t *iclog);
 STATIC xfs_lsn_t xlog_commit_record(xfs_mount_t *mp, xlog_ticket_t *ticket);
 STATIC int	 xlog_find_zeroed(xlog_t *log, daddr_t *blk_no);
-STATIC xlog_t *  xlog_alloc(xfs_mount_t	*mp,
-			    dev_t	log_dev,
-			    daddr_t	blk_offset,
-			    int		num_bblks);
+STATIC xlog_t *  xlog_alloc_log(xfs_mount_t	*mp,
+				dev_t		log_dev,
+				daddr_t		blk_offset,
+				int		num_bblks);
 STATIC int	 xlog_space_left(xlog_t *log, int cycle, int bytes);
 STATIC void	 xlog_sync(xlog_t *log, xlog_in_core_t *iclog, uint flags);
-STATIC void	 xlog_unalloc(void);
+STATIC void	 xlog_unalloc_log(xfs_mount_t *mp);
 STATIC int	 xlog_write(xfs_mount_t *mp, xfs_log_iovec_t region[],
 			    int nentries, xfs_log_ticket_t tic,
 			    xfs_lsn_t *start_lsn, uint flags);
@@ -441,7 +441,7 @@ xfs_log_mount(xfs_mount_t	*mp,
 	if (! xlog_debug)
 		return 0;
 
-	log = xlog_alloc(mp, log_dev, blk_offset, num_bblks);
+	log = xlog_alloc_log(mp, log_dev, blk_offset, num_bblks);
 	if (xlog_recover(log) != 0) {
 		return XFS_ERECOVER;
 	}
@@ -498,7 +498,7 @@ xfs_log_unmount(xfs_mount_t *mp)
 	      iclog->ic_state == XLOG_STATE_DIRTY))
 		spunlockspl_psema(log->l_icloglock, spl,	/* sleep */
 				  &iclog->ic_forcesema, 0);
-	xlog_unalloc();
+	xlog_unalloc_log(mp);
 
 	return 0;
 }	/* xfs_log_unmount */
@@ -669,10 +669,10 @@ xlog_iodone(buf_t *bp)
  * some other stuff may be filled in too.
  */
 STATIC xlog_t *
-xlog_alloc(xfs_mount_t	*mp,
-	      dev_t		log_dev,
-	      daddr_t		blk_offset,
-	      int		num_bblks)
+xlog_alloc_log(xfs_mount_t	*mp,
+	       dev_t		log_dev,
+	       daddr_t		blk_offset,
+	       int		num_bblks)
 {
 	xlog_t *log;
 
@@ -694,7 +694,7 @@ xlog_alloc(xfs_mount_t	*mp,
 	log->l_grant_reserve_cycle = 1;
 	log->l_grant_write_bytes = 0;
 	log->l_grant_write_cycle = 1;
-}	/* xlog_alloc */
+}	/* xlog_alloc_log */
 
 
 /*
@@ -702,7 +702,7 @@ xlog_alloc(xfs_mount_t	*mp,
  *
  * Perform all the specific initialization required during a log mount.
  * Values passed down from xfs_log_mount() were placed in log structure
- * in xlog_alloc().
+ * in xlog_alloc_log().
  */
 STATIC void
 xlog_init_log(xlog_t *log)
@@ -975,8 +975,9 @@ xlog_sync(xlog_t		*log,
  * Unallocate a log
  */
 void
-xlog_unalloc(void)
+xlog_unalloc_log(xfs_mount_t *mp)
 {
+	
 }	/* xlog_unalloc */
 
 
@@ -1591,15 +1592,27 @@ xlog_regrant_reserve_log_space(xlog_t	     *log,
 }	/* xlog_regrant_reserve_log_space */
 
 
+/*
+ * Give back the space left from a reservation.
+ *
+ * All the information we need to make a correct determination of space left
+ * is present.  For non-permanent reservations, things are quite easy.  The
+ * count should have been decremented to zero.  We only need to deal with the
+ * space remaining in the current reservation part of the ticket.  If the
+ * ticket contains a permanent reservation, there may be left over space which
+ * needs to be released.  A count of N means that N-1 refills of the current
+ * reservation can be done before we need to ask for more space.  The first
+ * one goes to fill up the first current reservation.  Once we run out of
+ * space, the count will stay at zero and the only space remaining will be
+ * in the current reservation field.
+ */
 STATIC void
 xlog_ungrant_log_space(xlog_t	     *log,
 		       xlog_ticket_t *ticket)
 {
-	int perm_res;
 	int spl;
 	int unused_bytes;
 
-	perm_res = ticket->t_flags & XLOG_TIC_PERM_RESERV;
 	if (ticket->t_cnt > 0)
 		ticket->t_cnt--;
 
@@ -1611,13 +1624,15 @@ xlog_ungrant_log_space(xlog_t	     *log,
 
 	xlog_trace_loggrant(log, ticket, "xlog_ungrant_log_space: sub current");
 
-	/* If this is a permanent reservation ticket, we can free up one
-	 * unit worth of space.
+	/* If this is a permanent reservation ticket, we may be able to free
+	 * up more space based on the remaining count.
 	 */
-	if (perm_res) {
+	if (ticket->t_cnt > 0) {
+		ASSERT(ticket->t_flags & XLOG_TIC_PERM_RESERV);
 		XLOG_GRANT_SUB_SPACE(log, ticket->t_unit_res*ticket->t_cnt,'w');
 		XLOG_GRANT_SUB_SPACE(log, ticket->t_unit_res*ticket->t_cnt,'r');
 	}
+
 	xlog_trace_loggrant(log, ticket, "xlog_ungrant_log_space: exit");
 	xlog_verify_grant_head(log, 1);
 	GRANT_UNLOCK(log, spl);
