@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.78 $"
+#ident	"$Revision: 1.79 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -52,6 +52,8 @@
 #include "xfs_bit.h"
 #include "xfs_bmap.h"
 #include "xfs_error.h"
+#include "xfs_quota.h"
+
 #ifdef SIM
 #include "sim.h"
 #endif
@@ -586,6 +588,15 @@ xfs_bmbt_delrec(
 	xfs_trans_set_sync(cur->bc_tp);
 	cur->bc_private.b.ip->i_d.di_nblocks--;
 	xfs_trans_log_inode(cur->bc_tp, cur->bc_private.b.ip, XFS_ILOG_CORE);
+	
+	if (XFS_IS_QUOTA_ON(mp) &&
+	    cur->bc_private.b.ip->i_ino != mp->m_sb.sb_uquotino &&
+	    cur->bc_private.b.ip->i_ino != mp->m_sb.sb_pquotino) {
+		xfs_trans_mod_dquot_byino(cur->bc_tp, cur->bc_private.b.ip, 
+					  XFS_TRANS_DQ_BCOUNT,
+					  (long) -1);
+	}
+
 	xfs_trans_binval(cur->bc_tp, rbp);
 	if (bp != lbp) {
 		cur->bc_bufs[level] = lbp;
@@ -867,6 +878,12 @@ xfs_bmbt_killroot(
 		cur->bc_private.b.flist, cur->bc_mp);
 	xfs_trans_set_sync(cur->bc_tp);
 	ip->i_d.di_nblocks--;
+	if (XFS_IS_QUOTA_ON(cur->bc_mp) &&
+	    ip->i_ino != cur->bc_mp->m_sb.sb_uquotino &&
+	    ip->i_ino != cur->bc_mp->m_sb.sb_pquotino) {
+		xfs_trans_mod_dquot_byino(cur->bc_tp, ip, XFS_TRANS_DQ_BCOUNT, 
+					  (long) -1);
+	}
 	xfs_trans_binval(cur->bc_tp, cbp);
 	cur->bc_bufs[level - 1] = NULL;
 	block->bb_level--;
@@ -1410,6 +1427,12 @@ xfs_bmbt_split(
 	cur->bc_private.b.allocated++;
 	cur->bc_private.b.ip->i_d.di_nblocks++;
 	xfs_trans_log_inode(args.tp, cur->bc_private.b.ip, XFS_ILOG_CORE);
+	if (XFS_IS_QUOTA_ON(args.mp) &&
+	    cur->bc_private.b.ip->i_ino != args.mp->m_sb.sb_uquotino &&
+	    cur->bc_private.b.ip->i_ino != args.mp->m_sb.sb_pquotino) {
+		xfs_trans_mod_dquot_byino(args.tp, cur->bc_private.b.ip,
+					  XFS_TRANS_DQ_BCOUNT, (long)1);
+	}
 	rbp = xfs_btree_get_bufl(args.mp, args.tp, args.fsbno, 0);
 	right = XFS_BUF_TO_BMBT_BLOCK(rbp);
 	xfs_btree_check_lblock(cur, left, level);
@@ -2326,6 +2349,12 @@ xfs_bmbt_newroot(
 	cur->bc_private.b.firstblock = args.fsbno;
 	cur->bc_private.b.allocated++;
 	cur->bc_private.b.ip->i_d.di_nblocks++;
+	if (XFS_IS_QUOTA_ON(args.mp) &&
+	    cur->bc_private.b.ip->i_ino != args.mp->m_sb.sb_uquotino &&
+	    cur->bc_private.b.ip->i_ino != args.mp->m_sb.sb_pquotino) {
+		xfs_trans_mod_dquot_byino(args.tp, cur->bc_private.b.ip,
+					  XFS_TRANS_DQ_BCOUNT, (long)1);
+	}
 	bp = xfs_btree_get_bufl(args.mp, cur->bc_tp, args.fsbno, 0);
 	cblock = XFS_BUF_TO_BMBT_BLOCK(bp);
 	*cblock = *block;
