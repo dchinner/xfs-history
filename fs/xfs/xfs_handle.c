@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.9 $"
+#ident "$Revision: 1.10 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -372,6 +372,7 @@ vp_to_handle (
 {
 	int		error;
 	struct	fid	*fidp = NULL;
+	int		hsize;
 
 	if (vp->v_vfsp->vfs_altfsid == NULL)
 		return EINVAL;
@@ -388,9 +389,10 @@ vp_to_handle (
 		return error;
 	if (fidp == NULL)
 		return EIO;		/* FIX: what real errno? */
-	bzero (handlep, sizeof *handlep);
 	bcopy (vp->v_vfsp->vfs_altfsid, &handlep->ha_fsid, sizeof (fsid_t));
 	bcopy (fidp, &handlep->ha_fid, sizeof *fidp);
+	hsize = HSIZE (*handlep);
+	bzero ((char *) handlep + hsize, sizeof *handlep - hsize);
 	freefid (fidp);
 	return 0;
 }
