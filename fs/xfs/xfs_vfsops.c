@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision$"
+#ident  "$Revision: 1.8 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -90,6 +90,12 @@
 #endif
 
 
+#define	whymount_t	whymountroot_t
+#define	NONROOT_MOUNT	ROOT_UNMOUNT
+
+static char *whymount[] = { "initial mount", "remount", "unmount" };
+
+
 /*
  * Static function prototypes.
  */
@@ -119,6 +125,18 @@ STATIC int	xfs_sync(vfs_t		*vp,
 STATIC int	xfs_vget(vfs_t		*vfsp,
 			 vnode_t	**vpp,
 			 fid_t		*fidp);
+
+STATIC int	xfs_cmountfs(struct vfs	*vfsp,
+			     dev_t		ddev,
+			     dev_t		rtdev,
+			     whymount_t		why,
+			     struct xfs_args	*ap,
+			     struct cred	*cr,
+			     int		lflags);
+
+STATIC xfs_mount_t *_xfs_get_vfsmount(struct vfs	*vfsp,
+				      dev_t		ddev,
+				      dev_t		rtdev);
 
 
 
@@ -180,18 +198,9 @@ _spectodev(char	*spec,
 }
 
 
-#define	whymount_t	whymountroot_t
-#define	NONROOT_MOUNT	ROOT_UNMOUNT
-
-static char *whymount[] = { "initial mount", "remount", "unmount" };
-
-STATIC int xfs_cmountfs(struct vfs *vfsp, dev_t ddev, dev_t rtdev,
-			whymount_t why, struct xfs_args *ap, struct cred *cr);
-
-STATIC xfs_mount_t *_xfs_get_vfsmount(struct vfs *vfsp, dev_t ddev,
-				      dev_t rtdev);
-
 /*
+ * xfs_cmountfs
+ *
  * This function is the common mount file system function.
  */
 STATIC int
@@ -200,11 +209,11 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	     dev_t		rtdev,
 	     whymount_t		why,
 	     struct xfs_args	*ap,
-	     struct cred	*cr)
+	     struct cred	*cr,
+	     int		lflags)
 {
 	xfs_mount_t	*mp;
 	int		error = 0;
-	int		lflags = XFS_LOG_RECOVER;
 	int		s;
 	xfs_sb_t	*sbp;
 	xfs_inode_t	*rip;
@@ -212,21 +221,21 @@ xfs_cmountfs(struct vfs 	*vfsp,
 
 /* XXXjleong More work needed to finish xfs_cmountfs() */
 
+	/*
+	 * Remounting a XFS file system is bad. The log manager
+	 * automatically handles recovery so no action is required.
+	 */
+	if (vfsp->vfs_flag & VFS_REMOUNT)
+		return 0;
+	
 	mp = _xfs_get_vfsmount(vfsp, ddev, rtdev);
-	if (vfsp->vfs_flag & VFS_REMOUNT) {
-		return 0;		/* XXX what happens on a remount? */
-	}
 	if (error = xfs_mountfs(vfsp, ddev)) {
-		if (0 == (vfsp->vfs_flag & VFS_REMOUNT)) {
-			/*
-			 * Clean up. Shouldn't need to worry about
-			 * locking stuff.
-			 */
-			freerbuf(mp->m_sb_bp);
-			kmem_free(mp, sizeof(*mp));
-		}
-		/* XXX xlate mount error to something user understandable */
-		return error;
+		/*
+		 * Clean up. Shouldn't need to worry about
+		 * locking stuff.
+		 */
+		kmem_free(mp, sizeof(*mp));
+		return error;		/* error should be in errno.h */
 	}
 
 	/*
@@ -239,14 +248,25 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	 * Get and sanity-check the root inode.
 	 */
 	rip = xfs_iget(mp, NULL, sbp->sb_rootino, XFS_ILOCK_EXCL);
-	if (0 == rip)
-		goto bad;
 	rvp = XFS_ITOV(rip);
-	/* XXX Is inode mode check needed: (((rip->i_mode & IFMT) == IFDIR) */
+	ASSERT(IFDIR == (rip->i_d.di_mode & IFMT));
+	if ((rip->i_d.di_mode & IFMT) != IFDIR) {
+		vmap_t vmap;
+
+		VMAP(rvp, vmap);
+		VN_RELE(rvp);
+		vn_purge(rvp, &vmap);
+
+		prdev("Root inode %d is not a directory",
+		      rip->i_dev, rip->i_ino);
+
+		return (error = EINVAL);
+	}
+
 	s = VN_LOCK(rvp);
 	rvp->v_flag |= VROOT;
 	VN_UNLOCK(rvp, s);
-	/* XXX Does mount struct need:  mp->m_rootip = rip; */
+	mp->m_rootip = rip;				/* save it */
 	xfs_iunlock(rip, XFS_ILOCK_EXCL);
 
 	/*
@@ -262,30 +282,21 @@ xfs_cmountfs(struct vfs 	*vfsp,
 
 	/*
 	 * Call the log's mount-time initialization.
-	 * XXX	xfs_log_mount() always does XFS_LOG_RECOVER.
+	 * xfs_log_mount() always does XFS_LOG_RECOVER.
 	 */
 	ASSERT(sbp->sb_logblocks > 0);		/* check for volume case */
 	error = xfs_log_mount(mp, ddev, xfs_btod(sbp, sbp->sb_logstart),
 			      xfs_btod(sbp, sbp->sb_logblocks), lflags);
-	if (error > 0)
+	if (error > 0) {
 		/*
 		 * XXX	log recovery failure - What action should be taken?
 		 * 	Translate log error to something user understandable
 		 */
 		error = EBUSY;		/* XXX log recovery fail - errno? */
+	}
 
 	return error;
-
-bad:
-	/* XXX do some cleanup. */
-	error = EINVAL;
-	if (rvp) {
-		vmap_t vmap;
-		VMAP(rvp, vmap);
-		VN_RELE(rvp);
-		vn_purge(rvp, &vmap);
-	}
-}
+} /* end of xfs_cmountfs() */
 
 /*
  * _xfs_get_vfsmount() ensures that the given vfs struct has an
@@ -423,41 +434,11 @@ xfs_vfsmount(vfs_t		*vfsp,
 			return EBUSY;
 	}
 
-#if 1
-	error = xfs_cmountfs(vfsp, ddev, rtdev, NONROOT_MOUNT, &args, credp);
-#else
-	/*
-	 * Mount the filesystem.
-	 */
-	mp = _xfs_get_vfsmount(vfsp, ddev, rtdev);
-	if (error = xfs_mountfs(vfsp, ddev)) {
-		if (0 == (vfsp->vfs_flag & VFS_REMOUNT)) {
-			/*
-			 * Clean up. Shouldn't need to worry about
-			 * locking stuff.
-			 */
-			freerbuf(mp->m_sb_bp);
-			kmem_free(mp, sizeof(*mp));
-		}
-		return error;
-	}
-
-	/*
-	 * Call the log's mount-time initialization.
-	 * XXX	xfs_log_mount() always does XFS_LOG_RECOVER.
-	 */
-	sbp = xfs_buf_to_sbp(mp->m_sb_bp);
-	ASSERT(sbp->sb_logblocks > 0);		/* check for volume case */
-	error = xfs_log_mount(mp, ddev, xfs_btod(sbp, sbp->sb_logstart),
-			      xfs_btod(sbp, sbp->sb_logblocks), lflags);
-	if (error > 0)
-		/*
-		 * XXX	log recovery failure - What action should be taken?
-		 */
-		error = EBUSY;		/* XXX log recovery fail - errno? */
-#endif
+	error = xfs_cmountfs(vfsp, ddev, rtdev, NONROOT_MOUNT,
+			     &args, credp, lflags);
 
 	return error;
+
 } /* xfs_vfsmount() */
 
 /*
@@ -502,6 +483,9 @@ xfs_mountroot(vfs_t		*vfsp,
 			return EBUSY;
 		if (rootdev == NODEV)
 			return ENODEV;
+		/*
+		 * XXX Check that the root device holds a XFS file system.
+		 */
 		vfsp->vfs_dev = rootdev;
 		break;
 	  case ROOT_REMOUNT:
@@ -520,7 +504,7 @@ xfs_mountroot(vfs_t		*vfsp,
 	error = vfs_lock(vfsp);
 	if (error)
 		goto bad;
-	error = xfs_cmountfs(vfsp, rootdev, NULL, why, NULL, cr);
+	error = xfs_cmountfs(vfsp, rootdev, NULL, why, NULL, cr, NULL);
 	if (error) {
 		vfs_unlock(vfsp);
 		goto bad;
@@ -566,28 +550,26 @@ xfs_unmount(vfs_t	*vfsp,
 		 */
 
 	/*
-	 * Get rid of root inode (vnode first), if we can.
+	 * Get rid of root inode (vnode) first, if we can.
 	 */
-	rip = xfs_iget(mp, NULL, sbp->sb_rootino, XFS_ILOCK_EXCL);
-	ASSERT(rip != 0);
-	if (0 == rip) {
-		return EINVAL;
-	}
+	rip = mp->m_rootip;
+	xfs_ilock(rip, XFS_ILOCK_EXCL);
 	rvp = XFS_ITOV(rip);
 	if (rvp->v_count != 1) {
 		xfs_iunlock(rip, XFS_ILOCK_EXCL);
 		return EBUSY;
 	}
+	xfs_iunlock(rip, XFS_ILOCK_EXCL);
+
 	VMAP(rvp, vmap);
 	VN_RELE(rvp);
 	vn_purge(rvp, &vmap);
-	xfs_iunlock(rip, XFS_ILOCK_EXCL);
 
 	/*
 	 * Call common unmount function to flush to disk
-	 * and free the super block buffer & mount structure.
+	 * and free the super block buffer & mount structures.
 	 */
-	xfs_umount(mp);			/* XXX okay? */
+	xfs_umount(mp);			/* XXX okay after deleting vnode? */
 
 	/*
 	 * XXX Later when xfs_unmount()'s inode freeing is implemented, do:
@@ -599,7 +581,13 @@ xfs_unmount(vfs_t	*vfsp,
 
 
 /*
- * xfs_root
+ * xfs_root extracts the root vnode from a vfs.
+ * This function is called by traverse() and vfs_mountroot()
+ * when crossing a mount point.
+ *
+ * vfsp -- the vfs struct for the desired file system
+ * vpp  -- address of the caller's vnode pointer which should be
+ *         set to the desired fs root vnode
  */
 STATIC int
 xfs_root(vfs_t		*vfsp,
@@ -609,6 +597,9 @@ xfs_root(vfs_t		*vfsp,
 	xfs_inode_t	*ip;
 	xfs_mount_t	*mp;
 
+#if 1
+	vp = XFS_ITOV((XFS_VFSTOM(vfsp))->m_rootip);	
+#else
 	/*
 	 * XXX	Save pointer to the root inode in the mount struct
 	 * so we don't need to do a iget everytime we want the root
@@ -620,6 +611,7 @@ xfs_root(vfs_t		*vfsp,
 	ip = xfs_iget(mp, NULL, mp->m_sb.sb_rootino, 0);
 	ASSERT(ip != NULL);
 	vp = XFS_ITOV(ip);
+#endif
 
 	VN_HOLD(vp);
 	*vpp = vp;
@@ -681,15 +673,31 @@ xfs_sync(vfs_t		*vp,
 
 /*
  * xfs_vget
- *
- * XXX xfs_vget() is just a stub
  */
 STATIC int
 xfs_vget(vfs_t		*vfsp,
 	 vnode_t	**vpp,
 	 fid_t		*fidp)
 {
-	return 0;
+        xfs_fid_t	*xfid;
+        xfs_inode_t	*ip;
+
+        xfid = (struct xfs_fid *)fidp;
+	ip = xfs_iget(XFS_VFSTOM(vfsp), NULL, xfid->fid_ino, XFS_ILOCK_EXCL);
+        if (NULL == ip) {
+                *vpp = NULL;
+                return EIO;
+        }
+        if (ip->i_gen != xfid->fid_gen) {
+                xfs_iput(ip, XFS_ILOCK_EXCL);
+                *vpp = NULL;
+                return 0;
+        }
+        xfs_iunlock(ip, XFS_ILOCK_EXCL);
+        *vpp = XFS_ITOV(ip);
+        return 0;
+
+
 }
 
 
