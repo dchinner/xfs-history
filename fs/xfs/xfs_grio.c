@@ -1,9 +1,11 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.1 1994/03/04 18:48:41 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.2 1994/03/09 23:54:02 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/errno.h>
+#ifndef SIM
 #include <sys/systm.h>
+#endif
 #include <sys/debug.h>
 #include <sys/buf.h>
 #include <sys/sema.h>
@@ -35,6 +37,11 @@
 #include <sys/fs/xfs_inode_item.h>
 #include <sys/fs/xfs_inode.h>
 
+#ifdef SIM
+#include "sim.h"
+#include "stdio.h"
+#endif
+
 /*
  * These routines determine if a griven file read or write request 
  * has been guaranteed rate I/O and marks the buffer accordingly.
@@ -43,14 +50,14 @@
  *
  */
 
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(SIM)
 extern int	grio_debug;
 #define GRIO_DBPRNT( level, str)        \
         if (grio_debug > level) {       \
                 printf(str);            \
         }
 #else
-#define GRIO_DBPRNT()
+#define GRIO_DBPRNT(s1, s2 )
 #endif
 
 int xfs_grio_add_ticket( int, dev_t, int, int);
@@ -59,6 +66,7 @@ xfs_inode_t *xfs_get_inode ( dev_t, int);
 int xfs_add_ticket_to_inode( xfs_inode_t *, int, int);
 void xfs_remove_ticket_from_inode( xfs_inode_t *, int);
 grio_ticket_t *xfs_io_is_guaranteed( xfs_inode_t *, int);
+STATIC int xfs_grio_issue_io( vnode_t *, uio_t *,int, cred_t *,int);
 
 void ticket_lock_shared( xfs_inode_t *);
 void ticket_lock_exclusive( xfs_inode_t *);
@@ -67,7 +75,8 @@ void ticket_unlock( xfs_inode_t *);
 
 extern int xfs_read_file(vnode_t *, uio_t *, int, cred_t *);
 extern int xfs_write_file(vnode_t *, uio_t *, int, cred_t *);
-extern void iunlock(xfs_inode_t *);
+extern int xfs_diordwr(vnode_t *,uio_t *, int, cred_t *,int);
+extern struct vfs *vfs_devsearch( dev_t );
 
 
 /*
@@ -171,7 +180,7 @@ xfs_grio_add_ticket( int ino, dev_t fs_dev, int sz, int id)
          */
         if (ip = xfs_get_inode( fs_dev, ino )) {
 		ret = xfs_add_ticket_to_inode( ip, sz, id );
-		iunlock( ip );
+		xfs_iunlock( ip, XFS_ILOCK_EXCL );
         }
 #ifdef DEBUG
         else {
@@ -245,7 +254,7 @@ xfs_grio_remove_ticket( int ino, dev_t fs_dev, int id)
 
 	if (ip = xfs_get_inode( fs_dev, ino)) {
 		xfs_remove_ticket_from_inode (ip, id);
-		iunlock( ip );
+		xfs_iunlock( ip, XFS_ILOCK_EXCL );
 	}
 	return(0);
 }
@@ -348,10 +357,7 @@ xfs_request_larger_than_guarantee(xfs_inode_t *ip, int id, uio_t *uiop, int iofl
                         /*
                          * Issue the request.
                          */
-                        if (rw == UIO_READ)
-                                ret = xfs_read_file(vp, uiop, ioflag, credp);
-                        else
-                                ret = xfs_write_file(vp,uiop, ioflag, credp);
+			ret = xfs_grio_issue_io(vp, uiop, ioflag, credp, rw);
 
                         /*
                          * Check for errors.
@@ -389,7 +395,7 @@ xfs_request_larger_than_guarantee(xfs_inode_t *ip, int id, uio_t *uiop, int iofl
 
 
 /*
- * xfs_issue_guaranteed_io()
+ * xfs_grio_req()
  *
  *	This routine issues user guaranteed rate I/O requests. If the
  *	size of the request is larger than the amount guaranteed for the
@@ -403,7 +409,7 @@ xfs_request_larger_than_guarantee(xfs_inode_t *ip, int id, uio_t *uiop, int iofl
  *	non-0 on failure.
  */
 int
-xfs_issue_guaranteed_io( xfs_inode_t *ip, 
+xfs_grio_req( xfs_inode_t *ip, 
 			int id, 
 			uio_t *uiop, 
 			int ioflag,
@@ -455,12 +461,37 @@ xfs_issue_guaranteed_io( xfs_inode_t *ip,
         ticket_unlock(ip);
         if (!ret) {
 		vp = XFS_ITOV(ip);
-                if (rw == UIO_READ)
-                        ret = xfs_read_file(vp, uiop, ioflag, credp);
-                else
-                        ret = xfs_write_file(vp, uiop, ioflag, credp);
+		ret = xfs_grio_issue_io( vp, uiop, ioflag, credp, rw);
         }
         return (ret) ;
+}
+
+/*
+ * xfs_grio_issue_io()
+ *
+ *
+ */
+STATIC int
+xfs_grio_issue_io( vnode_t *vp,
+		   uio_t   *uiop,
+		   int     ioflag,
+		   cred_t  *credp,
+		   int     rw)
+{
+	int ret;
+
+	if (rw == UIO_READ) {
+		if (ioflag & IO_DIRECT)
+			ret = xfs_diordwr( vp, uiop, ioflag, credp, B_READ);
+		else
+			ret = xfs_read_file(vp, uiop, ioflag, credp);
+	} else {
+		if (ioflag & IO_DIRECT)
+			ret = xfs_diordwr( vp, uiop, ioflag, credp, B_WRITE);
+		else
+			ret = xfs_write_file(vp, uiop, ioflag, credp);
+	}
+	return( ret );
 }
 
 
@@ -472,7 +503,9 @@ xfs_issue_guaranteed_io( xfs_inode_t *ip,
 void
 ticket_lock_shared(xfs_inode_t *ip)
 {
+#ifndef SIM
         mrlock(&ip->i_ticketlock, MR_ACCESS, PINOD);
+#endif
 }
 
 /*
@@ -483,7 +516,9 @@ ticket_lock_shared(xfs_inode_t *ip)
 void
 ticket_lock_exclusive(xfs_inode_t *ip)
 {
+#ifndef SIM
         mrlock(&ip->i_ticketlock, MR_UPDATE, PINOD);
+#endif
 }
 
 /*
@@ -494,7 +529,9 @@ ticket_lock_exclusive(xfs_inode_t *ip)
 void
 ticket_unlock(xfs_inode_t *ip)
 {
+#ifndef SIM
         mrunlock(&ip->i_ticketlock);
+#endif
 }
 
 
@@ -522,7 +559,6 @@ xfs_get_file_extents(dev_t fsdev,
  	 * get inode
 	 */
 	if (!(ip = xfs_get_inode( fsdev, ino ))) {
-printf("could not get file for extent lookup \n");
 		return( 1 );
 
 	}
@@ -540,22 +576,19 @@ printf("could not get file for extent lookup \n");
  		 */
 		xfs_bmbt_get_all( ep, rec[i]);
 	}
-printf("copied %d extents \n",extents );
 
 	/* 
 	 * copyout to user space along with count.
  	 */
 	if (copyout( &num_extents, count, sizeof( num_extents))) {
-printf("copyout of extent size failed \n");
 		ret = EFAULT;
 	}
 	if (copyout(rec, extents,recsize )) {
-printf("copyout of extents failed \n");
 		ret = EFAULT;
 	}
 
 	kmem_free(rec, 0 );
-	iunlock( ip );
+	xfs_iunlock( ip, XFS_ILOCK_EXCL );
 	return( ret );
 }
 
@@ -567,7 +600,6 @@ xfs_get_block_size(dev_t fsdev, int *fs_size)
 	vfsp = vfs_devsearch( fsdev );
 	if ( vfsp ) {
 		if (copyout(&(vfsp->vfs_bsize), fs_size, sizeof(*fs_size))) {
-printf("copyout of fs bsize failed \n");
 			ret = EFAULT;
 		}
 	} else {
