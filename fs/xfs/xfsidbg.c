@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.79 $"
+#ident	"$Revision: 1.80 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3557,9 +3557,9 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	printflags(mp->m_flags, xmount_flags,"flags");
 	qprintf("ialloc_inos %d ialloc_blks %d litino %d\n",
 		mp->m_ialloc_inos, mp->m_ialloc_blks, mp->m_litino);
-	qprintf("attroffset %d da_node_ents %d maxicount %lld inoalign %u",
+	qprintf("attroffset %d da_node_ents %d maxicount %lld inoalign_mask %d",
 		mp->m_attroffset, mp->m_da_node_ents, mp->m_maxicount,
-		mp->m_inoalign);
+		mp->m_inoalign_mask);
 #if XFS_BIG_FILESYSTEMS
 	qprintf(" inoadd %llx\n", mp->m_inoadd);
 #else
@@ -3574,8 +3574,8 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		qprintf("quotainfo NULL\n");
 	printflags(mp->m_qflags, quota_flags,"quotaflags");
 	qprintf("\n");
-	qprintf("data alignment %d stripe width %d sinoalign %d\n", 
-		mp->m_dalign, mp->m_swidth, mp->m_sinoalign);
+	qprintf("data alignment %d stripe width %d sinoalign %d da_magicpct %d\n", 
+		mp->m_dalign, mp->m_swidth, mp->m_sinoalign, mp->m_da_magicpct);
 	if (mp->m_fsname != NULL)
 		qprintf("mountpoint \"%s\"\n", mp->m_fsname);
 	else
