@@ -1385,7 +1385,7 @@ xfs_bmbt_get_all(
 	}
 #else	/* !DEBUG */
 	s->br_startoff = (((xfs_fileoff_t)r->l0) << 23) |
-			 ((((xfs_fileoff_t)r->l1) >> 9);
+			 (((xfs_fileoff_t)r->l1) >> 9);
 #endif	/* DEBUG */
 #endif	/* XFS_BIG_FILES */
 #if XFS_BIG_FILESYSTEMS
@@ -1487,7 +1487,7 @@ xfs_bmbt_get_startoff(
 	ASSERT((o >> 32) == 0);
 	return (xfs_fileoff_t)o;
 #else	/* !DEBUG */
-	return (((xfs_fileoff_t)r->l0) << 23) | ((((xfs_fileoff_t)r->l1) >> 9);
+	return (((xfs_fileoff_t)r->l0) << 23) | (((xfs_fileoff_t)r->l1) >> 9);
 #endif	/* DEBUG */
 #endif	/* XFS_BIG_FILES */
 }
