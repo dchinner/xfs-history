@@ -146,7 +146,7 @@ xfs_dm_mount(
 	char		*dir_name,
 	char		*fsname);
 
-int
+extern int
 xfs_dm_get_fsys_vector(
 	bhv_desc_t	*bdp,
 	dm_fcntl_vector_t *vecrq);
@@ -167,9 +167,8 @@ xfs_dm_send_create_event(
 	mode_t		new_mode,
 	int		*good_event_sent);
 
-int
+extern int
 xfs_dmapi_mmap_event(
-	struct file	*filp,
 	struct vm_area_struct *vma,
 	unsigned int	wantflag);
 

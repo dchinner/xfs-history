@@ -2701,7 +2701,6 @@ xfs_dm_mapevent(
 
 int
 xfs_dmapi_mmap_event(
-	struct file	*filp,
 	struct vm_area_struct *vma,
 	unsigned int	wantflag)
 {
@@ -2712,7 +2711,10 @@ xfs_dmapi_mmap_event(
 	dm_fcntl_mapevent_t maprq;
 	dm_eventtype_t	max_event = DM_EVENT_READ;
 
-	vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
+	if (!vma->vm_file)
+		return 0;
+
+	vp = LINVFS_GET_VP(vma->vm_file->f_dentry->d_inode);
 	ASSERT(vp);
 
 	if ((vp->v_type != VREG) || !(vp->v_vfsp->vfs_flag & VFS_DMI))
