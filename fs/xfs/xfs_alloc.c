@@ -62,13 +62,15 @@ xfs_alloc_compute_diff(
  * Fix up the length, based on mod and prod.
  * len should be k * prod + mod for some k.
  * If len is too small it is returned unchanged.
+ * If len hits maxlen it is left alone.
  */
 STATIC xfs_extlen_t			/* new length to use instead of len */
 xfs_alloc_fix_len(
 	xfs_extlen_t	mod,		/* mod value to fix length with */
 	xfs_extlen_t	prod,		/* product value to fix length with */
 	xfs_extlen_t	len,		/* input length */
-	xfs_extlen_t	minlen);	/* minimum length */
+	xfs_extlen_t	minlen,		/* minimum length */
+	xfs_extlen_t	maxlen);	/* maximum length */
 
 /*
  * Read in the allocation group header (free/alloc section).
@@ -206,20 +208,23 @@ xfs_alloc_compute_diff(
  * Fix up the length, based on mod and prod.
  * len should be k * prod + mod for some k.
  * If len is too small it is returned unchanged.
+ * If len hits maxlen it is left alone.
  */
 STATIC xfs_extlen_t			/* new length to use instead of len */
 xfs_alloc_fix_len(
 	xfs_extlen_t	mod,		/* mod value to fix length with */
 	xfs_extlen_t	prod,		/* product value to fix length with */
 	xfs_extlen_t	len,		/* input length */
-	xfs_extlen_t	minlen)		/* minimum length */
+	xfs_extlen_t	minlen,		/* minimum length */
+	xfs_extlen_t	maxlen)		/* maximum length */
 {
 	xfs_extlen_t	k;
 	xfs_extlen_t	rlen;
 
 	ASSERT(mod < prod);
 	ASSERT(len >= minlen);
-	if (prod <= 1 || len < mod || (mod == 0 && len < prod))
+	ASSERT(len <= maxlen);
+	if (prod <= 1 || len < mod || len == maxlen || (mod == 0 && len < prod))
 		return len;
 	k = len % prod;
 	if (k == mod)
@@ -396,7 +401,7 @@ xfs_alloc_ag_vextent_exact(
 	/*
 	 * Fix the length according to mod and prod if given.
 	 */
-	rlen = xfs_alloc_fix_len(mod, prod, end - bno, minlen);
+	rlen = xfs_alloc_fix_len(mod, prod, end - bno, minlen, maxlen);
 	end = bno + rlen;
 	/*
 	 * We are allocating bno for rlen [bno .. end)
@@ -560,7 +565,8 @@ xfs_alloc_ag_vextent_near(
 			 */
 			xfs_alloc_get_rec(cnt_cur, &ltbno, &ltlen);
 			rlen = xfs_extlen_min(ltlen, maxlen);
-			rlen = xfs_alloc_fix_len(mod, prod, rlen, minlen);
+			rlen = xfs_alloc_fix_len(mod, prod, rlen, minlen,
+				maxlen);
 			ltdiff = xfs_alloc_compute_diff(bno, rlen, ltbno, ltlen,
 				&ltnew);
 			if (!besti || ltdiff < bdiff) {
@@ -577,7 +583,7 @@ xfs_alloc_ag_vextent_near(
 		xfs_alloc_get_rec(cnt_cur, &ltbno, &ltlen);
 		ltend = ltbno + ltlen;
 		rlen = xfs_extlen_min(ltlen, maxlen);
-		rlen = xfs_alloc_fix_len(mod, prod, rlen, minlen);
+		rlen = xfs_alloc_fix_len(mod, prod, rlen, minlen, maxlen);
 		/*
 		 * Delete that entry from the by-size tree.
 		 */
@@ -742,7 +748,8 @@ xfs_alloc_ag_vextent_near(
 			 * Fix up the length.
 			 */
 			rlen = xfs_extlen_min(ltlen, maxlen);
-			rlen = xfs_alloc_fix_len(mod, prod, rlen, minlen);
+			rlen = xfs_alloc_fix_len(mod, prod, rlen, minlen,
+				maxlen);
 			ltdiff = xfs_alloc_compute_diff(bno, rlen, ltbno,
 				ltlen, &ltnew);
 			/*
@@ -773,7 +780,8 @@ xfs_alloc_ag_vextent_near(
 						rlen = xfs_extlen_min(gtlen,
 							maxlen);
 						rlen = xfs_alloc_fix_len(mod,
-							prod, rlen, minlen);
+							prod, rlen, minlen,
+							maxlen);
 						gtdiff = xfs_alloc_compute_diff(
 							bno, rlen, gtbno, gtlen,
 							&gtnew);
@@ -823,7 +831,8 @@ xfs_alloc_ag_vextent_near(
 			 * Fix up the length.
 			 */
 			rlen = xfs_extlen_min(gtlen, maxlen);
-			rlen = xfs_alloc_fix_len(mod, prod, rlen, minlen);
+			rlen = xfs_alloc_fix_len(mod, prod, rlen, minlen,
+				maxlen);
 			gtdiff = xfs_alloc_compute_diff(bno, rlen, gtbno, gtlen,
 				&gtnew);
 			/*
@@ -854,7 +863,8 @@ xfs_alloc_ag_vextent_near(
 						rlen = xfs_extlen_min(ltlen,
 							maxlen);
 						rlen = xfs_alloc_fix_len(mod,
-							prod, rlen, minlen);
+							prod, rlen, minlen,
+							maxlen);
 						ltdiff = xfs_alloc_compute_diff(
 							bno, rlen, ltbno, ltlen,
 							&ltnew);
@@ -910,7 +920,7 @@ xfs_alloc_ag_vextent_near(
 		 */
 		ltend = ltbno + ltlen;
 		rlen = xfs_extlen_min(ltlen, maxlen);
-		rlen = xfs_alloc_fix_len(mod, prod, rlen, minlen);
+		rlen = xfs_alloc_fix_len(mod, prod, rlen, minlen, maxlen);
 		ltdiff = xfs_alloc_compute_diff(bno, rlen, ltbno, ltlen,
 			&ltnew);
 		ltnewend = ltnew + rlen;
@@ -979,7 +989,7 @@ xfs_alloc_ag_vextent_near(
 		 */
 		gtend = gtbno + gtlen;
 		rlen = xfs_extlen_min(gtlen, maxlen);
-		rlen = xfs_alloc_fix_len(mod, prod, rlen, minlen);
+		rlen = xfs_alloc_fix_len(mod, prod, rlen, minlen, maxlen);
 		gtdiff = xfs_alloc_compute_diff(bno, rlen, gtbno, gtlen,
 			&gtnew);
 		gtnewend = gtnew + rlen;
@@ -1079,7 +1089,7 @@ xfs_alloc_ag_vextent_size(
 	/*
 	 * Fix up the length.
 	 */
-	rlen = xfs_alloc_fix_len(mod, prod, rlen, minlen);
+	rlen = xfs_alloc_fix_len(mod, prod, rlen, minlen, maxlen);
 	/*
 	 * Delete the entry from the by-size btree.
 	 */
