@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.87 $"
+#ident	"$Revision: 1.89 $"
 
 /*
  * High level interface routines for log manager
@@ -1980,6 +1980,7 @@ STATIC void
 xlog_state_ticket_alloc(xlog_t *log)
 {
 	xlog_ticket_t	*t_list;
+	xlog_ticket_t	*next;
 	caddr_t		buf;
 	int		spl;
 	uint		i = (NBPP / sizeof(xlog_ticket_t)) - 2;
@@ -1995,18 +1996,25 @@ xlog_state_ticket_alloc(xlog_t *log)
 	/* Attach 1st ticket to Q, so we can keep track of allocated memory */
 	t_list = (xlog_ticket_t *)buf;
 	t_list->t_next = log->l_unmount_free;
-	log->l_unmount_free = t_list;
+	log->l_unmount_free = t_list++;
 	log->l_ticket_cnt++;
 	log->l_ticket_tcnt++;
 
 	/* Next ticket becomes first ticket attached to ticket free list */
-	log->l_freelist = ++t_list;
+	if (log->l_freelist != NULL) {
+		ASSERT(log->l_tail != NULL);
+		log->l_tail->t_next = t_list;
+	} else {
+		log->l_freelist = t_list;
+	}
 	log->l_ticket_cnt++;
 	log->l_ticket_tcnt++;
 
 	/* Cycle through rest of alloc'ed memory, building up free Q */
 	for ( ; i > 0; i--) {
-		t_list->t_next = ++t_list;
+		next = t_list + 1;
+		t_list->t_next = next;
+		t_list = next;
 		log->l_ticket_cnt++;
 		log->l_ticket_tcnt++;
 	}
@@ -2036,7 +2044,12 @@ xlog_ticket_put(xlog_t		*log,
 #else
 	/* When we debug, it is easier if tickets are cycled */
 	ticket->t_next     = 0;
-	log->l_tail->t_next = ticket;
+	if (log->l_tail != 0) {
+		log->l_tail->t_next = ticket;
+	} else {
+		ASSERT(log->l_freelist == 0);
+		log->l_freelist = ticket;
+	}
 	log->l_tail	    = ticket;
 #endif /* DEBUG */
 	log->l_ticket_cnt++;
@@ -2056,12 +2069,19 @@ xlog_ticket_get(xlog_t		*log,
 	xlog_ticket_t	*tic;
 	int		spl;
 
+ alloc:
 	if (log->l_freelist == NULL)
 		xlog_state_ticket_alloc(log);		/* potentially sleep */
 
 	spl = LOG_LOCK(log);
+	if (log->l_freelist == NULL) {
+		LOG_UNLOCK(log, spl);
+		goto alloc;
+	}
 	tic		= log->l_freelist;
 	log->l_freelist	= tic->t_next;
+	if (log->l_freelist == NULL)
+		log->l_tail = NULL;
 	log->l_ticket_cnt--;
 	LOG_UNLOCK(log, spl);
 
