@@ -1016,12 +1016,12 @@ xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	buf_t *bp;
 	int retval, eob;
 
-	bp = xfs_dir_read_buf(trans, dp, 0);
-	ASSERT(bp != NULL);
 	if (XFS_DIR_COOKIE_BNO(dp->i_mount, uio->uio_offset) > 0) {
 		*eofp = 1;
 		return(XFS_ERROR(ENOENT));
 	}
+	bp = xfs_dir_read_buf(trans, dp, 0);
+	ASSERT(bp != NULL);
 	retval = xfs_dir_leaf_getdents_int(bp, dp, uio, &eob, dbp);
 	xfs_trans_brelse(trans, bp);
 	if (*eofp = eob)
