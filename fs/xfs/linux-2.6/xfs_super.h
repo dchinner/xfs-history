@@ -32,6 +32,9 @@
 #ifndef __XFS_SUPER_H__
 #define __XFS_SUPER_H__
 
+#ifdef CONFIG_DEBUG_SPINLOCK
+# error CONFIG_DEBUG_SPINLOCK is currently incompatible with XFS
+#endif
 
 #ifdef CONFIG_FS_POSIX_ACL
 # define XFS_ACL_STRING		"ACLs, "
