@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.82 $"
+#ident	"$Revision$"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -11,6 +11,11 @@
 #include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL
+#endif
+#ifndef SIM
+#include <sys/systm.h>
+#else
+#include <bstring.h>
 #endif
 #include <sys/stat.h>
 #include <sys/debug.h>
@@ -36,6 +41,7 @@
 #include "xfs_alloc.h"
 #include "xfs_bit.h"
 #include "xfs_rtalloc.h"
+#include "xfs_error.h"
 #ifdef SIM
 #include "sim.h"
 #endif
@@ -60,9 +66,9 @@ xfs_ialloc_log_di(
 
 /*
  * Allocate new inodes in the allocation group specified by agbp.
- * Return 0 for failure, 1 for success.
+ * Return 0 for success, else error code.
  */
-STATIC int				/* error */
+STATIC int				/* error code or 0 */
 xfs_ialloc_ag_alloc(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	buf_t		*agbp,		/* alloc group buffer */
@@ -103,10 +109,12 @@ xfs_ialloc_log_di(
 		offsetof(xfs_dinode_core_t, di_mode),
 		offsetof(xfs_dinode_core_t, di_version),
 		offsetof(xfs_dinode_core_t, di_format),
-		offsetof(xfs_dinode_core_t, di_nlink),
+		offsetof(xfs_dinode_core_t, di_onlink),
 		offsetof(xfs_dinode_core_t, di_uid),
 		offsetof(xfs_dinode_core_t, di_gid),
-		offsetof(xfs_dinode_core_t, di_uuid),
+		offsetof(xfs_dinode_core_t, di_nlink),
+		offsetof(xfs_dinode_core_t, di_projid),
+		offsetof(xfs_dinode_core_t, di_pad),
 		offsetof(xfs_dinode_core_t, di_atime),
 		offsetof(xfs_dinode_core_t, di_mtime),
 		offsetof(xfs_dinode_core_t, di_ctime),
@@ -150,9 +158,9 @@ xfs_ialloc_log_di(
 
 /*
  * Allocate new inodes in the allocation group specified by agbp.
- * Return 0 for failure, 1 for success.
+ * Return 0 for success, else error code.
  */
-STATIC int				/* success/failure */
+STATIC int				/* error code or 0 */
 xfs_ialloc_ag_alloc(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	buf_t		*agbp,		/* alloc group buffer */
@@ -173,18 +181,21 @@ xfs_ialloc_ag_alloc(
 	xfs_agino_t	newlen;		/* new number of inodes */
 	int		ninodes;	/* num inodes per buf */
 	xfs_agino_t	thisino;	/* current inode number, for loop */
+	int		version;	/* inode version number to use */
 	static xfs_timestamp_t ztime;	/* zero xfs timestamp */
-	static uuid_t	zuuid;		/* zero uuid */
 
 	args.tp = tp;
 	args.mp = tp->t_mountp;
-	agi = XFS_BUF_TO_AGI(agbp);
 	/*
 	 * Locking will ensure that we don't have two callers in here
 	 * at one time.
 	 */
 	newlen = XFS_IALLOC_INODES(args.mp);
+	if (args.mp->m_maxicount &&
+	    args.mp->m_sb.sb_icount + newlen > args.mp->m_maxicount)
+		return XFS_ERROR(ENOSPC);
 	args.minlen = args.maxlen = XFS_IALLOC_BLOCKS(args.mp);
+	agi = XFS_BUF_TO_AGI(agbp);
 	/*
 	 * Need to figure out where to allocate the inode blocks.
 	 * Ideally they should be spaced out through the a.g.
@@ -230,6 +241,19 @@ xfs_ialloc_ag_alloc(
 		nbufs = (int)args.len / blks_per_cluster;
 		ninodes = blks_per_cluster * args.mp->m_sb.sb_inopblock;
 	}
+
+	/*
+	 * Figure out what version number to use in the inodes we create.
+	 * If the superblock version has caught up to the one that supports
+	 * the new inode format, then use the new inode version.  Otherwise
+	 * use the old version so that old kernels will continue to be
+	 * able to use the file system.
+	 */
+	if (args.mp->m_sb.sb_versionnum < XFS_SB_VERSION_HASNLINK) {
+		version = XFS_DINODE_VERSION_1;
+	} else {
+		version = XFS_DINODE_VERSION_2;
+	}
 	for (j = 0; j < nbufs; j++) {
 		/*
 		 * Get the block.
@@ -248,12 +272,15 @@ xfs_ialloc_ag_alloc(
 			free = XFS_MAKE_IPTR(args.mp, fbuf, i);
 			free->di_core.di_magic = XFS_DINODE_MAGIC;
 			free->di_core.di_mode = 0;
-			free->di_core.di_version = XFS_DINODE_VERSION;
+			free->di_core.di_version = version;
 			free->di_core.di_format = 0;
-			free->di_core.di_nlink = 0;
+			free->di_core.di_onlink = 0;
 			free->di_core.di_uid = 0;
 			free->di_core.di_gid = 0;
-			free->di_core.di_uuid = zuuid;
+			free->di_core.di_nlink = 0;
+			free->di_core.di_projid = 0;
+			bzero(&(free->di_core.di_pad[0]),
+			      sizeof(free->di_core.di_pad));
 			free->di_core.di_atime = ztime;
 			free->di_core.di_mtime = ztime;
 			free->di_core.di_ctime = ztime;
@@ -529,7 +556,12 @@ xfs_dialloc(
 		 */
 		error = xfs_ialloc_ag_alloc(tp, agbp, &ialloced);
 		if (error) {
-			return error;
+			xfs_trans_brelse(tp, agbp);
+			if (error == ENOSPC) {
+				*inop = NULLFSINO;
+				return 0;
+			} else
+				return error;
 		}
 		if (ialloced) {
 			/*
