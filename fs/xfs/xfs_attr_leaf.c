@@ -2343,20 +2343,21 @@ xfs_attr_leaf_flipflags(xfs_da_args_t *args)
 
 /*
  * Recurse (gasp!) through the attribute nodes until we find leaves.
- * We're doing a depth-first traversal in order to bunmap() everything.
+ * We're doing a depth-first traversal in order to invalidate everything.
  */
 int
 xfs_attr_root_inactive(xfs_trans_t **trans, xfs_inode_t *dp)
 {
-	xfs_fsblock_t firstblock;
-	xfs_bmap_free_t flist;
 	xfs_da_blkinfo_t *info;
 	daddr_t blkno;
 	buf_t *bp;
-	int error, committed, done;
+	int error;
 
 	/*
 	 * Read block 0 to see what we have to work with.
+	 * We only get here if we have extents, since we remove
+	 * the extents in reverse order the extent containing
+	 * block 0 must still be there.
 	 */
 	error = xfs_da_read_buf(*trans, dp, 0, -1, &bp, XFS_ATTR_FORK);
 	if (error)
@@ -2364,7 +2365,7 @@ xfs_attr_root_inactive(xfs_trans_t **trans, xfs_inode_t *dp)
 	blkno = bp->b_blkno;	/* save for re-read later */
 
 	/*
-	 * Remove the tree, even if the "tree" is only a single leaf block.
+	 * Invalidate the tree, even if the "tree" is only a single leaf block.
 	 * This is a depth-first traversal!
 	 */
 	info = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
@@ -2386,71 +2387,27 @@ xfs_attr_root_inactive(xfs_trans_t **trans, xfs_inode_t *dp)
 	if (error)
 		return(error);
 	xfs_trans_binval(*trans, bp);	/* remove from cache */
-	xfs_trans_set_sync(*trans);	/* GROT: is this req'd */
-
 	/*
-	 * Now that we've either removed all the children of the root node,
-	 * or removed all the "remote" values of the single leaf block,
-	 * we can remove this (root) block.  We keep deallocating attribute
-	 * extents until all of them are gone (just in case there are more).
-	 *
-	 * This code assumes that the only way to get into this state is if
-	 * we are removing a "remote value" attribute and crash in the middle.
-	 * We would be left with blocks allocated to the inode but not
-	 * referenced by the attribute btree structure.  Since there has been
-	 * (by definition) a system reboot since we last referred to those
-	 * blocks, there can be no buffer cache blocks to clean up.  Since
-	 * this is in "inactive" there can be no users of these blocks, so we
-	 * just do what it takes to blow it away.
+	 * Commit the invalidate and start the next transaction.
 	 */
-	done = 0;
-	while (!done) {
-		XFS_BMAP_INIT(&flist, &firstblock);
-		error = xfs_bunmapi(*trans, dp, 0, 0x40000000,	/* ugly */
-				    XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA,
-				    1, &firstblock, &flist, &done);
-		if (!error) {
-			error = xfs_bmap_finish(trans, &flist, firstblock,
-						       &committed);
-		}
-		if (error) {
-			xfs_bmap_cancel(&flist);
-			return(error);
-		}
+	xfs_attr_rolltrans(trans, dp);
 
-		/*
-		 * bmap_finish() may have committed the last trans and started
-		 * a new one.  We need the inode to be in all transactions.
-		 */
-		if (committed) {
-			xfs_trans_ijoin(*trans, dp, XFS_ILOCK_EXCL);
-			xfs_trans_ihold(*trans, dp);
-		}
-
-		/*
-		 * Commit the deallocation and start the next trans.
-		 */
-		xfs_attr_rolltrans(trans, dp);
-	}
 	return(0);	
 }
 
 /*
  * Recurse (gasp!) through the attribute nodes until we find leaves.
- * We're doing a depth-first traversal in order to bunmap() everything.
+ * We're doing a depth-first traversal in order to invalidate everything.
  */
 int
 xfs_attr_node_inactive(xfs_trans_t **trans, xfs_inode_t *dp, buf_t *bp,
 				   int level)
 {
-	xfs_fsblock_t firstblock;
-	xfs_bmap_free_t flist;
 	xfs_da_blkinfo_t *info;
 	xfs_da_intnode_t *node;
-	xfs_da_node_entry_t *btree;
 	xfs_dablk_t child_fsb;
 	daddr_t parent_blkno, child_blkno;
-	int error, count, tmp, i;
+	int error, count, i;
 	buf_t *child_bp;
 
 	/*
@@ -2464,22 +2421,10 @@ xfs_attr_node_inactive(xfs_trans_t **trans, xfs_inode_t *dp, buf_t *bp,
 	ASSERT(node->hdr.info.magic == XFS_DA_NODE_MAGIC);
 	parent_blkno = bp->b_blkno;	/* save for re-read later */
 	count = node->hdr.count;
-
-	/*
-	 * If we have restarted this code, then we have already removed
-	 * sections of the tree, skip over those sections.
-	 */
-	for (btree = node->btree, i = 0; i < count; btree++, i++) {
-		if (btree->before) {
-			child_fsb = btree->before;
-			break;
-		}
-	}
-	xfs_trans_brelse(*trans, bp); /* no locks for later trans */
-	if (i >= count) {
+	if (!count)
 		return(0);
-	}
-
+	child_fsb = node->btree[0].before;
+	xfs_trans_brelse(*trans, bp);	/* no locks for later trans */
 
 	/*
 	 * If this is the node level just above the leaves, simply loop
@@ -2490,91 +2435,59 @@ xfs_attr_node_inactive(xfs_trans_t **trans, xfs_inode_t *dp, buf_t *bp,
 		/*
 		 * Read the subsidiary block to see what we have to work with.
 		 * Don't do this in a transaction.  This is a depth-first
-		 * traversal of the tree so we may do hundreds of transactions
-		 * before we want to make any changes to this block.
+		 * traversal of the tree so we may deal with many blocks
+		 * before we come back to this one.
 		 */
-		error = xfs_da_read_buf(*trans, dp, child_fsb, -1, &child_bp,
+		error = xfs_da_read_buf(*trans, dp, child_fsb, -2, &child_bp,
 						XFS_ATTR_FORK);
 		if (error)
 			return(error);
-		child_blkno = child_bp->b_blkno; /* save for re-read later */
+		if (child_bp) {
+						/* save for re-read later */
+			child_blkno = child_bp->b_blkno;
 
-		/*
-		 * Remove the subtree, however we have to.
-		 */
-		info = (xfs_da_blkinfo_t *)child_bp->b_un.b_addr;
-		if (info->magic == XFS_DA_NODE_MAGIC) {
-			error = xfs_attr_node_inactive(trans, dp, child_bp,
-							      level+1);
-		} else if (info->magic == XFS_ATTR_LEAF_MAGIC) {
-			error = xfs_attr_leaf_inactive(trans, dp, child_bp);
-		} else {
-			error = XFS_ERROR(EIO);
-			xfs_trans_brelse(*trans, child_bp);
-		}
-		if (error)
-			return(error);
+			/*
+			 * Invalidate the subtree, however we have to.
+			 */
+			info = (xfs_da_blkinfo_t *)child_bp->b_un.b_addr;
+			if (info->magic == XFS_DA_NODE_MAGIC) {
+				error = xfs_attr_node_inactive(trans, dp,
+						child_bp, level+1);
+			} else if (info->magic == XFS_ATTR_LEAF_MAGIC) {
+				error = xfs_attr_leaf_inactive(trans, dp,
+						child_bp);
+			} else {
+				error = XFS_ERROR(EIO);
+				xfs_trans_brelse(*trans, child_bp);
+			}
+			if (error)
+				return(error);
 
-		/*
-		 * Remove the subsidiary block from the cache and from the log.
-		 */
-		error = xfs_da_read_buf(*trans, dp, 0, child_blkno, &child_bp,
-						XFS_ATTR_FORK);
-		if (error)
-			return(error);
-		xfs_trans_binval(*trans, child_bp);
-		xfs_trans_set_sync(*trans);	/* GROT: is this req'd */
-
-		/*
-		 * Free the subsidiary block.
-		 */
-		XFS_BMAP_INIT(&flist, &firstblock);
-		error = xfs_bunmapi(*trans, dp, child_fsb, 1,
-				    XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA,
-				    1, &firstblock, &flist, &tmp);
-		if (!error) {
-			error = xfs_bmap_finish(trans, &flist, firstblock,
-						       &tmp);
-		}
-		if (error) {
-			xfs_bmap_cancel(&flist);
-			continue;
+			/*
+			 * Remove the subsidiary block from the cache
+			 * and from the log.
+			 */
+			error = xfs_da_read_buf(*trans, dp, 0, child_blkno,
+				&child_bp, XFS_ATTR_FORK);
+			if (error)
+				return(error);
+			xfs_trans_binval(*trans, child_bp);
 		}
 
 		/*
-		 * bmap_finish() may have committed the last trans and started
-		 * a new one.  We need the inode to be in all transactions.
-		 */
-		if (tmp) {
-			xfs_trans_ijoin(*trans, dp, XFS_ILOCK_EXCL);
-			xfs_trans_ihold(*trans, dp);
-		}
-
-		/*
-		 * Remove the pointer to the block being freed.
-		 */
-		error = xfs_da_read_buf(*trans, dp, 0, parent_blkno, &bp,
-						XFS_ATTR_FORK);
-		if (error)
-			return(error);
-		node = (xfs_da_intnode_t *)bp->b_un.b_addr;
-		ASSERT(node->hdr.info.magic == XFS_DA_NODE_MAGIC);
-		btree = &node->btree[i];
-		btree->hashval = 0;
-		btree->before = 0;
-		xfs_trans_log_buf(*trans, bp,
-				  XFS_DA_LOGRANGE(node, btree, sizeof(*btree)));
-
-		/*
-		 * Pick up the child's block number for the next loop.
+		 * If we're not done, re-read the parent to get the next
+		 * child block number.
 		 */
 		if ((i+1) < count) {
-			btree++;
-			child_fsb = btree->before;
+			error = xfs_da_read_buf(*trans, dp, 0, parent_blkno,
+				&bp, XFS_ATTR_FORK);
+			if (error)
+				return(error);
+			child_fsb = node->btree[i+1].before;
+			xfs_trans_brelse(*trans, bp);
 		}
-
 		/*
-		 * Atomically commit the whole unmap and de-reference stuff.
+		 * Atomically commit the whole invalidate stuff.
 		 */
 		xfs_attr_rolltrans(trans, dp);
 	}
@@ -2583,14 +2496,8 @@ xfs_attr_node_inactive(xfs_trans_t **trans, xfs_inode_t *dp, buf_t *bp,
 }
 
 /*
- * Free all of the "remote" value regions pointed to by a particular
- * leaf block.  We do not bother to log changes to the leaf block as we
- * free up each remote region, bunmapi() can be called on a logical file
- * address range that does not have any associated disk space without a
- * problem so we just avoid that log traffic.  If we restart this because
- * of a system crash, then we will do a bit more work but would have saved
- * lots of cycles under the normal case.
- *
+ * Invalidate all of the "remote" value regions pointed to by a particular
+ * leaf block.
  * Note that we must release the lock on the buffer so that we are not
  * caught holding something that the logging code wants to flush to disk.
  */
@@ -2614,9 +2521,8 @@ xfs_attr_leaf_inactive(xfs_trans_t **trans, xfs_inode_t *dp, buf_t *bp)
 	for (i = 0; i < leaf->hdr.count; entry++, i++) {
 		if (entry->nameidx && ((entry->flags & XFS_ATTR_LOCAL) == 0)) {
 			name_rmt = XFS_ATTR_LEAF_NAME_REMOTE(leaf, i);
-			if (name_rmt->valueblk != 0) {
+			if (name_rmt->valueblk != 0)
 				count++;
-			}
 		}
 	}
 
@@ -2653,7 +2559,7 @@ xfs_attr_leaf_inactive(xfs_trans_t **trans, xfs_inode_t *dp, buf_t *bp)
 	xfs_trans_brelse(*trans, bp);	/* unlock for trans. in freextent() */
 
 	/*
-	 * Remove each of the "remote" value extents.
+	 * Invalidate each of the "remote" value extents.
 	 */
 	error = 0;
 	for (lp = list, i = 0; i < count; i++, lp++) {
@@ -2668,18 +2574,16 @@ xfs_attr_leaf_inactive(xfs_trans_t **trans, xfs_inode_t *dp, buf_t *bp)
 }
 
 /*
- * Keep de-allocating extents until the remote-value region is gone,
- * invalidate any buffers that happen to be incore.
+ * Look at all the extents for this logical region,
+ * invalidate any buffers that are incore/in transactions.
  */
 int
 xfs_attr_leaf_freextent(xfs_trans_t **trans, xfs_inode_t *dp,
 				    xfs_dablk_t blkno, int blkcnt)
 {
 	xfs_bmbt_irec_t map;
-	xfs_fsblock_t firstblock;
-	xfs_bmap_free_t flist;
 	xfs_dablk_t tblkno;
-	int tblkcnt, dblkcnt, nmap, done, error, committed;
+	int tblkcnt, dblkcnt, nmap, error;
 	daddr_t dblkno;
 	buf_t *bp;
 
@@ -2693,11 +2597,10 @@ xfs_attr_leaf_freextent(xfs_trans_t **trans, xfs_inode_t *dp,
 		/*
 		 * Try to remember where we decided to put the value.
 		 */
-		XFS_BMAP_INIT(&flist, &firstblock);
 		nmap = 1;
-		error = xfs_bmapi(NULL, dp, (xfs_fileoff_t)tblkno, tblkcnt,
+		error = xfs_bmapi(*trans, dp, (xfs_fileoff_t)tblkno, tblkcnt,
 					XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA,
-					&firstblock, 0, &map, &nmap, &flist);
+					NULL, 0, &map, &nmap, NULL);
 		if (error) {
 			return(error);
 		}
@@ -2705,10 +2608,8 @@ xfs_attr_leaf_freextent(xfs_trans_t **trans, xfs_inode_t *dp,
 		ASSERT(map.br_startblock != DELAYSTARTBLOCK);
 
 		/*
-		 * The value may have already been unmapped if we're
-		 * currently processing an unlinked file during
-		 * recovery, so just skip the blocks if they're not
-		 * there.
+		 * If it's a hole, these are already unmapped 
+		 * so there's nothing to invalidate.
 		 */
 		if (map.br_startblock != HOLESTARTBLOCK) {
 
@@ -2716,56 +2617,19 @@ xfs_attr_leaf_freextent(xfs_trans_t **trans, xfs_inode_t *dp,
 						  map.br_startblock);
 			dblkcnt = XFS_FSB_TO_BB(dp->i_mount,
 						map.br_blockcount);
-
+			bp = xfs_trans_get_buf(*trans, dp->i_mount->m_dev,
+					dblkno, dblkcnt, 0);
+			xfs_trans_binval(*trans, bp);
 			/*
-			 * If the "remote" value is in the cache, remove it.
+			 * Roll to next transaction.
 			 */
-			bp = incore(dp->i_mount->m_dev, dblkno, dblkcnt, 1);
-			if (bp) {
-				bp->b_flags |= B_STALE;
-				bp->b_flags &= ~B_DELWRI;
-				brelse(bp);
-				bp = NULL;
-			}
+			xfs_attr_rolltrans(trans, dp);
 		}
 
 		tblkno += map.br_blockcount;
 		tblkcnt -= map.br_blockcount;
 	}
 
-	/*
-	 * Keep deallocating extents in the "remote" value region until 
-	 * all of them are gone.
-	 */
-	done = 0;
-	while (!done) {
-		XFS_BMAP_INIT(&flist, &firstblock);
-		error = xfs_bunmapi(*trans, dp, blkno, blkcnt,
-				    XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA,
-				    1, &firstblock, &flist, &done);
-		if (!error) {
-			error = xfs_bmap_finish(trans, &flist, firstblock,
-						       &committed);
-		}
-		if (error) {
-			xfs_bmap_cancel(&flist);
-			return(error);
-		}
-
-		/*
-		 * bmap_finish() may have committed the last trans and started
-		 * a new one.  We need the inode to be in all transactions.
-		 */
-		if (committed) {
-			xfs_trans_ijoin(*trans, dp, XFS_ILOCK_EXCL);
-			xfs_trans_ihold(*trans, dp);
-		}
-
-		/*
-		 * Commit the deallocation and start the next trans in series.
-		 */
-		xfs_attr_rolltrans(trans, dp);
-	}
 	return(0);
 }
 
