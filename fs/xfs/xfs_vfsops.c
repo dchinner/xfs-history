@@ -1093,7 +1093,7 @@ devvptoxfs(
 	if (error = VOP_OPEN(&devvp, FREAD, cr))
 		return error;
 	dev = devvp->v_rdev;
-	VOP_RWLOCK(devvp, 1);
+	VOP_RWLOCK(devvp, VRWLOCK_WRITE);
 	if (VTOS(devvp)->s_flag & SMOUNTED) {
 		/*
 		 * Device is mounted.  Get an empty buffer to hold a
@@ -1127,7 +1127,7 @@ devvptoxfs(
 		} else
 			fs = (xfs_sb_t *)bp->b_un.b_addr;
 	}
-	VOP_RWUNLOCK(devvp, 1);
+	VOP_RWUNLOCK(devvp, VRWLOCK_WRITE);
 	*bpp = bp;
 	*fsp = fs;
 	return error;
