@@ -799,6 +799,8 @@ retry:
 				}
 			case 2:
 				sync_blockdev(vp->v_vfsp->vfs_super->s_bdev);
+				xfs_log_force(ip->i_mount, (xfs_lsn_t)0,
+						XFS_LOG_FORCE|XFS_LOG_SYNC);
 
 				error = 0;
 /**
