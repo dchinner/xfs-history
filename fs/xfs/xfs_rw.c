@@ -1,4 +1,4 @@
-#ident "$Revision: 1.240 $"
+#ident "$Revision: 1.241 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1843,8 +1843,7 @@ xfs_zero_last_block(
 	 * buffer go thru or not, in case of a forced shutdown.
 	 */
 	ASSERT(bp->b_vp);
-	if (imap.br_startblock == DELAYSTARTBLOCK ||
-	    imap.br_state == XFS_EXT_UNWRITTEN) {
+	if (imap.br_startblock == DELAYSTARTBLOCK) {
 		bdwrite(bp);
 	} else {
 		error = bwrite(bp);
@@ -3822,13 +3821,17 @@ xfs_cmp_gap_list_and_zero(
 
 
 /*
- * "Read" in a buffer whose b_blkno is -1.  This means that
- * at the time the buffer was created there was no underlying
- * backing store for the range of the file covered by the bp.
+ * "Read" in a buffer whose b_blkno is -1 or uninitialized.
+ * If b_blkno is -1, this means that at the time the buffer was created
+ * there was no underlying backing store for the range of the file covered
+ * by the bp. An uninitialized buffer (with B_UNINITIAL set) indicates
+ * that there is allocated storage, but all or some portions of the
+ * underlying blocks have never been written.
+ *
  * To figure out the current state of things, we lock the inode
  * and call xfs_bmapi() to look at the current extents format.
- * If we're over a hole or delayed allocation space we simply
- * zero the corresponding portions of the buffer.  For parts
+ * If we're over a hole, delayed allocation or uninitialized space we
+ * simply zero the corresponding portions of the buffer.  For parts
  * over real disk space we need to read in the stuff from disk.
  *
  * We know that we can just use xfs_ilock(SHARED) rather than
@@ -3866,7 +3869,7 @@ xfs_strat_read(
 #define	XFS_STRAT_READ_IMAPS	XFS_BMAP_MAX_NMAP
 	xfs_bmbt_irec_t	imap[XFS_STRAT_READ_IMAPS];
 	
-	ASSERT(bp->b_blkno == -1);
+	ASSERT((bp->b_blkno == -1) || (bp->b_flags & B_UNINITIAL));
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
 	offset_fsb = XFS_BB_TO_FSBT(mp, bp->b_offset);
@@ -4261,6 +4264,7 @@ xfs_strat_write_iodone(
 	buf_t	*bp)
 {
 	bhv_desc_t 	*bdp;
+	/* REFERENCED */
 	xfs_inode_t	*ip;
 	int		s;
 
@@ -4271,7 +4275,7 @@ xfs_strat_write_iodone(
 	ASSERT(xfsc_count > 0);
 	ip = XFS_BHVTOI(bdp);
 	/*
-	 * Delay I/O done work until the transaction is cmpleted.
+	 * Delay I/O done work until the transaction is completed.
 	 */
 	bp->b_iodone = NULL;
 	ASSERT(bp->b_flags & B_BUSY);
@@ -4298,8 +4302,6 @@ xfs_strat_write_iodone(
 	}
 	buftrace("STRAT_WRITE_IODONE", bp);
 	xfsc_bufcount++;
-	ASSERT(ip->i_queued_bufs >= 0);
-	atomicAddInt(&(ip->i_queued_bufs), 1);
 	xfs_strat_write_bp_trace(XFS_STRAT_ENTER, ip, bp);
 	(void)sv_signal(&xfsc_wait);
 	mp_mutex_spinunlock(&xfsc_lock, s);
@@ -4319,6 +4321,7 @@ xfs_strat_comp(void)
 	buf_t		*back;
 	xfs_fileoff_t	offset_fsb;
 	xfs_filblks_t	count_fsb;
+	xfs_filblks_t	numblks_fsb;
 	xfs_bmbt_irec_t	imap;
 	int		nimaps;
 	int		nres;
@@ -4366,71 +4369,85 @@ xfs_strat_comp(void)
 		ip = XFS_BHVTOI(bdp);
 		mp = ip->i_mount;
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
-		nres = XFS_DIOSTRAT_SPACE_RES(mp, 0);	/* temp */
-		xfs_strat_write_bp_trace(XFS_STRAT_UNINT_CMPL, ip, bp);
-		/*
-		 * Set up a transaction with which to allocate the
-		 * backing store for the file.  Do allocations in a
-		 * loop until we get some space in the range we are
-		 * interested in.  The other space that might be allocated
-		 * is in the delayed allocation extent on which we sit
-		 * but before our buffer starts.
-		 */
-		tp = xfs_trans_alloc(mp, XFS_TRANS_STRAT_WRITE);
-		error = xfs_trans_reserve(tp, nres, XFS_WRITE_LOG_RES(mp),
-			0, XFS_TRANS_PERM_LOG_RES, XFS_WRITE_LOG_COUNT);
-		if (error) {
-			xfs_trans_cancel(tp, 0);
-			goto error0;
-		}
-
-		xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
-		xfs_trans_ihold(tp, ip);
-		xfs_strat_write_bp_trace(XFS_STRAT_ENTER, ip, bp);
-	
-		/*
-		 * Modify the unwritten extent state of the buffer.
-		 */
 		offset_fsb = XFS_BB_TO_FSBT(mp, bp->b_offset);
 		count_fsb = XFS_B_TO_FSB(mp, bp->b_bcount);
-		XFS_BMAP_INIT(&free_list, &firstfsb);
-		nimaps = 1;
-		error = xfs_bmapi(tp, ip, offset_fsb, count_fsb,
-				  XFS_BMAPI_WRITE, &firstfsb,
-				  1, &imap, &nimaps, &free_list);
-		if (error) {
-			xfs_bmap_cancel(&(free_list));
-			xfs_trans_cancel(tp,
-				 (XFS_TRANS_RELEASE_LOG_RES |
-				  XFS_TRANS_ABORT));
-			goto error0;
-		}
-		error = xfs_bmap_finish(&(tp), &(free_list),
-				firstfsb, &committed);
-		if (error) {
-			xfs_bmap_cancel(&free_list);
-			xfs_trans_cancel(tp,
-				 (XFS_TRANS_RELEASE_LOG_RES |
-				  XFS_TRANS_ABORT));
-			bp->b_flags |= B_ERROR;
-			bp->b_error = error;
-			goto error0;
-		}
+		do {
+			nres = XFS_DIOSTRAT_SPACE_RES(mp, 0);
+			xfs_strat_write_bp_trace(XFS_STRAT_UNINT_CMPL, ip, bp);
+			/*
+			 * Set up a transaction with which to allocate the
+			 * backing store for the file.  Do allocations in a
+			 * loop until we get some space in the range we are
+			 * interested in.  The other space that might be
+			 * allocated is in the delayed allocation extent
+			 * on which we sit but before our buffer starts.
+			 */
+			tp = xfs_trans_alloc(mp, XFS_TRANS_STRAT_WRITE);
+			error = xfs_trans_reserve(tp, nres,
+					XFS_WRITE_LOG_RES(mp), 0,
+					XFS_TRANS_PERM_LOG_RES,
+					XFS_WRITE_LOG_COUNT);
+			if (error) {
+				xfs_trans_cancel(tp, 0);
+				goto error0;
+			}
 
-		error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
-		if (error) {
-			bp->b_flags |= B_ERROR;
-			bp->b_error = error;
-			goto error0;
-		}
+			xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
+			xfs_trans_ihold(tp, ip);
+			xfs_strat_write_bp_trace(XFS_STRAT_ENTER, ip, bp);
+
+			/*
+			 * Modify the unwritten extent state of the buffer.
+			 */
+			XFS_BMAP_INIT(&free_list, &firstfsb);
+			nimaps = 1;
+			error = xfs_bmapi(tp, ip, offset_fsb, count_fsb,
+					  XFS_BMAPI_WRITE, &firstfsb,
+					  1, &imap, &nimaps, &free_list);
+			if (error) {
+				xfs_bmap_cancel(&(free_list));
+				xfs_trans_cancel(tp,
+					 (XFS_TRANS_RELEASE_LOG_RES |
+					  XFS_TRANS_ABORT));
+				goto error0;
+			}
+			error = xfs_bmap_finish(&(tp), &(free_list),
+					firstfsb, &committed);
+			if (error) {
+				xfs_bmap_cancel(&free_list);
+				xfs_trans_cancel(tp,
+					 (XFS_TRANS_RELEASE_LOG_RES |
+					  XFS_TRANS_ABORT));
+				bp->b_flags |= B_ERROR;
+				bp->b_error = error;
+				goto error0;
+			}
+
+			error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES,
+							NULL);
+			if (error) {
+				bp->b_flags |= B_ERROR;
+				bp->b_error = error;
+				goto error0;
+			}
+			if ((numblks_fsb = imap.br_blockcount) == 0) {
+				/*
+				 * The extent size should alway get bigger
+				 * otherwise the loop is stuck.
+				 */
+				ASSERT(imap.br_blockcount);
+				break;
+			}
+			offset_fsb += numblks_fsb;
+			count_fsb -= numblks_fsb;
+		} while (count_fsb > 0);
 
 		bp->b_flags &= ~(B_UNINITIAL);
 		xfs_strat_write_bp_trace(XFS_STRAT_UNINT_CMPL, ip, bp);
 		buftrace("STRAT_WRITE_CMPL", bp);
+		/* fall through on normal completion */
 
 error0:
-		atomicAddInt(&(ip->i_queued_bufs), -1);
-		ASSERT(ip->i_queued_bufs >= 0);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		biodone(bp);
 
@@ -5618,13 +5635,7 @@ xfs_strategy(
 	 * out and zero/read in the appropriate data.
 	 */
 	if (bp->b_flags & B_READ) {
-		if (!(bp->b_flags & B_UNINITIAL))
-			xfs_strat_read(bdp, bp);
-		else {
-			xfs_check_bp(ip, bp);
-			xfs_zero_bp(bp, 0, bp->b_bcount);
-			iodone(bp);
-		}
+		xfs_strat_read(bdp, bp);
 		return;
 	}
 
