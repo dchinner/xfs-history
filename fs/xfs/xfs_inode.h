@@ -145,6 +145,10 @@ typedef struct xfs_inode {
 	struct xfs_gap		*i_gap_list;	/* hole list in write range */
 	unsigned int		i_io_size;	/* file io buffer len */
 	unsigned int		i_last_req_sz;	/* last read size */
+	unsigned int		i_readio_blocks;	/* read buffer size */
+	unsigned int		i_writeio_blocks;	/* write buffer size */
+	uchar_t			i_readio_log;	/* log2 of read buffer size */
+	uchar_t			i_writeio_log;	/* log2 of write buffer size */
 
 	/* Miscellaneous state. */
 	unsigned short		i_flags;	/* see defined flags below */
@@ -228,6 +232,7 @@ void xfs_ifork_next_set(xfs_inode_t *ip, int w, int n);
  * In-core inode flags.
  */
 #define XFS_IGRIO	0x0001  /* inode will be used for guaranteed rate i/o */
+#define XFS_IUIOSZ	0x0002  /* inode i/o sizes have been explicitly set */
 
 /*
  * Per-fork incore inode flags.
