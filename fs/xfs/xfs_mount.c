@@ -8,9 +8,29 @@
 #include "xfs_ag.h"
 #include "xfs_alloc.h"
 #include "xfs_ialloc.h"
+#include "xfs_mount.h"
+
+#ifdef SIM
 #include "sim.h"
 #include <bstring.h>
+#endif
 
+/*
+ * Return a pointer to an initialized xfs_mount structure.
+ */
+xfs_mount_t *
+xfs_mount_init(void)
+{
+	xfs_mount_t *mp;
+
+	mp = kmem_zalloc(sizeof(*mp), 0);
+
+	initnlock(&mp->m_ail_lock, "xfs_ail");
+	initnlock(&mp->m_async_lock, "xfs_async");
+
+	return (mp);
+}
+	
 void
 xfs_mount(xfs_mount_t *mp, dev_t dev)
 {
