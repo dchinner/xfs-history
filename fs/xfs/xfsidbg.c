@@ -190,7 +190,8 @@ static void	xfsidbg_xqm_dquot(xfs_dquot_t *);
 static void	xfsidbg_xqm_mplist(xfs_mount_t *);
 static void	xfsidbg_xqm_qinfo(xfs_mount_t *mp);
 static void	xfsidbg_xqm_tpdqinfo(xfs_trans_t *tp);
-static void	xfsidbg_xsb(xfs_sb_t *, int convert);
+static void	xfsidbg_xsb(xfs_sb_t *);
+static void	xfsidbg_xsb_convert(xfs_sb_t *);
 static void	xfsidbg_xtp(xfs_trans_t *);
 static void	xfsidbg_xtrans_res(xfs_mount_t *);
 #ifdef CONFIG_XFS_QUOTA
@@ -1866,7 +1867,10 @@ static int	kdbm_xfs_xsb(
 		    return diag;
 	}
 
-	xfsidbg_xsb((xfs_sb_t *) addr, (int)convert);
+	if (convert)
+		xfsidbg_xsb_convert((xfs_sb_t *) addr);
+	else
+		xfsidbg_xsb((xfs_sb_t *) addr);
 	return 0;
 }
 
@@ -3022,8 +3026,7 @@ static char *xfs_fmtsize(size_t i);
 static char *xfs_fmtuuid(uuid_t *);
 static void xfs_inode_item_print(xfs_inode_log_item_t *ilip, int summary);
 static void xfs_inodebuf(xfs_buf_t *bp);
-static void xfs_prdinode(xfs_dinode_t *di, int coreonly, int convert);
-static void xfs_prdinode_core(xfs_dinode_core_t *dip, int convert);
+static void xfs_prdinode_core(xfs_dinode_core_t *dip);
 static void xfs_qoff_item_print(xfs_qoff_logitem_t *lip, int summary);
 #ifdef XFS_RW_TRACE
 static void xfs_rw_enter_trace_entry(ktrace_entry_t *ktep);
@@ -4082,13 +4085,19 @@ static void
 xfs_inodebuf(xfs_buf_t *bp)
 {
 	xfs_dinode_t *di;
+	xfs_dinode_core_t dic;
 	int n, i;
 
 	n = XFS_BUF_COUNT(bp) >> 8;
 	for (i = 0; i < n; i++) {
 		di = (xfs_dinode_t *)xfs_buf_offset(bp,
 					i * 256);
-		xfs_prdinode(di, 0, ARCH_CONVERT);
+
+		xfs_xlate_dinode_core((xfs_caddr_t)&di->di_core, &dic, 1);
+		xfs_prdinode_core(&dic);
+		kdb_printf("next_unlinked 0x%x u@0x%p\n",
+			   INT_GET(di->di_next_unlinked, ARCH_CONVERT),
+			   &di->di_u);
 	}
 }
 
@@ -4224,23 +4233,10 @@ xfs_inval_cached_trace_entry(ktrace_entry_t     *ktep)
 
 
 /*
- * Print disk inode.
- */
-static void
-xfs_prdinode(xfs_dinode_t *di, int coreonly, int convert)
-{
-	xfs_prdinode_core(&di->di_core, convert);
-	if (!coreonly)
-		kdb_printf("next_unlinked 0x%x u@0x%p\n",
-			INT_GET(di->di_next_unlinked, convert),
-			&di->di_u);
-}
-
-/*
  * Print disk inode core.
  */
 static void
-xfs_prdinode_core(xfs_dinode_core_t *dip, int convert)
+xfs_prdinode_core(xfs_dinode_core_t *dip)
 {
 	static char *diflags[] = {
 		"realtime",		/* XFS_DIFLAG_REALTIME */
@@ -4258,41 +4254,30 @@ xfs_prdinode_core(xfs_dinode_core_t *dip, int convert)
 	};
 
 	kdb_printf("magic 0x%x mode 0%o (%s) version 0x%x format 0x%x (%s)\n",
-		INT_GET(dip->di_magic, convert),
-		INT_GET(dip->di_mode, convert),
-		xfs_fmtmode(INT_GET(dip->di_mode, convert)),
-		INT_GET(dip->di_version, convert),
-		INT_GET(dip->di_format, convert),
-		xfs_fmtformat(
-		    (xfs_dinode_fmt_t)INT_GET(dip->di_format, convert)));
+		dip->di_magic, dip->di_mode,
+		xfs_fmtmode(dip->di_mode),
+		dip->di_version, dip->di_format,
+		xfs_fmtformat((xfs_dinode_fmt_t)dip->di_format));
 	kdb_printf("nlink %d uid %d gid %d projid %d flushiter %u\n",
-		INT_GET(dip->di_nlink, convert),
-		INT_GET(dip->di_uid, convert),
-		INT_GET(dip->di_gid, convert),
-		(uint)INT_GET(dip->di_projid, convert),
-		(uint)INT_GET(dip->di_flushiter, convert));
+		dip->di_nlink,
+		dip->di_uid,
+		dip->di_gid,
+		(uint)dip->di_projid,
+		(uint)dip->di_flushiter);
 	kdb_printf("atime %u:%u mtime %ud:%u ctime %u:%u\n",
-		INT_GET(dip->di_atime.t_sec, convert),
-		INT_GET(dip->di_atime.t_nsec, convert),
-		INT_GET(dip->di_mtime.t_sec, convert),
-		INT_GET(dip->di_mtime.t_nsec, convert),
-		INT_GET(dip->di_ctime.t_sec, convert),
-		INT_GET(dip->di_ctime.t_nsec, convert));
-	kdb_printf("size %Ld ", INT_GET(dip->di_size, convert));
+		dip->di_atime.t_sec, dip->di_atime.t_nsec,
+		dip->di_mtime.t_sec, dip->di_mtime.t_nsec,
+		dip->di_ctime.t_sec, dip->di_ctime.t_nsec);
+	kdb_printf("size %Ld ", dip->di_size);
 	kdb_printf("nblocks %Ld extsize 0x%x nextents 0x%x anextents 0x%x\n",
-		INT_GET(dip->di_nblocks, convert),
-		INT_GET(dip->di_extsize, convert),
-		INT_GET(dip->di_nextents, convert),
-		INT_GET(dip->di_anextents, convert));
+		dip->di_nblocks, dip->di_extsize, dip->di_nextents,
+		dip->di_anextents);
 	kdb_printf("forkoff %d aformat 0x%x (%s) dmevmask 0x%x dmstate 0x%x ",
-		INT_GET(dip->di_forkoff, convert),
-		INT_GET(dip->di_aformat, convert),
-		xfs_fmtformat(
-		    (xfs_dinode_fmt_t)INT_GET(dip->di_aformat, convert)),
-		INT_GET(dip->di_dmevmask, convert),
-		INT_GET(dip->di_dmstate, convert));
-	printflags(INT_GET(dip->di_flags, convert), diflags, "flags");
-	kdb_printf("gen 0x%x\n", INT_GET(dip->di_gen, convert));
+		dip->di_forkoff, dip->di_aformat,
+		xfs_fmtformat((xfs_dinode_fmt_t)dip->di_aformat),
+		dip->di_dmevmask, dip->di_dmstate);
+	printflags(dip->di_flags, diflags, "flags");
+	kdb_printf("gen 0x%x\n", dip->di_gen);
 }
 
 #ifdef XFS_RW_TRACE
@@ -5341,7 +5326,7 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 		} else {
 			kdb_printf("buf 0x%p sb 0x%p\n", bp, sb);
 			/* SB in a buffer - we need to convert */
-			xfsidbg_xsb(sb, 1);
+			xfsidbg_xsb_convert(sb);
 		}
 	} else if ((dqb = d)->d_magic == XFS_DQUOT_MAGIC) {
 #define XFSIDBG_DQTYPESTR(d)     \
@@ -7067,7 +7052,7 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	xfs_xnode_fork("data", &ip->i_df);
 	xfs_xnode_fork("attr", ip->i_afp);
 	kdb_printf("\n");
-	xfs_prdinode_core(&ip->i_d, ARCH_NOCONVERT);
+	xfs_prdinode_core(&ip->i_d);
 }
 
 static void
@@ -7544,61 +7529,52 @@ xfsidbg_xrwtrace(xfs_inode_t *ip)
  * Print xfs superblock.
  */
 static void
-xfsidbg_xsb(xfs_sb_t *sbp, int convert)
+xfsidbg_xsb(xfs_sb_t *sbp)
 {
-	xfs_arch_t arch=convert?ARCH_CONVERT:ARCH_NOCONVERT;
-
-	kdb_printf(convert?"<converted>\n":"<unconverted>\n");
-
 	kdb_printf("magicnum 0x%x blocksize 0x%x dblocks %Ld rblocks %Ld\n",
-		INT_GET(sbp->sb_magicnum, arch), INT_GET(sbp->sb_blocksize, arch),
-		INT_GET(sbp->sb_dblocks, arch), INT_GET(sbp->sb_rblocks, arch));
+		sbp->sb_magicnum, sbp->sb_blocksize,
+		sbp->sb_dblocks, sbp->sb_rblocks);
 	kdb_printf("rextents %Ld uuid %s logstart %s\n",
-		INT_GET(sbp->sb_rextents, arch),
-		xfs_fmtuuid(&sbp->sb_uuid),
-		xfs_fmtfsblock(INT_GET(sbp->sb_logstart, arch), NULL));
-	kdb_printf("rootino %s ",
-		xfs_fmtino(INT_GET(sbp->sb_rootino, arch), NULL));
-	kdb_printf("rbmino %s ",
-		xfs_fmtino(INT_GET(sbp->sb_rbmino, arch), NULL));
-	kdb_printf("rsumino %s\n",
-		xfs_fmtino(INT_GET(sbp->sb_rsumino, arch), NULL));
+		sbp->sb_rextents, xfs_fmtuuid(&sbp->sb_uuid),
+		xfs_fmtfsblock(sbp->sb_logstart, NULL));
+	kdb_printf("rootino %s ", xfs_fmtino(sbp->sb_rootino, NULL));
+	kdb_printf("rbmino %s ", xfs_fmtino(sbp->sb_rbmino, NULL));
+	kdb_printf("rsumino %s\n", xfs_fmtino(sbp->sb_rsumino, NULL));
 	kdb_printf("rextsize 0x%x agblocks 0x%x agcount 0x%x rbmblocks 0x%x\n",
-		INT_GET(sbp->sb_rextsize, arch),
-		INT_GET(sbp->sb_agblocks, arch),
-		INT_GET(sbp->sb_agcount, arch),
-		INT_GET(sbp->sb_rbmblocks, arch));
+		sbp->sb_rextsize, sbp->sb_agblocks, sbp->sb_agcount,
+		sbp->sb_rbmblocks);
 	kdb_printf("logblocks 0x%x versionnum 0x%x sectsize 0x%x inodesize 0x%x\n",
-		INT_GET(sbp->sb_logblocks, arch),
-		INT_GET(sbp->sb_versionnum, arch),
-		INT_GET(sbp->sb_sectsize, arch),
-		INT_GET(sbp->sb_inodesize, arch));
+		sbp->sb_logblocks, sbp->sb_versionnum, sbp->sb_sectsize,
+		sbp->sb_inodesize);
 	kdb_printf("inopblock 0x%x blocklog 0x%x sectlog 0x%x inodelog 0x%x\n",
-		INT_GET(sbp->sb_inopblock, arch),
-		INT_GET(sbp->sb_blocklog, arch),
-		INT_GET(sbp->sb_sectlog, arch),
-		INT_GET(sbp->sb_inodelog, arch));
+		sbp->sb_inopblock, sbp->sb_blocklog, sbp->sb_sectlog,
+		sbp->sb_inodelog);
 	kdb_printf("inopblog %d agblklog %d rextslog %d inprogress %d imax_pct %d\n",
-		INT_GET(sbp->sb_inopblog, arch),
-		INT_GET(sbp->sb_agblklog, arch),
-		INT_GET(sbp->sb_rextslog, arch),
-		INT_GET(sbp->sb_inprogress, arch),
-		INT_GET(sbp->sb_imax_pct, arch));
+		sbp->sb_inopblog, sbp->sb_agblklog, sbp->sb_rextslog,
+		sbp->sb_inprogress, sbp->sb_imax_pct);
 	kdb_printf("icount %Lx ifree %Lx fdblocks %Lx frextents %Lx\n",
-		INT_GET(sbp->sb_icount, arch),
-		INT_GET(sbp->sb_ifree, arch),
-		INT_GET(sbp->sb_fdblocks, arch),
-		INT_GET(sbp->sb_frextents, arch));
-	kdb_printf("uquotino %s ", xfs_fmtino(INT_GET(sbp->sb_uquotino, arch), NULL));
-	kdb_printf("gquotino %s ", xfs_fmtino(INT_GET(sbp->sb_gquotino, arch), NULL));
+		sbp->sb_icount, sbp->sb_ifree,
+		sbp->sb_fdblocks, sbp->sb_frextents);
+	kdb_printf("uquotino %s ", xfs_fmtino(sbp->sb_uquotino, NULL));
+	kdb_printf("gquotino %s ", xfs_fmtino(sbp->sb_gquotino, NULL));
 	kdb_printf("qflags 0x%x flags 0x%x shared_vn %d inoaligmt %d\n",
-		INT_GET(sbp->sb_qflags, arch), INT_GET(sbp->sb_flags, arch), INT_GET(sbp->sb_shared_vn, arch),
-		INT_GET(sbp->sb_inoalignmt, arch));
+		sbp->sb_qflags, sbp->sb_flags, sbp->sb_shared_vn,
+		sbp->sb_inoalignmt);
 	kdb_printf("unit %d width %d dirblklog %d\n",
-		INT_GET(sbp->sb_unit, arch), INT_GET(sbp->sb_width, arch), INT_GET(sbp->sb_dirblklog, arch));
-	kdb_printf("log sunit %d\n", INT_GET(sbp->sb_logsunit, arch));
+		sbp->sb_unit, sbp->sb_width, sbp->sb_dirblklog);
+	kdb_printf("log sunit %d\n", sbp->sb_logsunit);
 }
 
+static void
+xfsidbg_xsb_convert(xfs_sb_t *sbp)
+{
+	xfs_sb_t sb;
+
+	xfs_xlatesb(sbp, &sb, 1, XFS_SB_ALL_BITS);
+
+	kdb_printf("<converted>\n");
+	xfsidbg_xsb(&sb);
+}
 
 /*
  * Print out an XFS transaction structure.  Print summaries for

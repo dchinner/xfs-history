@@ -179,6 +179,8 @@ EXPORT_SYMBOL(xfs_dir2_sf_nextentry);
 EXPORT_SYMBOL(xfs_da_cookie_entry);
 EXPORT_SYMBOL(xfs_da_cookie_bno);
 EXPORT_SYMBOL(xfs_da_cookie_hash);
+EXPORT_SYMBOL(xfs_xlate_dinode_core);
+EXPORT_SYMBOL(xfs_xlatesb);
 #endif
 
 
