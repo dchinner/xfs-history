@@ -15,6 +15,7 @@
 #include <sys/vfs.h>
 #include <sys/syssgi.h>
 #include <sys/capability.h>
+#include <sys/user.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -128,7 +129,7 @@ xfs_bulkstat(
 	int			*count,	/* size of buffer/count returned */
 	bulkstat_one_pf		formatter, /* func that'd fill a single buf */
 	size_t			statstruct_size, /* sizeof struct filling */
-	caddr_t			ubuffer, /* buffer with inode stats */
+	caddr_t			buffer,	/* buffer with inode stats */
 	int			*done)	/* 1 if there're more stats to get */
 {
 	xfs_agblock_t		agbno;
@@ -137,9 +138,7 @@ xfs_bulkstat(
 	xfs_agnumber_t		agno;
 	int			bcount;
 	daddr_t			bno;
-	caddr_t			buffer;
 	caddr_t			bufp;	
-	int			nbufs;
 	xfs_btree_cur_t		*cur;
 	int			error;
 	__int32_t		gcnt;
@@ -161,12 +160,16 @@ xfs_bulkstat(
 	ino = (xfs_ino_t)*lastino;
 	agno = XFS_INO_TO_AGNO(mp, ino);
 	agino = XFS_INO_TO_AGINO(mp, ino);
-	left = *count;
+	if (agno >= mp->m_sb.sb_agcount) {
+		*done = 1;
+		*count = 0;
+		return 0;
+	}
+	bcount = left = *count;
 	*count = 0;
 	*done = 0;
-	bcount = MIN(left, NBPP / statstruct_size);
-	bufp = buffer = kmem_alloc(bcount * statstruct_size, KM_SLEEP);
-	error = nbufs = 0;
+	bufp = buffer;
+	error = 0;
 	cur = NULL;
 	agbp = NULL;
 	nicluster = mp->m_sb.sb_blocksize >= XFS_INODE_CLUSTER_SIZE ?
@@ -174,11 +177,8 @@ xfs_bulkstat(
 		(XFS_INODE_CLUSTER_SIZE >> mp->m_sb.sb_inodelog);
 	nimask = ~(nicluster - 1);
 	nbcluster = nicluster >> mp->m_sb.sb_inopblog;
-	if (agno >= mp->m_sb.sb_agcount) {
-		*done = 1;
-		error = 0;
-		goto out;
-	}
+	if (!useracc(buffer, bcount * statstruct_size, B_READ|B_PHYS))
+		return u.u_error ? u.u_error : EFAULT;
 	if (agino != 0) {
 		mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
 		error = xfs_ialloc_read_agi(mp, tp, agno, &agbp);
@@ -315,40 +315,18 @@ xfs_bulkstat(
 		}
 		bufp += statstruct_size; 
 		i++;
-		nbufs++;
 		left--;
-		if (nbufs == bcount) {
-			if (copyout(buffer, ubuffer, 
-				    nbufs * statstruct_size)){
-				error = EFAULT;
-				break;
-			}
-			ubuffer += nbufs * statstruct_size;
-			*count += nbufs;
-			nbufs = 0;
-			bufp = buffer;
-		}
 	}
-
-	if (!error) {
-		if (nbufs) {
-			if (copyout(buffer, ubuffer,
-				    nbufs * statstruct_size))
-				error = EFAULT;
-			else
-				*count += nbufs;
-		}
-		*lastino = XFS_AGINO_TO_INO(mp, agno, agino);
-		if (agno >= mp->m_sb.sb_agcount)
-			*done = 1;
-	}
- out:
-	kmem_free(buffer, bcount * statstruct_size);
+	unuseracc(buffer, bcount * statstruct_size, B_READ|B_PHYS);
+	*count = bcount - left;
+	*lastino = XFS_AGINO_TO_INO(mp, agno, agino);
+	if (agno >= mp->m_sb.sb_agcount)
+		*done = 1;
 	if (cur)
 		xfs_btree_del_cursor(cur);
 	if (agbp)
 		xfs_trans_brelse(tp, agbp);
-	return error;
+	return 0;
 }
 
 /*
