@@ -1,4 +1,4 @@
-#ident "$Revision: 1.25 $"
+#ident "$Revision: 1.26 $"
 
 
 #include <sys/param.h>
@@ -58,6 +58,7 @@
 #include "xfs_itable.h"
 #include "xfs_utils.h"
 #include "xfs_rw.h"
+#include "xfs_trans_space.h"
 
 extern int      ncsize;
 struct xfs_qm	*G_xqm = NULL;
@@ -1468,10 +1469,7 @@ xfs_qm_qino_alloc(
 
 	tp = xfs_trans_alloc(mp,XFS_TRANS_QM_QINOCREATE);
 	if (error = xfs_trans_reserve(tp,
-				      XFS_IALLOC_BLOCKS(mp) +
-				      XFS_IN_MAXLEVELS(mp) +
-				      XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) +
-				      mp->m_sb.sb_sectsize + 128,
+				      XFS_QM_QINOCREATE_SPACE_RES(mp),
 				      XFS_CREATE_LOG_RES(mp), 0,
 				      XFS_TRANS_PERM_LOG_RES,
 				      XFS_CREATE_LOG_COUNT)) {

@@ -95,6 +95,8 @@
 #include "xfs_bit.h"
 #include "xfs_quota.h"
 #include "xfs_utils.h"
+#include "xfs_trans_space.h"
+#include "xfs_dir_leaf.h"
 #ifdef SIM
 #include "sim.h"
 #endif
@@ -2406,8 +2408,7 @@ xfs_create(
 	
 	tp = xfs_trans_alloc(mp, XFS_TRANS_CREATE);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-	resblks = XFS_IALLOC_BLOCKS(mp) + XFS_IN_MAXLEVELS(mp) +
-		XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) + 10;
+	resblks = XFS_CREATE_SPACE_RES(mp, name);
 	/*
 	 * Initially assume that the file does not exist and
 	 * reserve the resources for that case.  If that is not
@@ -3120,7 +3121,8 @@ xfs_remove(
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_REMOVE);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-        if (error = xfs_trans_reserve(tp, 10, XFS_REMOVE_LOG_RES(mp),
+        if (error = xfs_trans_reserve(tp, XFS_REMOVE_SPACE_RES(mp),
+				      XFS_REMOVE_LOG_RES(mp),
 				      0, XFS_TRANS_PERM_LOG_RES,
 				      XFS_REMOVE_LOG_COUNT)) {
 		cancel_flags = 0;
@@ -3429,7 +3431,8 @@ xfs_link(
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_LINK);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-        if (error = xfs_trans_reserve(tp, 10, XFS_LINK_LOG_RES(mp),
+        if (error = xfs_trans_reserve(tp, XFS_LINK_SPACE_RES(mp, target_name),
+				      XFS_LINK_LOG_RES(mp),
 				      0, XFS_TRANS_PERM_LOG_RES,
 				      XFS_LINK_LOG_COUNT)) {
 		cancel_flags = 0;
@@ -3622,7 +3625,7 @@ xfs_mkdir(
 	
 	tp = xfs_trans_alloc(mp, XFS_TRANS_MKDIR);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-        resblks = XFS_IALLOC_BLOCKS(mp) + XFS_IN_MAXLEVELS(mp) + 10;
+        resblks = XFS_MKDIR_SPACE_RES(mp, dir_name);
 	if (error = xfs_trans_reserve(tp,
 				      resblks,
 				      XFS_MKDIR_LOG_RES(mp), 0,
@@ -3890,7 +3893,8 @@ xfs_rmdir(
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_RMDIR);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-        if (error = xfs_trans_reserve(tp, 10, XFS_REMOVE_LOG_RES(mp),
+        if (error = xfs_trans_reserve(tp, XFS_REMOVE_SPACE_RES(mp),
+				      XFS_REMOVE_LOG_RES(mp),
 				      0, XFS_TRANS_PERM_LOG_RES,
 				      XFS_DEFAULT_LOG_COUNT)) {
 		cancel_flags = 0;
@@ -4229,7 +4233,15 @@ xfs_symlink(
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_SYMLINK);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-	resblks = XFS_IALLOC_BLOCKS(mp) + XFS_IN_MAXLEVELS(mp) + 12;
+	/*
+	 * The symlink will fit into the inode data fork?
+	 * There can't be any attributes so we get the whole variable part.
+	 */
+	if (pathlen <= XFS_LITINO(mp))
+		fs_blocks = 0;
+	else
+		fs_blocks = XFS_B_TO_FSB(mp, pathlen);
+	resblks = XFS_SYMLINK_SPACE_RES(mp, link_name, fs_blocks);
         if (error = xfs_trans_reserve(tp,
 				      resblks,
 				      XFS_SYMLINK_LOG_RES(mp), 0,
@@ -4328,7 +4340,6 @@ xfs_symlink(
 
 	} else {
 		first_fsb = 0;
-		fs_blocks = XFS_B_TO_FSB(mp, pathlen);
 		nmaps = SYMLINK_MAPS;
 
 		error = xfs_bmapi(tp, ip, first_fsb, fs_blocks,
@@ -5417,7 +5428,7 @@ xfs_alloc_file_space(
 		 * allocate and setup the transaction
 		 */
 		tp = xfs_trans_alloc(mp, XFS_TRANS_DIOSTRAT);
-		resblks = XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) + datablocks;
+		resblks = XFS_DIOSTRAT_SPACE_RES(mp, datablocks);
 		error = xfs_trans_reserve(tp,
 					  resblks,
 					  XFS_WRITE_LOG_RES(mp),
@@ -5632,7 +5643,7 @@ xfs_free_file_space(
 	/*
 	 * free file space until done or until there is an error	
  	 */
-	resblks = XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK);
+	resblks = XFS_DIOSTRAT_SPACE_RES(mp, 0);
 	while (!error && !done) {
 
 		/*

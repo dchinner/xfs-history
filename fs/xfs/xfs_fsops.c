@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.23 $"
+#ident	"$Revision: 1.24 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -30,6 +30,7 @@
 #include "xfs_fsops.h"
 #include "xfs_itable.h"
 #include "xfs_rw.h"
+#include "xfs_trans_space.h"
 
 /*
  * File system operations
@@ -112,7 +113,7 @@ xfs_growfs_data(
 		mrunlock(&mp->m_peraglock);
 	}
 	tp = xfs_trans_alloc(mp, XFS_TRANS_GROWFS);
-	if (error = xfs_trans_reserve(tp, 2 * XFS_AG_MAXLEVELS(mp),
+	if (error = xfs_trans_reserve(tp, XFS_GROWFS_SPACE_RES(mp),
 			XFS_GROWDATA_LOG_RES(mp), 0, 0, 0)) {
 		xfs_trans_cancel(tp, 0);
 		return error;

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.21 $"
+#ident "$Revision: 1.22 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -49,6 +49,7 @@
 #include "xfs_qm.h"
 #include "xfs_quota_priv.h"
 #include "xfs_rw.h"
+#include "xfs_trans_space.h"
 
 /*
    LOCK ORDER
@@ -709,8 +710,7 @@ xfs_qm_idtodq(
 	if (flags & XFS_QMOPT_DQALLOC) {
 		tp = xfs_trans_alloc(mp, XFS_TRANS_QM_DQALLOC);
 		if (error = xfs_trans_reserve(tp,
-				       mp->m_bm_maxlevels[XFS_DATA_FORK] + 
-					      XFS_DQUOT_CLUSTER_SIZE_FSB,
+				       XFS_QM_DQALLOC_SPACE_RES(mp),
 				       XFS_WRITE_LOG_RES(mp) + 
 					      BBTOB(XFS_QI_DQCHUNKLEN(mp)) - 1 +
 					      128,

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.209 $"
+#ident "$Revision: 1.210 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -68,6 +68,7 @@
 #include "xfs_bit.h"
 #include "xfs_rw.h"
 #include "xfs_quota.h"
+#include "xfs_trans_space.h"
 #include <limits.h>
 
 #ifdef SIM
@@ -5067,6 +5068,7 @@ xfs_diostrat(
 	int		committed;
 	uint		lock_mode;
 	xfs_fsize_t	new_size;
+	int		nres;
 
 	CHECK_GRIO_TIMESTAMP(bp, 40);
 
@@ -5213,9 +5215,8 @@ retry:
 				tp = xfs_trans_alloc(mp, XFS_TRANS_DIOSTRAT);
 
 				xfs_iunlock(ip, XFS_ILOCK_EXCL);
-				error = xfs_trans_reserve(tp, 
-					   XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) +
-							  datablocks, 
+				nres = XFS_DIOSTRAT_SPACE_RES(mp, datablocks);
+				error = xfs_trans_reserve(tp, nres,
 					   XFS_WRITE_LOG_RES(mp),
 					   numrtextents,
 					   XFS_TRANS_PERM_LOG_RES,
@@ -5237,9 +5238,8 @@ retry:
 				 * quota reservations
 				 */
 				if (XFS_IS_QUOTA_ON(mp)) {
-					if (xfs_trans_reserve_blkquota(tp, ip, 
-					  XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) +
-					  datablocks)) {
+					if (xfs_trans_reserve_blkquota(tp, ip,
+							nres)) {
 						error = EDQUOT;
 						xfs_trans_cancel(tp, 
 						     XFS_TRANS_RELEASE_LOG_RES);

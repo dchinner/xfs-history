@@ -1,4 +1,4 @@
-#ident "$Revision: 1.1 $"
+#ident "$Revision: 1.2 $"
 
 #include <sys/types.h>
 #include <sys/uuid.h>
@@ -32,6 +32,9 @@
 #include "xfs_dir.h"
 #include "xfs_rw.h"
 #include "xfs_utils.h"
+#include "xfs_trans_space.h"
+#include "xfs_da_btree.h"
+#include "xfs_dir_leaf.h"
 
 #ifndef SIM
 mutex_t	xfs_ancestormon;		/* initialized in xfs_init */
@@ -757,8 +760,9 @@ xfs_rename(
 	mp = src_dp->i_mount;
 	tp = xfs_trans_alloc(mp, XFS_TRANS_RENAME);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-        if (error = xfs_trans_reserve(tp, 10, XFS_RENAME_LOG_RES(mp),
-			0, XFS_TRANS_PERM_LOG_RES, XFS_RENAME_LOG_COUNT)) {
+        if (error = xfs_trans_reserve(tp, XFS_RENAME_SPACE_RES(mp, target_name),
+			XFS_RENAME_LOG_RES(mp), 0, XFS_TRANS_PERM_LOG_RES,
+			XFS_RENAME_LOG_COUNT)) {
 		rename_which_error_return = __LINE__;
 		xfs_trans_cancel(tp, 0);
 		if (ancestor_checked) {
