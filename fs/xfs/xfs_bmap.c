@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.196 $"
+#ident	"$Revision: 1.197 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -4321,8 +4321,18 @@ xfs_getbmap(
 
 	ip = XFS_BHVTOI(bdp);
 	vp = BHV_TO_VNODE(bdp);
-	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS &&
-	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE)
+	if (whichfork == XFS_ATTR_FORK) {
+		if (XFS_IFORK_Q(ip)) {
+			if (ip->i_d.di_aformat != XFS_DINODE_FMT_EXTENTS &&
+			    ip->i_d.di_aformat != XFS_DINODE_FMT_BTREE &&
+			    ip->i_d.di_aformat != XFS_DINODE_FMT_LOCAL)
+				return XFS_ERROR(EINVAL);
+		} else if (ip->i_d.di_aformat != 0 &&
+			   ip->i_d.di_aformat != XFS_DINODE_FMT_EXTENTS)
+			return XFS_ERROR(EFSCORRUPTED);
+	} else if (ip->i_d.di_format != XFS_DINODE_FMT_EXTENTS &&
+		   ip->i_d.di_format != XFS_DINODE_FMT_BTREE &&
+		   ip->i_d.di_format != XFS_DINODE_FMT_LOCAL)
 		return XFS_ERROR(EINVAL);
 	mp = ip->i_mount;
 	if (whichfork == XFS_DATA_FORK &&
@@ -4373,12 +4383,16 @@ xfs_getbmap(
 	 */
 	map = kmem_alloc(nex * sizeof(*map), KM_SLEEP);
 	bmv->bmv_entries = 0;
-	nmap = nex;
-	firstblock = NULLFSBLOCK;
-	error = xfs_bmapi(NULL, ip, XFS_BB_TO_FSBT(mp, bmv->bmv_offset),
-			XFS_BB_TO_FSB(mp, bmv->bmv_length),
-			XFS_BMAPI_AFLAG(whichfork), &firstblock,
-			0, map, &nmap, NULL);
+	if (XFS_IFORK_NEXTENTS(ip, whichfork) == 0)
+		nmap = error = 0;
+	else {
+		nmap = nex;
+		firstblock = NULLFSBLOCK;
+		error = xfs_bmapi(NULL, ip, XFS_BB_TO_FSBT(mp, bmv->bmv_offset),
+				XFS_BB_TO_FSB(mp, bmv->bmv_length),
+				XFS_BMAPI_AFLAG(whichfork), &firstblock,
+				0, map, &nmap, NULL);
+	}
 	xfs_iunlock_map_shared(ip, lock);
 	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 	ASSERT(nmap <= nex);
