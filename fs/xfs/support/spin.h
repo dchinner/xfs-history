@@ -33,7 +33,7 @@
 #ifndef __XFS_SUPPORT_SPIN_H__
 #define __XFS_SUPPORT_SPIN_H__
 
-#include <linux/sched.h> /* preempt needs this */
+#include <linux/sched.h>	/* preempt needs this */
 #include <linux/spinlock.h>
 
 /*
@@ -41,9 +41,6 @@
  *
  * Note that linux turns on/off spinlocks depending on CONFIG_SMP.
  * We don't need to worry about SMP or not here.
- *
- * The irq safe calls get mapped from spinlocks and IRQ safe calls
- * to just spls.
  */
 
 typedef spinlock_t lock_t;
@@ -72,11 +69,6 @@ static inline void nested_spinlock(lock_t *lock)
 static inline void nested_spinunlock(lock_t *lock)
 {
 	spin_unlock(lock);
-}
-
-static inline int nested_spintrylock(lock_t *lock)
-{
-	return spin_trylock(lock);
 }
 
 #endif /* __XFS_SUPPORT_SPIN_H__ */
