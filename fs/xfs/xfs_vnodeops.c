@@ -1,4 +1,4 @@
-#ident "$Revision: 1.256 $"
+#ident "$Revision: 1.257 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -4272,8 +4272,7 @@ xfs_rename_target_checks(
 			goto error_return;
 		}
 
-		if (ABI_IS_SVR4(get_current_abi()) &&
-		    XFS_ITOV(target_ip)->v_vfsmountedhere) {
+		if (XFS_ITOV(target_ip)->v_vfsmountedhere) {
 			error = XFS_ERROR(EBUSY);
 			rename_which_error_return = __LINE__;
 			goto error_return;
