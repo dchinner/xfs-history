@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.168 $"
+#ident  "$Revision: 1.169 $"
 
 
 #include <limits.h>
@@ -33,11 +33,7 @@
 #include <sys/grio.h>
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
-#ifdef	OLDSPECFS
-#include <fs/specfs/snode.h>
-#else	/* ! OLDSPECFS */
 #include <fs/specfs/spec_lsnode.h>
-#endif	/* ! OLDSPECFS */
 #include <sys/kmem.h>
 #ifdef SIM
 #undef _KERNEL
@@ -1267,20 +1263,13 @@ devvptoxfs(
 	xfs_sb_t	**fsp,
 	cred_t		*cr)
 {
-#ifndef	OLDSPECFS
 	int	retval;
-#endif	/* ! OLDSPECFS */
 	buf_t		*bp;
 	dev_t		dev;
 	int		error;
 	xfs_sb_t	*fs;
 	vnode_t		*openvp;
 #if     !UNIKERNEL
-#ifdef	OLDSPECFS
-	bhv_desc_t	*bdp;
-	bhv_head_t	*bhp;
-	struct snode	*sp;
-#endif	/* OLDSPECFS */
 	bhv_desc_t	*vfs_bdp;
 #endif  /* !UNIKERNEL */
 	if (devvp->v_type != VBLK)
@@ -1293,21 +1282,6 @@ devvptoxfs(
 	VOP_RWLOCK(devvp, VRWLOCK_WRITE);
 
 #if     !UNIKERNEL
-#ifdef	OLDSPECFS
-	/*
-	 * Find the spec behavior for this vnode so that we can look
-	 * at the snode.
-	 */
-	bhp = VN_BHV_HEAD(devvp);
-	bdp = bhv_lookup_unlocked(bhp, &spec_vnodeops);
-	if (bdp == NULL) {
-		VOP_RWUNLOCK(devvp, VRWLOCK_WRITE);
-		return XFS_ERROR(ENODEV);
-	}
-
-	sp = (struct snode *)BHV_PDATA(bdp);
-	if (sp->s_flag & SMOUNTED)
-#else	/* ! OLDSPECFS */
 	/*
 	 * Ask specfs to check for the SMOUNTED flag in the common snode.
 	 */
@@ -1316,9 +1290,7 @@ devvptoxfs(
 		return XFS_ERROR(ENODEV);
 	}
 
-	if (retval)
-#endif	/* ! OLDSPECFS */
-	{
+	if (retval) {
 		extern vfsops_t xfs_vfsops;
 		/*
 		 * Device is mounted.  Get an empty buffer to hold a
