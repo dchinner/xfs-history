@@ -539,11 +539,11 @@ xfs_dir_shortform_lookup(xfs_trans_t *trans, struct xfs_dir_name *args)
 	if (args->namelen == 2 &&
 	    args->name[0] == '.' && args->name[1] == '.') {
 		bcopy(sf->hdr.parent, (char *)&args->inumber, sizeof(xfs_ino_t));
-		return(0);
+		return(EEXIST);
 	}
 	if (args->namelen == 1 && args->name[0] == '.') {
 		args->inumber = dp->i_ino;
-		return(0);
+		return(EEXIST);
 	}
 	sfe = &sf->list[0];
 	for (i = sf->hdr.count-1; i >= 0; i--) {
@@ -551,7 +551,7 @@ xfs_dir_shortform_lookup(xfs_trans_t *trans, struct xfs_dir_name *args)
 			if (bcmp(args->name, sfe->name, args->namelen) == 0) {
 				bcopy(sfe->inumber, (char *)&args->inumber,
 						    sizeof(xfs_ino_t));
-				return(0);
+				return(EEXIST);
 			}
 		}
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
@@ -1018,7 +1018,7 @@ xfs_dir_leaf_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
 	inum = args->inumber;
 	bp = xfs_dir_read_buf(trans, args->dp, 0);
 	retval = xfs_dir_leaf_lookup_int(bp, args, &index);
-	if (retval == 0) {
+	if (retval == EEXIST) {
 		leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
 		entry = &leaf->leaves[index];
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
@@ -1027,6 +1027,7 @@ xfs_dir_leaf_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
 			(char *)namest->inumber - (char *)leaf,
 			(char *)namest->inumber - (char *)leaf +
 			sizeof(namest->inumber) - 1);
+		retval = 0;
 	} else
 		xfs_trans_brelse(trans, bp);
 	return(retval);
@@ -1294,7 +1295,7 @@ xfs_dir_node_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
 	 */
 	retval = xfs_dir_node_lookup_int(&state);
 
-	if (retval == 0) {
+	if (retval == EEXIST) {
 		blk = &state.path.blk[state.path.active - 1];
 		ASSERT(blk->leafblk);
 		bp = blk->bp;
@@ -1306,6 +1307,7 @@ xfs_dir_node_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
 			(char *)namest->inumber - (char *)leaf,
 			(char *)namest->inumber - (char *)leaf +
 			sizeof(namest->inumber) - 1);
+		retval = 0;
 	} else {
 		i = state.path.active - 1;
 		xfs_trans_brelse(trans, state.path.blk[i].bp);
