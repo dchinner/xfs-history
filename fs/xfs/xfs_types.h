@@ -20,11 +20,7 @@ typedef	__uint32_t	xfs_agnumber_t;	/* allocation group number */
 
 #define	NULLFSBLOCK	((xfs_fsblock_t)-1)
 #define	NULLAGBLOCK	((xfs_agblock_t)-1)
-
-typedef struct xfs_uuid
-{
-	__uint64_t	hi, lo;
-} xfs_uuid_t;
+#define	NULLAGNUMBER	((xfs_agnumber_t)-1)
 
 typedef enum { XFS_LOOKUP_EQ, XFS_LOOKUP_LE, XFS_LOOKUP_GE } xfs_lookup_t;
 
