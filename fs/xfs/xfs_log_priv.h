@@ -4,6 +4,14 @@
 
 #include <sys/cmn_err.h>
 
+#if defined(XFS_ALL_TRACE)
+#define	XFS_LOG_TRACE
+#endif
+
+#if !defined(DEBUG) || defined(SIM)
+#undef XFS_LOG_TRACE
+#endif
+
 struct buf;
 struct ktrace;
 struct log;
@@ -246,7 +254,9 @@ typedef struct xlog_in_core {
 	struct log		*ic_log;
 	xfs_log_callback_t	*ic_callback;
 	xfs_log_callback_t	**ic_callback_tail;
+#ifdef DEBUG
 	struct ktrace		*ic_trace;
+#endif
 	int	  		ic_size;
 	int	  		ic_offset;
 	int	  		ic_refcnt;
@@ -304,8 +314,10 @@ typedef struct log {
     int			l_grant_write_bytes;	/* */
 
     /* The following fields don't need locking */
+#ifdef DEBUG
     struct ktrace	*l_trace;
     struct ktrace	*l_grant_trace;
+#endif
     uint		l_flags;
     struct xfs_buf_cancel **l_buf_cancel_table;	
 } xlog_t;
