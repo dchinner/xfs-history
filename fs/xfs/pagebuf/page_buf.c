@@ -406,72 +406,6 @@ void _pagebuf_free_object(
 }
 
 
-STATIC void
-_pagebuf_buffers_to_page(
-	struct page		*page,
-	page_buf_t		*pb,
-	int			pg_index,
-	size_t			pb_offset,
-	size_t			pb_length)
-{
-	pb_target_t		*target = pb->pb_target;
-	struct buffer_head	*bh, *head;
-	page_buf_daddr_t	bn;
-	size_t			offset, start, end, delta = 0;
-	int			bbits, i = 0;
-
-	assert(target->pbr_blocksize < PAGE_CACHE_SIZE);
-	assert(pb->pb_bn != PAGE_BUF_DADDR_NULL);
-
-	start = pb_offset;
-	end = pb_offset + pb_length;
-
-	/* TODO XXX:nathans -[512 byte bh]-  We do not use blocksize
-	 * here because several buffers must be written in chunks of
-	 * 512 bytes, independent of the blocksize.
-	 * The problem is different for blksize==pgsize because there
-	 * isn't sufficient space after the AG header for a filesystem
-	 * block (of course);  for all smaller cases, there is enough
-	 * space, so we are not able to do the full-page IOs here that
-	 * the pgsize case can.
-	 */
-
-	/* For now, all metadata buffer_heads for non-pagesize blksize
-	 * filesystems are 512 bytes long.
-	 */
-	bbits = 9;
-
-	/* Calculate the starting block number */
-	bn = pb->pb_bn;
-	if (pg_index) {
-		delta = (PAGE_CACHE_SIZE - pb->pb_offset);
-		delta += ((pg_index - 1) >> PAGE_CACHE_SHIFT);
-	}
-	bn += (delta >> 9);
-
-	if (!page_has_buffers(page))
-		create_empty_buffers(page, target->pbr_device, 1 << bbits);
-
-	bh = head = page_buffers(page);
-	do {
-		offset = i << bbits;
-		if (offset < start)
-			continue;
-		if (offset >= end)
-			break;
-
-		lock_buffer(bh);
-		assert(!waitqueue_active(&bh->b_wait));
-
-		bh->b_size = 1 << bbits;
-		bh->b_rsector = bh->b_blocknr = (bn + i - (start >> 9));
-		bh->b_rdev = bh->b_dev = pb->pb_dev;
-		init_waitqueue_head(&bh->b_wait);
-		atomic_set(&bh->b_count, 1);
-		set_bit(BH_Mapped, &bh->b_state);
-	} while (i++, (bh = bh->b_this_page) != head);
-}
-
 /*
  *	_pagebuf_lookup_pages
  *
@@ -1452,16 +1386,37 @@ _pagebuf_page_io(
 	if (blocksize < PAGE_CACHE_SIZE) {
 		multi_ok = 1;
 
-		/* find buffer_heads belonging to just this pagebuf */
+		/* TODO XXX:nathans -[512 byte bh]-  We do not use blocksize
+		 * here because several buffers must be written in chunks of
+		 * 512 bytes, independent of the blocksize.
+		 * The problem is different for blksize==pgsize because there
+		 * isn't sufficient space after the AG header for a filesystem
+		 * block (of course);  for all smaller cases, there is enough
+		 * space, so we are not able to do the full-page IOs here that
+		 * the pgsize case can.
+		 */
+
+		/* For now, all metadata buffer_heads for non-pagesize blksize
+		 * filesystems are 512 bytes long.
+		 */
+		sector = 1 << 9;
+		if (!page_has_buffers(page))
+			create_empty_buffers(page, dev, sector);
+
+		/* Find buffer_heads belonging to just this pagebuf */
 		bh = head = page_buffers(page);
 		do {
-			blk_length = i << 9; /* 512: _pagebuf_buffers_to_page */
+			blk_length = i << 9;
 			if (blk_length < pg_offset)
 				continue;
 			if (blk_length >= pg_offset + pg_length)
 				break;
-			assert(buffer_mapped(bh));
-			assert(buffer_locked(bh));
+
+			lock_buffer(bh);
+			assert(!waitqueue_active(&bh->b_wait));
+
+			bh->b_size = sector;
+			bh->b_blocknr = bn + (i - (pg_offset >> 9));
 			bufferlist[cnt++] = bh;
 		} while (i++, (bh = bh->b_this_page) != head);
 		goto request;
@@ -1516,14 +1471,10 @@ _pagebuf_page_io(
 			}
 		}
 		memset(bh, 0, sizeof(*bh));
-		init_waitqueue_head(&bh->b_wait);
-		set_bh_page(bh, page, pg_offset);
 		bh->b_size = sector;
-		bh->b_dev = bh->b_rdev = dev;
-		bh->b_blocknr = bh->b_rsector = bn++; 
-		atomic_set(&bh->b_count, 1);
+		bh->b_blocknr = bn++; 
 		set_bit(BH_Lock, &bh->b_state);
-		set_bit(BH_Mapped, &bh->b_state);
+		set_bh_page(bh, page, pg_offset);
 		bufferlist[cnt++] = bh;
 	}
 
@@ -1561,6 +1512,12 @@ request:
 			} else {
 				init_buffer(bh, callback, pb);
 			}
+
+			bh->b_rdev = bh->b_dev = dev;
+			bh->b_rsector = bh->b_blocknr;
+			set_bit(BH_Mapped, &bh->b_state);
+			init_waitqueue_head(&bh->b_wait);
+			atomic_set(&bh->b_count, 1);
 
 			if (rw == WRITE) {
 				set_bit(BH_Uptodate, &bh->b_state);
@@ -1840,7 +1797,6 @@ pagebuf_segment_apply(			/* apply function to segments   */
 	size_t			buffer_len = pb->pb_count_desired;
 	size_t			page_offset, len, total = 0;
 	size_t			cur_offset, cur_len;
-	struct page		*cp;
 
 	pagebuf_hold(pb);
 
@@ -1864,17 +1820,9 @@ pagebuf_segment_apply(			/* apply function to segments   */
 			len = cur_len;
 		cur_len -= len;
 
-		cp = pb->pb_pages[buf_index];
-
-		if (blocksize < PAGE_CACHE_SIZE) {
-			assert(pb->pb_bn != PAGE_BUF_DADDR_NULL);
-			_pagebuf_buffers_to_page(cp, pb, buf_index,
-							page_offset, len);
-		}
-
 		/* func probably = _page_buf_page_apply */
-		sval = func(pb, buffer_offset, cp, page_offset, len);
-
+		sval = func(pb, buffer_offset,
+				pb->pb_pages[buf_index], page_offset, len);
 		if (sval <= 0) {
 			status = sval;
 			break;
