@@ -1,4 +1,4 @@
-#ident "$Revision: 1.193 $"
+#ident "$Revision: 1.195 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -4894,7 +4894,6 @@ xfs_fcntl(
 	int			error = 0;
 	xfs_mount_t		*mp;
 	struct flock		bf;
-	struct irix4_flock	i4_bf;
 	struct irix5_flock	i5_bf;
 	extern int		scache_linemask;
 	
@@ -5044,12 +5043,7 @@ xfs_fcntl(
 				break;
 			}
 		} else {
-			/*
-			 * For compatibility we overlay an SVR3 flock on an
-			 * SVR4 flock.  This works because the input field
-			 * offsets in "struct flock" were preserved.
-			 */
-			if (copyin((caddr_t)arg, &i5_bf, sizeof i4_bf)) {
+			if (copyin((caddr_t)arg, &i5_bf, sizeof i5_bf)) {
 				error = XFS_ERROR(EFAULT);
 				break;
 			}
