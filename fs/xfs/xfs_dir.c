@@ -609,7 +609,6 @@ xfs_dir_shortform_to_leaf(xfs_trans_t *trans, struct xfs_dir_name *iargs)
 	char *tmpbuffer;
 	int retval, i, size;
 	xfs_fsblock_t blkno;
-	buf_t *bp;
 
 	dp = iargs->dp;
 	size = dp->i_bytes;
@@ -632,7 +631,7 @@ xfs_dir_shortform_to_leaf(xfs_trans_t *trans, struct xfs_dir_name *iargs)
 	}
 
 	ASSERT(blkno == 0);
-	bp = xfs_dir_leaf_create(trans, dp, blkno);
+	xfs_dir_leaf_create(trans, dp, blkno);
 
 	args.name = ".";
 	args.namelen = 1;
@@ -656,9 +655,9 @@ xfs_dir_shortform_to_leaf(xfs_trans_t *trans, struct xfs_dir_name *iargs)
 
 	sfe = &sf->list[0];
 	for (i = sf->hdr.count-1; i >= 0; i--) {
-		args.name = sfe->name;
+		args.name = (char *)(sfe->name);
 		args.namelen = sfe->namelen;
-		args.hashval = xfs_dir_hashname(sfe->name, sfe->namelen);
+		args.hashval = xfs_dir_hashname((char *)(sfe->name), sfe->namelen);
 		bcopy(sfe->inumber, (char *)&args.inumber, sizeof(xfs_ino_t));
 		retval = xfs_dir_leaf_addname(trans, &args);
 		if (retval)
@@ -758,8 +757,8 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	for (; i < sf->hdr.count; i++, entry++) {
 		bcopy(sfe->inumber, (char *)&ino, sizeof(ino));
 		nextcook = XFS_DIR_MAKE_COOKIE(mp, 0, entry + 1);
-		retval = xfs_dir_put_dirent(mp, dbp, ino, sfe->name, sfe->namelen,
-						nextcook, uio, &done);
+		retval = xfs_dir_put_dirent(mp, dbp, ino, (char *)(sfe->name), 
+				sfe->namelen, nextcook, uio, &done);
 		if (!done) {
 			uio->uio_offset = XFS_DIR_MAKE_COOKIE(mp, bno, entry);
 			return(retval);
@@ -978,7 +977,7 @@ xfs_dir_leaf_to_shortform(xfs_trans_t *trans, struct xfs_dir_name *iargs)
 		if (entry->nameidx == 0)
 			continue;
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
-		args.name = namest->name;
+		args.name = (char *)(namest->name);
 		args.namelen = entry->namelen;
 		args.hashval = entry->hashval;
 		bcopy(namest->inumber, (char *)&args.inumber, sizeof(xfs_ino_t));

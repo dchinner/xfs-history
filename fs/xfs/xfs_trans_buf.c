@@ -171,7 +171,7 @@ xfs_trans_getsb(xfs_trans_t	*tp,
 	 * recursion count and return the buffer to the caller.
 	 */
 	bp = tp->t_mountp->m_sb_bp;
-	if (bp->b_fsprivate2 == tp) {
+	if (((xfs_trans_t *)bp->b_fsprivate2) == tp) {
 		bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 		ASSERT(bip != NULL);
 		ASSERT(bip->bli_refcount > 0);
@@ -409,7 +409,7 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 		return;
 	}
 
-	ASSERT(bp->b_fsprivate2 == tp);
+	ASSERT(((xfs_trans_t *)bp->b_fsprivate2) == tp);
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;	
 	ASSERT(bip->bli_item.li_type == XFS_LI_BUF);
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));

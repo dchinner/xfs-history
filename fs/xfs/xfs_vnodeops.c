@@ -190,7 +190,7 @@ STATIC int	xfs_map(vnode_t	*vp,
 			off_t	offset,
 			preg_t	*pregp,
 			addr_t	*addrp,
-			uint	len,
+			size_t	len,
 			uint	prot,
 			uint	max_prot,
 			uint	flags,
@@ -200,7 +200,7 @@ STATIC int	xfs_addmap(vnode_t	*vp,
 			   off_t	offset,
 			   preg_t	*pregp,
 			   addr_t	addr,
-			   uint		len,
+			   size_t	len,
 			   uint		prot,
 			   uint		max_prot,
 			   uint		flags,
@@ -210,15 +210,15 @@ STATIC int	xfs_delmap(vnode_t	*vp,
 			   off_t	offset,
 			   preg_t	*pregp,
 			   addr_t	addr,
-			   uint		len,
+			   size_t	len,
 			   uint		prot,
 			   uint		max_prot,
 			   uint		flags,
 			   cred_t	*credp);
 
 STATIC int	xfs_allocstore(vnode_t	*vp,
-			       uint	offset,
-			       uint	len,
+			       off_t	offset,
+			       size_t	len,
 			       cred_t	*credp);
 
 STATIC int	xfs_fcntl(vnode_t	*vp,
@@ -1336,10 +1336,10 @@ xfs_dir_lookup_int (xfs_trans_t  *tp,
 		    xfs_inode_t  **ip,
 		    struct ncfastdata *fd)
 {
-	vnode_t		   *vp;
-	int		   name_len;
-	int		   code = 0;
-	boolean_t	   do_iget;
+	vnode_t	   *vp;
+	int	   name_len;
+	int	   code = 0;
+	int	   do_iget;
 
 	vn_trace_entry(dir_vp, "xfs_dir_lookup_int");
 	do_iget = flag & DLF_IGET;
@@ -2816,9 +2816,9 @@ xfs_rename(vnode_t	*src_dir_vp,
 	xfs_trans_t	*tp;
 	xfs_inode_t	*src_dp, *target_dp, *src_ip, *target_ip;
 	xfs_mount_t	*mp;
-	boolean_t	new_parent;		/* moving to a new dir */
-	boolean_t	src_is_directory;	/* src_name is a directory */
 	boolean_t	state_has_changed;
+	int		new_parent;		/* moving to a new dir */
+	int		src_is_directory;	/* src_name is a directory */
 	int		error;		
         xfs_bmap_free_t free_list;
         xfs_fsblock_t   first_block;
@@ -3898,7 +3898,7 @@ xfs_map(vnode_t	*vp,
 	off_t	offset,
 	preg_t	*pregp,
 	addr_t	*addrp,
-	uint	len,
+	size_t	len,
 	uint	prot,
 	uint	max_prot,
 	uint	flags,
@@ -3927,7 +3927,7 @@ xfs_addmap(vnode_t	*vp,
 	   off_t	offset,
 	   preg_t	*pregp,
 	   addr_t	addr,
-	   uint		len,
+	   size_t	len,
 	   uint		prot,
 	   uint		max_prot,
 	   uint		flags,
@@ -3957,7 +3957,7 @@ xfs_delmap(vnode_t	*vp,
 	   off_t	offset,
 	   preg_t	*pregp,
 	   addr_t	addr,
-	   uint		len,
+	   size_t	len,
 	   uint		prot,
 	   uint		max_prot,
 	   uint		flags,
@@ -3968,7 +3968,7 @@ xfs_delmap(vnode_t	*vp,
 	ip = XFS_VTOI(vp);
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	ip->i_mapcnt -= btoc(len);
-	ASSERT(ip->i_mapcnt >= 0);
+	ASSERT(((long)ip->i_mapcnt) >= 0);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	return 0;
 }
@@ -3986,8 +3986,8 @@ xfs_delmap(vnode_t	*vp,
  */
 STATIC int
 xfs_allocstore(vnode_t	*vp,
-	       uint	offset,
-	       uint	count,
+	       off_t	offset,
+	       size_t	count,
 	       cred_t	*credp)
 {
 	xfs_mount_t	*mp;
@@ -4054,7 +4054,7 @@ xfs_allocstore(vnode_t	*vp,
 		for (i = 0; i < nimaps; i++) {
 			ASSERT(imap[i].br_startblock != HOLESTARTBLOCK);
 			count_fsb -= imap[i].br_blockcount;
-			ASSERT(count_fsb >= 0);
+			ASSERT(((long)count_fsb) >= 0);
 			curr_off_fsb += imap[i].br_blockcount;
 			ASSERT(curr_off_fsb <= last_fsb);
 		}

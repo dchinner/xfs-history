@@ -1610,7 +1610,7 @@ xfs_dir_leaf_lookup_int(buf_t *bp, struct xfs_dir_name *args, int *index)
 
 	leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
 	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
-	ASSERT((leaf->hdr.count >= 0) && \
+	ASSERT((((int)leaf->hdr.count) >= 0) && \
 	       (leaf->hdr.count < (XFS_LBSIZE(args->dp->i_mount)/8)));
 
 	/*
@@ -1815,9 +1815,12 @@ xfs_dir_leaf_moveents(struct xfs_dir_leafblock *leaf_s, int start_s,
 	hdr_s = &leaf_s->hdr;
 	hdr_d = &leaf_d->hdr;
 	ASSERT((hdr_s->count > 0) && (hdr_s->count < (XFS_LBSIZE(mp)/8)));
-	ASSERT(hdr_s->firstused >= ((hdr_s->count*sizeof(*entry_s))+sizeof(*hdr_s)));
-	ASSERT((hdr_d->count >= 0) && (hdr_d->count < (XFS_LBSIZE(mp)/8)));
-	ASSERT(hdr_d->firstused >= ((hdr_d->count*sizeof(*entry_d))+sizeof(*hdr_d)));
+	ASSERT(hdr_s->firstused >= 
+		((hdr_s->count*sizeof(*entry_s))+sizeof(*hdr_s)));
+	ASSERT(((int)(hdr_d->count) >= 0) && 
+		(hdr_d->count < (XFS_LBSIZE(mp)/8)));
+	ASSERT(hdr_d->firstused >= 
+		((hdr_d->count*sizeof(*entry_d))+sizeof(*hdr_d)));
 
 	ASSERT(start_s < hdr_s->count);
 	ASSERT(start_d <= hdr_d->count);
@@ -2222,9 +2225,9 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, uio_t *uio, int *eobp,
 				nextcook = XFS_DIR_MAKE_COOKIE(mp, XFS_B_TO_FSBT(mp, dp->i_d.di_size), 0);
 		} else
 			nextcook = XFS_DIR_MAKE_COOKIE(mp, bno, i + 1);
-		retval = xfs_dir_put_dirent(mp, dbp, ino, namest->name,
-						entry->namelen, nextcook, uio,
-						&done);
+		retval = xfs_dir_put_dirent(mp, dbp, ino, 
+				(char *)(namest->name), entry->namelen, 
+				nextcook, uio, &done);
 		if (!done) {
 			uio->uio_offset = XFS_DIR_MAKE_COOKIE(mp, bno, i);
 			*eobp = 0;

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.36 $"
+#ident	"$Revision: 1.37 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -323,14 +323,13 @@ void
 xfs_btree_del_cursor(
 	xfs_btree_cur_t	*cur)		/* btree cursor */
 {
-	buf_t		*bp;		/* pointer to btree block buffer */
 	int		i;		/* btree level */
 
 	/*
 	 * Clear the buffer pointers, and release the buffers.
 	 */
 	for (i = 0; i < cur->bc_nlevels; i++) {
-		if (bp = cur->bc_bufs[i])
+		if (cur->bc_bufs[i])
 			xfs_btree_setbuf(cur, i, 0);
 		else
 			break;

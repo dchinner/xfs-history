@@ -293,7 +293,6 @@ xfs_trans_mod_sb(
 	uint		field,
 	long		delta)
 {
-	xfs_sb_t	*sbp;
 
 	switch (field) {
 	case XFS_TRANS_SB_ICOUNT:
@@ -331,7 +330,6 @@ xfs_trans_mod_sb(
 		 * number reserved.
 		 */
 		if (delta < 0) {
-			sbp = &tp->t_mountp->m_sb;
 			tp->t_rtx_res_used += (uint)-delta;
 			ASSERT(tp->t_rtx_res_used <= tp->t_rtx_res);
 		}

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.43 $"
+#ident	"$Revision: 1.46 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -503,9 +503,9 @@ xlog_find_tail(xlog_t  *log,
 	xlog_rec_header_t *rhead;
 	xlog_op_header_t  *op_head;
 	buf_t		  *bp;
-	int		  error, i, found, zeroed_log;
+	int		  error, i, found;
 	
-	found = error = zeroed_log = 0;
+	found = error = 0;
 	/*
 	 * Find previous log record 
 	 */
@@ -1974,6 +1974,7 @@ xlog_recover_unmount_trans(xlog_recover_t *trans)
 {
 	/* Do nothing now */
 	xlog_warn("xFS: xlog_recover_unmount_trans: Unmount LR");
+	return( 0 );
 }	/* xlog_recover_unmount_trans */
 
 
@@ -1998,7 +1999,8 @@ xlog_recover_process_data(xlog_t	    *log,
     xlog_op_header_t	*ohead;
     xlog_recover_t	*trans;
     xlog_tid_t		tid;
-    int			hash, error;
+    int			error;
+    unsigned long	hash;
     uint		flags;
 
     while (dp < lp) {
@@ -2062,6 +2064,7 @@ xlog_recover_process_data(xlog_t	    *log,
 	dp += ohead->oh_len;
 	num_logops--;
     }
+    return( 0 );
 }	/* xlog_recover_process_data */
 
 
