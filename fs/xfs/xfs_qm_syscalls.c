@@ -674,7 +674,7 @@ xfs_qm_scall_setqlim(
 	}
 #ifdef QUOTADEBUG
 	else 
-		printk("blkhard 0x%x < blksoft 0x%x\n", hard, soft);
+		printk("blkhard %Ld < blksoft %Ld\n", hard, soft);
 #endif			
 	hard = (newlim.d_fieldmask & FS_DQ_RTBHARD) ?
 		(xfs_qcnt_t) XFS_BB_TO_FSB(mp, newlim.d_rtb_hardlimit) :
@@ -688,7 +688,7 @@ xfs_qm_scall_setqlim(
 	}
 #ifdef QUOTADEBUG
 	else 
-		printk("rtbhard 0x%x < rtbsoft 0x%x\n", hard, soft);
+		printk("rtbhard %Ld < rtbsoft %Ld\n", hard, soft);
 #endif	
 	
 	hard = (newlim.d_fieldmask & FS_DQ_IHARD) ?
@@ -701,7 +701,7 @@ xfs_qm_scall_setqlim(
 	}
 #ifdef QUOTADEBUG
 	else 
-		printk("ihard 0x%x < isoft 0x%x\n", hard, soft);
+		printk("ihard %Ld < isoft %Ld\n", hard, soft);
 #endif		
 	if (id == 0) {
 		/*

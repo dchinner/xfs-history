@@ -494,7 +494,7 @@ xfs_trans_apply_dquot_deltas(
 
 #ifdef QUOTADEBUG
 			if (qtrx->qt_rtblk_res != 0)
-				printk("RT res %d for 0x%x\n",
+				printk("RT res %d for 0x%p\n",
 				      (int) qtrx->qt_rtblk_res,
 				      dqp);
 #endif

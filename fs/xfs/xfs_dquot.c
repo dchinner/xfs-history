@@ -1623,7 +1623,7 @@ xfs_qm_dqprint(xfs_dquot_t *dqp)
 	printk( "---- dquot ID	=  %d\n", (int) dqp->q_core.d_id);
 	printk( "---- type      =  %s\n", XFS_QM_ISUDQ(dqp) ? "USR" :
 	       "PRJ");
-	printk( "---- fs        =  0x%x\n", dqp->q_mount);
+	printk( "---- fs        =  0x%p\n", dqp->q_mount);
 	printk( "---- blkno     =  0x%x\n", (int) dqp->q_blkno);
 	printk( "---- boffset	=  0x%x\n", (int) dqp->q_bufoffset);
 	printk( "---- blkhlimit	=  %Lu (0x%x)\n", 

@@ -932,18 +932,15 @@ xfs_mountfs(
 	}
 
 #if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
-	if (! (XFS_IS_QUOTA_ON(mp))) {
+	if (! (XFS_IS_QUOTA_ON(mp)))
 		xfs_fs_cmn_err(CE_NOTE, mp, "Disk quotas not turned on");
-	} else {
+	else
 		xfs_fs_cmn_err(CE_NOTE, mp, "Disk quotas turned on");
-	}
 #endif
 
 #ifdef QUOTADEBUG
-	if (XFS_IS_QUOTA_ON(mp)) {
-		if (xfs_qm_internalqcheck(mp))
-			debug("qcheck failed");
-	}
+	if (XFS_IS_QUOTA_ON(mp) && xfs_qm_internalqcheck(mp))
+		cmn_err(CE_WARN, "XFS: mount internalqcheck failed");
 #endif
 
 	return (0);

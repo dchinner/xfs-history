@@ -2262,7 +2262,7 @@ xfs_qm_shake_freelist(
 		}
 		xfs_dqtrace_entry(dqp, "DQSHAKE: UNLINKING");
 #ifdef QUOTADEBUG
-		printk("Shake 0x%x, ID 0x%x\n", dqp, dqp->q_core.d_id);
+		printk("Shake 0x%p, ID 0x%x\n", dqp, dqp->q_core.d_id);
 #endif
 		ASSERT(dqp->q_nrefs == 0);
 		nextdqp = dqp->dq_flnext;
@@ -2862,7 +2862,7 @@ xfs_qm_freelist_destroy(xfs_frlist_t *ql)
 		xfs_dqlock(dqp);	
 		nextdqp = dqp->dq_flnext;
 #ifdef QUOTADEBUG
-		printk("FREELIST destroy 0x%x\n", dqp);
+		printk("FREELIST destroy 0x%p\n", dqp);
 #endif
 		XQM_FREELIST_REMOVE(dqp);
 		xfs_dqunlock(dqp);
@@ -2909,7 +2909,7 @@ xfs_qm_freelist_print(xfs_frlist_t *qlist, char *title)
 	int i = 0;
 	printk("%s (#%d)\n", title, (int) qlist->qh_nelems);	
 	FOREACH_DQUOT_IN_FREELIST(dq, qlist) {
-		printk("\t%d.\t\"%d (%s:0x%x)\"\t bcnt = %d, icnt = %d "
+		printk("\t%d.\t\"%d (%s:0x%p)\"\t bcnt = %d, icnt = %d "
 		       "refs = %d\n",  
 		       ++i, (int) dq->q_core.d_id,
 		       DQFLAGTO_TYPESTR(dq), dq,     
