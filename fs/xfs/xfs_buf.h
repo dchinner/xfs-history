@@ -211,17 +211,17 @@ extern inline xfs_caddr_t xfs_buf_offset(page_buf_t *bp, off_t offset)
 #define XFS_BUF_SET_REF(bp, ref)	
 
 #define xfs_buf_read(target, blkno, len, flags) \
-		pagebuf_get((target)->pb_targ, (blkno) << 9, (len) << 9, \
+		pagebuf_get((target)->pb_targ, (blkno), (len), \
 			PBF_LOCK | PBF_READ | PBF_MAPPED | PBF_MAPPABLE)
 #define xfs_buf_get(target, blkno, len, flags) \
-		pagebuf_get((target)->pb_targ, (blkno) << 9, (len) << 9, \
+		pagebuf_get((target)->pb_targ, (blkno), (len), \
 			PBF_LOCK | PBF_MAPPED | PBF_MAPPABLE)
 
 #define xfs_buf_read_flags(target, blkno, len, flags) \
-		pagebuf_get((target)->pb_targ, (blkno) << 9, (len) << 9, \
+		pagebuf_get((target)->pb_targ, (blkno), (len), \
 			PBF_READ | PBF_MAPPABLE | flags)
 #define xfs_buf_get_flags(target, blkno, len, flags) \
-		pagebuf_get((target)->pb_targ, (blkno) << 9, (len) << 9, \
+		pagebuf_get((target)->pb_targ, (blkno), (len), \
 			PBF_MAPPABLE | flags)
 
 static inline int	xfs_bawrite(void *mp, page_buf_t *bp)
@@ -264,7 +264,7 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
             pagebuf_iodone(pb)
 
 #define xfs_incore(buftarg,blkno,len,lockit) \
-            pagebuf_find(buftarg.pb_targ, blkno<<9 ,len<<9, lockit)
+            pagebuf_find(buftarg.pb_targ, blkno ,len, lockit)
 
 
 #define xfs_biomove(pb, off, len, data, rw) \
@@ -332,8 +332,8 @@ extern void XFS_bflush(buftarg_t);
 
 
 #define xfs_baread(target, rablkno, ralen)  \
-	pagebuf_readahead((target)->pb_targ, (rablkno) << 9, \
-			  (ralen) << 9, PBF_DONT_BLOCK)
+	pagebuf_readahead((target)->pb_targ, (rablkno), \
+			  (ralen), PBF_DONT_BLOCK)
 	
 #define XFS_getrbuf(sleep,mp)	\
 	pagebuf_get_empty((mp)->m_ddev_targ.pb_targ)
