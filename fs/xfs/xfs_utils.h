@@ -56,13 +56,6 @@ xfs_rename(
 	struct cred	*credp);
 
 extern int
-xfs_link(
-	bhv_desc_t	*target_dir_bdp,
-	struct vnode	*src_vp,
-	struct dentry	*target_dentry,
-	struct cred	*credp);
-
-extern int
 xfs_get_dir_entry(
 	struct dentry		*dentry,
 	xfs_inode_t		**ipp);

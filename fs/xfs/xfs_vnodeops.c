@@ -3035,7 +3035,7 @@ std_return:
  * xfs_link
  *
  */
-int
+STATIC int
 xfs_link(
 	bhv_desc_t	*target_dir_bdp,
 	vnode_t		*src_vp,
