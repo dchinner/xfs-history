@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.153 $"
+#ident	"$Revision: 1.154 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -83,7 +83,7 @@ xfs_mount_init(void)
 {
 	xfs_mount_t *mp;
 
-	mp = kmem_zalloc(sizeof(*mp), 0);
+	mp = kmem_zalloc(sizeof(*mp), KM_SLEEP);
 
 	AIL_LOCKINIT(&mp->m_ail_lock, "xfs_ail");
 	spinlock_init(&mp->m_ipinlock, "xfs_ipin");
@@ -228,7 +228,6 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	int		i;
 	xfs_inode_t	*rip;
 	vnode_t		*rvp = 0;
-	vnode_t		*rbmvp;
 	int		readio_log;
 	int		writeio_log;
 	vmap_t		vmap;
@@ -542,38 +541,19 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 			goto error1;
 		}
 	}
+
 	/*
 	 * Initialize realtime fields in the mount structure
 	 */
-	if (sbp->sb_rblocks) {
-		mp->m_rsumlevels = sbp->sb_rextslog + 1;
-		mp->m_rsumsize = sizeof(xfs_suminfo_t) * mp->m_rsumlevels * sbp->sb_rbmblocks;
-		mp->m_rsumsize = roundup(mp->m_rsumsize, sbp->sb_blocksize);
-		mp->m_rbmip = mp->m_rsumip = NULL;
-		/*
-		 * Check that the realtime section is an ok size.
-		 */
-		d = (daddr_t)XFS_FSB_TO_BB(mp, mp->m_sb.sb_rblocks);
-		if (XFS_BB_TO_FSB(mp, d) != mp->m_sb.sb_rblocks) {
-			error = XFS_ERROR(E2BIG);
-			goto error1;
-		}
-		error = xfs_read_buf(mp, mp->m_rtdev, d - 1, 1, 0, &bp);
-		if (!error) {
-			brelse(bp);
-		} else {
-			if (error == ENOSPC) {
-				error = XFS_ERROR(E2BIG);
-			}
-			goto error1;
-		}
-	}
+	if (error = xfs_rtmount_init(mp))
+		goto error1;
+
 	/*
 	 *  Copies the low order bits of the timestamp and the randomly
 	 *  set "sequence" number out of a UUID.
 	 */
 	uuid_getnodeuniq(&sbp->sb_uuid, mp->m_fixedfsid);
-				
+
 	/*
 	 *  The vfs structure needs to have a file system independent
 	 *  way of checking for the invariant file system ID.  Since it
@@ -620,13 +600,10 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 		goto error2;
 	}
 
-#ifdef SIM
 	/*
 	 * Mkfs calls mount before the root inode is allocated.
 	 */
-	if (read_rootinos == 1 && sbp->sb_rootino != NULLFSINO)
-#endif /* SIM */
-	{
+	if (read_rootinos == 1 && sbp->sb_rootino != NULLFSINO) {
 		/*
 		 * Get and sanity-check the root inode.
 		 * Save the pointer to it in the mount structure.
@@ -656,37 +633,14 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	/*
 	 * Initialize realtime inode pointers in the mount structure
 	 */
-	if (sbp->sb_rbmino != NULLFSINO && read_rootinos == 1) {
-		error = xfs_iget(mp, NULL, sbp->sb_rbmino, NULL,
-				 &mp->m_rbmip, 0);
-		if (error) {
-			/*
-			 * Free up the root inode.
-			 */
-			VMAP(rvp, vmap);
-			VN_RELE(rvp);
-			vn_purge(rvp, &vmap);
-			goto error2;
-		}
-		ASSERT(mp->m_rbmip != NULL);
-		ASSERT(sbp->sb_rsumino != NULLFSINO);
-		error = xfs_iget(mp, NULL, sbp->sb_rsumino, NULL,
-				 &mp->m_rsumip, 0);
-		if (error) {
-			/*
-			 * Free up the root and first rt inodes.
-			 */
-			VMAP(rvp, vmap);
-			VN_RELE(rvp);
-			vn_purge(rvp, &vmap);
-
-			rbmvp = XFS_ITOV(mp->m_rbmip);
-			VMAP(rbmvp, vmap);
-			VN_RELE(rbmvp);
-			vn_purge(rbmvp, &vmap);
-			goto error2;
-		}
-		ASSERT(mp->m_rsumip != NULL);
+	if (read_rootinos == 1 && (error = xfs_rtmount_inodes(mp))) {
+		/*
+		 * Free up the root inode.
+		 */
+		VMAP(rvp, vmap);
+		VN_RELE(rvp);
+		vn_purge(rvp, &vmap);
+		goto error2;
 	}
 
 	
@@ -1098,11 +1052,11 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
 STATIC int
 xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, xfs_sb_field_t field, int delta)
 {
-	register int		scounter; /* short counter for 32 bit fields */
-	register long long	lcounter; /* long counter for 64 bit fields */
+	int		scounter;	/* short counter for 32 bit fields */
+	long long	lcounter;	/* long counter for 64 bit fields */
 
 	/*
-	 * Obtain the in-core superblock spin lock and switch
+	 * With the in-core superblock spin lock held, switch
 	 * on the indicated field.  Apply the delta to the
 	 * proper field.  If the fields value would dip below
 	 * 0, then do not apply the delta and return EINVAL.
@@ -1168,6 +1122,51 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, xfs_sb_field_t field, int delta)
 			return (XFS_ERROR(EINVAL));
 		}
 		mp->m_sb.sb_imax_pct = scounter;
+		return (0);
+	case XFS_SBS_REXTSIZE:
+		scounter = mp->m_sb.sb_rextsize;
+		scounter += delta;
+		if (scounter < 0) {
+			ASSERT(0);
+			return (XFS_ERROR(EINVAL));
+		}
+		mp->m_sb.sb_rextsize = scounter;
+		return (0);
+	case XFS_SBS_RBMBLOCKS:
+		scounter = mp->m_sb.sb_rbmblocks;
+		scounter += delta;
+		if (scounter < 0) {
+			ASSERT(0);
+			return (XFS_ERROR(EINVAL));
+		}
+		mp->m_sb.sb_rbmblocks = scounter;
+		return (0);
+	case XFS_SBS_RBLOCKS:
+		lcounter = mp->m_sb.sb_rblocks;
+		lcounter += delta;
+		if (lcounter < 0) {
+			ASSERT(0);
+			return (XFS_ERROR(EINVAL));
+		}
+		mp->m_sb.sb_rblocks = lcounter;
+		return (0);
+	case XFS_SBS_REXTENTS:
+		lcounter = mp->m_sb.sb_rextents;
+		lcounter += delta;
+		if (lcounter < 0) {
+			ASSERT(0);
+			return (XFS_ERROR(EINVAL));
+		}
+		mp->m_sb.sb_rextents = lcounter;
+		return (0);
+	case XFS_SBS_REXTSLOG:
+		scounter = mp->m_sb.sb_rextslog;
+		scounter += delta;
+		if (scounter < 0) {
+			ASSERT(0);
+			return (XFS_ERROR(EINVAL));
+		}
+		mp->m_sb.sb_rextslog = scounter;
 		return (0);
 	default:
 		ASSERT(0);
