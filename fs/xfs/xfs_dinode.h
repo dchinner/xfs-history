@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DINODE_H
 #define	_FS_XFS_DINODE_H
 
-#ident "$Revision: 1.29 $"
+#ident "$Revision: 1.30 $"
 
 #define	XFS_DINODE_VERSION	1
 #define	XFS_DINODE_MAGIC	0x494e	/* 'IN' */
@@ -63,11 +63,13 @@ typedef struct xfs_dinode
 	 */
 	xfs_agino_t		di_next_unlinked;/* agi unlinked list ptr */
 	union {
-		dev_t		di_dev;	/* device for IFCHR/IFBLK */
-		char		di_c[1];/* local contents */
-		xfs_bmbt_rec_32_t di_bmx[1];/* extent list */
-		xfs_bmdr_block_t di_bmbt;/* btree root block */
-		uuid_t		di_muuid;/* mount point value */
+		xfs_bmdr_block_t di_bmbt;	/* btree root block */
+		xfs_bmbt_rec_32_t di_bmx[1];	/* extent list */
+		char		di_c[1];	/* local contents */
+		dev_t		di_dev;		/* device for IFCHR/IFBLK */
+		uuid_t		di_muuid;	/* mount point value */
+		xfs_dir_shortform_t di_sfdir;	/* local directory */
+		char		di_symlink[1];	/* local symbolic link */
 	}		di_u;
 } xfs_dinode_t;
 
@@ -108,7 +110,8 @@ typedef struct xfs_dinode
 typedef enum xfs_dinode_fmt
 {
 	XFS_DINODE_FMT_DEV,		/* CHR, BLK: di_dev */
-	XFS_DINODE_FMT_LOCAL,		/* DIR, REG, LNK: di_c */
+	XFS_DINODE_FMT_LOCAL,		/* DIR, REG: di_c */
+					/* LNK: di_symlink */
 	XFS_DINODE_FMT_EXTENTS,		/* DIR, REG, LNK: di_bmx */
 	XFS_DINODE_FMT_BTREE,		/* DIR, REG, LNK: di_bmbt */
 	XFS_DINODE_FMT_UUID 		/* MNT: di_uuid */
@@ -160,8 +163,10 @@ typedef enum xfs_dinode_fmt
  * There should be a one-to-one correspondence between these flags and the
  * XFS_XFLAG_s.
  */
-#define XFS_DIFLAG_REALTIME     0x1     /* file's blocks come from rt area */
-#define XFS_DIFLAG_PREALLOC	0x2	/* file space has been preallocated */
-#define XFS_DIFLAG_ALL  (XFS_DIFLAG_REALTIME)
+#define XFS_DIFLAG_REALTIME_BIT	0	/* file's blocks come from rt area */
+#define XFS_DIFLAG_PREALLOC_BIT	1	/* file space has been preallocated */
+#define XFS_DIFLAG_REALTIME     (1 << XFS_DIFLAG_REALTIME_BIT)
+#define XFS_DIFLAG_PREALLOC	(1 << XFS_DIFLAG_PREALLOC_BIT)
+#define XFS_DIFLAG_ALL  (XFS_DIFLAG_REALTIME|XFS_DIFLAG_PREALLOC)
 
 #endif	/* _FS_XFS_DINODE_H */
