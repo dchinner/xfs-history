@@ -96,6 +96,7 @@ xfs_trans_alloc(xfs_mount_t	*mp,
 	tp->t_tid = xfs_trans_id_alloc(mp);
 	tp->t_type = type;
 	tp->t_mountp = mp;
+	tp->t_flags = XFS_TRANS_FIRST;
 	initnsema(&(tp->t_sema), 0, "xfs_trans");
 	tp->t_items_free = XFS_LIC_NUM_SLOTS;
 	XFS_LIC_INIT(&(tp->t_items));
@@ -132,11 +133,29 @@ xfs_trans_dup(xfs_trans_t *tp)
 	ASSERT(!xlog_debug || (tp->t_ticket != NULL));
 	ntp->t_flags = XFS_TRANS_PERM_LOG_RES;
 	ntp->t_ticket = tp->t_ticket;
-	ntp->t_log_res = tp->t_log_res;
 	ntp->t_blk_res = tp->t_blk_res - tp->t_blk_res_used;
 	tp->t_blk_res = tp->t_blk_res_used;
 	ntp->t_rtx_res = tp->t_rtx_res - tp->t_rtx_res_used;
 	tp->t_rtx_res = tp->t_rtx_res_used;
+	ntp->t_log_res = 0;
+
+	/*
+	 * Differentiate the first dup from any subsequent dups.
+	 * These flags are looked at in xfs_trans_reserve().
+	 */
+	if (tp->t_flags & XFS_TRANS_FIRST) {
+		ASSERT(!(tp->t_flags &
+			 (XFS_TRANS_SECOND | XFS_TRANS_CONTINUED)));
+		ntp->t_flags &= ~XFS_TRANS_FIRST;
+		ntp->t_flags |= XFS_TRANS_SECOND;
+	} else if (tp->t_flags & XFS_TRANS_SECOND) {
+		ASSERT(!(tp->t_flags &
+			 (XFS_TRANS_FIRST | XFS_TRANS_CONTINUED)));
+		ntp->t_flags &= ~XFS_TRANS_SECOND;
+		ntp->t_flags |= XFS_TRANS_CONTINUED;
+	} else {
+		ntp->t_flags |= XFS_TRANS_CONTINUED;
+	}
 
 	return ntp;
 }
@@ -161,6 +180,7 @@ xfs_trans_reserve(xfs_trans_t	*tp,
 {
 	int	log_flags;
 	int	error;
+	uint	res_logspace;
 
 	error = 0;
 	/*
@@ -181,17 +201,50 @@ xfs_trans_reserve(xfs_trans_t	*tp,
 	 * Reserve the log space needed for this transaction.
 	 */
 	if (logspace > 0) {
-		ASSERT(tp->t_ticket == NULL);
-		ASSERT(!(tp->t_flags & XFS_TRANS_PERM_LOG_RES));
 		if (flags & XFS_TRANS_PERM_LOG_RES) {
 			log_flags = XFS_LOG_PERM_RESERV;
 			tp->t_flags |= XFS_TRANS_PERM_LOG_RES;
+			if (tp->t_flags & XFS_TRANS_FIRST) {
+				/*
+				 * This is the first of the chain of
+				 * transactions using the permanent
+				 * log reservation, so get 2 times what
+				 * we need for one.
+				 */
+				ASSERT(tp->t_ticket == NULL);
+				res_logspace = logspace * 2;
+			} else if (tp->t_flags & XFS_TRANS_SECOND) {
+				/*
+				 * This is the second in the chain of
+				 * transactions using the permanent
+				 * log reservation, so just use what was
+				 * gotten by the first.
+				 */
+				ASSERT(tp->t_ticket != NULL);
+				res_logspace = 0;
+				error = 0;
+			} else {
+				/*
+				 * We are the third or beyond xact in the
+				 * chain, so reclaim the space used and
+				 * released by the first.
+				 */
+				ASSERT(tp->t_flags & XFS_TRANS_CONTINUED);
+				res_logspace = logspace;
+			}
 		} else {
+			ASSERT(tp->t_flags & XFS_TRANS_FIRST);
+			ASSERT(tp->t_ticket == NULL);
+			ASSERT(!(tp->t_flags & XFS_TRANS_PERM_LOG_RES));
 			log_flags = 0;
+			res_logspace = logspace;
 		}
-		error = xfs_log_reserve(tp->t_mountp, logspace,
-					&tp->t_ticket,
-					XFS_TRANSACTION, log_flags);
+
+		if (res_logspace) {
+			error = xfs_log_reserve(tp->t_mountp, res_logspace,
+						&tp->t_ticket,
+						XFS_TRANSACTION, log_flags);
+		}
 #ifdef SIM
 		if (error != 0) {
 			printf("Log reservation failed\n");
