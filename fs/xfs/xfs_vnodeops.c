@@ -247,7 +247,8 @@ STATIC int	xfs_reclaim(vnode_t	*vp,
 
 #ifndef SIM
 
-sema_t xfs_ancestormon;		/* initialized in xfs_init */
+sema_t	xfs_ancestormon;		/* initialized in xfs_init */
+int	xfs_do_fast_fid = 1;
 
 #define IRELE(ip)	VN_RELE(XFS_ITOV(ip))
 #define IHOLD(ip)	VN_HOLD(XFS_ITOV(ip))
@@ -3835,6 +3836,39 @@ error_return:
 	return error;
 }
 
+/*
+ * This is called from the customized NFS server code that
+ * keeps the fid structure on the stack rather than having
+ * us kmem_alloc one.  It is much more CPU efficient to do
+ * it this way.
+ */
+int
+xfs_fast_fid(
+	vnode_t		*vp,
+	xfs_fid_t	*xfid)
+{
+	xfs_inode_t	*ip;
+	xfs_mount_t	*mp;
+
+	ASSERT(xfs_do_fast_fid != 0);
+
+	mp = XFS_VFSTOM(vp->v_vfsp);
+	if (XFS_INO_BITS(mp) > (NBBY * sizeof(xfs_fid_ino_t))) {
+		/*
+		 * If the ino won't fit into the __uint32_t that's
+		 * in our xfs_fid structure, then return an error.
+		 */
+		return EFBIG;
+	}
+
+	ip = XFS_VTOI(vp);
+	xfid->fid_len = sizeof(xfs_fid_t) - sizeof(xfid->fid_len);
+	xfid->fid_pad = 0;
+	xfid->fid_ino = (xfs_fid_ino_t)ip->i_ino;
+	xfid->fid_gen = ip->i_d.di_gen;	
+
+	return 0;
+}
 
 /*
  * xfs_fid
