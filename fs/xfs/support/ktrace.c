@@ -36,7 +36,6 @@
 #include "kmem.h"
 #include "spin.h"
 #include "debug.h"
-#include "atomic.h"
 #include "ktrace.h"
 
 #if	(defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
