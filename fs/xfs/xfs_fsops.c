@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.5 $"
+#ident	"$Revision: 1.8 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -165,7 +165,7 @@ xfs_growfs_data(
 		block->bb_numrecs = 1;
 		block->bb_leftsib = block->bb_rightsib = NULLAGBLOCK;
 		arec = XFS_BTREE_REC_ADDR(bsize, xfs_alloc, block, 1,
-			XFS_BTREE_BLOCK_MAXRECS(bsize, xfs_alloc, 1));
+			mp->m_alloc_mxr[0]);
 		arec->ar_startblock = XFS_PREALLOC_BLOCKS(mp);
 		arec->ar_blockcount = agsize - arec->ar_startblock;
 		bwrite(bp);
@@ -182,7 +182,7 @@ xfs_growfs_data(
 		block->bb_numrecs = 1;
 		block->bb_leftsib = block->bb_rightsib = NULLAGBLOCK;
 		arec = XFS_BTREE_REC_ADDR(bsize, xfs_alloc, block, 1,
-			XFS_BTREE_BLOCK_MAXRECS(bsize, xfs_alloc, 1));
+			mp->m_alloc_mxr[0]);
 		arec->ar_startblock = XFS_PREALLOC_BLOCKS(mp);
 		arec->ar_blockcount = agsize - arec->ar_startblock;
 		nfree += arec->ar_blockcount;
