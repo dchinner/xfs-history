@@ -163,7 +163,7 @@ acl_xfs_to_ext_attr(xfs_acl_t *src, acl_ea_header *ext_acl, size_t size)
 	src_entry = &src->acl_entry[0];
 	for (n=0; n < src->acl_cnt; n++, dest_entry++, src_entry++) {
 		dest_entry->e_perm = cpu_to_le16(src_entry->ae_perm);
-		switch(dest_entry->ae_perm) {
+		switch(src_entry->ae_perm) {
 			case ACL_READ:
 			case ACL_WRITE:
 			case ACL_EXECUTE:
