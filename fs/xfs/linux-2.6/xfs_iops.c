@@ -215,7 +215,6 @@ linvfs_link(
 		validate_fields(ip);
 		d_instantiate(dentry, ip);
 		mark_inode_dirty(ip);
-		mark_inode_dirty(LINVFS_GET_IP(tdvp));
 	}
 	return -error;
 }
@@ -516,7 +515,7 @@ linvfs_getattr(
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	int		error = 0;
 
-	if (vp->v_flag & VMODIFIED) {
+	if (unlikely(vp->v_flag & VMODIFIED)) {
 		error = linvfs_revalidate_core(inode, 0);
 	}
 	if (!error)
@@ -633,7 +632,7 @@ linvfs_get_block_core(
 		set_buffer_new(bh_result);
 
 	if (pbmap.pbm_flags & PBMF_DELAY) {
-		if (direct)
+		if (unlikely(direct))
 			BUG();
 		if (!create) {
 			struct page	*page = bh_result->b_page;
@@ -711,8 +710,8 @@ retry:
 			(struct page_buf_bmap_s *) pbmapp, retpbbm, error);
 	}
 	if (flags & PBF_WRITE) {
-		if ((flags & PBF_DIRECT) && *retpbbm &&
-		    (pbmapp->pbm_flags & PBMF_DELAY)) {
+		if (unlikely((flags & PBF_DIRECT) && *retpbbm &&
+		    (pbmapp->pbm_flags & PBMF_DELAY))) {
 			flags = PBF_WRITE | PBF_FILE_ALLOCATE;
 			goto retry;
 		}
@@ -813,9 +812,6 @@ linvfs_write_full_page(
 
 	inode = page->mapping->host;
 	vp = LINVFS_GET_VP(inode);
-	if (vp->v_flag & VMODIFIED) {
-		linvfs_revalidate_core(inode, 0);
-	}
 	error = pagebuf_write_full_page(page, nr_delalloc, linvfs_pb_bmap);
 
 	return error;
