@@ -588,7 +588,7 @@ xfs_acl_get_attr(
 	flags |= ATTR_ROOT;
 	VOP_ATTR_GET(vp, kind==ACL_TYPE_ACCESS ? SGI_ACL_FILE : SGI_ACL_DEFAULT,
 		     (char *)aclp, &len, flags, sys_cred, *error);
-	if (*error || (flags & ATTR_KERNOVAL)))
+	if (*error || (flags & ATTR_KERNOVAL))
 		return;
 	xfs_acl_get_endian(aclp);
 }
