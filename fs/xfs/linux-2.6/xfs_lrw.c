@@ -207,7 +207,7 @@ xfs_bmap(bhv_desc_t	*bdp,
 }	
 
 
-void
+static void
 _xfs_imap_to_bmap(
 	xfs_iocore_t    *io,
 	off_t		offset,
@@ -270,7 +270,7 @@ _xfs_imap_to_bmap(
 	}
 }
 
-int
+STATIC int
 xfs_iomap_read(
 	xfs_iocore_t	*io,
 	off_t		offset,
@@ -713,4 +713,113 @@ xfs_iomap_extra(
 #endif
 	}
 	return 0;
+}
+
+int
+_xfs_incore_relse(buftarg_t *targ,
+				  int	delwri_only,
+				  int	wait)
+{
+  printk("_xfs_incore_relse not implemented\n");
+  return 0;
+} 
+
+xfs_buf_t *
+_xfs_incore_match(buftarg_t     *targ,
+			 daddr_t		blkno,
+			 int 			len,
+			 int			field,
+			 void			*value)
+{
+  printk("_xfs_incore_relse not implemented\n");
+  return NULL;
+}
+
+/*
+ * All xfs metadata buffers except log state machine buffers
+ * get this attached as their b_bdstrat callback function. 
+ * This is so that we can catch a buffer
+ * after prematurely unpinning it to forcibly shutdown the filesystem.
+ */
+int
+xfs_bdstrat_cb(struct xfs_buf *bp)
+{
+
+  pagebuf_iorequest(bp);
+  return 0;
+
+
+  /* for now we just call the io routine... once the shutdown stuff is working 
+   * the rest of this function will need to be implemented 01/10/2000 RMC */
+#if 0
+	xfs_mount_t	*mp;
+
+	mp = bp->b_fsprivate3;
+
+	ASSERT(bp->b_target);
+	if (!XFS_FORCED_SHUTDOWN(mp)) {
+		struct bdevsw *my_bdevsw;
+		my_bdevsw =  bp->b_target->bdevsw;
+		ASSERT(my_bdevsw != NULL);
+		bp->b_bdstrat = NULL;
+		bdstrat(my_bdevsw, bp);
+		return 0;
+	} else { 
+		xfs_buftrace("XFS__BDSTRAT IOERROR", bp);
+		/*
+		 * Metadata write that didn't get logged but 
+		 * written delayed anyway. These aren't associated
+		 * with a transaction, and can be ignored.
+		 */
+		if (XFS_BUF_IODONE_FUNC(bp) == NULL &&
+		    (XFS_BUF_ISREAD(bp)) == 0)
+			return (xfs_bioerror_relse(bp));
+		else
+			return (xfs_bioerror(bp));
+	}
+#endif
+}
+/*
+ * Wrapper around bdstrat so that we can stop data
+ * from going to disk in case we are shutting down the filesystem.
+ * Typically user data goes thru this path; one of the exceptions
+ * is the superblock.
+ */
+int
+xfsbdstrat( struct xfs_mount 	*mp,
+			struct xfs_buf		*bp)
+{
+  //	int		dev_major = emajor(bp->b_edev);
+
+	ASSERT(mp);
+	ASSERT(bp->b_target);
+	if (!XFS_FORCED_SHUTDOWN(mp)) {
+		/*
+		 * We want priority I/Os to non-XLV disks to go thru'
+		 * griostrategy(). The rest of the I/Os follow the normal
+		 * path, and are uncontrolled. If we want to rectify
+		 * that, use griostrategy2.
+		 */
+#if 0
+		if ( (XFS_BUF_IS_GRIO(bp)) &&
+				(dev_major != XLV_MAJOR) ) {
+			griostrategy(bp);
+		} else {
+			struct bdevsw	*my_bdevsw;
+
+			my_bdevsw = bp->b_target->bdevsw;
+			bdstrat(my_bdevsw, bp);
+		}
+#endif
+		if (XFS_BUF_IS_GRIO(bp)) {
+		  printk("xfsbdstrat needs griostrategy\n");
+		} else {
+		  pagebuf_iorequest(bp);
+		}
+
+		return 0;
+	}
+
+	buftrace("XFSBDSTRAT IOERROR", bp);
+	return (xfs_bioerror_relse(bp));
 }

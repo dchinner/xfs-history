@@ -21,7 +21,7 @@
  * this program; if not, write the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.187 $"
+#ident	"$Revision: 1.188 $"
 
 /*
  * High level interface routines for log manager
@@ -1026,13 +1026,17 @@ xlog_bdstrat_cb(struct xfs_buf *bp)
 	iclog = XFS_BUF_FSPRIVATE(bp, xlog_in_core_t *);
 
 	if ((iclog->ic_state & XLOG_STATE_IOERROR) == 0) {
+#if !(defined(CONFIG_PAGE_BUF) || defined(CONFIG_PAGE_BUF_MODULE))
 		struct bdevsw	*my_bdevsw;
 
 		my_bdevsw = bp->b_target->bdevsw;
 		ASSERT(my_bdevsw != NULL);
 		bdstrat(my_bdevsw, bp);
+#else
+		pagebuf_iostart(bp,0);
+#endif
 		return 0;
-	} 
+	}
 
 	xfs_buftrace("XLOG__BDSTRAT IOERROR", bp);
 	XFS_BUF_ERROR(bp, EIO);
@@ -1198,7 +1202,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	log->l_quotaoffs_flag = 0;      /* XFS_LI_QUOTAOFF logitems */
 
 	xlog_get_iclog_buffer_size(mp, log);
-	bp = log->l_xbuf   = getrbuf(0);	/* get my locked buffer */
+	bp = log->l_xbuf   = XFS_getrbuf(0);	/* get my locked buffer */
 	XFS_BUF_SET_TARGET(bp, &mp->m_logdev_targ);
 	XFS_BUF_SET_SIZE(bp, log->l_iclog_size);
 	XFS_BUF_SET_IODONE_FUNC(bp, xlog_iodone);
@@ -1241,7 +1245,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 		head->h_lsn = 0;
 		head->h_tail_lsn = 0;
 
-		bp = iclog->ic_bp = getrbuf(0);		/* my locked buffer */
+		bp = iclog->ic_bp = XFS_getrbuf(0);		/* my locked buffer */
 		XFS_BUF_SET_TARGET(bp, &mp->m_logdev_targ);
 		XFS_BUF_SET_SIZE(bp, log->l_iclog_size);
 		XFS_BUF_SET_IODONE_FUNC(bp, xlog_iodone);
@@ -1453,7 +1457,13 @@ xlog_sync(xlog_t		*log,
 	xlog_verify_iclog(log, iclog, count, B_TRUE);
 
 	/* account for log which doesn't start at block #0 */
-	XFS_BUF_ADDR(bp) += log->l_logBBstart;
+	{ loff_t t;
+	/* pagebuf uses bytes and struct buf uses sectors 
+	 * Macro does the shift for us, but in this case we
+	 * need a temp variable to do the math.
+	 */
+	t = XFS_BUF_ADDR(bp); t += log->l_logBBstart; XFS_BUF_SET_ADDR(bp,t);
+	}
 	/*
 	 * Don't call xfs_bwrite here. We do log-syncs even when the filesystem
 	 * is shutting down.
@@ -1518,7 +1528,7 @@ xlog_unalloc_log(xlog_t *log)
 	iclog = log->l_iclog;
 	for (i=0; i<log->l_iclog_bufs; i++) {
 		sv_destroy(&iclog->ic_forcesema);
-		freerbuf(iclog->ic_bp);
+		XFS_freerbuf(iclog->ic_bp);
 #ifdef DEBUG
 		if (iclog->ic_trace != NULL) {
 			ktrace_free(iclog->ic_trace);
@@ -1550,7 +1560,7 @@ xlog_unalloc_log(xlog_t *log)
 			tic = next_tic;
 		}
 	}
-	freerbuf(log->l_xbuf);
+	XFS_freerbuf(log->l_xbuf);
 #ifdef DEBUG
 	if (log->l_trace != NULL) {
 		ktrace_free(log->l_trace);

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.196 $"
+#ident	"$Revision: 1.197 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -239,7 +239,7 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	 * This will be kept around at all time to optimize
 	 * access to the superblock.
 	 */
-	bp = ngetrbuf(BBTOB(BTOBB(sizeof(xfs_sb_t))));
+	bp = XFS_ngetrbuf(BBTOB(BTOBB(sizeof(xfs_sb_t))));
 	ASSERT(bp != NULL);
 	ASSERT(XFS_BUF_ISBUSY(bp) && valusema(&bp->b_lock) <= 0);
 
@@ -253,6 +253,12 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	xfsbdstrat(mp, bp);
 	if (error = xfs_iowait(bp)) {
 		goto err;
+	}
+
+	{
+	page_buf_t	*pb;
+	pb = pagebuf_get(mp->m_ddev_targp->inode, 0, 16384, PBF_LOCK | PBF_READ);
+	printk("pagebuf_get returned 0x%x\n", pb);
 	}
 
 	/*
@@ -271,7 +277,7 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	return 0;
 
  err:
-	nfreerbuf(bp);
+	XFS_nfreerbuf(bp);
 	return error;
 }
 
@@ -1480,7 +1486,7 @@ xfs_freesb(
 	 * when we call nfreerbuf().
 	 */
 	bp = xfs_getsb(mp, 0);
-	nfreerbuf(bp);
+	XFS_nfreerbuf(bp);
 	mp->m_sb_bp = NULL;
 }
 
@@ -1496,8 +1502,10 @@ xfs_sb_relse(xfs_buf_t *bp)
 	ASSERT(valusema(&bp->b_lock) <= 0);
 	XFS_BUF_UNASYNC(bp);
 	XFS_BUF_UNREAD(bp);
+#if !(defined(CONFIG_PAGE_BUF) || defined(CONFIG_PAGE_BUF_MODULE))
 	bp->av_forw = NULL;
 	bp->av_back = NULL;
+#endif
 	XFS_BUF_VSEMA(bp);
 }
 

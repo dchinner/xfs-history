@@ -146,6 +146,7 @@ typedef struct buf xfs_buf_t;
 
 #define XFS_BUF_PTR(bp)	((bp)->b_un.b_addr)
 #define XFS_BUF_ADDR(bp)	((bp)->b_blkno)
+#define XFS_BUF_OFFSET(bp)	((bp)->b_offset)
 #define XFS_BUF_SET_ADDR(bp, blk)		\
 			((bp)->b_blkno = blk)
 #define XFS_BUF_COUNT(bp)	((bp)->b_bcount)
@@ -236,6 +237,9 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define xfs_bflushed(buftarg)           \
             bflushed(buftarg.dev) 
 
+#define XFS_bflush(buftarg)           \
+            bflush(buftarg.dev) 
+
 #define xfs_incore_relse(buftarg,delwri_only,wait) \
             incore_relse(buftarg.dev,delwri_only,wait)
 
@@ -244,7 +248,22 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 
 #define xfs_baread(target, rablkno, ralen) \
             baread(target, rablkno, ralen)
-            
+
+#define XFS_pdflush(vnode,flags) \
+            pdflush(vnode,flags)
+
+#define XFS_getrbuf(sleep)\
+            getrbuf(sleep)
+
+#define XFS_ngetrbuf(len)\
+            ngetrbuf(len)
+
+#define XFS_freerbuf(bp) \
+            freerbuf(bp)
+
+#define XFS_nfreerbuf(bp) \
+		    nfreerbuf(bp)
+
 #endif /* _USING_BUF_T */
 
 #ifdef _USING_PAGEBUF_T
@@ -324,6 +343,11 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 
 /* hmm what does the mean on linux? may go away */
 #define XFS_BUF_PAGEIO(x)        /* error! not implemeneted yet */
+/*
+ * Flags for incore_match() and findchunk_match().
+ */
+#define BUF_FSPRIV      0x1
+#define BUF_FSPRIV2     0x2  
 
 typedef struct page_buf_s xfs_buf_t;
 #define xfs_buf page_buf_s
@@ -334,6 +358,10 @@ typedef struct buftarg {
 	struct inode	*inode;
 	dev_t		dev;
 } buftarg_t;
+
+typedef struct bfidev {
+  /* this is for CXFS server relocation... probably won't need this for a while 01/06/2000 RMC */
+} bfidev_t; 
 
 #define XFS_BUF_IODONE_FUNC(buf)	(buf)->pb_iodone
 #define XFS_BUF_SET_IODONE_FUNC(buf, func)	\
@@ -357,7 +385,7 @@ typedef struct buftarg {
 			((type)(buf)->pb_fspriv2)
 #define XFS_BUF_SET_FSPRIVATE2(buf, value)	\
 			(buf)->pb_fspriv2 = (void *)(value)
-#define XFS_BUF_FSPRIVATE3(buf, type)		1
+#define XFS_BUF_FSPRIVATE3(buf, type)	NULL	
 
 #define XFS_BUF_SET_FSPRIVATE3(buf, value)
 #define XFS_BUF_SET_START(buf)
@@ -366,9 +394,15 @@ typedef struct buftarg {
 
 
 #define XFS_BUF_PTR(bp)		(caddr_t)((bp)->pb_addr)
-#define XFS_BUF_ADDR(bp)	((bp)->pb_file_offset >> 9)
+/*#define XFS_BUF_ADDR(bp)	((bp)->pb_file_offset >> 9) */
+#define XFS_BUF_ADDR(bp)	((bp)->pb_bn)
+#define XFS_BUF_OFFSET(bp)	((bp)->pb_file_offset >> 9)
+/*
 #define XFS_BUF_SET_ADDR(bp, blk)		\
 			((bp)->pb_file_offset = (blk) << 9)
+*/
+#define XFS_BUF_SET_ADDR(bp, blk)		\
+			((bp)->pb_bn = (blk))
 #define XFS_BUF_COUNT(bp)	((bp)->pb_count_desired)
 #define XFS_BUF_SET_COUNT(bp, cnt)		\
 			((bp)->pb_count_desired = cnt)
@@ -421,7 +455,7 @@ typedef struct buftarg {
 #define xfs_bp_mapin(bp)             \
         pagebuf_mapin(bp)
 
-#define xfs_xfsd_list_evict(x)       sleep(0)
+#define xfs_xfsd_list_evict(x)       printk("xfs_xfsd_list_evict not implemented\n")
 #define xfs_buftrace(x,y)     
 
 #define xfs_biodone(pb)             \
@@ -443,20 +477,37 @@ typedef struct buftarg {
 			      * wants to flush all delay write buffers
 			      * on device...  how do we do this with pagebuf? */
 
-#define xfs_bflushed(buftarg) /* assert the buffers for dev are really flushed */
+#define xfs_bflushed(buftarg) printk("XFS_bflushed not implemented\n")
+/* assert the buffers for dev are really flushed */
 
-#define xfs_incore_relse(buftarg,delwri_only,wait) 
+#define XFS_bflush(buftarg) printk("XFS_bflush not implemented\n")
+
+#define xfs_incore_relse(buftarg,delwri_only,wait) _xfs_incore_relse(buftarg,delwri_only,wait)
 /*
  * Go through all incore buffers, and release buffers
  * if they belong to the given device. This is used in
  * filesystem error handling to preserve the consistency
  * of its metadata.
  */
-#define xfs_incore_match(buftarg,blkno,len,field,value) 
+#define xfs_incore_match(buftarg,blkno,len,field,value) _xfs_incore_match(buftarg,blkno,len,field,value) 
 
 #define xfs_baread(target, rablkno, ralen) 
 
+#define XFS_pdflush(vnode,flags) printk("XFS_pdflush not implemeneted\n")
+
 #define buftrace(id, bp)
+
+#define chunkread(vnode,bmap,nmaps,cred) printk("chunkread... whaa shouldn't be here at all\n")
+#define getchunk(vnode,bmap,cred) printk("chunkread... whaa shouldn't be here at all\n")
+
+#define XFS_getrbuf(sleep) printk("XFS_getrbuf! Dude better get to this\n")
+
+#define XFS_ngetrbuf(len) printk("XFS_ngetrbuf! Dude better get to this\n")
+
+#define XFS_freerbuf(bp)  printk("XFS_freerbuf! Dube Better get to this\n")
+
+#define XFS_nfreerbuf(bp) printk("XFS_nfreerbuf! Dude Better get to this\n")
+
 
 #endif /* _USING_PAGEBUF_T */
 

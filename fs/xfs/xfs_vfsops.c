@@ -22,7 +22,7 @@
  * this program; if not, write the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident  "$Revision: 1.241 $"
+#ident  "$Revision: 1.242 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -1334,6 +1334,7 @@ xfs_isdev(
 	xfs_buf_t	 *bp;
 	int	 error;
 
+#if !defined(__linux__)
 	if (!bdvalid(get_bdevsw(dev)))
 		return 1;
 
@@ -1351,6 +1352,10 @@ xfs_isdev(
 	XFS_BUF_AGE(bp);
 	xfs_buf_relse(bp);
 	return error;
+#else
+	printk("DING DING DING... need to implement this once we start doing xfs root\n");
+	return 0;
+#endif
 }
 
 /*
@@ -1418,7 +1423,7 @@ xfs_mountroot(
 	case ROOT_UNMOUNT:
 		mp = XFS_BHVTOM(bdp);
 		if (xfs_ibusy(mp)) {
-			bflush(mp->m_dev);
+			XFS_bflush(mp->m_ddev_targ);
 			/*
 			 * There are still busy vnodes in the file system.
 			 * Flush what we can and then get out without
@@ -1666,7 +1671,7 @@ xfs_unmount(
 		goto out;
 	}
 	
-	bflush(mp->m_dev);
+	XFS_bflush(mp->m_ddev_targ);
 	error = xfs_unmount_flush(mp, 0);
 	if (error)
 		goto out;
@@ -2435,7 +2440,7 @@ xfs_syncsub(
 				ASSERT(vp->v_type == VREG);
 				if (vp->v_type == VREG) {
 					xfs_iunlock(ip, XFS_ILOCK_SHARED);
-					pdflush(vp, XFS_B_DELWRI);
+					XFS_pdflush(vp, XFS_B_DELWRI);
 					xfs_ilock(ip, XFS_ILOCK_SHARED);
 				}
 			}
@@ -2767,9 +2772,9 @@ xfs_syncsub(
 	 * to disk or the filesystem can appear corrupt from the PROM.
 	 */
 	if ((flags & (SYNC_CLOSE|SYNC_WAIT)) == (SYNC_CLOSE|SYNC_WAIT)) {
-		bflush(mp->m_dev);
+		XFS_bflush(mp->m_ddev_targ);
 		if (mp->m_rtdev != NODEV) {
-			bflush(mp->m_rtdev);
+			XFS_bflush(mp->m_rtdev_targ);
 		}
 	}
 

@@ -22,7 +22,7 @@
  * Place - Suite 330, Boston MA 02111-1307, USA.
  */
 
-#ident	"$Revision: 1.150 $"
+#ident	"$Revision: 1.151 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -144,7 +144,7 @@ xlog_get_bp(int num_bblks)
 	xfs_buf_t   *bp;
 
 	ASSERT(num_bblks > 0);
-	bp = ngetrbuf(BBTOB(num_bblks));
+	bp = XFS_ngetrbuf(BBTOB(num_bblks));
 	return bp;
 }	/* xlog_get_bp */
 
@@ -152,7 +152,7 @@ xlog_get_bp(int num_bblks)
 void
 xlog_put_bp(xfs_buf_t *bp)
 {
-	nfreerbuf(bp);
+	XFS_nfreerbuf(bp);
 }	/* xlog_get_bp */
 
 
@@ -3202,9 +3202,11 @@ xlog_do_recover(xlog_t	*log,
 	}
 
 #ifdef _KERNEL
+#if 0
 	bfid.bfid_dev = log->l_mp->m_dev;
 	bfid.bfid_flags = BFID_NOVNBUF;
 	bflush_dev(&bfid);    /* Flush out the delayed write buffers */
+#endif
 
 	/*
 	 * If IO errors happened during recovery, bail out.

@@ -4524,7 +4524,7 @@ xfs_zero_bp(
 		return;
 	}
 
-	data_offset += BBTOOFF(dpoff(bp->b_offset));
+	data_offset += BBTOOFF(dpoff(XFS_BUF_OFFSET(bp)));
 	pfdp = NULL;
 	pfdp = getnextpg(bp, pfdp);
 	ASSERT(pfdp != NULL);
@@ -6667,7 +6667,7 @@ xfs_bwrite(
  * This is so that we can catch a buffer
  * after prematurely unpinning it to forcibly shutdown the filesystem.
  */
-#if 1
+#if !defined(__linux__)
 int
 xfs_bdstrat_cb(struct xfs_buf *bp)
 {
@@ -6705,7 +6705,7 @@ xfs_bdstrat_cb(struct xfs_buf *bp)
  * Typically user data goes thru this path; one of the exceptions
  * is the superblock.
  */
-#if 1
+#if !defined(__linux__)
 int
 xfsbdstrat(
 	struct xfs_mount 	*mp,
