@@ -2393,7 +2393,7 @@ pb_stats_clear_handler(
 	int			ret;
 	int			*valp = ctl->data;
 
-	ret = proc_doulongvec_minmax(ctl, write, filp, buffer, lenp);
+	ret = proc_dointvec_minmax(ctl, write, filp, buffer, lenp);
 
 	if (!ret && write && *valp) {
 		printk("XFS Clearing pbstats\n");
