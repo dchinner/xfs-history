@@ -168,9 +168,11 @@ STATIC int	xfs_symlink(vnode_t	*dir_vp,
 STATIC int	xfs_fid(vnode_t	*vp,
 			fid_t	**fidpp);
 
-STATIC void	xfs_rwlock(vnode_t	*vp);
+STATIC void	xfs_rwlock(vnode_t	*vp,
+			   int		write_lock);
 
-STATIC void	xfs_rwunlock(vnode_t	*vp);
+STATIC void	xfs_rwunlock(vnode_t	*vp,
+			     int	write_lock);
 
 STATIC int	xfs_seek(vnode_t	*vp,
 			 off_t		old_offset,
@@ -3169,7 +3171,8 @@ xfs_fid(vnode_t	*vp,
  *
  */
 STATIC void
-xfs_rwlock(vnode_t	*vp)
+xfs_rwlock(vnode_t	*vp,
+	   int		write_lock)
 {
 	xfs_inode_t	*ip;
 
@@ -3184,7 +3187,8 @@ xfs_rwlock(vnode_t	*vp)
  *
  */
 STATIC void
-xfs_rwunlock(vnode_t	*vp)
+xfs_rwunlock(vnode_t	*vp,
+	     int	write_lock)
 {
         xfs_inode_t     *ip;
 
