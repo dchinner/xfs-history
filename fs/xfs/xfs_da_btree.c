@@ -652,6 +652,7 @@ xfs_dir_leaf_figure_balance(struct xfs_dir_state *state,
 	hdr1 = &leaf1->hdr;
 	hdr2 = &leaf2->hdr;
 	foundit = 0;
+	totallen = 0;
 
 	/*
 	 * Examine entries until we reduce the absolute difference in
@@ -1215,8 +1216,8 @@ xfs_dir_fixhashpath(struct xfs_dir_state *state,
 			break;
 		blk->hashval = btree->hashval = lasthash;
 		xfs_trans_log_buf(state->trans, blk->bp,
-					 XFS_DIR_LOGSTART(node, btree),
-					 XFS_DIR_LOGSTART(node, btree) +
+					 XFS_DIR_LOGSTART(node, *btree),
+					 XFS_DIR_LOGSTART(node, *btree) +
 					 XFS_DIR_LOGSIZE(btree->hashval) - 1);
 
 		lasthash = node->btree[ node->hdr.count-1 ].hashval;
