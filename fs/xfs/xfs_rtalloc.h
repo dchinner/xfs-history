@@ -1,14 +1,14 @@
 #ifndef _FS_XFS_RTALLOC_H
 #define	_FS_XFS_RTALLOC_H
 
-#ident	"$Revision: 1.8 $"
+#ident	"$Revision: 1.9 $"
 
 struct xfs_mount;
 struct xfs_trans;
 
 /* Min and max rt extent sizes, specified in bytes */
 #define	XFS_MAX_RTEXTSIZE	(1024 * 1024 * 1024)	/* 1GB */
-#define	XFS_MIN_RTEXTSIZE	(64 * 1024)		/* 64KB */
+#define	XFS_MIN_RTEXTSIZE	(4 * 1024)		/* 4KB */
 
 /*
  * Constants for bit manipulations.
@@ -64,37 +64,52 @@ struct xfs_trans;
  */
 
 #ifndef SIM
-int
+/*
+ * Allocate an extent in the realtime subvolume, with the usual allocation
+ * parameters.  The length units are all in realtime extents, as is the
+ * result block number.
+ */
+int					/* error */
 xfs_rtallocate_extent(
-	struct xfs_trans	*tp,
-	xfs_rtblock_t		bno,
-	xfs_extlen_t		minlen,
-	xfs_extlen_t		maxlen,
-	xfs_extlen_t		*len,
-	xfs_alloctype_t		type,
-	int			wasdel,
-	xfs_extlen_t		prod,
-	xfs_rtblock_t		*rtblock);		      
+	struct xfs_trans	*tp,	/* transaction pointer */
+	xfs_rtblock_t		bno,	/* starting block number to allocate */
+	xfs_extlen_t		minlen,	/* minimum length to allocate */
+	xfs_extlen_t		maxlen,	/* maximum length to allocate */
+	xfs_extlen_t		*len,	/* out: actual length allocated */
+	xfs_alloctype_t		type,	/* allocation type XFS_ALLOCTYPE... */
+	int			wasdel,	/* was a delayed allocation extent */
+	xfs_extlen_t		prod,	/* extent product factor */
+	xfs_rtblock_t		*rtblock); /* out: start block allocated */
 #endif	/* !SIM */
 
-int
+/*
+ * Free an extent in the realtime subvolume.  Length is expressed in
+ * realtime extents, as is the block number.
+ */
+int					/* error */
 xfs_rtfree_extent(
-	struct xfs_trans	*tp,
-	xfs_rtblock_t		bno,
-	xfs_extlen_t		len);
+	struct xfs_trans	*tp,	/* transaction pointer */
+	xfs_rtblock_t		bno,	/* starting block number to free */
+	xfs_extlen_t		len);	/* length of extent freed */
 
 #ifdef XFSDEBUG
+/*
+ * Debug code: print out the value of a range in the bitmap.
+ */
 void
 xfs_rtprint_range(
-	struct xfs_mount	*mp,
-	struct xfs_trans	*tp,
-	xfs_rtblock_t		start,
-	xfs_extlen_t		len);
+	struct xfs_mount	*mp,	/* file system mount structure */
+	struct xfs_trans	*tp,	/* transaction pointer */
+	xfs_rtblock_t		start,	/* starting block to print */
+	xfs_extlen_t		len);	/* length to print */
 
+/*
+ * Debug code: print the summary file.
+ */
 void
 xfs_rtprint_summary(
-	struct xfs_mount	*mp,
-	struct xfs_trans	*tp);
+	struct xfs_mount	*mp,	/* file system mount structure */
+	struct xfs_trans	*tp);	/* transaction pointer */
 #endif	/* XFSDEBUG */
 
 #endif	/* !_FS_XFS_RTALLOC_H */
