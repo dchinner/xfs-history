@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.78 $"
+#ident	"$Revision: 1.79 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -149,6 +149,7 @@ static void	xfsidbg_xiclogcb(xlog_in_core_t *);
 static void	xfsidbg_xiclogtrace(xlog_in_core_t *);
 static void	xfsidbg_xilock_trace(xfs_inode_t *);
 #endif
+static void	xfsidbg_xihash(xfs_mount_t *mp);
 static void	xfsidbg_xinodes(xfs_mount_t *);
 static void	xfsidbg_xlog(xlog_t *);
 #ifdef DEBUG
@@ -265,6 +266,7 @@ static struct xif {
     "xilocktrc",VD xfsidbg_xilock_trace,"Dump XFS ilock trace",
 #endif
     "xinodes",	VD xfsidbg_xinodes, 	"Dump XFS inodes per mount",
+    "xihash",	VD xfsidbg_xihash, 	"Dump XFS inode hash statistics",
 #ifdef DEBUG
     "xl_grtr",	VD xfsidbg_xlog_granttrace,"Dump XFS log grant trace",
 #endif
@@ -3581,6 +3583,63 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		
 }
 
+#define XFS_BUCKETS 256
+#define XFS_IHLOCK(ih)          mp_mutex_lock(&(ih)->ih_lock, PINOD)
+#define XFS_IHUNLOCK(ih)        mp_mutex_unlock(&(ih)->ih_lock)
+
+
+static void
+xfsidbg_xihash(xfs_mount_t *mp)
+{
+	xfs_ihash_t	*ih;
+	int		i;
+	int		j;
+	int		total;
+	int		numzeros;
+	xfs_inode_t	*ip;
+	int		hist[XFS_BUCKETS];
+	int		hist2[21];
+
+	for (i = 0; i < XFS_BUCKETS; i++) {
+		ih = mp->m_ihash + i;
+		XFS_IHLOCK(ih);
+
+		j = 0;
+		for (ip = ih->ih_next; ip != NULL; ip = ip->i_next)
+			j++;
+
+		XFS_IHUNLOCK(ih);
+
+		hist[i] = j;
+	}
+
+	numzeros = total = 0;
+
+	for (i = 0; i < 21; i++)
+		hist2[i] = 0;
+
+	for (i = 0; i < XFS_BUCKETS; i++)  {
+		qprintf("%d ", hist[i]);
+		total += hist[i];
+		numzeros += hist[i] == 0 ? 1 : 0;
+		if (hist[i] > 20)
+			j = 20;
+		else
+			j = hist[i];
+		ASSERT(j <= 20);
+		hist2[j]++;
+	}
+
+	qprintf("\n");
+
+	qprintf("total inodes = %d, average length = %d, adjusted average = %d \n",
+		total, total / XFS_BUCKETS, total / (XFS_BUCKETS - numzeros));
+
+	for (i = 0; i < 21; i++)  {
+		qprintf("%d - %d , ", i, hist2[i]);
+	}
+	qprintf("\n");
+}
 
 /*
  * Command to print xfs inodes: kp xnode <addr>
