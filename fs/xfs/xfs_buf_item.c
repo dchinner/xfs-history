@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.102 $"
+#ident "$Revision: 1.103 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -1283,7 +1283,7 @@ xfs_buf_iodone_callbacks(
 			    XFS_BUF_UNSHUT(bp);
 				xfs_buf_relse(bp);
 			} else {
-			  xfs_biodone(bp);
+				xfs_biodone(bp);
 			}
 			
 			return;
@@ -1309,7 +1309,7 @@ xfs_buf_iodone_callbacks(
 			 * before we start the umount; we don't want these
 			 * DELWRI metadata bufs to be hanging around.
 			 */
-		  XFS_BUF_ERROR(bp,0); /* errno of 0 unsets the flag */
+			XFS_BUF_ERROR(bp,0); /* errno of 0 unsets the flag */
 
 			if (!(XFS_BUF_ISSTALE(bp))) {
 				XFS_BUF_DELAYWRITE(bp);

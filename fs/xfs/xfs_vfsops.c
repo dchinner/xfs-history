@@ -31,7 +31,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident  "$Revision: 1.278 $"
+#ident  "$Revision: 1.279 $"
 
 #include <xfs_os_defs.h>
 
@@ -1635,18 +1635,23 @@ xfs_syncsub(
 
 		/*
 		 * If the vnode is gone then this is being torn down,
-		 * skip it.
+		 * call reclaim if it is flushed, else let regular flush
+		 * code deal with it later in the loop.
 		 */
 
 		if (vp == NULL) {
-			if (!(ip->i_flags & XFS_IRECLAIM)) {
+			/* Skip ones already in reclaim */
+			if (ip->i_flags & XFS_IRECLAIM) {
+				ip = ip->i_mnext;
+				continue;
+			}
+			if ((ip->i_update_core == 0) &&
+			    ((ip->i_itemp == NULL) ||
+			    !(ip->i_itemp->ili_format.ilf_fields & XFS_ILOG_ALL))) {
 				if (xfs_ilock_nowait(ip, XFS_ILOCK_EXCL) == 0) {
 					ip = ip->i_mnext;
-					continue;
-				}
-				if ((ip->i_pincount == 0) &&
+				} else if ((ip->i_pincount == 0) &&
 				    xfs_iflock_nowait(ip)) {
-					ip->i_flags |= XFS_IRECLAIM;
 					IPOINTER_INSERT(ip, mp);
 
 					xfs_finish_reclaim(ip, 1);
@@ -1658,10 +1663,8 @@ xfs_syncsub(
 					xfs_iunlock(ip, XFS_ILOCK_EXCL);
 					ip = ip->i_mnext;
 				}
-			} else {
-				ip = ip->i_mnext;
+				continue;
 			}
-			continue;
 		}
 
 		/*
@@ -2077,7 +2080,7 @@ xfs_syncsub(
 		ASSERT(ipointer_in == B_FALSE);
 		ip = ip->i_mnext;
 
-	} while (ip != mp->m_inodes);
+	} while (ip->i_mnext != mp->m_inodes);
 
 	XFS_MOUNT_IUNLOCK(mp);
 

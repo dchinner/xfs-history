@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.294 $"
+#ident "$Revision: 1.295 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -2998,7 +2998,7 @@ xfs_iflush(
 	uint			flags)
 {
 	xfs_inode_log_item_t	*iip;
-	xfs_buf_t			*bp;
+	xfs_buf_t		*bp;
 	xfs_dinode_t		*dip;
 	xfs_mount_t		*mp;
 	int			error;
@@ -3268,7 +3268,7 @@ cluster_corrupt_out:
 STATIC int
 xfs_iflush_int(
 	xfs_inode_t		*ip,
-	xfs_buf_t			*bp)
+	xfs_buf_t		*bp)
 {
 	xfs_inode_log_item_t	*iip;
 	xfs_dinode_t		*dip;
