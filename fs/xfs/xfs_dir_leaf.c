@@ -388,9 +388,20 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	 * Collect the rest of the directory entries.
 	 */
 	sfe = &sf->list[0];
-	for (i = 0; i < entry - 2; i++)
+	for (i = 0; i < entry - 2; i++) {
+		if ((char *)sfe < (char *)sf ||
+		    (char *)sfe >= ((char *)sf + dp->i_df.if_bytes))
+			return XFS_ERROR(EDIRCORRUPTED);
+		if (sfe->namelen >= MAXNAMELEN)
+			return XFS_ERROR(EDIRCORRUPTED);
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
+	}
 	for (; i < sf->hdr.count; i++, entry++) {
+		if ((char *)sfe < (char *)sf ||
+		    (char *)sfe >= ((char *)sf + dp->i_df.if_bytes))
+			return XFS_ERROR(EDIRCORRUPTED);
+		if (sfe->namelen >= MAXNAMELEN)
+			return XFS_ERROR(EDIRCORRUPTED);
 		bcopy(sfe->inumber, (char *)&ino, sizeof(ino));
 		nextcook = XFS_DA_MAKE_COOKIE(mp, 0, entry + 1);
 		retval = xfs_dir_put_dirent(mp, dbp, ino, (char *)(sfe->name), 
@@ -1703,7 +1714,8 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, uio_t *uio, int *eobp,
 	bno = (__uint32_t)XFS_DA_COOKIE_BNO(mp, uio->uio_offset);
 	entno = XFS_DA_COOKIE_ENTRY(mp, uio->uio_offset);
 	leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
-	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
+	if (leaf->hdr.info.magic != XFS_DIR_LEAF_MAGIC)
+		return(XFS_ERROR(ENOENT));
 	if (entno >= leaf->hdr.count) {
 		*eobp = 0;
 		return(XFS_ERROR(ENOENT));
@@ -1711,6 +1723,10 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, uio_t *uio, int *eobp,
 	entry = &leaf->entries[entno];
 	for (i = entno; i < leaf->hdr.count; entry++, i++) {
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
+		if ((char *)namest < (char *)leaf ||
+		    (char *)namest >= (char *)leaf + bp->b_bcount ||
+		    entry->namelen >= MAXNAMELEN)
+			return XFS_ERROR(EDIRCORRUPTED);
 		bcopy(namest->inumber, (char *)&ino, sizeof(ino));
 		if (i == leaf->hdr.count - 1) {
 			if (leaf->hdr.info.forw)

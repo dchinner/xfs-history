@@ -1,4 +1,4 @@
-#ident "$Revision: 1.68 $"
+#ident "$Revision: 1.70 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -801,9 +801,14 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	}
 	for (;;) {
 		leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
+		if (leaf->hdr.info.magic != XFS_DIR_LEAF_MAGIC) {
+			xfs_trans_brelse(trans, bp);
+			return XFS_ERROR(EDIRCORRUPTED);
+		}
 		bno = leaf->hdr.info.forw;
 		if (bno != 0) {
 			if (XFS_DA_COOKIE_ENTRY(mp, uio->uio_offset) == 0)
+		if (leaf->hdr.info.magic != XFS_DIR_LEAF_MAGIC)
 				mappedbno = xfs_da_reada_buf(trans, dp, bno,
 								XFS_DATA_FORK);
 			else
