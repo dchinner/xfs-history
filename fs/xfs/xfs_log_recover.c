@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.89 $"
+#ident	"$Revision: 1.90 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -61,7 +61,9 @@
 #include <sys/fs/xfs_extfree_item.h>
 #include <sys/fs/xfs_trans_priv.h>
 #include <sys/fs/xfs_bit.h>
-
+#include <sys/fs/xfs_quota.h>
+#include <sys/fs/xfs_dquot.h>
+#include <sys/fs/xfs_qm.h>
 
 #ifdef SIM
 #include "sim.h"		/* must be last include file */
@@ -1242,7 +1244,21 @@ xlog_recover_print_trans_head(xlog_recover_t *tr)
 		"SET_DMATTRS",
 		"GROWFS",
 		"STRAT_WRITE",
-		"DIOSTRAT"
+		"DIOSTRAT",
+		"WRITE_SYNC",
+		"WRITEID",
+		"ADDAFORK",
+		"ATTRINVAL",
+		"ATRUNCATE",
+		"ATTR_SET",
+		"ATTR_QM",
+		"ATTR_FLAG",
+		"CLEAR_AGI_BUCKET",
+		"QM_SBCHANGE",
+		"QM_QUOTAOFF",
+		"QM_DQALLOC",
+		"QM_SETQLIM",
+		"QM_DQCLUSTER"
 	};
 
 	printf("TRANS: tid:0x%x  type:%s  #items:%d  trans:0x%x  q:0x%x\n",
@@ -1710,6 +1726,8 @@ xlog_recover_reorder_trans(xlog_t	  *log,
 	    case XFS_LI_INODE:
 	    case XFS_LI_6_1_INODE:
 	    case XFS_LI_5_3_INODE:
+	    case XFS_LI_DQUOT:
+	    case XFS_LI_QUOTAOFF:
 	    case XFS_LI_EFD:
 	    case XFS_LI_EFI: {
 		xlog_recover_insert_item_backq(&trans->r_itemq, itemq);
@@ -2104,6 +2122,37 @@ xlog_recover_do_reg_buffer(xfs_mount_t		*mp,
 
 
 /*
+ * Perform a dquot buffer recovery.
+ * Simple algorithm: if we have found a QUOTAOFF logitem of the same type
+ * (ie. USR or PRJ), then just toss this buffer away; don't recover it.
+ * Else, treat it as a regular buffer and do recovery.
+ */
+STATIC void
+xlog_recover_do_dquot_buffer(
+	xfs_mount_t		*mp,
+	xlog_t			*log,
+	xlog_recover_item_t 	*item,
+	buf_t			*bp,
+	xfs_buf_log_format_t	*buf_f)
+{
+	uint type;
+	ASSERT(XFS_IS_QUOTA_RUNNING(mp));
+
+	type = 0;
+	if (buf_f->blf_flags & XFS_BLI_UDQUOT_BUF)
+		type |= XFS_DQ_USER;
+	if (buf_f->blf_flags & XFS_BLI_PDQUOT_BUF)
+		type |= XFS_DQ_PROJ;
+	/*
+	 * This type of quotas was turned off, so ignore this buffer
+	 */
+	if (log->l_quotaoffs_flag & type)
+		return;
+	
+	xlog_recover_do_reg_buffer(mp, item, bp, buf_f);
+}
+
+/*
  * This routine replays a modification made to a buffer at runtime.
  * There are actually two types of buffer, regular and inode, which
  * are handled differently.  Inode buffers are handled differently
@@ -2164,17 +2213,23 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 		}
 	}
 	switch (buf_f->blf_type) {
-	case XFS_LI_BUF:
+	      case XFS_LI_BUF:
 		blkno = buf_f->blf_blkno;
 		len = buf_f->blf_len;
 		flags = buf_f->blf_flags;
 		break;
-	case XFS_LI_6_1_BUF:
-	case XFS_LI_5_3_BUF:
+	      case XFS_LI_6_1_BUF:
+	      case XFS_LI_5_3_BUF:
 		obuf_f = (xfs_buf_log_format_v1_t*)buf_f;
 		blkno = obuf_f->blf_blkno;
 		len = obuf_f->blf_len;
 		flags = obuf_f->blf_flags;
+		break;
+	      default:
+		cmn_err(CE_ALERT,
+			"xfs_log_recover: unknown buf type 0x%x\n", 
+			buf_f->blf_type);
+		ASSERT(0);
 		break;
 	}
 
@@ -2192,6 +2247,9 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 
 	if (flags & XFS_BLI_INODE_BUF) {
 		xlog_recover_do_inode_buffer(mp, item, bp, buf_f);
+	} else if (flags & (XFS_BLI_UDQUOT_BUF | XFS_BLI_PDQUOT_BUF)) {
+		if (XFS_IS_QUOTA_ON(mp))
+			xlog_recover_do_dquot_buffer(mp, log, item, bp, buf_f);
 	} else {
 		xlog_recover_do_reg_buffer(mp, item, bp, buf_f);
 	}
@@ -2438,6 +2496,126 @@ write_inode_buffer:
 
 
 /*
+ * recover QUOTAOFF records. We simply make a note of it in the xlog_t
+ * structure, so that we know not to do any dquot item or dquot buffer recovery,
+ * of that type.
+ */
+STATIC int
+xlog_recover_do_quotaoff_trans(xlog_t			*log,
+			       xlog_recover_item_t	*item,
+			       int			pass)
+{
+	xfs_qoff_logformat_t *qoff_f;
+	ASSERT(XFS_IS_QUOTA_RUNNING(log->l_mp));
+
+	if (pass == XLOG_RECOVER_PASS2) {
+		return (0);
+	}
+	
+	qoff_f = (xfs_qoff_logformat_t *)item->ri_buf[0].i_addr;
+	ASSERT(qoff_f);
+	cmn_err(CE_NOTE, "QUOTAOFF 0x%x record found in recovery\n", 
+		qoff_f->qf_flags);
+	
+	/*
+	 * The logitem format's flag tells us if this was user quotaoff, 
+	 * project quotaoff or both. 
+	 */
+	if (qoff_f->qf_flags & XFS_MOUNT_UDQ_ACCT) 
+		log->l_quotaoffs_flag |= XFS_DQ_USER;
+	if (qoff_f->qf_flags & XFS_MOUNT_PDQ_ACCT)
+		log->l_quotaoffs_flag |= XFS_DQ_PROJ;
+	
+	return (0);
+}
+
+
+/*
+ * recover a dquot record
+ */
+STATIC int
+xlog_recover_do_dquot_trans(xlog_t		*log,
+			    xlog_recover_item_t *item,
+			    int			pass)
+{
+	xfs_mount_t		*mp;
+	buf_t			*bp;
+	struct xfs_disk_dquot	*ddq, *recddq;
+	int			error;
+	xfs_dq_logformat_t	*dq_f;
+	uint			type;
+	mp = log->l_mp;
+
+	ASSERT(XFS_IS_QUOTA_RUNNING(mp));
+
+	if (pass == XLOG_RECOVER_PASS1) {
+		return 0;
+	}
+	recddq = (xfs_disk_dquot_t *)item->ri_buf[1].i_addr;
+	ASSERT(recddq);
+	/*
+	 * This type of quotas was turned off, so ignore this buffer
+	 */
+	type = recddq->d_flags & (XFS_DQ_USER|XFS_DQ_PROJ);
+	ASSERT(type);
+	if (log->l_quotaoffs_flag & type) {
+		cmn_err(CE_NOTE, "skipping");
+		return (0);
+	}
+
+	dq_f = (xfs_dq_logformat_t *)item->ri_buf[0].i_addr;
+	ASSERT(dq_f);
+	if (xfs_qm_dqcheck(recddq, 
+			   dq_f->qlf_id,
+			   "xlog_recover_do_dquot_trans (log copy)")) {
+		return (EIO);
+	}
+	/*
+	cmn_err(CE_NOTE, "blk = 0x%x, len = %d, bufoff 0x%x\n",
+		(int) dq_f->qlf_blkno, dq_f->qlf_len, 
+		dq_f->qlf_boffset);
+		*/
+	ASSERT(dq_f->qlf_len == 1);
+	
+	bp = read_buf(mp->m_dev, 
+		      dq_f->qlf_blkno, 
+		      XFS_FSB_TO_BB(mp, dq_f->qlf_len),
+		      0);
+	if (bp == NULL || bp->b_flags & B_ERROR) {
+		cmn_err(CE_WARN,
+			"XFS: xlog_recover_do_dquot_trans: bread error (%d)",
+			(int) dq_f->qlf_blkno);
+		ASSERT(0);
+		error = bp->b_error;
+		brelse(bp);
+		return error;
+	}
+	ddq = (xfs_disk_dquot_t *)((xfs_dqblk_t *)bp->b_un.b_addr +
+				   dq_f->qlf_boffset);
+	
+	/* 
+	 * at least the magic num portion should be on disk because this
+	 * was among a chunk of dquots created earlier, and we did some
+	 * minimal initialization then.
+	 */
+	if (xfs_qm_dqcheck(ddq, dq_f->qlf_id, "xlog_recover_do_dquot_trans")) {
+		brelse(bp);
+		return (EIO);
+	}
+	ASSERT((caddr_t)ddq + item->ri_buf[1].i_len <=
+	       bp->b_dmaaddr + bp->b_bcount);
+
+	bcopy(recddq, ddq, item->ri_buf[1].i_len);
+	cmn_err(CE_NOTE, "recovering  dquot (id = %d), ddq 0x%x\n", 
+		recddq->d_id, ddq);
+
+	ASSERT(dq_f->qlf_size == 2);
+	bdwrite(bp);
+
+	return (0);
+}	/* xlog_recover_do_dquot_trans */
+
+/*
  * This routine is called to create an in-core extent free intent
  * item from the efi format structure which was logged on disk.
  * It allocates an in-core efi, copies the extents from the format
@@ -2609,6 +2787,20 @@ xlog_recover_do_trans(xlog_t	     *log,
 						  pass);
 		} else if (ITEM_TYPE(item) == XFS_LI_EFD) {
 			xlog_recover_do_efd_trans(log, item, pass);
+		} else if (ITEM_TYPE(item) == XFS_LI_DQUOT) {
+			if (XFS_IS_QUOTA_ON(log->l_mp)) {
+				if (error = 
+				    xlog_recover_do_dquot_trans(log, item, 
+								pass))
+					break;
+			}
+		} else if ((ITEM_TYPE(item) == XFS_LI_QUOTAOFF)) {
+			if (XFS_IS_QUOTA_ON(log->l_mp)) {
+				if (error = 
+				    xlog_recover_do_quotaoff_trans(log, item, 
+								   pass))
+					break;
+			}
 		} else {
 			xlog_warn("XFS: xlog_recover_do_trans");
 			ASSERT(0);
