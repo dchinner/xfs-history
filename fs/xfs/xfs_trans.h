@@ -113,6 +113,7 @@ typedef struct xfs_log_item {
 #define	XFS_TRANS_GROWFSRT_ALLOC	37
 #define	XFS_TRANS_GROWFSRT_ZERO		38
 #define	XFS_TRANS_GROWFSRT_FREE		39
+#define	XFS_TRANS_SWAPEXT		40
 
 typedef struct xfs_item_ops {
 	uint (*iop_size)(xfs_log_item_t *);

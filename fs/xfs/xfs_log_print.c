@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.4 $"
+#ident	"$Revision: 1.5 $"
 
 /*
  * This is meant to be used by only the user level log-print code, and
@@ -170,6 +170,7 @@ xlog_recover_print_trans_head(
 		"GROWFSRT_ALLOC",
 		"GROWFSRT_ZERO",
 		"GROWFSRT_FREE",
+		"SWAPEXT",
 	};
 
 	printf("TRANS: tid:0x%x  type:%s  #items:%d  trans:0x%x  q:0x%x\n",
