@@ -66,7 +66,6 @@ STATIC int xfs_attr_leaf_list(xfs_trans_t *trans, xfs_inode_t *dp,
  * Internal routines when attribute list size > XFS_LBSIZE(mp).
  */
 STATIC int xfs_attr_node_addname(xfs_trans_t *trans, xfs_da_name_t *args);
-STATIC int xfs_attr_node_lookup(xfs_trans_t *trans, xfs_da_name_t *args);
 STATIC int xfs_attr_node_get(xfs_trans_t *trans, xfs_da_name_t *args);
 STATIC int xfs_attr_node_removename(xfs_trans_t *trans, xfs_da_name_t *args);
 STATIC void xfs_attr_node_print(xfs_trans_t *trans, xfs_inode_t *dp);
@@ -80,6 +79,7 @@ STATIC int xfs_attr_node_list(xfs_trans_t *trans, xfs_inode_t *dp,
  * Overall external interface routines.
  *========================================================================*/
 
+/*ARGSUSED*/
 int								/* error */
 xfs_attr_get(vnode_t *vp, char *name, char *value, int *valuelenp, int flags,
 		     struct cred *cred)
@@ -129,6 +129,7 @@ xfs_attr_get(vnode_t *vp, char *name, char *value, int *valuelenp, int flags,
 	return(error);
 }
 
+/*ARGSUSED*/
 int								/* error */
 xfs_attr_set(vnode_t *vp, char *name, char *value, int valuelen, int flags,
 		     struct cred *cred)
@@ -232,6 +233,7 @@ out:
  * Generic handler routine to remove a name from an attribute list.
  * Transitions attribute list from Btree to shortform as necessary.
  */
+/*ARGSUSED*/
 int								/* error */
 xfs_attr_remove(vnode_t *vp, char *name, int flags, struct cred *cred)
 {
@@ -240,7 +242,7 @@ xfs_attr_remove(vnode_t *vp, char *name, int flags, struct cred *cred)
 	xfs_fsblock_t firstblock;
 	xfs_bmap_free_t flist;
 	xfs_da_name_t args;
-	int count, totallen, newsize, error, retval, committed;
+	int error, retval, committed;
 
 	xfsda_t_reinit("attr_remove", __FILE__, __LINE__);
 
@@ -315,6 +317,7 @@ out:
 	return(retval);
 }
 
+/*ARGSUSED*/
 int								/* error */
 xfs_attr_list(vnode_t *vp, char *buffer, int bufsize, int flags,
 		      attrlist_cursor_kern_t *cursor, struct cred *cred)
@@ -481,19 +484,19 @@ xfs_attr_leaf_removename(xfs_trans_t *trans, xfs_da_name_t *args, int *result)
 STATIC int
 xfs_attr_leaf_get(xfs_trans_t *trans, xfs_da_name_t *args)
 {
-	int index, retval, error;
+	int index, error;
 	buf_t *bp;
 
-	retval = xfs_da_read_buf(trans, args->dp, 0, &bp);
-	if (retval)
-		return(retval);
+	error = xfs_da_read_buf(trans, args->dp, 0, &bp);
+	if (error)
+		return(error);
 	ASSERT(bp != NULL);
-	retval = xfs_attr_leaf_lookup_int(bp, args, &index);
-	if (retval == EEXIST) {
-		retval = xfs_attr_leaf_getvalue(bp, args, index);
+	error = xfs_attr_leaf_lookup_int(bp, args, &index);
+	if (error == EEXIST) {
+		error = xfs_attr_leaf_getvalue(bp, args, index);
 	}
 	xfs_trans_brelse(trans, bp);
-	return(retval);
+	return(error);
 }
 
 /*
@@ -526,7 +529,7 @@ xfs_attr_leaf_list(xfs_trans_t *trans, xfs_inode_t *dp, attrlist_t *alist,
 	if (error)
 		return(error);
 	ASSERT(bp != NULL);
-	(void)xfs_attr_leaf_list_int(bp, dp, alist, cursor);
+	(void)xfs_attr_leaf_list_int(bp, alist, cursor);
 	xfs_trans_brelse(trans, bp);
 	return(0);
 }
@@ -802,7 +805,7 @@ xfs_attr_node_list(xfs_trans_t *trans, xfs_inode_t *dp, attrlist_t *alist,
 	 * adding the information.
 	 */
 	for (;;) {
-		error = xfs_attr_leaf_list_int(bp, dp, alist, cursor);
+		error = xfs_attr_leaf_list_int(bp, alist, cursor);
 		if (error)
 			break;
 		info = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
