@@ -347,7 +347,7 @@ xfs_read(
 	}
 
 	xfs_rw_enter_trace(XFS_READ_ENTER, &ip->i_iocore,
-				iovp, segs, *offset, ioflags);
+				(void *)iovp, segs, *offset, ioflags);
 	ret = __generic_file_aio_read(iocb, iovp, segs, offset);
 	if (!(ioflags & IO_ISLOCKED))
 		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
@@ -411,7 +411,7 @@ xfs_sendfile(
 		}
 	}
 	xfs_rw_enter_trace(XFS_SENDFILE_ENTER, &ip->i_iocore,
-				target, count, *offset, ioflags);
+			   (void*)(unsigned long)target, count, *offset, ioflags);
 	ret = generic_file_sendfile(filp, offset, count, actor, target);
 	if (!(ioflags & IO_ISLOCKED))
 		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
@@ -814,10 +814,10 @@ retry:
 	if (ioflags & IO_ISDIRECT) {
 		xfs_inval_cached_pages(vp, io, *offset, 1, 1);
 		xfs_rw_enter_trace(XFS_DIOWR_ENTER,
-				io, iovp, segs, *offset, ioflags);
+				io, (void *)iovp, segs, *offset, ioflags);
 	} else {
 		xfs_rw_enter_trace(XFS_WRITE_ENTER,
-				io, iovp, segs, *offset, ioflags);
+				io, (void *)iovp, segs, *offset, ioflags);
 	}
 	ret = generic_file_aio_write_nolock(iocb, iovp, segs, offset);
 
