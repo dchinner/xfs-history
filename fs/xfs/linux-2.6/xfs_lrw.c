@@ -745,12 +745,11 @@ int
 xfs_bdstrat_cb(struct xfs_buf *bp)
 {
 
-  pagebuf_iorequest(bp);
-  return 0;
-
 
   /* for now we just call the io routine... once the shutdown stuff is working 
    * the rest of this function will need to be implemented 01/10/2000 RMC */
+#if !defined(_USING_PAGEBUF_T)
+	bdstrat(NULL, bp);
 #if 0
 	xfs_mount_t	*mp;
 
@@ -778,6 +777,11 @@ xfs_bdstrat_cb(struct xfs_buf *bp)
 			return (xfs_bioerror(bp));
 	}
 #endif
+#else
+	pagebuf_iorequest(bp);
+#endif
+	return 0;
+
 }
 /*
  * Wrapper around bdstrat so that we can stop data
@@ -800,22 +804,26 @@ xfsbdstrat( struct xfs_mount 	*mp,
 		 * path, and are uncontrolled. If we want to rectify
 		 * that, use griostrategy2.
 		 */
+#if !defined(_USING_PAGEBUF_T)
 #if 0
 		if ( (XFS_BUF_IS_GRIO(bp)) &&
 				(dev_major != XLV_MAJOR) ) {
 			griostrategy(bp);
-		} else {
+		} else
+#endif
+			{
 			struct bdevsw	*my_bdevsw;
 
 			my_bdevsw = bp->b_target->bdevsw;
 			bdstrat(my_bdevsw, bp);
 		}
-#endif
+#else
 		if (XFS_BUF_IS_GRIO(bp)) {
 		  printk("xfsbdstrat needs griostrategy\n");
 		} else {
 		  pagebuf_iorequest(bp);
 		}
+#endif
 
 		return 0;
 	}
