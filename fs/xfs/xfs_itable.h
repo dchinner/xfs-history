@@ -50,7 +50,8 @@ typedef struct xfs_bstat
  * XFS_DIFLAG_s.
  */
 #define XFS_XFLAG_REALTIME	0x1
-#define XFS_XFLAG_ALL		( XFS_XFLAG_REALTIME )
+#define	XFS_XFLAG_PREALLOC	0x2
+#define XFS_XFLAG_ALL		( XFS_XFLAG_REALTIME|XFS_XFLAG_PREALLOC )
 
 /*
  * Structures returned from xfs_inumbers syssgi routine.
