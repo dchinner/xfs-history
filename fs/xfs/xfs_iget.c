@@ -498,7 +498,17 @@ xfs_iget(
 
 
 		vp = LINVFS_GET_VN_ADDRESS(inode);
-		if (!(inode->i_state & I_NEW)) {
+		if (inode->i_state & I_NEW) {
+			vn_initialize(XFS_MTOVFS(mp), inode, 0);
+			error = xfs_iget_core(vp, mp, tp, ino,
+							lock_flags, ipp, bno);
+			if (error)
+				make_bad_inode(inode);
+
+			unlock_new_inode(inode);
+			if (error)
+				iput(inode);
+		} else {
 			bdp = vn_bhv_lookup(VN_BHV_HEAD(vp), &xfs_vnodeops);
 			ip = XFS_BHVTOI(bdp);
 			if (lock_flags != 0) {
@@ -512,22 +522,10 @@ xfs_iget(
 			vn_revalidate(vp, ATTR_COMM|ATTR_LAZY);
 			XFS_STATS_INC(xfsstats.xs_ig_found);
 			*ipp = ip;
-			return 0;
+			error = 0;
 		}
-
-		vn_initialize(XFS_MTOVFS(mp), inode, 0);
-	}
-
-	error = xfs_iget_core(vp, mp, tp, ino, lock_flags, ipp, bno);
-	if (inode && (inode->i_state & I_NEW)) {
-		if (error) {
-			make_bad_inode(inode);
-		}
-		unlock_new_inode(inode);
-		if (error) {
-			iput(inode);
-		}
-	}
+	} else
+		error = ENOMEM;	/* If we got no inode we are out of memory */
 
 	return error;
 }
