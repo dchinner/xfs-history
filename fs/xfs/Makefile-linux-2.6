@@ -21,6 +21,7 @@ XFS_CSRCS=	byte_to_bits.c \
 		xfs_buf_item.c \
 		xfs_dir.c \
 		xfs_dir_btree.c \
+		xfs_error.c \
 		xfs_extfree_item.c \
 		xfs_grio.c \
 		xfs_ialloc.c \
@@ -43,7 +44,6 @@ XFS_CSRCS=	byte_to_bits.c \
 		xfs_trans_iunlink.c \
 		xfs_vfsops.c \
 		xfs_vnodeops.c
-# not ready yet: xfs_dir.c, xfs_dir_btree.c
 
 XFS_OBJS=$(XFS_CSRCS:.c=.o)
 $(XFS_NAME):$(XFS_NAME)($(XFS_OBJS)) MAKELIB

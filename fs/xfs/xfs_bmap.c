@@ -307,7 +307,8 @@ xfs_bmap_add_extent(
 			ASSERT(ISNULLSTARTBLOCK(prev.br_startblock));
 			da_old = STARTBLOCKVAL(prev.br_startblock);
 			logflags = xfs_bmap_add_extent_delay_real(ip, idx,
-				curp, new, &da_new, first, flist);
+				&cur, new, &da_new, first, flist);
+			ASSERT(*curp == cur || *curp == NULL);
 		}
 		/*
 		 * Otherwise we're filling in a hole with an allocation.
@@ -322,9 +323,9 @@ xfs_bmap_add_extent(
 	mp = ip->i_mount;
 	if (ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS &&
 	    ip->i_d.di_nextents > XFS_BMAP_EXT_MAXRECS(mp)) {
+		ASSERT(cur == NULL);
 		logflags |= xfs_bmap_extents_to_btree(ip->i_transp, ip,
 			first, flist, &cur, da_old > 0);
-		*curp = cur;
 	}
 	/*
 	 * Adjust for changes in reserved delayed indirect blocks.
@@ -342,8 +343,10 @@ xfs_bmap_add_extent(
 	/*
 	 * Clear out the allocated field, done with it now in any case.
 	 */
-	if (cur)
+	if (cur) {
 		cur->bc_private.b.allocated = 0;
+		*curp = cur;
+	}
 	return logflags;
 }
 
