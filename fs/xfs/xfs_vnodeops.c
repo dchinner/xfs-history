@@ -5134,7 +5134,7 @@ xfs_reclaim(
 	mrunlock(&ih->ih_lock);
 
 	if (!ip->i_update_core && (ip->i_itemp == NULL)) {
-		return xfs_finish_reclaim(ip, locked);
+		return xfs_finish_reclaim(ip, locked, 0);
 	}
 
 	if (locked) {
@@ -5148,10 +5148,12 @@ xfs_reclaim(
 int
 xfs_finish_reclaim(
 	xfs_inode_t	*ip,
-	int		locked)
+	int		locked,
+	int		from_umount)
 {
 	int	error;
 	xfs_ihash_t	*ih = ip->i_hash;
+	int	sync_mode;
 
 	mrupdate(&ih->ih_lock);
 	if (XFS_ITOV_NULL(ip)) {
@@ -5162,6 +5164,9 @@ xfs_finish_reclaim(
 		ip->i_flags |= XFS_IRECLAIM;
 		mrunlock(&ih->ih_lock);
 	}
+
+	sync_mode = from_umount ? XFS_IFLUSH_ASYNC :
+				XFS_IFLUSH_DELWRI_ELSE_SYNC;
 
 	/*
 	 * If the inode is still dirty, then flush it out.  If the inode
@@ -5190,7 +5195,7 @@ xfs_finish_reclaim(
 		if (ip->i_update_core ||
 		    ((ip->i_itemp != NULL) &&
 		     (ip->i_itemp->ili_format.ilf_fields != 0))) {
-			error = xfs_iflush(ip, XFS_IFLUSH_DELWRI_ELSE_SYNC);
+			error = xfs_iflush(ip, sync_mode);
 			/*
 			 * If we hit an error, typically because of filesystem
 			 * shutdown, we don't need to let vn_reclaim to know
