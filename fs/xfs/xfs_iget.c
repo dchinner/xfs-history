@@ -253,11 +253,9 @@ finish_inode:
 				xfs_iocore_inode_reinit(ip);
 			}
 
-			if (!list_empty(&ip->i_reclaim)) {
-				XFS_MOUNT_ILOCK(mp);
-				list_del(&ip->i_reclaim);
-				XFS_MOUNT_IUNLOCK(mp);
-			}
+			XFS_MOUNT_ILOCK(mp);
+			list_del_init(&ip->i_reclaim);
+			XFS_MOUNT_IUNLOCK(mp);
 
 			vn_trace_exit(vp, "xfs_iget.found",
 						(inst_t *)__return_address);
