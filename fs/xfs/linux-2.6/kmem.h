@@ -68,7 +68,6 @@ typedef unsigned long xfs_pflags_t;
 
 #define PFLAGS_DUP(OSTATEP, NSTATEP) do { \
 	*(NSTATEP) = *(OSTATEP);	\
-	*(OSTATEP) = current->flags;	\
 } while (0)
 
 /*
