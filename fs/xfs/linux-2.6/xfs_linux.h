@@ -242,8 +242,6 @@ typedef __uint32_t	xfs_dev_t;
 #define nopkg()		( ENOSYS )
 #define getf(fd,fpp)	( printk("getf not implemented\n"), ASSERT(0), 0 )
 
-extern int max_threads;
-#define numprocs	( max_threads/2 )	/* sets dquot limit only */
 #define ncsize		( files_stat.nr_files )
 
 #define MAXNAMELEN      256

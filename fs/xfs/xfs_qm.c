@@ -94,9 +94,17 @@ xfs_qm_init(void)
 	int			hsize, i;
 	static xfs_zone_t	*qm_dqzone = NULL;
 	static xfs_zone_t	*qm_dqtrxzone = NULL;
+	extern int max_threads;
+	/* currently this is broken for module loads... max_threads is not an exported symbol
+	 * this is only used by quotas anyways so move here... will get fixed 
+	 * at some point.
+	 */
+#define numprocs	( max_threads/2 )	/* sets dquot limit only */
 
 	xqm = kmem_zalloc(sizeof(xfs_qm_t), KM_SLEEP);
 	ASSERT(xqm);
+	/* moved from xfs_vfsops.c xfs_init */
+	ndquot = 200 + (2 * numprocs);
 
 	/*
 	 * initialize the dquot hash tables .
