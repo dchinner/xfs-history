@@ -401,6 +401,8 @@ vn_remove(struct vnode *vp)
 	if (!(vp->v_fbhv))
 		return;
 
+	XFS_STATS_INC(xfsstats.vn_remove);
+
 	vn_trace_exit(vp, "vn_remove", (inst_t *)__return_address);
 
 	/*
