@@ -40,16 +40,13 @@
 #include <sys/vnode.h>
 #include <sys/sysmacros.h>
 #include <sys/uuid.h>
-#include <sys/grio.h>
-#include <sys/pda.h>
+#include <linux/grio.h>
 #include <sys/dmi_kern.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
 #include <sys/var.h>
-#include <sys/conf.h>
 #include <sys/systm.h>
 #include <sys/uthread.h>
-#include <ksys/as.h>
 #include <sys/kmem.h>
 #include <linux/xfs_sema.h>
 #include <ksys/vfile.h>
@@ -57,8 +54,6 @@
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
 #include <sys/ktrace.h>
-#include <sys/ksa.h>
-#include <ksys/sthread.h>
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -110,61 +105,19 @@ int uiodbg_writeiolog[XFS_UIO_MAX_WRITEIO_LOG - XFS_UIO_MIN_WRITEIO_LOG + 1] =
 int uiodbg_switch = 0;
 #endif
 
-#define XFS_NUMVNMAPS 10	    /* number of uacc maps to pass to VM */
-
-extern int xfs_nfs_io_units;
-typedef	uuid_t		stream_id_t;
-void daemonize(void); /* from linux/xfs_thread.c */
-void set_thread_name(char *name); /* from linux/xfs_thread.c */
-extern void griostrategy(xfs_buf_t *bp);  /* prototype -- where to find it? */
-int grio_io_is_guaranteed( vfile_t *fp, stream_id_t *stream_id);  /* prototype -- where to find it? */
-extern int			grio_monitor_start( sysarg_t );
-int grio_monitor_io_start( stream_id_t *stream_id, __int64_t iosize);
-int grio_monitor_io_end( stream_id_t *stream_id, int index );
-
-int sthread_create(char *name,
-				   caddr_t stack_addr,
-				   uint_t stack_size,
-				   uint_t flags,
-				   uint_t pri,
-				   uint_t schedflags,
-				   st_func_t func,
-				   void *arg0,
-				   void *arg1,
-				   void *arg2,
-				   void *arg3);  /* from linux/xfs_thread.c */
-/*
- * This lock is used by xfs_strat_write().
- * The xfs_strat_lock is initialized in xfs_init().
- */
-lock_t	xfs_strat_lock;
-
-/*
- * Variables for coordination with the xfs_strat daemon.
- * The xfsc_lock and xfsc_wait variables are initialized
- * in xfs_init();
- */
-static int	xfsc_count;
-static xfs_buf_t	*xfsc_list;
-static int	xfsc_bufcount;
-lock_t		xfsc_lock;
-sv_t		xfsc_wait;
 
 /*
  * Variables for coordination with the xfsd daemons.
- * The xfsd_lock and xfsd_wait variables are initialized
- * in xfs_init();
+ * The xfsd_lock variable is initialized in xfs_init()
  */
-static int	xfsd_count;
 static xfs_buf_t	*xfsd_list;
 static int	xfsd_bufcount;
 lock_t		xfsd_lock;
-sv_t		xfsd_wait;
 
 /*
  * Zone allocator for xfs_gap_t structures.
  */
-zone_t		*xfs_gap_zone;
+xfs_zone_t		*xfs_gap_zone;
 
 #ifdef DEBUG
 /*
@@ -176,7 +129,7 @@ ktrace_t	*xfs_strat_trace_buf;
 STATIC int
 xfs_retrieved(
 	uint		available,
-	off_t		offset,
+	xfs_off_t		offset,
 	size_t		count,
 	uint		*total_retrieved,
 	xfs_fsize_t	isize);
@@ -196,7 +149,7 @@ xfs_check_gap_list(
 int
 xfs_build_gap_list(
 	xfs_iocore_t	*ip,
-	off_t		offset,
+	xfs_off_t		offset,
 	size_t		count);
 
 void
@@ -219,26 +172,6 @@ xfs_dio_write_zero_rtarea(
 	struct xfs_buf	*bp,
 	xfs_fileoff_t	offset_fsb,
 	xfs_filblks_t	count_fsb);
-#if defined(__sgi__)
-extern int
-grio_io_is_guaranteed(
-	vfile_t *,
-	stream_id_t	*);
-
-extern void
-griostrategy(
-	xfs_buf_t	*);
-
-extern int
-grio_monitor_io_start( 
-	stream_id_t *, 
-	__int64_t);
-
-extern int
-grio_monitor_io_end(
-	stream_id_t *,
-	int);
-#endif	
 
 extern void xfs_error(
 	xfs_mount_t *,
@@ -310,7 +243,7 @@ static void
 xfs_iomap_enter_trace(
 	int		tag,
 	xfs_iocore_t	*io,
-	off_t		offset,
+	xfs_off_t		offset,
 	size_t		count)
 {
 	xfs_inode_t	*ip = XFS_IO_INODE(io);
@@ -342,7 +275,7 @@ void
 xfs_iomap_map_trace(
 	int		tag,	     
 	xfs_iocore_t	*io,
-	off_t		offset,
+	xfs_off_t		offset,
 	size_t		count,
 	struct bmapval	*bmapp,
 	xfs_bmbt_irec_t	*imapp)    
@@ -375,10 +308,10 @@ xfs_iomap_map_trace(
 static void
 xfs_inval_cached_trace(
 	xfs_iocore_t	*io,
-	off_t		offset,
-	off_t		len,
-	off_t		first,
-	off_t		last)
+	xfs_off_t		offset,
+	xfs_off_t		len,
+	xfs_off_t		first,
+	xfs_off_t		last)
 {
 	xfs_inode_t	*ip = XFS_IO_INODE(io);
 
@@ -524,7 +457,7 @@ xfs_next_bmap(
 	 * end of the extent, then trim down the length
 	 * to match that of the extent.
 	 */
-	 extra_blocks = (off_t)(bmapp->offset + bmapp->length) -
+	 extra_blocks = (xfs_off_t)(bmapp->offset + bmapp->length) -
 	                (__uint64_t)(imapp->br_startoff +
 				     imapp->br_blockcount);   
 	 if (extra_blocks > 0) {
@@ -541,7 +474,7 @@ xfs_next_bmap(
 	 */
 	if (start_block == HOLESTARTBLOCK) {
 		last_file_fsb = XFS_B_TO_FSB(mp, isize);
-		extra_blocks = (off_t)(bmapp->offset + bmapp->length) -
+		extra_blocks = (xfs_off_t)(bmapp->offset + bmapp->length) -
 			(__uint64_t)last_file_fsb;
 		if (extra_blocks > 0) {
 			bmapp->length -= extra_blocks;
@@ -567,7 +500,7 @@ xfs_next_bmap(
 STATIC int
 xfs_retrieved(
 	uint		available,
-	off_t		offset,
+	xfs_off_t		offset,
 	size_t		count,
 	uint		*total_retrieved,
 	xfs_fsize_t	isize)
@@ -685,7 +618,7 @@ xfs_check_gap_list(
 int				/* error */
 xfs_build_gap_list(
 	xfs_iocore_t	*io,
-	off_t		offset,
+	xfs_off_t		offset,
 	size_t		count)
 {
 	xfs_fileoff_t	offset_fsb;
@@ -856,7 +789,7 @@ xfs_force_shutdown(
 #ifdef XFSERRORDEBUG
 	{
 		int nbufs;
-		while (nbufs = xfs_incore_relse(mp->m_ddev_targ, 1, 0)) {
+		while (nbufs = xfs_incore_relse(&mp->m_ddev_targ, 1, 0)) {
 			printf("XFS: released 0x%x bufs\n", nbufs);
 			if (ntries >= XFS_MAX_DRELSE_RETRIES) {
 				printf("XFS: ntries 0x%x\n", ntries);
@@ -867,7 +800,7 @@ xfs_force_shutdown(
 		}
 	}
 #else
-	while (xfs_incore_relse(mp->m_ddev_targ, 1, 0)) {
+	while (xfs_incore_relse(&mp->m_ddev_targ, 1, 0)) {
 		if (ntries >= XFS_MAX_DRELSE_RETRIES)
 			break;
 		delay(++ntries * 5);
@@ -979,7 +912,7 @@ xfs_ioerror_alert(
 	char 			*func,
 	struct xfs_mount	*mp,
 	dev_t			dev,
-	daddr_t			blkno)
+	xfs_daddr_t			blkno)
 {
 	cmn_err(CE_ALERT,
  "I/O error in filesystem (\"%s\") meta-data dev 0x%x block 0x%x (\"%s\")",
@@ -1003,9 +936,9 @@ int
 xfs_read_buf(
 	struct xfs_mount *mp,
 	buftarg_t	 *target,
-        daddr_t 	 blkno,
-        int              len,
-        uint             flags,
+	xfs_daddr_t 	 blkno,
+	int              len,
+	uint             flags,
 	xfs_buf_t		 **bpp)
 {
 	xfs_buf_t		 *bp;
@@ -1072,7 +1005,7 @@ xfs_bwrite(
  * remove its buffers from the xfsd_list so it doesn't have to wait
  * for them to be pushed out to disk
  */
-#if !defined(_USING_PAGEBUF_T) 
+#if 0
 void 
 _xfs_xfsd_list_evict(bhv_desc_t * bdp)
 {
@@ -1399,8 +1332,8 @@ void
 xfs_inval_cached_pages(
 	vnode_t		*vp,
 	xfs_iocore_t	*io,
-	off_t		offset,
-	off_t		len,
+	xfs_off_t		offset,
+	xfs_off_t		len,
 	void		*dio)		    
 {
 	xfs_dio_t	*diop = (xfs_dio_t *)dio;
@@ -1501,7 +1434,9 @@ xfs_refcache_insert(
 	}
 
 	vp = XFS_ITOV(ip);
-	ASSERT(vp->v_count > 0);
+
+	ASSERT(vn_count(vp) > 0);
+
 	VN_HOLD(vp);
 
 	/*
@@ -1619,7 +1554,9 @@ xfs_refcache_purge_ip(
 	mp_mutex_spinunlock(&xfs_refcache_lock, s);
 
 	vp = XFS_ITOV(ip);
-	ASSERT(vp->v_count > 1);
+
+	ASSERT(vn_count(vp) > 1);
+
 	VN_RELE(vp);
 
 	return;

@@ -37,17 +37,15 @@
 
 #ifndef SIM
 #define FSID_T
-#include <linux/xfs_to_linux.h>
 #include <linux/fs.h>
-#include <linux/linux_to_xfs.h>
 #else
 #define _KERNEL	1
 #endif
+#include <sys/mode.h>
 #include "xfs_buf.h"
 #include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
-#include <sys/grio.h>
 #include <sys/dmi_kern.h>
 #include <sys/kmem.h>
 #ifdef SIM
@@ -63,16 +61,13 @@
 #include <stdio.h>
 #else
 #include <sys/systm.h>
-#include <sys/conf.h>
 #endif
-#include <sys/mount.h>
 #include <sys/param.h>
 #include <linux/xfs_sema.h>
 #include <sys/statvfs.h>
 #include <sys/uio.h>
 #include <sys/dirent.h>
 #include <sys/ktrace.h>
-#include <sys/xlate.h>
 #include <sys/capability.h>
 
 #include "xfs_macros.h"
@@ -115,12 +110,11 @@
 #ifdef SIM
 #include "sim.h"
 #endif
-#include <fs/fs_bhv_id.h>
 
 #ifndef SIM
-#define	whymount_t	whymountroot_t
 #define	NONROOT_MOUNT	ROOT_UNMOUNT
-
+#define MS_DMI          0x1000  /* enable DMI interfaces (XFS only) */
+#define	whymount_t	whymountroot_t
 static char *whymount[] = { "initial mount", "remount", "unmount" };
 
 /*
@@ -206,16 +200,10 @@ spectodevs(
         dev_t   *rtdevp);
 
 STATIC int
-xfs_isdev(
-	dev_t	dev);
-
-STATIC int
 xfs_ibusy(
 	xfs_mount_t	*mp);
 
 #endif	/* !SIM */
-
-
 
 
 /*
@@ -238,44 +226,31 @@ int	xfs_fstype;
 int
 xfs_init(int	fstype)
 {
-	extern void	xfs_start_daemons(void);
-#ifndef SIM
-#ifdef DATAPIPE
-	extern void     fspeinit(void);
-#endif
-#endif
+	extern void	xfs_init_procfs(void);
 	extern mutex_t	xfs_refcache_lock;
 	extern int	xfs_refcache_size;
 	extern int	ncsize;
 	extern int	xfs_refcache_percent;
 	extern xfs_inode_t	**xfs_refcache;
-	extern zone_t	*xfs_da_state_zone;
-	extern zone_t	*xfs_bmap_free_item_zone;
-	extern zone_t	*xfs_btree_cur_zone;
-	extern zone_t	*xfs_inode_zone;
-	extern zone_t	*xfs_chashlist_zone;
-	extern zone_t	*xfs_trans_zone;
-	extern zone_t	*xfs_buf_item_zone;
-#if XFS_BIG_FILESYSTEMS
-	extern zone_t	*xfs_buf_item64_zone;
-#endif
-	extern zone_t	*xfs_efd_zone;
-	extern zone_t	*xfs_efi_zone;
-	extern zone_t	*xfs_dabuf_zone;
+	extern xfs_zone_t	*xfs_da_state_zone;
+	extern xfs_zone_t	*xfs_bmap_free_item_zone;
+	extern xfs_zone_t	*xfs_btree_cur_zone;
+	extern xfs_zone_t	*xfs_inode_zone;
+	extern xfs_zone_t	*xfs_chashlist_zone;
+	extern xfs_zone_t	*xfs_trans_zone;
+	extern xfs_zone_t	*xfs_buf_item_zone;
+	extern xfs_zone_t	*xfs_efd_zone;
+	extern xfs_zone_t	*xfs_efi_zone;
+	extern xfs_zone_t	*xfs_dabuf_zone;
 #if	(defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
-	extern zone_t	*xfs_ktrace_hdr_zone;
-	extern zone_t	*xfs_ktrace_ent_zone;
+	extern xfs_zone_t	*xfs_ktrace_hdr_zone;
+	extern xfs_zone_t	*xfs_ktrace_ent_zone;
 #endif	/* (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING)) */
 #ifndef SIM
-	extern lock_t	xfs_strat_lock;
 	extern lock_t	xfsd_lock;
-	extern sv_t	xfsd_wait;
-	extern lock_t	xfsc_lock;
-	extern sv_t	xfsc_wait;
 	extern mutex_t	xfs_ancestormon;
 	extern mutex_t	xfs_uuidtabmon;
-	extern mutex_t	xfs_Gqm_lock;
-	extern zone_t	*xfs_gap_zone;
+	extern xfs_zone_t	*xfs_gap_zone;
 #ifdef DEBUG
 	extern ktrace_t	*xfs_alloc_trace_buf;
 	extern ktrace_t	*xfs_bmap_trace_buf;
@@ -296,14 +271,9 @@ xfs_init(int	fstype)
 	spinlock_init(&xfs_dabuf_global_lock, "xfsda");
 #endif
 #ifndef SIM
-	spinlock_init(&xfs_strat_lock, "xfsstrat");
 	mutex_init(&xfs_ancestormon, MUTEX_DEFAULT, "xfs_ancestor");
 	mutex_init(&xfs_uuidtabmon, MUTEX_DEFAULT, "xfs_uuidtab");
 	spinlock_init(&xfsd_lock, "xfsd");
-	sv_init(&xfsd_wait, SV_DEFAULT, "xfsd");
-	spinlock_init(&xfsc_lock, "xfsc");
-	sv_init(&xfsc_wait, SV_DEFAULT, "xfsc");
-	mutex_init(&xfs_Gqm_lock, MUTEX_DEFAULT, "xfs_qmlock");
 
 	/*
 	 * Initialize the inode reference cache.
@@ -397,20 +367,15 @@ xfs_init(int	fstype)
 
 	xfs_dir_startup();
 	
-#ifndef SIM
-#ifdef DATAPIPE
-	fspeinit();
-#endif /* DATAPIPE */
-
-#endif
-
 #ifdef CELL_CAPABLE
 	/*
          * Special initialization for cxfs
 	 */
 	cxfs_arrinit();
 #endif
-
+#ifndef	SIM
+	xfs_init_procfs();
+#endif
 	/*
 	 * The inode hash table is created on a per mounted
 	 * file system bases.
@@ -437,32 +402,31 @@ xfs_fill_buftarg(buftarg_t *btp, dev_t dev, struct super_block *sb)
 }
 
 #ifndef SIM
-extern int	kmem_cache_destroy(zone_t *);
+extern int	kmem_cache_destroy(xfs_zone_t *);
 
 void
 xfs_cleanup(void)
 {
-#if !CONFIG_PAGE_BUF_META
-	extern zone_t	*buf_zone;
-#endif
-	extern zone_t	*xfs_bmap_free_item_zone;
-	extern zone_t	*xfs_btree_cur_zone;
-	extern zone_t	*xfs_inode_zone;
-	extern zone_t	*xfs_trans_zone;
-	extern zone_t	*xfs_gap_zone;
-	extern zone_t	*xfs_da_state_zone;
-	extern zone_t	*xfs_dabuf_zone;
-	extern zone_t	*xfs_efd_zone;
-	extern zone_t	*xfs_efi_zone;
-	extern zone_t	*xfs_buf_item_zone;
-	extern zone_t	*xfs_chashlist_zone;
+	extern void	xfs_cleanup_procfs(void);
+
+	extern xfs_zone_t	*xfs_bmap_free_item_zone;
+	extern xfs_zone_t	*xfs_btree_cur_zone;
+	extern xfs_zone_t	*xfs_inode_zone;
+	extern xfs_zone_t	*xfs_trans_zone;
+	extern xfs_zone_t	*xfs_gap_zone;
+	extern xfs_zone_t	*xfs_da_state_zone;
+	extern xfs_zone_t	*xfs_dabuf_zone;
+	extern xfs_zone_t	*xfs_efd_zone;
+	extern xfs_zone_t	*xfs_efi_zone;
+	extern xfs_zone_t	*xfs_buf_item_zone;
+	extern xfs_zone_t	*xfs_chashlist_zone;
 #if  (! defined(SIM) && (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING)))
-	extern zone_t	*xfs_ktrace_hdr_zone;
-	extern zone_t	*xfs_ktrace_ent_zone;
+	extern xfs_zone_t	*xfs_ktrace_hdr_zone;
+	extern xfs_zone_t	*xfs_ktrace_ent_zone;
 #endif
 
-#if !CONFIG_PAGE_BUF_META
-	kmem_cache_destroy(buf_zone);
+#ifndef	SIM
+	xfs_cleanup_procfs();
 #endif
 	kmem_cache_destroy(xfs_bmap_free_item_zone);
 	kmem_cache_destroy(xfs_btree_cur_zone);
@@ -523,9 +487,6 @@ xfs_cmountfs(
 	/*
  	 * Open the data and real time devices now.
 	 */
-
-	printk("mp: %p, blocklog: %u\n", mp,
-	       (unsigned int)mp->m_sb.sb_blocklog);
 
 	vfs_flags = (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE;
 	xfs_fill_buftarg(&mp->m_ddev_targ, ddev, vfsp->vfs_super);
@@ -758,8 +719,6 @@ xfs_cmountfs(
 		}
 	}
 
-	printk("blocklog end: %u\n", (unsigned int)mp->m_sb.sb_blocklog);
-
 	return error;
 
 	/*
@@ -879,8 +838,9 @@ xfs_mount(
 
 	if (mvp->v_type != VDIR)
 		return XFS_ERROR(ENOTDIR);
-	if (((uap->flags & MS_REMOUNT) == 0) &&
-	    ((mvp->v_count != 1) || (mvp->v_flag & VROOT)))
+
+	if (   ((uap->flags & MS_REMOUNT) == 0)
+	    && ((vn_count(mvp) != 1) || (mvp->v_flag & VROOT)) )
 		return XFS_ERROR(EBUSY);
 
 	/*
@@ -961,24 +921,6 @@ xfs_vfsmount(
 	return (error);
 }
 
-/*
- * This function determines whether or not the given device has a
- * XFS file system. It reads a XFS superblock from the device and
- * checks the magic and version numbers.
- *
- * Return 0 if device has a XFS file system.
- */
-STATIC int
-xfs_isdev(
-	dev_t dev)
-{
-	xfs_sb_t *sbp;
-	xfs_buf_t	 *bp;
-	int	 error;
-
-	printk("DING DING DING... need to implement this once we start doing xfs root\n");
-	return 0;
-}
 
 /*
  * xfs_mountroot() mounts the root file system.
@@ -1204,15 +1146,16 @@ xfs_ibusy(
 			continue;
 		}
 
-		vp = XFS_ITOV(ip);
-		if (vp->v_count != 0) {
-		  	if (xfs_ibusy_check(ip, vp->v_count) == 0) {
+		vp = XFS_ITOV_NULL(ip);
+
+		if (vp && vn_count(vp) != 0) {
+		  	if (xfs_ibusy_check(ip, vn_count(vp)) == 0) {
 				ip = ip->i_mnext;
 				continue;
 			}
 #ifdef DEBUG
 			printk("busy vp=0x%p ip=0x%p inum %Ld count=%d\n",
-				vp, ip, ip->i_ino, vp->v_count);
+				vp, ip, ip->i_ino, vn_count(vp));
 #endif
 			busy++;
 		}
@@ -1239,7 +1182,6 @@ xfs_unmount(
 	xfs_mount_t	*mp;
 	xfs_inode_t	*rip;
 	vnode_t		*rvp = 0;
-	vmap_t		vmap;
 	int		vfs_flags;
 	struct vfs 	*vfsp = bhvtovfs(bdp);
 	int		unmount_event_wanted = 0;
@@ -1279,6 +1221,7 @@ xfs_unmount(
 	 */
 	if (xfs_ibusy(mp)) {
 		error = XFS_ERROR(EBUSY);
+		printk("xfs_unmount: xfs_ibusy says error/%d\n", error);
 		goto out;
 	}
 	
@@ -1287,9 +1230,16 @@ xfs_unmount(
 	if (error)
 		goto out;
 
-	VMAP(rvp, vmap);
+	ASSERT(vn_count(rvp) == 1);
+
+	/*
+	 * Drop the reference count, and then
+	 * run the vnode through vn_remove.
+	 */
+	rvp->v_flag |= VPURGE;			/* OK for vn_purge */
 	VN_RELE(rvp);
-	vn_purge(rvp, &vmap);
+
+	vn_remove(rvp);
 
 	/*
 	 * If we're forcing a shutdown, typically because of a media error,
@@ -1361,7 +1311,8 @@ xfs_unmount_flush(
 
 		if (error == EFSCORRUPTED)
 			goto fscorrupt_out;
-		ASSERT(XFS_ITOV(rbmip)->v_count == 1);
+
+		ASSERT(vn_count(XFS_ITOV(rbmip)) == 1);
 
 		rsumip = mp->m_rsumip;
 		xfs_ilock(rsumip, XFS_ILOCK_EXCL);
@@ -1371,7 +1322,8 @@ xfs_unmount_flush(
 
 		if (error == EFSCORRUPTED)
 			goto fscorrupt_out;
-		ASSERT(XFS_ITOV(rsumip)->v_count == 1);
+
+		ASSERT(vn_count(XFS_ITOV(rsumip)) == 1);
 	}
 
 	/*
@@ -1381,7 +1333,8 @@ xfs_unmount_flush(
 
 	if (error == EFSCORRUPTED)
 		goto fscorrupt_out2;
-	if (rvp->v_count != 1 && !relocation) {
+
+	if (vn_count(rvp) != 1 && !relocation) {
 		xfs_iunlock(rip, XFS_ILOCK_EXCL);
 		error = XFS_ERROR(EBUSY);
 		return (error);
@@ -1570,7 +1523,7 @@ xfs_syncsub(
 	xfs_inode_t	*ip = NULL;
 	xfs_inode_t	*ip_next;
 	xfs_buf_t		*bp;
-	vnode_t		*vp;
+	vnode_t		*vp = NULL;
 	vmap_t		vmap;
 	int		error;
 	int		last_error;
@@ -1672,14 +1625,18 @@ xfs_syncsub(
 	}
 
 	XFS_MOUNT_ILOCK(mp);
+
 	ip = mp->m_inodes;
+
 	mount_locked = B_TRUE;
-	vnode_refed = B_FALSE;
+	vnode_refed  = B_FALSE;
+
 	IPOINTER_CLR;
 
 	do {
 		ASSERT(ipointer_in == B_FALSE);
 		ASSERT(vnode_refed == B_FALSE);
+
 		lock_flags = base_lock_flags;
 
 		/*
@@ -1698,7 +1655,27 @@ xfs_syncsub(
 			continue;
 		}
 
-		vp = XFS_ITOV(ip);
+		vp = XFS_ITOV_NULL(ip);
+
+		/*
+		 * If the vnode is gone then this is being torn down,
+		 * skip it.
+		 */
+
+		if (vp == NULL) {
+			if (!(ip->i_flags & XFS_IRECLAIM)) {
+				IPOINTER_INSERT(ip, mp);
+
+				xfs_finish_reclaim(ip);
+
+				XFS_MOUNT_ILOCK(mp);
+				mount_locked = B_TRUE;
+				IPOINTER_REMOVE(ip, mp);
+			} else {
+				ip = ip->i_mnext;
+			}
+			continue;
+		}
 
 		/*
 		 * We don't mess with swap files from here since it is
@@ -1756,6 +1733,7 @@ xfs_syncsub(
 		 * a vn_get() for every inode we touch here.
 		 */
 		if (xfs_ilock_nowait(ip, lock_flags) == 0) {
+
 			if (flags & SYNC_BDFLUSH) {
 				ip = ip->i_mnext;
 				continue;
@@ -1772,10 +1750,9 @@ xfs_syncsub(
 			 * in taking a snapshot of the vnode version number
 			 * for use in calling vn_get().
 			 */
-
-
-			VMAP(vp, vmap);
+			VMAP(vp, ip, vmap);
 			IPOINTER_INSERT(ip, mp);
+
 			vp = vn_get(vp, &vmap, 0);
 			if (vp == NULL) {
 				/*
@@ -1785,14 +1762,20 @@ xfs_syncsub(
 				 */
 
 				XFS_MOUNT_ILOCK(mp);
+
 				mount_locked = B_TRUE;
-				vnode_refed = B_FALSE;
+				vnode_refed  = B_FALSE;
+
 				IPOINTER_REMOVE(ip, mp);
+
 				continue;
 			}
+
 			xfs_ilock(ip, lock_flags);
+
 			ASSERT(vp == XFS_ITOV(ip));
 			ASSERT(ip->i_mount == mp);
+
 			vnode_refed = B_TRUE;
 		}
 
@@ -1815,6 +1798,7 @@ xfs_syncsub(
 			 * down anyway.
 			 */
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
+
 			if (XFS_FORCED_SHUTDOWN(mp)) {
                                 if (xflags & XFS_XSYNC_RELOC) {
 					fs_tosspages(XFS_ITOBHV(ip), 0,
@@ -1832,7 +1816,9 @@ xfs_syncsub(
 					VOP_FLUSHINVAL_PAGES(vp, 0, FI_REMAPF);
 				}
 			}
+
 			xfs_ilock(ip, XFS_ILOCK_SHARED);
+
 		} else if (flags & SYNC_DELWRI) {
 			if (VN_DIRTY(vp)) {
 				/* We need to have dropped the lock here,
@@ -1848,8 +1834,9 @@ xfs_syncsub(
 				 * across calls to the buffer cache.
 				 */
 				xfs_iunlock(ip, XFS_ILOCK_SHARED);
-				VOP_FLUSH_PAGES(vp, (off_t)0,
+				VOP_FLUSH_PAGES(vp, (xfs_off_t)0,
 						fflag, FI_NONE, error);
+
 				xfs_ilock(ip, XFS_ILOCK_SHARED);
 			}
 
@@ -1872,12 +1859,15 @@ xfs_syncsub(
 				ASSERT(vp->v_type == VREG);
 				if (vp->v_type == VREG) {
 					xfs_iunlock(ip, XFS_ILOCK_SHARED);
+
 					XFS_pdflush(vp, XFS_B_DELWRI);
+
 					xfs_ilock(ip, XFS_ILOCK_SHARED);
 				}
 			}
 
 		} else if (flags & SYNC_BDFLUSH) {
+
 			if ((flags & SYNC_ATTR) &&
 			    ((ip->i_update_core) ||
 			     ((ip->i_itemp != NULL) &&
@@ -1910,8 +1900,10 @@ xfs_syncsub(
 				 */
 				if ((ip->i_pincount == 0) &&
 				    xfs_iflock_nowait(ip)) {
+
 					xfs_ifunlock(ip);
 					xfs_iunlock(ip, XFS_ILOCK_SHARED);
+
 					error = xfs_itobp(mp, NULL, ip,
 							  &dip, &bp, 0);
 					if (!error) {
@@ -1921,10 +1913,14 @@ xfs_syncsub(
 						 * marker and free it.
 						 */
 						XFS_MOUNT_ILOCK(mp);
+
 						IPOINTER_REMOVE(ip, mp);
+
 						XFS_MOUNT_IUNLOCK(mp);
+
 						ASSERT(!(lock_flags &
 							XFS_IOLOCK_SHARED));
+
 						kmem_free(ipointer,
 							sizeof(xfs_iptr_t));
 						return (0);
@@ -1944,8 +1940,10 @@ xfs_syncsub(
 					 */
 					XFS_MOUNT_ILOCK(mp);
 					mount_locked = B_TRUE;
+
 					if (ip != ipointer->ip_mprev) {
 						IPOINTER_REMOVE(ip, mp);
+
 						ASSERT(!vnode_refed);
 						ASSERT(!(lock_flags &
 							XFS_IOLOCK_SHARED));
@@ -1953,6 +1951,7 @@ xfs_syncsub(
 					}
 
 					ASSERT(ip->i_mount == mp);
+
 					if (xfs_ilock_nowait(ip,
 						    XFS_ILOCK_SHARED) == 0) {
 						ASSERT(ip->i_mount == mp);
@@ -2030,6 +2029,7 @@ xfs_syncsub(
 		if (lock_flags != 0) {
 			xfs_iunlock(ip, lock_flags);
 		}
+
 		if (vnode_refed) {
 			/*
 			 * If we had to take a reference on the vnode
@@ -2046,12 +2046,16 @@ xfs_syncsub(
 			if (mount_locked) {
 				IPOINTER_INSERT(ip, mp);
 			}
+
 			VN_RELE(vp);
+
 			vnode_refed = B_FALSE;
 		}
+
 		if (error) {
 			last_error = error;
 		}
+
 		/*
 		 * bail out if the filesystem is corrupted.
 		 */
@@ -2065,6 +2069,7 @@ xfs_syncsub(
 			kmem_free(ipointer, sizeof(xfs_iptr_t));
 			return XFS_ERROR(error);
 		}
+
 		/* Let other threads have a chance at the mount lock
 		 * if we have looped many times without dropping the
 		 * lock.
@@ -2074,6 +2079,7 @@ xfs_syncsub(
 				IPOINTER_INSERT(ip, mp);
 			}
 		}
+
 		if (mount_locked == B_FALSE) {
 			XFS_MOUNT_ILOCK(mp);
 			mount_locked = B_TRUE;
@@ -2083,8 +2089,11 @@ xfs_syncsub(
 
 		ASSERT(ipointer_in == B_FALSE);
 		ip = ip->i_mnext;
+
 	} while (ip != mp->m_inodes);
+
 	XFS_MOUNT_IUNLOCK(mp);
+
 	ASSERT(ipointer_in == B_FALSE);
 
 	/*
@@ -2103,6 +2112,7 @@ xfs_syncsub(
 			}
 		}
 	}
+
 	/*
 	 * Flushing out dirty data above probably generated more
 	 * log activity, so if this isn't vfs_sync() then flush
@@ -2217,7 +2227,7 @@ xfs_syncsub(
 STATIC int
 xfs_get_vnode(bhv_desc_t *bdp,
 	vnode_t		**vpp,
-	ino_t		ino)
+	xfs_ino_t		ino)
 {
 	xfs_mount_t	*mp;
 	xfs_ihash_t	*ih;
@@ -2239,8 +2249,12 @@ xfs_get_vnode(bhv_desc_t *bdp,
 
 	mrunlock(&ih->ih_lock);
 
-	if (!*vpp)
-		return XFS_ERROR(ENOENT);
+	if (!*vpp) {
+		if (xfs_iget(mp, NULL, (xfs_ino_t) ino, 0, &ip, 0)) {
+			return XFS_ERROR(ENOENT);
+		}
+		*vpp = XFS_ITOV(ip);
+	}
 	
 	return(0);
 }

@@ -785,7 +785,7 @@ xfs_dir2_sf_getdents(
 	xfs_dir2_put_args_t	p;		/* arg package for put rtn */
 	xfs_dir2_sf_entry_t	*sfep;		/* shortform directory entry */
 	xfs_dir2_sf_t		*sfp;		/* shortform structure */
-	off_t			dir_offset;
+	xfs_off_t			dir_offset;
 
 	mp = dp->i_mount;
 

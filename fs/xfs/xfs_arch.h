@@ -37,15 +37,20 @@
 
 /* includes */
 
-#include <linux/autoconf.h>
 #include "xfs_types.h"
+#ifdef SIM
 #include <endian.h>
+#else
+#include <asm/byteorder.h>
 
-/* sanity checks */
-
-#if !defined(__LITTLE_ENDIAN) || !defined(__BIG_ENDIAN) || !defined(__BYTE_ORDER)
-#error endian defines are screwy
+#ifdef __LITTLE_ENDIAN
+#define __BYTE_ORDER	__LITTLE_ENDIAN
 #endif
+#ifdef __BIG_ENDIAN
+#define __BYTE_ORDER	__BIG_ENDIAN
+#endif
+#endif
+
 
 #ifndef XFS_BIG_FILESYSTEMS
 #error XFS_BIG_FILESYSTEMS must be defined true or false

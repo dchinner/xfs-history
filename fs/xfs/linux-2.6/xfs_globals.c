@@ -35,58 +35,9 @@
  * $Author$
  * $Id$
  *
- * $Log$
- * Revision 1.12  2000/03/29 01:45:59  kenmcd
+ * Revision 1.12  2000/06/09 02:50:02  kenmcd
  * Updated copyright and license notices, ready for open source release
- *
- * Revision 1.11  2000/03/25 01:29:53  nathans
- * Merge of 2.3.42-xfs:slinx:46428a by ananth.
- *
- *   remove unused include files.
- *
- * Revision 1.10  2000/03/25 01:15:49  lord
- * use linux security mechanisms
- * Merge of 2.3.42-xfs:slinx:46379a by ananth.
- *
- * Revision 1.9  2000/03/25 00:47:57  lord
- * Merge of 2.3.42-xfs:slinx:44783a by ananth.
- *
- *   remove vfssw
- *
- * Revision 1.8  2000/03/25 00:36:28  cattelan
- * Merge of 2.3.42-xfs:slinx:44186a by ananth.
- *
- *   Copied GPL from slinx-xfs tree.
- *
- * Revision 1.11  2000/03/20 07:37:34  nathans
- * remove unused include files.
- *
- * Revision 1.10  2000/03/18 22:51:26  lord
- * use linux security mechanisms
- *
- * Revision 1.8  2000/02/21 21:54:31  cattelan
- * Copied GPL from slinx-xfs tree.
- *
- * Revision 1.8  2000/02/21 03:16:16  kenmcd
- * Encumbrance review done.
- * Add copyright and license words consistent with GPL.
- * Refer to http://fsg.melbourne.sgi.com/reviews/ for details.
- *
- * Revision 1.7  1999/11/30 23:26:23  lord
- * remove lbolt definition, using jiffies
- *
- * Revision 1.6  1999/09/29 17:55:19  lord
- * Fill in var structure for buffer cache sizes.
- *
- * Revision 1.5  1999/09/03 00:40:44  mostek
- * A bunch more (physmem, maxdmasz, lbolt, ...
- *
- * Revision 1.3  1999/09/02 22:24:14  cattelan
- * No Message Supplied
- *
- * Revision 1.1  1999/09/01 00:35:47  mostek
- * Add some globals that came from systune. Systune doesn't exist
- * on Linux.
+ * Merge of 2.3.99pre2-xfs:slinx:55821a by ananth.
  *
  */
 
@@ -94,6 +45,8 @@
  * This file contains globals needed by XFS that were normally defined
  * somewhere else in IRIX.
  */
+
+#include <xfs_os_defs.h>
 
 #include <sys/types.h>
 #include <sys/var.h>
@@ -126,6 +79,4 @@ int		maxdmasz = 0x401;	/* Obviously needs to be set dynamically */
 #ifdef SIM
 time_t		jiffies;
 #endif
-struct ksa	ksa;
-struct ksa      *ksaptr = &ksa;        /* ptr to kernel system activities buf*/
 

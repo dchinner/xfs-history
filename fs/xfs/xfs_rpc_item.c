@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.6 $"
+#ident "$Revision: 1.7 $"
 #include <xfs_os_defs.h>
 
 /*
@@ -93,14 +93,14 @@ xfs_rpc_item_format(xfs_rpc_log_item_t *rpcip, xfs_log_iovec_t *logvec)
 	/*
 	 * first logvec contains everything but the data union
 	 */
-	vec->i_addr = (caddr_t) &rpcip->rpcli_format;
+	vec->i_addr = (xfs_caddr_t) &rpcip->rpcli_format;
 	vec->i_len = sizeof(cxfs_rpc_log_format_t);
 	vec++;
 
 	/*
 	 * second logvec contains the contents of the data union
 	 */
-	vec->i_addr = (caddr_t) &rpcip->rpcli_data.rpcli_base;
+	vec->i_addr = (xfs_caddr_t) &rpcip->rpcli_data.rpcli_base;
 	vec->i_len = rpcip->rpcli_format.rlf_size;
 }
 

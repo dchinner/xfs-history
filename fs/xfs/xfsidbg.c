@@ -31,6 +31,9 @@
  */
 #ident	"$Revision$"
 
+#undef	DEBUG
+#undef	XFSDEBUG
+
 #include <xfs_os_defs.h>
 
 #include <sys/types.h>
@@ -39,10 +42,8 @@
 #include <linux/kdb.h>
 #include <linux/kdbprivate.h>
 
-#include <linux/xfs_to_linux.h>
 #include <linux/mm.h>
-#include <linux/linux_to_xfs.h>
-
+#include <linux/fs.h>
 
 #include <sys/vfs.h>
 #include <sys/vnode.h>
@@ -50,7 +51,7 @@
 #include <sys/uuid.h>
 #include "sys/ktrace.h"
 #include "xfs_buf.h"
-#include "xfs_macros.h"
+
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -93,6 +94,146 @@
 #include "xfs_qm.h"
 #include "xfs_quota_priv.h"
 
+#if     (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
+
+/*
+ * Return the number of entries in the trace buffer.
+ */
+int
+ktrace_nentries(
+	ktrace_t        *ktp)
+{
+	if (ktp == NULL) {
+		return 0;
+	}
+
+	return (ktp->kt_rollover ? ktp->kt_nentries : ktp->kt_index);
+}
+
+
+/*
+ * ktrace_first()
+ *
+ * This is used to find the start of the trace buffer.
+ * In conjunction with ktrace_next() it can be used to
+ * iterate through the entire trace buffer.  This code does
+ * not do any locking because it is assumed that it is called
+ * from the debugger.
+ *
+ * The caller must pass in a pointer to a ktrace_snap
+ * structure in which we will keep some state used to
+ * iterate through the buffer.  This state must not touched
+ * by any code outside of this module.
+ */
+ktrace_entry_t *
+ktrace_first(ktrace_t   *ktp, ktrace_snap_t     *ktsp)
+{
+        ktrace_entry_t  *ktep;
+        int             index;
+        int             nentries;
+
+        if (ktp->kt_rollover)
+                index = ktp->kt_index;
+        else
+                index = 0;
+
+        ktsp->ks_start = index;
+        ktep = &(ktp->kt_entries[index]);
+
+        nentries = ktrace_nentries(ktp);
+        index++;
+        if (index < nentries) {
+                ktsp->ks_index = index;
+        } else {
+                ktsp->ks_index = 0;
+                if (index > nentries)
+                        ktep = NULL;
+        }
+        return ktep;
+}
+
+
+/*
+ * ktrace_next()
+ *
+ * This is used to iterate through the entries of the given
+ * trace buffer.  The caller must pass in the ktrace_snap_t
+ * structure initialized by ktrace_first().  The return value
+ * will be either a pointer to the next ktrace_entry or NULL
+ * if all of the entries have been traversed.
+ */
+ktrace_entry_t *
+ktrace_next(
+        ktrace_t        *ktp,
+        ktrace_snap_t   *ktsp)
+{
+        int             index;
+        ktrace_entry_t  *ktep;
+
+        index = ktsp->ks_index;
+        if (index == ktsp->ks_start) {
+                ktep = NULL;
+        } else {
+                ktep = &ktp->kt_entries[index];
+        }
+
+        index++;
+        if (index == ktrace_nentries(ktp)) {
+                ktsp->ks_index = 0;
+        } else {
+                ktsp->ks_index = index;
+        }
+
+        return ktep;
+}
+
+/*
+ * ktrace_skip()
+ *
+ * Skip the next "count" entries and return the entry after that.
+ * Return NULL if this causes us to iterate past the beginning again.
+ */
+
+ktrace_entry_t *
+ktrace_skip(
+        ktrace_t        *ktp,
+        int             count,
+        ktrace_snap_t   *ktsp)
+{
+        int             index;
+        int             new_index;
+        ktrace_entry_t  *ktep;
+        int             nentries = ktrace_nentries(ktp);
+
+        index = ktsp->ks_index;
+        new_index = index + count;
+        while (new_index >= nentries) {
+                new_index -= nentries;
+        }
+        if (index == ktsp->ks_start) {
+                /*
+                 * We've iterated around to the start, so we're done.
+                 */
+                ktep = NULL;
+        } else if ((new_index < index) && (index < ktsp->ks_index)) {
+                /*
+                 * We've skipped past the start again, so we're done.
+                 */
+                ktep = NULL;
+                ktsp->ks_index = ktsp->ks_start;
+        } else {
+                ktep = &(ktp->kt_entries[new_index]);
+                new_index++;
+                if (new_index == nentries) {
+                        ktsp->ks_index = 0;
+                } else {
+                        ktsp->ks_index = new_index;
+                }
+        }
+        return ktep;
+}
+
+#endif
 /*
  * External functions & data not in header files.
  */
@@ -1323,7 +1464,7 @@ char *tab_vflags[] = {
 	"VFRLOCKS",		/*  0x8000000 */
 	"VENF_LOCKING",		/* 0x10000000 */
 	"VOPLOCK",		/* 0x20000000 */
-	"INVALID0x40000000",	/* 0x40000000 */
+	"VPURGE",		/* 0x40000000 */
 	"INVALID0x80000000",	/* 0x80000000 */
 	0
 };
@@ -1333,7 +1474,7 @@ static char *vnode_type[] = {
 	"VNON", "VREG", "VDIR", "VBLK", "VLNK", "VFIFO", "VBAD", "VSOCK"
 };
 
-void
+static void
 printflags(register uint64_t flags,
         register char **strings,
         register char *name)
@@ -1341,18 +1482,52 @@ printflags(register uint64_t flags,
         register uint64_t mask = 1;
 
         if (name)
-                printk("%s 0x%Lx <", name, flags);
+                kdb_printf("%s 0x%Lx <", name, flags);
+
         while (flags != 0 && *strings) {
                 if (mask & flags) {
-                        printk("%s ", *strings);
+                        kdb_printf("%s ", *strings);
                         flags &= ~mask;
                 }
                 mask <<= 1;
                 strings++;
         }
+
         if (name)
-                printk("> ");
+                kdb_printf("> ");
+
         return;
+}
+
+
+static void	printvnode(vnode_t *vp)
+{
+	bhv_desc_t	*bh;
+	kdb_symtab_t	 symtab;
+
+
+	kdb_printf("vnode: 0x%p type %s\n", vp, vnode_type[vp->v_type]);
+
+	if (bh = vp->v_bh.bh_first) {
+		kdb_printf("   v_inode 0x%p v_bh->bh_first 0x%p pobj 0x%p\n",
+						vp->v_inode, bh, bh->bd_pdata);
+
+		if (kdbnearsym((unsigned int)bh->bd_ops, &symtab))
+			kdb_printf("   ops %s ", symtab.sym_name);
+		else
+			kdb_printf("   ops %s/0x%p ",
+						"???", (void *)bh->bd_ops);
+	} else {
+		kdb_printf("   v_inode 0x%p v_bh->bh_first = NULLBHV ",
+						vp->v_inode);
+	}
+
+	printflags((__psunsigned_t)vp->v_flag, tab_vflags, "flag =");
+	kdb_printf("\n");
+
+#ifdef	CONFIG_XFS_VNODE_TRACING
+	kdb_printf("   v_trace 0x%p\n", vp->v_trace);
+#endif	/* CONFIG_XFS_VNODE_TRACING */
 }
 
 
@@ -1368,7 +1543,7 @@ static int	kdbm_vnode(
 	int diag;
 	vnode_t		*vp;
 	bhv_desc_t	*bh;
-	char		*symname;
+	kdb_symtab_t	 symtab;
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
@@ -1380,23 +1555,7 @@ static int	kdbm_vnode(
 
 	vp = (vnode_t *)addr;
 
-	printk("vnode: 0x%p v_count %d type %s\n", vp, vp->v_count,
-						   vnode_type[vp->v_type]);
-
-	if (bh = vp->v_bh.bh_first) {
-		symname = kdbnearsym((unsigned int)bh->bd_ops);
-
-		printk("   v_inode 0x%p v_bh->bh_first 0x%p pobj 0x%p\n",
-						vp->v_inode, bh, bh->bd_pdata);
-		printk("   ops %s\n", symname ? symname : "???");
-	} else {
-		printk("   v_inode 0x%p v_bh->bh_first = NULLBHV\n",
-						vp->v_inode);
-	}
-
-#ifdef	CONFIG_XFS_VNODE_TRACING
-	printk("   v_trace 0x%p\n", vp->v_trace);
-#endif	/* CONFIG_XFS_VNODE_TRACING */
+	printvnode(vp);
 
 	return 0;
 }
@@ -1408,73 +1567,102 @@ static int	kdbm_vnode(
 static int
 vn_trace_pr_entry(ktrace_entry_t *ktep)
 {
-	char		*symname;
+	char		funcname[128];
+	kdb_symtab_t	symtab;
 
 
 	if ((__psint_t)ktep->val[0] == 0)
 		return 0;
 
+	if (kdbnearsym((unsigned int)ktep->val[8], &symtab)) {
+		unsigned long offval;
+
+		offval = (unsigned int)ktep->val[8] - symtab.sym_start;
+
+		if (offval)
+			sprintf(funcname, "%s+0x%lx", symtab.sym_name, offval);
+		else
+			sprintf(funcname, "%s", symtab.sym_name);
+	} else
+		funcname[0] = '\0';
+
+
 	switch ((__psint_t)ktep->val[0]) {
 	case VNODE_KTRACE_ENTRY:
-		printk("entry to %s v_count = %d",
-				(char *)ktep->val[1], (__psint_t)ktep->val[3]);
+		kdb_printf("entry to %s i_count = %d",
+						(char *)ktep->val[1],
+						(__psint_t)ktep->val[3]);
+		break;
+
+	case VNODE_KTRACE_EXIT:
+		kdb_printf("exit from %s i_count = %d",
+						(char *)ktep->val[1],
+						(__psint_t)ktep->val[3]);
 		break;
 
 	case VNODE_KTRACE_HOLD:
 		if ((__psint_t)ktep->val[3] != 1)
-			printk("hold @%s:%d v_count %d => %d",
+			kdb_printf("hold @%s:%d(%s) i_count %d => %d ",
 						(char *)ktep->val[1],
 						(__psint_t)ktep->val[2],
+						funcname,
 						(__psint_t)ktep->val[3] - 1,
 						(__psint_t)ktep->val[3]);
 		else
-			printk("get @%s:%d",	(char *)ktep->val[1],
-						(__psint_t)ktep->val[2]);
+			kdb_printf("get @%s:%d(%s) i_count = %d",
+						(char *)ktep->val[1],
+						(__psint_t)ktep->val[2],
+						funcname,
+						(__psint_t)ktep->val[3]);
 		break;
 
 	case VNODE_KTRACE_REF:
-		printk("ref @%s:%d v_count = %d",
+		kdb_printf("ref @%s:%d(%s) i_count = %d",
 						(char *)ktep->val[1],
 						(__psint_t)ktep->val[2],
+						funcname,
 						(__psint_t)ktep->val[3]);
 		break;
 
 	case VNODE_KTRACE_RELE:
 		if ((__psint_t)ktep->val[3] != 1)
-			printk("rele @%s:%d v_count %d => %d",
+			kdb_printf("rele @%s:%d(%s) i_count %d => %d ",
 						(char *)ktep->val[1],
 						(__psint_t)ktep->val[2],
+						funcname,
 						(__psint_t)ktep->val[3],
 						(__psint_t)ktep->val[3] - 1);
 		else
-			printk("free @%s:%d",
-				(char *)ktep->val[1], (__psint_t)ktep->val[2]);
+			kdb_printf("free @%s:%d(%s) i_count = %d",
+						(char *)ktep->val[1],
+						(__psint_t)ktep->val[2],
+						funcname,
+						(__psint_t)ktep->val[3]);
 		break;
 
 	default:
-		printk("unknown vntrace record\n");
+		kdb_printf("unknown vntrace record\n");
 		return 1;
 	}
 
-	if (symname = kdbnearsym((unsigned int)ktep->val[4])) {
-		unsigned long val, offval;
+	kdb_printf("\n");
 
-		val = kdbgetsymval(symname);
-
-		offval  = (unsigned int)ktep->val[4];
-		offval -= val;
-
-		if (offval)
-			printk("  ra = %s+0x%lx\n", symname, offval);
-		else
-			printk("  ra = %s\n", symname);
-	} else
-		printk("  ra = ?? 0x%p\n", (void *)ktep->val[4]);
-
-	printk("  cpu = %d pid = %d ",
+	kdb_printf("  cpu = %d pid = %d ",
 			(__psint_t)ktep->val[6], (pid_t)ktep->val[7]);
 
 	printflags((__psunsigned_t)ktep->val[5], tab_vflags, "flag =");
+
+	if (kdbnearsym((unsigned int)ktep->val[4], &symtab)) {
+		unsigned long offval;
+
+		offval = (unsigned int)ktep->val[4] - symtab.sym_start;
+
+		if (offval)
+			kdb_printf("  ra = %s+0x%lx", symtab.sym_name, offval);
+		else
+			kdb_printf("  ra = %s", symtab.sym_name);
+	} else
+		kdb_printf("  ra = ?? 0x%p", (void *)ktep->val[4]);
 
 	return 1;
 }
@@ -1509,26 +1697,161 @@ static int	kdbm_vntrace(
 	vp = (vnode_t *)addr;
 
 	if (vp->v_trace == NULL) {
-		printk("The vnode trace buffer is not initialized\n");
+		kdb_printf("The vnode trace buffer is not initialized\n");
 
 		return 0;
 	}
 
-	printk("vntrace vp 0x%p\n", vp);
+	kdb_printf("vntrace vp 0x%p\n", vp);
 
 	ktep = ktrace_first(vp->v_trace, &kts);
 
 	while (ktep != NULL) {
 		if (vn_trace_pr_entry(ktep))
-			printk("\n");
+			kdb_printf("\n");
 
 		ktep = ktrace_next(vp->v_trace, &kts);
 	}
 
 	return 0;
 }
+/*
+ * Print out the trace buffer attached to the given vnode.
+ */
+static int	kdbm_vntraceaddr(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	int		diag;
+	int		nextarg = 1;
+	long		offset = 0;
+	unsigned long	addr;
+	struct ktrace	*kt;
+	ktrace_entry_t	*ktep;
+	ktrace_snap_t	kts;
+
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+
+	if (diag)
+		return diag;
+
+	kt = (struct ktrace *)addr;
+
+	kdb_printf("vntraceaddr kt 0x%p\n", kt);
+
+	ktep = ktrace_first(kt, &kts);
+
+	while (ktep != NULL) {
+		if (vn_trace_pr_entry(ktep))
+			kdb_printf("\n");
+
+		ktep = ktrace_next(kt, &kts);
+	}
+
+	return 0;
+}
 #endif	/* CONFIG_XFS_VNODE_TRACING */
 
+
+static void	printinode(struct inode *ip)
+{
+	unsigned char *iaddr;
+	unsigned long	addr;
+
+
+	if (ip == NULL)
+		return;
+
+	kdb_printf(" i_ino = %lu i_count = %u i_dev = 0x%x i_size %Ld\n",
+					ip->i_ino, ip->i_count,
+					ip->i_dev, ip->i_size);
+
+	kdb_printf(
+		" i_mode = 0x%x  i_nlink = %d  i_rdev = 0x%x i_state = 0x%lx\n",
+					ip->i_mode, ip->i_nlink,
+					ip->i_rdev, ip->i_state);
+
+	kdb_printf(" i_hash.nxt = 0x%p i_hash.prv = 0x%p\n",
+					ip->i_hash.next, ip->i_hash.prev);
+	kdb_printf(" i_list.nxt = 0x%p i_list.prv = 0x%p\n",
+					ip->i_list.next, ip->i_list.prev);
+	kdb_printf(" i_dentry.nxt = 0x%p i_dentry.prv = 0x%p\n",
+					ip->i_dentry.next,
+					ip->i_dentry.prev);
+
+	addr = (unsigned long)ip;
+
+	kdb_printf(" i_sb = 0x%p i_op = 0x%p i_data = 0x%lx nrpages = %lu\n",
+					ip->i_sb, ip->i_op,
+					addr + offsetof(struct inode, i_data),
+					ip->i_data.nrpages);
+
+	iaddr  = (char *)ip;
+	iaddr += offsetof(struct inode, u.xfs_i.vnode);
+
+	kdb_printf("  vnode ptr 0x%p\n", iaddr);
+}
+
+
+static int	kdbm_vn(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	int		diag;
+	int		nextarg = 1;
+	char		*symname;
+	long		offset = 0;
+	unsigned long	addr;
+	struct inode	*ip;
+	bhv_desc_t	*bh;
+	ktrace_entry_t	*ktep;
+	ktrace_snap_t	kts;
+	vnode_t		*vp;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+
+	if (diag)
+		return diag;
+
+	vp = (vnode_t *)addr;
+
+	ip = vp->v_inode;
+
+	kdb_printf("--> Inode @ 0x%p\n", ip);
+	printinode(ip);
+
+	kdb_printf("--> Vnode @ 0x%p\n", vp);
+	printvnode(vp);
+
+#ifdef	CONFIG_XFS_VNODE_TRACING
+	kdb_printf("--> Vntrace @ 0x%p/0x%p\n", vp, vp->v_trace);
+
+	if (vp->v_trace == NULL)
+		return 0;
+
+	ktep = ktrace_first(vp->v_trace, &kts);
+
+	while (ktep != NULL) {
+		if (vn_trace_pr_entry(ktep))
+			kdb_printf("\n");
+
+		ktep = ktrace_next(vp->v_trace, &kts);
+	}
+#endif	/* CONFIG_XFS_VNODE_TRACING */
+
+	return 0;
+}
 
 
 
@@ -1538,9 +1861,11 @@ static struct xif {
 	char	*args;
 	char	*help;
 } xfsidbg_funcs[] = {
+  {  "vn",	kdbm_vn,	"<vnode>", "Dump inode/vnode/trace"},
   {  "vnode",	kdbm_vnode,	"<vnode>", "Dump vnode"},
 #ifdef	CONFIG_XFS_VNODE_TRACING
   {  "vntrace",	kdbm_vntrace,	"<vntrace>", "Dump vnode Trace"},
+  {  "vntraceaddr",	kdbm_vntraceaddr, "<vntrace>", "Dump vnode Trace by Address"},
 #endif	/* CONFIG_XFS_VNODE_TRACING */
   {  "xagf",	kdbm_xfs_xagf,	"<agf>",
 				"Dump XFS allocation group freespace" },
@@ -1734,16 +2059,16 @@ xfs_broot(xfs_inode_t *ip, xfs_ifork_t *f)
 	format = f == &ip->i_df ? ip->i_d.di_format : ip->i_d.di_aformat;
 	if ((f->if_flags & XFS_IFBROOT) == 0 ||
 	    format != XFS_DINODE_FMT_BTREE) {
-		printk("inode 0x%p not btree format\n", ip); 
+		kdb_printf("inode 0x%p not btree format\n", ip); 
 		return;
 	}
 	broot = f->if_broot;
-	printk("block @0x%p magic %x level %d numrecs %d\n",
+	kdb_printf("block @0x%p magic %x level %d numrecs %d\n",
 		broot, INT_GET(broot->bb_magic, ARCH_CONVERT), INT_GET(broot->bb_level, ARCH_CONVERT), INT_GET(broot->bb_numrecs, ARCH_CONVERT));
 	kp = XFS_BMAP_BROOT_KEY_ADDR(broot, 1, f->if_broot_bytes);
 	pp = XFS_BMAP_BROOT_PTR_ADDR(broot, 1, f->if_broot_bytes);
 	for (i = 1; i <= INT_GET(broot->bb_numrecs, ARCH_CONVERT); i++)
-		printk("\t%d: startoff %Ld ptr %Lx %s\n",
+		kdb_printf("\t%d: startoff %Ld ptr %Lx %s\n",
 			i, INT_GET(kp[i - 1].br_startoff, ARCH_CONVERT), INT_GET(pp[i - 1], ARCH_CONVERT),
 			xfs_fmtfsblock(INT_GET(pp[i - 1], ARCH_CONVERT), ip->i_mount));
 }
@@ -1756,7 +2081,7 @@ xfs_btalloc(xfs_alloc_block_t *bt, int bsz)
 {
 	int i;
 
-	printk("magic 0x%x level %d numrecs %d leftsib 0x%x rightsib 0x%x\n",
+	kdb_printf("magic 0x%x level %d numrecs %d leftsib 0x%x rightsib 0x%x\n",
 		INT_GET(bt->bb_magic, ARCH_CONVERT), INT_GET(bt->bb_level, ARCH_CONVERT), INT_GET(bt->bb_numrecs, ARCH_CONVERT),
 		INT_GET(bt->bb_leftsib, ARCH_CONVERT), INT_GET(bt->bb_rightsib, ARCH_CONVERT));
 	if (INT_GET(bt->bb_level, ARCH_CONVERT) == 0) {
@@ -1765,7 +2090,7 @@ xfs_btalloc(xfs_alloc_block_t *bt, int bsz)
 			xfs_alloc_rec_t *r;
 
 			r = XFS_BTREE_REC_ADDR(bsz, xfs_alloc, bt, i, 0);
-			printk("rec %d startblock 0x%x blockcount %d\n",
+			kdb_printf("rec %d startblock 0x%x blockcount %d\n",
 				i, INT_GET(r->ar_startblock, ARCH_CONVERT), INT_GET(r->ar_blockcount, ARCH_CONVERT));
 		}
 	} else {
@@ -1778,7 +2103,7 @@ xfs_btalloc(xfs_alloc_block_t *bt, int bsz)
 
 			k = XFS_BTREE_KEY_ADDR(bsz, xfs_alloc, bt, i, mxr);
 			p = XFS_BTREE_PTR_ADDR(bsz, xfs_alloc, bt, i, mxr);
-			printk("key %d startblock 0x%x blockcount %d ptr 0x%x\n",
+			kdb_printf("key %d startblock 0x%x blockcount %d ptr 0x%x\n",
 				i, INT_GET(k->ar_startblock, ARCH_CONVERT), INT_GET(k->ar_blockcount, ARCH_CONVERT), *p);
 		}
 	}
@@ -1792,12 +2117,12 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 {
 	int i;
 
-	printk("magic 0x%x level %d numrecs %d leftsib %Lx ",
+	kdb_printf("magic 0x%x level %d numrecs %d leftsib %Lx ",
 		INT_GET(bt->bb_magic, ARCH_CONVERT),
 		INT_GET(bt->bb_level, ARCH_CONVERT),
 		INT_GET(bt->bb_numrecs, ARCH_CONVERT),
 		INT_GET(bt->bb_leftsib, ARCH_CONVERT));
-	printk("rightsib %Lx\n", INT_GET(bt->bb_rightsib, ARCH_CONVERT));
+	kdb_printf("rightsib %Lx\n", INT_GET(bt->bb_rightsib, ARCH_CONVERT));
 	if (INT_GET(bt->bb_level, ARCH_CONVERT) == 0) {
 		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_CONVERT); i++) {
 			xfs_bmbt_rec_64_t *r;
@@ -1809,9 +2134,9 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 			r = (xfs_bmbt_rec_64_t *)XFS_BTREE_REC_ADDR(bsz,
 				xfs_bmbt, bt, i, 0);
 			xfs_convert_extent(r, &o, &s, &c, &fl);
-			printk("rec %d startoff %Ld ", i, o);
-			printk("startblock %Lx ", s);
-			printk("blockcount %Ld flag %d\n", c, fl);
+			kdb_printf("rec %d startoff %Ld ", i, o);
+			kdb_printf("startblock %Lx ", s);
+			kdb_printf("blockcount %Ld flag %d\n", c, fl);
 		}
 	} else {
 		int mxr;
@@ -1823,9 +2148,9 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 
 			k = XFS_BTREE_KEY_ADDR(bsz, xfs_bmbt, bt, i, mxr);
 			p = XFS_BTREE_PTR_ADDR(bsz, xfs_bmbt, bt, i, mxr);
-			printk("key %d startoff %Ld ",
+			kdb_printf("key %d startoff %Ld ",
 				i, INT_GET(k->br_startoff, ARCH_CONVERT));
-			printk("ptr %Lx\n", INT_GET(*p, ARCH_CONVERT));
+			kdb_printf("ptr %Lx\n", INT_GET(*p, ARCH_CONVERT));
 		}
 	}
 }
@@ -1838,7 +2163,7 @@ xfs_btino(xfs_inobt_block_t *bt, int bsz)
 {
 	int i;
 
-	printk("magic 0x%x level %d numrecs %d leftsib 0x%x rightsib 0x%x\n",
+	kdb_printf("magic 0x%x level %d numrecs %d leftsib 0x%x rightsib 0x%x\n",
 		INT_GET(bt->bb_magic, ARCH_CONVERT), INT_GET(bt->bb_level, ARCH_CONVERT), INT_GET(bt->bb_numrecs, ARCH_CONVERT),
 		INT_GET(bt->bb_leftsib, ARCH_CONVERT), INT_GET(bt->bb_rightsib, ARCH_CONVERT));
 	if (INT_GET(bt->bb_level, ARCH_CONVERT) == 0) {
@@ -1847,7 +2172,7 @@ xfs_btino(xfs_inobt_block_t *bt, int bsz)
 			xfs_inobt_rec_t *r;
 
 			r = XFS_BTREE_REC_ADDR(bsz, xfs_inobt, bt, i, 0);
-			printk("rec %d startino 0x%x freecount %d, free %Lx\n",
+			kdb_printf("rec %d startino 0x%x freecount %d, free %Lx\n",
 				i, INT_GET(r->ir_startino, ARCH_CONVERT), INT_GET(r->ir_freecount, ARCH_CONVERT),
 				INT_GET(r->ir_free, ARCH_CONVERT));
 		}
@@ -1861,7 +2186,7 @@ xfs_btino(xfs_inobt_block_t *bt, int bsz)
 
 			k = XFS_BTREE_KEY_ADDR(bsz, xfs_inobt, bt, i, mxr);
 			p = XFS_BTREE_PTR_ADDR(bsz, xfs_inobt, bt, i, mxr);
-			printk("key %d startino 0x%x ptr 0x%x\n",
+			kdb_printf("key %d startino 0x%x ptr 0x%x\n",
 				i, INT_GET(k->ir_startino, ARCH_CONVERT), INT_GET(*p, ARCH_CONVERT));
 		}
 	}
@@ -1888,28 +2213,28 @@ xfs_buf_item_print(xfs_buf_log_item_t *blip, int summary)
 		};
 
 	if (summary) {
-		printk("buf 0x%p blkno 0x%Lx ", blip->bli_buf,
+		kdb_printf("buf 0x%p blkno 0x%Lx ", blip->bli_buf,
 			     blip->bli_format.blf_blkno);
 		printflags(blip->bli_flags, bli_flags, "flags:");
-		printk("\n   ");
+		kdb_printf("\n   ");
 		xfsidbg_xbuf_real(blip->bli_buf, 1);
 		return;
 	}
-	printk("buf 0x%p recur %d refcount %d flags:",
+	kdb_printf("buf 0x%p recur %d refcount %d flags:",
 		blip->bli_buf, blip->bli_recur, blip->bli_refcount);
 	printflags(blip->bli_flags, bli_flags, NULL);
-	printk("\n");
-	printk("size %d blkno 0x%Lx len 0x%x map size %d map 0x%p\n",
+	kdb_printf("\n");
+	kdb_printf("size %d blkno 0x%Lx len 0x%x map size %d map 0x%p\n",
 		blip->bli_format.blf_size, blip->bli_format.blf_blkno,
 		(uint) blip->bli_format.blf_len, blip->bli_format.blf_map_size,
 		&(blip->bli_format.blf_data_map[0]));
-	printk("blf flags: ");
+	kdb_printf("blf flags: ");
 	printflags((uint)blip->bli_format.blf_flags, blf_flags, NULL);
 #ifdef XFS_TRANS_DEBUG
-	printk("orig 0x%x logged 0x%x",
+	kdb_printf("orig 0x%x logged 0x%x",
 		blip->bli_orig, blip->bli_logged);
 #endif
-	printk("\n");
+	kdb_printf("\n");
 }
 
 /*
@@ -1945,22 +2270,22 @@ xfs_dastate_path(xfs_da_state_path_t *p)
 {
 	int i;
 
-	printk("active %d\n", p->active);
+	kdb_printf("active %d\n", p->active);
 	for (i = 0; i < XFS_DA_NODE_MAXDEPTH; i++) {
 #if XFS_BIG_FILES
-		printk(" blk %d bp 0x%p blkno 0x%x",
+		kdb_printf(" blk %d bp 0x%p blkno 0x%x",
 #else
-		printk(" blk %d bp 0x%p blkno 0x%Lx",
+		kdb_printf(" blk %d bp 0x%p blkno 0x%Lx",
 #endif
 			i, p->blk[i].bp, p->blk[i].blkno);
-		printk(" index %d hashval 0x%x ",
+		kdb_printf(" index %d hashval 0x%x ",
 			p->blk[i].index, (uint_t)p->blk[i].hashval);
 		switch(p->blk[i].magic) {
-		case XFS_DA_NODE_MAGIC:		printk("NODE\n");	break;
-		case XFS_DIR_LEAF_MAGIC:	printk("DIR\n");	break;
-		case XFS_ATTR_LEAF_MAGIC:	printk("ATTR\n");	break;
-		case XFS_DIR2_LEAFN_MAGIC:	printk("DIR2\n");	break;
-		default:			printk("type ??\n");	break;
+		case XFS_DA_NODE_MAGIC:		kdb_printf("NODE\n");	break;
+		case XFS_DIR_LEAF_MAGIC:	kdb_printf("DIR\n");	break;
+		case XFS_ATTR_LEAF_MAGIC:	kdb_printf("ATTR\n");	break;
+		case XFS_DIR2_LEAFN_MAGIC:	kdb_printf("DIR2\n");	break;
+		default:			kdb_printf("type ??\n");	break;
 		}
 	}
 }
@@ -1976,19 +2301,19 @@ xfs_efd_item_print(xfs_efd_log_item_t *efdp, int summary)
 	xfs_extent_t	*ep;
 
 	if (summary) {
-		printk("Extent Free Done: ID 0x%Lx nextents %d (at 0x%p)\n",
+		kdb_printf("Extent Free Done: ID 0x%Lx nextents %d (at 0x%p)\n",
 				efdp->efd_format.efd_efi_id,
 				efdp->efd_format.efd_nextents, efdp);
 		return;
 	}
-	printk("size %d nextents %d next extent %d efip 0x%p\n",
+	kdb_printf("size %d nextents %d next extent %d efip 0x%p\n",
 		efdp->efd_format.efd_size, efdp->efd_format.efd_nextents,
 		efdp->efd_next_extent, efdp->efd_efip);
-	printk("efi_id 0x%Lx\n", efdp->efd_format.efd_efi_id);
-	printk("efd extents:\n");
+	kdb_printf("efi_id 0x%Lx\n", efdp->efd_format.efd_efi_id);
+	kdb_printf("efd extents:\n");
 	ep = &(efdp->efd_format.efd_extents[0]);
 	for (i = 0; i < efdp->efd_next_extent; i++, ep++) {
-		printk("    block %Lx len %d\n",
+		kdb_printf("    block %Lx len %d\n",
 			ep->ext_start, ep->ext_len);
 	}
 }
@@ -2009,21 +2334,21 @@ xfs_efi_item_print(xfs_efi_log_item_t *efip, int summary)
 		};
 
 	if (summary) {
-		printk("Extent Free Intention: ID 0x%Lx nextents %d (at 0x%p)\n",
+		kdb_printf("Extent Free Intention: ID 0x%Lx nextents %d (at 0x%p)\n",
 				efip->efi_format.efi_id,
 				efip->efi_format.efi_nextents, efip);
 		return;
 	}
-	printk("size %d nextents %d next extent %d\n",
+	kdb_printf("size %d nextents %d next extent %d\n",
 		efip->efi_format.efi_size, efip->efi_format.efi_nextents,
 		efip->efi_next_extent);
-	printk("id %Lx", efip->efi_format.efi_id);
+	kdb_printf("id %Lx", efip->efi_format.efi_id);
 	printflags(efip->efi_flags, efi_flags, "flags :");
-	printk("\n");
-	printk("efi extents:\n");
+	kdb_printf("\n");
+	kdb_printf("efi extents:\n");
 	ep = &(efip->efi_format.efi_extents[0]);
 	for (i = 0; i < efip->efi_next_extent; i++, ep++) {
-		printk("    block %Lx len %d\n",
+		kdb_printf("    block %Lx len %d\n",
 			ep->ext_start, ep->ext_len);
 	}
 }
@@ -2146,8 +2471,11 @@ xfs_fmtuuid(uuid_t *uu)
 	static char rval[40];
 	uint *ip = (uint *)uu;
 
-	ASSERT(sizeof(*uu) == 16);
-	sprintf(rval, "%32x:%32x:%32x:%32x", ip[0], ip[1], ip[2], ip[3]);
+	if (sizeof(*uu) != 16)
+		sprintf(rval, "(sizeof(*uu) != 16) @ line # %d", __LINE__);
+	else
+		sprintf(rval, "%32x:%32x:%32x:%32x",
+						ip[0], ip[1], ip[2], ip[3]);
 	return rval;
 }
 
@@ -2177,35 +2505,35 @@ xfs_inode_item_print(xfs_inode_log_item_t *ilip, int summary)
 		};
 
 	if (summary) {
-		printk("inode 0x%p logged %d ",
+		kdb_printf("inode 0x%p logged %d ",
 			ilip->ili_inode, ilip->ili_logged);
 		printflags(ilip->ili_flags, ili_flags, "flags:");
 		printflags(ilip->ili_format.ilf_fields, ilf_fields, "format:");
 		printflags(ilip->ili_last_fields, ilf_fields, "lastfield:");
-		printk("\n");
+		kdb_printf("\n");
 		return;
 	}
-	printk("inode 0x%p ino 0x%Lx logged %d flags: ",
+	kdb_printf("inode 0x%p ino 0x%Lx logged %d flags: ",
 		ilip->ili_inode, ilip->ili_format.ilf_ino, ilip->ili_logged);
 	printflags(ilip->ili_flags, ili_flags, NULL);
-	printk("\n");
-	printk("ilock recur %d iolock recur %d ext buf 0x%p\n",
+	kdb_printf("\n");
+	kdb_printf("ilock recur %d iolock recur %d ext buf 0x%p\n",
 		ilip->ili_ilock_recur, ilip->ili_iolock_recur,
 		ilip->ili_extents_buf);
 #ifdef XFS_TRANS_DEBUG
-	printk("root bytes %d root orig 0x%x\n",
+	kdb_printf("root bytes %d root orig 0x%x\n",
 		ilip->ili_root_size, ilip->ili_orig_root);
 #endif
-	printk("size %d fields: ", ilip->ili_format.ilf_size);
+	kdb_printf("size %d fields: ", ilip->ili_format.ilf_size);
 	printflags(ilip->ili_format.ilf_fields, ilf_fields, "formatfield");
-	printk(" last fields: ");
+	kdb_printf(" last fields: ");
 	printflags(ilip->ili_last_fields, ilf_fields, "lastfield");
-	printk("\n");
-	printk("dsize %d, asize %d, rdev 0x%x\n",
+	kdb_printf("\n");
+	kdb_printf("dsize %d, asize %d, rdev 0x%x\n",
 		ilip->ili_format.ilf_dsize,
 		ilip->ili_format.ilf_asize,
 		ilip->ili_format.ilf_u.ilfu_rdev);
-	printk("blkno 0x%Lx len 0x%x boffset 0x%x\n",
+	kdb_printf("blkno 0x%Lx len 0x%x boffset 0x%x\n",
 		ilip->ili_format.ilf_blkno,
 		ilip->ili_format.ilf_len,
 		ilip->ili_format.ilf_boffset);
@@ -2218,7 +2546,7 @@ xfs_inode_item_print(xfs_inode_log_item_t *ilip, int summary)
 static void
 xfs_dquot_item_print(xfs_dq_logitem_t *lip, int summary)
 {
-	printk("dquot 0x%p\n",
+	kdb_printf("dquot 0x%p\n",
 		lip->qli_dquot);
 
 }
@@ -2230,7 +2558,7 @@ xfs_dquot_item_print(xfs_dq_logitem_t *lip, int summary)
 static void
 xfs_qoff_item_print(xfs_qoff_logitem_t *lip, int summary)
 {
-	printk("start qoff item 0x%p flags 0x%x\n",
+	kdb_printf("start qoff item 0x%p flags 0x%x\n",
 		lip->qql_start_lip, lip->qql_format.qf_flags);
 
 }
@@ -2272,7 +2600,7 @@ xfs_prdinode(xfs_dinode_t *di, int coreonly)
 {
 	xfs_prdinode_core(&di->di_core);
 	if (!coreonly)
-		printk("next_unlinked 0x%x u@0x%p\n", di->di_next_unlinked,
+		kdb_printf("next_unlinked 0x%x u@0x%p\n", di->di_next_unlinked,
 			&di->di_u);
 }
 
@@ -2288,27 +2616,27 @@ xfs_prdinode_core(xfs_dinode_core_t *dip)
 		NULL
 	};
 
-	printk("magic 0x%x mode 0%o (%s) version 0x%x format 0x%x (%s)\n",
+	kdb_printf("magic 0x%x mode 0%o (%s) version 0x%x format 0x%x (%s)\n",
 		dip->di_magic, dip->di_mode, xfs_fmtmode(dip->di_mode),
 		dip->di_version, dip->di_format,
 		xfs_fmtformat((xfs_dinode_fmt_t)dip->di_format));
-	printk("nlink 0x%x uid 0x%x gid 0x%x projid 0x%x\n",
+	kdb_printf("nlink 0x%x uid 0x%x gid 0x%x projid 0x%x\n",
 		dip->di_nlink, dip->di_uid, dip->di_gid,
 		(uint)dip->di_projid);
-	printk("atime 0x%x:%x mtime 0x%x:%x ctime 0x%x:%x\n",
+	kdb_printf("atime 0x%x:%x mtime 0x%x:%x ctime 0x%x:%x\n",
 		dip->di_atime.t_sec, dip->di_atime.t_nsec,
 		dip->di_mtime.t_sec, dip->di_mtime.t_nsec,
 		dip->di_ctime.t_sec, dip->di_ctime.t_nsec);
-	printk("size 0x%Lx ", dip->di_size);
-	printk("nblocks %Ld extsize 0x%x nextents 0x%x anextents 0x%x\n",
+	kdb_printf("size 0x%Lx ", dip->di_size);
+	kdb_printf("nblocks %Ld extsize 0x%x nextents 0x%x anextents 0x%x\n",
 		dip->di_nblocks, dip->di_extsize,
 		dip->di_nextents, dip->di_anextents);
-	printk("forkoff %d aformat 0x%x (%s) dmevmask 0x%x dmstate 0x%x ",
+	kdb_printf("forkoff %d aformat 0x%x (%s) dmevmask 0x%x dmstate 0x%x ",
 		dip->di_forkoff, dip->di_aformat,
 		xfs_fmtformat((xfs_dinode_fmt_t)dip->di_aformat),
 		dip->di_dmevmask, dip->di_dmstate);
 	printflags(dip->di_flags, diflags, "flags");
-	printk("gen 0x%x\n", dip->di_gen);
+	kdb_printf("gen 0x%x\n", dip->di_gen);
 }
 
 /*
@@ -2327,13 +2655,13 @@ xfs_xexlist_fork(xfs_inode_t *ip, int whichfork)
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	if (ifp->if_flags & XFS_IFEXTENTS) {
 		nextents = ifp->if_bytes / sizeof(xfs_bmbt_rec_64_t);
-		printk("inode 0x%p %cf extents 0x%p nextents 0x%x\n",
+		kdb_printf("inode 0x%p %cf extents 0x%p nextents 0x%x\n",
 			ip, "da"[whichfork], ifp->if_u1.if_extents, nextents);
 		for (i = 0; i < nextents; i++) {
 			xfs_convert_extent(
 				(xfs_bmbt_rec_64_t *)&ifp->if_u1.if_extents[i],
 				&o, &s, &c, &flag);
-			printk(
+			kdb_printf(
 		"%d: startoff %Ld startblock %s blockcount %Ld flag %d\n",
 				i, o, xfs_fmtfsblock(s, ip->i_mount), c, flag);
 		}
@@ -2351,29 +2679,29 @@ xfs_xnode_fork(char *name, xfs_ifork_t *f)
 	};
 	int *p;
 
-	printk("%s fork", name);
+	kdb_printf("%s fork", name);
 	if (f == NULL) {
-		printk(" empty\n");
+		kdb_printf(" empty\n");
 		return;
 	} else
-		printk("\n");
-	printk(" bytes %s ", xfs_fmtsize(f->if_bytes));
-	printk("real_bytes %s lastex 0x%x u1:%s 0x%p\n",
+		kdb_printf("\n");
+	kdb_printf(" bytes %s ", xfs_fmtsize(f->if_bytes));
+	kdb_printf("real_bytes %s lastex 0x%x u1:%s 0x%p\n",
 		xfs_fmtsize(f->if_real_bytes), f->if_lastex,
 		f->if_flags & XFS_IFINLINE ? "data" : "extents",
 		f->if_flags & XFS_IFINLINE ?
 			f->if_u1.if_data :
 			(char *)f->if_u1.if_extents);
-	printk(" broot 0x%p broot_bytes %s ext_max %d ",
+	kdb_printf(" broot 0x%p broot_bytes %s ext_max %d ",
 		f->if_broot, xfs_fmtsize(f->if_broot_bytes), f->if_ext_max);
 	printflags(f->if_flags, tab_flags, "flags");
-	printk("\n");
-	printk(" u2");
+	kdb_printf("\n");
+	kdb_printf(" u2");
 	for (p = (int *)&f->if_u2;
 	     p < (int *)((char *)&f->if_u2 + XFS_INLINE_DATA);
 	     p++)
-		printk(" 0x%x", *p);
-	printk("\n");
+		kdb_printf(" 0x%x", *p);
+	kdb_printf("\n");
 }
 
 /*
@@ -2386,17 +2714,17 @@ xfs_xnode_fork(char *name, xfs_ifork_t *f)
 static void
 xfsidbg_xagf(xfs_agf_t *agf)
 {
-	printk("magicnum 0x%x versionnum 0x%x seqno 0x%x length 0x%x\n",
+	kdb_printf("magicnum 0x%x versionnum 0x%x seqno 0x%x length 0x%x\n",
 		INT_GET(agf->agf_magicnum, ARCH_CONVERT),
 		INT_GET(agf->agf_versionnum, ARCH_CONVERT),
 		INT_GET(agf->agf_seqno, ARCH_CONVERT),
 		INT_GET(agf->agf_length, ARCH_CONVERT));
-	printk("roots b 0x%x c 0x%x levels b %d c %d\n",
+	kdb_printf("roots b 0x%x c 0x%x levels b %d c %d\n",
 		INT_GET(agf->agf_roots[XFS_BTNUM_BNO], ARCH_CONVERT),
 		INT_GET(agf->agf_roots[XFS_BTNUM_CNT], ARCH_CONVERT),
 		INT_GET(agf->agf_levels[XFS_BTNUM_BNO], ARCH_CONVERT),
 		INT_GET(agf->agf_levels[XFS_BTNUM_CNT], ARCH_CONVERT));
-	printk("flfirst %d fllast %d flcount %d freeblks %d longest %d\n",
+	kdb_printf("flfirst %d fllast %d flcount %d freeblks %d longest %d\n",
 		INT_GET(agf->agf_flfirst, ARCH_CONVERT),
 		INT_GET(agf->agf_fllast, ARCH_CONVERT),
 		INT_GET(agf->agf_flcount, ARCH_CONVERT),
@@ -2413,27 +2741,27 @@ xfsidbg_xagi(xfs_agi_t *agi)
     	int	i;
 	int	j;
 
-	printk("magicnum 0x%x versionnum 0x%x seqno 0x%x length 0x%x\n",
+	kdb_printf("magicnum 0x%x versionnum 0x%x seqno 0x%x length 0x%x\n",
 		INT_GET(agi->agi_magicnum, ARCH_CONVERT),
 		INT_GET(agi->agi_versionnum, ARCH_CONVERT),
 		INT_GET(agi->agi_seqno, ARCH_CONVERT),
 		INT_GET(agi->agi_length, ARCH_CONVERT));
-	printk("count 0x%x root 0x%x level 0x%x\n",
+	kdb_printf("count 0x%x root 0x%x level 0x%x\n",
 		INT_GET(agi->agi_count, ARCH_CONVERT),
 		INT_GET(agi->agi_root, ARCH_CONVERT),
 		INT_GET(agi->agi_level, ARCH_CONVERT));
-	printk("freecount 0x%x newino 0x%x dirino 0x%x\n",
+	kdb_printf("freecount 0x%x newino 0x%x dirino 0x%x\n",
 		INT_GET(agi->agi_freecount, ARCH_CONVERT),
 		INT_GET(agi->agi_newino, ARCH_CONVERT),
 		INT_GET(agi->agi_dirino, ARCH_CONVERT));
 
-	printk("unlinked buckets\n");
+	kdb_printf("unlinked buckets\n");
 	for (i = 0; i < XFS_AGI_UNLINKED_BUCKETS; i++) {
 		for (j = 0; j < 4; j++, i++) {
-			printk("0x%08x ",
+			kdb_printf("0x%08x ",
 				INT_GET(agi->agi_unlinked[i], ARCH_CONVERT));
 		}
-		printk("\n");
+		kdb_printf("\n");
 	}
 }
 
@@ -2444,17 +2772,17 @@ xfsidbg_xagi(xfs_agi_t *agi)
 static void
 xfsidbg_xalloc(xfs_alloc_arg_t *args)
 {
-	printk("tp 0x%p mp 0x%p agbp 0x%p pag 0x%p fsbno %s\n",
+	kdb_printf("tp 0x%p mp 0x%p agbp 0x%p pag 0x%p fsbno %s\n",
 		args->tp, args->mp, args->agbp, args->pag,
 		xfs_fmtfsblock(args->fsbno, args->mp));
-	printk("agno 0x%x agbno 0x%x minlen 0x%x maxlen 0x%x mod 0x%x\n",
+	kdb_printf("agno 0x%x agbno 0x%x minlen 0x%x maxlen 0x%x mod 0x%x\n",
 		args->agno, args->agbno, args->minlen, args->maxlen, args->mod);
-	printk("prod 0x%x minleft 0x%x total 0x%x alignment 0x%x\n",
+	kdb_printf("prod 0x%x minleft 0x%x total 0x%x alignment 0x%x\n",
 		args->prod, args->minleft, args->total, args->alignment);
-	printk("minalignslop 0x%x len 0x%x type %s otype %s wasdel %d\n",
+	kdb_printf("minalignslop 0x%x len 0x%x type %s otype %s wasdel %d\n",
 		args->minalignslop, args->len, xfs_alloctype[args->type],
 		xfs_alloctype[args->otype], args->wasdel);
-	printk("wasfromfl %d isfl %d userdata %d\n",
+	kdb_printf("wasfromfl %d isfl %d userdata %d\n",
 		args->wasfromfl, args->isfl, args->userdata);
 }
 
@@ -2483,14 +2811,14 @@ xfsidbg_xattrcontext(struct xfs_attr_list_context *context)
 		NULL
 	};
 
-	printk("dp 0x%p, dupcnt %d, resynch %d",
+	kdb_printf("dp 0x%p, dupcnt %d, resynch %d",
 		    context->dp, context->dupcnt, context->resynch);
 	printflags((__psunsigned_t)context->flags, attr_arg_flags, ", flags");
-	printk("\ncursor h/b/o 0x%x/0x%x/%d -- p/p/i 0x%x/0x%x/0x%x\n",
+	kdb_printf("\ncursor h/b/o 0x%x/0x%x/%d -- p/p/i 0x%x/0x%x/0x%x\n",
 			  context->cursor->hashval, context->cursor->blkno,
 			  context->cursor->offset, context->cursor->pad1,
 			  context->cursor->pad2, context->cursor->initted);
-	printk("alist 0x%p, bufsize 0x%x, count %d, firstu 0x%x\n",
+	kdb_printf("alist 0x%p, bufsize 0x%x, count %d, firstu 0x%x\n",
 		       context->alist, context->bufsize, context->count,
 		       context->firstu);
 }
@@ -2511,42 +2839,42 @@ xfsidbg_xattrleaf(struct xfs_attr_leafblock *leaf)
 
 	h = &leaf->hdr;
 	i = &h->info;
-	printk("hdr info forw 0x%x back 0x%x magic 0x%x\n",
+	kdb_printf("hdr info forw 0x%x back 0x%x magic 0x%x\n",
 		i->forw, i->back, i->magic);
-	printk("hdr count %d usedbytes %d firstused %d holes %d\n",
+	kdb_printf("hdr count %d usedbytes %d firstused %d holes %d\n",
 		h->count, h->usedbytes, h->firstused, h->holes);
 	for (j = 0, m = h->freemap; j < XFS_ATTR_LEAF_MAPSIZE; j++, m++) {
-		printk("hdr freemap %d base %d size %d\n",
+		kdb_printf("hdr freemap %d base %d size %d\n",
 			j, m->base, m->size);
 	}
 	for (j = 0, e = leaf->entries; j < h->count; j++, e++) {
-		printk("[%2d] hash 0x%x nameidx %d flags 0x%x",
+		kdb_printf("[%2d] hash 0x%x nameidx %d flags 0x%x",
 			j, e->hashval, e->nameidx, e->flags);
 		if (e->flags & XFS_ATTR_LOCAL)
-			printk("LOCAL ");
+			kdb_printf("LOCAL ");
 		if (e->flags & XFS_ATTR_ROOT)
-			printk("ROOT ");
+			kdb_printf("ROOT ");
 		if (e->flags & XFS_ATTR_INCOMPLETE)
-			printk("INCOMPLETE ");
+			kdb_printf("INCOMPLETE ");
 		k = ~(XFS_ATTR_LOCAL | XFS_ATTR_ROOT | XFS_ATTR_INCOMPLETE);
 		if ((e->flags & k) != 0)
-			printk("0x%x", e->flags & k);
-		printk(">\n     name \"");
+			kdb_printf("0x%x", e->flags & k);
+		kdb_printf(">\n     name \"");
 		if (e->flags & XFS_ATTR_LOCAL) {
 			l = XFS_ATTR_LEAF_NAME_LOCAL(leaf, j);
 			for (k = 0; k < l->namelen; k++)
-				printk("%c", l->nameval[k]);
-			printk("\"(%d) value \"", l->namelen);
+				kdb_printf("%c", l->nameval[k]);
+			kdb_printf("\"(%d) value \"", l->namelen);
 			for (k = 0; (k < l->valuelen) && (k < 32); k++)
-				printk("%c", l->nameval[l->namelen + k]);
+				kdb_printf("%c", l->nameval[l->namelen + k]);
 			if (k == 32)
-				printk("...");
-			printk("\"(%d)\n", l->valuelen);
+				kdb_printf("...");
+			kdb_printf("\"(%d)\n", l->valuelen);
 		} else {
 			r = XFS_ATTR_LEAF_NAME_REMOTE(leaf, j);
 			for (k = 0; k < r->namelen; k++)
-				printk("%c", r->name[k]);
-			printk("\"(%d) value blk 0x%x len %d\n",
+				kdb_printf("%c", r->name[k]);
+			kdb_printf("\"(%d) value blk 0x%x len %d\n",
 				   r->namelen, r->valueblk, r->valuelen);
 		}
 	}
@@ -2563,17 +2891,17 @@ xfsidbg_xattrsf(struct xfs_attr_shortform *s)
 	int i, j;
 
 	sfh = &s->hdr;
-	printk("hdr count %d\n", sfh->count);
+	kdb_printf("hdr count %d\n", sfh->count);
 	for (i = 0, sfe = s->list; i < sfh->count; i++) {
-		printk("entry %d namelen %d name \"", i, sfe->namelen);
+		kdb_printf("entry %d namelen %d name \"", i, sfe->namelen);
 		for (j = 0; j < sfe->namelen; j++)
-			printk("%c", sfe->nameval[j]);
-		printk("\" valuelen %d value \"", sfe->valuelen);
+			kdb_printf("%c", sfe->nameval[j]);
+		kdb_printf("\" valuelen %d value \"", sfe->valuelen);
 		for (j = 0; (j < sfe->valuelen) && (j < 32); j++)
-			printk("%c", sfe->nameval[sfe->namelen + j]);
+			kdb_printf("%c", sfe->nameval[sfe->namelen + j]);
 		if (j == 32)
-			printk("...");
-		printk("\"\n");
+			kdb_printf("...");
+		kdb_printf("\"\n");
 		sfe = XFS_ATTR_SF_NEXTENTRY(sfe);
 	}
 }
@@ -2585,7 +2913,7 @@ xfsidbg_xattrsf(struct xfs_attr_shortform *s)
 static void
 xfsidbg_xbirec(xfs_bmbt_irec_t *r)
 {
-	printk(
+	kdb_printf(
 	"startoff %Ld startblock %Lx blockcount %Ld state %Ld\n",
 		(__uint64_t)r->br_startoff,
 		(__uint64_t)r->br_startblock,
@@ -2600,15 +2928,15 @@ xfsidbg_xbirec(xfs_bmbt_irec_t *r)
 static void
 xfsidbg_xbmalla(xfs_bmalloca_t *a)
 {
-	printk("tp 0x%p ip 0x%p eof %d prevp 0x%p\n",
+	kdb_printf("tp 0x%p ip 0x%p eof %d prevp 0x%p\n",
 		a->tp, a->ip, a->eof, a->prevp);
-	printk("gotp 0x%p firstblock %s alen %d total %d\n",
+	kdb_printf("gotp 0x%p firstblock %s alen %d total %d\n",
 		a->gotp, xfs_fmtfsblock(a->firstblock, a->ip->i_mount),
 		a->alen, a->total);
-	printk("off %s wasdel %d userdata %d minlen %d\n",
+	kdb_printf("off %s wasdel %d userdata %d minlen %d\n",
 		xfs_fmtfsblock(a->off, a->ip->i_mount), a->wasdel,
 		a->userdata, a->minlen);
-	printk("minleft %d low %d rval %s aeof %d\n",
+	kdb_printf("minleft %d low %d rval %s aeof %d\n",
 		a->minleft, a->low, xfs_fmtfsblock(a->rval, a->ip->i_mount),
 		a->aeof);
 }
@@ -2626,7 +2954,7 @@ xfsidbg_xbrec(xfs_bmbt_rec_64_t *r)
 	int flag;
 
 	xfs_convert_extent(r, &o, &s, &c, &flag);
-	printk("startoff %Ld startblock %Lx blockcount %Ld flag %d\n",
+	kdb_printf("startoff %Ld startblock %Lx blockcount %Ld flag %d\n",
 		o, s, c, flag);
 }
 
@@ -2657,54 +2985,54 @@ xfsidbg_xbtcur(xfs_btree_cur_t *c)
 {
 	int l;
 
-	printk("tp 0x%p mp 0x%p\n",
+	kdb_printf("tp 0x%p mp 0x%p\n",
 		c->bc_tp,
 		c->bc_mp);
 	if (c->bc_btnum == XFS_BTNUM_BMAP) {
-		printk("rec.b ");
+		kdb_printf("rec.b ");
 		xfsidbg_xbirec(&c->bc_rec.b);
 	} else if (c->bc_btnum == XFS_BTNUM_INO) {
-		printk("rec.i startino 0x%x freecount 0x%x free %Lx\n",
+		kdb_printf("rec.i startino 0x%x freecount 0x%x free %Lx\n",
 			c->bc_rec.i.ir_startino, c->bc_rec.i.ir_freecount,
 			c->bc_rec.i.ir_free);
 	} else {
-		printk("rec.a startblock 0x%x blockcount 0x%x\n",
+		kdb_printf("rec.a startblock 0x%x blockcount 0x%x\n",
 			c->bc_rec.a.ar_startblock,
 			c->bc_rec.a.ar_blockcount);
 	}
-	printk("bufs");
+	kdb_printf("bufs");
 	for (l = 0; l < c->bc_nlevels; l++)
-		printk(" 0x%p", c->bc_bufs[l]);
-	printk("\n");
-	printk("ptrs");
+		kdb_printf(" 0x%p", c->bc_bufs[l]);
+	kdb_printf("\n");
+	kdb_printf("ptrs");
 	for (l = 0; l < c->bc_nlevels; l++)
-		printk(" 0x%x", c->bc_ptrs[l]);
-	printk("  ra");
+		kdb_printf(" 0x%x", c->bc_ptrs[l]);
+	kdb_printf("  ra");
 	for (l = 0; l < c->bc_nlevels; l++)
-		printk(" %d", c->bc_ra[l]);
-	printk("\n");
-	printk("nlevels %d btnum %s blocklog %d\n",
+		kdb_printf(" %d", c->bc_ra[l]);
+	kdb_printf("\n");
+	kdb_printf("nlevels %d btnum %s blocklog %d\n",
 		c->bc_nlevels,
 		c->bc_btnum == XFS_BTNUM_BNO ? "bno" :
 		(c->bc_btnum == XFS_BTNUM_CNT ? "cnt" :
 		 (c->bc_btnum == XFS_BTNUM_BMAP ? "bmap" : "ino")),
 		c->bc_blocklog);
 	if (c->bc_btnum == XFS_BTNUM_BMAP) {
-		printk("private forksize 0x%x whichfork %d ip 0x%p flags %d\n",
+		kdb_printf("private forksize 0x%x whichfork %d ip 0x%p flags %d\n",
 			c->bc_private.b.forksize,
 			c->bc_private.b.whichfork,
 			c->bc_private.b.ip,
 			c->bc_private.b.flags);
-		printk("private firstblock %s flist 0x%p allocated 0x%x\n",
+		kdb_printf("private firstblock %s flist 0x%p allocated 0x%x\n",
 			xfs_fmtfsblock(c->bc_private.b.firstblock, c->bc_mp),
 			c->bc_private.b.flist,
 			c->bc_private.b.allocated);
 	} else if (c->bc_btnum == XFS_BTNUM_INO) {
-		printk("private agbp 0x%p agno 0x%x\n",
+		kdb_printf("private agbp 0x%p agno 0x%x\n",
 			c->bc_private.i.agbp,
 			c->bc_private.i.agno);
 	} else {
-		printk("private agbp 0x%p agno 0x%x\n",
+		kdb_printf("private agbp 0x%p agno 0x%x\n",
 			c->bc_private.a.agbp,
 			c->bc_private.a.agno);
 	}
@@ -2747,134 +3075,134 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 	d = XFS_BUF_PTR(bp);
 	if (INT_GET((agf = d)->agf_magicnum, ARCH_CONVERT) == XFS_AGF_MAGIC) {
 		if (summary) {
-			printk("freespace hdr for AG %d (at 0x%p)\n",
+			kdb_printf("freespace hdr for AG %d (at 0x%p)\n",
 				INT_GET(agf->agf_seqno, ARCH_CONVERT), agf);
 		} else {
-			printk("buf 0x%p agf 0x%p\n", bp, agf);
+			kdb_printf("buf 0x%p agf 0x%p\n", bp, agf);
 			xfsidbg_xagf(agf);
 		}
 	} else if (INT_GET((agi = d)->agi_magicnum, ARCH_CONVERT) == XFS_AGI_MAGIC) {
 		if (summary) {
-			printk("Inode hdr for AG %d (at 0x%p)\n",
+			kdb_printf("Inode hdr for AG %d (at 0x%p)\n",
 			       INT_GET(agi->agi_seqno, ARCH_CONVERT), agi);
 		} else {
-			printk("buf 0x%p agi 0x%p\n", bp, agi);
+			kdb_printf("buf 0x%p agi 0x%p\n", bp, agi);
 			xfsidbg_xagi(agi);
 		}
 	} else if (INT_GET((bta = d)->bb_magic, ARCH_CONVERT) == XFS_ABTB_MAGIC) {
 		if (summary) {
-			printk("Alloc BNO Btree blk, level %d (at 0x%p)\n",
+			kdb_printf("Alloc BNO Btree blk, level %d (at 0x%p)\n",
 				       INT_GET(bta->bb_level, ARCH_CONVERT), bta);
 		} else {
-			printk("buf 0x%p abtbno 0x%p\n", bp, bta);
+			kdb_printf("buf 0x%p abtbno 0x%p\n", bp, bta);
 			xfs_btalloc(bta, XFS_BUF_COUNT(bp));
 		}
 	} else if (INT_GET((bta = d)->bb_magic, ARCH_CONVERT) == XFS_ABTC_MAGIC) {
 		if (summary) {
-			printk("Alloc COUNT Btree blk, level %d (at 0x%p)\n",
+			kdb_printf("Alloc COUNT Btree blk, level %d (at 0x%p)\n",
 				       INT_GET(bta->bb_level, ARCH_CONVERT), bta);
 		} else {
-			printk("buf 0x%p abtcnt 0x%p\n", bp, bta);
+			kdb_printf("buf 0x%p abtcnt 0x%p\n", bp, bta);
 			xfs_btalloc(bta, XFS_BUF_COUNT(bp));
 		}
 	} else if (INT_GET((btb = d)->bb_magic, ARCH_CONVERT) == XFS_BMAP_MAGIC) {
 		if (summary) {
-			printk("Bmap Btree blk, level %d (at 0x%p)\n",
+			kdb_printf("Bmap Btree blk, level %d (at 0x%p)\n",
 				      INT_GET(btb->bb_level, ARCH_CONVERT), btb);
 		} else {
-			printk("buf 0x%p bmapbt 0x%p\n", bp, btb);
+			kdb_printf("buf 0x%p bmapbt 0x%p\n", bp, btb);
 			xfs_btbmap(btb, XFS_BUF_COUNT(bp));
 		}
 	} else if (INT_GET((bti = d)->bb_magic, ARCH_CONVERT) == XFS_IBT_MAGIC) {
 		if (summary) {
-			printk("Inode Btree blk, level %d (at 0x%p)\n",
+			kdb_printf("Inode Btree blk, level %d (at 0x%p)\n",
 				       INT_GET(bti->bb_level, ARCH_CONVERT), bti);
 		} else {
-			printk("buf 0x%p inobt 0x%p\n", bp, bti);
+			kdb_printf("buf 0x%p inobt 0x%p\n", bp, bti);
 			xfs_btino(bti, XFS_BUF_COUNT(bp));
 		}
 	} else if ((aleaf = d)->hdr.info.magic == XFS_ATTR_LEAF_MAGIC) {
 		if (summary) {
-			printk("Attr Leaf, 1st hash 0x%x (at 0x%p)\n",
+			kdb_printf("Attr Leaf, 1st hash 0x%x (at 0x%p)\n",
 				      aleaf->entries[0].hashval, aleaf);
 		} else {
-			printk("buf 0x%p attr leaf 0x%p\n", bp, aleaf);
+			kdb_printf("buf 0x%p attr leaf 0x%p\n", bp, aleaf);
 			xfsidbg_xattrleaf(aleaf);
 		}
 	} else if (INT_GET((dleaf = d)->hdr.info.magic, ARCH_CONVERT) == XFS_DIR_LEAF_MAGIC) {
 		if (summary) {
-			printk("Dir Leaf, 1st hash 0x%x (at 0x%p)\n",
+			kdb_printf("Dir Leaf, 1st hash 0x%x (at 0x%p)\n",
 				     dleaf->entries[0].hashval, dleaf);
 		} else {
-			printk("buf 0x%p dir leaf 0x%p\n", bp, dleaf);
+			kdb_printf("buf 0x%p dir leaf 0x%p\n", bp, dleaf);
 			xfsidbg_xdirleaf(dleaf);
 		}
 	} else if (INT_GET((node = d)->hdr.info.magic, ARCH_CONVERT) == XFS_DA_NODE_MAGIC) {
 		if (summary) {
-			printk("Dir/Attr Node, level %d, 1st hash 0x%x (at 0x%p)\n",
+			kdb_printf("Dir/Attr Node, level %d, 1st hash 0x%x (at 0x%p)\n",
 			      node->hdr.level, node->btree[0].hashval, node);
 		} else {
-			printk("buf 0x%p dir/attr node 0x%p\n", bp, node);
+			kdb_printf("buf 0x%p dir/attr node 0x%p\n", bp, node);
 			xfsidbg_xdanode(node);
 		}
 	} else if (INT_GET((di = d)->di_core.di_magic, ARCH_CONVERT) == XFS_DINODE_MAGIC) {
 		if (summary) {
-			printk("Disk Inode (at 0x%p)\n", di);
+			kdb_printf("Disk Inode (at 0x%p)\n", di);
 		} else {
-			printk("buf 0x%p dinode 0x%p\n", bp, di);
+			kdb_printf("buf 0x%p dinode 0x%p\n", bp, di);
 			xfs_inodebuf(bp);
 		}
 	} else if (INT_GET((sb = d)->sb_magicnum, ARCH_CONVERT) == XFS_SB_MAGIC) {
 		if (summary) {
-			printk("Superblock (at 0x%p)\n", sb);
+			kdb_printf("Superblock (at 0x%p)\n", sb);
 		} else {
-			printk("buf 0x%p sb 0x%p\n", bp, sb);
+			kdb_printf("buf 0x%p sb 0x%p\n", bp, sb);
 			xfsidbg_xsb(sb);
 		}
 	} else if ((dqb = d)->d_magic == XFS_DQUOT_MAGIC) {
 #define XFSIDBG_DQTYPESTR(d)     (((d)->d_flags & XFS_DQ_USER) ? "USR" : \
                                  (((d)->d_flags & XFS_DQ_PROJ) ? "PRJ" : "???"))
 
-		printk("Quota blk starting ID [%d], type %s at 0x%p\n",
+		kdb_printf("Quota blk starting ID [%d], type %s at 0x%p\n",
 			dqb->d_id, XFSIDBG_DQTYPESTR(dqb), dqb);
 		
 	} else if (INT_GET((d2block = d)->hdr.magic, ARCH_CONVERT) == XFS_DIR2_BLOCK_MAGIC) {
 		if (summary) {
-			printk("Dir2 block (at 0x%p)\n", d2block);
+			kdb_printf("Dir2 block (at 0x%p)\n", d2block);
 		} else {
-			printk("buf 0x%p dir2 block 0x%p\n", bp, d2block);
+			kdb_printf("buf 0x%p dir2 block 0x%p\n", bp, d2block);
 			xfs_dir2data((void *)d2block, XFS_BUF_COUNT(bp));
 		}
 	} else if (INT_GET((d2data = d)->hdr.magic, ARCH_CONVERT) == XFS_DIR2_DATA_MAGIC) {
 		if (summary) {
-			printk("Dir2 data (at 0x%p)\n", d2data);
+			kdb_printf("Dir2 data (at 0x%p)\n", d2data);
 		} else {
-			printk("buf 0x%p dir2 data 0x%p\n", bp, d2data);
+			kdb_printf("buf 0x%p dir2 data 0x%p\n", bp, d2data);
 			xfs_dir2data((void *)d2data, XFS_BUF_COUNT(bp));
 		}
 	} else if (INT_GET((d2leaf = d)->hdr.info.magic, ARCH_CONVERT) == XFS_DIR2_LEAF1_MAGIC) {
 		if (summary) {
-			printk("Dir2 leaf(1) (at 0x%p)\n", d2leaf);
+			kdb_printf("Dir2 leaf(1) (at 0x%p)\n", d2leaf);
 		} else {
-			printk("buf 0x%p dir2 leaf 0x%p\n", bp, d2leaf);
+			kdb_printf("buf 0x%p dir2 leaf 0x%p\n", bp, d2leaf);
 			xfs_dir2leaf(d2leaf, XFS_BUF_COUNT(bp));
 		}
 	} else if (INT_GET(d2leaf->hdr.info.magic, ARCH_CONVERT) == XFS_DIR2_LEAFN_MAGIC) {
 		if (summary) {
-			printk("Dir2 leaf(n) (at 0x%p)\n", d2leaf);
+			kdb_printf("Dir2 leaf(n) (at 0x%p)\n", d2leaf);
 		} else {
-			printk("buf 0x%p dir2 leaf 0x%p\n", bp, d2leaf);
+			kdb_printf("buf 0x%p dir2 leaf 0x%p\n", bp, d2leaf);
 			xfs_dir2leaf(d2leaf, XFS_BUF_COUNT(bp));
 		}
 	} else if (INT_GET((d2free = d)->hdr.magic, ARCH_CONVERT) == XFS_DIR2_FREE_MAGIC) {
 		if (summary) {
-			printk("Dir2 free (at 0x%p)\n", d2free);
+			kdb_printf("Dir2 free (at 0x%p)\n", d2free);
 		} else {
-			printk("buf 0x%p dir2 free 0x%p\n", bp, d2free);
+			kdb_printf("buf 0x%p dir2 free 0x%p\n", bp, d2free);
 			xfsidbg_xdir2free(d2free);
 		}
 	} else {
-		printk("buf 0x%p unknown 0x%p\n", bp, d);
+		kdb_printf("buf 0x%p unknown 0x%p\n", bp, d);
 	}
 }
 
@@ -2888,51 +3216,51 @@ xfsidbg_xdaargs(xfs_da_args_t *n)
 	char *ch;
 	int i;
 
-	printk(" name \"");
+	kdb_printf(" name \"");
 	for (i = 0; i < n->namelen; i++) {
-		printk("%c", n->name[i]);
+		kdb_printf("%c", n->name[i]);
 	}
-	printk("\"(%d) value ", n->namelen);
+	kdb_printf("\"(%d) value ", n->namelen);
 	if (n->value) {
-		printk("\"");
+		kdb_printf("\"");
 		ch = n->value;
 		for (i = 0; (i < n->valuelen) && (i < 32); ch++, i++) {
 			switch(*ch) {
-			case '\n':	printk("\n");		break;
-			case '\b':	printk("\b");		break;
-			case '\t':	printk("\t");		break;
-			default:	printk("%c", *ch);	break;
+			case '\n':	kdb_printf("\n");		break;
+			case '\b':	kdb_printf("\b");		break;
+			case '\t':	kdb_printf("\t");		break;
+			default:	kdb_printf("%c", *ch);	break;
 			}
 		}
 		if (i == 32)
-			printk("...");
-		printk("\"(%d)\n", n->valuelen);
+			kdb_printf("...");
+		kdb_printf("\"(%d)\n", n->valuelen);
 	} else {
-		printk("(NULL)(%d)\n", n->valuelen);
+		kdb_printf("(NULL)(%d)\n", n->valuelen);
 	}
-	printk(" hashval 0x%x whichfork %d flags <",
+	kdb_printf(" hashval 0x%x whichfork %d flags <",
 		  (uint_t)n->hashval, n->whichfork);
 	if (n->flags & ATTR_ROOT)
-		printk("ROOT ");
+		kdb_printf("ROOT ");
 	if (n->flags & ATTR_CREATE)
-		printk("CREATE ");
+		kdb_printf("CREATE ");
 	if (n->flags & ATTR_REPLACE)
-		printk("REPLACE ");
+		kdb_printf("REPLACE ");
 	if (n->flags & XFS_ATTR_INCOMPLETE)
-		printk("INCOMPLETE ");
+		kdb_printf("INCOMPLETE ");
 	i = ~(ATTR_ROOT | ATTR_CREATE | ATTR_REPLACE | XFS_ATTR_INCOMPLETE);
 	if ((n->flags & i) != 0)
-		printk("0x%x", n->flags & i);
-	printk(">\n");
-	printk(" rename %d justcheck %d addname %d oknoent %d\n",
+		kdb_printf("0x%x", n->flags & i);
+	kdb_printf(">\n");
+	kdb_printf(" rename %d justcheck %d addname %d oknoent %d\n",
 		  n->rename, n->justcheck, n->addname, n->oknoent);
-	printk(" leaf: blkno %d index %d rmtblkno %d rmtblkcnt %d\n",
+	kdb_printf(" leaf: blkno %d index %d rmtblkno %d rmtblkcnt %d\n",
 		  n->blkno, n->index, n->rmtblkno, n->rmtblkcnt);
-	printk(" leaf2: blkno %d index %d rmtblkno %d rmtblkcnt %d\n",
+	kdb_printf(" leaf2: blkno %d index %d rmtblkno %d rmtblkcnt %d\n",
 		  n->blkno2, n->index2, n->rmtblkno2, n->rmtblkcnt2);
-	printk(" inumber %Ld dp 0x%p firstblock 0x%p flist 0x%p\n",
+	kdb_printf(" inumber %Ld dp 0x%p firstblock 0x%p flist 0x%p\n",
 		  n->inumber, n->dp, n->firstblock, n->flist);
-	printk(" trans 0x%p total %d\n",
+	kdb_printf(" trans 0x%p total %d\n",
 		  n->trans, n->total);
 }
 
@@ -2944,13 +3272,13 @@ xfsidbg_xdabuf(xfs_dabuf_t *dabuf)
 {
 	int	i;
 
-	printk("nbuf %d dirty %d bbcount %d data 0x%p bps",
+	kdb_printf("nbuf %d dirty %d bbcount %d data 0x%p bps",
 		dabuf->nbuf, dabuf->dirty, dabuf->bbcount, dabuf->data);
 	for (i = 0; i < dabuf->nbuf; i++)
-		printk(" %d:0x%p", i, dabuf->bps[i]);
-	printk("\n");
+		kdb_printf(" %d:0x%p", i, dabuf->bps[i]);
+	kdb_printf("\n");
 #ifdef XFS_DABUF_DEBUG
-	printk(" ra 0x%x prev 0x%x next 0x%x dev 0x%x blkno 0x%x\n",
+	kdb_printf(" ra 0x%x prev 0x%x next 0x%x dev 0x%x blkno 0x%x\n",
 		dabuf->ra, dabuf->prev, dabuf->next, dabuf->dev, dabuf->blkno);
 #endif
 }
@@ -2968,12 +3296,12 @@ xfsidbg_xdanode(struct xfs_da_intnode *node)
 
 	h = &node->hdr;
 	i = &h->info;
-	printk("hdr info forw 0x%x back 0x%x magic 0x%x\n",
+	kdb_printf("hdr info forw 0x%x back 0x%x magic 0x%x\n",
 		INT_GET(i->forw, ARCH_CONVERT), INT_GET(i->back, ARCH_CONVERT), INT_GET(i->magic, ARCH_CONVERT));
-	printk("hdr count %d level %d\n",
+	kdb_printf("hdr count %d level %d\n",
 		INT_GET(h->count, ARCH_CONVERT), INT_GET(h->level, ARCH_CONVERT));
 	for (j = 0, e = node->btree; j < INT_GET(h->count, ARCH_CONVERT); j++, e++) {
-		printk("btree %d hashval 0x%x before 0x%x\n",
+		kdb_printf("btree %d hashval 0x%x before 0x%x\n",
 			j, (uint_t)INT_GET(e->hashval, ARCH_CONVERT), INT_GET(e->before, ARCH_CONVERT));
 	}
 }
@@ -2986,25 +3314,25 @@ xfsidbg_xdastate(xfs_da_state_t *s)
 {
 	xfs_da_state_blk_t *eblk;
 
-	printk("args 0x%p mp 0x%p blocksize %d inleaf %d\n",
+	kdb_printf("args 0x%p mp 0x%p blocksize %d inleaf %d\n",
 		s->args, s->mp, s->blocksize, s->inleaf);
 	if (s->args)
 		xfsidbg_xdaargs(s->args);
 	
-	printk("path:  ");
+	kdb_printf("path:  ");
 	xfs_dastate_path(&s->path);
 
-	printk("altpath:  ");
+	kdb_printf("altpath:  ");
 	xfs_dastate_path(&s->altpath);
 
 	eblk = &s->extrablk;
-	printk("extra: valid %d, after %d\n", s->extravalid, s->extraafter);
+	kdb_printf("extra: valid %d, after %d\n", s->extravalid, s->extraafter);
 #if XFS_BIG_FILES
-	printk(" bp 0x%p blkno 0x%x ", eblk->bp, eblk->blkno);
+	kdb_printf(" bp 0x%p blkno 0x%x ", eblk->bp, eblk->blkno);
 #else
-	printk(" bp 0x%x blkno 0x%x ", eblk->bp, eblk->blkno);
+	kdb_printf(" bp 0x%x blkno 0x%x ", eblk->bp, eblk->blkno);
 #endif
-	printk("index %d hashval 0x%x\n", eblk->index, (uint_t)eblk->hashval);
+	kdb_printf("index %d hashval 0x%x\n", eblk->index, (uint_t)eblk->hashval);
 }
 
 /*
@@ -3023,23 +3351,23 @@ xfsidbg_xdirleaf(xfs_dir_leafblock_t *leaf)
 
 	h = &leaf->hdr;
 	i = &h->info;
-	printk("hdr info forw 0x%x back 0x%x magic 0x%x\n",
+	kdb_printf("hdr info forw 0x%x back 0x%x magic 0x%x\n",
 		INT_GET(i->forw, ARCH_CONVERT), INT_GET(i->back, ARCH_CONVERT), INT_GET(i->magic, ARCH_CONVERT));
-	printk("hdr count %d namebytes %d firstused %d holes %d\n",
+	kdb_printf("hdr count %d namebytes %d firstused %d holes %d\n",
 		INT_GET(h->count, ARCH_CONVERT), INT_GET(h->namebytes, ARCH_CONVERT), INT_GET(h->firstused, ARCH_CONVERT), h->holes);
 	for (j = 0, m = h->freemap; j < XFS_DIR_LEAF_MAPSIZE; j++, m++) {
-		printk("hdr freemap %d base %d size %d\n",
+		kdb_printf("hdr freemap %d base %d size %d\n",
 			j, INT_GET(m->base, ARCH_CONVERT), INT_GET(m->size, ARCH_CONVERT));
 	}
 	for (j = 0, e = leaf->entries; j < INT_GET(h->count, ARCH_CONVERT); j++, e++) {
 		n = XFS_DIR_LEAF_NAMESTRUCT(leaf, INT_GET(e->nameidx, ARCH_CONVERT));
 		XFS_DIR_SF_GET_DIRINO_ARCH(&n->inumber, &ino, ARCH_CONVERT);
-		printk("leaf %d hashval 0x%x nameidx %d inumber %Ld ",
+		kdb_printf("leaf %d hashval 0x%x nameidx %d inumber %Ld ",
 			j, (uint_t)INT_GET(e->hashval, ARCH_CONVERT), INT_GET(e->nameidx, ARCH_CONVERT), ino);
-		printk("namelen %d name \"", e->namelen);
+		kdb_printf("namelen %d name \"", e->namelen);
 		for (k = 0; k < e->namelen; k++)
-			printk("%c", n->name[k]);
-		printk("\"\n");
+			kdb_printf("%c", n->name[k]);
+		kdb_printf("\"\n");
 	}
 }
 
@@ -3064,13 +3392,13 @@ xfs_dir2data(void *addr, int size)
 	db = (xfs_dir2_data_t *)addr;
 	bb = (xfs_dir2_block_t *)addr;
 	h = &db->hdr;
-	printk("hdr magic 0x%x (%s)\nhdr bestfree", INT_GET(h->magic, ARCH_CONVERT),
+	kdb_printf("hdr magic 0x%x (%s)\nhdr bestfree", INT_GET(h->magic, ARCH_CONVERT),
 		INT_GET(h->magic, ARCH_CONVERT) == XFS_DIR2_DATA_MAGIC ? "DATA" :
 			(INT_GET(h->magic, ARCH_CONVERT) == XFS_DIR2_BLOCK_MAGIC ? "BLOCK" : ""));
 	for (j = 0, m = h->bestfree; j < XFS_DIR2_DATA_FD_COUNT; j++, m++) {
-		printk(" %d: 0x%x@0x%x", j, INT_GET(m->length, ARCH_CONVERT), INT_GET(m->offset, ARCH_CONVERT));
+		kdb_printf(" %d: 0x%x@0x%x", j, INT_GET(m->length, ARCH_CONVERT), INT_GET(m->offset, ARCH_CONVERT));
 	}
-	printk("\n");
+	kdb_printf("\n");
 	if (INT_GET(h->magic, ARCH_CONVERT) == XFS_DIR2_DATA_MAGIC)
 		t = (char *)db + size;
 	else {
@@ -3083,30 +3411,30 @@ xfs_dir2data(void *addr, int size)
 	for (p = (char *)(h + 1); p < t; ) {
 		u = (xfs_dir2_data_unused_t *)p;
 		if (u->freetag == XFS_DIR2_DATA_FREE_TAG) {
-			printk("0x%x unused freetag 0x%x length 0x%x tag 0x%x\n",
+			kdb_printf("0x%x unused freetag 0x%x length 0x%x tag 0x%x\n",
 				p - (char *)addr, INT_GET(u->freetag, ARCH_CONVERT), INT_GET(u->length, ARCH_CONVERT),
 				INT_GET(*XFS_DIR2_DATA_UNUSED_TAG_P_ARCH(u, ARCH_CONVERT), ARCH_CONVERT));
 			p += INT_GET(u->length, ARCH_CONVERT);
 			continue;
 		}
 		e = (xfs_dir2_data_entry_t *)p;
-		printk("0x%x entry inumber %Ld namelen %d name \"",
+		kdb_printf("0x%x entry inumber %Ld namelen %d name \"",
 			p - (char *)addr, INT_GET(e->inumber, ARCH_CONVERT), e->namelen);
 		for (k = 0; k < e->namelen; k++)
-			printk("%c", e->name[k]);
-		printk("\" tag 0x%x\n", INT_GET(*XFS_DIR2_DATA_ENTRY_TAG_P(e), ARCH_CONVERT));
+			kdb_printf("%c", e->name[k]);
+		kdb_printf("\" tag 0x%x\n", INT_GET(*XFS_DIR2_DATA_ENTRY_TAG_P(e), ARCH_CONVERT));
 		p += XFS_DIR2_DATA_ENTSIZE(e->namelen);
 	}
 	if (INT_GET(h->magic, ARCH_CONVERT) == XFS_DIR2_DATA_MAGIC)
 		return;
 	for (j = 0; j < INT_GET(tail->count, ARCH_CONVERT); j++, l++) {
-		printk("0x%x leaf %d hashval 0x%x address 0x%x (byte 0x%x)\n",
+		kdb_printf("0x%x leaf %d hashval 0x%x address 0x%x (byte 0x%x)\n",
 			(char *)l - (char *)addr, j,
 			(uint_t)INT_GET(l->hashval, ARCH_CONVERT), INT_GET(l->address, ARCH_CONVERT),
 			/* XFS_DIR2_DATAPTR_TO_BYTE */
 			INT_GET(l->address, ARCH_CONVERT) << XFS_DIR2_DATA_ALIGN_LOG);
 	}
-	printk("0x%x tail count %d\n",
+	kdb_printf("0x%x tail count %d\n",
 		(char *)tail - (char *)addr, INT_GET(tail->count, ARCH_CONVERT));
 }
 
@@ -3123,11 +3451,11 @@ xfs_dir2leaf(xfs_dir2_leaf_t *leaf, int size)
 	h = &leaf->hdr;
 	i = &h->info;
 	e = leaf->ents;
-	printk("hdr info forw 0x%x back 0x%x magic 0x%x\n",
+	kdb_printf("hdr info forw 0x%x back 0x%x magic 0x%x\n",
 		INT_GET(i->forw, ARCH_CONVERT), INT_GET(i->back, ARCH_CONVERT), INT_GET(i->magic, ARCH_CONVERT));
-	printk("hdr count %d stale %d\n", INT_GET(h->count, ARCH_CONVERT), INT_GET(h->stale, ARCH_CONVERT));
+	kdb_printf("hdr count %d stale %d\n", INT_GET(h->count, ARCH_CONVERT), INT_GET(h->stale, ARCH_CONVERT));
 	for (j = 0; j < INT_GET(h->count, ARCH_CONVERT); j++, e++) {
-		printk("0x%x ent %d hashval 0x%x address 0x%x (byte 0x%x)\n",
+		kdb_printf("0x%x ent %d hashval 0x%x address 0x%x (byte 0x%x)\n",
 			(char *)e - (char *)leaf, j,
 			(uint_t)INT_GET(e->hashval, ARCH_CONVERT), INT_GET(e->address, ARCH_CONVERT),
 			/* XFS_DIR2_DATAPTR_TO_BYTE */
@@ -3139,10 +3467,10 @@ xfs_dir2leaf(xfs_dir2_leaf_t *leaf, int size)
 	t = (xfs_dir2_leaf_tail_t *)((char *)leaf + size - sizeof(*t));
 	b = XFS_DIR2_LEAF_BESTS_P_ARCH(t, ARCH_CONVERT);
 	for (j = 0; j < INT_GET(t->bestcount, ARCH_CONVERT); j++, b++) {
-		printk("0x%x best %d 0x%x\n",
+		kdb_printf("0x%x best %d 0x%x\n",
 			(char *)b - (char *)leaf, j, INT_GET(*b, ARCH_CONVERT));
 	}
-	printk("tail bestcount %d\n", INT_GET(t->bestcount, ARCH_CONVERT));
+	kdb_printf("tail bestcount %d\n", INT_GET(t->bestcount, ARCH_CONVERT));
 }
 
 /*
@@ -3158,15 +3486,15 @@ xfsidbg_xdirsf(xfs_dir_shortform_t *s)
 
 	sfh = &s->hdr;
 	XFS_DIR_SF_GET_DIRINO_ARCH(&sfh->parent, &ino, ARCH_CONVERT);
-	printk("hdr parent %Ld", ino);
-	printk(" count %d\n", sfh->count);
+	kdb_printf("hdr parent %Ld", ino);
+	kdb_printf(" count %d\n", sfh->count);
 	for (i = 0, sfe = s->list; i < sfh->count; i++) {
 		XFS_DIR_SF_GET_DIRINO_ARCH(&sfe->inumber, &ino, ARCH_CONVERT);
-		printk("entry %d inumber %Ld", i, ino);
-		printk(" namelen %d name \"", sfe->namelen);
+		kdb_printf("entry %d inumber %Ld", i, ino);
+		kdb_printf(" namelen %d name \"", sfe->namelen);
 		for (j = 0; j < sfe->namelen; j++)
-			printk("%c", sfe->name[j]);
-		printk("\"\n");
+			kdb_printf("%c", sfe->name[j]);
+		kdb_printf("\"\n");
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
 	}
 }
@@ -3184,15 +3512,15 @@ xfsidbg_xdir2sf(xfs_dir2_sf_t *s)
 
 	sfh = &s->hdr;
 	ino = XFS_DIR2_SF_GET_INUMBER_ARCH(s, &sfh->parent, ARCH_CONVERT);
-	printk("hdr count %d i8count %d parent %Ld\n",
+	kdb_printf("hdr count %d i8count %d parent %Ld\n",
 		sfh->count, sfh->i8count, ino);
 	for (i = 0, sfe = XFS_DIR2_SF_FIRSTENTRY(s); i < sfh->count; i++) {
 		ino = XFS_DIR2_SF_GET_INUMBER_ARCH(s, XFS_DIR2_SF_INUMBERP(sfe), ARCH_CONVERT);
-		printk("entry %d inumber %Ld offset 0x%x namelen %d name \"",
+		kdb_printf("entry %d inumber %Ld offset 0x%x namelen %d name \"",
 			i, ino, XFS_DIR2_SF_GET_OFFSET_ARCH(sfe, ARCH_CONVERT), sfe->namelen);
 		for (j = 0; j < sfe->namelen; j++)
-			printk("%c", sfe->name[j]);
-		printk("\"\n");
+			kdb_printf("%c", sfe->name[j]);
+		kdb_printf("\"\n");
 		sfe = XFS_DIR2_SF_NEXTENTRY(s, sfe);
 	}
 }
@@ -3205,10 +3533,10 @@ xfsidbg_xdir2free(xfs_dir2_free_t *f)
 {
 	int	i;
 
-	printk("hdr magic 0x%x firstdb %d nvalid %d nused %d\n",
+	kdb_printf("hdr magic 0x%x firstdb %d nvalid %d nused %d\n",
 		INT_GET(f->hdr.magic, ARCH_CONVERT), INT_GET(f->hdr.firstdb, ARCH_CONVERT), INT_GET(f->hdr.nvalid, ARCH_CONVERT), INT_GET(f->hdr.nused, ARCH_CONVERT));
 	for (i = 0; i < INT_GET(f->hdr.nvalid, ARCH_CONVERT); i++) {
-		printk("entry %d db %d count %d\n",
+		kdb_printf("entry %d db %d count %d\n",
 			i, i + INT_GET(f->hdr.firstdb, ARCH_CONVERT), INT_GET(f->bests[i], ARCH_CONVERT));
 	}
 }
@@ -3233,10 +3561,10 @@ xfsidbg_xflist(xfs_bmap_free_t *flist)
 {
 	xfs_bmap_free_item_t	*item;
 
-	printk("flist@0x%p: first 0x%p count %d low %d\n", flist,
+	kdb_printf("flist@0x%p: first 0x%p count %d low %d\n", flist,
 		flist->xbf_first, flist->xbf_count, flist->xbf_low);
 	for (item = flist->xbf_first; item; item = item->xbfi_next) {
-		printk("item@0x%p: startblock %Lx blockcount %d", item,
+		kdb_printf("item@0x%p: startblock %Lx blockcount %d", item,
 			(xfs_dfsbno_t)item->xbfi_startblock,
 			item->xbfi_blockcount);
 	}
@@ -3252,12 +3580,12 @@ xfsidbg_xgaplist(xfs_inode_t *ip)
 
 	curr_gap = ip->i_iocore.io_gap_list;
 	if (curr_gap == NULL) {
-		printk("Gap list is empty for inode 0x%p\n", ip);
+		kdb_printf("Gap list is empty for inode 0x%p\n", ip);
 		return;
 	}
 
 	while (curr_gap != NULL) {
-		printk("gap 0x%p next 0x%p offset 0x%Lx count 0x%x\n",
+		kdb_printf("gap 0x%p next 0x%p offset 0x%Lx count 0x%x\n",
 		       curr_gap, curr_gap->xg_next, curr_gap->xg_offset_fsb,
 		       curr_gap->xg_count_fsb);
 		curr_gap = curr_gap->xg_next;
@@ -3273,7 +3601,7 @@ xfsidbg_xhelp(void)
 	struct xif	*p;
 
 	for (p = xfsidbg_funcs; p->name; p++)
-		printk("%-16s %s %s\n", p->name, p->args, p->help);
+		kdb_printf("%-16s %s %s\n", p->name, p->args, p->help);
 }
 
 /*
@@ -3296,35 +3624,35 @@ xfsidbg_xiclog(xlog_in_core_t *iclog)
 		0
 	};
 
-	printk("xlog_in_core/header at 0x%p\n", iclog);
-	printk("magicno: %x  cycle: %d  version: %d  lsn: 0x%Lx\n",
+	kdb_printf("xlog_in_core/header at 0x%p\n", iclog);
+	kdb_printf("magicno: %x  cycle: %d  version: %d  lsn: 0x%Lx\n",
 		INT_GET(iclog->ic_header.h_magicno, ARCH_CONVERT), INT_GET(iclog->ic_header.h_cycle, ARCH_CONVERT),
 		INT_GET(iclog->ic_header.h_version, ARCH_CONVERT), INT_GET(iclog->ic_header.h_lsn, ARCH_CONVERT));
-	printk("tail_lsn: 0x%Lx  len: %d  prev_block: %d  num_ops: %d\n",
+	kdb_printf("tail_lsn: 0x%Lx  len: %d  prev_block: %d  num_ops: %d\n",
 		INT_GET(iclog->ic_header.h_tail_lsn, ARCH_CONVERT), INT_GET(iclog->ic_header.h_len, ARCH_CONVERT),
 		INT_GET(iclog->ic_header.h_prev_block, ARCH_CONVERT), INT_GET(iclog->ic_header.h_num_logops, ARCH_CONVERT));
-	printk("cycle_data: ");
+	kdb_printf("cycle_data: ");
 	for (i=0; i<(iclog->ic_size>>BBSHIFT); i++) {
-		printk("%x  ", INT_GET(iclog->ic_header.h_cycle_data[i], ARCH_CONVERT));
+		kdb_printf("%x  ", INT_GET(iclog->ic_header.h_cycle_data[i], ARCH_CONVERT));
 	}
-	printk("\n");
-	printk("--------------------------------------------------\n");
-	printk("data: 0x%p  &forcesema: 0x%p  next: 0x%p bp: 0x%p\n",
+	kdb_printf("\n");
+	kdb_printf("--------------------------------------------------\n");
+	kdb_printf("data: 0x%p  &forcesema: 0x%p  next: 0x%p bp: 0x%p\n",
 		iclog->ic_data, &iclog->ic_forcesema, iclog->ic_next,
 		iclog->ic_bp);
-	printk("log: 0x%p  callb: 0x%p  callb_tail: 0x%p  roundoff: %d\n",
+	kdb_printf("log: 0x%p  callb: 0x%p  callb_tail: 0x%p  roundoff: %d\n",
 		iclog->ic_log, iclog->ic_callback, iclog->ic_callback_tail,
 		iclog->ic_roundoff);
-	printk("size: %d  (OFFSET: %d) trace: 0x%p  refcnt: %d  bwritecnt: %d",
+	kdb_printf("size: %d  (OFFSET: %d) trace: 0x%p  refcnt: %d  bwritecnt: %d",
 		iclog->ic_size, iclog->ic_offset,
 		NULL,
 		iclog->ic_refcnt, iclog->ic_bwritecnt);
-	printk("  state: ");
+	kdb_printf("  state: ");
 	if (iclog->ic_state & XLOG_STATE_ALL)
 		printflags(iclog->ic_state, ic_flags,"state");
 	else
-		printk("ILLEGAL");
-	printk("\n");
+		kdb_printf("ILLEGAL");
+	kdb_printf("\n");
 }	/* xfsidbg_xiclog */
 
 
@@ -3338,7 +3666,7 @@ xfsidbg_xiclogall(xlog_in_core_t *iclog)
 
     do {
 	xfsidbg_xiclog(iclog);
-	printk("=================================================\n");
+	kdb_printf("=================================================\n");
 	iclog = iclog->ic_next;
     } while (iclog != first_iclog);
 }	/* xfsidbg_xiclogall */
@@ -3350,11 +3678,25 @@ static void
 xfsidbg_xiclogcb(xlog_in_core_t *iclog)
 {
 	xfs_log_callback_t	*cb;
+	kdb_symtab_t		 symtab;
 
 	for (cb = iclog->ic_callback; cb != NULL; cb = cb->cb_next) {
-		printk("func ");
-		kdbnearsym((unsigned long)cb->cb_func /* , NULL, NULL */);
-		printk(" arg 0x%p next 0x%p\n", cb->cb_arg, cb->cb_next);
+
+		if (kdbnearsym((unsigned long)cb->cb_func, &symtab)) {
+			unsigned long offval;
+
+			offval = (unsigned long)cb->cb_func - symtab.sym_start;
+
+			if (offval)
+				kdb_printf("func = %s+0x%lx",
+							symtab.sym_name,
+							offval);
+			else
+				kdb_printf("func = %s", symtab.sym_name);
+		} else
+			kdb_printf("func = ?? 0x%p", (void *)cb->cb_func);
+
+		kdb_printf(" arg 0x%p next 0x%p\n", cb->cb_arg, cb->cb_next);
 	}
 }
 
@@ -3367,7 +3709,7 @@ xfsidbg_xinodes(xfs_mount_t *mp)
 {
 	xfs_inode_t	*ip;
 
-	printk("xfs_mount at 0x%p\n", mp);
+	kdb_printf("xfs_mount at 0x%p\n", mp);
 	ip = mp->m_inodes;
 	if (ip != NULL) {
 		do {
@@ -3375,12 +3717,12 @@ xfsidbg_xinodes(xfs_mount_t *mp)
 				ip = ip->i_mnext;
 				continue;
 			}
-			printk("\n");
+			kdb_printf("\n");
 			xfsidbg_xnode(ip);
 			ip = ip->i_mnext;
 		} while (ip != mp->m_inodes);
 	}
-	printk("\nEnd of Inodes\n");
+	kdb_printf("\nEnd of Inodes\n");
 }
 
 static char *
@@ -3418,34 +3760,34 @@ xfsidbg_xlog(xlog_t *log)
 		0
 	};
 
-	printk("xlog at 0x%p\n", log);
-	printk("&flushsm: 0x%p  tic_cnt: %d  tic_tcnt: %d  \n",
+	kdb_printf("xlog at 0x%p\n", log);
+	kdb_printf("&flushsm: 0x%p  tic_cnt: %d  tic_tcnt: %d  \n",
 		&log->l_flushsema, log->l_ticket_cnt, log->l_ticket_tcnt);
-	printk("freelist: 0x%p  tail: 0x%p  ICLOG: 0x%p  \n",
+	kdb_printf("freelist: 0x%p  tail: 0x%p  ICLOG: 0x%p  \n",
 		log->l_freelist, log->l_tail, log->l_iclog);
-	printk("&icloglock: 0x%p  tail_lsn: 0x%Lx  last_sync_lsn: 0x%Lx \n",
+	kdb_printf("&icloglock: 0x%p  tail_lsn: 0x%Lx  last_sync_lsn: 0x%Lx \n",
 		&log->l_icloglock, log->l_tail_lsn, log->l_last_sync_lsn);
-	printk("mp: 0x%p  xbuf: 0x%p  roundoff: %d  l_covered_state: %s \n",
+	kdb_printf("mp: 0x%p  xbuf: 0x%p  roundoff: %d  l_covered_state: %s \n",
 		log->l_mp, log->l_xbuf, log->l_roundoff,
 			xfsidbg_get_cstate(log->l_covered_state));
-	printk("flags: ");
+	kdb_printf("flags: ");
 	printflags(log->l_flags, t_flags,"log");
-	printk("  dev: 0x%x logBBstart: %Ld logsize: %d logBBsize: %d\n",
+	kdb_printf("  dev: 0x%x logBBstart: %Ld logsize: %d logBBsize: %d\n",
 		log->l_dev, log->l_logBBstart, log->l_logsize,log->l_logBBsize);
-     printk("curr_cycle: %d  prev_cycle: %d  curr_block: %d  prev_block: %d\n",
+     kdb_printf("curr_cycle: %d  prev_cycle: %d  curr_block: %d  prev_block: %d\n",
 	     log->l_curr_cycle, log->l_prev_cycle, log->l_curr_block,
 	     log->l_prev_block);
-	printk("iclog_bak: 0x%p  iclog_size: 0x%x (%d)  num iclogs: %d\n",
+	kdb_printf("iclog_bak: 0x%p  iclog_size: 0x%x (%d)  num iclogs: %d\n",
 		log->l_iclog_bak, log->l_iclog_size, log->l_iclog_size,
 		log->l_iclog_bufs);
-	printk("&grant_lock: 0x%p  resHeadQ: 0x%p  wrHeadQ: 0x%p\n",
+	kdb_printf("&grant_lock: 0x%p  resHeadQ: 0x%p  wrHeadQ: 0x%p\n",
 		&log->l_grant_lock, log->l_reserve_headq, log->l_write_headq);
-	printk("GResCycle: %d  GResBytes: %d  GWrCycle: %d  GWrBytes: %d\n",
+	kdb_printf("GResCycle: %d  GResBytes: %d  GWrCycle: %d  GWrBytes: %d\n",
 		log->l_grant_reserve_cycle, log->l_grant_reserve_bytes,
 		log->l_grant_write_cycle, log->l_grant_write_bytes);
 	rbytes = log->l_grant_reserve_bytes + log->l_roundoff;
 	wbytes = log->l_grant_write_bytes + log->l_roundoff;
-       printk("GResBlocks: %d  GResRemain: %d  GWrBlocks: %d  GWrRemain: %d\n",
+       kdb_printf("GResBlocks: %d  GResRemain: %d  GWrBlocks: %d  GWrRemain: %d\n",
 	       rbytes / BBSIZE, rbytes % BBSIZE,
 	       wbytes / BBSIZE, wbytes % BBSIZE);
 }	/* xfsidbg_xlog */
@@ -3459,18 +3801,18 @@ xfsidbg_xlog_ritem(xlog_recover_item_t *item)
 {
 	int i = XLOG_MAX_REGIONS_IN_ITEM;
 
-	printk("(xlog_recover_item 0x%p) ", item);
-	printk("next: 0x%p prev: 0x%p type: %d cnt: %d ttl: %d\n",
+	kdb_printf("(xlog_recover_item 0x%p) ", item);
+	kdb_printf("next: 0x%p prev: 0x%p type: %d cnt: %d ttl: %d\n",
 		item->ri_next, item->ri_prev, item->ri_type, item->ri_cnt,
 		item->ri_total);
 	for ( ; i > 0; i--) {
 		if (!item->ri_buf[XLOG_MAX_REGIONS_IN_ITEM-i].i_addr)
 			break;
-		printk("a: 0x%p l: %d ",
+		kdb_printf("a: 0x%p l: %d ",
 			item->ri_buf[XLOG_MAX_REGIONS_IN_ITEM-i].i_addr,
 			item->ri_buf[XLOG_MAX_REGIONS_IN_ITEM-i].i_len);
 	}
-	printk("\n");
+	kdb_printf("\n");
 }	/* xfsidbg_xlog_ritem */
 
 /*
@@ -3481,16 +3823,16 @@ xfsidbg_xlog_rtrans(xlog_recover_t *trans)
 {
 	xlog_recover_item_t *rip, *first_rip;
 
-	printk("(xlog_recover 0x%p) ", trans);
-	printk("tid: %x type: %d items: %d ttid: 0x%x  ",
+	kdb_printf("(xlog_recover 0x%p) ", trans);
+	kdb_printf("tid: %x type: %d items: %d ttid: 0x%x  ",
 		trans->r_log_tid, trans->r_theader.th_type,
 		trans->r_theader.th_num_items, trans->r_theader.th_tid);
-	printk("itemq: 0x%p\n", trans->r_itemq);
+	kdb_printf("itemq: 0x%p\n", trans->r_itemq);
 	if (trans->r_itemq) {
 		rip = first_rip = trans->r_itemq;
 		do {
-			printk("(recovery item: 0x%p) ", rip);
-			printk("type: %d cnt: %d total: %d\n",
+			kdb_printf("(recovery item: 0x%p) ", rip);
+			kdb_printf("type: %d cnt: %d total: %d\n",
 				rip->ri_type, rip->ri_cnt, rip->ri_total);
 			rip = rip->ri_next;
 		} while (rip != first_rip);
@@ -3510,13 +3852,13 @@ xfsidbg_xlog_buf_logitem(xlog_recover_item_t *item)
 
 	buf_f = (xfs_buf_log_format_t *)item->ri_buf[0].i_addr;
 	if (buf_f->blf_flags & XFS_BLI_INODE_BUF) {
-		printk("\tINODE BUF <blkno=0x%Lx, len=0x%x>\n",
+		kdb_printf("\tINODE BUF <blkno=0x%Lx, len=0x%x>\n",
 			buf_f->blf_blkno, buf_f->blf_len);
 	} else if (buf_f->blf_flags & (XFS_BLI_UDQUOT_BUF | XFS_BLI_PDQUOT_BUF)) {
-		printk("\tDQUOT BUF <blkno=0x%Lx, len=0x%x>\n",
+		kdb_printf("\tDQUOT BUF <blkno=0x%Lx, len=0x%x>\n",
 			buf_f->blf_blkno, buf_f->blf_len);
 	} else {
-		printk("\tREG BUF <blkno=0x%Lx, len=0x%x>\n",
+		kdb_printf("\tREG BUF <blkno=0x%Lx, len=0x%x>\n",
 			buf_f->blf_blkno, buf_f->blf_len);
 		data_map = buf_f->blf_data_map;
 		map_size = buf_f->blf_map_size;
@@ -3524,13 +3866,13 @@ xfsidbg_xlog_buf_logitem(xlog_recover_item_t *item)
 		i = 1;  /* 0 is the buf format structure */
 		while (1) {
 			size = 1;
-			printk("\t\tlogbuf.i_addr 0x%p, size 0x%xB\n",
+			kdb_printf("\t\tlogbuf.i_addr 0x%p, size 0x%xB\n",
 				item->ri_buf[i].i_addr, size);
-			printk("\t\t\t\"");
+			kdb_printf("\t\t\t\"");
 			for (j=0; j<8 && j<size; j++) {
-				printk("%c", ((char *)item->ri_buf[i].i_addr)[j]);
+				kdb_printf("%c", ((char *)item->ri_buf[i].i_addr)[j]);
 			}
-			printk("...\"\n");
+			kdb_printf("...\"\n");
 			i++;
 			bit += nbits;
 		}
@@ -3546,38 +3888,38 @@ xfsidbg_xlog_rtrans_entire(xlog_recover_t *trans)
 {
 	xlog_recover_item_t *item, *first_rip;
 
-	printk("(Recovering Xact 0x%p) ", trans);
-	printk("tid: %x type: %d nitems: %d ttid: 0x%x  ",
+	kdb_printf("(Recovering Xact 0x%p) ", trans);
+	kdb_printf("tid: %x type: %d nitems: %d ttid: 0x%x  ",
 		trans->r_log_tid, trans->r_theader.th_type,
 		trans->r_theader.th_num_items, trans->r_theader.th_tid);
-	printk("itemq: 0x%p\n", trans->r_itemq);
+	kdb_printf("itemq: 0x%p\n", trans->r_itemq);
 	if (trans->r_itemq) {
 		item = first_rip = trans->r_itemq;
 		do {
 			/* 
-			   printk("(recovery item: 0x%x) ", item);
-			   printk("type: %d cnt: %d total: %d\n",
+			   kdb_printf("(recovery item: 0x%x) ", item);
+			   kdb_printf("type: %d cnt: %d total: %d\n",
 				   item->ri_type, item->ri_cnt, item->ri_total); 
 				   */
 			if ((ITEM_TYPE(item) == XFS_LI_BUF) ||
 			    (ITEM_TYPE(item) == XFS_LI_6_1_BUF) ||
 			    (ITEM_TYPE(item) == XFS_LI_5_3_BUF)) {
-				printk("BUF:");
+				kdb_printf("BUF:");
 				xfsidbg_xlog_buf_logitem(item);
 			} else if ((ITEM_TYPE(item) == XFS_LI_INODE) ||
 				   (ITEM_TYPE(item) == XFS_LI_6_1_INODE) ||
 				   (ITEM_TYPE(item) == XFS_LI_5_3_INODE)) {
-				printk("INODE:\n");
+				kdb_printf("INODE:\n");
 			} else if (ITEM_TYPE(item) == XFS_LI_EFI) {
-				printk("EFI:\n");
+				kdb_printf("EFI:\n");
 			} else if (ITEM_TYPE(item) == XFS_LI_EFD) {
-				printk("EFD:\n");
+				kdb_printf("EFD:\n");
 			} else if (ITEM_TYPE(item) == XFS_LI_DQUOT) {
-				printk("DQUOT:\n");
+				kdb_printf("DQUOT:\n");
 			} else if ((ITEM_TYPE(item) == XFS_LI_QUOTAOFF)) {
-				printk("QUOTAOFF:\n");
+				kdb_printf("QUOTAOFF:\n");
 			} else {
-				printk("UNKNOWN LOGITEM 0x%x\n", ITEM_TYPE(item));
+				kdb_printf("UNKNOWN LOGITEM 0x%x\n", ITEM_TYPE(item));
 			}
 			item = item->ri_next;
 		} while (item != first_rip);
@@ -3597,15 +3939,15 @@ xfsidbg_xlog_tic(xlog_ticket_t *tic)
 		0
 	};
 
-	printk("xlog_ticket at 0x%p\n", tic);
-	printk("next: 0x%p  prev: 0x%p  tid: 0x%x  \n",
+	kdb_printf("xlog_ticket at 0x%p\n", tic);
+	kdb_printf("next: 0x%p  prev: 0x%p  tid: 0x%x  \n",
 		tic->t_next, tic->t_prev, tic->t_tid);
-	printk("curr_res: %d  unit_res: %d  ocnt: %d  cnt: %d\n",
+	kdb_printf("curr_res: %d  unit_res: %d  ocnt: %d  cnt: %d\n",
 		tic->t_curr_res, tic->t_unit_res, (int)tic->t_ocnt,
 		(int)tic->t_cnt);
-	printk("clientid: %c  \n", tic->t_clientid);
+	kdb_printf("clientid: %c  \n", tic->t_clientid);
 	printflags(tic->t_flags, t_flags,"ticket");
-	printk("\n");
+	kdb_printf("\n");
 }	/* xfsidbg_xlog_tic */
 
 /*
@@ -3634,22 +3976,22 @@ xfsidbg_xlogitem(xfs_log_item_t *lip)
 		0
 		};
 
-	printk("type %s mountp 0x%p flags ",
+	kdb_printf("type %s mountp 0x%p flags ",
 		lid_type[lip->li_type - XFS_LI_5_3_BUF + 1],
 		lip->li_mountp);
 	printflags((uint)(lip->li_flags), li_flags,"log");
-	printk("\n");
-	printk("ail forw 0x%p ail back 0x%p lsn %s desc %p ops 0x%p\n",
+	kdb_printf("\n");
+	kdb_printf("ail forw 0x%p ail back 0x%p lsn %s desc %p ops 0x%p\n",
 		lip->li_ail.ail_forw, lip->li_ail.ail_back,
 		xfs_fmtlsn(&(lip->li_lsn)), lip->li_desc, lip->li_ops);
-	printk("iodonefunc &0x%p\n", lip->li_cb);
+	kdb_printf("iodonefunc &0x%p\n", lip->li_cb);
 	if (lip->li_type == XFS_LI_BUF) {
 		bio_lip = lip->li_bio_list;
 		if (bio_lip != NULL) {
-			printk("iodone list:\n");
+			kdb_printf("iodone list:\n");
 		}
 		while (bio_lip != NULL) {
-			printk("item 0x%p func 0x%p\n",
+			kdb_printf("item 0x%p func 0x%p\n",
 				bio_lip, bio_lip->li_cb);
 			bio_lip = bio_lip->li_bio_list;
 		}
@@ -3675,7 +4017,7 @@ xfsidbg_xlogitem(xfs_log_item_t *lip)
 		break;
 		
 	default:
-		printk("Unknown item type %d\n", lip->li_type);
+		kdb_printf("Unknown item type %d\n", lip->li_type);
 		break;
 	}
 }
@@ -3709,16 +4051,16 @@ xfsidbg_xaildump(xfs_mount_t *mp)
 
 	if ((mp->m_ail.ail_forw == NULL) ||
 	    (mp->m_ail.ail_forw == (xfs_log_item_t *)&mp->m_ail)) {
-		printk("AIL is empty\n");
+		kdb_printf("AIL is empty\n");
 		return;
 	}
-	printk("AIL for mp 0x%p, oldest first\n", mp);
+	kdb_printf("AIL for mp 0x%p, oldest first\n", mp);
 	lip = (xfs_log_item_t*)mp->m_ail.ail_forw;
 	for (count = 0; lip; count++) {
-		printk("[%d] type %s ", count,
+		kdb_printf("[%d] type %s ", count,
 			      lid_type[lip->li_type - XFS_LI_5_3_BUF + 1]);
 		printflags((uint)(lip->li_flags), li_flags, "flags:");
-		printk("  lsn %s\n   ", xfs_fmtlsn(&(lip->li_lsn)));
+		kdb_printf("  lsn %s\n   ", xfs_fmtlsn(&(lip->li_lsn)));
 		switch (lip->li_type) {
 		case XFS_LI_BUF:
 			xfs_buf_item_print((xfs_buf_log_item_t *)lip, 1);
@@ -3739,7 +4081,7 @@ xfsidbg_xaildump(xfs_mount_t *mp)
 			xfs_qoff_item_print((xfs_qoff_logitem_t *)lip, 1);
 			break;	
 		default:
-			printk("Unknown item type %d\n", lip->li_type);
+			kdb_printf("Unknown item type %d\n", lip->li_type);
 			break;
 		}
 
@@ -3787,89 +4129,89 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		0
 	};
 
-	printk("xfs_mount at 0x%p\n", mp);
-	printk("vfsp 0x%p tid 0x%x ail_lock 0x%p &ail 0x%p\n",
+	kdb_printf("xfs_mount at 0x%p\n", mp);
+	kdb_printf("vfsp 0x%p tid 0x%x ail_lock 0x%p &ail 0x%p\n",
 		XFS_MTOVFS(mp), mp->m_tid, &mp->m_ail_lock, &mp->m_ail);
-	printk("ail_gen 0x%x &sb 0x%p\n",
+	kdb_printf("ail_gen 0x%x &sb 0x%p\n",
 		mp->m_ail_gen, &mp->m_sb);
-	printk("sb_lock 0x%p sb_bp 0x%p dev 0x%x logdev 0x%x rtdev 0x%x\n",
+	kdb_printf("sb_lock 0x%p sb_bp 0x%p dev 0x%x logdev 0x%x rtdev 0x%x\n",
 		&mp->m_sb_lock, mp->m_sb_bp, mp->m_dev, mp->m_logdev,
 		mp->m_rtdev);
-	printk("bsize %d agfrotor %d agirotor %d ihash 0x%p ihsize %d\n",
+	kdb_printf("bsize %d agfrotor %d agirotor %d ihash 0x%p ihsize %d\n",
 		mp->m_bsize, mp->m_agfrotor, mp->m_agirotor,
 		mp->m_ihash, mp->m_ihsize);
-	printk("inodes 0x%p ilock 0x%p ireclaims 0x%x\n",
+	kdb_printf("inodes 0x%p ilock 0x%p ireclaims 0x%x\n",
 		mp->m_inodes, &mp->m_ilock, mp->m_ireclaims);
-	printk("readio_log 0x%x readio_blocks 0x%x ",
+	kdb_printf("readio_log 0x%x readio_blocks 0x%x ",
 		mp->m_readio_log, mp->m_readio_blocks);
-	printk("writeio_log 0x%x writeio_blocks 0x%x\n",
+	kdb_printf("writeio_log 0x%x writeio_blocks 0x%x\n",
 		mp->m_writeio_log, mp->m_writeio_blocks);
-	printk("logbufs %d logbsize %d LOG 0x%p\n", mp->m_logbufs,
+	kdb_printf("logbufs %d logbsize %d LOG 0x%p\n", mp->m_logbufs,
 		mp->m_logbsize, mp->m_log);
-	printk("rsumlevels 0x%x rsumsize 0x%x rbmip 0x%p rsumip 0x%p\n",
+	kdb_printf("rsumlevels 0x%x rsumsize 0x%x rbmip 0x%p rsumip 0x%p\n",
 		mp->m_rsumlevels, mp->m_rsumsize, mp->m_rbmip, mp->m_rsumip);
-	printk("rootip 0x%p\n", mp->m_rootip);
-	printk("dircook_elog %d blkbit_log %d blkbb_log %d agno_log %d\n",
+	kdb_printf("rootip 0x%p\n", mp->m_rootip);
+	kdb_printf("dircook_elog %d blkbit_log %d blkbb_log %d agno_log %d\n",
 		mp->m_dircook_elog, mp->m_blkbit_log, mp->m_blkbb_log,
 		mp->m_agno_log);
-	printk("agino_log %d nreadaheads %d inode cluster size %d\n",
+	kdb_printf("agino_log %d nreadaheads %d inode cluster size %d\n",
 		mp->m_agino_log, mp->m_nreadaheads,
 		mp->m_inode_cluster_size);
-	printk("blockmask 0x%x blockwsize 0x%x blockwmask 0x%x\n",
+	kdb_printf("blockmask 0x%x blockwsize 0x%x blockwmask 0x%x\n",
 		mp->m_blockmask, mp->m_blockwsize, mp->m_blockwmask);
-	printk("alloc_mxr[lf,nd] %d %d alloc_mnr[lf,nd] %d %d\n",
+	kdb_printf("alloc_mxr[lf,nd] %d %d alloc_mnr[lf,nd] %d %d\n",
 		mp->m_alloc_mxr[0], mp->m_alloc_mxr[1],
 		mp->m_alloc_mnr[0], mp->m_alloc_mnr[1]);
-	printk("bmap_dmxr[lfnr,ndnr] %d %d bmap_dmnr[lfnr,ndnr] %d %d\n",
+	kdb_printf("bmap_dmxr[lfnr,ndnr] %d %d bmap_dmnr[lfnr,ndnr] %d %d\n",
 		mp->m_bmap_dmxr[0], mp->m_bmap_dmxr[1],
 		mp->m_bmap_dmnr[0], mp->m_bmap_dmnr[1]);
-	printk("inobt_mxr[lf,nd] %d %d inobt_mnr[lf,nd] %d %d\n",
+	kdb_printf("inobt_mxr[lf,nd] %d %d inobt_mnr[lf,nd] %d %d\n",
 		mp->m_inobt_mxr[0], mp->m_inobt_mxr[1],
 		mp->m_inobt_mnr[0], mp->m_inobt_mnr[1]);
-	printk("ag_maxlevels %d bm_maxlevels[d,a] %d %d in_maxlevels %d\n",
+	kdb_printf("ag_maxlevels %d bm_maxlevels[d,a] %d %d in_maxlevels %d\n",
 		mp->m_ag_maxlevels, mp->m_bm_maxlevels[0],
 		mp->m_bm_maxlevels[1], mp->m_in_maxlevels);
-	printk("perag 0x%p &peraglock 0x%p &growlock 0x%p\n",
+	kdb_printf("perag 0x%p &peraglock 0x%p &growlock 0x%p\n",
 		mp->m_perag, &mp->m_peraglock, &mp->m_growlock);
 	printflags(mp->m_flags, xmount_flags,"flags");
-	printk("ialloc_inos %d ialloc_blks %d litino %d\n",
+	kdb_printf("ialloc_inos %d ialloc_blks %d litino %d\n",
 		mp->m_ialloc_inos, mp->m_ialloc_blks, mp->m_litino);
-	printk("attroffset %d da_node_ents %d maxicount %Ld inoalign_mask %d\n",
+	kdb_printf("attroffset %d da_node_ents %d maxicount %Ld inoalign_mask %d\n",
 		mp->m_attroffset, mp->m_da_node_ents, mp->m_maxicount,
 		mp->m_inoalign_mask);
-	printk("resblks %Ld resblks_avail %Ld\n", mp->m_resblks, 
+	kdb_printf("resblks %Ld resblks_avail %Ld\n", mp->m_resblks, 
 		mp->m_resblks_avail);
 #if XFS_BIG_FILESYSTEMS
-	printk(" inoadd %Lx\n", mp->m_inoadd);
+	kdb_printf(" inoadd %Lx\n", mp->m_inoadd);
 #else
-	printk("\n");
+	kdb_printf("\n");
 #endif
 	if (mp->m_quotainfo)
-		printk("quotainfo 0x%p (uqip = 0x%p, pqip = 0x%p)\n",
+		kdb_printf("quotainfo 0x%p (uqip = 0x%p, pqip = 0x%p)\n",
 			mp->m_quotainfo, 
 			mp->m_quotainfo->qi_uquotaip,
 			mp->m_quotainfo->qi_pquotaip);
 	else 
-		printk("quotainfo NULL\n");
+		kdb_printf("quotainfo NULL\n");
 	printflags(mp->m_qflags, quota_flags,"quotaflags");
-	printk("\n");
-	printk("dalign %d swidth %d sinoalign %d attr_magicpct %d dir_magicpct %d\n", 
+	kdb_printf("\n");
+	kdb_printf("dalign %d swidth %d sinoalign %d attr_magicpct %d dir_magicpct %d\n", 
 		mp->m_dalign, mp->m_swidth, mp->m_sinoalign,
 		mp->m_attr_magicpct, mp->m_dir_magicpct);
-	printk("mk_sharedro %d dirversion %d dirblkfsbs %d &dirops 0x%p\n",
+	kdb_printf("mk_sharedro %d dirversion %d dirblkfsbs %d &dirops 0x%p\n",
 		mp->m_mk_sharedro, mp->m_dirversion, mp->m_dirblkfsbs,
 		&mp->m_dirops);
-	printk("dirblksize %d dirdatablk 0x%Lx dirleafblk 0x%Lx dirfreeblk 0x%Lx\n",
+	kdb_printf("dirblksize %d dirdatablk 0x%Lx dirleafblk 0x%Lx dirfreeblk 0x%Lx\n",
 		mp->m_dirblksize,
 		(xfs_dfiloff_t)mp->m_dirdatablk,
 		(xfs_dfiloff_t)mp->m_dirleafblk,
 		(xfs_dfiloff_t)mp->m_dirfreeblk);
-	printk("chsize %d chash 0x%p\n",
+	kdb_printf("chsize %d chash 0x%p\n",
 		mp->m_chsize, mp->m_chash);
 	if (mp->m_fsname != NULL)
-		printk("mountpoint \"%s\"\n", mp->m_fsname);
+		kdb_printf("mountpoint \"%s\"\n", mp->m_fsname);
 	else
-		printk("No name!!!\n");
+		kdb_printf("No name!!!\n");
 		
 }
 
@@ -3889,7 +4231,13 @@ xfsidbg_xihash(xfs_mount_t *mp)
 	void		kfree_s(void *, size_t);
 
 	hist = (int *) kmalloc(hist_bytes, GFP_KERNEL);
-        ASSERT(hist);
+
+        if (hist == NULL) {
+		kdb_printf("xfsidbg_xihash: kmalloc(%d) failed!\n",
+							hist_bytes);
+		return;
+	}
+
 	for (i = 0; i < mp->m_ihsize; i++) {
 		ih = mp->m_ihash + i;
 		j = 0;
@@ -3904,27 +4252,33 @@ xfsidbg_xihash(xfs_mount_t *mp)
 		hist2[i] = 0;
 
 	for (i = 0; i < mp->m_ihsize; i++)  {
-		printk("%d ", hist[i]);
+		kdb_printf("%d ", hist[i]);
 		total += hist[i];
 		numzeros += hist[i] == 0 ? 1 : 0;
 		if (hist[i] > 20)
 			j = 20;
 		else
 			j = hist[i];
-		ASSERT(j <= 20);
+
+		if (! (j <= 20)) {
+			kdb_printf("xfsidbg_xihash: (j > 20)/%d @ line # %d\n",
+							j, __LINE__);
+			return;
+		}
+
 		hist2[j]++;
 	}
 
-	printk("\n");
+	kdb_printf("\n");
 
-	printk("total inodes = %d, average length = %d, adjusted average = %d \n",
+	kdb_printf("total inodes = %d, average length = %d, adjusted average = %d \n",
 		total, total / mp->m_ihsize,
 		total / (mp->m_ihsize - numzeros));
 
 	for (i = 0; i < 21; i++)  {
-		printk("%d - %d , ", i, hist2[i]);
+		kdb_printf("%d - %d , ", i, hist2[i]);
 	}
-	printk("\n");
+	kdb_printf("\n");
 	kfree_s(hist, hist_bytes);
 }
 
@@ -3937,50 +4291,52 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	static char *tab_flags[] = {
 		"grio",		/* XFS_IGRIO */
 		"uiosize",	/* XFS_IUIOSZ */
+		"quiesce",	/* XFS_IQUIESCE */
+		"reclaim",	/* XFS_IRECLAIM */
 		NULL
 	};
 
-	printk("hash 0x%p next 0x%p prevp 0x%p mount 0x%p\n",
+	kdb_printf("hash 0x%p next 0x%p prevp 0x%p mount 0x%p\n",
 		ip->i_hash,
 		ip->i_next,
 		ip->i_prevp,
 		ip->i_mount);
-	printk("mnext 0x%p mprev 0x%p vnode 0x%p \n",
+	kdb_printf("mnext 0x%p mprev 0x%p vnode 0x%p \n",
 		ip->i_mnext,
 		ip->i_mprev,
-		XFS_ITOV(ip));
-	printk("dev %x ino %s\n",
+		XFS_ITOV_NULL(ip));
+	kdb_printf("dev %x ino %s\n",
 		ip->i_dev,
 		xfs_fmtino(ip->i_ino, ip->i_mount));
-	printk("blkno 0x%Lx len 0x%x boffset 0x%x\n",
+	kdb_printf("blkno 0x%Lx len 0x%x boffset 0x%x\n",
 		ip->i_blkno,
 		ip->i_len,
 		ip->i_boffset);
-	printk("transp 0x%p &itemp 0x%p\n",
+	kdb_printf("transp 0x%p &itemp 0x%p\n",
 		ip->i_transp,
 		ip->i_itemp);
-	printk("&lock 0x%p lock_ra 0x%p &iolock 0x%p\n",
+	kdb_printf("&lock 0x%p lock_ra 0x%p &iolock 0x%p\n",
 		&ip->i_lock,
 		ip->i_ilock_ra,
 		&ip->i_iolock);
-	printk("udquotp 0x%p pdquotp 0x%p\n",
+	kdb_printf("udquotp 0x%p pdquotp 0x%p\n",
 		ip->i_udquot, ip->i_pdquot);
-	printk("&flock 0x%p (%d) &pinlock 0x%p pincount 0x%x &pinsema 0x%p\n",
+	kdb_printf("&flock 0x%p (%d) &pinlock 0x%p pincount 0x%x &pinsema 0x%p\n",
 		&ip->i_flock, valusema(&ip->i_flock),
 		&ip->i_ipinlock,
 		ip->i_pincount,
 		&ip->i_pinsema);
-	printk("&rlock 0x%p\n", &ip->i_iocore.io_rlock);
-	printk("next_offset %Lx ", ip->i_iocore.io_next_offset);
-	printk("io_offset %Lx reada_blkno %s io_size 0x%x\n",
+	kdb_printf("&rlock 0x%p\n", &ip->i_iocore.io_rlock);
+	kdb_printf("next_offset %Lx ", ip->i_iocore.io_next_offset);
+	kdb_printf("io_offset %Lx reada_blkno %s io_size 0x%x\n",
 		ip->i_iocore.io_offset,
 		xfs_fmtfsblock(ip->i_iocore.io_reada_blkno, ip->i_mount),
 		ip->i_iocore.io_size);
-	printk("last_req_sz 0x%x new_size %Lx\n",
+	kdb_printf("last_req_sz 0x%x new_size %Lx\n",
 		ip->i_iocore.io_last_req_sz, ip->i_iocore.io_new_size);
-	printk("write off %Lx gap list 0x%p\n",
+	kdb_printf("write off %Lx gap list 0x%p\n",
 		ip->i_iocore.io_write_offset, ip->i_iocore.io_gap_list);
-	printk(
+	kdb_printf(
 "readiolog %u, readioblocks %u, writeiolog %u, writeioblocks %u, maxiolog %u\n",
 		(unsigned int) ip->i_iocore.io_readio_log,
 		ip->i_iocore.io_readio_blocks,
@@ -3988,21 +4344,21 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		ip->i_iocore.io_writeio_blocks,
 		(unsigned int) ip->i_iocore.io_max_io_log);
 	printflags((int)ip->i_flags, tab_flags, "flags");
-	printk("\n");
-	printk("update_core 0x%x update size 0x%x\n",
+	kdb_printf("\n");
+	kdb_printf("update_core 0x%x update size 0x%x\n",
 		(int)(ip->i_update_core), (int) ip->i_update_size);
-	printk("gen 0x%x qbufs %d delayed blks %d",
+	kdb_printf("gen 0x%x qbufs %d delayed blks %d",
 		ip->i_gen,
 		ip->i_iocore.io_queued_bufs,
 		ip->i_delayed_blks);
-	printk("\n");
-	printk("chash 0x%p cnext 0x%p cprev 0x%p\n",
+	kdb_printf("\n");
+	kdb_printf("chash 0x%p cnext 0x%p cprev 0x%p\n",
 		ip->i_chash,
 		ip->i_cnext,
 		ip->i_cprev);
 	xfs_xnode_fork("data", &ip->i_df);
 	xfs_xnode_fork("attr", ip->i_afp);
-	printk("\n");
+	kdb_printf("\n");
 	xfs_prdinode_core(&ip->i_d);
 }
 
@@ -4010,25 +4366,25 @@ static void
 xfsidbg_xcore(xfs_iocore_t *io)
 {
 	if (IO_IS_XFS(io)) {
-		printk("io_obj 0x%p (xinode) io_mount 0x%p\n",
+		kdb_printf("io_obj 0x%p (xinode) io_mount 0x%p\n",
 			io->io_obj, io->io_mount);
 	} else {
-		printk("io_obj 0x%p (dcxvn) io_mount 0x%p\n",
+		kdb_printf("io_obj 0x%p (dcxvn) io_mount 0x%p\n",
 			io->io_obj, io->io_mount);
 	}
-	printk("&lock 0x%p &iolock 0x%p &flock 0x%p &rlock 0x%p\n",
+	kdb_printf("&lock 0x%p &iolock 0x%p &flock 0x%p &rlock 0x%p\n",
 		io->io_lock, io->io_iolock,
 		io->io_flock, &io->io_rlock);
-	printk("next_offset %Lx ", io->io_next_offset);
-	printk("io_offset %Lx reada_blkno %s io_size 0x%x\n",
+	kdb_printf("next_offset %Lx ", io->io_next_offset);
+	kdb_printf("io_offset %Lx reada_blkno %s io_size 0x%x\n",
 		io->io_offset,
 		xfs_fmtfsblock(io->io_reada_blkno, io->io_mount),
 		io->io_size);
-	printk("last_req_sz 0x%x new_size %Lx\n",
+	kdb_printf("last_req_sz 0x%x new_size %Lx\n",
 		io->io_last_req_sz, io->io_new_size);
-	printk("write off %Lx gap list 0x%p\n",
+	kdb_printf("write off %Lx gap list 0x%p\n",
 		io->io_write_offset, io->io_gap_list);
-	printk(
+	kdb_printf(
 "readiolog %u, readioblocks %u, writeiolog %u, writeioblocks %u, maxiolog %u\n",
 		(unsigned int) io->io_readio_log,
 		io->io_readio_blocks,
@@ -4046,11 +4402,11 @@ xfsidbg_xchash(xfs_mount_t *mp)
 	int		i;
 	xfs_chash_t	*ch;
 
-	printk("m_chash 0x%p size %d\n",
+	kdb_printf("m_chash 0x%p size %d\n",
 		mp->m_chash, mp->m_chsize);
 	for (i = 0; i < mp->m_chsize; i++) {
 		ch = mp->m_chash + i;
-		printk("[%3d] ch 0x%p chashlist 0x%p\n", i, ch, ch->ch_list);
+		kdb_printf("[%3d] ch 0x%p chashlist 0x%p\n", i, ch, ch->ch_list);
 		xfsidbg_xchashlist(ch->ch_list);
 	}
 }
@@ -4064,18 +4420,18 @@ xfsidbg_xchashlist(xfs_chashlist_t *chl)
 	xfs_inode_t	*ip;
 
 	while (chl != NULL) {
-		printk("hashlist inode 0x%p blkno %Ld ",
+		kdb_printf("hashlist inode 0x%p blkno %Ld ",
 		       chl->chl_ip, chl->chl_blkno);
 
-		printk("\n");
+		kdb_printf("\n");
 
 		/* print inodes on chashlist */
 		ip = chl->chl_ip;
 		do {
-			printk("0x%p ", ip);
+			kdb_printf("0x%p ", ip);
 			ip = ip->i_cnext;
 		} while (ip != chl->chl_ip);
-		printk("\n");
+		kdb_printf("\n");
 
 		chl=chl->chl_next;
 	}
@@ -4092,17 +4448,17 @@ xfsidbg_xperag(xfs_mount_t *mp)
 
 	pag = mp->m_perag;
 	for (agno = 0; agno < mp->m_sb.sb_agcount; agno++, pag++) {
-		printk("ag %d f_init %d i_init %d\n",
+		kdb_printf("ag %d f_init %d i_init %d\n",
 			agno, pag->pagf_init, pag->pagi_init);
 		if (pag->pagf_init)
-			printk(
+			kdb_printf(
 	"    f_levels[b,c] %d,%d f_flcount %d f_freeblks %d f_longest %d\n",
 				pag->pagf_levels[XFS_BTNUM_BNOi],
 				pag->pagf_levels[XFS_BTNUM_CNTi],
 				pag->pagf_flcount, pag->pagf_freeblks,
 				pag->pagf_longest);
 		if (pag->pagi_init)
-			printk("    i_freecount %d\n", pag->pagi_freecount);
+			kdb_printf("    i_freecount %d\n", pag->pagi_freecount);
 	}
 }
 
@@ -4113,16 +4469,16 @@ xfsidbg_xqm()
 {
 
 	if (xfs_Gqm == NULL) {
-		printk("NULL XQM!!\n");
+		kdb_printf("NULL XQM!!\n");
 		return;
 	}
 
-	printk("usrhtab 0x%p\tprjhtab 0x%p\tndqfree 0x%x\thashmask 0x%x\n",
+	kdb_printf("usrhtab 0x%p\tprjhtab 0x%p\tndqfree 0x%x\thashmask 0x%x\n",
 		xfs_Gqm->qm_usr_dqhtable,
 		xfs_Gqm->qm_prj_dqhtable,
 		xfs_Gqm->qm_dqfreelist.qh_nelems,
 		xfs_Gqm->qm_dqhashmask);
-	printk("&freelist 0x%p, totaldquots 0x%x nrefs 0x%x\n",
+	kdb_printf("&freelist 0x%p, totaldquots 0x%x nrefs 0x%x\n",
 		&xfs_Gqm->qm_dqfreelist,
 		xfs_Gqm->qm_totaldquots,
 		xfs_Gqm->qm_nrefs);
@@ -4131,15 +4487,15 @@ xfsidbg_xqm()
 static void
 xfsidbg_xqm_diskdq(xfs_disk_dquot_t *d)
 {
-	printk("magic 0x%x\tversion 0x%x\tID 0x%x (%d)\t\n", d->d_magic,
+	kdb_printf("magic 0x%x\tversion 0x%x\tID 0x%x (%d)\t\n", d->d_magic,
 		d->d_version, d->d_id, d->d_id);
-	printk("blk_hard 0x%x\tblk_soft 0x%x\tino_hard 0x%x\tino_soft 0x%x\n",
+	kdb_printf("blk_hard 0x%x\tblk_soft 0x%x\tino_hard 0x%x\tino_soft 0x%x\n",
 		(int)d->d_blk_hardlimit, (int)d->d_blk_softlimit,
 		(int)d->d_ino_hardlimit, (int)d->d_ino_softlimit);
-	printk("bcount 0x%x (%d) icount 0x%x (%d)\n",
+	kdb_printf("bcount 0x%x (%d) icount 0x%x (%d)\n",
 		(int)d->d_bcount, (int)d->d_bcount, 
 		(int)d->d_icount, (int)d->d_icount);
-	printk("btimer 0x%x itimer 0x%x \n",
+	kdb_printf("btimer 0x%x itimer 0x%x \n",
 		(int)d->d_btimer, (int)d->d_itimer);
 }
 
@@ -4157,29 +4513,29 @@ xfsidbg_xqm_dquot(xfs_dquot_t *dqp)
 		"MARKER",
 		0
 	};
-	printk("mount 0x%p hash 0x%p pdquotp 0x%p HL_next 0x%p HL_prevp 0x%p\n",
+	kdb_printf("mount 0x%p hash 0x%p pdquotp 0x%p HL_next 0x%p HL_prevp 0x%p\n",
 		dqp->q_mount,
 		dqp->q_hash,
 		dqp->q_pdquot,
 		dqp->HL_NEXT,
 		dqp->HL_PREVP);
-	printk("MPL_next 0x%p MPL_prevp 0x%p FL_next 0x%p FL_prev 0x%p\n",
+	kdb_printf("MPL_next 0x%p MPL_prevp 0x%p FL_next 0x%p FL_prev 0x%p\n",
 		dqp->MPL_NEXT,
 		dqp->MPL_PREVP,
 		dqp->dq_flnext,
 		dqp->dq_flprev);
 
-	printk("nrefs 0x%x, res_bcount %d, ", 
+	kdb_printf("nrefs 0x%x, res_bcount %d, ", 
 		dqp->q_nrefs, (int) dqp->q_res_bcount);
 	printflags(dqp->dq_flags, qflags, "flags:");
-	printk("\nblkno 0x%x\tdev 0x%x\tboffset 0x%x\n", (int) dqp->q_blkno, 
+	kdb_printf("\nblkno 0x%x\tdev 0x%x\tboffset 0x%x\n", (int) dqp->q_blkno, 
 		(int) dqp->q_dev, (int) dqp->q_bufoffset);
-	printk("qlock 0x%p  flock 0x%p (%s) pincount 0x%x\n",
+	kdb_printf("qlock 0x%p  flock 0x%p (%s) pincount 0x%x\n",
 		&dqp->q_qlock,
 		&dqp->q_flock, 
 		(valusema(&dqp->q_flock) <= 0) ? "LCK" : "UNLKD",
 		dqp->q_pincount);
-	printk("disk-dquot 0x%p\n", &dqp->q_core);
+	kdb_printf("disk-dquot 0x%p\n", &dqp->q_core);
 	xfsidbg_xqm_diskdq(&dqp->q_core);
 	
 }
@@ -4189,16 +4545,16 @@ xfsidbg_xqm_dquot(xfs_dquot_t *dqp)
 { \
 	  xfs_dquot_t	*dqp;\
 	  int i = 0; \
-	  printk("[#%d dquots]\n", (int) (l)->qh_nelems); \
+	  kdb_printf("[#%d dquots]\n", (int) (l)->qh_nelems); \
 	  for (dqp = (l)->qh_next; dqp != NULL; dqp = dqp->NXT) {\
-	   printk( \
+	   kdb_printf( \
 	      "\t%d. [0x%p] \"%d (%s)\"\t blks = %d, inos = %d refs = %d\n", \
 			 ++i, dqp, (int) dqp->q_core.d_id, \
 		         DQFLAGTO_TYPESTR(dqp),      \
 			 (int) dqp->q_core.d_bcount, \
 			 (int) dqp->q_core.d_icount, \
                          (int) dqp->q_nrefs); }\
-	  printk("\n"); \
+	  kdb_printf("\n"); \
 }
 
 static void
@@ -4215,12 +4571,12 @@ xfsidbg_xqm_dqattached_inos(xfs_mount_t	*mp)
 		}
 		if (ip->i_udquot || ip->i_pdquot) {
 			n++;
-			printk("inode = 0x%p, ino %d: udq 0x%p, pdq 0x%p\n", 
+			kdb_printf("inode = 0x%p, ino %d: udq 0x%p, pdq 0x%p\n", 
 				ip, (int) ip->i_ino, ip->i_udquot, ip->i_pdquot);
 		}
 		ip = ip->i_mnext;
 	} while (ip != mp->m_inodes);
-	printk("\nNumber of inodes with dquots attached: %d\n", n);
+	kdb_printf("\nNumber of inodes with dquots attached: %d\n", n);
 
 }
 
@@ -4230,9 +4586,9 @@ xfsidbg_xqm_freelist_print(xfs_frlist_t *qlist, char *title)
 {
 	xfs_dquot_t *dq;
 	int i = 0;
-	printk("%s (#%d)\n", title, (int) qlist->qh_nelems);		
+	kdb_printf("%s (#%d)\n", title, (int) qlist->qh_nelems);		
 	FOREACH_DQUOT_IN_FREELIST(dq, qlist) {
-		printk("\t%d.\t\"%d (%s:0x%p)\"\t bcnt = %d, icnt = %d "
+		kdb_printf("\t%d.\t\"%d (%s:0x%p)\"\t bcnt = %d, icnt = %d "
 		       "refs = %d\n",  
 		       ++i, (int) dq->q_core.d_id,
 		       DQFLAGTO_TYPESTR(dq), dq,     
@@ -4248,14 +4604,14 @@ xfsidbg_xqm_freelist(void)
 	if (xfs_Gqm) {
 		xfsidbg_xqm_freelist_print(&(xfs_Gqm->qm_dqfreelist), "Freelist");
 	} else
-		printk("NULL XQM!!\n");
+		kdb_printf("NULL XQM!!\n");
 }
 
 static void	
 xfsidbg_xqm_mplist(xfs_mount_t *mp)
 {
 	if (mp->m_quotainfo == NULL) {
-		printk("NULL quotainfo\n");
+		kdb_printf("NULL quotainfo\n");
 		return;
 	}
 	
@@ -4270,20 +4626,20 @@ xfsidbg_xqm_htab(void)
 	xfs_dqhash_t	*h;
 
 	if (xfs_Gqm == NULL) {
-		printk("NULL XQM!!\n");
+		kdb_printf("NULL XQM!!\n");
 		return;
 	}
 	for (i = 0; i <= xfs_Gqm->qm_dqhashmask; i++) {
 		h = &xfs_Gqm->qm_usr_dqhtable[i];
 		if (h->qh_next) {
-			printk("USR %d: ", i);
+			kdb_printf("USR %d: ", i);
 			XQMIDBG_LIST_PRINT(h, HL_NEXT);
 		}
 	}
 	for (i = 0; i <= xfs_Gqm->qm_dqhashmask; i++) {
 		h = &xfs_Gqm->qm_prj_dqhtable[i];
 		if (h->qh_next) {
-			printk("PRJ %d: ", i);
+			kdb_printf("PRJ %d: ", i);
 			XQMIDBG_LIST_PRINT(h, HL_NEXT);
 		}
 	}
@@ -4294,23 +4650,23 @@ static void
 xfsidbg_xqm_qinfo(xfs_mount_t *mp)
 {
 	if (mp == NULL || mp->m_quotainfo == NULL) {
-		printk("NULL quotainfo\n");
+		kdb_printf("NULL quotainfo\n");
 		return;
 	}
 	
-	printk("uqip 0x%p, pqip 0x%p, &pinlock 0x%p &dqlist 0x%p\n",
+	kdb_printf("uqip 0x%p, pqip 0x%p, &pinlock 0x%p &dqlist 0x%p\n",
 		mp->m_quotainfo->qi_uquotaip,
 		mp->m_quotainfo->qi_pquotaip,
 		&mp->m_quotainfo->qi_pinlock,
 		&mp->m_quotainfo->qi_dqlist);
 
-	printk("nreclaims %d, btmlimit 0x%x, itmlimit 0x%x, RTbtmlim 0x%x\n",
+	kdb_printf("nreclaims %d, btmlimit 0x%x, itmlimit 0x%x, RTbtmlim 0x%x\n",
 		(int)mp->m_quotainfo->qi_dqreclaims,
 		(int)mp->m_quotainfo->qi_btimelimit,
 		(int)mp->m_quotainfo->qi_itimelimit,
 		(int)mp->m_quotainfo->qi_rtbtimelimit);
 
-	printk("bwarnlim 0x%x, iwarnlim 0x%x, &qofflock 0x%p, "
+	kdb_printf("bwarnlim 0x%x, iwarnlim 0x%x, &qofflock 0x%p, "
 		"chunklen 0x%x, dqperchunk 0x%x\n",
 		(int)mp->m_quotainfo->qi_bwarnlimit,
 		(int)mp->m_quotainfo->qi_iwarnlimit,
@@ -4325,17 +4681,17 @@ xfsidbg_xqm_tpdqinfo(xfs_trans_t *tp)
 	xfs_dqtrx_t 	*qa, *q;
 	int		i,j;
 
-	printk("dqinfo 0x%p\n", tp->t_dqinfo);
+	kdb_printf("dqinfo 0x%p\n", tp->t_dqinfo);
 	if (! tp->t_dqinfo)
 		return;
-	printk("USR: \n");
+	kdb_printf("USR: \n");
 	qa = tp->t_dqinfo->dqa_usrdquots;
 	for (j = 0; j < 2; j++) {
 		for (i = 0; i < XFS_QM_TRANS_MAXDQS; i++) {
 			if (qa[i].qt_dquot == NULL)
 				break;
 			q = &qa[i];
-			printk(
+			kdb_printf(
   "\"%d\"[0x%p]: bres %d, bres-used %d, bdelta %d, del-delta %d, icnt-delta %d\n",
 				(int) q->qt_dquot->q_core.d_id,
 				q->qt_dquot,
@@ -4347,7 +4703,7 @@ xfsidbg_xqm_tpdqinfo(xfs_trans_t *tp)
 		}
 		if (j == 0) {
 			qa = tp->t_dqinfo->dqa_prjdquots;
-			printk("PRJ: \n");
+			kdb_printf("PRJ: \n");
 		}
 	}
 				
@@ -4361,51 +4717,51 @@ xfsidbg_xqm_tpdqinfo(xfs_trans_t *tp)
 static void
 xfsidbg_xsb(xfs_sb_t *sbp)
 {
-	printk("magicnum 0x%x blocksize 0x%x dblocks %Ld rblocks %Ld\n",
+	kdb_printf("magicnum 0x%x blocksize 0x%x dblocks %Ld rblocks %Ld\n",
 		sbp->sb_magicnum, sbp->sb_blocksize,
 		sbp->sb_dblocks, sbp->sb_rblocks);
-	printk("rextents %Ld uuid %s logstart %s\n",
+	kdb_printf("rextents %Ld uuid %s logstart %s\n",
 		sbp->sb_rextents,
 		xfs_fmtuuid(&sbp->sb_uuid),
 		xfs_fmtfsblock(sbp->sb_logstart, NULL));
-	printk("rootino %s ",
+	kdb_printf("rootino %s ",
 		xfs_fmtino(sbp->sb_rootino, NULL));
-	printk("rbmino %s ",
+	kdb_printf("rbmino %s ",
 		xfs_fmtino(sbp->sb_rbmino, NULL));
-	printk("rsumino %s\n",
+	kdb_printf("rsumino %s\n",
 		xfs_fmtino(sbp->sb_rsumino, NULL));
-	printk("rextsize 0x%x agblocks 0x%x agcount 0x%x rbmblocks 0x%x\n",
+	kdb_printf("rextsize 0x%x agblocks 0x%x agcount 0x%x rbmblocks 0x%x\n",
 		sbp->sb_rextsize,
 		sbp->sb_agblocks,
 		sbp->sb_agcount,
 		sbp->sb_rbmblocks);
-	printk("logblocks 0x%x versionnum 0x%x sectsize 0x%x inodesize 0x%x\n",
+	kdb_printf("logblocks 0x%x versionnum 0x%x sectsize 0x%x inodesize 0x%x\n",
 		sbp->sb_logblocks,
 		sbp->sb_versionnum,
 		sbp->sb_sectsize,
 		sbp->sb_inodesize);
-	printk("inopblock 0x%x blocklog 0x%x sectlog 0x%x inodelog 0x%x\n",
+	kdb_printf("inopblock 0x%x blocklog 0x%x sectlog 0x%x inodelog 0x%x\n",
 		sbp->sb_inopblock,
 		sbp->sb_blocklog,
 		sbp->sb_sectlog,
 		sbp->sb_inodelog);
-	printk("inopblog %d agblklog %d rextslog %d inprogress %d imax_pct %d\n",
+	kdb_printf("inopblog %d agblklog %d rextslog %d inprogress %d imax_pct %d\n",
 		sbp->sb_inopblog,
 		sbp->sb_agblklog,
 		sbp->sb_rextslog,
 		sbp->sb_inprogress,
 		sbp->sb_imax_pct);
-	printk("icount %Lx ifree %Lx fdblocks %Lx frextents %Lx\n",
+	kdb_printf("icount %Lx ifree %Lx fdblocks %Lx frextents %Lx\n",
 		sbp->sb_icount,
 		sbp->sb_ifree,
 		sbp->sb_fdblocks,
 		sbp->sb_frextents);
-	printk("uquotino %s ", xfs_fmtino(sbp->sb_uquotino, NULL));
-	printk("pquotino %s ", xfs_fmtino(sbp->sb_pquotino, NULL));
-	printk("qflags 0x%x flags 0x%x shared_vn %d inoaligmt %d\n",
+	kdb_printf("uquotino %s ", xfs_fmtino(sbp->sb_uquotino, NULL));
+	kdb_printf("pquotino %s ", xfs_fmtino(sbp->sb_pquotino, NULL));
+	kdb_printf("qflags 0x%x flags 0x%x shared_vn %d inoaligmt %d\n",
 		sbp->sb_qflags, sbp->sb_flags, sbp->sb_shared_vn,
 		sbp->sb_inoalignmt);
-	printk("unit %d width %d dirblklog %d\n",
+	kdb_printf("unit %d width %d dirblklog %d\n",
 		sbp->sb_unit, sbp->sb_width, sbp->sb_dirblklog);
 }
 
@@ -4436,80 +4792,80 @@ xfsidbg_xtp(xfs_trans_t *tp)
 		0
 		};
 
-	printk("tp 0x%p type ", tp);
+	kdb_printf("tp 0x%p type ", tp);
 	switch (tp->t_type) {
-	case XFS_TRANS_SETATTR_NOT_SIZE: printk("SETATTR_NOT_SIZE");	break;
-	case XFS_TRANS_SETATTR_SIZE:	printk("SETATTR_SIZE");	break;
-	case XFS_TRANS_INACTIVE:	printk("INACTIVE");		break;
-	case XFS_TRANS_CREATE:		printk("CREATE");		break;
-	case XFS_TRANS_CREATE_TRUNC:	printk("CREATE_TRUNC");	break;
-	case XFS_TRANS_TRUNCATE_FILE:	printk("TRUNCATE_FILE");	break;
-	case XFS_TRANS_REMOVE:		printk("REMOVE");		break;
-	case XFS_TRANS_LINK:		printk("LINK");		break;
-	case XFS_TRANS_RENAME:		printk("RENAME");		break;
-	case XFS_TRANS_MKDIR:		printk("MKDIR");		break;
-	case XFS_TRANS_RMDIR:		printk("RMDIR");		break;
-	case XFS_TRANS_SYMLINK:		printk("SYMLINK");		break;
-	case XFS_TRANS_SET_DMATTRS:	printk("SET_DMATTRS");		break;
-	case XFS_TRANS_GROWFS:		printk("GROWFS");		break;
-	case XFS_TRANS_STRAT_WRITE:	printk("STRAT_WRITE");		break;
-	case XFS_TRANS_DIOSTRAT:	printk("DIOSTRAT");		break;
-	case XFS_TRANS_WRITE_SYNC:	printk("WRITE_SYNC");		break;
-	case XFS_TRANS_WRITEID:		printk("WRITEID");		break;
-	case XFS_TRANS_ADDAFORK:	printk("ADDAFORK");		break;
-	case XFS_TRANS_ATTRINVAL:	printk("ATTRINVAL");		break;
-	case XFS_TRANS_ATRUNCATE:	printk("ATRUNCATE");		break;
-	case XFS_TRANS_ATTR_SET:	printk("ATTR_SET");		break;
-	case XFS_TRANS_ATTR_RM:		printk("ATTR_RM");		break;
-	case XFS_TRANS_ATTR_FLAG:	printk("ATTR_FLAG");		break;
-	case XFS_TRANS_CLEAR_AGI_BUCKET:  printk("CLEAR_AGI_BUCKET");	break;
-	case XFS_TRANS_QM_SBCHANGE:	printk("QM_SBCHANGE"); 	break;
-	case XFS_TRANS_QM_QUOTAOFF:	printk("QM_QUOTAOFF"); 	break;
-	case XFS_TRANS_QM_DQALLOC:	printk("QM_DQALLOC");		break;
-	case XFS_TRANS_QM_SETQLIM:	printk("QM_SETQLIM");		break;
-	case XFS_TRANS_QM_DQCLUSTER:	printk("QM_DQCLUSTER");	break;
-	case XFS_TRANS_QM_QINOCREATE:	printk("QM_QINOCREATE");	break;
-	case XFS_TRANS_QM_QUOTAOFF_END:	printk("QM_QOFF_END");		break;
-	case XFS_TRANS_SB_UNIT:		printk("SB_UNIT");		break;
-	case XFS_TRANS_FSYNC_TS:	printk("FSYNC_TS");		break;
-	case XFS_TRANS_GROWFSRT_ALLOC:	printk("GROWFSRT_ALLOC");	break;
-	case XFS_TRANS_GROWFSRT_ZERO:	printk("GROWFSRT_ZERO");	break;
-	case XFS_TRANS_GROWFSRT_FREE:	printk("GROWFSRT_FREE");	break;
+	case XFS_TRANS_SETATTR_NOT_SIZE: kdb_printf("SETATTR_NOT_SIZE");	break;
+	case XFS_TRANS_SETATTR_SIZE:	kdb_printf("SETATTR_SIZE");	break;
+	case XFS_TRANS_INACTIVE:	kdb_printf("INACTIVE");		break;
+	case XFS_TRANS_CREATE:		kdb_printf("CREATE");		break;
+	case XFS_TRANS_CREATE_TRUNC:	kdb_printf("CREATE_TRUNC");	break;
+	case XFS_TRANS_TRUNCATE_FILE:	kdb_printf("TRUNCATE_FILE");	break;
+	case XFS_TRANS_REMOVE:		kdb_printf("REMOVE");		break;
+	case XFS_TRANS_LINK:		kdb_printf("LINK");		break;
+	case XFS_TRANS_RENAME:		kdb_printf("RENAME");		break;
+	case XFS_TRANS_MKDIR:		kdb_printf("MKDIR");		break;
+	case XFS_TRANS_RMDIR:		kdb_printf("RMDIR");		break;
+	case XFS_TRANS_SYMLINK:		kdb_printf("SYMLINK");		break;
+	case XFS_TRANS_SET_DMATTRS:	kdb_printf("SET_DMATTRS");		break;
+	case XFS_TRANS_GROWFS:		kdb_printf("GROWFS");		break;
+	case XFS_TRANS_STRAT_WRITE:	kdb_printf("STRAT_WRITE");		break;
+	case XFS_TRANS_DIOSTRAT:	kdb_printf("DIOSTRAT");		break;
+	case XFS_TRANS_WRITE_SYNC:	kdb_printf("WRITE_SYNC");		break;
+	case XFS_TRANS_WRITEID:		kdb_printf("WRITEID");		break;
+	case XFS_TRANS_ADDAFORK:	kdb_printf("ADDAFORK");		break;
+	case XFS_TRANS_ATTRINVAL:	kdb_printf("ATTRINVAL");		break;
+	case XFS_TRANS_ATRUNCATE:	kdb_printf("ATRUNCATE");		break;
+	case XFS_TRANS_ATTR_SET:	kdb_printf("ATTR_SET");		break;
+	case XFS_TRANS_ATTR_RM:		kdb_printf("ATTR_RM");		break;
+	case XFS_TRANS_ATTR_FLAG:	kdb_printf("ATTR_FLAG");		break;
+	case XFS_TRANS_CLEAR_AGI_BUCKET:  kdb_printf("CLEAR_AGI_BUCKET");	break;
+	case XFS_TRANS_QM_SBCHANGE:	kdb_printf("QM_SBCHANGE"); 	break;
+	case XFS_TRANS_QM_QUOTAOFF:	kdb_printf("QM_QUOTAOFF"); 	break;
+	case XFS_TRANS_QM_DQALLOC:	kdb_printf("QM_DQALLOC");		break;
+	case XFS_TRANS_QM_SETQLIM:	kdb_printf("QM_SETQLIM");		break;
+	case XFS_TRANS_QM_DQCLUSTER:	kdb_printf("QM_DQCLUSTER");	break;
+	case XFS_TRANS_QM_QINOCREATE:	kdb_printf("QM_QINOCREATE");	break;
+	case XFS_TRANS_QM_QUOTAOFF_END:	kdb_printf("QM_QOFF_END");		break;
+	case XFS_TRANS_SB_UNIT:		kdb_printf("SB_UNIT");		break;
+	case XFS_TRANS_FSYNC_TS:	kdb_printf("FSYNC_TS");		break;
+	case XFS_TRANS_GROWFSRT_ALLOC:	kdb_printf("GROWFSRT_ALLOC");	break;
+	case XFS_TRANS_GROWFSRT_ZERO:	kdb_printf("GROWFSRT_ZERO");	break;
+	case XFS_TRANS_GROWFSRT_FREE:	kdb_printf("GROWFSRT_FREE");	break;
 
-	default:			printk("0x%x", tp->t_type);	break;
+	default:			kdb_printf("0x%x", tp->t_type);	break;
 	}
-	printk(" mount 0x%p\n", tp->t_mountp);
-	printk("flags ");
+	kdb_printf(" mount 0x%p\n", tp->t_mountp);
+	kdb_printf("flags ");
 	printflags(tp->t_flags, xtp_flags,"xtp");
-	printk("\n");
-	printk("callback 0x%p forw 0x%p back 0x%p\n",
+	kdb_printf("\n");
+	kdb_printf("callback 0x%p forw 0x%p back 0x%p\n",
 		&tp->t_logcb, tp->t_forw, tp->t_back);
-	printk("log res %d block res %d block res used %d\n",
+	kdb_printf("log res %d block res %d block res used %d\n",
 		tp->t_log_res, tp->t_blk_res, tp->t_blk_res_used);
-	printk("rt res %d rt res used %d\n", tp->t_rtx_res,
+	kdb_printf("rt res %d rt res used %d\n", tp->t_rtx_res,
 		tp->t_rtx_res_used);
-	printk("ticket 0x%x lsn %s\n",
+	kdb_printf("ticket 0x%x lsn %s\n",
 		(uint32_t) tp->t_ticket, xfs_fmtlsn(&tp->t_lsn));
-	printk("callback 0x%p callarg 0x%p\n",
+	kdb_printf("callback 0x%p callarg 0x%p\n",
 		tp->t_callback, tp->t_callarg);
-	printk("icount delta %ld ifree delta %ld\n",
+	kdb_printf("icount delta %ld ifree delta %ld\n",
 		tp->t_icount_delta, tp->t_ifree_delta);
-	printk("blocks delta %ld res blocks delta %ld\n",
+	kdb_printf("blocks delta %ld res blocks delta %ld\n",
 		tp->t_fdblocks_delta, tp->t_res_fdblocks_delta);
-	printk("rt delta %ld res rt delta %ld\n",
+	kdb_printf("rt delta %ld res rt delta %ld\n",
 		tp->t_frextents_delta, tp->t_res_frextents_delta);
-	printk("ag freeblks delta %ld ag flist delta %ld ag btree delta %ld\n",
+	kdb_printf("ag freeblks delta %ld ag flist delta %ld ag btree delta %ld\n",
 		tp->t_ag_freeblks_delta, tp->t_ag_flist_delta,
 		tp->t_ag_btree_delta);
-	printk("dblocks delta %ld agcount delta %ld imaxpct delta %ld\n",
+	kdb_printf("dblocks delta %ld agcount delta %ld imaxpct delta %ld\n",
 		tp->t_dblocks_delta, tp->t_agcount_delta, tp->t_imaxpct_delta);
-	printk("rextsize delta %ld rbmblocks delta %ld\n",
+	kdb_printf("rextsize delta %ld rbmblocks delta %ld\n",
 		tp->t_rextsize_delta, tp->t_rbmblocks_delta);
-	printk("rblocks delta %ld rextents delta %ld rextslog delta %ld\n",
+	kdb_printf("rblocks delta %ld rextents delta %ld rextslog delta %ld\n",
 		tp->t_rblocks_delta, tp->t_rextents_delta,
 		tp->t_rextslog_delta);
-	printk("dqinfo 0x%p\n", tp->t_dqinfo);
-	printk("log items:\n");
+	kdb_printf("dqinfo 0x%p\n", tp->t_dqinfo);
+	kdb_printf("log items:\n");
 	licp = &tp->t_items;
 	chunk = 0;
 	while (licp != NULL) {
@@ -4524,12 +4880,12 @@ xfsidbg_xtp(xfs_trans_t *tp)
 			}
 
 			lidp = XFS_LIC_SLOT(licp, i);
-			printk("\n");
-			printk("chunk %d index %d item 0x%p size %d\n",
+			kdb_printf("\n");
+			kdb_printf("chunk %d index %d item 0x%p size %d\n",
 				chunk, i, lidp->lid_item, lidp->lid_size);
-			printk("flags ");
+			kdb_printf("flags ");
 			printflags(lidp->lid_flags, lid_flags,"lic");
-			printk("\n");
+			kdb_printf("\n");
 			xfsidbg_xlogitem(lidp->lid_item);
 		}
 		chunk++;
@@ -4544,19 +4900,19 @@ xfsidbg_xtrans_res(
 	xfs_trans_reservations_t	*xtrp;
 
 	xtrp = &mp->m_reservations;
-	printk("write: %d\ttruncate: %d\trename: %d\n",
+	kdb_printf("write: %d\ttruncate: %d\trename: %d\n",
 		xtrp->tr_write, xtrp->tr_itruncate, xtrp->tr_rename);
-	printk("link: %d\tremove: %d\tsymlink: %d\n",
+	kdb_printf("link: %d\tremove: %d\tsymlink: %d\n",
 		xtrp->tr_link, xtrp->tr_remove, xtrp->tr_symlink);
-	printk("create: %d\tmkdir: %d\tifree: %d\n",
+	kdb_printf("create: %d\tmkdir: %d\tifree: %d\n",
 		xtrp->tr_create, xtrp->tr_mkdir, xtrp->tr_ifree);
-	printk("ichange: %d\tgrowdata: %d\tswrite: %d\n",
+	kdb_printf("ichange: %d\tgrowdata: %d\tswrite: %d\n",
 		xtrp->tr_ichange, xtrp->tr_growdata, xtrp->tr_swrite);
-	printk("addafork: %d\twriteid: %d\tattrinval: %d\n",
+	kdb_printf("addafork: %d\twriteid: %d\tattrinval: %d\n",
 		xtrp->tr_addafork, xtrp->tr_writeid, xtrp->tr_attrinval);
-	printk("attrset: %d\tattrrm: %d\tclearagi: %d\n",
+	kdb_printf("attrset: %d\tattrrm: %d\tclearagi: %d\n",
 		xtrp->tr_attrset, xtrp->tr_attrrm, xtrp->tr_clearagi);
-	printk("growrtalloc: %d\tgrowrtzero: %d\tgrowrtfree: %d\n",
+	kdb_printf("growrtalloc: %d\tgrowrtzero: %d\tgrowrtfree: %d\n",
 		xtrp->tr_growrtalloc, xtrp->tr_growrtzero, xtrp->tr_growrtfree);
 }
 

@@ -42,7 +42,7 @@ struct xfs_trans;
  * an inode number to its on disk location.
  */
 typedef struct xfs_imap {
-	daddr_t		im_blkno;	/* starting BB of inode chunk */
+ 	xfs_daddr_t		im_blkno;	/* starting BB of inode chunk */
 	uint		im_len;		/* length in BBs of inode chunk */
 	xfs_agblock_t	im_agblkno;	/* logical block of inode chunk in ag */
 	ushort		im_ioffset;	/* inode offset in block in "inodes" */

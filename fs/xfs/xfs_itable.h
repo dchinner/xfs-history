@@ -76,7 +76,7 @@ typedef int (*bulkstat_one_pf)(struct xfs_mount	*mp,
 			       struct xfs_trans	*tp,
 			       xfs_ino_t   	ino,
 			       void	     	*buffer,
-			       daddr_t		bno,
+			       xfs_daddr_t		bno,
 			       void		*dip,
 			       int		*stat);
 /*
@@ -100,19 +100,19 @@ int					/* error status */
 xfs_bulkstat(
 	struct xfs_mount	*mp,	/* mount point for filesystem */
 	struct xfs_trans	*tp,	/* transaction pointer */
-	ino64_t		*lastino,	/* last inode returned */
+	xfs_ino_t		*lastino,	/* last inode returned */
 	int		*count,		/* size of buffer/count returned */
 	bulkstat_one_pf formatter,	/* func that'd fill a single buf */
 	size_t		statstruct_size,/* sizeof struct that we're filling */
-	caddr_t		ubuffer,	/* buffer with inode stats */
+	xfs_caddr_t		ubuffer,	/* buffer with inode stats */
 	int		flags,		/* flag to control access method */
 	int		*done);		/* 1 if there're more stats to get */
 
 int
 xfs_bulkstat_single(
 	struct xfs_mount	*mp,
-	ino64_t		*lastinop,
-	caddr_t		buffer,
+	xfs_ino_t		*lastinop,
+	xfs_caddr_t		buffer,
 	int		*done);
 
 int
@@ -121,7 +121,7 @@ xfs_bulkstat_one(
 	struct xfs_trans	*tp,
 	xfs_ino_t	ino,
 	void		*buffer,
-	daddr_t		bno,
+	xfs_daddr_t		bno,
 	void		*dibuff,
 	int		*stat);
 

@@ -30,11 +30,11 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
+#include <xfs_os_defs.h>
+
 #define FSID_T
 #include <sys/types.h>
 #include <linux/errno.h>
-
-#include <linux/xfs_to_linux.h>
 
 #undef  NODEV
 #include <linux/version.h>
@@ -42,8 +42,6 @@
 #include <linux/sched.h>	/* To get current */
 #include <linux/locks.h>
 #include <linux/slab.h>
-
-#include <linux/linux_to_xfs.h>
 
 #include <sys/sysmacros.h>
 #include <sys/capability.h>
@@ -76,7 +74,7 @@
 #include <xfs_error.h>
 #include <xfs_itable.h>
 
-#include <asm/smplock.h>
+#include <linux/smp_lock.h>
 
 #include <linux/dcache.h>
 #include <linux/file.h>
@@ -431,11 +429,7 @@ xfs_open_by_handle(
 		xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
 
-		/*
-		 * Get the linux inode, triggering a linvfs_read_inode
-		 * which will stitch the XFS inode/vnode into place.
-		 */
-		inode = iget(parinode->i_sb, vp->v_nodeid);
+		inode = vp->v_inode;
 
 		if (! inode) {
 			error = -EACCES;
@@ -823,7 +817,7 @@ int xfs_ioctl (
 	case XFS_IOC_FSBULKSTAT_SINGLE:
 	case XFS_IOC_FSBULKSTAT: {
 		int		count;		/* # of records returned */
-		ino64_t		inlast;		/* last inode number */
+		xfs_ino_t		inlast;		/* last inode number */
 		int		done;		/* = 1 if there are more
 						 * stats to get and if
 						 * bulkstat should be called
@@ -865,8 +859,8 @@ int xfs_ioctl (
 			return -error;
 
 		if (bulkreq.ocount != NULL) {
-			if (copy_to_user((ino64_t *)bulkreq.lastip, &inlast,
-							sizeof(ino64_t)))
+			if (copy_to_user((xfs_ino_t *)bulkreq.lastip, &inlast,
+							sizeof(xfs_ino_t)))
 				return -XFS_ERROR(EFAULT);
 
 			if (copy_to_user((__s32 *)bulkreq.ocount, &count,

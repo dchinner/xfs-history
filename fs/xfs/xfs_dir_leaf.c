@@ -2003,7 +2003,7 @@ xfs_dir_leaf_getdents_int(
 	int		*eobp,
 	dirent_t	*dbp,
 	xfs_dir_put_t	put,
-	daddr_t		nextda)
+	xfs_daddr_t		nextda)
 {
 	xfs_dir_leafblock_t	*leaf;
 	xfs_dir_leaf_entry_t	*entry;

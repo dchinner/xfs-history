@@ -45,7 +45,6 @@
 #include <sys/systm.h>
 #include <sys/attributes.h>
 #include <sys/uuid.h>
-#include <sys/grio.h>
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -1670,8 +1669,7 @@ xfs_attr_leaf_lookup_int(xfs_dabuf_t *bp, xfs_da_args_t *args)
 
 	leaf = bp->data;
 	ASSERT(leaf->hdr.info.magic == XFS_ATTR_LEAF_MAGIC);
-	ASSERT((((int)leaf->hdr.count) >= 0) && \
-	       (leaf->hdr.count < (XFS_LBSIZE(args->dp->i_mount)/8)));
+	ASSERT(leaf->hdr.count < (XFS_LBSIZE(args->dp->i_mount)/8));
 
 	/*
 	 * Binary search.  (note: small blocks will skip this loop)
@@ -1772,8 +1770,7 @@ xfs_attr_leaf_getvalue(xfs_dabuf_t *bp, xfs_da_args_t *args)
 
 	leaf = bp->data;
 	ASSERT(leaf->hdr.info.magic == XFS_ATTR_LEAF_MAGIC);
-	ASSERT((((int)leaf->hdr.count) >= 0) && \
-	       (leaf->hdr.count < (XFS_LBSIZE(args->dp->i_mount)/8)));
+	ASSERT(leaf->hdr.count < (XFS_LBSIZE(args->dp->i_mount)/8));
 	ASSERT(args->index < ((int)leaf->hdr.count));
 
 	entry = &leaf->entries[args->index];
@@ -1838,8 +1835,7 @@ xfs_attr_leaf_moveents(xfs_attr_leafblock_t *leaf_s, int start_s,
 	ASSERT((hdr_s->count > 0) && (hdr_s->count < (XFS_LBSIZE(mp)/8)));
 	ASSERT(hdr_s->firstused >= 
 		((hdr_s->count*sizeof(*entry_s))+sizeof(*hdr_s)));
-	ASSERT(((int)(hdr_d->count) >= 0) && 
-		(hdr_d->count < (XFS_LBSIZE(mp)/8)));
+	ASSERT(hdr_d->count < (XFS_LBSIZE(mp)/8));
 	ASSERT(hdr_d->firstused >= 
 		((hdr_d->count*sizeof(*entry_d))+sizeof(*hdr_d)));
 
@@ -2412,7 +2408,7 @@ int
 xfs_attr_root_inactive(xfs_trans_t **trans, xfs_inode_t *dp)
 {
 	xfs_da_blkinfo_t *info;
-	daddr_t blkno;
+	xfs_daddr_t blkno;
 	xfs_dabuf_t *bp;
 	int error;
 
@@ -2469,7 +2465,7 @@ xfs_attr_node_inactive(xfs_trans_t **trans, xfs_inode_t *dp, xfs_dabuf_t *bp,
 	xfs_da_blkinfo_t *info;
 	xfs_da_intnode_t *node;
 	xfs_dablk_t child_fsb;
-	daddr_t parent_blkno, child_blkno;
+	xfs_daddr_t parent_blkno, child_blkno;
 	int error, count, i;
 	xfs_dabuf_t *child_bp;
 
@@ -2636,7 +2632,7 @@ xfs_attr_leaf_inactive(xfs_trans_t **trans, xfs_inode_t *dp, xfs_dabuf_t *bp)
 			error = tmp;	/* save only the 1st errno */
 	}
 
-	kmem_free((caddr_t)list, size);
+	kmem_free((xfs_caddr_t)list, size);
 	return(error);
 }
 
@@ -2651,7 +2647,7 @@ xfs_attr_leaf_freextent(xfs_trans_t **trans, xfs_inode_t *dp,
 	xfs_bmbt_irec_t map;
 	xfs_dablk_t tblkno;
 	int tblkcnt, dblkcnt, nmap, error;
-	daddr_t dblkno;
+	xfs_daddr_t dblkno;
 	xfs_buf_t *bp;
 
 	/*

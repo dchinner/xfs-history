@@ -33,6 +33,10 @@
 
 #include <xfs_os_defs.h>
 #include <linux/stat.h>
+#ifndef SIM
+#include <linux/sched.h>
+#endif
+
 
 #ifdef SIM
 #define _KERNEL 1
@@ -44,8 +48,6 @@
 #include <sys/vnode.h>
 #include <sys/vfs.h>
 #include <sys/uuid.h>
-#include <sys/grio.h>
-#include <sys/ksa.h>
 #include <sys/debug.h>
 #include <sys/imon.h>
 #include <sys/cmn_err.h>
@@ -87,7 +89,7 @@
 #endif /* SIM */
 
 extern vnodeops_t xfs_vnodeops;
-extern zone_t *xfs_chashlist_zone;
+extern xfs_zone_t *xfs_chashlist_zone;
 
 void
 xfs_ilock_ra(xfs_inode_t	*ip,
@@ -212,7 +214,7 @@ xfs_iget(
 	xfs_ino_t	ino,
 	uint		lock_flags,
 	xfs_inode_t	**ipp,
-	daddr_t		bno)
+	xfs_daddr_t		bno)
 {
 	xfs_ihash_t	*ih;
 	xfs_inode_t	*ip;
@@ -233,23 +235,53 @@ xfs_iget(
 	XFSSTATS.xs_ig_attempts++;
 
 	ih = XFS_IHASH(mp, ino);
+
 again:
 	mraccess(&ih->ih_lock);
+
 	for (ip = ih->ih_next; ip != NULL; ip = ip->i_next) {
   		if (ip->i_ino == ino) {
-			vp = XFS_ITOV(ip);
-			VMAP(vp, vmap);
+
+			vp = XFS_ITOV_NULL(ip);
+			if (vp == NULL) {
+				if (ip->i_flags & XFS_IRECLAIM) {
+					mrunlock(&ih->ih_lock);
+					delay(1);
+					XFSSTATS.xs_ig_frecycle++;
+					goto again;
+				}
+					
+				vp = vn_alloc(XFS_MTOVFS(mp),
+					ino, IFTOVT(ip->i_d.di_mode),
+					MKDEV(emajor(ip->i_df.if_u2.if_rdev),
+					      eminor(ip->i_df.if_u2.if_rdev)));
+
+				vn_trace_exit(vp, "xfs_iget.alloc",
+					(inst_t *)__return_address);
+
+				bhv_desc_init(&(ip->i_bhv_desc), ip, vp,
+					&xfs_vnodeops);
+				vn_bhv_insert_initial(VN_BHV_HEAD(vp),
+					&(ip->i_bhv_desc));
+				XFSSTATS.xs_ig_found++;
+
+				goto finish_inode;
+			}
+			VMAP(vp, ip, vmap);
+
 			/*
 			 * Inode cache hit: if ip is not at the front of
 			 * its hash chain, move it there now.
 			 * Do this with the lock held for update, but
 			 * do statistics after releasing the lock.
 			 */
-			if (ip->i_prevp != &ih->ih_next &&
-			    mrtrypromote(&ih->ih_lock)) {
+			if (   ip->i_prevp != &ih->ih_next
+			    && mrtrypromote(&ih->ih_lock)) {
+
 				if (iq = ip->i_next) {
 					iq->i_prevp = ip->i_prevp;
 				}
+
 				*ip->i_prevp = iq;
 				iq = ih->ih_next;
 				iq->i_prevp = &ip->i_next;
@@ -257,8 +289,12 @@ again:
 				ip->i_prevp = &ih->ih_next;
 				ih->ih_next = ip;
 			}
+
+#ifdef	SIM
 			mrunlock(&ih->ih_lock);
+#endif
 			XFSSTATS.xs_ig_found++;
+
 			/*
 			 * Get a reference to the vnode/inode.
 			 * vn_get() takes care of coordination with
@@ -270,23 +306,45 @@ again:
 			 * looking for the same inode so we have to at
 			 * least look.
 			 */
-			if (!(vp = vn_get(vp, &vmap, 0))) {
+#ifndef	SIM
+			/*
+			 * In the linux kernel implementation, we hang
+			 * onto the hash queue lock until after we've
+			 * coordinated with the I_FREEING state via a
+			 * call to vn_get.
+			 */
+#endif
+			if ( ! (vp = vn_get(vp, &vmap, 0))) {
 #pragma mips_frequency_hint NEVER
+#ifndef	SIM
+				mrunlock(&ih->ih_lock);
+
+				delay(1);
+#endif
 				XFSSTATS.xs_ig_frecycle++;
+
 				goto again;
 			}
 
+finish_inode:
+
+#ifndef	SIM
+			mrunlock(&ih->ih_lock);
+#endif
 			if (lock_flags != 0) {
 				xfs_ilock(ip, lock_flags);
 			}
 
 			newnode = (ip->i_d.di_mode == 0);
-			if (newnode)
+			if (newnode) {
+				ip->i_flags &= ~XFS_IRECLAIM;
 				xfs_iocore_inode_reinit(ip);
+			}
 #ifdef CELL_CAPABLE
 			quiesce_new = 0;
 #endif
-			ITRACE(ip);
+			vn_trace_exit(vp, "xfs_iget.found",
+						(inst_t *)__return_address);
 			goto return_ip;
 		}
 	}
@@ -296,7 +354,9 @@ again:
 	 * the chain, so we don't deadlock in vn_alloc.
 	 */
 	XFSSTATS.xs_ig_missed++;
+
 	version = ih->ih_version;
+
 	mrunlock(&ih->ih_lock);
 
 	/*
@@ -309,9 +369,13 @@ again:
 	if (error) {
 		return error;
 	}
-	vp = vn_alloc(XFS_MTOVFS(mp), IFTOVT(ip->i_d.di_mode),
-		      MKDEV(emajor(ip->i_df.if_u2.if_rdev),
-			    eminor(ip->i_df.if_u2.if_rdev)));
+
+	vp = vn_alloc(XFS_MTOVFS(mp), ino, IFTOVT(ip->i_d.di_mode),
+				      MKDEV(emajor(ip->i_df.if_u2.if_rdev),
+					    eminor(ip->i_df.if_u2.if_rdev)));
+
+	vn_trace_exit(vp, "xfs_iget.alloc", (inst_t *)__return_address);
+
 	bhv_desc_init(&(ip->i_bhv_desc), ip, vp, &xfs_vnodeops);
 	vn_bhv_insert_initial(VN_BHV_HEAD(vp), &(ip->i_bhv_desc));
 
@@ -323,8 +387,8 @@ again:
 #ifndef SIM
 	if (mp->m_inode_quiesce)
 		quiesce_new = cxfs_inode_qset(ip);
-#endif
-#endif
+#endif	/* !SIM */
+#endif	/* CELL_CAPABLE */
 
 	if (lock_flags != 0) {
 		xfs_ilock(ip, lock_flags);
@@ -352,14 +416,20 @@ again:
 	 * after we released the hash lock.
 	 */
 	mrupdate(&ih->ih_lock);
+
 	if (ih->ih_version != version) {
 		for (iq = ih->ih_next; iq != NULL; iq = iq->i_next) {
 			if (iq->i_ino == ino) {
 				mrunlock(&ih->ih_lock);
+#ifdef	SIM
 				vn_bhv_remove(VN_BHV_HEAD(vp), 
 					      &(ip->i_bhv_desc));
 				vn_free(vp);
+#else	/* ! SIM */
+				vn_put(vp);
+#endif	/* ! SIM */
 				xfs_idestroy(ip);
+
 				XFSSTATS.xs_ig_dup++;
 				goto again;
 			}
@@ -414,7 +484,8 @@ again:
 		if (chlnew == NULL) {
 			mutex_spinunlock(&ch->ch_lock, s);
 			ASSERT(xfs_chashlist_zone != NULL);
-			chlnew = (xfs_chashlist_t *)kmem_zone_zalloc(xfs_chashlist_zone,
+			chlnew = (xfs_chashlist_t *)
+					kmem_zone_zalloc(xfs_chashlist_zone,
 								  KM_SLEEP);
 			ASSERT(chlnew != NULL);
 			goto chlredo;
@@ -433,7 +504,9 @@ again:
 			kmem_zone_free(xfs_chashlist_zone, chlnew);
 		}
 	}
+
 	mutex_spinunlock(&ch->ch_lock, s);
+
 	mrunlock(&ih->ih_lock);
 
 	/*
@@ -463,6 +536,7 @@ again:
  return_ip:
 	ASSERT(ip->i_df.if_ext_max ==
 	       XFS_IFORK_DSIZE(ip) / sizeof(xfs_bmbt_rec_t));
+
 	ASSERT(((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0) ==
 	       ((ip->i_iocore.io_flags & XFS_IOCORE_RT) != 0));
 	/*
@@ -475,7 +549,7 @@ again:
 	        if (quiesce_new)
 			cxfs_inode_quiesce(ip);
 #endif
-		IMON_CHECK(vp, ip->i_dev, (ino_t)ino);
+		IMON_CHECK(vp, ip->i_dev, (xfs_ino_t)ino);
 	}
 #endif
 	/*
@@ -486,13 +560,18 @@ again:
 #else
 	vp->v_nodeid = ip->i_ino;
 #endif
+
+#ifndef SIM
+	vn_revalidate(vp);	/* Update linux inode */
+#endif
+
 	*ipp = ip;
 
 	return 0;
 }
 
 /*
- * Do the setup for the various locvks within the incore inode.
+ * Do the setup for the various locks within the incore inode.
  */
 void
 xfs_inode_lock_init(
@@ -569,9 +648,13 @@ void
 xfs_iput(xfs_inode_t	*ip,
 	 uint		lock_flags)
 {
+	vnode_t	*vp = XFS_ITOV(ip);
+
+	vn_trace_entry(vp, "xfs_iput", (inst_t *)__return_address);
+
 	xfs_iunlock(ip, lock_flags);
-	ITRACE(ip);
-	VN_RELE(XFS_ITOV(ip));
+
+	VN_RELE(vp);
 }
 
 /*
@@ -589,6 +672,7 @@ xfs_ireclaim(xfs_inode_t *ip)
 	 * Remove from old hash list and mount list.
 	 */
 	XFSSTATS.xs_ig_reclaims++;
+
 	xfs_iextract(ip);
 
 	/*
@@ -614,8 +698,10 @@ xfs_ireclaim(xfs_inode_t *ip)
 	/*
 	 * Pull our behavior descriptor from the vnode chain.
 	 */
-	vp = XFS_ITOV(ip);
-	vn_bhv_remove(VN_BHV_HEAD(vp), &(ip->i_bhv_desc));
+	vp = XFS_ITOV_NULL(ip);
+	if (vp) {
+		vn_bhv_remove(VN_BHV_HEAD(vp), XFS_ITOBHV(ip));
+	}
  
 	/*
 	 * Free all memory associated with the inode.
@@ -624,7 +710,7 @@ xfs_ireclaim(xfs_inode_t *ip)
 }
 
 /*
- * This routine removes an about-to-be-destoryed inode from 
+ * This routine removes an about-to-be-destroyed inode from 
  * all of the lists in which it is lcoated with the exception
  * of the behavior chain.  It is used by xfs_ireclaim and
  * by cxfs relocation cocde, in which case, we are removing 

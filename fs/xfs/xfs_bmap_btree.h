@@ -35,7 +35,6 @@
 #ident "$Revision$"
 
 #include "xfs_buf.h"
-#include <endian.h>
 
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 

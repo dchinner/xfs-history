@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.7 $"
+#ident "$Revision: 1.8 $"
 /*
  * xfsrt stubs
  */
@@ -40,28 +40,72 @@
 #include <sys/uuid.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
+#include <sys/cmn_err.h>
 #include "xfs_buf.h"
 #include <ksys/behavior.h>
 #include <xfs_types.h>
+#include <xfs_inum.h>
 #include <xfs_inum.h>
 #include <xfs_sb.h>
 #include <xfs_log.h>
 #include <xfs_trans.h>
 #include <xfs_dir.h>
 #include <xfs_mount.h>
+#include <xfs_alloc.h>
+
+#include <xfs_rtalloc.h>
 
 extern int nopkg(void);
 
-int xfs_rtallocate_extent(void) { return nopkg(); }
-int xfs_rtfree_extent(void) { return nopkg(); }
-int xfs_growfs_rt(void) { return nopkg(); }
-int xfs_rtpick_extent(void) { return nopkg(); }
+int	
+xfs_rtallocate_extent(
+	struct xfs_trans	*tp,	
+	xfs_rtblock_t		bno,	
+	xfs_extlen_t		minlen,	
+	xfs_extlen_t		maxlen,	
+	xfs_extlen_t		*len,	
+	xfs_alloctype_t		type,	
+	int			wasdel,	
+	xfs_extlen_t		prod,	
+	xfs_rtblock_t		*rtblock)
+{
+    return nopkg(); 
+}
+
+int
+xfs_rtfree_extent(
+	struct xfs_trans	*tp,
+	xfs_rtblock_t		bno,
+	xfs_extlen_t		len)
+{ 
+    return nopkg(); 
+}
+
+int
+xfs_growfs_rt(
+	struct xfs_mount	*mp,
+	struct xfs_growfs_rt	*in)
+{ 
+    return nopkg(); 
+}
+
+
+int
+xfs_rtpick_extent(
+	struct xfs_mount	*mp,
+	struct xfs_trans	*tp,
+	xfs_extlen_t		len,
+	xfs_rtblock_t		*pick)
+{ 
+    return nopkg(); 
+}
 
 int
 xfs_rtmount_init(xfs_mount_t *mp)
 {
 	if (mp->m_sb.sb_rblocks == 0)
 		return 0;
+        cmn_err(CE_WARN, "XFS: RT not enabled (CONFIG_XFS_RT)\n");
 	return nopkg();
 }
 

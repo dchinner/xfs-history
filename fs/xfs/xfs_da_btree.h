@@ -140,37 +140,37 @@ __uint32_t xfs_da_make_bnoentry(struct xfs_mount *mp, xfs_dablk_t bno,
 	(((bno) << (mp)->m_dircook_elog) | (entry))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_MAKE_COOKIE)
-off_t xfs_da_make_cookie(struct xfs_mount *mp, xfs_dablk_t bno, int entry,
+xfs_off_t xfs_da_make_cookie(struct xfs_mount *mp, xfs_dablk_t bno, int entry,
 				xfs_dahash_t hash);
 #define	XFS_DA_MAKE_COOKIE(mp,bno,entry,hash)	\
 	xfs_da_make_cookie(mp,bno,entry,hash)
 #else
 #define	XFS_DA_MAKE_COOKIE(mp,bno,entry,hash) \
-	(((off_t)XFS_DA_MAKE_BNOENTRY(mp, bno, entry) << 32) | (hash))
+	(((xfs_off_t)XFS_DA_MAKE_BNOENTRY(mp, bno, entry) << 32) | (hash))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_COOKIE_HASH)
-xfs_dahash_t xfs_da_cookie_hash(struct xfs_mount *mp, off_t cookie);
+xfs_dahash_t xfs_da_cookie_hash(struct xfs_mount *mp, xfs_off_t cookie);
 #define	XFS_DA_COOKIE_HASH(mp,cookie)		xfs_da_cookie_hash(mp,cookie)
 #else
 #define	XFS_DA_COOKIE_HASH(mp,cookie)	((xfs_dahash_t)(cookie))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_COOKIE_BNO)
-xfs_dablk_t xfs_da_cookie_bno(struct xfs_mount *mp, off_t cookie);
+xfs_dablk_t xfs_da_cookie_bno(struct xfs_mount *mp, xfs_off_t cookie);
 #define	XFS_DA_COOKIE_BNO(mp,cookie)		xfs_da_cookie_bno(mp,cookie)
 #else
 #define	XFS_DA_COOKIE_BNO(mp,cookie) \
-	(((off_t)(cookie) >> 31) == -1LL ? \
+	(((xfs_off_t)(cookie) >> 31) == -1LL ? \
 		(xfs_dablk_t)0 : \
-		(xfs_dablk_t)((off_t)(cookie) >> ((mp)->m_dircook_elog + 32)))
+		(xfs_dablk_t)((xfs_off_t)(cookie) >> ((mp)->m_dircook_elog + 32)))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_COOKIE_ENTRY)
-int xfs_da_cookie_entry(struct xfs_mount *mp, off_t cookie);
+int xfs_da_cookie_entry(struct xfs_mount *mp, xfs_off_t cookie);
 #define	XFS_DA_COOKIE_ENTRY(mp,cookie)		xfs_da_cookie_entry(mp,cookie)
 #else
 #define	XFS_DA_COOKIE_ENTRY(mp,cookie) \
-	(((off_t)(cookie) >> 31) == -1LL ? \
+	(((xfs_off_t)(cookie) >> 31) == -1LL ? \
 		(xfs_dablk_t)0 : \
-		(xfs_dablk_t)(((off_t)(cookie) >> 32) & \
+		(xfs_dablk_t)(((xfs_off_t)(cookie) >> 32) & \
 			      ((1 << (mp)->m_dircook_elog) - 1)))
 #endif
 
@@ -228,7 +228,7 @@ typedef struct xfs_dabuf {
 	struct xfs_dabuf *next;		/* next in global chain */
 	struct xfs_dabuf *prev;		/* previous in global chain */
 	dev_t		dev;		/* device for buffer */
-	daddr_t		blkno;		/* daddr first in bps[0] */
+	xfs_daddr_t		blkno;		/* daddr first in bps[0] */
 #endif
 	struct xfs_buf	*bps[1];	/* actually nbuf of these */
 } xfs_dabuf_t;
@@ -249,7 +249,7 @@ extern xfs_dabuf_t	*xfs_dabuf_global_list;
 typedef struct xfs_da_state_blk {
 	xfs_dabuf_t	*bp;		/* buffer containing block */
 	xfs_dablk_t	blkno;		/* filesystem blkno of buffer */
-	daddr_t		disk_blkno;	/* on-disk blkno (in BBs) of buffer */
+	xfs_daddr_t		disk_blkno;	/* on-disk blkno (in BBs) of buffer */
 	int		index;		/* relevant index into block */
 	xfs_dahash_t	hashval;	/* last hash value in block */
 	int		magic;		/* blk's magic number, ie: blk type */
@@ -320,19 +320,19 @@ int	xfs_da_blk_link(xfs_da_state_t *state, xfs_da_state_blk_t *old_blk,
  */
 int	xfs_da_grow_inode(xfs_da_args_t *args, xfs_dablk_t *new_blkno);
 int	xfs_da_get_buf(struct xfs_trans *trans, struct xfs_inode *dp,
-			      xfs_dablk_t bno, daddr_t mappedbno,
+			      xfs_dablk_t bno, xfs_daddr_t mappedbno,
 			      xfs_dabuf_t **bp, int whichfork);
 int	xfs_da_read_buf(struct xfs_trans *trans, struct xfs_inode *dp,
-			       xfs_dablk_t bno, daddr_t mappedbno,
+			       xfs_dablk_t bno, xfs_daddr_t mappedbno,
 			       xfs_dabuf_t **bpp, int whichfork);
 #ifdef XFS_REPAIR_SIM
 int	xfs_da_read_bufr(struct xfs_trans *trans, struct xfs_inode *dp,
-				xfs_dablk_t bno, daddr_t mappedbno,
+				xfs_dablk_t bno, xfs_daddr_t mappedbno,
 				xfs_dabuf_t **bpp, int whichfork);
 #endif	/* XFS_REPAIR_SIM */
 #ifndef SIM
-daddr_t	xfs_da_reada_buf(struct xfs_trans *trans, struct xfs_inode *dp,
-				xfs_dablk_t bno, int whichfork);
+xfs_daddr_t	xfs_da_reada_buf(struct xfs_trans *trans, struct xfs_inode *dp,
+			xfs_dablk_t bno, int whichfork);
 #endif	/* !SIM */
 int	xfs_da_shrink_inode(xfs_da_args_t *args, xfs_dablk_t dead_blkno,
 					  xfs_dabuf_t *dead_buf);
@@ -348,7 +348,7 @@ void xfs_da_log_buf(struct xfs_trans *tp, xfs_dabuf_t *dabuf, uint first,
 			   uint last);
 void xfs_da_brelse(struct xfs_trans *tp, xfs_dabuf_t *dabuf);
 void xfs_da_binval(struct xfs_trans *tp, xfs_dabuf_t *dabuf);
-daddr_t xfs_da_blkno(xfs_dabuf_t *dabuf);
+xfs_daddr_t xfs_da_blkno(xfs_dabuf_t *dabuf);
 #ifdef XFS_REPAIR_SIM
 void xfs_da_bwrite(xfs_dabuf_t *dabuf);
 void xfs_da_bhold(struct xfs_trans *tp, xfs_dabuf_t *dabuf);
@@ -356,7 +356,7 @@ void xfs_da_bjoin(struct xfs_trans *tp, xfs_dabuf_t *dabuf);
 #endif	/* XFS_REPAIR_SIM */
 
 #ifdef _KERNEL
-extern struct zone *xfs_da_state_zone;
+extern struct xfs_zone *xfs_da_state_zone;
 #endif /* _KERNEL */
 
 #endif	/* !FS_XFS_DA_BTREE_H */

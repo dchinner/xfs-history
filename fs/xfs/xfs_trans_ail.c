@@ -41,7 +41,6 @@
 #include <sys/uuid.h>
 #include <sys/debug.h>
 #include <sys/cmn_err.h>
-#include <sys/ksa.h>
 #ifdef SIM
 #undef _KERNEL
 #endif

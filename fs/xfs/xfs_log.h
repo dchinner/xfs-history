@@ -129,7 +129,7 @@ static inline xfs_lsn_t	_lsn_cmp(xfs_lsn_t lsn1, xfs_lsn_t lsn2, xfs_arch_t arch
 #define XFS_LOG			0xaa
 
 typedef struct xfs_log_iovec {
-	caddr_t		i_addr;		/* beginning address of region */
+	xfs_caddr_t		i_addr;		/* beginning address of region */
 	int		i_len;		/* length in bytes of region */
 } xfs_log_iovec_t;
 
@@ -157,7 +157,7 @@ int	  xfs_log_force(struct xfs_mount *mp,
 int	  xfs_log_init(void);
 int	  xfs_log_mount(struct xfs_mount *mp,
 			dev_t		 log_dev,
-			daddr_t		 start_block,
+			xfs_daddr_t		 start_block,
 			int		 num_bblocks);
 int	  xfs_log_mount_finish(struct xfs_mount *mp, int);
 void	  xfs_log_move_tail(struct xfs_mount	*mp,
@@ -184,7 +184,7 @@ int	  xfs_log_force_umount(struct xfs_mount *mp, int logerror);
 /* Log manager utility interfaces */
 void xfs_log_print(struct xfs_mount *mp,
 		   dev_t	    log_dev,
-		   daddr_t	    start_block,
+		   xfs_daddr_t	    start_block,
 		   int		    num_bblocks,
 		   int		    start_print_block,
 		   uint		    flags);

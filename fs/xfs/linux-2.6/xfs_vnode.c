@@ -31,6 +31,8 @@
  */
 #ident	"$Revision$"
 
+#include <xfs_os_defs.h>
+
 #include <xfs_linux.h>
 
 #ifdef SIM
@@ -52,12 +54,22 @@
 #endif
 #include <sys/vfs.h>
 #include <sys/vnode_private.h>
-#include <sys/ksa.h>
 #include <sys/dnlc.h>
+#include <sys/mode.h>
 #include <sys/sysmacros.h>
-#include <sys/pda.h>
 #include <sys/imon.h>
 #include <sys/cmn_err.h>
+
+#include <xfs_types.h>		/* for XFS_BHVTOI */
+#include <xfs_bmap_btree.h>	/* for XFS_BHVTOI */
+#include <xfs_inum.h>		/* for XFS_BHVTOI */
+#include <xfs_dir_sf.h>		/* for XFS_BHVTOI */
+#include <xfs_dir.h>		/* for XFS_BHVTOI */
+#include <xfs_dir2.h>		/* for XFS_BHVTOI */
+#include <xfs_dir2_sf.h>	/* for XFS_BHVTOI */
+#include <xfs_attr_sf.h>	/* for XFS_BHVTOI */
+#include <xfs_dinode.h>		/* for XFS_BHVTOI */
+#include <xfs_inode.h>		/* for XFS_BHVTOI */
 
 #ifdef	CONFIG_XFS_VNODE_TRACING
 #include <sys/ktrace.h>
@@ -77,13 +89,12 @@
 #define	NESTED_LOCK_VFP(listp)	nested_spinlock(&(listp)->vf_lock)
 #define	NESTED_UNLOCK_VFP(listp) nested_spinunlock(&(listp)->vf_lock)
 
-static struct zone *vn_zone;	/* vnode heap zone */
+static struct xfs_zone *vn_zone;	/* vnode heap zone */
 uint64_t vn_generation;		/* vnode generation number */
 u_long	vn_vnumber;		/* # of vnodes ever allocated */
 int	vn_epoch;		/* # of vnodes freed */
 				/* vn_vnumber - vn_epoch == # current vnodes */
 int vn_minvn;			/* minimum # vnodes before reclaiming */
-int vn_nfree;			/* # of free vnodes */
 static int vn_shaken;		/* damper for vn_alloc */
 static unsigned int vn_coin;	/* coin for vn_alloc */
 int vnode_free_ratio = 1;	/* tuneable parameter for vn_alloc */
@@ -104,8 +115,6 @@ int vnode_free_ratio = 1;	/* tuneable parameter for vn_alloc */
 
 vfreelist_t	*vfreelist;	/* pointer to array of freelist structs */
 static int	vfreelistmask;	/* number of free-lists - 1 */
-
-static void vn_relink(vnlist_t *, vnode_t *, vnode_t *);
 
 typedef struct vhash {
 	struct vnode	*vh_vnode;
@@ -143,135 +152,25 @@ u_short vttoif_tab[] = {
 void
 vn_init(void)
 {
-	register vfreelist_t *vfp;
-	register sv_t *svp;
-	register int i;
-	extern int ncsize;
+        register sv_t *svp;
+        register int i;
 
-	/*
-	 * There are ``vfreelistmask + 1'' freelists -- so constructed
-	 * so multiple clients can allocate vnodes simultaneously. and
-	 * to keep the individual lists reasonable short.
-	 */
-	i = 1;
-	vfreelistmask = i - 1;
-
-	vfp = vfreelist = (vfreelist_t *)
-			kmem_zalloc(i * sizeof(vfreelist_t), KM_SLEEP);
-
-	for (i = 0; i <= vfreelistmask; i++) {
-		vn_initlist(&vfp->vf_freelist);
-		vfp->vf_next = vfp + 1;
-		vfp->vf_listid = i;
-		spinlock_init(&vfp->vf_lock, 0);
-		vfp++;
-	}
-	vfreelist[vfreelistmask].vf_next = vfreelist;
-
-        for (svp = vsync, i = 0; i < NVSYNC; i++, svp++)
-                init_sv(svp, SV_DEFAULT, "vsy", i);
-
-	vn_zone = kmem_zone_init(sizeof(vnode_t), "Vnodes");
-
-	vhash = (vhash_t *)kmem_zalloc((VHASHMASK+1) * sizeof(vhash_t),
-					KM_SLEEP);
-	for (i = 0; i <= VHASHMASK; i++) {
-		init_spinlock(&vhash[i].vh_lock, "vhash", i);
-	}
-	vn_minvn = ncsize;
+	for (svp = vsync, i = 0; i < NVSYNC; i++, svp++)
+		init_sv(svp, SV_DEFAULT, "vsy", i);
 }
 
-#ifndef SIM
-void
-vn_cleanup(void)
-{
-	extern int	kmem_cache_destroy(zone_t *);
-	vnlist_t *vlist;
-	vnode_t	*vp, *nvp;
-	int	list, s;
-
-	s = LOCK_VFP(vfreelist);
-	list = 0;
-	vlist = VFREELIST(list);
-	vp = vlist->vl_next;
-	while (vp != (struct vnode *)vlist) {
-		nvp = vp->v_next;
-		vn_unlink(vp);
-#ifdef	CONFIG_XFS_VNODE_TRACING
-		ktrace_free(vp->v_trace);
-#endif	/* CONFIG_XFS_VNODE_TRACING */
-		kmem_zone_free(vn_zone, vp);
-		vp = nvp;
-	}
-	UNLOCK_VFREELIST(list, s);
-
-	kmem_cache_destroy(vn_zone);
-	kmem_free(vhash, (VHASHMASK+1) * sizeof(vhash_t));
-	kmem_free(vfreelist, (vfreelistmask + 1) * sizeof(vfreelist_t));
-}
-#endif
-
-vnode_t *
-vn_find(vnumber_t number)
-{
-	register vhash_t *vhp = VHASH(number);
-	register int s = mutex_spinlock(&vhp->vh_lock);
-	register vnode_t *vp;
-
-	for (vp = vhp->vh_vnode; vp; vp = vp->v_hashn) {
-		if (vp->v_number == number)
-			break;
-	}
-	mutex_spinunlock(&vhp->vh_lock, s);
-
-	return(vp);
-}
-
-void
-vn_hash(register vnode_t *vp)
-{
-	register vhash_t *vhp = VHASH(vp->v_number);
-	register int s = mutex_spinlock(&vhp->vh_lock);
-	register vnode_t **vpp = &vhp->vh_vnode;
-
-	vp->v_hashp = (vnode_t *)NULL;
-	vp->v_hashn = *vpp;
-	if (vp->v_hashn)
-		vp->v_hashn->v_hashp = vp;
-	*vpp = vp;
-	mutex_spinunlock(&vhp->vh_lock, s);
-}
-
-void
-vn_unhash(register vnode_t *vp)
-{
-	register vhash_t *vhp = VHASH(vp->v_number);
-	register int s = mutex_spinlock(&vhp->vh_lock);
-	register vnode_t *vnext = vp->v_hashn;
-	register vnode_t *vprev = vp->v_hashp;
-
-	if (vprev)
-		vprev->v_hashn = vnext;
-	else
-		vhp->vh_vnode = vnext;
-
-	if (vnext)
-		vnext->v_hashp = vprev;
-
-	mutex_spinunlock(&vhp->vh_lock, s);
-	vp->v_hashp = vp->v_hashn = (vnode_t *)NULL;
-	vp->v_number = 0;
-}
 
 /*
  * Clean a vnode of filesystem-specific data and prepare it for reuse.
  */
-static int
+int
 vn_reclaim(struct vnode *vp, int flag)
 {
 	int error, s;
 
 	VOPINFO.vn_reclaim++;
+
+	vn_trace_entry(vp, "vn_reclaim", (inst_t *)__return_address);
 
 	/*
 	 * Only make the VOP_RECLAIM call if there are behaviors
@@ -313,30 +212,25 @@ vn_reclaim(struct vnode *vp, int flag)
 	vp->v_pgcnt = 0;
 
 	s = VN_LOCK(vp);
-	if (vp->v_number) {
-		vn_unhash(vp);
-	}
-	ASSERT(vp->v_hashp == (vnode_t *)NULL);
-	ASSERT(vp->v_hashn == (vnode_t *)NULL);
 
-	vp->v_flag &= (VRECLM|VWAIT|VSHARE|VLOCK);
+	vp->v_flag &= (VRECLM|VWAIT|VLOCK);
 	VN_UNLOCK(vp, s);
-#ifdef PGCACHEDEBUG
-	{
-	extern void panyvp(vnode_t *);
-	extern void pfindany(vnode_t *, pgno_t);
-	pfindany(vp, 0xffffff);
-	panyvp(vp);
-	}
-#endif
+
 	vp->v_type = VNON;
 	vp->v_fbhv = NULL;
 
+#ifdef  CONFIG_XFS_VNODE_TRACING
+	ktrace_free(vp->v_trace);
+
+	vp->v_trace = NULL;
+#endif  /* CONFIG_XFS_VNODE_TRACING */
+
 	ASSERT(vp->v_mreg == (struct pregion *)vp);
+
 	return 0;
 }
 
-static void
+STATIC void
 vn_wakeup(struct vnode *vp)
 {
 	int s = VN_LOCK(vp);
@@ -347,236 +241,85 @@ vn_wakeup(struct vnode *vp)
 	VN_UNLOCK(vp, s);
 }
 
-/*
- * Allocate a vnode struct for filesystem usage.
- * Reclaim the oldest on the global freelist if there are any,
- * otherwise allocate another.
- */
+
 struct vnode *
-vn_alloc(struct vfs *vfsp, enum vtype type, dev_t dev)
+vn_address(struct inode *ip)
 {
-	register struct vnode *vp;
-	register int list;
-	register vnlist_t *vlist;
-	register int cnt, s, i;
-	register u_long vnumber;
-	long target;
-	int alloced = 0;
-	int error;
-#define VN_ALLOC_TRIES 1
+	vnode_t	*vp;
 
-	VOPINFO.vn_alloc++;
 
-	s = LOCK_VFP(vfreelist);
-	list = 0;
+	vp = (vnode_t *)(&((ip)->u.xfs_i.vnode));
 
-	vlist = VFREELIST(list);
-	vp = vlist->vl_next;
+	if ((vp->v_type != VNON) && vp->v_number && vp->v_inode)
+		return vp;
+	
+	return NULL;
+}
 
-	/*
-	 * Easy cases: if list is empty, allocate a new vnode from the
-	 * heap; if first vnode on the list is empty, use it.
-	 */
-	if (vp == (struct vnode *)vlist)
-		goto alloc;
 
-	if (vp->v_fbhv == NULL) {
-		ASSERT(!vp->v_dbuf && !vp->v_dpages && !vp->v_pgcnt);
-		cnt = VN_ALLOC_TRIES;
-		goto get;
-	}
+struct vnode *
+vn_initialize(struct inode *ip)
+{
+	struct vnode	*vp;
+	
+	VOPINFO.vn_active++;
 
-	/*
-	 * Allocate a minumum of vn_minvn vnodes.
-	 * XXX  Do this from vn_init?
-	 */
-	vnumber = vn_vnumber - vn_epoch;	/* # of extant vnodes */
-	if (vnumber < vn_minvn)
-		goto alloc;
+	vp = LINVFS_GET_VN_ADDRESS(ip);
 
-	ASSERT(vnode_free_ratio > 0);
+	vp->v_inode = ip;
 
-	cnt = vn_nfree;
-	vnumber -= cnt;				/* # of vnodes in use */
+	vp->v_flag = 0;
 
-	/*
-	 * If number of free vnode < number in-use, just alloc a new vnode.
-	 */
-	if (cnt < vnumber)
-		goto alloc;
-
-	/*
-	 * Calculate target # of free vnodes to have allocated.
-	 * It is # of in-use vnodes * vnode_free_ratio.
-	 * vnode_free_ratio is always a small number, so register
-	 * additions should be faster than a multiply.
-	 */
-	target = (long)vnumber;
-	for (i = vnode_free_ratio; --i > 0; target += vnumber)
-		;
-
-	/*
-	 * If number of free vnode < half of target, alloc a new vnode.
-	 */
-	if (cnt < target/2)
-		goto alloc;
-
-	/*
-	 * If below target # of free vnodes, devise the chance that
-	 * we'll manufacture a new vnode from the heap.  The closer
-	 * we are to target, the more likely we'll just allocate from
-	 * the freelist -- don't want to manufacture vnodes willy-nilly
-	 * just to have vhand/vn_shake decommission them.
-	 */
-	if (cnt < target) {
-		vnumber = target / 16;
-		i = 0xf;
-		if (vn_shaken > 0) {
-			vn_shaken--;
-			vnumber <<= 1;
-		}
-
-		while (cnt < target - vnumber) {
-			i >>= 1;
-			vnumber <<= 1;
-		}
-
-		if (!(++vn_coin & i))
-			goto alloc;
-	}
-
-	/*
-	 * If a reclaimable vnode isn't found after searching a very
-	 * few vnodes, put those vnodes on the tail of the free list
-	 * and allocate a vnode from the heap.  This shouldn't happen
-	 * often, and vn_shake will trim down the number of vnodes if
-	 * the count rises too high.
-	 */
-	cnt = VN_ALLOC_TRIES;
-again:
-	for ( ; vp != (struct vnode *)vlist ; vp = vp->v_next) {
-		ASSERT(vp->v_listid == list);
-
-		if (vp->v_dbuf || vp->v_dpages || vp->v_pgcnt > 8) {
-			VOPINFO.vn_afreeloops++;
-			if (--cnt < 0) {
-				if (vlist->vl_next == vp) {
-					vn_unlink(vp);
-					vn_append(vp, vlist);
-				} else if (vp->v_next !=
-					   (struct vnode *)vlist) {
-					vn_relink(vlist, vp, vp->v_prev);
-				}
-				VOPINFO.vn_afreemiss++;
-				break;
-			}
-			continue;
-		}
-	get:
-		VOPINFO.vn_afreeloops++;
-
-		NESTED_VN_LOCK(vp);
-		ASSERT(vp->v_count == 0);
-		ASSERT((vp->v_flag & VINACT) == 0);
-		if ((vp->v_flag & VRECLM) == 0) {
-
-			vp->v_flag |= VRECLM;
-			NESTED_VN_UNLOCK(vp);
-
-			if (vlist->vl_next != vp && vlist->vl_prev != vp) {
-				vn_relink(vlist, vp->v_next, vp->v_prev);
-				vp->v_next = vp->v_prev = vp;
-			} else
-				vn_unlink(vp);
-			ASSERT(vlist->vl_next->v_prev == (struct vnode *)vlist);
-			ASSERT(vlist->vl_prev->v_next == (struct vnode *)vlist);
-			ASSERT(vp->v_listid == list);
-			ASSERT(vfreelist[list].vf_lsize > 0);
-			vfreelist[list].vf_lsize--;
-			UNLOCK_VFREELIST(list, s);
-
-			error = vn_reclaim(vp, 0);
-
-			if (error) {
-				/*
-				 * Freelist lock must be held before cvsema'ing
-				 * vnode.  A vn_get could happen on this vnode:
-				 * just after this process releases vp, it gets
-				 * an interrupt; the vn_get process acquires
-				 * freelist lock and dequeues it from nowhere;
-				 * then this process puts it back on free list.
-				 */
-				s = LOCK_VFREELIST(list);
-				vn_wakeup(vp);
-
-				ASSERT(vp->v_listid == list);
-				ASSERT(vfreelist[list].vf_lsize >= 0);
-				vfreelist[list].vf_lsize++;
-				vn_append(vp, vlist);
-				vp = vlist->vl_next;
-				if (--cnt < 0) {
-					break;
-				}
-				goto again;
-			} else {
-				vn_wakeup(vp);
-				VOPINFO.vn_afree++;
-				atomicAddInt(&vn_nfree, -1);
-
-				ASSERT(!(vp->v_number));
-				goto gotit;
-			}
-		}
-		NESTED_VN_UNLOCK(vp);
-	}
-alloc:
-	UNLOCK_VFREELIST(list, s);
-
-	VOPINFO.vn_aheap++;
-
-	vp = kmem_zone_zalloc(vn_zone, KM_SLEEP);
-	alloced = 1;
-
-#ifdef	CONFIG_XFS_VNODE_TRACING
-	vp->v_trace = ktrace_alloc(VNODE_TRACE_SIZE, 0);
-#endif	/* CONFIG_XFS_VNODE_TRACING */
-
-	vp->v_flag = VSHARE;
 	(void) atomicAddLong((long *)&vn_vnumber, 1);
-
 
 	/* We never free the vnodes in the simulator, so these don't
 	   get destroyed either */
 	spinlock_init(&vp->v_lock, "v_lock");
 	vp->v_mreg = vp->v_mregb = (struct pregion *)vp;
 
-gotit:
 	vp->v_number = atomicAddUint64(&vn_generation, 1);
 
 	ASSERT(vp->v_number);
-	vn_hash(vp);
 
-	ASSERT(vp->v_count == 0);
 	ASSERT(vp->v_dpages == NULL && vp->v_dbuf == 0 && vp->v_pgcnt == 0);
-	ASSERT(vp->v_flag & VSHARE);
 
 	/* Initialize the first behavior and the behavior chain head. */
-	if (!alloced) {
-		ASSERT(VN_BHV_NOT_READ_LOCKED(VN_BHV_HEAD(vp)) &&
-		       VN_BHV_NOT_WRITE_LOCKED(VN_BHV_HEAD(vp)));
-		vn_bhv_head_reinit(VN_BHV_HEAD(vp));
-	} else
-		vn_bhv_head_init(VN_BHV_HEAD(vp), "vnode");
+	vn_bhv_head_init(VN_BHV_HEAD(vp), "vnode");
 
-	vp->v_count = 1;
-	vp->v_vfsp = vfsp;
-	vp->v_type = type;
-	vp->v_rdev = dev;
-	vp->v_next = vp->v_prev = vp;
+#ifdef	CONFIG_XFS_VNODE_TRACING
+	vp->v_trace = ktrace_alloc(VNODE_TRACE_SIZE, KM_SLEEP);
+#endif	/* CONFIG_XFS_VNODE_TRACING */
 
+	vn_trace_exit(vp, "vn_initialize", (inst_t *)__return_address);
 
 	return vp;
 }
+
+struct vnode *
+vn_alloc(struct vfs *vfsp, __uint64_t ino, enum vtype type, dev_t dev)
+{
+	struct inode	*ip;
+	struct vnode	*vp;
+	xfs_ino_t	inum = (xfs_ino_t) ino;
+
+	VOPINFO.vn_alloc++;
+
+	ip = iget(vfsp->vfs_super, inum);
+
+	vp = LINVFS_GET_VN_ADDRESS(ip);
+
+	ASSERT((vp->v_flag & VPURGE) == 0);
+
+	vp->v_vfsp  = vfsp;
+	vp->v_type  = type;
+	vp->v_rdev  = dev;
+	vp->v_inode = ip;
+
+	vn_trace_exit(vp, "vn_alloc", (inst_t *)__return_address);
+
+	return vp;
+}
+
 
 /*
  * Free an isolated vnode, putting it at the front of a vfreelist.
@@ -585,200 +328,177 @@ gotit:
 void
 vn_free(struct vnode *vp)
 {
-	register vfreelist_t *vfp;
-	register int s;
+	VOPINFO.vn_free++;
 
-	ASSERT(vp->v_count == 1);
+	vn_trace_entry(vp, "vn_free", (inst_t *)__return_address);
 
-	if (vfreelistmask) {
-		ASSERT(vfreelistmask == 0);
-	} else {
-		vp->v_listid = 0;
-		vfp = vfreelist;
-	}
+	ASSERT(vn_count(vp) == 1);
 
-	vp->v_count = 0;
+	ASSERT((vp->v_flag & VPURGE) == 0);
+
 	vp->v_fbhv = NULL;
-
-	s = LOCK_VFP(vfp);
-	ASSERT(vp->v_listid == vfp->vf_listid);
-	vfp->vf_lsize++;
-	vn_insert(vp, &vfp->vf_freelist);
-	UNLOCK_VFP(vfp, s);
-	atomicAddInt(&vn_nfree, 1);
-
-	VOPINFO.vn_rele++;
 }
 
+
 /*
- * Get and reference a vnode, possibly removing it from the freelist.
- * If v_count is zero and VINACT is set, then vn_rele is inactivating
- * and we must wait for vp to go on the freelist, or to be reclaimed.
- * If v_count is zero and VRECLM is set, vn_alloc is reclaiming vp;
- * we must sleep till vp is reclaimed, then return false to our caller,
- * who will try again to hash vp's identifier in its filesystem cache.
- * If during the sleep on vfreelock we miss a reclaim, we will notice
- * that v_number has changed.
+ * Get a reference on a vnode.
  */
 vnode_t *
-vn_get(register struct vnode *vp, register vmap_t *vmap, uint flags)
+vn_get(struct vnode *vp, vmap_t *vmap, uint flags)
 {
-	register int list = vmap->v_id;
-	register vfreelist_t *vfp;
-	register int s;
+	struct inode	*inode;
+	xfs_ino_t		inum;
 
 	VOPINFO.vn_get++;
 
 	/*
-	 * Check that the epoch of vnodes hasn't changed.  Epoch only
-	 * changes when a vnode is deallocated, which means that sampled
-	 * vnode pointers in filesystem caches may now be stale.  If the
-	 * epoch has changed, search for the vnode in the vnode hash.
+	 * Don't use the vnode address for anything other than
+	 * calculating the linux inode address until after
+	 * we've grabbed the inode and verified it.
 	 */
-again:
-	if (list < 0 || list > vfreelistmask)
-		return 0;
+	inode = (struct inode *)((char *)vp
+				- offsetof(struct inode, u.xfs_i.vnode));
 
-	vfp = &vfreelist[list];
-	s = LOCK_VFP(vfp);
+	inode = igrab(inode);
+
+	if (inode == NULL)		/* I_FREEING conflict */
+		return NULL;
+
+	inum = inode->i_ino;
+
+	/*
+	 * Verify that the linux inode we just 'grabbed'
+	 * is still the one we want.
+	 */
+	if (vmap->v_number != vp->v_number) {
+printk("vn_get: vp/0x%p inode/0x%p v_number %Ld/%Ld\n",
+vp, inode, vmap->v_number, vp->v_number);
+
+		goto fail;
+	}
 
 	if (vmap->v_epoch != vn_epoch) {
-		vp = vn_find(vmap->v_number);
-		if (vp == NULL) {
-			UNLOCK_VFP(vfp, s);
-			VOPINFO.vn_gchg++;
-			vmap->v_id = 0;
-			return 0;
-		}
+printk("vn_get: vp/0x%p inode/0x%p v_epoch %d/%d\n",
+vp, inode, vmap->v_epoch, vn_epoch);
+
+		goto fail;
 	}
 
-	NESTED_VN_LOCK(vp);
-	if (vp->v_number != vmap->v_number) {
-		NESTED_UNLOCK_VFP(vfp);
-		vmap->v_id = 0;
-		VN_UNLOCK(vp, s);
-		VOPINFO.vn_gchg++;
-		return 0;
+	if (vmap->v_ino != inum) {
+printk("vn_get: vp/0x%p inode/0x%p v_ino %Ld/%Ld\n",
+vp, inode, vmap->v_ino, inum);
+
+		goto fail;
 	}
 
-	if (vp->v_count == 0) {
-		/*
-		 * Combine the inactive and reclaim race detection code.
-		 */
-		if (vp->v_flag & (VINACT|VRECLM|VGONE)) {
-			ASSERT((vp->v_flag & VGONE) == 0);
-			/*
-			 * If the caller cannot get stuck waiting
-			 * for the vnode to complete its inactive
-			 * or reclaim routine, then return NULL.
-			 * Set v_id to -2 to indicate that this is
-			 * why NULL was returned.
-			 */
-			if (flags & VN_GET_NOWAIT) {
-				vmap->v_id = -2;
-				NESTED_VN_UNLOCK(vp);
-				UNLOCK_VFP(vfp, s);
-				return 0;
-			}
-			NESTED_UNLOCK_VFP(vfp);
-			vp->v_flag |= VWAIT;
-			sv_wait(vptosync(vp), PINOD, &vp->v_lock, s);
-			VOPINFO.vn_gchg++;
-			goto again;
-		}
+	vn_trace_exit(vp, "vn_get", (inst_t *)__return_address);
 
-		/*
-		 * vnode could have travelled from one freelist to
-		 * another since it was sampled by caller.
-		 */
-		if (list != vp->v_listid) {
-			list = vp->v_listid;
-			NESTED_VN_UNLOCK(vp);
-			UNLOCK_VFP(vfp, s);
-			VOPINFO.vn_gchg++;
-			goto again;
-		}
-
-		/*
-		 * If there are no behaviors attached to this vnode,
-		 * there is no point in giving it back to the caller.
-		 * This can happen if the behavior was detached in
-		 * the filesystem's inactive routine.
-		 */
-		if (vp->v_fbhv == NULL) {
-			NESTED_VN_UNLOCK(vp);
-			UNLOCK_VFP(vfp, s);
-			vmap->v_id = 0;
-			return NULL;
-		}
-
-		/*
-		 * Give vp one reference for our caller and unlink it from
-		 * the vnode freelist.
-		 */
-		vp->v_count = 1;
-		NESTED_VN_UNLOCK(vp);
-
-		ASSERT(vp->v_next != vp && vp->v_prev != vp);
-		ASSERT(vp->v_flag & VSHARE);
-
-		vn_unlink(vp);
-		ASSERT(vfp->vf_lsize > 0);
-		vfp->vf_lsize--;
-		UNLOCK_VFP(vfp, s);
-
-		ASSERT(vn_nfree > 0);
-		atomicAddInt(&vn_nfree, -1);
-		VOPINFO.vn_gfree++;
-
-		return vp;
-	}
-
-	vp->v_count++;
-	NESTED_VN_UNLOCK(vp);
-	ASSERT(vp->v_flag & VSHARE);
-	UNLOCK_VFP(vfp, s);
+	ASSERT((vp->v_flag & VPURGE) == 0);
 
 	return vp;
+
+fail:
+	iput(inode);
+
+	return NULL;
 }
+
+
+/*
+ * "put" the linux inode.
+ */
+void
+vn_put(struct vnode *vp)
+{
+	struct inode *inode;
+
+	vn_trace_entry(vp, "vn_put", (inst_t *)__return_address);
+
+	inode = LINVFS_GET_IP(vp);
+
+	ASSERT(inode);
+
+	iput(inode);
+}
+
+
+/*
+ * "Temporary" routine to return the linux inode
+ * hold count, after everybody else can directly
+ * reference the inode (header magic!), this
+ * routine is dead meat..
+ */
+int
+vn_count(struct vnode *vp)
+{
+	struct inode *inode;
+
+	inode = LINVFS_GET_IP(vp);
+
+	ASSERT(inode);
+
+	return inode->i_count;
+}
+
+
+/*
+ * "revalidate" the linux inode.
+ */
+void
+vn_revalidate(struct vnode *vp)
+{
+	int		error;
+	struct inode	*inode;
+	cred_t		cred;
+	vattr_t		va;
+
+	vn_trace_entry(vp, "vn_revalidate", (inst_t *)__return_address);
+
+	va.va_mask = AT_STAT|ATTR_LAZY;
+
+	ASSERT(vp->v_bh.bh_first != NULL);
+
+	VOP_GETATTR(vp, &va, ATTR_LAZY, &cred, error);
+
+	if (! error) {
+		inode = LINVFS_GET_IP(vp);
+
+		ASSERT(inode);
+
+		inode->i_mode    = VTTOIF(va.va_type) | va.va_mode;
+		inode->i_nlink   = va.va_nlink;
+		inode->i_uid     = va.va_uid;
+		inode->i_gid     = va.va_gid;
+		inode->i_rdev    = va.va_rdev;
+		inode->i_size    = va.va_size;
+		inode->i_blocks  = va.va_nblocks;
+		inode->i_blksize = va.va_blksize;
+		inode->i_atime   = va.va_atime.tv_sec;
+		inode->i_mtime   = va.va_mtime.tv_sec;
+		inode->i_ctime   = va.va_ctime.tv_sec;
+	} else {
+		vn_trace_exit(vp, "vn_revalidate.error",
+					(inst_t *)__return_address);
+	}
+}
+
 
 /*
  * purge a vnode from the cache
- * At this point the vnode is guaranteed to have no references (v_count == 0)
+ * At this point the vnode is guaranteed to have no references (vn_count == 0)
  * The caller has to make sure that there are no ways someone could
  * get a handle (via vn_get) on the vnode (usually done via a mount/vfs lock).
  */
 void
 vn_purge(struct vnode *vp, vmap_t *vmap)
 {
-	register vfreelist_t *vfp;
-	register int list = vmap->v_id;
-	register int s;
+	unsigned	s;
 
-	/* if you don't SHARE you don't get to play */
-	ASSERT(vp->v_flag & VSHARE);
+	vn_trace_entry(vp, "vn_purge", (inst_t *)__return_address);
+
+	ASSERT(vp->v_flag & VPURGE);
+
 again:
-	if (list < 0 || list > vfreelistmask)
-		return;
-
-	vfp = &vfreelist[list];
-	s = LOCK_VFP(vfp);
-
-	/*
-	 * Check that the epoch of vnodes hasn't changed.  Epoch only
-	 * changes when a vnode is deallocated, which means that sampled
-	 * vnode pointers in filesystem caches may now be stale.  If the
-	 * epoch has changed, search for the vnode in the vnode hash.
-	 */
-	if (vmap->v_epoch != vn_epoch) {
-		vp = vn_find(vmap->v_number);
-		if (vp == NULL) {
-			UNLOCK_VFP(vfp, s);
-			VOPINFO.vn_gchg++;
-			return;
-		}
-	}
-
 	/*
 	 * Check whether vp has already been reclaimed since our caller
 	 * sampled its version while holding a filesystem cache lock that
@@ -787,7 +507,6 @@ again:
 	NESTED_VN_LOCK(vp);
 	if (vp->v_number != vmap->v_number) {
 		NESTED_VN_UNLOCK(vp);
-		UNLOCK_VFP(vfp, s);
 		return;
 	}
 
@@ -798,47 +517,22 @@ again:
 	 * reclaim can fail.
 	 */
 	if (vp->v_flag & (VINACT | VRECLM)) {
-		ASSERT(vp->v_count == 0);
-		NESTED_UNLOCK_VFP(vfp);
+		ASSERT(vn_count(vp) == 0);
 		vp->v_flag |= VWAIT;
-		sv_wait(vptosync(vp), PINOD, &vp->v_lock, s);
+		sv_wait(vptosync(vp), PINOD, &vp->v_lock, 0);
 		goto again;
 	}
 
 	/*
 	 * Another process could have raced in and gotten this vnode...
 	 */
-	if (vp->v_count > 0) {
-		NESTED_UNLOCK_VFP(vfp);
+	if (vn_count(vp) > 0) {
 		VN_UNLOCK(vp, s);
 		return;
 	}
 
-	/*
-	 * vnode could have travelled from one freelist to
-	 * another since it was sampled by caller.
-	 */
-	if (list != vp->v_listid) {
-		list = vp->v_listid;
-		NESTED_UNLOCK_VFP(vfp);
-		VN_UNLOCK(vp, s);
-		VOPINFO.vn_gchg++;
-		goto again;
-	}
-
 	vp->v_flag |= VRECLM;
 	NESTED_VN_UNLOCK(vp);
-
-	vn_unlink(vp);
-	/*
-	 * XXX	There is no routine that relies on a freelist's vf_lsize
-	 * XXX	exactly matching the number of free list entries.  Since
-	 * XXX	this vnode is going right back on the same freelist, we
-	 * XXX	won't bother to decrement, and later, increment vf_lsize.
-	ASSERT(vfp->vf_lsize > 0);
-	vfp->vf_lsize--;
-	 */
-	UNLOCK_VFP(vfp, s);
 
 	/*
 	 * Call VOP_RECLAIM and clean vp. The FSYNC_INVAL flag tells
@@ -848,21 +542,6 @@ again:
 	 */
 	if (vn_reclaim(vp, FSYNC_INVAL) != 0)
 		panic("vn_purge: cannot reclaim");
-
-	/*
-	 * Setting v_listid is protected by VRECLM flag above...
-	vp->v_listid = list;
-	 */
-	s = LOCK_VFP(vfp);
-	ASSERT(vp->v_listid == list);
-	vn_insert(vp, &vfp->vf_freelist);
-
-	/*
-	 * XXX	See comments above about vf_lsize.
-	ASSERT(vfp->vf_lsize >= 0);
-	vfp->vf_lsize++;
-	 */
-	UNLOCK_VFP(vfp, s);
 
 	/*
 	 * Wakeup anyone waiting for vp to be reclaimed.
@@ -877,12 +556,21 @@ struct vnode *
 vn_hold(struct vnode *vp)
 {
 	register int s = VN_LOCK(vp);
-	ASSERT(!(vp->v_flag & VSHARE) || (vp->v_count > 0));
-	ASSERT((vp->v_flag & VSHARE) || (vp->v_count >= 0));
-	vp->v_count++;
+	struct inode *inode;
+
+	VOPINFO.vn_hold++;
+
+	inode = LINVFS_GET_IP(vp);
+
+	inode = igrab(inode);
+
+	ASSERT(inode);
+
 	VN_UNLOCK(vp, s);
+
 	return vp;
 }
+
 
 /*
  * Release a vnode.  Decrements reference count and calls
@@ -891,25 +579,32 @@ vn_hold(struct vnode *vp)
 void
 vn_rele(struct vnode *vp)
 {
-	register vfreelist_t *vfp;
-	register int s;
-	int private_vnode;
+	int	s;
+	int	vcnt;
 	/* REFERENCED */
 	int cache;
 
 	VOPINFO.vn_rele++;
 
 	s = VN_LOCK(vp);
-	ASSERT(vp->v_count > 0);
-	if (--vp->v_count == 0) {
 
+	vcnt = vn_count(vp);
+
+	ASSERT(vcnt > 0);
+
+	/*
+	 * Note that we are allowing for the fact that the
+	 * i_count won't be decremented until we do the
+	 * 'iput' below.
+	 */
+	if (vcnt == 1) {
 		/*
 		 * It is absolutely, positively the case that
 		 * the lock manager will not be releasing vnodes
 		 * without first having released all of its locks.
 		 */
 		ASSERT(!(vp->v_flag & VLOCKHOLD));
-		private_vnode = !(vp->v_flag & VSHARE);
+
 		/*
 		 * As soon as we turn this on, noone can find us in vn_get
 		 * until we turn off VINACT or VRECLM
@@ -924,104 +619,96 @@ vn_rele(struct vnode *vp)
 		if (vp->v_fbhv != NULL) {
 			VOP_INACTIVE(vp, get_current_cred(), cache);
 		}
-		/*
-		 * For filesystems that do not want to be part of
-		 * the global vnode cache, we must not touch the
-		 * vp after we have called inactive
-		 */
-		if (private_vnode)
-			return;
 
-		ASSERT(vp->v_next == vp && vp->v_prev == vp);
+		s = VN_LOCK(vp);
 
-		if (vfreelistmask) {
-			ASSERT(vfreelistmask == 0);
-		} else {
-			vp->v_listid = 0;
-			vfp = vfreelist;
-		}
-
-		ASSERT(vp->v_listid <= vfreelistmask);
-		s = LOCK_VFP(vfp);
-		if (vp->v_fbhv == NULL)
-			vn_insert(vp, &vfp->vf_freelist);
-		else
-			vn_append(vp, &vfp->vf_freelist);
-
-		ASSERT(vfp->vf_lsize >= 0);
-		vfp->vf_lsize++;
-
-		/*
-		 * Must hold freelist lock here to prevent
-		 * vnode from being deallocated first.
-		 * VRECLM is turned off, too, because it may
-		 * have been vn_reclaim'd, above (this stmt.
-		 * not true anymore).
-		 */
-		NESTED_VN_LOCK(vp);
-		if (vp->v_flag & VWAIT) {
-			sv_broadcast(vptosync(vp));
-		}
 		vp->v_flag &= ~(VINACT|VWAIT|VRECLM|VGONE);
 
-		NESTED_VN_UNLOCK(vp);
-		UNLOCK_VFP(vfp, s);
+		VN_UNLOCK(vp, s);
 
-		ASSERT(vn_nfree >= 0);
-		atomicAddInt(&vn_nfree, 1);
+		vn_trace_exit(vp, "vn_rele", (inst_t *)__return_address);
+
+		/*
+		 * Don't reference the vnode after the 'put',
+		 * it'll be gone.
+		 */
+		vn_put(vp);
 
 		return;
 	}
+
 	VN_UNLOCK(vp, s);
-}
 
-/*
- * Vnode list primitives.  The callers must exclude one another.
- */
-void
-vn_initlist(struct vnlist *vl)
-{
-	vl->vl_next = vl->vl_prev = (struct vnode *)vl;
-}
-
-void
-vn_insert(struct vnode *vp, struct vnlist *vl)
-{
-	vp->v_next = vl->vl_next;
-	vp->v_prev = (struct vnode *)vl;
-	vl->vl_next = vp;
+	vn_trace_exit(vp, "vn_rele", (inst_t *)__return_address);
 
 	/*
-	 * imon depends on vp this...
+	 * The vnode will still be around after the 'put',
+	 * but keep the same trace sequence for consistency.
 	 */
-	vp->v_next->v_prev = vp;
+	vn_put(vp);
 }
 
+
+/*
+ * Finish the removal of a vnode.
+ * A 'special' case of vn_rele.
+ */
 void
-vn_unlink(register struct vnode *vp)
+vn_remove(struct vnode *vp)
 {
-	register struct vnode *next = vp->v_next;
-	register struct vnode *prev = vp->v_prev;
+	int	s;
+	/* REFERENCED */
+	int cache;
+	vmap_t  vmap;
 
-	next->v_prev = prev;
-	prev->v_next = next;
-	vp->v_next = vp->v_prev = vp;
-}
+	vn_trace_entry(vp, "vn_remove", (inst_t *)__return_address);
 
-static void
-vn_relink(
-	register vnlist_t *vlist,
-	register vnode_t *next,
-	register vnode_t *prev)
-{
-	register struct vnode *N = vlist->vl_next;
-	register struct vnode *P = vlist->vl_prev;
-	next->v_prev = (struct vnode *)vlist;
-	P->v_next = N;
-	N->v_prev = P;
-	vlist->vl_next = next;
-	vlist->vl_prev = prev;
-	prev->v_next = (struct vnode *)vlist;
+	VOPINFO.vn_remove++;
+	VOPINFO.vn_active--;
+
+	s = VN_LOCK(vp);
+
+	ASSERT(vn_count(vp) == 0);
+
+	/*
+	 * It is absolutely, positively the case that
+	 * the lock manager will not be releasing vnodes
+	 * without first having released all of its locks.
+	 */
+	ASSERT(!(vp->v_flag & VLOCKHOLD));
+
+	/*
+	 * As soon as we turn this on, noone can find us in vn_get
+	 * until we turn off VINACT or VRECLM
+	 */
+	vp->v_flag |= VINACT;
+	VN_UNLOCK(vp, s);
+
+	/*
+	 * Do not make the VOP_INACTIVE call if there
+	 * are no behaviors attached to the vnode to call.
+	 */
+	if (vp->v_fbhv != NULL) {
+		VOP_INACTIVE(vp, get_current_cred(), cache);
+	}
+
+	s = VN_LOCK(vp);
+
+	vp->v_flag &= ~(VINACT|VWAIT|VRECLM|VGONE);
+
+	VN_UNLOCK(vp, s);
+
+	vn_trace_exit(vp, "vn_remove", (inst_t *)__return_address);
+
+	/*
+	 * After the following purge the vnode
+	 * will no longer exist.
+	 */
+	VMAP(vp, XFS_BHVTOI(vp->v_fbhv), vmap);
+
+	vn_purge(vp, &vmap);
+
+	vp->v_inode = NULL;		/* No more references to inode */
 }
 
 
@@ -1036,39 +723,80 @@ vn_relink(
 void
 vn_trace_entry(vnode_t *vp, char *func, inst_t *ra)
 {
-	ktrace_enter(vp->v_trace, (void *)(__psint_t)VNODE_KTRACE_ENTRY,
-		(void *)func, 0, (void *)(__psint_t)vp->v_count, (void *)ra,
-		(void *)(__psunsigned_t)vp->v_flag, (void *)(__psint_t)cpuid(),
-		(void *)(__psint_t)current_pid(), 0, 0, 0, 0, 0, 0, 0, 0);
+	ktrace_enter(	vp->v_trace,
+/*  0 */		(void *)(__psint_t)VNODE_KTRACE_ENTRY,
+/*  1 */		(void *)func,
+/*  2 */		0,
+/*  3 */		(void *)(vp->v_inode ? vp->v_inode->i_count : -9),
+/*  4 */		(void *)ra,
+/*  5 */		(void *)(__psunsigned_t)vp->v_flag,
+/*  6 */		(void *)(__psint_t)cpuid(),
+/*  7 */		(void *)(__psint_t)current_pid(),
+/*  8 */		(void *)__return_address,
+/*  9 */		0, 0, 0, 0, 0, 0, 0);
+}
+
+void
+vn_trace_exit(vnode_t *vp, char *func, inst_t *ra)
+{
+	ktrace_enter(	vp->v_trace,
+/*  0 */		(void *)(__psint_t)VNODE_KTRACE_EXIT,
+/*  1 */		(void *)func,
+/*  2 */		0,
+/*  3 */		(void *)(vp->v_inode ? vp->v_inode->i_count : -9),
+/*  4 */		(void *)ra,
+/*  5 */		(void *)(__psunsigned_t)vp->v_flag,
+/*  6 */		(void *)(__psint_t)cpuid(),
+/*  7 */		(void *)(__psint_t)current_pid(),
+/*  8 */		(void *)__return_address,
+/*  9 */		0, 0, 0, 0, 0, 0, 0);
 }
 
 void
 vn_trace_hold(vnode_t *vp, char *file, int line, inst_t *ra)
 {
-	ktrace_enter(vp->v_trace, (void *)(__psint_t)VNODE_KTRACE_HOLD,
-		(void *)file, (void *)(__psint_t)line,
-		(void *)(__psint_t)vp->v_count, (void *)ra,
-		(void *)(__psunsigned_t)vp->v_flag, (void *)(__psint_t)cpuid(),
-		(void *)(__psint_t)current_pid(), 0, 0, 0, 0, 0, 0, 0, 0);
+	ktrace_enter(	vp->v_trace,
+/*  0 */		(void *)(__psint_t)VNODE_KTRACE_HOLD,
+/*  1 */		(void *)file,
+/*  2 */		(void *)(__psint_t)line,
+/*  3 */		(void *)(vp->v_inode ? vp->v_inode->i_count : -9),
+/*  4 */		(void *)ra,
+/*  5 */		(void *)(__psunsigned_t)vp->v_flag,
+/*  6 */		(void *)(__psint_t)cpuid(),
+/*  7 */		(void *)(__psint_t)current_pid(),
+/*  8 */		(void *)__return_address,
+/*  9 */		0, 0, 0, 0, 0, 0, 0);
 }
 
 void
 vn_trace_ref(vnode_t *vp, char *file, int line, inst_t *ra)
 {
-	ktrace_enter(vp->v_trace, (void *)(__psint_t)VNODE_KTRACE_REF,
-		(void *)file, (void *)(__psint_t)line,
-		(void *)(__psint_t)vp->v_count, (void *)ra,
-		(void *)(__psunsigned_t)vp->v_flag, (void *)(__psint_t)cpuid(),
-		(void *)(__psint_t)current_pid(), 0, 0, 0, 0, 0, 0, 0, 0);
+	ktrace_enter(	vp->v_trace,
+/*  0 */		(void *)(__psint_t)VNODE_KTRACE_REF,
+/*  1 */		(void *)file,
+/*  2 */		(void *)(__psint_t)line,
+/*  3 */		(void *)(vp->v_inode ? vp->v_inode->i_count : -9),
+/*  4 */		(void *)ra,
+/*  5 */		(void *)(__psunsigned_t)vp->v_flag,
+/*  6 */		(void *)(__psint_t)cpuid(),
+/*  7 */		(void *)(__psint_t)current_pid(),
+/*  8 */		(void *)__return_address,
+/*  9 */		0, 0, 0, 0, 0, 0, 0);
 }
 
 void
 vn_trace_rele(vnode_t *vp, char *file, int line, inst_t *ra)
 {
-	ktrace_enter(vp->v_trace, (void *)(__psint_t)VNODE_KTRACE_RELE,
-		(void *)file, (void *)(__psint_t)line,
-		(void *)(__psint_t)vp->v_count, (void *)ra,
-		(void *)(__psunsigned_t)vp->v_flag, (void *)(__psint_t)cpuid(),
-		(void *)(__psint_t)current_pid(), 0, 0, 0, 0, 0, 0, 0, 0);
+	ktrace_enter(	vp->v_trace,
+/*  0 */		(void *)(__psint_t)VNODE_KTRACE_RELE,
+/*  1 */		(void *)file,
+/*  2 */		(void *)(__psint_t)line,
+/*  3 */		(void *)(vp->v_inode ? vp->v_inode->i_count : -9),
+/*  4 */		(void *)ra,
+/*  5 */		(void *)(__psunsigned_t)vp->v_flag,
+/*  6 */		(void *)(__psint_t)cpuid(),
+/*  7 */		(void *)(__psint_t)current_pid(),
+/*  8 */		(void *)__return_address,
+/*  9 */		0, 0, 0, 0, 0, 0, 0);
 }
 #endif	/* CONFIG_XFS_VNODE_TRACING */

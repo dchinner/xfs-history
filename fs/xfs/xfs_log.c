@@ -45,7 +45,6 @@
 #include <sys/sysmacros.h>
 #include "xfs_buf.h"
 #include <sys/vnode.h>
-#include <sys/ksa.h>
 
 #ifdef SIM
 #undef _KERNEL
@@ -53,7 +52,6 @@
 #include <stdlib.h>
 #else
 #include <sys/systm.h>
-#include <sys/conf.h>
 #endif
 
 #include <sys/cmn_err.h>
@@ -99,7 +97,7 @@ STATIC int	 xlog_commit_record(xfs_mount_t *mp, xlog_ticket_t *ticket,
 				    xfs_lsn_t *);
 STATIC xlog_t *  xlog_alloc_log(xfs_mount_t	*mp,
 				dev_t		log_dev,
-				daddr_t		blk_offset,
+				xfs_daddr_t		blk_offset,
 				int		num_bblks);
 STATIC int	 xlog_space_left(xlog_t *log, int cycle, int bytes);
 STATIC int	 xlog_sync(xlog_t *log, xlog_in_core_t *iclog, uint flags);
@@ -111,10 +109,10 @@ STATIC int	 xlog_write(xfs_mount_t *mp, xfs_log_iovec_t region[],
 /* local state machine functions */
 STATIC void xlog_state_done_syncing(xlog_in_core_t *iclog, int);
 STATIC void xlog_state_do_callback(xlog_t *log,int aborted, xlog_in_core_t *iclog);
-STATIC void xlog_state_finish_copy(xlog_t	   *log,
-				   xlog_in_core_t  *iclog,
-				   int		   first_write,
-				   int		   bytes);
+static inline void xlog_state_finish_copy(xlog_t	*log,
+					xlog_in_core_t	*iclog,
+					int		first_write,
+					int		bytes);
 STATIC int  xlog_state_get_iclog_space(xlog_t		*log,
 				       int		len,
 				       xlog_in_core_t	**iclog,
@@ -200,7 +198,7 @@ dev_t xlog_devt  = 0;
 
 #if defined(XFS_LOG_TRACE)
 void
-xlog_trace_loggrant(xlog_t *log, xlog_ticket_t *tic, caddr_t string)
+xlog_trace_loggrant(xlog_t *log, xlog_ticket_t *tic, xfs_caddr_t string)
 {
 	if (! log->l_grant_trace)
 		log->l_grant_trace = ktrace_alloc(1024, KM_SLEEP);
@@ -373,22 +371,28 @@ xfs_log_force(xfs_mount_t *mp,
 	      xfs_lsn_t	  lsn,
 	      uint	  flags)
 {
+	int	rval;
 	xlog_t *log = mp->m_log;
 
 #if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
 	if (! xlog_debug && xlog_devt == log->l_dev)
 		return 0;
 #endif
+
 	ASSERT(flags & XFS_LOG_FORCE);
+
 	XFSSTATS.xs_log_force++;
+
 	if ((log->l_flags & XLOG_IO_ERROR) == 0) {
 		if (lsn == 0)
-			return (xlog_state_sync_all(log, flags));
+			rval = xlog_state_sync_all(log, flags);
 		else 
-			return (xlog_state_sync(log, lsn, flags));
+			rval = xlog_state_sync(log, lsn, flags);
 	} else {
-		return XFS_ERROR(EIO);
+		rval = XFS_ERROR(EIO);
 	}
+
+	return rval;
 
 }	/* xfs_log_force */
 
@@ -499,7 +503,7 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 int
 xfs_log_mount(xfs_mount_t	*mp,
 	      dev_t		log_dev,
-	      daddr_t		blk_offset,
+	      xfs_daddr_t		blk_offset,
 	      int		num_bblks)
 {
 	xlog_t *log;
@@ -676,7 +680,6 @@ xfs_log_unmount_write(xfs_mount_t *mp)
 		if (!(iclog->ic_state == XLOG_STATE_ACTIVE ||
 		      iclog->ic_state == XLOG_STATE_DIRTY)) {
 			if (!XLOG_FORCED_SHUTDOWN(log)) {
-				xfs_trigger_io();
 				sv_wait(&iclog->ic_forcesema, PMEM, 
 					&log->l_icloglock, spl);
 			} else {
@@ -715,7 +718,6 @@ xfs_log_unmount_write(xfs_mount_t *mp)
 		        || iclog->ic_state == XLOG_STATE_DIRTY
 			|| iclog->ic_state == XLOG_STATE_IOERROR) ) {
 
-				xfs_trigger_io();
 				sv_wait(&iclog->ic_forcesema, PMEM, 
 					&log->l_icloglock, spl);
 		} else {
@@ -1021,11 +1023,7 @@ xlog_bdstrat_cb(struct xfs_buf *bp)
 	iclog = XFS_BUF_FSPRIVATE(bp, xlog_in_core_t *);
 
 	if ((iclog->ic_state & XLOG_STATE_IOERROR) == 0) {
-#if !defined(_USING_PAGEBUF_T)
-		bdstrat(NULL, bp);
-#elif defined(_USING_PAGEBUF_T)
 		pagebuf_iostart(bp,0);
-#endif
 		return 0;
 	}
 
@@ -1158,7 +1156,7 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 STATIC xlog_t *
 xlog_alloc_log(xfs_mount_t	*mp,
 	       dev_t		log_dev,
-	       daddr_t		blk_offset,
+	       xfs_daddr_t		blk_offset,
 	       int		num_bblks)
 {
 	xlog_t			*log;
@@ -1229,7 +1227,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 		iclog = *iclogp;
 		iclog->ic_prev = prev_iclog;
 		prev_iclog = iclog;
-		log->l_iclog_bak[i] = (caddr_t)&(iclog->ic_header);
+		log->l_iclog_bak[i] = (xfs_caddr_t)&(iclog->ic_header);
 
 		head = &iclog->ic_header;
 		INT_SET(head->h_magicno, ARCH_CONVERT, XLOG_HEADER_MAGIC_NUM);
@@ -1384,7 +1382,7 @@ xlog_sync(xlog_t		*log,
 	  xlog_in_core_t	*iclog,
 	  uint			flags)
 {
-	caddr_t		dptr;		/* pointer to byte sized element */
+	xfs_caddr_t		dptr;		/* pointer to byte sized element */
 	xfs_buf_t		*bp;
 	int		i;
 	uint		count;		/* byte count of bwrite */
@@ -1432,7 +1430,7 @@ xlog_sync(xlog_t		*log,
 	} else {
 		iclog->ic_bwritecnt = 1;
 	}
-	XFS_BUF_SET_PTR(bp, (caddr_t) &(iclog->ic_header), count);
+	XFS_BUF_SET_PTR(bp, (xfs_caddr_t) &(iclog->ic_header), count);
 	XFS_BUF_SET_FSPRIVATE(bp, iclog);	/* save for later */
 	if (flags & XFS_LOG_SYNC){
 		XFS_BUF_BUSY(bp);
@@ -1465,7 +1463,7 @@ xlog_sync(xlog_t		*log,
 							(unsigned long)1);
 		XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)2);
 		XFS_BUF_SET_ADDR(bp, 0);	     /* logical 0 */
-		XFS_BUF_SET_PTR(bp, (caddr_t)((__psint_t)&(iclog->ic_header)+
+		XFS_BUF_SET_PTR(bp, (xfs_caddr_t)((__psint_t)&(iclog->ic_header)+
 					    (__psint_t)count), split);
 		XFS_BUF_SET_FSPRIVATE(bp, iclog);
 		XFS_BUF_BUSY(bp);
@@ -1750,7 +1748,7 @@ xlog_write(xfs_mount_t *	mp,
 
 	    /* copy region */
 	    ASSERT(copy_len >= 0);
-	    bcopy(reg[index].i_addr + copy_off, (caddr_t)ptr, copy_len);
+	    bcopy(reg[index].i_addr + copy_off, (xfs_caddr_t)ptr, copy_len);
 	    xlog_write_adv_cnt(ptr, len, log_offset, copy_len);
 
 	    /* make copy_len total bytes copied, including headers */
@@ -2133,7 +2131,7 @@ xlog_state_done_syncing(
  * Update counters atomically now that bcopy is done.
  */
 /* ARGSUSED */
-void
+static inline void
 xlog_state_finish_copy(xlog_t		*log,
 		       xlog_in_core_t	*iclog,
 		       int		first_write,
@@ -2203,7 +2201,6 @@ restart:
 		xlog_trace_iclog(iclog, XLOG_TRACE_SLEEP_FLUSH);
 		XFSSTATS.xs_log_noiclogs++;
 		/* Ensure that log writes happen */
-		xfs_trigger_io();
 		psema(&log->l_flushsema, PINOD);
 		goto restart;
 	}
@@ -2880,7 +2877,6 @@ maybe_sleep:
 			return XFS_ERROR(EIO);
 		}
 		XFSSTATS.xs_log_force_sleep++;
-		xfs_trigger_io();
 		sv_wait(&iclog->ic_forcesema, PINOD, &log->l_icloglock, spl);
 		/*
 		 * No need to grab the log lock here since we're
@@ -2963,9 +2959,8 @@ try_again:
 						 XLOG_STATE_SYNCING))) {
 			ASSERT(!(iclog->ic_state & XLOG_STATE_IOERROR));
 			XFSSTATS.xs_log_force_sleep++;
-			xfs_trigger_io();
-			sv_wait(&iclog->ic_forcesema, PSWP, &log->l_icloglock,
-				spl);
+			sv_wait(&iclog->ic_prev->ic_forcesema, PSWP,
+				&log->l_icloglock, spl);
 			already_slept = 1;
 			goto try_again;
 		} else {
@@ -2990,7 +2985,6 @@ try_again:
 			return XFS_ERROR(EIO);
 		}
 		XFSSTATS.xs_log_force_sleep++;
-		xfs_trigger_io();
 		sv_wait(&iclog->ic_forcesema, PSWP, &log->l_icloglock, spl);
 		/*
 		 * No need to grab the log lock here since we're
@@ -3049,7 +3043,7 @@ xlog_state_ticket_alloc(xlog_t *log)
 {
 	xlog_ticket_t	*t_list;
 	xlog_ticket_t	*next;
-	caddr_t		buf;
+	xfs_caddr_t		buf;
 	int		spl;
 	uint		i = (NBPP / sizeof(xlog_ticket_t)) - 2;
 
@@ -3057,7 +3051,7 @@ xlog_state_ticket_alloc(xlog_t *log)
 	 * The kmem_zalloc may sleep, so we shouldn't be holding the
 	 * global lock.  XXXmiken: may want to use zone allocator.
 	 */
-	buf = (caddr_t) kmem_zalloc(NBPP, 0);
+	buf = (xfs_caddr_t) kmem_zalloc(NBPP, 0);
 
 	spl = LOG_LOCK(log);
 
@@ -3229,7 +3223,7 @@ xlog_verify_disk_cycle_no(xlog_t	 *log,
 {
     xfs_buf_t	*bp;
     uint	cycle_no;
-    daddr_t	i;
+    xfs_daddr_t	i;
 
     if (BLOCK_LSN(iclog->ic_header.h_lsn, ARCH_CONVERT) < 10) {
 	cycle_no = CYCLE_LSN(iclog->ic_header.h_lsn, ARCH_CONVERT);
@@ -3309,8 +3303,8 @@ xlog_verify_iclog(xlog_t	 *log,
 #ifndef _KERNEL
 	xlog_tid_t		tid;
 #endif
-	caddr_t			ptr;
-	caddr_t			base_ptr;
+	xfs_caddr_t			ptr;
+	xfs_caddr_t			base_ptr;
 	__psint_t		field_offset;
 	char			clientid;
 	int			len, i, op_len, spl;
@@ -3329,11 +3323,11 @@ xlog_verify_iclog(xlog_t	 *log,
 	LOG_UNLOCK(log, spl);
 
 	/* check log magic numbers */
-	ptr = (caddr_t) &(iclog->ic_header);
+	ptr = (xfs_caddr_t) &(iclog->ic_header);
 	if (INT_GET(*(uint *)ptr, ARCH_CONVERT) != XLOG_HEADER_MAGIC_NUM)
 		xlog_panic("xlog_verify_iclog: illegal magic num");
 	
-	for (ptr += BBSIZE; ptr < ((caddr_t)&(iclog->ic_header))+count;
+	for (ptr += BBSIZE; ptr < ((xfs_caddr_t)&(iclog->ic_header))+count;
 	     ptr += BBSIZE) {
 		if (INT_GET(*(uint *)ptr, ARCH_CONVERT) == XLOG_HEADER_MAGIC_NUM)
 			xlog_panic("xlog_verify_iclog: unexpected magic num");
@@ -3349,7 +3343,7 @@ xlog_verify_iclog(xlog_t	 *log,
 
 		/* clientid is only 1 byte */
 		field_offset = (__psint_t)
-			       ((caddr_t)&(ophead->oh_clientid) - base_ptr);
+			       ((xfs_caddr_t)&(ophead->oh_clientid) - base_ptr);
 		if (syncing == B_FALSE || (field_offset & 0x1ff)) {
 			clientid = ophead->oh_clientid;
 		} else {
@@ -3362,7 +3356,7 @@ xlog_verify_iclog(xlog_t	 *log,
 #ifndef _KERNEL
 		/* check tids */
 		field_offset = (__psint_t)
-			       ((caddr_t)&(ophead->oh_tid) - base_ptr);
+			       ((xfs_caddr_t)&(ophead->oh_tid) - base_ptr);
 		if (syncing == B_FALSE || (field_offset & 0x1ff)) {
 			tid = INT_GET(ophead->oh_tid, ARCH_CONVERT);
 		} else {
@@ -3378,7 +3372,7 @@ xlog_verify_iclog(xlog_t	 *log,
 
 		/* check length */
 		field_offset = (__psint_t)
-			       ((caddr_t)&(ophead->oh_len) - base_ptr);
+			       ((xfs_caddr_t)&(ophead->oh_len) - base_ptr);
 		if (syncing == B_FALSE || (field_offset & 0x1ff)) {
 			op_len = INT_GET(ophead->oh_len, ARCH_CONVERT);
 		} else {

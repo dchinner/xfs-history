@@ -172,7 +172,7 @@ void xfs_dir_trace_g_dul(char *where, struct xfs_inode *dp, struct uio *uio,
 void xfs_dir_trace_g_due(char *where, struct xfs_inode *dp, struct uio *uio,
 			      struct xfs_dir_leaf_entry *entry);
 void xfs_dir_trace_g_duc(char *where, struct xfs_inode *dp, struct uio *uio,
-			      off_t cookie);
+			      xfs_off_t cookie);
 void xfs_dir_trace_enter(int type, char *where,
 			     __psunsigned_t a0, __psunsigned_t a1,
 			     __psunsigned_t a2, __psunsigned_t a3,

@@ -29,6 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
+#include <xfs_os_defs.h>
 
 #define FSID_T /* wrapper hack... border files have type problems */
 #include <sys/types.h> 
@@ -36,8 +37,7 @@
 #include <linux/module.h>
 #include <linux/errno.h>
 
-#include <linux/xfs_to_linux.h>
-#include <config/page/buf/meta.h>	/* CONFIG_PAGE_BUF_META */
+#include <config/xfs/grio.h>    	/* CONFIG_XFS_GRIO */
 
 #undef  NODEV
 #include <linux/version.h>
@@ -49,21 +49,23 @@
 #include <linux/xfs_iops.h>
 #include <linux/blkdev.h>
 
-#include <linux/linux_to_xfs.h>
-
 #include <sys/systm.h>
 #include <sys/sysmacros.h>
 #include <sys/capability.h>
 #include <sys/vfs.h>
 #include <sys/pvfs.h>
 #include <sys/vnode.h>
+#include <sys/mode.h>
 #include <ksys/behavior.h>
 #include <sys/statvfs.h>
+#include <sys/ktrace.h>
+#include <sys/kmem.h>
 #include <asm/uaccess.h>
 #include <linux/init.h>
 #include <linux/page_buf.h>
 
 #include <linux/xfs_cred.h>
+#include <xfs_grio.h>
 
 #define	MS_DATA		0x04
 
@@ -72,17 +74,10 @@
 #include <xfs_inum.h>
 #include <sys/uuid.h>
 #include <sys/pvfs.h>
+#include <xfs_iops.h>
 #include <xfs_sb.h>
 
 #undef sysinfo
-
-
-#if CONFIG_PAGE_BUF_META
-extern pagebuf_daemon_t *pb_daemon;
-#else
-/* xfs_fs_bio.c */
-void binit(void);
-#endif
 
 /* xfs_vfs.c */
 
@@ -135,6 +130,7 @@ linvfs_make_inode(kdev_t kdev, struct super_block *sb)
 	inode->i_op = &linvfs_meta_ops;
 	inode->i_sb = sb;
 
+
 	pagebuf_lock_enable(inode);
 
 	return inode;
@@ -158,11 +154,13 @@ linvfs_read_super(
 	void		*data,
 	int		silent)
 {
+	extern	int	page_cleaner_daemon_started; 
+	extern  void	page_cleaner_daemon_start(void);
+
 	vfsops_t	*vfsops;
 	extern vfsops_t xfs_vfsops;
 	vfs_t		*vfsp;
 	vnode_t		*cvp, *rootvp;
-	unsigned long	ino;
 	extern		int mountargs_xfs(char *, struct xfs_args *);
 
 	struct mounta	ap;
@@ -171,21 +169,15 @@ linvfs_read_super(
 	struct xfs_args	arg, *args = &arg;
 	int		error;
 	statvfs_t	statvfs;
-	vattr_t		attr;
 	u_int		disk, partition;
-	extern	int	page_cleaner_daemon_started; 
-	extern  void	page_cleaner_daemon_start(void);
+	struct		inode *ip, *cip;
 
 	MOD_INC_USE_COUNT;
 
-#if CONFIG_PAGE_BUF_META
-	if (!pb_daemon){
-		/* first mount pagebuf delayed write daemon not running yet */
-		if (pagebuf_daemon_start() < 0) {
-			goto fail_vnrele;
-		}
+	/* first mount pagebuf delayed write daemon not running yet */
+	if (pagebuf_daemon_start() < 0) {
+		goto fail_vnrele;
 	}
-#endif
 
 #ifdef XFS_DELALLOC
 	if (!page_cleaner_daemon_started)
@@ -226,11 +218,23 @@ linvfs_read_super(
 
 	/*  Setup up the cvp structure  */
 
-	cvp = (vnode_t *)kern_malloc(sizeof(vnode_t));
-	bzero(cvp, sizeof(*cvp));
+	cip = (struct inode *)kern_malloc(sizeof(struct inode));
+	bzero(cip, sizeof(*cip));
 
-	cvp->v_type = VDIR;
-	cvp->v_count = 1;
+	cip->i_count = 1;
+
+	cvp = LINVFS_GET_VN_ADDRESS(cip);
+
+	cvp->v_type   = VDIR;
+	cvp->v_number = 1;		/* Place holder */
+	cvp->v_inode  = cip;
+
+#ifdef  CONFIG_XFS_VNODE_TRACING
+	cvp->v_trace = ktrace_alloc(VNODE_TRACE_SIZE, KM_SLEEP);
+#endif  /* CONFIG_XFS_VNODE_TRACING */
+
+	vn_trace_entry(cvp, "linvfs_read_super", (inst_t *)__return_address);
+
         cvp->v_flag |= VMOUNTING;
 
 	/*  When we support DMI, we need to set up the behavior
@@ -244,6 +248,10 @@ linvfs_read_super(
 	sb->s_blocksize_bits = ffs(sb->s_blocksize) - 1;
 	set_blocksize(sb->s_dev, 512);
 
+	sb->s_op = &linvfs_sops;
+
+	LINVFS_SET_VFS(sb, vfsp);
+
 	VFSOPS_MOUNT(vfsops, vfsp, cvp, uap, NULL, sys_cred, error);
 	if (error)
 		goto fail_vfsop;
@@ -254,26 +262,24 @@ linvfs_read_super(
 
 	sb->s_magic = XFS_SB_MAGIC;
 	sb->s_dirt = 1;  /*  Make sure we get regular syncs  */
-	LINVFS_SET_VFS(sb, vfsp);
 
         VFS_ROOT(vfsp, &rootvp, error);
         if (error)
                 goto fail_unmount;
 
-	attr.va_mask = AT_NODEID;
+	ip = LINVFS_GET_IP(rootvp);
 
-	VOP_GETATTR(rootvp, &attr, 0, sys_cred, error);
-	if (error)
-		goto fail_vnrele;
+	linvfs_set_inode_ops(ip);
 
-	ino = (unsigned long) attr.va_nodeid;
-	sb->s_op = &linvfs_sops;
-	sb->s_root = d_alloc_root(iget(sb, ino));
+	sb->s_root = d_alloc_root(ip);
+
 	if (!sb->s_root)
 		goto fail_vnrele;
 
 	if (is_bad_inode((struct inode *) sb->s_root))
 		goto fail_vnrele;
+
+	vn_trace_exit(rootvp, "linvfs_read_super", (inst_t *)__return_address);
 
 	return(sb);
 
@@ -287,35 +293,22 @@ fail_unmount:
 
 fail_vfsop:
 	vfs_deallocate(vfsp);
+
 	MOD_DEC_USE_COUNT;
 
 	return(NULL);
 }
 
-
 void
-linvfs_read_inode(
+linvfs_set_inode_ops(
 	struct inode	*inode)
 {
-	vfs_t		*vfsp = LINVFS_GET_VFS(inode->i_sb);
-	vnode_t		*vp;
-	int		error = ENOENT;
-	struct dentry	dentry;
+	vnode_t	*vp;
 
-	if (vfsp) {
-		VFS_GET_VNODE(vfsp, &vp, inode->i_ino, error);
-	}
-	if (error) {
-		make_bad_inode(inode);
-		return;
-	}
+	vp = LINVFS_GET_VP(inode);
+	ASSERT(vp);
 
-	LINVFS_GET_VP(inode) = vp;
-	vp->v_inode = inode;
-
-	dentry.d_inode = inode;
-	linvfs_revalidate(&dentry);
-	inode->i_version = ++event;
+	inode->i_mode = VTTOIF(vp->v_type);
 
 	if (S_ISREG(inode->i_mode)) {
 		inode->i_op = &linvfs_file_inode_operations;
@@ -333,13 +326,28 @@ linvfs_read_inode(
 }
 
 void
-linvfs_delete_inode(
+linvfs_read_inode(
 	struct inode	*inode)
 {
-	clear_inode(inode);
+	vfs_t		*vfsp = LINVFS_GET_VFS(inode->i_sb);
+
+	if (vfsp) {
+		vn_initialize(inode);
+	} else {
+		make_bad_inode(inode);
+		return;
+	}
+
+	inode->i_version = ++event;
 }
 
 
+#ifdef	CONFIG_XFS_VNODE_TRACING
+
+/*
+ * We only 'use' the "put" & "write" methods to
+ * trace interesting events in the life of a vnode.
+ */
 void
 linvfs_put_inode(
 	struct inode	*inode)
@@ -347,63 +355,138 @@ linvfs_put_inode(
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 
 	if (vp) {
-#ifdef DELALLOC_PURGE
-		/* XXX ---------- DELALLOC --------------- XXX */
-		extern atomic_t	pb_delalloc_pages;
-		extern wait_queue_head_t pcd_waitq;
-
-		while (atomic_read(&pb_delalloc_pages) > 0) {
-			wake_up_interruptible(&pcd_waitq);
-			/* Sleep 10 mS - arbitrary */
-			schedule_timeout((10*HZ)/1000);
-		}
-		/* XXX ---------- DELALLOC --------------- XXX */
-#endif
-
-		VOP_RWLOCK(vp, VRWLOCK_READ);
-		pagebuf_flush(inode, 0, 0); 
-		VOP_RWUNLOCK(vp, VRWLOCK_READ);
-
-		VN_RELE(vp);
-		vp->v_inode = 0;
+		vn_trace_entry(vp, "linvfs_put_inode",
+					(inst_t *)__return_address);
 	}
 }
 
+
+void
+linvfs_write_inode(
+	struct inode	*inode)
+{
+	vnode_t	*vp = LINVFS_GET_VP(inode);
+
+	if (vp) {
+		vn_trace_entry(vp, "linvfs_write_inode",
+					(inst_t *)__return_address);
+	}
+}
+#endif	/* CONFIG_XFS_VNODE_TRACING */
+
+
+void
+linvfs_delete_inode(
+	struct inode	*inode)
+{
+	vnode_t	*vp = LINVFS_GET_VP(inode);
+
+	if (vp) {
+
+		vn_trace_entry(vp, "linvfs_delete_inode",
+					(inst_t *)__return_address);
+		/*
+		 * Remove the vnode, the nlink count
+		 * is zero & the unlink will complete.
+		 */
+		vp->v_flag |= VPURGE;
+		vn_remove(vp);
+
+	} else {
+printk("linvfs_delete_inode: NOVP!: inode/0x%p ino/%ld icnt/%d\n",
+inode, inode->i_ino, inode->i_count);
+	}
+
+	clear_inode(inode);
+}
+
+
+void
+linvfs_clear_inode(
+	struct inode	*inode)
+{
+	vnode_t		*vp = LINVFS_GET_VP(inode);
+
+	if (vp) {
+
+		vn_trace_entry(vp, "linvfs_clear_inode",
+					(inst_t *)__return_address);
+		/*
+		 * Do all our cleanup, and remove
+		 * this vnode.
+		 */
+		vp->v_flag |= VPURGE;
+		vn_remove(vp);
+	}
+}
 
 
 void
 linvfs_put_super(
 	struct super_block *sb)
 {
-	vfs_t 		*vfsp = LINVFS_GET_VFS(sb);
 	int		error;
 	int		sector_size = 512;
+	struct inode	*rootip;
 	kdev_t		dev = sb->s_dev;
+	vfs_t 		*vfsp = LINVFS_GET_VFS(sb);
+	vnode_t		*rootvp, *cvp;
 
 
 #ifdef XFS_DELALLOC
-	extern atomic_t	pb_delalloc_pages;
-	extern wait_queue_head_t pcd_waitq;
+	int 		pb_min_save = PB_MIN_DIRTY_PAGES;
 
 	unlock_super(sb);
 
+	PB_MIN_DIRTY_PAGES = 0; /* force page cleaner to process all */
 	while (atomic_read(&pb_delalloc_pages) > 0) {
 		wake_up_interruptible(&pcd_waitq);
 		/* Sleep 10 mS - arbitrary */
 		schedule_timeout((10*HZ)/1000);
 	}
+	PB_MIN_DIRTY_PAGES = pb_min_save;
 
 	fsync_dev(sb->s_dev);
+
 	lock_super(sb);
 #endif
 
-	VFS_DOUNMOUNT(vfsp, 0, NULL, sys_cred, error); 
-	if (error)
+	/*
+	 * Find the root vnode/inode, we can't
+	 * use sb->s_root->d_inode 'cause it
+	 * appears to be gone already?
+	 */
+	VFS_ROOT(vfsp, &rootvp, error);
+
+	if (error) {
 		printk("XFS unmount got error %d\n", error);
+		printk("linvfs_put_super: vfsp/0x%p left dangling!\n", vfsp);
+		return;
+	}
+
+	VN_RELE(rootvp);	/* Release the hold taken by VFS_ROOT */
+
+	rootip = LINVFS_GET_IP(rootvp);
+
+	VFS_DOUNMOUNT(vfsp, 0, NULL, sys_cred, error); 
+
+	if (error) {
+		printk("XFS unmount got error %d\n", error);
+		printk("linvfs_put_super: vfsp/0x%p left dangling!\n", vfsp);
+		return;
+	}
 
 	vfs_deallocate(vfsp);
 
-	kfree(LINVFS_GET_CVP(sb));
+	cvp = LINVFS_GET_CVP(sb);
+
+#ifdef  CONFIG_XFS_VNODE_TRACING
+	ktrace_free(cvp->v_trace);
+
+	cvp->v_trace = NULL;
+#endif  /* CONFIG_XFS_VNODE_TRACING */
+
+	kfree(cvp->v_inode);
 
 	/*  Do something to get rid of the VNODE/VFS layer here  */
 
@@ -423,18 +506,9 @@ linvfs_write_super(
 {
  	vfs_t		*vfsp = LINVFS_GET_VFS(sb); 
  	int		error; 
-#if !CONFIG_PAGE_BUF_META
-	extern void bflush_bufs(dev_t);
-#endif
-
 
 	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_BDFLUSH|SYNC_NOWAIT|SYNC_ATTR,
 		sys_cred, error);
-
-#if !CONFIG_PAGE_BUF_META
-	bflush_bufs(vfsp->vfs_dev);/* Pretend a bdflush is going off for XFS
-					specific buffers from xfs_fs_bio.c */
-#endif
 
 	sb->s_dirt = 1;  /*  Keep the syncs coming.  */
 }
@@ -523,8 +597,12 @@ linvfs_remount(
 
 static struct super_operations linvfs_sops = {
 	read_inode:		linvfs_read_inode,
+#ifdef	CONFIG_XFS_VNODE_TRACING
 	put_inode:		linvfs_put_inode,
+	write_inode:		linvfs_write_inode,
+#endif
 	delete_inode:		linvfs_delete_inode,
+	clear_inode:		linvfs_clear_inode,
 	put_super:		linvfs_put_super,
 	write_super:		linvfs_write_super,
 	statfs:			linvfs_statfs,
@@ -540,28 +618,30 @@ static struct file_system_type xfs_fs_type = {
 
 int __init init_xfs_fs(void)
 {
-  extern void uuid_init(void);
-  struct sysinfo	si;
+	extern void uuid_init(void);
+	struct sysinfo	si;
 
-  ENTER("init_xfs_fs"); 
-  si_meminfo(&si);
+	si_meminfo(&si);
 
-  physmem = si.totalram;
+	physmem = si.totalram;
 
-  cred_init();
-#if !CONFIG_PAGE_BUF_META
-  binit();
+	cred_init();
+
+	vfsinit();
+	uuid_init();
+	xfs_init(0);
+
+#if CONFIG_XFS_GRIO
+        xfs_grio_init();
 #endif
-  vfsinit();
-  uuid_init();
-  xfs_init(0);
-  
-  EXIT("init_xfs_fs"); 
-  return register_filesystem(&xfs_fs_type);
+        
+	return register_filesystem(&xfs_fs_type);
 }
 
 
 #ifdef MODULE
+
+EXPORT_NO_SYMBOLS;
 
 int init_module(void)
 {
@@ -571,10 +651,11 @@ int init_module(void)
 void cleanup_module(void)
 {
 	extern void xfs_cleanup(void);
-	extern void vn_cleanup(void);
 
+#if CONFIG_XFS_GRIO
+        xfs_grio_uninit();
+#endif
 	xfs_cleanup();
-	vn_cleanup();
         unregister_filesystem(&xfs_fs_type);
 }
 

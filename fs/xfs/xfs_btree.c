@@ -43,7 +43,6 @@
 #include "xfs_buf.h"
 #include <sys/uuid.h>
 #include <sys/vnode.h>
-#include <sys/grio.h>
 #include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
@@ -78,7 +77,7 @@
 /*
  * Cursor allocation zone.
  */
-zone_t	*xfs_btree_cur_zone;
+xfs_zone_t	*xfs_btree_cur_zone;
 
 /*
  * Btree magic numbers.
@@ -548,7 +547,7 @@ xfs_btree_get_bufl(
 	uint		lock)		/* lock flags for get_buf */
 {
 	xfs_buf_t	*bp;		/* buffer pointer (return value) */
-	daddr_t		d;		/* real disk block address */
+	xfs_daddr_t		d;		/* real disk block address */
 
 	ASSERT(fsbno != NULLFSBLOCK);
 	d = XFS_FSB_TO_DADDR(mp, fsbno);
@@ -571,7 +570,7 @@ xfs_btree_get_bufs(
 	uint		lock)		/* lock flags for get_buf */
 {
 	xfs_buf_t	*bp;		/* buffer pointer (return value) */
-	daddr_t		d;		/* real disk block address */
+	xfs_daddr_t		d;		/* real disk block address */
 
 	ASSERT(agno != NULLAGNUMBER);
 	ASSERT(agbno != NULLAGBLOCK);
@@ -771,7 +770,7 @@ xfs_btree_read_bufl(
 	int		refval)		/* ref count value for buffer */
 {
 	xfs_buf_t	*bp;		/* return value */
-	daddr_t		d;		/* real disk block address */
+	xfs_daddr_t		d;		/* real disk block address */
 	int		error;
 
 	ASSERT(fsbno != NULLFSBLOCK);
@@ -804,7 +803,7 @@ xfs_btree_read_bufs(
 	int		refval)		/* ref count value for buffer */
 {
 	xfs_buf_t	*bp;		/* return value */
-	daddr_t		d;		/* real disk block address */
+	xfs_daddr_t		d;		/* real disk block address */
 	int		error;
 
 	ASSERT(agno != NULLAGNUMBER);
@@ -841,7 +840,7 @@ xfs_btree_reada_bufl(
 	xfs_extlen_t	count)		/* count of filesystem blocks */
 {
 #ifndef SIM
-	daddr_t		d;
+	xfs_daddr_t		d;
 #endif
 
 	ASSERT(fsbno != NULLFSBLOCK);
@@ -864,7 +863,7 @@ xfs_btree_reada_bufs(
 	xfs_extlen_t	count)		/* count of filesystem blocks */
 {
 #ifndef SIM
-	daddr_t		d;
+	xfs_daddr_t		d;
 #endif
 
 	ASSERT(agno != NULLAGNUMBER);

@@ -41,7 +41,6 @@
 #include <sys/vnode.h>
 #include "xfs_buf.h"
 #include <sys/uuid.h>
-#include <sys/grio.h>
 #include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
@@ -182,7 +181,7 @@ xfs_ialloc_log_di(
 	 * Convert to buffer offsets and log it.
 	 */
 	dip = XFS_MAKE_IPTR(mp, bp, off);
-	ioffset = (int)((caddr_t)dip - (caddr_t)XFS_BUF_TO_DINODE(bp));
+	ioffset = (int)((xfs_caddr_t)dip - (xfs_caddr_t)XFS_BUF_TO_DINODE(bp));
 	first += ioffset;
 	last += ioffset;
 	xfs_trans_log_buf(tp, bp, first, last);
@@ -206,7 +205,7 @@ xfs_ialloc_ag_alloc(
 	xfs_alloc_arg_t	args;		/* allocation argument structure */
 	int		blks_per_cluster;  /* fs blocks per inode cluster */
 	xfs_btree_cur_t	*cur;		/* inode btree cursor */
-	daddr_t		d;		/* disk addr of buffer */
+	xfs_daddr_t		d;		/* disk addr of buffer */
 	int		error;
 	xfs_buf_t	*fbuf;		/* new free inodes' buffer */
 	xfs_dinode_t	*free;		/* new free inode structure */
@@ -1298,7 +1297,7 @@ xfs_ialloc_read_agi(
 	xfs_agi_t	*agi;		/* allocation group header */
 	int		agi_ok;		/* agi is consistent */
 	xfs_buf_t	*bp;		/* allocation group hdr buf */
-	daddr_t		d;		/* disk block address */
+    xfs_daddr_t		d;		/* disk block address */
 	int		error;
 #ifdef DEBUG
 	int		i;

@@ -32,7 +32,7 @@
 #ifndef __XFS_QM_H__
 #define __XFS_QM_H__
 
-#ident "$Revision: 1.13 $"
+#ident "$Revision: 1.14 $"
 
 struct  xfs_dqhash;
 struct  xfs_inode;
@@ -46,7 +46,6 @@ struct  xfs_qm;
  * tables of dquots.
  */
 extern	struct xfs_qm		*xfs_Gqm;		
-extern	mutex_t			xfs_Gqm_lock;
 
 /*
  * Used in xfs_qm_sync called by xfs_sync to count the max times that it can
@@ -118,8 +117,8 @@ typedef struct xfs_qm {
 	uint		 qm_totaldquots; /* total incore dquots */
 	uint		 qm_nrefs;	 /* file systems with quota on */
 	int		 qm_dqfree_ratio;/* ratio of free to inuse dquots */
-	zone_t		*qm_dqzone;	 /* dquot mem-alloc zone */
-	zone_t		*qm_dqtrxzone;	 /* t_dqinfo of transactions */
+	xfs_zone_t		*qm_dqzone;	 /* dquot mem-alloc zone */
+	xfs_zone_t		*qm_dqtrxzone;	 /* t_dqinfo of transactions */
 } xfs_qm_t;
 
 /*

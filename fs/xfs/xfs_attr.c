@@ -42,9 +42,7 @@
 #include <sys/vnode.h>
 #include <sys/dirent.h>
 #include <sys/uuid.h>
-#include <sys/grio.h>
 #include <sys/ktrace.h>
-#include <sys/ksa.h>
 #include <sys/systm.h>
 #include <sys/attributes.h>
 #include "xfs_macros.h"
@@ -1859,8 +1857,8 @@ xfs_attr_rmtval_get(xfs_da_args_t *args)
 	xfs_bmbt_irec_t map[ATTR_RMTVALUE_MAPSIZE];
 	xfs_fsblock_t firstblock;
 	xfs_mount_t *mp;
-	daddr_t dblkno;
-	caddr_t dst;
+	xfs_daddr_t dblkno;
+	xfs_caddr_t dst;
 	xfs_buf_t *bp;
 	int nmap, error, tmp, valuelen, blkcnt, i;
 	xfs_dablk_t lblkno;
@@ -1915,8 +1913,8 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 	xfs_fileoff_t lfileoff;
 	xfs_inode_t *dp;
 	xfs_bmbt_irec_t map;
-	daddr_t dblkno;
-	caddr_t src;
+	xfs_daddr_t dblkno;
+	xfs_caddr_t src;
 	xfs_buf_t *bp;
 	xfs_dablk_t lblkno;
 	int blkcnt, valuelen, nmap, error, tmp, committed;
@@ -2046,7 +2044,7 @@ xfs_attr_rmtval_remove(xfs_da_args_t *args)
 	xfs_mount_t *mp;
 	xfs_bmbt_irec_t map;
 	xfs_buf_t *bp;
-	daddr_t dblkno;
+	xfs_daddr_t dblkno;
 	xfs_dablk_t lblkno;
 	int valuelen, blkcnt, nmap, error, done, committed;
 

@@ -43,8 +43,8 @@ typedef struct xfs_swapext
 	__int64_t	sx_version;	/* version */	
 	__int64_t	sx_fdtarget;	/* fd of target file */
 	__int64_t	sx_fdtmp;	/* fd of tmp file */
-	off64_t		sx_offset; 	/* offset into file */
-	off64_t		sx_length; 	/* leng from offset */
+	xfs_off_t		sx_offset; 	/* offset into file */
+	xfs_off_t		sx_length; 	/* leng from offset */
 	char		sx_pad[16];	/* pad space, unused */
 	xfs_bstat_t	sx_stat;	/* stat of target b4 copy */
 } xfs_swapext_t;

@@ -57,8 +57,6 @@
 #endif
 #include <sys/vnode.h>
 #include <sys/uuid.h>
-#include <sys/grio.h>
-#include <sys/ksa.h>
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
 
@@ -114,7 +112,7 @@ STATIC void
 xfs_bmap_check_leaf_extents(xfs_btree_cur_t *cur, xfs_inode_t *ip, int whichfork);
 #endif
 
-zone_t		*xfs_bmap_free_item_zone;
+xfs_zone_t		*xfs_bmap_free_item_zone;
 
 /*
  * Prototypes for internal bmap routines.
@@ -5731,7 +5729,7 @@ xfs_getbmap(
 
 	if (whichfork == XFS_DATA_FORK && ip->i_delayed_blks) {
 
-		VOP_FLUSH_PAGES(vp, (off_t)0, 0, FI_REMAPF, error);
+		VOP_FLUSH_PAGES(vp, (xfs_off_t)0, 0, FI_REMAPF, error);
 	}
 
 	ASSERT(whichfork == XFS_ATTR_FORK || ip->i_delayed_blks == 0);

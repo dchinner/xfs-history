@@ -42,7 +42,6 @@
 #endif
 #include <sys/param.h>
 #include "xfs_buf.h"
-#include <sys/ksa.h>
 #include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
@@ -977,8 +976,8 @@ xfs_alloc_log_keys(
 
 	block = XFS_BUF_TO_ALLOC_BLOCK(bp);
 	kp = XFS_ALLOC_KEY_ADDR(block, 1, cur);
-	first = (int)((caddr_t)&kp[kfirst - 1] - (caddr_t)block);
-	last = (int)(((caddr_t)&kp[klast] - 1) - (caddr_t)block);
+	first = (int)((xfs_caddr_t)&kp[kfirst - 1] - (xfs_caddr_t)block);
+	last = (int)(((xfs_caddr_t)&kp[klast] - 1) - (xfs_caddr_t)block);
 	xfs_trans_log_buf(cur->bc_tp, bp, first, last);
 }
 
@@ -999,8 +998,8 @@ xfs_alloc_log_ptrs(
 
 	block = XFS_BUF_TO_ALLOC_BLOCK(bp);
 	pp = XFS_ALLOC_PTR_ADDR(block, 1, cur);
-	first = (int)((caddr_t)&pp[pfirst - 1] - (caddr_t)block);
-	last = (int)(((caddr_t)&pp[plast] - 1) - (caddr_t)block);
+	first = (int)((xfs_caddr_t)&pp[pfirst - 1] - (xfs_caddr_t)block);
+	last = (int)(((xfs_caddr_t)&pp[plast] - 1) - (xfs_caddr_t)block);
 	xfs_trans_log_buf(cur->bc_tp, bp, first, last);
 }
 
@@ -1033,8 +1032,8 @@ xfs_alloc_log_recs(
 			       INT_GET(agf->agf_length, ARCH_CONVERT));
 	}
 #endif
-	first = (int)((caddr_t)&rp[rfirst - 1] - (caddr_t)block);
-	last = (int)(((caddr_t)&rp[rlast] - 1) - (caddr_t)block);
+	first = (int)((xfs_caddr_t)&rp[rfirst - 1] - (xfs_caddr_t)block);
+	last = (int)(((xfs_caddr_t)&rp[rlast] - 1) - (xfs_caddr_t)block);
 	xfs_trans_log_buf(cur->bc_tp, bp, first, last);
 }
 
@@ -1078,7 +1077,7 @@ xfs_alloc_lookup(
 	 */
 	for (level = cur->bc_nlevels - 1, diff = 1; level >= 0; level--) {
 		xfs_buf_t	*bp;		/* buffer pointer for btree block */
-		daddr_t	d;		/* disk address of btree block */
+		xfs_daddr_t	d;		/* disk address of btree block */
 
 		/*
 		 * Get the disk address we're looking for.

@@ -55,7 +55,6 @@
 #endif /* SIM */
 #include <sys/dirent.h>
 #include <sys/uuid.h>
-#include <sys/ksa.h>
 #ifdef SIM
 #undef _KERNEL
 #else
@@ -503,7 +502,7 @@ xfs_dir2_getdents(
 	int		alignment;	/* alignment required for ABI */
 	dirent_t	*dbp;		/* malloc'ed buffer */
 	int		is32;		/* is O32 abi - 4 byte alignment */
-	caddr_t		lockaddr;	/* locked-down caller address */
+	xfs_caddr_t		lockaddr;	/* locked-down caller address */
 	int		locklen;	/* locked-down caller length */
 	xfs_dir2_put_t	put;		/* entry formatting routine */
 	int		rval;		/* return value */
@@ -517,7 +516,7 @@ xfs_dir2_getdents(
 	 * lock it down first.
 	 */
 	is32 = ABI_IS_IRIX5(GETDENTS_ABI(get_current_abi(), uio));
-	alignment = (is32 ? sizeof(irix5_off_t) : sizeof(off_t)) - 1;
+	alignment = (is32 ? sizeof(irix5_off_t) : sizeof(xfs_off_t)) - 1;
 #ifndef __linux__
 	if ((uio->uio_iovcnt == 1) &&
 #if CELL_CAPABLE
@@ -1015,7 +1014,7 @@ xfs_dir2_put_dirent32_uio(
 	idbp->d_off = pa->cook;
 	idbp->d_name[namelen] = '\0';
 	bcopy(pa->name, idbp->d_name, namelen);
-	rval = uiomove((caddr_t)idbp, reclen, UIO_READ, uio);
+	rval = uiomove((xfs_caddr_t)idbp, reclen, UIO_READ, uio);
 	pa->done = (rval == 0);
 #endif /* __linux__ */
 	return rval;
@@ -1103,7 +1102,7 @@ xfs_dir2_put_dirent64_uio(
 	idbp->d_off = pa->cook;
 	idbp->d_name[namelen] = '\0';
 	bcopy(pa->name, idbp->d_name, namelen);
-	rval = uiomove((caddr_t)idbp, reclen, UIO_READ, uio);
+	rval = uiomove((xfs_caddr_t)idbp, reclen, UIO_READ, uio);
 	pa->done = (rval == 0);
 #endif /* __linux__ */
 	return rval;

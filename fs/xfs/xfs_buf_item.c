@@ -78,7 +78,7 @@
 
 #define	ROUNDUPNBWORD(x)	(((x) + (NBWORD - 1)) & ~(NBWORD - 1))
 
-zone_t	*xfs_buf_item_zone;
+xfs_zone_t	*xfs_buf_item_zone;
 
 #if 0
 STATIC void	xfs_buf_item_set_bit(uint *, uint, uint);
@@ -204,7 +204,7 @@ xfs_buf_item_format(
 	base_size =
 		(uint)(sizeof(xfs_buf_log_format_t) +
 		       ((bip->bli_format.blf_map_size - 1) * sizeof(uint)));
-	vecp->i_addr = (caddr_t)&bip->bli_format;
+	vecp->i_addr = (xfs_caddr_t)&bip->bli_format;
 	vecp->i_len = base_size;
 	vecp++;
 	nvecs = 1;
@@ -425,13 +425,7 @@ xfs_buf_item_trylock(
 	 * if it's on the free list.  Private buffers like the
 	 * superblock buffer are not.
 	 */
-#ifndef _USING_PAGEBUF_T
-	if (bp->av_forw != NULL) {
-		notavail(bp);
-	}
-#else
-	pagebuf_hold(bp);
-#endif
+	XFS_BUF_HOLD(bp);
 
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
 	xfs_buf_item_trace("TRYLOCK SUCCESS", bip);

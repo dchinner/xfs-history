@@ -42,6 +42,9 @@
 # EXTRA_MKDEP_OPTIONS = -v
 
 EXTRA_FIND_DIRECTORIES = linux pseudo-inc
+ifeq ($(CONFIG_XFS_GRIO),y)
+	EXTRA_FIND_DIRECTORIES += grio
+endif
 EXTRA_INCLUDE_DIRECTORIES = -I./linux -I./pseudo-inc -I.
 
 EXTRA_CFLAGS += -g3 -Wno-unused  -Wno-parentheses \
@@ -53,9 +56,13 @@ EXTRA_CFLAGS += $(shell if $(CC) -Wno-unknown-pragmas -S -o /dev/null -xc /dev/n
 
 # EXTRA_CFLAGS += -DDEBUG -DXFSDEBUG
 
-ALL_SUB_DIRS = linux
-SUB_DIRS = ${ALL_SUB_DIRS}
-
+ifeq ($(CONFIG_XFS_GRIO),y)
+	ALL_SUB_DIRS = linux grio
+	SUB_DIRS = linux grio
+else
+	ALL_SUB_DIRS = linux
+	SUB_DIRS = linux
+endif
 
 O_TARGET := xfs.o
 
@@ -72,8 +79,20 @@ ifeq ($(CONFIG_KDB),y)
 endif
 endif
 
+ifeq ($(CONFIG_XFS_RT),y)
+	XFS_RT_OBJS=xfs_rtalloc.o xfs_rtbit.o
+else
+	XFS_RT_OBJS=xfsrtstubs.o
+endif
+ifeq ($(CONFIG_XFS_GRIO),y)
+	XFS_GRIO_OBJS=xfs_grio.o 
+else
+	XFS_GRIO_OBJS=
+endif
 
-XFS_OBJS  :=   xfs_alloc.o \
+XFS_OBJS  :=    $(XFS_RT_OBJS) \
+		$(XFS_GRIO_OBJS) \
+		xfs_alloc.o \
                 xfs_alloc_btree.o \
                 xfs_attr.o \
                 xfs_attr_leaf.o \
@@ -97,7 +116,6 @@ XFS_OBJS  :=   xfs_alloc.o \
                 xfs_fsops.o \
                 xfs_ialloc.o \
                 xfs_ialloc_btree.o \
-                xfs_icrash.o \
                 xfs_iget.o \
                 xfs_inode.o \
                 xfs_inode_item.o \
@@ -121,15 +139,16 @@ XFS_OBJS  :=   xfs_alloc.o \
                 xfs_rw.o \
 		xfsdmapistubs.o \
 		xfsquotasstubs.o \
-		xfsrtstubs.o \
 		macstubs.o \
 		oplockstubs.o
 
 
-OX_OBJS :=  $(XFS_OBJS) 
+O_OBJS :=  $(XFS_OBJS) 
 
 O_OBJS += linux/linux_xfs.o
-
+ifeq ($(CONFIG_XFS_GRIO),y)
+	O_OBJS += grio/xfs_grio.o
+endif
 
 include $(TOPDIR)/Rules.make
 

@@ -43,7 +43,6 @@
 #include "xfs_buf.h"
 #include <sys/vnode.h>
 #include <sys/uuid.h>
-#include <sys/grio.h>
 #include <sys/debug.h>
 #include <sys/acl.h>
 #include <sys/mac_label.h>
@@ -57,8 +56,6 @@
 #include <sys/kmem.h>
 #include <sys/ktrace.h>
 #include <sys/cmn_err.h>
-#include <sys/pda.h>
-#include <sys/ksa.h>
 #ifdef SIM
 #include <stdio.h>
 #include <string.h>
@@ -105,9 +102,9 @@
 
 #include "xfs_arch.h"
 
-zone_t *xfs_ifork_zone;
-zone_t *xfs_inode_zone;
-zone_t *xfs_chashlist_zone;
+xfs_zone_t *xfs_ifork_zone;
+xfs_zone_t *xfs_inode_zone;
+xfs_zone_t *xfs_chashlist_zone;
 
 /*
  * Used in xfs_itruncate().  This is the maximum number of extents
@@ -173,8 +170,8 @@ xfs_itrunc_trace(
 	xfs_inode_t	*ip,
 	int		flag,		 
 	xfs_fsize_t	new_size,
-	off_t		toss_start,
-	off_t		toss_finish);
+	xfs_off_t		toss_start,
+	xfs_off_t		toss_finish);
 #else
 #define	xfs_itrunc_trace(tag, ip, flag, new_size, toss_start, toss_finish)
 #endif /* XFS_RW_TRACE */
@@ -370,7 +367,7 @@ xfs_itobp(
 	xfs_inode_t	*ip,	
 	xfs_dinode_t	**dipp,
 	xfs_buf_t	**bpp,
-	daddr_t		bno)
+	xfs_daddr_t		bno)
 {
 	xfs_buf_t	*bp;
 	int		error;
@@ -380,7 +377,7 @@ xfs_itobp(
 	int		ni;
 #endif
 
-	if (ip->i_blkno == (daddr_t)0) {
+	if (ip->i_blkno == (xfs_daddr_t)0) {
 		/*
 		 * Call the space management code to find the location of the
 		 * inode on disk.
@@ -786,7 +783,7 @@ xfs_iformat_btree(
  */
  
 void 
-xfs_xlate_dinode_core(caddr_t buf, xfs_dinode_core_t *dip, 
+xfs_xlate_dinode_core(xfs_caddr_t buf, xfs_dinode_core_t *dip, 
     int dir, xfs_arch_t arch)
 {
     xfs_dinode_core_t   *buf_core;
@@ -799,9 +796,9 @@ xfs_xlate_dinode_core(caddr_t buf, xfs_dinode_core_t *dip,
     
     if (arch == ARCH_NOCONVERT) {
         if (dir>0) {
-            bcopy((caddr_t)buf_core, (caddr_t)mem_core, sizeof(xfs_dinode_core_t));
+            bcopy((xfs_caddr_t)buf_core, (xfs_caddr_t)mem_core, sizeof(xfs_dinode_core_t));
         } else {
-            bcopy((caddr_t)mem_core, (caddr_t)buf_core, sizeof(xfs_dinode_core_t));
+            bcopy((xfs_caddr_t)mem_core, (xfs_caddr_t)buf_core, sizeof(xfs_dinode_core_t));
         }
         return;
     }
@@ -860,7 +857,7 @@ xfs_iread(
 	xfs_trans_t	*tp,
 	xfs_ino_t	ino,
 	xfs_inode_t	**ipp,
-	daddr_t		bno)
+	xfs_daddr_t		bno)
 {
 	xfs_buf_t	*bp;
 	xfs_dinode_t	*dip;
@@ -931,7 +928,7 @@ xfs_iread(
 	 * Otherwise, just get the truly permanent information.
 	 */
 	if (!INT_ISZERO(dip->di_core.di_mode, ARCH_CONVERT)) {
-                xfs_xlate_dinode_core((caddr_t)&dip->di_core, 
+                xfs_xlate_dinode_core((xfs_caddr_t)&dip->di_core, 
                      &(ip->i_d), 1, ARCH_CONVERT);
 		error = xfs_iformat(ip, dip);
 		if (error)  {
@@ -1360,8 +1357,8 @@ xfs_itrunc_trace(
 	xfs_inode_t	*ip,
 	int		flag,		 
 	xfs_fsize_t	new_size,
-	off_t		toss_start,
-	off_t		toss_finish)		 
+	xfs_off_t		toss_start,
+	xfs_off_t		toss_finish)		 
 {
 	if (ip->i_rwtrace == NULL) {
 		return;
@@ -1417,7 +1414,7 @@ xfs_itruncate_start(
 	xfs_fsize_t	new_size)
 {
 	xfs_fsize_t	last_byte;
-	off_t		toss_start;
+	xfs_off_t		toss_start;
 	xfs_mount_t	*mp;
 	vnode_t		*vp;
 
@@ -1861,7 +1858,7 @@ xfs_iunlink(
 	xfs_buf_t	*agibp;
 	xfs_buf_t	*ibp;
 	xfs_agnumber_t	agno;
-	daddr_t		agdaddr;
+	xfs_daddr_t		agdaddr;
 	xfs_agino_t	agino;
 	short		bucket_index;
 	int		offset;
@@ -1959,7 +1956,7 @@ xfs_iunlink_remove(
 	xfs_buf_t	*agibp;
 	xfs_buf_t	*ibp;
 	xfs_agnumber_t	agno;
-	daddr_t		agdaddr;
+	xfs_daddr_t		agdaddr;
 	xfs_agino_t	agino;
 	xfs_agino_t	next_agino;
 	xfs_buf_t	*last_ibp;
@@ -2697,6 +2694,8 @@ xfs_iunpin_wait(
 	xfs_inode_t	*ip)
 {
 	int		s;
+	xfs_inode_log_item_t	*iip;
+	xfs_lsn_t	lsn;
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE | MR_ACCESS));
 
@@ -2704,10 +2703,17 @@ xfs_iunpin_wait(
 		return;
 	}
 
+	iip = ip->i_itemp;
+	if (iip && iip->ili_last_lsn) {
+		lsn = iip->ili_last_lsn;
+	} else {
+		lsn = (xfs_lsn_t)0;
+	}
+
 	/*
 	 * Give the log a push so we don't wait here too long.
 	 */
-	xfs_log_force(ip->i_mount, (xfs_lsn_t)0, XFS_LOG_FORCE);
+	xfs_log_force(ip->i_mount, lsn, XFS_LOG_FORCE);
 
 	s = mutex_spinlock(&ip->i_ipinlock);
 	if (ip->i_pincount == 0) {
@@ -3121,8 +3127,8 @@ xfs_iflush(
 	ch = XFS_CHASH(mp, ip->i_blkno);
 	s = mutex_spinlock(&ch->ch_lock);
 
-	clcount=0;
-	for (iq=ip->i_cnext; iq != ip; iq=iq->i_cnext) {
+	clcount = 0;
+	for (iq = ip->i_cnext; iq != ip; iq = iq->i_cnext) {
 		/*
 		 * Do an un-protected check to see if the inode is dirty and
 		 * is a candidate for flushing.  These checks will be repeated
@@ -3140,8 +3146,8 @@ xfs_iflush(
 		 * We don't mess with swap files from here since it is
 		 * too easy to deadlock on memory.
 		 */
-		vp = XFS_ITOV(iq);
-		if (vp->v_flag & VISSWAP) {
+		vp = XFS_ITOV_NULL(iq);
+		if (!vp || vp->v_flag & VISSWAP) {
 			continue;
 		}
 
@@ -3184,8 +3190,9 @@ xfs_iflush(
 	}
 	mutex_spinunlock(&ch->ch_lock, s);
 
-	if (!clcount) {
-	    XFSSTATS.xs_icluster_flushzero++;
+	if (clcount) {
+	    XFSSTATS.xs_icluster_flushcnt++;
+	    XFSSTATS.xs_icluster_flushinode += clcount;
 	}
 
 	/*
@@ -3373,7 +3380,7 @@ xfs_iflush_int(
 	 * because if the inode is dirty at all the core must
 	 * be.
 	 */
-        xfs_xlate_dinode_core((caddr_t)&(dip->di_core), &(ip->i_d),
+        xfs_xlate_dinode_core((xfs_caddr_t)&(dip->di_core), &(ip->i_d),
                 -1, ARCH_CONVERT);
 #ifdef XFS_TRANS_DEBUG
 	first = (char*)&(dip->di_core) - XFS_BUF_PTR(bp);
@@ -3533,9 +3540,17 @@ xfs_iflush_all(
 			 * It's up to our caller to purge the root
 			 * and quota vnodes later.
 			 */
-			vp = XFS_ITOV(ip);
-			if (vp->v_count != 0) {
-				if (vp->v_count == 1 && 
+			vp = XFS_ITOV_NULL(ip);
+
+			if (!vp) {
+				XFS_MOUNT_IUNLOCK(mp);
+				xfs_finish_reclaim(ip);
+				purged = 1;
+				break;
+			}
+
+			if (vn_count(vp) != 0) {
+				if (vn_count(vp) == 1 && 
 				    (ip == mp->m_rootip ||
 				     (mp->m_quotainfo && 
 				      (ip->i_ino == mp->m_sb.sb_uquotino ||
@@ -3567,9 +3582,12 @@ xfs_iflush_all(
 			 * entry in the list anyway so we'll know below
 			 * whether we reached the end or not.
 			 */
-			VMAP(vp, vmap);
+			VMAP(vp, ip, vmap);
+			vp->v_flag |= VPURGE;		/* OK for vn_purge */
 			XFS_MOUNT_IUNLOCK(mp);
+
 			vn_purge(vp, &vmap);
+
 			purged = 1;
 			break;
 		} while (ip != mp->m_inodes);
@@ -3879,11 +3897,6 @@ xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
 		 */
 		vfs_unbusy( vfsp );
 	}
-#ifdef GRIO_DEBUG
-	else {
-		printf("grio vfs_busydev failed \n");
-	}
-#endif
 
 	return( ip );
 }

@@ -31,66 +31,27 @@
  */
 /*
  *
- * $Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfsquotasstubs.c,v 1.8 2000/06/09 03:18:45 mostek Exp $
- * $Author: mostek $
- * $Id: xfsquotasstubs.c,v 1.8 2000/06/09 03:18:45 mostek Exp $
+ * $Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfsquotasstubs.c,v 1.9 2000/06/09 06:40:03 ananth Exp $
+ * $Author: ananth $
+ * $Id: xfsquotasstubs.c,v 1.9 2000/06/09 06:40:03 ananth Exp $
  *
- * $Log: xfsquotasstubs.c,v $
  * Revision 1.8  2000/06/09 03:18:45  mostek
  * Merge of 2.3.99pre2-xfs:slinx:56126a by ananth.
  *
  *   delete a couple of include files not really needed that
  *   cause problems with builds on Redhat 5.2.
  *
- * Revision 1.8  2000/03/31 15:11:13  mostek
- * delete a couple of include files not really needed that
- * cause problems with builds on Redhat 5.2.
- *
- * Revision 1.7  2000/03/29 01:45:59  kenmcd
- * Updated copyright and license notices, ready for open source release
- *
- * Revision 1.6  2000/03/25 01:42:41  cattelan
- * Merge of 2.3.42-xfs:slinx:46541a by ananth.
- *
- *   Removed <sys/fs... from include files
- *   This should eliminate the need for the link in pseudo-inc
- *
- * Revision 1.5  2000/03/25 01:29:53  nathans
- * Merge of 2.3.42-xfs:slinx:46428a by ananth.
- *
- *   remove unused include files.
- *
- * Revision 1.6  2000/03/21 01:58:59  cattelan
- * Removed <sys/fs... from include files
- * This should eliminate the need for the link in pseudo-inc
- *
- * Revision 1.5  2000/03/20 07:37:34  nathans
- * remove unused include files.
- *
- * Revision 1.4  2000/01/30 09:59:06  kenmcd
- * Encumbrance review done.
- * Add copyright and license words consistent with GPL.
- * Refer to http://fsg.melbourne.sgi.com/reviews/ for details.
- *
- * There is a slight change in the license terms and conditions words
- * to go with the copyrights, so most of the files are not getting
- * new GPL's, just updated versions ... but there are 20-30 more files
- * here as well.
- *
- * Revision 1.2  1999/09/01 00:35:47  mostek
- * Get rid of warnings (void) arguments.
- *
  */
 
 /*
  * XFS Disk Quota stubs
  */
+#include <xfs_os_defs.h>
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <linux/xfs_sema.h>
 
 struct xfs_qm *xfs_Gqm = NULL;
-mutex_t	xfs_Gqm_lock;
 
 struct xfs_qm   *xfs_qm_init(void) {return NULL;}
 

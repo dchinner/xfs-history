@@ -127,7 +127,7 @@ typedef struct xfs_dir_leaf_name xfs_dir_leaf_name_t;
 typedef int (*xfs_dir_put_t)(struct xfs_dir_put_args *pa);
 
 typedef union {
-	off_t		o;		/* offset (cookie) */
+	xfs_off_t		o;		/* offset (cookie) */
 	/*
 	 * Watch the order here (endian-ness dependent).
 	 */
@@ -232,7 +232,7 @@ int	xfs_dir_leaf_remove(struct xfs_trans *trans,
 int	xfs_dir_leaf_getdents_int(struct xfs_dabuf *bp, struct xfs_inode *dp,
 					 xfs_dablk_t bno, struct uio *uio,
 					 int *eobp, struct dirent *dbp,
-					 xfs_dir_put_t put, daddr_t nextda);
+					 xfs_dir_put_t put, xfs_daddr_t nextda);
 #endif	/* !SIM */
 
 /*

@@ -16,7 +16,8 @@ HPATH   	= $(TOPDIR)/include
 FINDHPATH	= $(HPATH)/asm $(HPATH)/linux $(HPATH)/scsi $(HPATH)/net
 
 HOSTCC  	= gcc
-HOSTCFLAGS	= -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer
+HOSTCFLAGS	= -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer \
+			-DPAGEBUF_TRACE -DPAGEBUF_DEBUG
 
 CROSS_COMPILE 	=
 
@@ -33,8 +34,10 @@ NM		= $(CROSS_COMPILE)nm
 STRIP		= $(CROSS_COMPILE)strip
 OBJCOPY		= $(CROSS_COMPILE)objcopy
 OBJDUMP		= $(CROSS_COMPILE)objdump
+AWK		= awk
 MAKEFILES	= $(TOPDIR)/.config
 GENKSYMS	= /sbin/genksyms
+KALLSYMS	= /sbin/kallsyms
 MODFLAGS	= -DMODULE
 PERL		= perl
 
@@ -89,23 +92,15 @@ AFLAGS := -D__ASSEMBLY__ $(CPPFLAGS)
 # use '-fno-strict-aliasing', but only if the compiler can take it
 CFLAGS += $(shell if $(CC) -fno-strict-aliasing -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-fno-strict-aliasing"; fi)
 
-ifdef CONFIG_KDB_FRAMEPTR
-USE_FRAMEPTR = 1
-endif
-ifdef CONFIG_LOCKMETER
-USE_FRAMEPTR = 1
-endif
-
 # Turn on -pg to instrument the kernel with calls to mcount().
 # Unfortunately, gcc won't allow -pg without frame pointers.
 ifdef CONFIG_MCOUNT
   PROF_FLAGS = -pg
 endif
 
-ifdef USE_FRAMEPTR
 CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes -O2
-else
-CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer
+ifndef CONFIG_FRAME_POINTER
+CFLAGS += -fomit-frame-pointer
 endif
 AFLAGS := $(CPPFLAGS)
 
@@ -147,6 +142,11 @@ DRIVERS		=drivers/block/block.a \
 	         drivers/parport/parport.a
 LIBS		=$(TOPDIR)/lib/lib.a
 SUBDIRS		=kernel drivers mm fs net ipc lib
+
+ifeq ($(CONFIG_KDB),y)
+CORE_FILES	+= kdb/kdb.o
+SUBDIRS		+= kdb
+endif
 
 DRIVERS-n :=
 DRIVERS-y :=
@@ -194,11 +194,6 @@ DRIVERS-$(CONFIG_IRDA) += drivers/net/irda/irda_drivers.a
 DRIVERS-$(CONFIG_I2C) += drivers/i2c/i2c.a
 DRIVERS-$(CONFIG_PHONE) += drivers/telephony/telephony.a
 
-ifdef CONFIG_KDB
-CORE_FILES := $(CORE_FILES) kdb/kdb.o
-SUBDIRS	   := $(SUBDIRS) kdb
-endif
-
 DRIVERS += $(DRIVERS-y)
 
 include arch/$(ARCH)/Makefile
@@ -216,47 +211,34 @@ Version: dummy
 boot: vmlinux
 	@$(MAKE) -C arch/$(ARCH)/boot
 
-ifeq ($(CONFIG_KDB),y)
-vmlinux: $(CONFIGURATION) init/main.o init/version.o linuxsubdirs
-	echo "c0000000 t firstaddr\n" > System.map
-	rm -f map map.out
-	$(AWK) -f scripts/genkdbsym.awk System.map > dummy_sym.c
-	$(CC) -Iinclude -c -o dummy_sym.o dummy_sym.c
-	$(LD) $(LINKFLAGS) $(HEAD) -Map map init/main.o init/version.o \
-		--start-group \
-		$(CORE_FILES) \
-		$(NETWORKS) \
-		$(DRIVERS) \
-		$(LIBS) \
-		dummy_sym.o \
-		--end-group \
-		-o vmlinux
-	$(NM) vmlinux | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aU] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
-	cp System.map System.map.sv
-	$(AWK) -f scripts/genkdbsym.awk System.map > ksym.c
-	$(CC) -Iinclude -c -o ksym.o ksym.c > ksym.o
-	$(LD) $(LINKFLAGS) $(HEAD) -Map map.out init/main.o init/version.o \
-		--start-group \
-		$(CORE_FILES) \
-		$(NETWORKS) \
-		$(DRIVERS) \
-		$(LIBS) \
-		ksym.o \
-		--end-group \
-		-o vmlinux
-	$(NM) vmlinux | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aU] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
+LD_VMLINUX	:= $(LD) $(LINKFLAGS) $(HEAD) init/main.o init/version.o \
+			--start-group \
+			$(CORE_FILES) \
+			$(DRIVERS) \
+			$(NETWORKS) \
+			$(LIBS) \
+			--end-group
+ifeq ($(CONFIG_KALLSYMS),y)
+LD_VMLINUX_KALLSYMS	:= .tmp_kallsyms3.o
 else
-vmlinux: $(CONFIGURATION) init/main.o init/version.o linuxsubdirs
-	$(LD) $(LINKFLAGS) $(HEAD) init/main.o init/version.o \
-		--start-group \
-		$(CORE_FILES) \
-		$(DRIVERS) \
-		$(NETWORKS) \
-		$(LIBS) \
-		--end-group \
-		-o vmlinux
-	$(NM) vmlinux | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aU] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
+LD_VMLINUX_KALLSYMS	:=
 endif
+
+vmlinux: $(CONFIGURATION) init/main.o init/version.o linuxsubdirs
+ifeq ($(CONFIG_KALLSYMS),y)
+	@echo kallsyms pass 1
+	$(LD_VMLINUX) -o .tmp_vmlinux1
+	@$(KALLSYMS) .tmp_vmlinux1 > .tmp_kallsyms1.o
+	@echo kallsyms pass 2
+	@$(LD_VMLINUX) .tmp_kallsyms1.o -o .tmp_vmlinux2
+	@$(KALLSYMS) .tmp_vmlinux2 > .tmp_kallsyms2.o
+	@echo kallsyms pass 3
+	@$(LD_VMLINUX) .tmp_kallsyms2.o -o .tmp_vmlinux3
+	@$(KALLSYMS) .tmp_vmlinux3 > .tmp_kallsyms3.o
+endif
+	$(LD_VMLINUX) $(LD_VMLINUX_KALLSYMS) -o vmlinux
+	$(NM) vmlinux | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aU] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
+	@rm -f .tmp_vmlinux* .tmp_kallsyms*
 
 symlinks:
 	rm -f include/asm
@@ -418,7 +400,6 @@ endif
 clean:	archclean
 	rm -f kernel/ksyms.lst include/linux/compile.h
 	find . -name '*.[oas]' -type f -print | grep -v lxdialog/ | xargs rm -f
-	rm -f ksym.[ch] dummy_sym.c System.map.sv map map.out
 	rm -f core `find . -type f -name 'core' -print`
 	rm -f core `find . -type f -name '.*.flags' -print`
 	rm -f vmlinux System.map

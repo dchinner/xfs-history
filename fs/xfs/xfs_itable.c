@@ -86,7 +86,7 @@ xfs_bulkstat_one(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	ino,		/* inode number to get data for */
 	void		*buffer,	/* buffer to place output in */
-	daddr_t		bno,		/* starting bno of inode cluster */
+	xfs_daddr_t		bno,		/* starting bno of inode cluster */
 	void		*dibuff,	/* on-disk inode buffer */
 	int		*stat)		/* BULKSTAT_RV_... */
 {
@@ -118,7 +118,7 @@ xfs_bulkstat_one(
 			return error;
 		}
 		ASSERT(ip != NULL);
-		ASSERT(ip->i_blkno != (daddr_t)0);
+		ASSERT(ip->i_blkno != (xfs_daddr_t)0);
 		if (ip->i_d.di_mode == 0) {
 			xfs_iput(ip, XFS_ILOCK_SHARED);
 			*stat = BULKSTAT_RV_NOTHING;
@@ -239,11 +239,11 @@ int					/* error status */
 xfs_bulkstat(
 	xfs_mount_t		*mp,	/* mount point for filesystem */
 	xfs_trans_t		*tp,	/* transaction pointer */
-	ino64_t			*lastinop, /* last inode returned */
+	xfs_ino_t			*lastinop, /* last inode returned */
 	int			*ubcountp, /* size of buffer/count returned */
 	bulkstat_one_pf		formatter, /* func that'd fill a single buf */
 	size_t			statstruct_size, /* sizeof struct filling */
-	caddr_t			ubuffer, /* buffer with inode stats */
+	xfs_caddr_t			ubuffer, /* buffer with inode stats */
 	int			flags, 	/* defined in xfs_itable.h */
 	int			*done)	/* 1 if there're more stats to get */
 {
@@ -252,7 +252,7 @@ xfs_bulkstat(
 	xfs_agi_t		*agi;	/* agi header data */
 	xfs_agino_t		agino;	/* inode # in allocation group */
 	xfs_agnumber_t		agno;	/* allocation group number */
-	daddr_t			bno;	/* inode cluster start daddr */
+	xfs_daddr_t			bno;	/* inode cluster start daddr */
 	int			chunkidx; /* current index into inode chunk */
 	int			clustidx; /* current index into inode cluster */
 	xfs_btree_cur_t		*cur;	/* btree cursor for ialloc btree */
@@ -277,7 +277,7 @@ xfs_bulkstat(
 	int			tmp;	/* result value from btree calls */
 	int			ubcount; /* size of user's buffer */
 	int			ubleft;	/* spaces left in user's buffer */
-	caddr_t			ubufp;	/* current pointer into user's buffer */
+	xfs_caddr_t			ubufp;	/* current pointer into user's buffer */
 	xfs_buf_t		*bp;	/* ptr to on-disk inode cluster buf */
 	xfs_dinode_t		*dip;	/* ptr into bp for specific inode */
 	xfs_inode_t		*ip;	/* ptr to in-core inode struct */
@@ -562,7 +562,7 @@ xfs_bulkstat(
 								   XFS_RANDOM_BULKSTAT_READ_CHUNK)) {
 							break;
 						}
-						clustidx = ((caddr_t)dip - 
+						clustidx = ((xfs_caddr_t)dip - 
 						          XFS_BUF_PTR(bp))/
 						          mp->m_sb.sb_inodesize;
 					}
@@ -645,10 +645,10 @@ xfs_bulkstat(
 		 * the end of the filesystem, so the next call
 		 * will return immediately.
 		 */
-		*lastinop = (ino64_t)XFS_AGINO_TO_INO(mp, agno, 0);
+		*lastinop = (xfs_ino_t)XFS_AGINO_TO_INO(mp, agno, 0);
 		*done = 1;
 	} else
-		*lastinop = (ino64_t)lastino;
+		*lastinop = (xfs_ino_t)lastino;
 	if (vfs_unbusy_needed) {
 		vfs_unbusy(vfsp);
 	}
@@ -662,8 +662,8 @@ xfs_bulkstat(
 int					/* error status */
 xfs_bulkstat_single(
 	xfs_mount_t		*mp,	/* mount point for filesystem */
-	ino64_t			*lastinop, /* inode to return */
-	caddr_t			buffer,	/* buffer with inode stats */
+	xfs_ino_t			*lastinop, /* inode to return */
+	xfs_caddr_t			buffer,	/* buffer with inode stats */
 	int			*done)	/* 1 if there're more stats to get */
 {
 	xfs_bstat_t		bstat;	/* one bulkstat result structure */
@@ -703,9 +703,9 @@ STATIC int				/* error status */
 xfs_inumbers(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
 	xfs_trans_t	*tp,		/* transaction pointer */
-	ino64_t		*lastino,	/* last inode returned */
+	xfs_ino_t		*lastino,	/* last inode returned */
 	int		*count,		/* size of buffer/count returned */
-	caddr_t		ubuffer)	/* buffer with inode descriptions */
+	xfs_caddr_t		ubuffer)	/* buffer with inode descriptions */
 {
 	xfs_buf_t	*agbp;
 	xfs_agino_t	agino;
@@ -784,7 +784,7 @@ xfs_inumbers(
 		bufidx++;
 		left--;
 		if (bufidx == bcount) {
-			if (copyout((caddr_t)buffer, ubuffer,
+			if (copyout((xfs_caddr_t)buffer, ubuffer,
 					bufidx * sizeof(*buffer))) {
 				error = XFS_ERROR(EFAULT);
 				break;
@@ -811,7 +811,7 @@ xfs_inumbers(
 	}
 	if (!error) {
 		if (bufidx) {
-			if (copyout((caddr_t)buffer, ubuffer,
+			if (copyout((xfs_caddr_t)buffer, ubuffer,
 					bufidx * sizeof(*buffer)))
 				error = XFS_ERROR(EFAULT);
 			else

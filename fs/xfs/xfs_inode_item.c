@@ -46,7 +46,6 @@
 #include "xfs_buf.h"
 #include <sys/vnode.h>
 #include <sys/uuid.h>
-#include <sys/grio.h>
 #include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
@@ -83,7 +82,7 @@
 #include "sim.h"
 #endif
 
-zone_t	*xfs_ili_zone;		/* inode log item zone */
+xfs_zone_t	*xfs_ili_zone;		/* inode log item zone */
 
 /*
  * This returns the number of iovecs needed to log the given inode item.
@@ -265,7 +264,7 @@ xfs_inode_item_format(
 	ip = iip->ili_inode;
 	vecp = log_vector;
 
-	vecp->i_addr = (caddr_t)&iip->ili_format;
+	vecp->i_addr = (xfs_caddr_t)&iip->ili_format;
 	vecp->i_len  = sizeof(xfs_inode_log_format_t);
 	vecp++;
 	nvecs	     = 1;
@@ -309,7 +308,7 @@ xfs_inode_item_format(
 	if (ip->i_update_size)
 		ip->i_update_size = 0;
 
-	vecp->i_addr = (caddr_t)&ip->i_d;
+	vecp->i_addr = (xfs_caddr_t)&ip->i_d;
 	vecp->i_len  = sizeof(xfs_dinode_core_t);
 	vecp++;
 	nvecs++;
@@ -378,7 +377,7 @@ xfs_inode_item_format(
 				ext_buffer = kmem_alloc(ip->i_df.if_bytes,
 					KM_SLEEP);
 				iip->ili_extents_buf = ext_buffer;
-				vecp->i_addr = (caddr_t)ext_buffer;
+				vecp->i_addr = (xfs_caddr_t)ext_buffer;
 				vecp->i_len = xfs_iextents_copy(ip, ext_buffer,
 					XFS_DATA_FORK);
 			}
@@ -396,7 +395,7 @@ xfs_inode_item_format(
 		if (iip->ili_format.ilf_fields & XFS_ILOG_DBROOT) {
 			ASSERT(ip->i_df.if_broot_bytes > 0);
 			ASSERT(ip->i_df.if_broot != NULL);
-			vecp->i_addr = (caddr_t)ip->i_df.if_broot;
+			vecp->i_addr = (xfs_caddr_t)ip->i_df.if_broot;
 			vecp->i_len = ip->i_df.if_broot_bytes;
 			vecp++;
 			nvecs++;
@@ -413,7 +412,7 @@ xfs_inode_item_format(
 			ASSERT(ip->i_df.if_u1.if_data != NULL);
 			ASSERT(ip->i_d.di_size > 0);
 
-			vecp->i_addr = (caddr_t)ip->i_df.if_u1.if_data;
+			vecp->i_addr = (xfs_caddr_t)ip->i_df.if_u1.if_data;
 			/*
 			 * Round i_bytes up to a word boundary.
 			 * The underlying memory is guaranteed to
@@ -499,7 +498,7 @@ xfs_inode_item_format(
 		if (iip->ili_format.ilf_fields & XFS_ILOG_ABROOT) {
 			ASSERT(ip->i_afp->if_broot_bytes > 0);
 			ASSERT(ip->i_afp->if_broot != NULL);
-			vecp->i_addr = (caddr_t)ip->i_afp->if_broot;
+			vecp->i_addr = (xfs_caddr_t)ip->i_afp->if_broot;
 			vecp->i_len = ip->i_afp->if_broot_bytes;
 			vecp++;
 			nvecs++;
@@ -514,7 +513,7 @@ xfs_inode_item_format(
 			ASSERT(ip->i_afp->if_bytes > 0);
 			ASSERT(ip->i_afp->if_u1.if_data != NULL);
 
-			vecp->i_addr = (caddr_t)ip->i_afp->if_u1.if_data;
+			vecp->i_addr = (xfs_caddr_t)ip->i_afp->if_u1.if_data;
 			/*
 			 * Round i_bytes up to a word boundary.
 			 * The underlying memory is guaranteed to

@@ -75,7 +75,7 @@ extern int
 xfs_dm_send_data_event(
 	dm_eventtype_t	event, 
 	bhv_desc_t	*bdp,
-	off_t		offset,
+	xfs_off_t		offset,
 	size_t		length, 
 	int		flags,
 	vrwlock_t	*locktype);
@@ -92,14 +92,14 @@ xfs_dm_fcntl(
 	bhv_desc_t	*bdp,
 	void		*arg,
 	int		flags,
-	off_t		offset,
+	xfs_off_t		offset,
 	cred_t		*credp,
 	union rval	*rvalp);
 
 extern int
 xfs_dm_map(
 	bhv_desc_t	*bdp,
-        off_t           offset,
+        xfs_off_t           offset,
         size_t          length,
         dm_eventtype_t  max_event);
 

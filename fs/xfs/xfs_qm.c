@@ -29,12 +29,11 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.48 $"
+#ident "$Revision: 1.49 $"
 
 
 #include <sys/param.h>
 #include "xfs_buf.h"
-#include <sys/ksa.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/capability.h>
@@ -90,7 +89,6 @@
 
 extern int      ncsize;
 struct xfs_qm	*xfs_Gqm = NULL;
-mutex_t		xfs_Gqm_lock;
 extern time_t	time;
 
 STATIC void	xfs_qm_list_init(xfs_dqlist_t *, char *, int);
@@ -105,7 +103,7 @@ STATIC int	xfs_qm_dqiter_bufs(xfs_mount_t *, xfs_dqid_t, xfs_fsblock_t,
 STATIC int	xfs_qm_dqiterate(xfs_mount_t *, xfs_inode_t *, uint);
 STATIC void 	xfs_qm_quotacheck_dqadjust(xfs_dquot_t *, xfs_qcnt_t, xfs_qcnt_t);
 STATIC int	xfs_qm_dqusage_adjust(xfs_mount_t *, xfs_trans_t *, xfs_ino_t, 
-				      void *, daddr_t, void *, int *);
+				      void *, xfs_daddr_t, void *, int *);
 STATIC int	xfs_qm_quotacheck(xfs_mount_t *);
 
 STATIC int	xfs_qm_init_quotainos(xfs_mount_t *);
@@ -588,11 +586,11 @@ xfs_qm_unmount_quotas(
 		}
 	}
 	if (uqp) {
-		 XFS_PURGE_INODE(XFS_ITOV(uqp));
+		 XFS_PURGE_INODE(uqp);
 		 mp->m_quotainfo->qi_uquotaip = NULL;
 	}
 	if (pqp) {
-		XFS_PURGE_INODE(XFS_ITOV(pqp));
+		XFS_PURGE_INODE(pqp);
 		mp->m_quotainfo->qi_pquotaip = NULL;
 	}
 out:
@@ -1145,16 +1143,16 @@ xfs_qm_unmount(
 	if (XFS_IS_UQUOTA_ON(mp)) {
 		vp = XFS_ITOV(XFS_QI_UQIP(mp));
 		VN_RELE(vp);
-		if (vp->v_count > 1)
+		if (vn_count(vp) > 1)
 			cmn_err(CE_WARN, "UQUOTA busy vp=0x%x count=%d\n", 
-				vp, vp->v_count);
+				vp, vn_count(vp));
 	} 
 	if (XFS_IS_PQUOTA_ON(mp)) {
 		vp = XFS_ITOV(XFS_QI_PQIP(mp));
 		VN_RELE(vp);
-		if (vp->v_count > 1)
+		if (vn_count(vp) > 1)
 			cmn_err(CE_WARN, "PQUOTA busy vp=0x%x count=%d\n", 
-				vp, vp->v_count);
+				vp, vn_count(vp));
 	} 
 
 	return (0);
@@ -1399,11 +1397,11 @@ xfs_qm_destroy_quotainfo(
 	xfs_qm_list_destroy(&qi->qi_dqlist);
 
 	if (qi->qi_uquotaip) {
-		XFS_PURGE_INODE(XFS_ITOV(qi->qi_uquotaip));
+		XFS_PURGE_INODE(qi->qi_uquotaip);
 		qi->qi_uquotaip = NULL; /* paranoia */
 	}
 	if (qi->qi_pquotaip) {
-		XFS_PURGE_INODE(XFS_ITOV(qi->qi_pquotaip));
+		XFS_PURGE_INODE(qi->qi_pquotaip);
 		qi->qi_pquotaip = NULL; 
 	}
 	mutex_destroy(&qi->qi_quotaofflock);
@@ -1878,7 +1876,7 @@ xfs_qm_dqusage_adjust(
         xfs_trans_t     *tp,            /* transaction pointer - NULL */
         xfs_ino_t       ino,            /* inode number to get data for */
         void            *buffer,        /* not used */
-        daddr_t         bno,            /* starting block of inode cluster */
+        xfs_daddr_t         bno,            /* starting block of inode cluster */
 	void    	*dip,           /* on-disk inode pointer (not used) */
 	int		*res)		/* result code value */
 {

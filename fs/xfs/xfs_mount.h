@@ -108,7 +108,7 @@ typedef int		(*xfs_bmapi_t)(struct xfs_trans *, void *,
 				struct xfs_bmbt_irec *, int *,
 				struct xfs_bmap_free *);
 typedef int		(*xfs_bmap_eof_t)(void *, xfs_fileoff_t, int, int *);
-typedef int		(*xfs_rsync_t)(void *, int, off_t, off_t);
+typedef int		(*xfs_rsync_t)(void *, int, xfs_off_t, xfs_off_t);
 typedef uint		(*xfs_lck_map_shared_t)(void *);
 typedef void		(*xfs_lock_t)(void *, uint);
 typedef void		(*xfs_lock_demote_t)(void *, uint);
@@ -116,7 +116,7 @@ typedef int		(*xfs_lock_nowait_t)(void *, uint);
 typedef void		(*xfs_unlk_t)(void *, unsigned int);
 typedef void		(*xfs_chgtime_t)(void *, int);
 typedef xfs_fsize_t	(*xfs_size_t)(void *);
-typedef xfs_fsize_t	(*xfs_setsize_t)(void *, off_t);
+typedef xfs_fsize_t	(*xfs_setsize_t)(void *, xfs_off_t);
 typedef xfs_fsize_t	(*xfs_lastbyte_t)(void *);
 
 

@@ -57,9 +57,7 @@
 #endif
 #include "xfs_buf.h"
 #include <sys/uuid.h>
-#include <sys/grio.h>
 #include <sys/ktrace.h>
-#include <sys/ksa.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -1085,8 +1083,8 @@ xfs_bmbt_log_keys(
 
 		block = XFS_BUF_TO_BMBT_BLOCK(bp);
 		kp = XFS_BMAP_KEY_DADDR(block, 1, cur);
-		first = (int)((caddr_t)&kp[kfirst - 1] - (caddr_t)block);
-		last = (int)(((caddr_t)&kp[klast] - 1) - (caddr_t)block);
+		first = (int)((xfs_caddr_t)&kp[kfirst - 1] - (xfs_caddr_t)block);
+		last = (int)(((xfs_caddr_t)&kp[klast] - 1) - (xfs_caddr_t)block);
 		xfs_trans_log_buf(tp, bp, first, last);
 	} else {
 		xfs_inode_t		 *ip;
@@ -1124,8 +1122,8 @@ xfs_bmbt_log_ptrs(
 
 		block = XFS_BUF_TO_BMBT_BLOCK(bp);
 		pp = XFS_BMAP_PTR_DADDR(block, 1, cur);
-		first = (int)((caddr_t)&pp[pfirst - 1] - (caddr_t)block);
-		last = (int)(((caddr_t)&pp[plast] - 1) - (caddr_t)block);
+		first = (int)((xfs_caddr_t)&pp[pfirst - 1] - (xfs_caddr_t)block);
+		last = (int)(((xfs_caddr_t)&pp[plast] - 1) - (xfs_caddr_t)block);
 		xfs_trans_log_buf(tp, bp, first, last);
 	} else {
 		xfs_inode_t		*ip;
@@ -1148,7 +1146,7 @@ xfs_bmbt_lookup(
 {
 	xfs_bmbt_block_t	*block;
 	xfs_buf_t			*bp;
-	daddr_t			d;
+	xfs_daddr_t			d;
 	xfs_sfiloff_t		diff;
 	int			error;		/* error return value */
 #ifdef XFS_BMBT_TRACE
@@ -2578,8 +2576,8 @@ xfs_bmbt_log_recs(
 	tp = cur->bc_tp;
 	block = XFS_BUF_TO_BMBT_BLOCK(bp);
 	rp = XFS_BMAP_REC_DADDR(block, 1, cur);
-	first = (int)((caddr_t)&rp[rfirst - 1] - (caddr_t)block);
-	last = (int)(((caddr_t)&rp[rlast] - 1) - (caddr_t)block);
+	first = (int)((xfs_caddr_t)&rp[rfirst - 1] - (xfs_caddr_t)block);
+	last = (int)(((xfs_caddr_t)&rp[rlast] - 1) - (xfs_caddr_t)block);
 	xfs_trans_log_buf(tp, bp, first, last);
 	XFS_BMBT_TRACE_CURSOR(cur, EXIT);
 }

@@ -35,7 +35,6 @@
 #ident "$Revision$"
 
 struct bhv_desc;
-struct bdevsw;
 struct bmapval;
 struct xfs_buf;
 struct cred;
@@ -48,14 +47,6 @@ struct xfs_mount;
 struct xfs_trans;
 struct xfs_dio;
 struct pm;
-
-/*
- * used for mmap i/o page lockdown code
- */
-typedef struct xfs_uaccmap {
-	uvaddr_t		xfs_uacstart;
-	__psunsigned_t		xfs_uaclen;
-} xfs_uaccmap_t;
 
 /*
  * Maximum count of bmaps used by read and write paths.
@@ -90,12 +81,12 @@ typedef struct xfs_uaccmap {
  * does.
  */
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_FSB_TO_DB)
-daddr_t xfs_fsb_to_db(struct xfs_inode *ip, xfs_fsblock_t fsb);
+xfs_daddr_t xfs_fsb_to_db(struct xfs_inode *ip, xfs_fsblock_t fsb);
 #define	XFS_FSB_TO_DB(ip,fsb)	xfs_fsb_to_db(ip,fsb)
 #else
 #define	XFS_FSB_TO_DB(ip,fsb) \
 		(((ip)->i_d.di_flags & XFS_DIFLAG_REALTIME) ? \
-		 (daddr_t)XFS_FSB_TO_BB((ip)->i_mount, (fsb)) : \
+		 (xfs_daddr_t)XFS_FSB_TO_BB((ip)->i_mount, (fsb)) : \
 		 XFS_FSB_TO_DADDR((ip)->i_mount, (fsb)))
 #endif
 
@@ -131,13 +122,6 @@ daddr_t xfs_fsb_to_db(struct xfs_inode *ip, xfs_fsblock_t fsb);
 #define	XFS_INVAL_CACHED	18
 #define	XFS_DIORD_ENTER		19
 #define	XFS_DIOWR_ENTER		20
-
-#define	XFS_STRAT_ENTER		1
-#define	XFS_STRAT_FAST		2
-#define	XFS_STRAT_SUB		3
-#define	XFS_STRAT_UNINT		4
-#define	XFS_STRAT_UNINT_DONE	5
-#define	XFS_STRAT_UNINT_CMPL	6
 
 #if defined(XFS_ALL_TRACE)
 #define	XFS_RW_TRACE
@@ -188,7 +172,7 @@ xfs_strat_write_iodone(struct xfs_buf *bp);
 
 int
 xfs_bmap(struct bhv_desc	*bdp,
-	 off_t			offset,
+	 xfs_off_t			offset,
 	 ssize_t		count,
 	 int			flags,
 	 struct cred		*credp,
@@ -198,7 +182,7 @@ xfs_bmap(struct bhv_desc	*bdp,
 int
 xfs_zero_eof(vnode_t		*vp,
 	     struct xfs_iocore	*io,
-	     off_t		offset,
+	     xfs_off_t		offset,
 	     xfs_fsize_t	isize,
 	     struct cred	*credp,
 	     struct pm		*pmp);
@@ -207,8 +191,8 @@ void
 xfs_inval_cached_pages(
 	struct vnode		*vp,
 	struct xfs_iocore	*io,
-	off_t			offset,
-	off_t			len,
+	xfs_off_t			offset,
+	xfs_off_t			len,
 	void			*dio);
 
 void
@@ -234,41 +218,11 @@ xfs_bioerror(struct xfs_buf *b);
  * XFS I/O core functions
  */
 
-struct vnmap;
-
-extern int xfs_dio_read(struct xfs_dio *);
-extern int xfs_dio_write(struct xfs_dio *);
-extern int xfs_read_core(bhv_desc_t *, struct xfs_iocore *, uio_t *, int,
-                        struct cred *, struct flid *, int,
-			struct vnmap *, int, const uint,
-			xfs_uaccmap_t *, xfs_fsize_t, int,
-			vrwlock_t *);
-extern int xfs_diostrat(struct xfs_buf *);
-extern int xfs_diordwr(bhv_desc_t *, struct xfs_iocore *, uio_t *, int,
-                        struct cred *, uint64_t, off_t *, size_t *);
-extern int xfs_strat_read(struct xfs_iocore *, struct xfs_buf *);
-extern int xfs_strat_write(struct xfs_iocore *, struct xfs_buf *);
-extern int xfs_strat_write_core(struct xfs_iocore *, struct xfs_buf *, int);
-extern int xfs_iomap_read(struct xfs_iocore *, off_t, size_t, struct bmapval *,
-                        int *, struct pm *, int *, unsigned int);
+extern int xfs_iomap_read(struct xfs_iocore *, xfs_off_t, size_t,
+	struct bmapval *, int *, struct pm *, int *, unsigned int);
 extern int xfs_bioerror_relse(struct xfs_buf *);
-extern void xfs_strat_core(struct xfs_iocore *, struct xfs_buf *);
-extern int xfs_write_file(bhv_desc_t *, struct xfs_iocore *, uio_t *, int,
-			 struct cred *, xfs_lsn_t *, struct vnmap *, int,
-			 const uint, xfs_uaccmap_t *);
-extern int xfs_strat_write_unwritten(struct xfs_iocore *, struct xfs_buf *);
-extern int xfs_check_mapped_io(struct vnode *, uio_t *, struct vnmap**,
-			int *, int *, int *, xfs_fsize_t *, xfs_uaccmap_t **);
-extern int xfs_is_nested_locking_enabled(void);
-extern void xfs_enable_nested_locking(void);
-extern void xfs_disable_nested_locking(void);
 #endif
 
-
-#ifndef _USING_PAGEBUF_T
-void
-xfs_xfsd_list_evict(bhv_desc_t *bdp);
-#endif
 
 /*
  * Needed by xfs_rw.c
@@ -299,9 +253,9 @@ int
 xfs_read_buf(
 	struct xfs_mount *mp,
 	buftarg_t	 *target,
-        daddr_t 	 blkno,
-        int              len,
-        uint             flags,
+	xfs_daddr_t 	 blkno,
+	int              len,
+	uint             flags,
 	struct xfs_buf	 **bpp);
 
 void
@@ -309,6 +263,6 @@ xfs_ioerror_alert(
 	char 			*func,
 	struct xfs_mount	*mp,
 	dev_t			dev,
-	daddr_t			blkno);
+	xfs_daddr_t			blkno);
 	  
 #endif /* _XFS_RW_H */

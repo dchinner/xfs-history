@@ -40,13 +40,11 @@
 #include <sys/sysmacros.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
-#include <sys/grio.h>
 #include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
 #else
 #include <sys/kmem.h>
-#include <sys/conf.h>
 #include <sys/systm.h>
 #endif
 #include "xfs_macros.h"

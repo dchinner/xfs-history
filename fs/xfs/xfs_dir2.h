@@ -76,14 +76,14 @@ typedef	__uint32_t	xfs_dir2_db_t;
 /*
  * Byte offset in a directory.
  */
-typedef	off64_t		xfs_dir2_off_t;
+typedef	xfs_off_t		xfs_dir2_off_t;
 
 /*
  * For getdents, argument struct for put routines.
  */
 typedef int (*xfs_dir2_put_t)(struct xfs_dir2_put_args *pa);
 typedef struct xfs_dir2_put_args {
-	off_t		cook;		/* cookie of (next) entry */
+	xfs_off_t		cook;		/* cookie of (next) entry */
 	xfs_intino_t	ino;		/* inode number */
 	struct dirent	*dbp;		/* buffer pointer */
 	char		*name;		/* directory entry name */

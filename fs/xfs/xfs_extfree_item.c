@@ -69,8 +69,8 @@
 #include "sim.h"
 #endif
 
-zone_t	*xfs_efi_zone;
-zone_t	*xfs_efd_zone;
+xfs_zone_t	*xfs_efi_zone;
+xfs_zone_t	*xfs_efd_zone;
 
 STATIC uint	xfs_efi_item_size(xfs_efi_log_item_t *);
 STATIC void	xfs_efi_item_format(xfs_efi_log_item_t *, xfs_log_iovec_t *);
@@ -133,7 +133,7 @@ xfs_efi_item_format(xfs_efi_log_item_t	*efip,
 	size += (efip->efi_format.efi_nextents - 1) * sizeof(xfs_extent_t);
 	efip->efi_format.efi_size = 1;
 
-	log_vector->i_addr = (caddr_t)&(efip->efi_format);
+	log_vector->i_addr = (xfs_caddr_t)&(efip->efi_format);
 	log_vector->i_len = size;
 	ASSERT(size >= sizeof(xfs_efi_log_format_t));
 }
@@ -369,7 +369,7 @@ xfs_efi_init(xfs_mount_t	*mp,
 	efip->efi_item.li_ops = &xfs_efi_item_ops;
 	efip->efi_item.li_mountp = mp;
 	efip->efi_format.efi_nextents = nextents;
-	efip->efi_format.efi_id = (__uint64_t)efip;
+	efip->efi_format.efi_id = (long)efip;
 
 	return (efip);
 }
@@ -500,7 +500,7 @@ xfs_efd_item_format(xfs_efd_log_item_t	*efdp,
 	size += (efdp->efd_format.efd_nextents - 1) * sizeof(xfs_extent_t);
 	efdp->efd_format.efd_size = 1;
 
-	log_vector->i_addr = (caddr_t)&(efdp->efd_format);
+	log_vector->i_addr = (xfs_caddr_t)&(efdp->efd_format);
 	log_vector->i_len = size;
 	ASSERT(size >= sizeof(xfs_efd_log_format_t));
 }

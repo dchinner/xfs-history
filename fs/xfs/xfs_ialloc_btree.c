@@ -950,8 +950,8 @@ xfs_inobt_log_keys(
 
 	block = XFS_BUF_TO_INOBT_BLOCK(bp);
 	kp = XFS_INOBT_KEY_ADDR(block, 1, cur);
-	first = (int)((caddr_t)&kp[kfirst - 1] - (caddr_t)block);
-	last = (int)(((caddr_t)&kp[klast] - 1) - (caddr_t)block);
+	first = (int)((xfs_caddr_t)&kp[kfirst - 1] - (xfs_caddr_t)block);
+	last = (int)(((xfs_caddr_t)&kp[klast] - 1) - (xfs_caddr_t)block);
 	xfs_trans_log_buf(cur->bc_tp, bp, first, last);
 }
 
@@ -972,8 +972,8 @@ xfs_inobt_log_ptrs(
 
 	block = XFS_BUF_TO_INOBT_BLOCK(bp);
 	pp = XFS_INOBT_PTR_ADDR(block, 1, cur);
-	first = (int)((caddr_t)&pp[pfirst - 1] - (caddr_t)block);
-	last = (int)(((caddr_t)&pp[plast] - 1) - (caddr_t)block);
+	first = (int)((xfs_caddr_t)&pp[pfirst - 1] - (xfs_caddr_t)block);
+	last = (int)(((xfs_caddr_t)&pp[plast] - 1) - (xfs_caddr_t)block);
 	xfs_trans_log_buf(cur->bc_tp, bp, first, last);
 }
 
@@ -994,8 +994,8 @@ xfs_inobt_log_recs(
 
 	block = XFS_BUF_TO_INOBT_BLOCK(bp);
 	rp = XFS_INOBT_REC_ADDR(block, 1, cur);
-	first = (int)((caddr_t)&rp[rfirst - 1] - (caddr_t)block);
-	last = (int)(((caddr_t)&rp[rlast] - 1) - (caddr_t)block);
+	first = (int)((xfs_caddr_t)&rp[rfirst - 1] - (xfs_caddr_t)block);
+	last = (int)(((xfs_caddr_t)&rp[rlast] - 1) - (xfs_caddr_t)block);
 	xfs_trans_log_buf(cur->bc_tp, bp, first, last);
 }
 
@@ -1039,7 +1039,7 @@ xfs_inobt_lookup(
 	 */
 	for (level = cur->bc_nlevels - 1, diff = 1; level >= 0; level--) {
 		xfs_buf_t	*bp;	/* buffer pointer for btree block */
-		daddr_t		d;	/* disk address of btree block */
+		xfs_daddr_t		d;	/* disk address of btree block */
 
 		/*
 		 * Get the disk address we're looking for.

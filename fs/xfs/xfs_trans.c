@@ -39,7 +39,6 @@
 #include <sys/param.h>
 #include "xfs_buf.h"
 #include <sys/sysmacros.h>
-#include <sys/ksa.h>
 #include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
@@ -50,7 +49,6 @@
 #include <sys/uuid.h>
 #include <stddef.h>
 #ifndef SIM
-#include <sys/conf.h>
 #include <sys/systm.h>
 #endif
 #include "xfs_macros.h"
@@ -97,7 +95,7 @@ STATIC void	xfs_trans_committed(xfs_trans_t *, int);
 STATIC void	xfs_trans_chunk_committed(xfs_log_item_chunk_t *, xfs_lsn_t, int);
 STATIC void	xfs_trans_free(xfs_trans_t *);
 
-zone_t		*xfs_trans_zone;
+xfs_zone_t		*xfs_trans_zone;
 
 
 /*
@@ -1038,7 +1036,7 @@ xfs_trans_fill_vecs(
 	tp->t_header.th_magic = XFS_TRANS_HEADER_MAGIC;
 	tp->t_header.th_type = tp->t_type;
 	tp->t_header.th_num_items = nitems;
-	log_vector->i_addr = (caddr_t)&tp->t_header;
+	log_vector->i_addr = (xfs_caddr_t)&tp->t_header;
 	log_vector->i_len = sizeof(xfs_trans_header_t);
 }
 

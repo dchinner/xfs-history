@@ -168,12 +168,14 @@ for ((dqp) = (qlist)->qh_next; (dqp) != (xfs_dquot_t *)(qlist); \
 					 (tp)->t_dqinfo->dqa_prjdquots)
 #define XFS_IS_SUSER_DQUOT(dqp)		((dqp)->q_core.d_id == 0)
 
-#define XFS_PURGE_INODE(vp) 		\
+#define XFS_PURGE_INODE(ip) 		\
 	{ 				\
 	  vmap_t dqvmap;		\
-	  VMAP((vp), dqvmap); 		\
-	  VN_RELE(vp);			\
-	  vn_purge((vp), &dqvmap);	\
+	  vnode_t dqvp;			\
+	  dqvp = XFS_ITOV(ip);		\
+	  VMAP(dqvp, ip, dqvmap);	\
+	  VN_RELE(dqvp));		\
+	  vn_purge(dqvp, &dqvmap);	\
         }
 
 #define DQFLAGTO_TYPESTR(d) 	(((d)->dq_flags & XFS_DQ_USER) ? "USR" : \

@@ -42,6 +42,9 @@ extern struct file_operations linvfs_dir_operations;
 extern struct address_space_operations linvfs_aops;
 
 extern int linvfs_revalidate(struct dentry *);
+extern int linvfs_revalidate_core(struct inode *);
+
+extern void linvfs_set_inode_ops(struct inode *);
 
 #endif  /*  XFS_LINUX_OPS_INODE_DOT_H  */
 

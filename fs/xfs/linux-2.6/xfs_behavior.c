@@ -31,7 +31,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  *									  *
  **************************************************************************/
-#ident "$Id: xfs_behavior.c,v 1.9 2000/06/09 02:50:02 kenmcd Exp $"
+#ident "$Id: xfs_behavior.c,v 1.10 2000/06/09 06:40:03 ananth Exp $"
 
 /*
  * Source file used to associate/disassociate behaviors with virtualized 
@@ -40,9 +40,7 @@
  * The implementation is split between functions in this file and macros
  * in behavior.h.
  */
-#if defined(__linux__)
-#include <xfs_linux.h>
-#endif
+#include <xfs_os_defs.h>
 
 #define	_KERNEL	1
 
@@ -53,7 +51,7 @@
 
 #include "xfs_sim.h"
 
-zone_t	*bhv_global_zone;
+xfs_zone_t	*bhv_global_zone;
 
 /*
  * Global initialization function called out of main.

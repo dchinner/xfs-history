@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.18 $"
+#ident	"$Revision: 1.19 $"
 
 /*
  * This is meant to be used by only the user level log-print code, and
@@ -59,7 +59,6 @@
 #include <stdlib.h>
 #else
 #include <sys/systm.h>
-#include <sys/conf.h>
 #endif
 
 #include <sys/kmem.h>
@@ -108,11 +107,11 @@
 #endif
 
 #ifndef _KERNEL
-extern int		xlog_find_zeroed(struct log *log, daddr_t *blk_no);
+extern int		xlog_find_zeroed(struct log *log, xfs_daddr_t *blk_no);
 extern int		xlog_find_cycle_start(struct log *log,
 					      xfs_buf_t	*bp,	
-					      daddr_t	first_blk,
-					      daddr_t	*last_blk,
+					      xfs_daddr_t	first_blk,
+					      xfs_daddr_t	*last_blk,
 					      uint	cycle);
 
 /*
@@ -123,10 +122,10 @@ extern int		xlog_find_cycle_start(struct log *log,
 int
 xlog_print_find_oldest(
 	struct log  *log,
-	daddr_t *last_blk)
+	xfs_daddr_t *last_blk)
 {
 	xfs_buf_t	*bp;
-	daddr_t	first_blk;
+	xfs_daddr_t	first_blk;
 	uint	first_half_cycle, last_half_cycle;
 	int	error;
 	
@@ -217,7 +216,7 @@ xlog_recover_print_trans_head(
 
 void
 xlog_recover_print_data(
-	caddr_t 	p, 
+	xfs_caddr_t 	p, 
 	int 		len)
 {
 	extern int print_data;
@@ -249,9 +248,9 @@ xlog_recover_print_buffer(
 	xfs_agf_t		*agf;
 	xfs_buf_log_format_v1_t	*old_f;
 	xfs_buf_log_format_t	*f;
-	caddr_t			p;
+	xfs_caddr_t			p;
 	int			len, num, i;
-	daddr_t			blkno;
+	xfs_daddr_t			blkno;
 	extern int		print_buffer;
 	xfs_disk_dquot_t	*ddq;
 
@@ -275,12 +274,12 @@ xlog_recover_print_buffer(
 	if (f->blf_type == XFS_LI_BUF) {
 		printf("#regs:%d   start blkno:0x%Lx   len:%d   bmap size:%d\n",
 		       f->blf_size, f->blf_blkno, f->blf_len, f->blf_map_size);
-		blkno = (daddr_t)f->blf_blkno;
+		blkno = (xfs_daddr_t)f->blf_blkno;
 	} else {
 		printf("#regs:%d   start blkno:0x%x   len:%d   bmap size:%d\n",
 		       old_f->blf_size, old_f->blf_blkno, old_f->blf_len,
 		       old_f->blf_map_size);
-		blkno = (daddr_t)old_f->blf_blkno;
+		blkno = (xfs_daddr_t)old_f->blf_blkno;
 	}
 	num = f->blf_size-1;
 	i = 1;

@@ -299,8 +299,8 @@ xfs_log_item_chunk_t *xfs_lic_desc_to_chunk(xfs_log_item_desc_t *dp);
 #define	XFS_LIC_DESC_TO_CHUNK(dp)	xfs_lic_desc_to_chunk(dp)
 #else
 #define	XFS_LIC_DESC_TO_CHUNK(dp)	((xfs_log_item_chunk_t*) \
-					(((caddr_t)((dp) - (dp)->lid_index)) -\
-					(caddr_t)(((xfs_log_item_chunk_t*) \
+					(((xfs_caddr_t)((dp) - (dp)->lid_index)) -\
+					(xfs_caddr_t)(((xfs_log_item_chunk_t*) \
 					0)->lic_descs)))
 #endif
 
@@ -929,10 +929,10 @@ int		xfs_trans_reserve(xfs_trans_t *, uint, uint, uint,
 void		xfs_trans_callback(xfs_trans_t *,
 				   void (*)(xfs_trans_t *, void *), void *);
 void		xfs_trans_mod_sb(xfs_trans_t *, uint, long);
-struct xfs_buf	*xfs_trans_get_buf(xfs_trans_t *, struct buftarg *, daddr_t,
+struct xfs_buf	*xfs_trans_get_buf(xfs_trans_t *, struct buftarg *, xfs_daddr_t,
 				   int, uint);
 int		xfs_trans_read_buf(struct xfs_mount *, xfs_trans_t *,
-				   struct buftarg *, daddr_t, int, uint,
+				   struct buftarg *, xfs_daddr_t, int, uint,
 				   struct xfs_buf **);
 struct xfs_buf	*xfs_trans_getsb(xfs_trans_t *, struct xfs_mount *, int);
 

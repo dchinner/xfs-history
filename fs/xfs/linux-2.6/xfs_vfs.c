@@ -32,11 +32,11 @@
 
 #ident	"$Revision$"
 
+#include <xfs_os_defs.h>
+
 #define FSID_T
 #include <sys/types.h>
 #include <linux/errno.h>
-
-#include <linux/xfs_to_linux.h>
 
 #undef  NODEV
 #include <linux/version.h>
@@ -45,8 +45,6 @@
 #include <linux/locks.h>
 #include <linux/smp_lock.h>
 #include <linux/slab.h>
-
-#include <linux/linux_to_xfs.h>
 
 #include <sys/sysmacros.h>
 #include <sys/vfs.h>
@@ -231,7 +229,7 @@ vfs_busydev(dev_t dev, int type)
 {
 	long s;
 	struct vfs *vfsp;
-	kdev_t	kdev = MKDEV(MAJOR(dev), MAJOR(dev));
+	kdev_t	kdev = MKDEV(MAJOR(dev), MINOR(dev));
 	struct vfsmount *entry;
 
 	lock_kernel();

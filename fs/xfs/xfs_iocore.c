@@ -43,8 +43,6 @@
 #include <sys/vnode.h>
 #include <sys/sysmacros.h>
 #include <sys/uuid.h>
-#include <sys/grio.h>
-#include <sys/pda.h>
 #include <sys/dmi_kern.h>
 #ifdef SIM
 #undef _KERNEL
@@ -55,7 +53,6 @@
 #ifdef SIM
 #include <stdio.h>
 #else
-#include <sys/conf.h>
 #include <sys/systm.h>
 #endif
 #include <sys/kmem.h>
@@ -65,8 +62,6 @@
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
 #include <sys/ktrace.h>
-#include <sys/ksa.h>
-#include <ksys/sthread.h>
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -107,8 +102,8 @@ static int
 xfs_rsync_fn(
 	xfs_inode_t	*ip,
 	int		ioflag,
-	off_t		start,
-	off_t		end)
+	xfs_off_t		start,
+	xfs_off_t		end)
 {
 	xfs_mount_t	*mp = ip->i_mount;
 	int		error = 0;

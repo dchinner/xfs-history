@@ -469,7 +469,7 @@ typedef struct log {
     struct xfs_mount	*l_mp;	        /* mount point */
     struct xfs_buf		*l_xbuf;        /* extra buffer for log wrapping */
     dev_t		l_dev;	        /* dev_t of log */
-    daddr_t		l_logBBstart;   /* start block of log */
+    xfs_daddr_t		l_logBBstart;   /* start block of log */
     int			l_logsize;      /* size of log in bytes */
     int			l_logBBsize;    /* size of log in 512 byte chunks */
     int			l_roundoff;	/* round off error of all iclogs */
@@ -507,18 +507,18 @@ typedef struct log {
 /* common routines */
 extern xfs_lsn_t xlog_assign_tail_lsn(struct xfs_mount *mp,
 				      xlog_in_core_t *iclog);
-extern int	 xlog_find_head(xlog_t *log, daddr_t *head_blk);
+extern int	 xlog_find_head(xlog_t *log, xfs_daddr_t *head_blk);
 extern int	 xlog_find_tail(xlog_t	*log,
-				daddr_t *head_blk,
-				daddr_t *tail_blk,
+				xfs_daddr_t *head_blk,
+				xfs_daddr_t *tail_blk,
 				int readonly);
-extern int	 xlog_print_find_oldest(xlog_t *log, daddr_t *last_blk);
+extern int	 xlog_print_find_oldest(xlog_t *log, xfs_daddr_t *last_blk);
 extern int	 xlog_recover(xlog_t *log, int readonly);
 extern int	 xlog_recover_finish(xlog_t *log, int mfsi_flags);
 extern void	 xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog);
 extern struct xfs_buf *xlog_get_bp(int,xfs_mount_t *);
 extern void	 xlog_put_bp(struct xfs_buf *);
-extern int	 xlog_bread(xlog_t *, daddr_t blkno, int bblks, struct xfs_buf *bp);
+extern int	 xlog_bread(xlog_t *, xfs_daddr_t blkno, int bblks, struct xfs_buf *bp);
 extern void	 xlog_recover_process_iunlinks(xlog_t *log);
 
 #define XLOG_TRACE_GRAB_FLUSH  1

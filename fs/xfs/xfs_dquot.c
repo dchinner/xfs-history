@@ -29,10 +29,9 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.46 $"
+#ident "$Revision: 1.47 $"
 #include <sys/param.h>
 #include "xfs_buf.h"
-#include <sys/ksa.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/kmem.h>
@@ -550,7 +549,7 @@ xfs_qm_dqtobp(
 	/* 
 	 * If we don't know where the dquot lives, find out.
 	 */
-	if (dqp->q_blkno == (daddr_t) 0) {
+	if (dqp->q_blkno == (xfs_daddr_t) 0) {
 		/* We use the id as an index */
 		dqp->q_fileoffset = (xfs_fileoff_t) ((uint)id / 
 						     XFS_QM_DQPERBLK(mp));

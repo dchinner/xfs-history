@@ -40,7 +40,6 @@
 #define _KERNEL 1
 #endif
 #include <sys/param.h>
-#include <sys/ksa.h>
 #include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
@@ -596,7 +595,7 @@ xfs_alloc_read_agfl(
 	xfs_buf_t	**bpp)		/* buffer for the ag free block array */
 {
 	xfs_buf_t	*bp;		/* return value */
-	daddr_t		d;		/* disk block address */
+	xfs_daddr_t		d;		/* disk block address */
 	int		error;
 
 	ASSERT(agno != NULLAGNUMBER);
@@ -941,6 +940,8 @@ xfs_alloc_ag_vextent_near(
 	extern ulong_t	random(void);
 
 	if (!seed) {
+		extern void nanotime(struct timespec *);
+
 		nanotime(&now);
 		seed = (int)now.tv_sec ^ (int)now.tv_nsec;
 	}
@@ -2302,8 +2303,8 @@ xfs_alloc_put_freelist(
 	TRACE_MODAGF(NULL, agf, XFS_AGF_FLLAST | XFS_AGF_FLCOUNT);
 	xfs_alloc_log_agf(tp, agbp, XFS_AGF_FLLAST | XFS_AGF_FLCOUNT);
 	xfs_trans_log_buf(tp, agflbp,
-		(int)((caddr_t)blockp - (caddr_t)agfl),
-		(int)((caddr_t)blockp - (caddr_t)agfl +
+		(int)((xfs_caddr_t)blockp - (xfs_caddr_t)agfl),
+		(int)((xfs_caddr_t)blockp - (xfs_caddr_t)agfl +
 			sizeof(xfs_agblock_t) - 1));
 	return 0;
 }
@@ -2322,7 +2323,7 @@ xfs_alloc_read_agf(
 	xfs_agf_t	*agf;		/* ag freelist header */
 	int		agf_ok;		/* set if agf is consistent */
 	xfs_buf_t	*bp;		/* return value */
-	daddr_t		d;		/* disk block address */
+	xfs_daddr_t		d;		/* disk block address */
 	int		error;
 	xfs_perag_t	*pag;		/* per allocation group data */
 

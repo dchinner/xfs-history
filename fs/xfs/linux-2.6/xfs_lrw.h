@@ -35,47 +35,7 @@
  * $Author$
  * $Id$
  *
- * $Log$
- * Revision 1.9  2000/04/19 04:54:48  cattelan
- * proto  xfs_is_read_only
- *
- * Revision 1.8  2000/03/29 01:45:59  kenmcd
- * Updated copyright and license notices, ready for open source release
- *
- * Revision 1.7  2000/03/28 20:31:53  lord
- * Simplify bmap code, add support for NEW extents.
- *
- * Revision 1.6  2000/03/25 01:15:49  lord
- * use linux security mechanisms
- * Merge of 2.3.42-xfs:slinx:46379a by ananth.
- *
- * Revision 1.5  2000/03/25 00:36:28  cattelan
- * Merge of 2.3.42-xfs:slinx:44186a by ananth.
- *
- *   Copied GPL from slinx-xfs tree.
- *
- * Revision 1.6  2000/03/18 22:51:26  lord
- * use linux security mechanisms
- *
- * Revision 1.5  2000/02/21 21:54:31  cattelan
- * Copied GPL from slinx-xfs tree.
- *
- * Revision 1.5  2000/02/21 03:16:16  kenmcd
- * Encumbrance review done.
- * Add copyright and license words consistent with GPL.
- * Refer to http://fsg.melbourne.sgi.com/reviews/ for details.
- *
- * Revision 1.4  2000/02/12 01:03:17  cattelan
- * new functions xfs_pb_getr xfs_pb_ngetr
- *
- * Revision 1.3  2000/02/08 04:47:02  mostek
- * Fix warnings.
- *
- * Revision 1.1  1999/12/29 21:14:01  cattelan
- * new file
- *
  */
-
 
 #ifndef _XFS_LRW_H
 #define _XFS_LRW_H
@@ -86,9 +46,10 @@
  */
 #define	XFS_MAX_RW_NBMAPS	4
 
-extern int xfs_bmap(bhv_desc_t *,off_t,ssize_t,int,pb_bmap_t *,int *);
-extern int xfs_iomap_read(xfs_iocore_t *,off_t,size_t,pb_bmap_t *,int *,struct pm *);
-extern int xfs_iomap_write(xfs_iocore_t	*,off_t,size_t,pb_bmap_t *,int *,int,struct pm *);
+extern int xfs_bmap(bhv_desc_t *,loff_t,ssize_t,int,pb_bmap_t *,int *);
+extern int xfs_iomap_read(xfs_iocore_t *, loff_t, size_t, int,
+			  pb_bmap_t *, int *, struct pm *);
+extern int xfs_iomap_write(xfs_iocore_t	*,loff_t,size_t,pb_bmap_t *,int *,int,struct pm *);
 
 extern int xfs_is_read_only(xlog_t *);
 /*

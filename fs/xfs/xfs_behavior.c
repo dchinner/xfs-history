@@ -40,9 +40,7 @@
  * The implementation is split between functions in this file and macros
  * in behavior.h.
  */
-#if defined(__linux__)
-#include <xfs_linux.h>
-#endif
+#include <xfs_os_defs.h>
 
 #define	_KERNEL	1
 
@@ -53,7 +51,7 @@
 
 #include "xfs_sim.h"
 
-zone_t	*bhv_global_zone;
+xfs_zone_t	*bhv_global_zone;
 
 /*
  * Global initialization function called out of main.

@@ -45,7 +45,6 @@
 #undef _KERNEL
 #else
 #include <sys/kmem.h>
-#include <sys/conf.h>
 #include <sys/systm.h>
 #endif
 #include "xfs_macros.h"

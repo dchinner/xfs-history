@@ -116,9 +116,6 @@
 #define dtopt(DD)	((DD) >> DPPSHFT)
 #define dpoff(DD)	((DD) & (NDPP-1))
 
-#include <sys/ksa.h>
-
-
 #ifndef SIM
 #define ENOTSUP		1008	/* Not supported (POSIX 1003.1b) */
 #endif
@@ -158,17 +155,8 @@ typedef long int            irix5_off_t;
 #define NBBY    8       /* number of bits per byte */
 #endif  /* NBBY */
 
-
-#if defined(_KERNEL)
-extern ksa_t ksa;
-extern ksa_t *ksaptr;
-#endif
-
-
 #define findrawpath(x) x
 #define findblockpath(x) x
-
-#define	get_bdevsw(dev)	((struct bdevsw *)(__psint_t)(dev))
 
 #undef bzero
 #define bzero(p,s) memset((p), 0, (s))
@@ -178,11 +166,5 @@ extern ksa_t *ksaptr;
 
 extern void *kern_malloc(size_t);
 #define bcmp(s1,s2,l) memcmp(s1,s2,l)    
-
-/* sys/ktime.h */
-#if 0
-struct timespec;
-extern void nanotime_syscall(timespec_t *);
-#endif
 
 #endif /* __XFS_LINUX_ */

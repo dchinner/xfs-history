@@ -47,7 +47,6 @@
 #ifdef SIM
 #undef _KERNEL
 #endif
-#include <sys/pda.h>
 #include <sys/debug.h>
 #ifdef SIM
 #include <stdlib.h>
@@ -125,6 +124,8 @@ int
 xfs_error_test(int error_tag, int *fsidp, char *expression,
 	       int line, char *file, unsigned long randfactor)
 {
+	extern unsigned long random(void);
+
 	int i;
 	int64_t fsid;
 

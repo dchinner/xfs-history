@@ -52,9 +52,7 @@
 #endif /* SIM */
 #include <sys/dirent.h>
 #include <sys/uuid.h>
-#include <sys/grio.h>
 #include <sys/ktrace.h>
-#include <sys/ksa.h>
 #ifdef SIM
 #undef _KERNEL
 #include <stdio.h>
@@ -584,7 +582,7 @@ xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 static int							/* error */
 xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 {
-	caddr_t lockaddr;
+	xfs_caddr_t lockaddr;
 	int locklen = 0, alignment, retval, is32;
 	xfs_dir_put_t put;
 	int error;
@@ -599,7 +597,7 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	 */
 	is32 = ABI_IS_IRIX5(GETDENTS_ABI(get_current_abi(), uio));
 
-	alignment = (is32 ? sizeof(irix5_off_t) : sizeof(off_t)) - 1;
+	alignment = (is32 ? sizeof(irix5_off_t) : sizeof(xfs_off_t)) - 1;
 
 	put = is32 ?
 		xfs_dir_put_dirent32_uio :
@@ -1041,7 +1039,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	xfs_mount_t *mp;
 	int error, eob, i;
 	xfs_dabuf_t *bp;
-	daddr_t nextda;
+    xfs_daddr_t nextda;
 
 	/*
 	 * Pick up our context.
@@ -1321,7 +1319,7 @@ xfs_dir_trace_g_due(char *where, xfs_inode_t *dp, uio_t *uio,
  * Add a trace buffer entry for an inode and a uio.
  */
 void
-xfs_dir_trace_g_duc(char *where, xfs_inode_t *dp, uio_t *uio, off_t cookie)
+xfs_dir_trace_g_duc(char *where, xfs_inode_t *dp, uio_t *uio, xfs_off_t cookie)
 {
 	xfs_dir_trace_enter(XFS_DIR_KTRACE_G_DUC, where,
 		     (__psunsigned_t)dp, (__psunsigned_t)dp->i_mount,

@@ -118,15 +118,15 @@ startblockval(xfs_fsblock_t x)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_AG_CHECK_DADDR)
 void
-xfs_ag_check_daddr(xfs_mount_t *mp, daddr_t d, xfs_extlen_t len)
+xfs_ag_check_daddr(xfs_mount_t *mp, xfs_daddr_t d, xfs_extlen_t len)
 {
 	XFS_AG_CHECK_DADDR(mp, d, len);
 }
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_AG_DADDR)
-daddr_t
-xfs_ag_daddr(xfs_mount_t *mp, xfs_agnumber_t agno, daddr_t d)
+xfs_daddr_t
+xfs_ag_daddr(xfs_mount_t *mp, xfs_agnumber_t agno, xfs_daddr_t d)
 {
 	return XFS_AG_DADDR(mp, agno, d);
 }
@@ -165,7 +165,7 @@ xfs_ag_min_blocks(int bl)
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_AGB_TO_DADDR)
-daddr_t
+xfs_daddr_t
 xfs_agb_to_daddr(xfs_mount_t *mp, xfs_agnumber_t agno, xfs_agblock_t agbno)
 {
 	return XFS_AGB_TO_DADDR(mp, agno, agbno);
@@ -863,7 +863,7 @@ xfs_cnt_block(xfs_mount_t *mp)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DA_COOKIE_BNO)
 xfs_dablk_t
-xfs_da_cookie_bno(xfs_mount_t *mp, off_t cookie)
+xfs_da_cookie_bno(xfs_mount_t *mp, xfs_off_t cookie)
 {
 	return XFS_DA_COOKIE_BNO(mp, cookie);
 }
@@ -871,7 +871,7 @@ xfs_da_cookie_bno(xfs_mount_t *mp, off_t cookie)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DA_COOKIE_ENTRY)
 int
-xfs_da_cookie_entry(xfs_mount_t *mp, off_t cookie)
+xfs_da_cookie_entry(xfs_mount_t *mp, xfs_off_t cookie)
 {
 	return XFS_DA_COOKIE_ENTRY(mp, cookie);
 }
@@ -880,7 +880,7 @@ xfs_da_cookie_entry(xfs_mount_t *mp, off_t cookie)
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DA_COOKIE_HASH)
 /*ARGSUSED1*/
 xfs_dahash_t
-xfs_da_cookie_hash(xfs_mount_t *mp, off_t cookie)
+xfs_da_cookie_hash(xfs_mount_t *mp, xfs_off_t cookie)
 {
 	return XFS_DA_COOKIE_HASH(mp, cookie);
 }
@@ -895,7 +895,7 @@ xfs_da_make_bnoentry(xfs_mount_t *mp, xfs_dablk_t bno, int entry)
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DA_MAKE_COOKIE)
-off_t
+xfs_off_t
 xfs_da_make_cookie(xfs_mount_t *mp, xfs_dablk_t bno, int entry,
 		   xfs_dahash_t hash)
 {
@@ -913,7 +913,7 @@ xfs_da_node_entries(xfs_mount_t *mp)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DADDR_TO_AGBNO)
 xfs_agblock_t
-xfs_daddr_to_agbno(xfs_mount_t *mp, daddr_t d)
+xfs_daddr_to_agbno(xfs_mount_t *mp, xfs_daddr_t d)
 {
 	return XFS_DADDR_TO_AGBNO(mp, d);
 }
@@ -921,7 +921,7 @@ xfs_daddr_to_agbno(xfs_mount_t *mp, daddr_t d)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DADDR_TO_AGNO)
 xfs_agnumber_t
-xfs_daddr_to_agno(xfs_mount_t *mp, daddr_t d)
+xfs_daddr_to_agno(xfs_mount_t *mp, xfs_daddr_t d)
 {
 	return XFS_DADDR_TO_AGNO(mp, d);
 }
@@ -929,7 +929,7 @@ xfs_daddr_to_agno(xfs_mount_t *mp, daddr_t d)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DADDR_TO_FSB)
 xfs_fsblock_t
-xfs_daddr_to_fsb(xfs_mount_t *mp, daddr_t d)
+xfs_daddr_to_fsb(xfs_mount_t *mp, xfs_daddr_t d)
 {
 	return XFS_DADDR_TO_FSB(mp, d);
 }
@@ -1522,7 +1522,7 @@ xfs_fsb_to_agno(xfs_mount_t *mp, xfs_fsblock_t fsbno)
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_FSB_TO_DADDR)
-daddr_t
+xfs_daddr_t
 xfs_fsb_to_daddr(xfs_mount_t *mp, xfs_fsblock_t fsbno)
 {
 	return XFS_FSB_TO_DADDR(mp, fsbno);
@@ -1530,7 +1530,7 @@ xfs_fsb_to_daddr(xfs_mount_t *mp, xfs_fsblock_t fsbno)
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_FSB_TO_DB)
-daddr_t
+xfs_daddr_t
 xfs_fsb_to_db(xfs_inode_t *ip, xfs_fsblock_t fsb)
 {
 	return XFS_FSB_TO_DB(ip, fsb);
@@ -1539,7 +1539,7 @@ xfs_fsb_to_db(xfs_inode_t *ip, xfs_fsblock_t fsb)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_HDR_BLOCK)
 xfs_agblock_t
-xfs_hdr_block(xfs_mount_t *mp, daddr_t d)
+xfs_hdr_block(xfs_mount_t *mp, xfs_daddr_t d)
 {
 	return XFS_HDR_BLOCK(mp, d);
 }

@@ -29,11 +29,10 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.36 $"
+#ident "$Revision: 1.37 $"
 
 #include <sys/param.h>
 #include "xfs_buf.h"
-#include <sys/ksa.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/capability.h>
@@ -85,11 +84,11 @@
 extern int 	xfs_fstype;
 
 STATIC int	xfs_qm_scall_trunc_qfiles(xfs_mount_t *, uint);
-STATIC int	xfs_qm_scall_getquota(xfs_mount_t *, xfs_dqid_t, uint, caddr_t);
-STATIC int	xfs_qm_scall_getqstat(xfs_mount_t *, caddr_t);
-STATIC int	xfs_qm_scall_setqlim(xfs_mount_t *, xfs_dqid_t, uint, caddr_t);
+STATIC int	xfs_qm_scall_getquota(xfs_mount_t *, xfs_dqid_t, uint, xfs_caddr_t);
+STATIC int	xfs_qm_scall_getqstat(xfs_mount_t *, xfs_caddr_t);
+STATIC int	xfs_qm_scall_setqlim(xfs_mount_t *, xfs_dqid_t, uint, xfs_caddr_t);
 STATIC int	xfs_qm_scall_quotaon(xfs_mount_t *, uint);
-STATIC int	xfs_qm_scall_qwarn(xfs_mount_t *, xfs_dqid_t, caddr_t);
+STATIC int	xfs_qm_scall_qwarn(xfs_mount_t *, xfs_dqid_t, xfs_caddr_t);
 STATIC int	xfs_qm_log_quotaoff(xfs_mount_t *, xfs_qoff_logitem_t **, uint);
 STATIC int	xfs_qm_log_quotaoff_end(xfs_mount_t *, xfs_qoff_logitem_t *,
 					uint);
@@ -109,7 +108,7 @@ xfs_quotactl(
 	struct bhv_desc *bdp,
 	int		cmd,
 	int		id,
-	caddr_t		addr)
+	xfs_caddr_t		addr)
 {
 	xfs_mount_t	*mp;
 	int 		error;
@@ -468,12 +467,12 @@ xfs_qm_scall_quotaoff(
 	 */
 	if ((dqtype & XFS_QMOPT_UQUOTA) &&
 	    XFS_QI_UQIP(mp)) {
-		XFS_PURGE_INODE(XFS_ITOV(XFS_QI_UQIP(mp)));
+		XFS_PURGE_INODE(XFS_QI_UQIP(mp));
 		XFS_QI_UQIP(mp) = NULL;
 	}
 	if ((dqtype & XFS_QMOPT_PQUOTA) && 
 	    XFS_QI_PQIP(mp)) {
-		XFS_PURGE_INODE(XFS_ITOV(XFS_QI_PQIP(mp)));
+		XFS_PURGE_INODE(XFS_QI_PQIP(mp));
 		XFS_QI_PQIP(mp) = NULL;
 	}
 	mutex_unlock(&(XFS_QI_QOFFLOCK(mp)));
@@ -673,7 +672,7 @@ xfs_qm_scall_quotaon(
 STATIC int
 xfs_qm_scall_getqstat(
 	xfs_mount_t 	*mp,
-	caddr_t		addr)
+	xfs_caddr_t		addr)
 {
 	fs_quota_stat_t	out;
 	xfs_inode_t	*uip, *pip;
@@ -758,7 +757,7 @@ xfs_qm_scall_setqlim(
 	xfs_mount_t		*mp,
 	xfs_dqid_t		id,
 	uint			type,
-	caddr_t			addr)
+	xfs_caddr_t			addr)
 {
 	xfs_disk_dquot_t	*ddq;
 	fs_disk_quota_t		newlim;
@@ -910,7 +909,7 @@ STATIC int
 xfs_qm_scall_qwarn(
 	xfs_mount_t 	*mp,
 	xfs_dqid_t 	id,
-	caddr_t 	addr)
+	xfs_caddr_t 	addr)
 {
 	/*
 	 * XXX when this is supported, if it's a write operation
@@ -925,7 +924,7 @@ xfs_qm_scall_getquota(
 	xfs_mount_t 	*mp,
 	xfs_dqid_t 	id,
 	uint		type,
-	caddr_t 	addr)
+	xfs_caddr_t 	addr)
 {
 	xfs_dquot_t	*dqp;
 	fs_disk_quota_t	out;
@@ -1245,17 +1244,17 @@ again:
 			 * Sample vp mapping while holding the mplock, lest
 			 * we come across a non-existent vnode.
 			 */
-			VMAP(vp, vmap);
+			VMAP(vp, ip, vmap);
 			ireclaims = mp->m_ireclaims;
 			topino = mp->m_inodes;
 			XFS_MOUNT_IUNLOCK(mp);
 			
 			/* XXX restart limit ? */
 #ifndef _IRIX62_XFS_ONLY
-			if (!(vp = vn_get(vp, &vmap, 0)))
+			if ( ! (vp = vn_get(vp, &vmap, 0)))
 				goto again;
 #else
-			if (!(vp = vn_get(vp, &vmap)))
+			if ( ! (vp = vn_get(vp, vmap)))
 				goto again;
 			ASSERT(ip == XFS_VTOI(vp));
 #endif
@@ -1524,7 +1523,7 @@ xfs_qm_internalqcheck_adjust(
         xfs_trans_t     *tp,            /* transaction pointer */
         xfs_ino_t       ino,            /* inode number to get data for */
         void            *buffer,        /* not used */
-        daddr_t         bno,            /* starting block of inode cluster */	
+        xfs_daddr_t         bno,            /* starting block of inode cluster */	
 	void		*dip,		/* not used */
 	int		*res)		/* bulkstat result code */
 {

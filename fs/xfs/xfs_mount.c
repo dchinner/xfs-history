@@ -42,7 +42,6 @@
 #include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
-#include <sys/grio.h>
 #include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
@@ -52,7 +51,6 @@
 #include <sys/cmn_err.h>
 #ifndef SIM
 #include <sys/systm.h>
-#include <sys/conf.h>
 #include <sys/var.h>
 #endif /* SIM */
 #include <stddef.h>
@@ -329,8 +327,8 @@ void
 xfs_xlatesb(void *data, xfs_sb_t *sb, int dir, xfs_arch_t arch, 
             __int64_t fields)
 {
-    caddr_t     buf_ptr;
-    caddr_t     mem_ptr;
+    xfs_caddr_t     buf_ptr;
+    xfs_caddr_t     mem_ptr;
            
     ASSERT(dir);
     ASSERT(fields);
@@ -338,8 +336,8 @@ xfs_xlatesb(void *data, xfs_sb_t *sb, int dir, xfs_arch_t arch,
     if (!fields)
         return;
     
-    buf_ptr=(caddr_t)data;
-    mem_ptr=(caddr_t)sb;
+    buf_ptr=(xfs_caddr_t)data;
+    mem_ptr=(xfs_caddr_t)sb;
     
     while (fields) {
 	xfs_sb_field_t	f;
@@ -490,7 +488,7 @@ xfs_mountfs_int(
 	int		readio_log;
 	int		writeio_log;
 	vmap_t		vmap;
-	daddr_t		d;
+	xfs_daddr_t		d;
 	extern dev_t	rootdev;		/* from sys/systm.h */
 	extern xfs_ioops_t xfs_iocore_xfs;	/* from xfs_iocore.c */
 #ifndef SIM
@@ -750,7 +748,7 @@ xfs_mountfs_int(
 	/*
 	 * Check that the data (and log if separate) are an ok size.
 	 */
-	d = (daddr_t)XFS_FSB_TO_BB(mp, mp->m_sb.sb_dblocks);
+	d = (xfs_daddr_t)XFS_FSB_TO_BB(mp, mp->m_sb.sb_dblocks);
 	if (XFS_BB_TO_FSB(mp, d) != mp->m_sb.sb_dblocks) {
   		cmn_err(CE_WARN, "XFS: size check 1 failed\n");
 		error = XFS_ERROR(E2BIG);
@@ -771,7 +769,7 @@ xfs_mountfs_int(
 
 	if (!noio && ((mfsi_flags & XFS_MFSI_CLIENT) == 0) &&
 	    mp->m_logdev && mp->m_logdev != mp->m_dev) {
-		d = (daddr_t)XFS_FSB_TO_BB(mp, mp->m_sb.sb_logblocks);
+		d = (xfs_daddr_t)XFS_FSB_TO_BB(mp, mp->m_sb.sb_logblocks);
 		if (XFS_BB_TO_FSB(mp, d) != mp->m_sb.sb_logblocks) {
   		        cmn_err(CE_WARN, "XFS: size check 3 failed\n");
 			error = XFS_ERROR(E2BIG);
@@ -902,7 +900,7 @@ xfs_mountfs_int(
 		rvp = XFS_ITOV(rip);
 		if ((rip->i_d.di_mode & IFMT) != IFDIR) {
   		        cmn_err(CE_WARN, "XFS: corrupted root inode\n");
-			VMAP(rvp, vmap);
+			VMAP(rvp, rip, vmap);
 			prdev("Root inode %Ld is not a directory",
 			      (int)rip->i_dev, rip->i_ino);
 			xfs_iunlock(rip, XFS_ILOCK_EXCL);
@@ -925,7 +923,7 @@ xfs_mountfs_int(
 		 * Free up the root inode.
 		 */
   		cmn_err(CE_WARN, "XFS: failed ro read RT inodes\n");
-		VMAP(rvp, vmap);
+		VMAP(rvp, rip, vmap);
 		VN_RELE(rvp);
 		vn_purge(rvp, &vmap);
 		goto error2;
@@ -1179,8 +1177,7 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	 * does a two pass iteration thru the bufcache.
 	 */
 	if (XFS_FORCED_SHUTDOWN(mp)) {
-	  /* 		(void)xfs_incore_relse(mp->m_dev, 0, 1); *//* synchronous */
-		(void)xfs_incore_relse(mp->m_ddev_targ, 0, 1); /* synchronous */
+		(void)xfs_incore_relse(&mp->m_ddev_targ, 0, 1); /* synchronous*/
 	}
 	xfs_uuid_unmount(mp);
 
@@ -1641,10 +1638,6 @@ xfs_sb_relse(xfs_buf_t *bp)
 	ASSERT(XFS_BUF_VALUSEMA(bp) <= 0);
 	XFS_BUF_UNASYNC(bp);
 	XFS_BUF_UNREAD(bp);
-#if !defined(_USING_PAGEBUF_T)
-	bp->av_forw = NULL;
-	bp->av_back = NULL;
-#endif
 	XFS_BUF_VSEMA(bp);
 }
 

@@ -432,7 +432,7 @@ int xfs_sb_version_subextflgbit(xfs_sb_t *sbp);
  * end of superblock version macros
  */
 
-#define	XFS_SB_DADDR	((daddr_t)0)		/* daddr in filesystem/ag */
+#define	XFS_SB_DADDR	((xfs_daddr_t)0)		/* daddr in filesystem/ag */
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_SB_BLOCK)
 xfs_agblock_t xfs_sb_block(struct xfs_mount *mp);
 #define	XFS_SB_BLOCK(mp)	xfs_sb_block(mp)
@@ -441,20 +441,20 @@ xfs_agblock_t xfs_sb_block(struct xfs_mount *mp);
 #endif
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_HDR_BLOCK)
-xfs_agblock_t xfs_hdr_block(struct xfs_mount *mp, daddr_t d);
+xfs_agblock_t xfs_hdr_block(struct xfs_mount *mp, xfs_daddr_t d);
 #define	XFS_HDR_BLOCK(mp,d)	xfs_hdr_block(mp,d)
 #else
 #define	XFS_HDR_BLOCK(mp,d)	((xfs_agblock_t)(XFS_BB_TO_FSBT(mp,d)))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DADDR_TO_FSB)
-xfs_fsblock_t xfs_daddr_to_fsb(struct xfs_mount *mp, daddr_t d);
+xfs_fsblock_t xfs_daddr_to_fsb(struct xfs_mount *mp, xfs_daddr_t d);
 #define	XFS_DADDR_TO_FSB(mp,d)		xfs_daddr_to_fsb(mp,d)
 #else
 #define	XFS_DADDR_TO_FSB(mp,d) \
 	XFS_AGB_TO_FSB(mp, XFS_DADDR_TO_AGNO(mp,d), XFS_DADDR_TO_AGBNO(mp,d))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_FSB_TO_DADDR)
-daddr_t xfs_fsb_to_daddr(struct xfs_mount *mp, xfs_fsblock_t fsbno);
+xfs_daddr_t xfs_fsb_to_daddr(struct xfs_mount *mp, xfs_fsblock_t fsbno);
 #define	XFS_FSB_TO_DADDR(mp,fsbno)	xfs_fsb_to_daddr(mp,fsbno)
 #else
 #define	XFS_FSB_TO_DADDR(mp,fsbno) \

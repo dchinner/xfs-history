@@ -29,14 +29,11 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-
+#include <xfs_os_defs.h>
 #define FSID_T
-#include <linux/xfs_to_linux.h>
 #include <linux/sched.h>
 #include <linux/fs.h>
 #include <linux/dcache.h>
-#include <linux/linux_to_xfs.h>
-#include <linux/xfs_linux.h>
 #include <linux/xfs_cred.h>
 #include <sys/vnode.h>
 
@@ -52,6 +49,8 @@ STATIC long long linvfs_file_lseek(
 	int error;
 
 	vp = LINVFS_GET_VP(inode);
+
+	ASSERT(vp);
 
 	switch (origin) {
 		case 2:
@@ -91,6 +90,9 @@ STATIC ssize_t linvfs_read(
 	vnode_t *vp;
 	int rv;
 	
+	XFSSTATS.xs_read_calls++;
+	XFSSTATS64.xs_read_bytes += size;
+
 	if (!filp || !filp->f_dentry ||
 			!(inode = filp->f_dentry->d_inode)) {
 		printk("EXIT linvfs_read -EBADF\n");
@@ -99,6 +101,8 @@ STATIC ssize_t linvfs_read(
 
 	inode = filp->f_dentry->d_inode;
 	vp = LINVFS_GET_VP(inode);
+
+	ASSERT(vp);
 
 	VOP_READ(vp, filp, buf, size, offset, rv);
 	return(rv);
@@ -141,7 +145,12 @@ STATIC ssize_t linvfs_write(
 	if (filp->f_flags & O_APPEND)
 		pos = inode->i_size;
 
+	XFSSTATS.xs_write_calls++;
+	XFSSTATS64.xs_write_bytes += size;
+
 	vp = LINVFS_GET_VP(inode);
+
+	ASSERT(vp);
 
 	VOP_WRITE(vp, (void *)filp, buf, size, &pos, err);
 
@@ -159,6 +168,8 @@ STATIC int linvfs_open(
 	vnode_t *vp = LINVFS_GET_VP(inode);
 	vnode_t *newvp;
 	int	error;
+
+	ASSERT(vp);
 
 	VOP_OPEN(vp, &newvp, 0, get_current_cred(), error);
 
@@ -188,6 +199,8 @@ STATIC int linvfs_fsync(
 	struct inode *inode = filp->f_dentry->d_inode;
 	vnode_t *vp = LINVFS_GET_VP(inode);
 	int	error;
+
+	ASSERT(vp);
 
 	VOP_FSYNC(vp, FSYNC_WAIT, get_current_cred(),
 		(off_t)0, (off_t)-1, error);
@@ -228,6 +241,9 @@ STATIC int linvfs_readdir(
 		return -EBADF;
 
         vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
+
+	ASSERT(vp);
+
 	iov.iov_base = dirent;
 	iov.iov_len = sizeof(dirent); /* Arbitrary. The real size is held in
 					the abstract structure pointed to by dirent */
@@ -260,6 +276,9 @@ int linvfs_generic_file_mmap(struct file *filp, struct vm_area_struct *vma)
 		vap->va_mask = AT_UPDATIME;
 
 		vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
+
+		ASSERT(vp);
+
 		VOP_SETATTR(vp, vap, AT_UPDATIME, NULL, ret);
 	}
 	return(ret);
@@ -275,6 +294,8 @@ STATIC int linvfs_ioctl(
 	int	error;
 	vnode_t	*vp = LINVFS_GET_VP(inode);
 
+
+	ASSERT(vp);
 
 	VOP_IOCTL(vp, inode, filp, cmd, arg, error);
 

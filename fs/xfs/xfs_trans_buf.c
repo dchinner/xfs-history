@@ -51,7 +51,6 @@
 #endif
 #else
 #include <sys/kmem.h>
-#include <sys/conf.h>
 #include <sys/systm.h>
 #include <sys/cmn_err.h>
 #endif
@@ -77,14 +76,14 @@ STATIC xfs_buf_t *
 xfs_trans_buf_item_match(
 	xfs_trans_t	*tp,
 	buftarg_t	*target,
-	daddr_t		blkno,
+	xfs_daddr_t		blkno,
 	int		len);
 
 STATIC xfs_buf_t *
 xfs_trans_buf_item_match_all(
 	xfs_trans_t	*tp,
 	buftarg_t	*target,
-	daddr_t		blkno,
+	xfs_daddr_t		blkno,
 	int		len);
 
 
@@ -108,7 +107,7 @@ xfs_trans_buf_item_match_all(
 xfs_buf_t *
 xfs_trans_get_buf(xfs_trans_t	*tp,
 		  buftarg_t	*target_dev,
-		  daddr_t	blkno,
+		  xfs_daddr_t	blkno,
 		  int		len,
 		  uint		flags)
 {
@@ -310,7 +309,7 @@ xfs_trans_getsb(xfs_trans_t	*tp,
 }
 
 #ifdef DEBUG
-dev_t	xfs_error_dev = 0x2000027;
+dev_t	xfs_error_dev = 0;
 int	xfs_do_error;
 int	xfs_req_num;
 int	xfs_error_mod = 33;
@@ -339,7 +338,7 @@ xfs_trans_read_buf(
 	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	buftarg_t	*target,
-	daddr_t		blkno,
+	xfs_daddr_t		blkno,
 	int		len,
 	uint		flags,
 	xfs_buf_t	**bpp)
@@ -1059,7 +1058,7 @@ STATIC xfs_buf_t *
 xfs_trans_buf_item_match(
 	xfs_trans_t	*tp,
 	buftarg_t	*target,
-	daddr_t		blkno,
+	xfs_daddr_t		blkno,
 	int		len)
 {
 	xfs_log_item_chunk_t	*licp;
@@ -1112,7 +1111,7 @@ STATIC xfs_buf_t *
 xfs_trans_buf_item_match_all(
 	xfs_trans_t	*tp,
 	buftarg_t	*target,
-	daddr_t		blkno,
+	xfs_daddr_t		blkno,
 	int		len)
 {
 	xfs_log_item_chunk_t	*licp;

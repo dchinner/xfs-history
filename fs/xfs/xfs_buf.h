@@ -33,23 +33,9 @@
 #define __XFS_BUF_H__
 
 #ifdef SIM
-#define _USING_BUF_T
-#else
-#include <config/page/buf/meta.h>
-#if CONFIG_PAGE_BUF_META
-#define _USING_PAGEBUF_T 
-#else
-#define _USING_BUF_T 
-#endif
-#endif
-
-#ifdef _USING_BUF_T
 #include <sys/buf.h>
 #include <linux/xfs_sema.h>
 #include <sys/kmem.h>
-#ifndef SIM
-#include <linux/page_buf.h>
-#endif
 
 typedef struct buf xfs_buf_t;
 #define xfs_buf buf
@@ -256,6 +242,8 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define XFS_bflush(buftarg)           \
             bflush(buftarg.dev) 
 
+#define XFS_pbflush(buftarg)
+
 #define xfs_incore_relse(buftarg,delwri_only,wait) \
             incore_relse(buftarg.dev,delwri_only,wait)
 
@@ -284,9 +272,9 @@ extern void pdflush(struct vnode *, uint64_t);
 
 #define xfs_trigger_io()
 
-#endif /* _USING_BUF_T */
+#endif /* SIM */
 
-#ifdef _USING_PAGEBUF_T
+#ifndef SIM
 #include <linux/xfs_sema.h>
 #include <sys/kmem.h>
 #include <linux/page_buf.h>
@@ -437,7 +425,10 @@ extern void xfs_pb_nfreer(page_buf_t *);
 			(buf)->pb_relse = (value)
 
 
-#define XFS_BUF_PTR(bp)		(caddr_t)((bp)->pb_addr)
+/* this may need to be linux caddr_t, with the define is was irix_caddr_
+ * so lets convert it to xfs_caddr_t for now
+ */
+#define XFS_BUF_PTR(bp)		(xfs_caddr_t)((bp)->pb_addr)
 #define XFS_BUF_SET_PTR(bp, val, count)		\
 				pagebuf_associate_memory(bp, val, count)
 #define XFS_BUF_ADDR(bp)	((bp)->pb_bn)
@@ -560,8 +551,11 @@ static inline int	XFS_bwrite(page_buf_t *pb)
 
 
 extern void XFS_bflush(buftarg_t);
+extern void XFS_pbflush(void);
 
-#define xfs_incore_relse(buftarg,delwri_only,wait) _xfs_incore_relse(buftarg,delwri_only,wait)
+#define xfs_incore_relse(buftarg,delwri_only,wait)	\
+       _xfs_incore_relse(buftarg,delwri_only,wait)
+extern int _xfs_incore_relse(buftarg_t *, int, int);
 /*
  * Go through all incore buffers, and release buffers
  * if they belong to the given device. This is used in
@@ -597,6 +591,6 @@ void xfs_pb_nfreer(page_buf_t *bp);
 #define XFS_nfreerbuf(bp) xfs_pb_nfreer(bp)
 
 
-#endif /* _USING_PAGEBUF_T */
+#endif /* !SIM */
 
 #endif

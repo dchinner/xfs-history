@@ -29,32 +29,30 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#include <linux/xfs_linux.h>
-#include <xfs_arch.h>
 
-#ifdef NEED_FS_H
-# include <linux/fs.h>
-#endif
+#ident "$Revision: 1.50 $"
+#ifndef _XFS_GRIO_H_
+#define _XFS_GRIO_H_
 
-#ifndef SIM
-typedef __u64    xfs_off_t;
-typedef __s32    xfs_off32_t;
-typedef	__u64    xfs_ino_t;		/* <inode> type */
-typedef	__s64    xfs_daddr_t;	/* <disk address> type */
-typedef	char *	 xfs_caddr_t;	/* ?<core address> type */
+#include <xfs_buf.h>
+#include <linux/grio.h>
+#include <linux/fs.h>
 
-typedef off_t linux_off_t;
-typedef __kernel_ino_t linux_ino_t;
-#else
-typedef loff_t  xfs_off_t;
-typedef	__u64	xfs_ino_t;		/* <inode> type */
-typedef __s64   xfs_daddr_t;
-typedef	char *	xfs_caddr_t;	/* ?<core address> type */
-typedef ino_t   linux_ino_t;
-typedef off_t   linux_off_t;
-#endif
+void xfs_grio_init(void);
+void xfs_grio_uninit(void);
 
-typedef caddr_t linux_caddr_t;
-typedef daddr_t linux_daddr_t;
+int grio_io_is_guaranteed(struct file *fp, stream_id_t *stream_id); 
+int grio_monitor_start(sysarg_t );
+int grio_monitor_io_start(stream_id_t *stream_id, __int64_t iosize);
+int grio_monitor_io_end(stream_id_t *stream_id, int index );
 
-#define XFS_kmem_realloc(ptr,new,old,flag) kmem_realloc(ptr,new,old,flag)
+int grio_strategy(xfs_buf_t *);
+int grio_config(sysarg_t, sysarg_t, sysarg_t, sysarg_t, sysarg_t );
+void grio_iodone(xfs_buf_t *);
+
+/* Function to convert the device number to an pointer to
+ * structure containing grio_info
+ */
+grio_disk_info_t	*grio_disk_info(dev_t gdev);
+
+#endif /* _XFS_GRIO_H_ */

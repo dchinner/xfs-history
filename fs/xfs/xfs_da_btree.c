@@ -2105,7 +2105,7 @@ xfs_da_do_buf(
 	xfs_trans_t	*trans,
 	xfs_inode_t	*dp,
 	xfs_dablk_t	bno,
-	daddr_t		*mappedbnop,
+	xfs_daddr_t		*mappedbnop,
 	xfs_dabuf_t	**bpp,
 	int		whichfork,
 	int		caller,
@@ -2117,7 +2117,7 @@ xfs_da_do_buf(
 	int		i;
 	xfs_bmbt_irec_t	map;
 	xfs_bmbt_irec_t	*mapp;
-	daddr_t		mappedbno;
+	xfs_daddr_t		mappedbno;
 	xfs_mount_t	*mp;
 	int		nbplist;
 	int		nfsb;
@@ -2315,7 +2315,7 @@ xfs_da_get_buf(
 	xfs_trans_t	*trans,
 	xfs_inode_t	*dp,
 	xfs_dablk_t	bno,
-	daddr_t		mappedbno,
+	xfs_daddr_t		mappedbno,
 	xfs_dabuf_t	**bpp,
 	int		whichfork)
 {
@@ -2331,7 +2331,7 @@ xfs_da_read_buf(
 	xfs_trans_t	*trans,
 	xfs_inode_t	*dp,
 	xfs_dablk_t	bno,
-	daddr_t		mappedbno,
+	xfs_daddr_t		mappedbno,
 	xfs_dabuf_t	**bpp,
 	int		whichfork)
 {
@@ -2349,7 +2349,7 @@ xfs_da_read_bufr(
 	xfs_trans_t	*trans,
 	xfs_inode_t	*dp,
 	xfs_dablk_t	bno,
-	daddr_t		mappedbno,
+	xfs_daddr_t		mappedbno,
 	xfs_dabuf_t	**bpp,
 	int		whichfork)
 {
@@ -2362,14 +2362,14 @@ xfs_da_read_bufr(
 /*
  * Readahead the dir/attr block.
  */
-daddr_t
+xfs_daddr_t
 xfs_da_reada_buf(
 	xfs_trans_t	*trans,
 	xfs_inode_t	*dp,
 	xfs_dablk_t	bno,
 	int		whichfork)
 {
-	daddr_t		rval;
+	xfs_daddr_t		rval;
 
 	rval = -1;
 	if (xfs_da_do_buf(trans, dp, bno, &rval, NULL, whichfork, 3,
@@ -2395,8 +2395,8 @@ xfs_da_log2_roundup(uint i)
 	return(rval);
 }
 
-zone_t *xfs_da_state_zone;	/* anchor for state struct zone */
-zone_t *xfs_dabuf_zone;		/* dabuf zone */
+xfs_zone_t *xfs_da_state_zone;	/* anchor for state struct zone */
+xfs_zone_t *xfs_dabuf_zone;		/* dabuf zone */
 
 /*
  * Allocate a dir-state structure.
@@ -2723,7 +2723,7 @@ xfs_da_binval(xfs_trans_t *tp, xfs_dabuf_t *dabuf)
 /*
  * Get the first daddr from a dabuf.
  */
-daddr_t
+xfs_daddr_t
 xfs_da_blkno(xfs_dabuf_t *dabuf)
 {
 	ASSERT(dabuf->nbuf);

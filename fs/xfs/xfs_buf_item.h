@@ -128,7 +128,7 @@ typedef struct xfs_buf_log_item {
  * items which have been canceled and should not be replayed.
  */
 typedef struct xfs_buf_cancel {
-	daddr_t			bc_blkno;
+	xfs_daddr_t			bc_blkno;
 	uint			bc_len;
 	int			bc_refcount;
 	struct xfs_buf_cancel	*bc_next;

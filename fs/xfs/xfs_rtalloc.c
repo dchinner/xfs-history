@@ -42,13 +42,14 @@
 #include <sys/param.h>
 #include "xfs_buf.h"
 #include <sys/uuid.h>
-#include <sys/grio.h>
+#include <linux/grio.h>
 #include <sys/debug.h>
 #include <sys/vnode.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
 #include <stddef.h>
+#include <sys/cmn_err.h>
 #ifdef SIM
 #include <stdlib.h>
 #include <stdio.h>
@@ -407,7 +408,7 @@ xfs_growfs_rt_alloc(
 	xfs_buf_t		*bp;		/* temporary buffer for zeroing */
 	int		cancelflags;	/* flags for xfs_trans_cancel */
 	int		committed;	/* transaction committed flag */
-	daddr_t		d;		/* disk block address */
+	xfs_daddr_t		d;		/* disk block address */
 	int		error;		/* error return value */
 	xfs_fsblock_t	firstblock;	/* first block allocated in xaction */
 	xfs_bmap_free_t	flist;		/* list of freed blocks */
@@ -1172,7 +1173,7 @@ xfs_rtbuf_get(
 	xfs_buf_t		**bpp)		/* output: buffer for the block */
 {
 	xfs_buf_t		*bp;		/* block buffer, result */
-	daddr_t		d;		/* disk addr of block */
+	xfs_daddr_t		d;		/* disk addr of block */
 	int		error;		/* error value */
 	xfs_fsblock_t	fsb;		/* fs block number for block */
 	xfs_inode_t	*ip;		/* bitmap or summary inode */
@@ -1199,7 +1200,7 @@ xfs_rtbuf_get(
 	if (error) {
 		return error;
 	}
-	ASSERT(bp && !geterror(bp));
+	ASSERT(bp && !XFS_BUF_GETERROR(bp));
 	*bpp = bp;
 	return 0;
 }
@@ -2450,6 +2451,9 @@ xfs_rtallocate_extent(
 	xfs_fsblock_t	sb;		/* summary file block number */
 	xfs_buf_t		*sumbp;		/* summary file block buffer */
 
+        printk("xfs_rtallocate_extent block=%Ld, min=%d, max=%d, type=%d, del=%d, prod=%d\n",
+                bno, minlen, maxlen, type, wasdel, prod);
+        
 	ASSERT(minlen > 0 && minlen <= maxlen);
 	mp = tp->t_mountp;
 	/*
@@ -2491,6 +2495,8 @@ xfs_rtallocate_extent(
 		error = xfs_rtallocate_extent_exact(mp, tp, bno, minlen, maxlen,
 				len, &sumbp, &sb, prod, &r);
 		break;
+        default:
+                ASSERT(0);
 	}
 	if (error) {
 		return error;
@@ -2584,15 +2590,17 @@ xfs_rtmount_init(
 	xfs_mount_t	*mp)	/* file system mount structure */
 {
 	xfs_buf_t		*bp;	/* buffer for last block of subvolume */
-	daddr_t		d;	/* address of last block of subvolume */
+	xfs_daddr_t		d;	/* address of last block of subvolume */
 	int		error;	/* error return value */
 	xfs_sb_t	*sbp;	/* filesystem superblock copy in mount */
 
 	sbp = &mp->m_sb;
 	if (sbp->sb_rblocks == 0)
 		return 0;
-	if (mp->m_rtdev == NODEV)
+	if (mp->m_rtdev == NODEV) {
+  		cmn_err(CE_WARN, "XFS: This FS has an RT subvol - specify -o rtdev on mount\n");
 		return XFS_ERROR(E2BIG);
+        }
 	mp->m_rsumlevels = sbp->sb_rextslog + 1;
 	mp->m_rsumsize =
 		(uint)sizeof(xfs_suminfo_t) * mp->m_rsumlevels *
@@ -2602,14 +2610,20 @@ xfs_rtmount_init(
 	/*
 	 * Check that the realtime section is an ok size.
 	 */
-	d = (daddr_t)XFS_FSB_TO_BB(mp, mp->m_sb.sb_rblocks);
-	if (XFS_BB_TO_FSB(mp, d) != mp->m_sb.sb_rblocks)
+	d = (xfs_daddr_t)XFS_FSB_TO_BB(mp, mp->m_sb.sb_rblocks);
+	if (XFS_BB_TO_FSB(mp, d) != mp->m_sb.sb_rblocks) {
+  		cmn_err(CE_WARN, "XFS: RT mount - %d != %d\n",
+                        XFS_BB_TO_FSB(mp, d), mp->m_sb.sb_rblocks);
 		return XFS_ERROR(E2BIG);
+        }
 	error = xfs_read_buf(mp, &mp->m_rtdev_targ, d - 1, 1, 0, &bp);
-	if (error == ENOSPC)
-		return XFS_ERROR(E2BIG);
-	else if (error)
+        if (error) {
+  		cmn_err(CE_WARN, "XFS: RT mount - xfs_read_buf returned %d\n",
+                        error);
+    	        if (error == ENOSPC)
+		    return XFS_ERROR(E2BIG);
 		return error;
+        }
 	xfs_buf_relse(bp);
 	return 0;
 }
@@ -2628,18 +2642,18 @@ xfs_rtmount_inodes(
 	sbp = &mp->m_sb;
 	if (sbp->sb_rbmino == NULLFSINO)
 		return 0;
-	error = xfs_iget(mp, NULL, sbp->sb_rbmino, NULL, &mp->m_rbmip, 0);
+	error = xfs_iget(mp, NULL, sbp->sb_rbmino, 0, &mp->m_rbmip, 0);
 	if (error)
 		return error;
 	ASSERT(mp->m_rbmip != NULL);
 	ASSERT(sbp->sb_rsumino != NULLFSINO);
-	error = xfs_iget(mp, NULL, sbp->sb_rsumino, NULL, &mp->m_rsumip, 0);
+	error = xfs_iget(mp, NULL, sbp->sb_rsumino, 0, &mp->m_rsumip, 0);
 	if (error) {
 		vnode_t		*rbmvp;		/* vnode for bitmap file */
 		vmap_t		vmap;		/* vmap to delete vnode */
 
 		rbmvp = XFS_ITOV(mp->m_rbmip);
-		VMAP(rbmvp, vmap);
+		VMAP(rbmvp, mp->m_rbmip, vmap);
 		VN_RELE(rbmvp);
 		vn_purge(rbmvp, &vmap);
 		return error;
@@ -2712,10 +2726,10 @@ xfs_rtprint_range(
 {
 	xfs_extlen_t	i;		/* block number in the extent */
 
-	printf("%Ld: ", start);
+	printk("%Ld: ", start);
 	for (i = 0; i < len; i++)
-		printf("%d", xfs_rtcheck_bit(mp, tp, start + i, 1));
-	printf("\n");
+		printk("%d", xfs_rtcheck_bit(mp, tp, start + i, 1));
+	printk("\n");
 }
 
 /*
@@ -2739,17 +2753,17 @@ xfs_rtprint_summary(
 			(void)xfs_rtget_summary(mp, tp, l, i, &sumbp, &sb, &c);
 			if (c) {
 				if (!p) {
-					printf("%Ld-%Ld:", 1LL << l,
+					printk("%Ld-%Ld:", 1LL << l,
 						XFS_RTMIN((1LL << l) +
 							  ((1LL << l) - 1LL),
 							 mp->m_sb.sb_rextents));
 					p = 1;
 				}
-				printf(" %Ld:%d", i, c);
+				printk(" %Ld:%d", i, c);
 			}
 		}
 		if (p)
-			printf("\n");
+			printk("\n");
 	}
 	if (sumbp)
 		xfs_trans_brelse(tp, sumbp);

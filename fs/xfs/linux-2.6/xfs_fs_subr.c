@@ -31,14 +31,13 @@
  */
 #ident	"$Revision$"
 
-#include <linux/xfs_linux.h>
+#include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
 
 #include <sys/types.h>
 #undef sysinfo
 #include <linux/kernel.h> /* for printk... remove later if needed */
 #include <linux/page_buf.h>
-#include <ksys/as.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
 #include <ksys/vfile.h>
@@ -154,7 +153,7 @@ fs_vnode_change(
 void
 fs_tosspages(
         bhv_desc_t	*bdp,
-	off_t		first,
+	xfs_off_t		first,
 	int		fiopt)
 {
 	if (BHV_TO_VNODE(bdp)->v_inode)
@@ -169,7 +168,7 @@ fs_tosspages(
 void
 fs_flushinval_pages(
         bhv_desc_t	*bdp,
-	off_t		first,
+	xfs_off_t		first,
 	int		fiopt)
 {
 	if (BHV_TO_VNODE(bdp)->v_inode)
@@ -185,7 +184,7 @@ fs_flushinval_pages(
 int
 fs_flush_pages(
         bhv_desc_t	*bdp,
-	off_t		first,
+	xfs_off_t		first,
 	uint64_t	flags,
 	int		fiopt)
 {
@@ -205,7 +204,7 @@ fs_pages_sethole(
 	void		*pfd,
 	int		cnt,
 	int		doremap,
-	off_t		remap_offset)
+	xfs_off_t		remap_offset)
 {
 	printk("XFS: fs_pages_sethole() NOT IMPLEMENTED\n");
 }

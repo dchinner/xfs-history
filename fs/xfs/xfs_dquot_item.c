@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.17 $"
+#ident "$Revision: 1.18 $"
 
 #include <sys/param.h>
 #include "xfs_buf.h"
@@ -140,10 +140,10 @@ xfs_qm_dquot_logitem_format(
 	ASSERT(logitem);
 	ASSERT(logitem->qli_dquot);
 
-	logvec->i_addr = (caddr_t)&logitem->qli_format;
+	logvec->i_addr = (xfs_caddr_t)&logitem->qli_format;
 	logvec->i_len  = sizeof(xfs_dq_logformat_t);
 	logvec++;
-	logvec->i_addr = (caddr_t)&logitem->qli_dquot->q_core;
+	logvec->i_addr = (xfs_caddr_t)&logitem->qli_dquot->q_core;
 	logvec->i_len  = sizeof(xfs_disk_dquot_t);
 
 	ASSERT(2 == logitem->qli_item.li_desc->lid_size);
@@ -551,7 +551,7 @@ xfs_qm_qoff_logitem_format(xfs_qoff_logitem_t	*qf,
 {
 	ASSERT(qf->qql_format.qf_type == XFS_LI_QUOTAOFF);
 
-	log_vector->i_addr = (caddr_t)&(qf->qql_format);
+	log_vector->i_addr = (xfs_caddr_t)&(qf->qql_format);
 	log_vector->i_len = sizeof(xfs_qoff_logitem_t);
 	qf->qql_format.qf_size = 1;
 }

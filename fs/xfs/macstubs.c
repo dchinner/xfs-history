@@ -29,14 +29,14 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-
+#include <xfs_os_defs.h>
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <linux/kernel.h>
 /*
  * Mandatory Access Control stubs.
  */
-#ident "$Revision: 1.4 $"
+#ident "$Revision: 1.5 $"
 
 #ifdef DEBUG
 #define DOPANIC(s) panic(s)

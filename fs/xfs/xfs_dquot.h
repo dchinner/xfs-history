@@ -32,7 +32,7 @@
 #ifndef _XFS_DQUOT__H_
 #define _XFS_DQUOT__H_
 
-#ident "$Revision: 1.14 $"
+#ident "$Revision: 1.15 $"
 
 /* 
  * Dquots are structures that hold quota information about a user or a project,
@@ -87,7 +87,7 @@ typedef struct xfs_dquot {
 	struct xfs_mount*q_mount;	/* filesystem this relates to */
 	struct xfs_trans*q_transp;	/* trans this belongs to currently */
 	uint		 q_nrefs;       /* # active refs from inodes */
-	daddr_t		 q_blkno;	/* blkno of dquot buffer */
+	xfs_daddr_t		 q_blkno;	/* blkno of dquot buffer */
 	dev_t		 q_dev;		/* dev for this dquot */
 	int		 q_bufoffset;	/* off of dq in buffer (# dquots) */
 	xfs_fileoff_t    q_fileoffset;	/* offset in quotas file */

@@ -29,51 +29,53 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.82 2000/06/09 02:50:02 kenmcd Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.83 2000/06/09 06:40:03 ananth Exp $"
+
+#include <xfs_os_defs.h>
 
 #include <sys/types.h>
 #include <sys/param.h>
-#ifndef SIM
-#include <sys/systm.h>
-#endif
 #include <sys/debug.h>
 #include "xfs_buf.h"
 #include <linux/xfs_sema.h>
+#if 0 /* XXX PORT */
 #include <sys/lock.h>
+#endif
 #ifdef SIM
 #define _KERNEL 1
 #endif
-#include <sys/vnode.h>
-#include <ksys/vfile.h>
-#include <ksys/fdt.h>
 #include <sys/uuid.h>
-#include <sys/grio.h>
+#include <xfs_grio.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
-#include <sys/vfs.h>
 #include <sys/kmem.h>
-#include <sys/fs/xfs_macros.h>
-#include <sys/fs/xfs_types.h>
-#include <sys/fs/xfs_log.h>
-#include <sys/fs/xfs_inum.h>
-#include <sys/fs/xfs_trans.h>
-#include <sys/fs/xfs_sb.h>
-#include <sys/fs/xfs_dir.h>
-#include <sys/fs/xfs_dir2.h>
-#include <sys/fs/xfs_mount.h>
-#include <sys/fs/xfs_alloc_btree.h>
-#include <sys/fs/xfs_bmap_btree.h>
-#include <sys/fs/xfs_ialloc_btree.h>
-#include <sys/fs/xfs_btree.h>
-#include <sys/fs/xfs_attr_sf.h>
-#include <sys/fs/xfs_dir_sf.h>
-#include <sys/fs/xfs_dir2_sf.h>
-#include <sys/fs/xfs_dinode.h>
-#include <sys/fs/xfs_inode.h>
-#include <sys/fs/xfs_itable.h>
-#include <sys/fs/xfs_error.h>
-#include <sys/pda.h>
+#include <sys/vnode.h>
+#include <xfs_grio.h>
+#include <xfs_macros.h>
+#include <xfs_types.h>
+#include <xfs_log.h>
+#include <xfs_inum.h>
+#include <xfs_trans.h>
+#include <xfs_sb.h>
+#include <xfs_dir.h>
+#include <xfs_dir2.h>
+#include <xfs_mount.h>
+#include <xfs_alloc_btree.h>
+#include <xfs_bmap_btree.h>
+#include <xfs_ialloc_btree.h>
+#include <xfs_btree.h>
+#include <xfs_attr_sf.h>
+#include <xfs_dir_sf.h>
+#include <xfs_dir2_sf.h>
+#include <xfs_dinode.h>
+#include <xfs_inode.h>
+#include <xfs_itable.h>
+#include <xfs_error.h>
+#include <asm/uaccess.h>
+#include <linux/miscdevice.h>
+#include <linux/module.h>
+#include <linux/file.h>
 
 #ifdef SIM
 #include "sim.h"
@@ -83,7 +85,7 @@
 #define IRELE(ip)		VN_RELE(XFS_ITOV(ip))
 
 extern xfs_inode_t 			*xfs_get_inode ( dev_t, xfs_ino_t);
-
+extern void grioinit(void);
 
 /*
  * xfs_get_file_extents()
@@ -109,10 +111,10 @@ xfs_get_file_extents(
 	xfs_bmbt_irec_t 	thisrec;
 	grio_bmbt_irec_t	*grec;
 	grio_file_id_t		fileid;
-	caddr_t			extents, count;
+	xfs_caddr_t			extents, count;
 
-	if ( copyin((caddr_t)sysarg_file_id, &fileid, sizeof(grio_file_id_t))) {
-		error = XFS_ERROR(EFAULT);
+	if (copy_from_user(&fileid, SYSARG_TO_PTR(sysarg_file_id), sizeof(grio_file_id_t))) {
+		error = -XFS_ERROR(EFAULT);
 		return( error );
 	}
 
@@ -122,19 +124,18 @@ xfs_get_file_extents(
 	/*
 	 * Get sysarg arguements
 	 */
-	extents		= (caddr_t)sysarg_extents_addr;
-	count		= (caddr_t)sysarg_count;
+	extents		= (xfs_caddr_t)SYSARG_TO_PTR(sysarg_extents_addr);
+	count		= (xfs_caddr_t)SYSARG_TO_PTR(sysarg_count);
 
 	/*
  	 * Get the inode
 	 */
 	if (!(ip = xfs_get_inode( fs_dev, ino ))) {
-		error = XFS_ERROR(ENOENT);
-		if (copyout( 	&num_extents, 
-				(caddr_t)count, 
+		error = -XFS_ERROR(ENOENT);
+		if (copy_to_user((xfs_caddr_t)count, &num_extents, 
 				sizeof( num_extents))) {
 
-			error = XFS_ERROR(EFAULT);
+			error = -XFS_ERROR(EFAULT);
 		}
 		return( error );
 	}
@@ -178,17 +179,17 @@ xfs_get_file_extents(
 			grec[i].br_blockcount 	= thisrec.br_blockcount;
 		}
 
-		if (copyout(grec, (caddr_t)extents, recsize )) {
-			error = XFS_ERROR(EFAULT);
+		if (copy_to_user((xfs_caddr_t)extents, grec, recsize )) {
+			error = -XFS_ERROR(EFAULT);
 		}
 		kmem_free(grec, recsize);
 	}
 
 	/* 
-	 * copyout to user space along with count.
+	 * copy out to user space along with count.
  	 */
-	if (copyout( &num_extents, (caddr_t)count, sizeof( num_extents))) {
-		error = XFS_ERROR(EFAULT);
+	if (copy_to_user((xfs_caddr_t)count,  &num_extents, sizeof( num_extents))) {
+		error = -XFS_ERROR(EFAULT);
 	}
 
  out:
@@ -208,6 +209,7 @@ xfs_get_file_extents(
  *	0 on success
  *	non zero on failure
  */
+int
 xfs_get_file_rt( 
 	sysarg_t sysarg_file_id,
 	sysarg_t sysarg_rt)
@@ -216,16 +218,16 @@ xfs_get_file_rt(
 	dev_t		fs_dev;
 	xfs_ino_t	ino;
 	xfs_inode_t 	*ip;
-	caddr_t		rt;
+	xfs_caddr_t		rt;
 	grio_file_id_t	fileid;
 
 
-	if ( copyin((caddr_t)sysarg_file_id, &fileid, sizeof(grio_file_id_t))) {
-		error = XFS_ERROR(EFAULT);
+	if ( copy_from_user(&fileid, SYSARG_TO_PTR(sysarg_file_id), sizeof(grio_file_id_t))) {
+		error = -XFS_ERROR(EFAULT);
 		return( error );
 	}
 
-	rt		= (caddr_t)sysarg_rt;
+	rt		= (xfs_caddr_t)SYSARG_TO_PTR(sysarg_rt);
 	fs_dev 		= fileid.fs_dev;
 	ino		= fileid.ino;
 
@@ -233,8 +235,7 @@ xfs_get_file_rt(
  	 * Get the inode.
 	 */
 	if (!(ip = xfs_get_inode( fs_dev, ino ))) {
-		error = XFS_ERROR( ENOENT );
-		return( error );
+		return -XFS_ERROR( ENOENT );
 	}
 
 	/*
@@ -247,8 +248,8 @@ xfs_get_file_rt(
 	/*
  	 * Copy the results to user space.
  	 */
-	if ( copyout( &inodert, (caddr_t)rt, sizeof(int)) ) {
-		error = XFS_ERROR(EFAULT);
+	if (copy_to_user((xfs_caddr_t)rt, &inodert, sizeof(int)) ) {
+		error = -XFS_ERROR(EFAULT);
 	}
 
 	xfs_iunlock( ip, XFS_ILOCK_SHARED );
@@ -267,28 +268,28 @@ xfs_get_file_rt(
  *	0 on success
  *	non zero on failure
  */
+int
 xfs_get_block_size(
 	sysarg_t sysarg_fs_dev, 
 	sysarg_t sysarg_fs_size)
 {
 	int 		error = 0;
 	dev_t		fs_dev;
-	caddr_t		fs_size;
+	xfs_caddr_t		fs_size;
 	struct vfs	*vfsp;
 	extern int	xfs_fstype;
 
 	fs_dev 		= (dev_t)sysarg_fs_dev;
-	fs_size		= (caddr_t)sysarg_fs_size;
+	fs_size		= (xfs_caddr_t)SYSARG_TO_PTR(sysarg_fs_size);
 
 	if ( vfsp = vfs_devsearch( fs_dev, xfs_fstype ) ) {
-		if ( copyout(	&(vfsp->vfs_bsize), 
-				(caddr_t)fs_size, 
+		if (copy_to_user((xfs_caddr_t)fs_size, &(vfsp->vfs_bsize), 
 				sizeof(u_int)) ) {
 
-			error = XFS_ERROR(EFAULT);
+			error = -XFS_ERROR(EFAULT);
 		}
 	} else {
-		error = XFS_ERROR( EIO );
+		error = -XFS_ERROR( EIO );
 	}
 	return( error );
 }
@@ -308,32 +309,22 @@ xfs_get_block_size(
 xfs_ino_t 
 xfs_grio_get_inumber( int fdes )
 {
-	vfile_t	*fp;
-	vnode_t	*vp;
-	xfs_inode_t	*ip;
-	bhv_desc_t	*bdp;
-	vn_bhv_head_t	*bhp;
-	xfs_ino_t	ino;
+	xfs_ino_t   ino=-1;
+        struct file *filp;
+        
+        filp = fget(fdes);
+        if (filp) {
+                struct dentry *dentry = filp->f_dentry;
+                struct inode *inode = dentry->d_inode;
+            
+                ino=inode->i_ino;
+                fput(filp);    
+        }
+        printk("xfs_grio_get_inumber fd %d -> ino %Ld\n",
+                fdes, ino);
+        
+        return ino;
 
-	if ( getf( fdes, &fp ) != 0 ) {
-		return( (xfs_ino_t)0 );
-	}
-
-	if (!VF_IS_VNODE(fp)) {
-		return( (xfs_ino_t)0 );
-	}
-	vp = VF_TO_VNODE(fp);
-	bhp = VN_BHV_HEAD(vp);
-	VN_BHV_READ_LOCK(bhp);
-	bdp = vn_bhv_lookup(bhp, &xfs_vnodeops);
-	if (bdp == NULL) {
-		ino = (xfs_ino_t)0;
-	} else {
-		ip = XFS_BHVTOI(bdp);
-		ino = ip->i_ino;
-	}
-	VN_BHV_READ_UNLOCK(bhp);
-	return( ino );
 }
 
 
@@ -350,30 +341,115 @@ xfs_grio_get_inumber( int fdes )
 dev_t 
 xfs_grio_get_fs_dev( int fdes )
 {
-	vfile_t	*fp;
-	vnode_t	*vp;
-	xfs_inode_t	*ip;
-	bhv_desc_t	*bdp;
-	vn_bhv_head_t	*bhp;
-	dev_t		dev;
+	dev_t		dev=0;
+        struct file     *filp;
 
-	if ( getf( fdes, &fp ) != 0 ) {
-		return( 0 );
-	}
-
-	if (!VF_IS_VNODE(fp)) {
-		return( 0 );
-	}
-	vp = VF_TO_VNODE(fp);
-	bhp = VN_BHV_HEAD(vp);
-	VN_BHV_READ_LOCK(bhp);
-	bdp = vn_bhv_lookup(bhp, &xfs_vnodeops);
-	if (bdp == NULL) {
-		dev = 0;
-	} else {
-		ip = XFS_BHVTOI(bdp);
-		dev = ip->i_dev;
-	}
-	VN_BHV_READ_UNLOCK(bhp);
+        filp = fget(fdes);
+        if (filp) {
+                struct dentry *dentry = filp->f_dentry;
+                struct inode *inode = dentry->d_inode;
+            
+                dev=inode->i_dev;
+                
+                fput(filp);    
+        }
+        printk("xfs_grio_get_fs_dev fd %d -> dev 0x%x (%d)\n",
+                fdes, dev, dev);
+                
 	return( dev );
 }
+
+/* stubbed out - real version is in grio module */
+int grio_strategy(xfs_buf_t *bp) 
+{
+	return pagebuf_iorequest(bp);
+}
+
+/* make XFS GRIO syscall available thru /dev/grio ioctl */
+
+int xfs_grio_ioctl (
+	struct inode	*inode,
+	struct file	*filp,
+	unsigned int	cmd,
+	unsigned long	arg)
+{
+        
+        if (cmd!=XFS_GRIO_CMD) {
+            printk("xfs_grio_ioctl command %d (expect %d)\n", 
+                    cmd, XFS_GRIO_CMD);
+            return -EINVAL;
+        }
+        
+        /* XXX PORT do we need to check for FORCED_SHUTDOWN here? */
+
+	switch (cmd) {
+
+	case XFS_GRIO_CMD: {
+		xfs_grio_ioctl_t   grioio;
+
+		if (copy_from_user(&grioio, (xfs_grio_ioctl_t *)arg,
+						sizeof(xfs_grio_ioctl_t)))
+			return -XFS_ERROR(EFAULT);
+                
+                return grio_config(grioio.cmd,
+                                        grioio.arg1, grioio.arg2,
+                                        grioio.arg3, grioio.arg4);
+	}
+
+	default:
+		return -EINVAL;
+	}
+}
+
+static atomic_t xfs_grio_isopen = ATOMIC_INIT(0);
+
+static int xfs_grio_open(struct inode *inode, struct file *file)
+{
+        MOD_INC_USE_COUNT;
+        return 0;
+}
+
+static int xfs_grio_release(struct inode *inode, struct file *file)
+{
+        MOD_DEC_USE_COUNT;
+        return 0;
+}
+
+static struct file_operations xfs_grio_fops = {
+        ioctl:          xfs_grio_ioctl,
+        open:           xfs_grio_open,
+        release:        xfs_grio_release,
+};
+
+static struct miscdevice xfs_grio_dev=
+{
+        XFS_GRIO_MINOR,
+        "xfs_grio",
+        &xfs_grio_fops
+};
+
+void xfs_grio_init(void)
+{
+        printk("xfs_grio_init\n");
+        printk("sizeof(grio_cmd_t)=%d\n", sizeof(grio_cmd_t));
+    printk("%d %d %d %d %d\n", 
+            offsetof(grio_cmd_t,gr_fp),
+            offsetof(grio_cmd_t,other_end),
+            offsetof(grio_cmd_t,memloc),
+            offsetof(grio_cmd_t,cmd_info),
+            offsetof(grio_cmd_t,gr_usecs_bw));
+    printk("%d %d %d %d\n", 
+            offsetof(struct end_info,gr_end_type),
+            offsetof(struct end_info,gr_dev),
+            offsetof(struct end_info,gr_ino),
+            sizeof(struct end_info));
+        grioinit();
+        misc_register(&xfs_grio_dev);
+}
+
+void xfs_grio_uninit(void)
+{
+        printk("xfs_grio_uninit\n");
+        misc_deregister(&xfs_grio_dev);
+}
+

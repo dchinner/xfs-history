@@ -55,7 +55,6 @@
 #include <stdlib.h>
 #else
 #include <sys/systm.h>
-#include <sys/conf.h>
 #endif
 
 #include <sys/kmem.h>
@@ -107,11 +106,11 @@ extern int xfs_is_read_only(xlog_t *);
 #include "sim.h"		/* must be last include file */
 #endif
 
-int		xlog_find_zeroed(struct log *log, daddr_t *blk_no);
+int		xlog_find_zeroed(struct log *log, xfs_daddr_t *blk_no);
 int		xlog_find_cycle_start(struct log *log,
 				      xfs_buf_t	*bp,	
-				      daddr_t	first_blk,
-				      daddr_t	*last_blk,
+				      xfs_daddr_t	first_blk,
+				      xfs_daddr_t	*last_blk,
 				      uint	cycle);
 
 #ifndef SIM
@@ -168,7 +167,7 @@ xlog_put_bp(xfs_buf_t *bp)
  */
 int
 xlog_bread(xlog_t	*log,
-	   daddr_t	blk_no,
+	   xfs_daddr_t	blk_no,
 	   int		nbblks,
 	   xfs_buf_t	*bp)
 {
@@ -203,7 +202,7 @@ xlog_bread(xlog_t	*log,
 int
 xlog_bwrite(
 	xlog_t	*log,
-	daddr_t	blk_no,
+	xfs_daddr_t	blk_no,
 	int	nbblks,
 	xfs_buf_t	*bp)
 {
@@ -257,11 +256,11 @@ xlog_recover_iodone(
 int
 xlog_find_cycle_start(xlog_t	*log,
 		      xfs_buf_t	*bp,
-		      daddr_t	first_blk,
-		      daddr_t	*last_blk,
+		      xfs_daddr_t	first_blk,
+		      xfs_daddr_t	*last_blk,
 		      uint	cycle)
 {
-	daddr_t mid_blk;
+	xfs_daddr_t mid_blk;
 	uint	mid_cycle;
 	int	error;
 
@@ -296,9 +295,9 @@ xlog_find_cycle_start(xlog_t	*log,
  * Return -1 if we encounter no errors.  This is an invalid block number
  * since we don't ever expect logs to get this large.
  */
-STATIC daddr_t
-xlog_find_verify_cycle(caddr_t	*bap,		/* update ptr as we go */
-		       daddr_t	start_blk,
+STATIC xfs_daddr_t
+xlog_find_verify_cycle(xfs_caddr_t	*bap,		/* update ptr as we go */
+		       xfs_daddr_t	start_blk,
 		       int	nbblks,
 		       uint	stop_on_cycle_no)
 {
@@ -330,13 +329,13 @@ xlog_find_verify_cycle(caddr_t	*bap,		/* update ptr as we go */
  * call to this routine.
  */
 STATIC int
-xlog_find_verify_log_record(caddr_t	ba,	     /* update ptr as we go */
-			    daddr_t	start_blk,
-			    daddr_t	*last_blk,
+xlog_find_verify_log_record(xfs_caddr_t	ba,	     /* update ptr as we go */
+			    xfs_daddr_t	start_blk,
+			    xfs_daddr_t	*last_blk,
 			    int		extra_bblks)
 {
     xlog_rec_header_t *rhead;
-    daddr_t           i;
+    xfs_daddr_t           i;
 
     ASSERT(start_blk != 0 || *last_blk != start_blk);
 
@@ -393,14 +392,14 @@ xlog_find_verify_log_record(caddr_t	ba,	     /* update ptr as we go */
  */
 int
 xlog_find_head(xlog_t  *log,
-	       daddr_t *return_head_blk)
+	       xfs_daddr_t *return_head_blk)
 {
     xfs_buf_t   *bp, *big_bp;
-    daddr_t new_blk, first_blk, start_blk, last_blk, head_blk;
+    xfs_daddr_t new_blk, first_blk, start_blk, last_blk, head_blk;
     int     num_scan_bblks;
     uint    first_half_cycle, last_half_cycle;
     uint    stop_on_cycle;
-    caddr_t ba;
+    xfs_caddr_t ba;
     int     error, log_bbnum = log->l_logBBsize;
 
     /* special case freshly mkfs'ed filesystem; return immediately */
@@ -536,7 +535,7 @@ xlog_find_head(xlog_t  *log,
 	 * accomplish that.
 	 */
 	start_blk = log_bbnum - num_scan_bblks + head_blk;
-	ASSERT(head_blk <= INT_MAX && (daddr_t) num_scan_bblks-head_blk >= 0);
+	ASSERT(head_blk <= INT_MAX && (xfs_daddr_t) num_scan_bblks-head_blk >= 0);
 	if (error = xlog_bread(log, start_blk,
 			num_scan_bblks-(int)head_blk, big_bp))
 	    goto big_bp_err;
@@ -598,7 +597,7 @@ bad_blk:
 	    /* We hit the beginning of the log during our search */
 	    start_blk = log_bbnum - num_scan_bblks + head_blk;
 	    new_blk = log_bbnum;
-	    ASSERT(start_blk <= INT_MAX && (daddr_t) log_bbnum-start_blk >= 0);
+	    ASSERT(start_blk <= INT_MAX && (xfs_daddr_t) log_bbnum-start_blk >= 0);
 	    if (error = xlog_bread(log, start_blk, log_bbnum - (int)start_blk,
 				   big_bp))
 		goto big_bp_err;
@@ -651,7 +650,7 @@ bp_err:
  * It was added to support external logs on Linux, but could be used to support
  * non-volume-managed external logs on other OSes.
  */
-static int
+STATIC int
 xlog_test_footer(xlog_t *log)
 {
 	int error = 0;
@@ -734,16 +733,16 @@ xlog_test_footer(xlog_t *log)
 #endif
 int
 xlog_find_tail(xlog_t  *log,
-	       daddr_t *head_blk,
-	       daddr_t *tail_blk,
+	       xfs_daddr_t *head_blk,
+	       xfs_daddr_t *tail_blk,
 	       int readonly)
 {
 	xlog_rec_header_t	*rhead;
 	xlog_op_header_t	*op_head;
 	xfs_buf_t			*bp;
 	int			error, i, found;
-	daddr_t			umount_data_blk;
-	daddr_t			after_umount_blk;
+	xfs_daddr_t			umount_data_blk;
+	xfs_daddr_t			after_umount_blk;
 #ifdef SIM
 	/* REFERENCED */
 #endif
@@ -911,13 +910,13 @@ exit:
  */
 int
 xlog_find_zeroed(struct log	*log,
-		 daddr_t 	*blk_no)
+		 xfs_daddr_t 	*blk_no)
 {
 	xfs_buf_t	*bp, *big_bp;
 	uint	first_cycle, last_cycle;
-	daddr_t	new_blk, last_blk, start_blk;
-	daddr_t num_scan_bblks;
-	caddr_t	ba;
+	xfs_daddr_t	new_blk, last_blk, start_blk;
+	xfs_daddr_t num_scan_bblks;
+	xfs_caddr_t	ba;
 	int	error, log_bbnum = log->l_logBBsize;
 
 	error = 0;
@@ -1227,18 +1226,18 @@ xlog_recover_add_item(xlog_recover_item_t **itemq)
 
 STATIC int
 xlog_recover_add_to_cont_trans(xlog_recover_t	*trans,
-			       caddr_t		dp,
+			       xfs_caddr_t		dp,
 			       int		len)
 {
 	xlog_recover_item_t	*item;
-	caddr_t			ptr, old_ptr;
+	xfs_caddr_t			ptr, old_ptr;
 	int			old_len;
 	
 	item = trans->r_itemq;
 	if (item == 0) {
 		/* finish copying rest of trans header */
 		xlog_recover_add_item(&trans->r_itemq);
-		ptr = (caddr_t)&trans->r_theader+sizeof(xfs_trans_header_t)-len;
+		ptr = (xfs_caddr_t)&trans->r_theader+sizeof(xfs_trans_header_t)-len;
 		bcopy(dp, ptr, len); /* s, d, l */
 		return 0;
 	}
@@ -1272,12 +1271,12 @@ xlog_recover_add_to_cont_trans(xlog_recover_t	*trans,
  */
 STATIC int
 xlog_recover_add_to_trans(xlog_recover_t	*trans,
-			  caddr_t		dp,
+			  xfs_caddr_t		dp,
 			  int			len)
 {
 	xfs_inode_log_format_t	 *in_f;			/* any will do */
 	xlog_recover_item_t	 *item;
-	caddr_t			 ptr;
+	xfs_caddr_t			 ptr;
 
 	if (!len)
 		return 0;
@@ -1447,7 +1446,7 @@ xlog_recover_do_buffer_pass1(xlog_t			*log,
 	xfs_buf_cancel_t	*prevp;
 	xfs_buf_cancel_t	**bucket;
 	xfs_buf_log_format_v1_t	*obuf_f;
-	daddr_t			blkno;
+	xfs_daddr_t			blkno;
 	uint			len;
 	ushort			flags;
 
@@ -1460,7 +1459,7 @@ xlog_recover_do_buffer_pass1(xlog_t			*log,
 	case XFS_LI_6_1_BUF:
 	case XFS_LI_5_3_BUF:
 		obuf_f = (xfs_buf_log_format_v1_t*)buf_f;
-		blkno = (daddr_t) obuf_f->blf_blkno;
+		blkno = (xfs_daddr_t) obuf_f->blf_blkno;
 		len = obuf_f->blf_len;
 		flags = obuf_f->blf_flags;
 		break;
@@ -1543,7 +1542,7 @@ xlog_recover_do_buffer_pass2(xlog_t			*log,
 	xfs_buf_cancel_t	*prevp;
 	xfs_buf_cancel_t	**bucket;
 	xfs_buf_log_format_v1_t	*obuf_f;
-	daddr_t			blkno;
+	xfs_daddr_t			blkno;
 	ushort			flags;
 	uint			len;
 
@@ -1557,9 +1556,9 @@ xlog_recover_do_buffer_pass2(xlog_t			*log,
 	case XFS_LI_6_1_BUF:
 	case XFS_LI_5_3_BUF:
 		obuf_f = (xfs_buf_log_format_v1_t*)buf_f;
-		blkno = (daddr_t) obuf_f->blf_blkno;
+		blkno = (xfs_daddr_t) obuf_f->blf_blkno;
 		flags = obuf_f->blf_flags;
-		len = (daddr_t) obuf_f->blf_len;
+		len = (xfs_daddr_t) obuf_f->blf_len;
 		break;
 	}
 	if (log->l_buf_cancel_table == NULL) {
@@ -1893,7 +1892,7 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	xfs_buf_t		     	*bp;
 	int		     	error;
 	int		     	cancel;
-	daddr_t			blkno;
+	xfs_daddr_t			blkno;
 	int			len;
 	ushort			flags;
 
@@ -2004,8 +2003,8 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	xfs_dinode_t		*dip;
 	xfs_ino_t		ino;
 	int			len;
-	caddr_t			src;
-	caddr_t			dest;
+	xfs_caddr_t			src;
+	xfs_caddr_t			dest;
 	int			error;
 	int			attr_index;
 	uint			fields;
@@ -2019,7 +2018,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	ino = in_f->ilf_ino;
 	mp = log->l_mp;
 	if (ITEM_TYPE(item) == XFS_LI_INODE) {
-		imap.im_blkno = (daddr_t)in_f->ilf_blkno;
+		imap.im_blkno = (xfs_daddr_t)in_f->ilf_blkno;
 		imap.im_len = in_f->ilf_len;
 		imap.im_boffset = in_f->ilf_boffset;
 	} else {
@@ -2112,15 +2111,17 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
-	ASSERT((caddr_t)dip+item->ri_buf[1].i_len <=
+	ASSERT((xfs_caddr_t)dip+item->ri_buf[1].i_len <=
 			XFS_BUF_PTR(bp)+XFS_BUF_COUNT(bp));
         
         /* The core is in in-core format */
-        xfs_xlate_dinode_core(dip, item->ri_buf[1].i_addr, -1, ARCH_CONVERT);
+        xfs_xlate_dinode_core((xfs_caddr_t)&dip->di_core, 
+                              (xfs_dinode_core_t*)item->ri_buf[1].i_addr, 
+                              -1, ARCH_CONVERT);
         /* the rest is in on-disk format */
 	if (item->ri_buf[1].i_len > sizeof(xfs_dinode_core_t)) {
 		bcopy(item->ri_buf[1].i_addr + sizeof(xfs_dinode_core_t), 
-		      (caddr_t) dip          + sizeof(xfs_dinode_core_t), 
+		      (xfs_caddr_t) dip          + sizeof(xfs_dinode_core_t), 
 		      item->ri_buf[1].i_len  - sizeof(xfs_dinode_core_t));
 	}
 
@@ -2137,7 +2138,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	switch (fields & (XFS_ILOG_DFORK | XFS_ILOG_DEV | XFS_ILOG_UUID)) {
 	case XFS_ILOG_DDATA:
 	case XFS_ILOG_DEXT:
-		ASSERT((caddr_t)&dip->di_u+len <=
+		ASSERT((xfs_caddr_t)&dip->di_u+len <=
 			XFS_BUF_PTR(bp)+XFS_BUF_COUNT(bp));
 		bcopy(src, &dip->di_u, len);
 		break;
@@ -2351,7 +2352,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 		xfs_buf_relse(bp);
 		return XFS_ERROR(EIO);
 	}
-	ASSERT((caddr_t)ddq + item->ri_buf[1].i_len <=
+	ASSERT((xfs_caddr_t)ddq + item->ri_buf[1].i_len <=
 	       XFS_BUF_PTR(bp) + XFS_BUF_COUNT(bp));
 
 	bcopy(recddq, ddq, item->ri_buf[1].i_len);
@@ -2518,10 +2519,10 @@ xlog_recover_do_trans(xlog_t	     *log,
 		/*
 		 * we don't need to worry about the block number being
 		 * truncated in > 1 TB buffers because in user-land,
-		 * we're now n32 or 64-bit so daddr_t is 64-bits so
+		 * we're now n32 or 64-bit so xfs_daddr_t is 64-bits so
 		 * the blkno's will get through the user-mode buffer
 		 * cache properly.  The only bad case is o32 kernels
-		 * where daddr_t is 32-bits but mount will warn us
+		 * where xfs_daddr_t is 32-bits but mount will warn us
 		 * off a > 1 TB filesystem before we get here.
 		 */
 		if ((ITEM_TYPE(item) == XFS_LI_BUF) ||
@@ -2633,10 +2634,10 @@ STATIC int
 xlog_recover_process_data(xlog_t	    *log,
 			  xlog_recover_t    *rhash[],
 			  xlog_rec_header_t *rhead,
-			  caddr_t	    dp,
+			  xfs_caddr_t	    dp,
 			  int		    pass)
 {
-    caddr_t		lp	   = dp+INT_GET(rhead->h_len, ARCH_CONVERT);
+    xfs_caddr_t		lp	   = dp+INT_GET(rhead->h_len, ARCH_CONVERT);
     int			num_logops = INT_GET(rhead->h_num_logops, ARCH_CONVERT);
     xlog_op_header_t	*ohead;
     xlog_recover_t	*trans;
@@ -2869,7 +2870,7 @@ xlog_recover_clear_agi_bucket(
 {
 	xfs_trans_t	*tp;
 	xfs_agi_t	*agi;
-	daddr_t		agidaddr;
+	xfs_daddr_t		agidaddr;
 	xfs_buf_t	*agibp;
 	int		offset;
 	int		error;
@@ -2920,7 +2921,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 	xfs_mount_t	*mp;
 	xfs_agnumber_t	agno;
 	xfs_agi_t	*agi;
-	daddr_t		agidaddr;
+	xfs_daddr_t		agidaddr;
 	xfs_buf_t	*agibp;
 	xfs_inode_t	*ip;
 	xfs_agino_t	agino;
@@ -3033,7 +3034,7 @@ void
 xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog)
 {
 	int	i;
-	caddr_t dp;
+	xfs_caddr_t dp;
 #ifdef DEBUG
 	uint	*up;
 	uint	chksum = 0;
@@ -3059,7 +3060,7 @@ xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog)
 /*ARGSUSED*/
 STATIC void
 xlog_unpack_data(xlog_rec_header_t *rhead,
-		 caddr_t	   dp,
+		 xfs_caddr_t	   dp,
 		 xlog_t		   *log)
 {
 	int i;
@@ -3103,13 +3104,13 @@ xlog_unpack_data(xlog_rec_header_t *rhead,
  */
 STATIC int
 xlog_do_recovery_pass(xlog_t	*log,
-		      daddr_t	head_blk,
-		      daddr_t	tail_blk,
+		      xfs_daddr_t	head_blk,
+		      xfs_daddr_t	tail_blk,
 		      int	pass)
 {
     xlog_rec_header_t	*rhead;
-    daddr_t		blk_no;
-    caddr_t		bufaddr;
+    xfs_daddr_t		blk_no;
+    xfs_caddr_t		bufaddr;
     xfs_buf_t		*hbp, *dbp;
     int			error;
     int		  	bblks, split_bblks;
@@ -3244,8 +3245,8 @@ bread_err:
  */
 STATIC int
 xlog_do_log_recovery(xlog_t	*log,
-		     daddr_t	head_blk,
-		     daddr_t	tail_blk)
+		     xfs_daddr_t	head_blk,
+		     xfs_daddr_t	tail_blk)
 {
 	int		error;
 #ifdef DEBUG
@@ -3291,8 +3292,8 @@ xlog_do_log_recovery(xlog_t	*log,
  */
 STATIC int
 xlog_do_recover(xlog_t	*log,
-		daddr_t head_blk,
-		daddr_t tail_blk)
+		xfs_daddr_t head_blk,
+		xfs_daddr_t tail_blk)
 {
 #ifdef _KERNEL
 	xfs_buf_t	*bp;
@@ -3369,7 +3370,7 @@ xlog_do_recover(xlog_t	*log,
 int
 xlog_recover(xlog_t *log, int readonly)
 {
-	daddr_t head_blk, tail_blk;
+	xfs_daddr_t head_blk, tail_blk;
 	int	error;
 	xfs_mount_t *mp;
 
@@ -3377,7 +3378,7 @@ xlog_recover(xlog_t *log, int readonly)
 		return error;
 	if (tail_blk != head_blk) {
 #ifdef SIM
-		extern daddr_t HEAD_BLK, TAIL_BLK;
+		extern xfs_daddr_t HEAD_BLK, TAIL_BLK;
 		head_blk = HEAD_BLK;
 		tail_blk = TAIL_BLK;
 #endif
@@ -3407,12 +3408,12 @@ xlog_recover(xlog_t *log, int readonly)
 		cmn_err(CE_NOTE,
 			"Starting XFS recovery on filesystem: %s (dev: %d/%d)",
 			log->l_mp->m_fsname, MAJOR(log->l_dev),
-			MAJOR(log->l_dev));
+			MINOR(log->l_dev));
 #else
 		cmn_err(CE_NOTE,
 			"!Starting XFS recovery on filesystem: %s (dev: %d/%d)",
 			log->l_mp->m_fsname, MAJOR(log->l_dev),
-			MAJOR(log->l_dev));
+			MINOR(log->l_dev));
 #endif
 #endif
 		error = xlog_do_recover(log, head_blk, tail_blk);
@@ -3498,8 +3499,8 @@ xlog_recover_check_summary(xlog_t	*log)
 	xfs_agi_t	*agip;
 	xfs_buf_t	*agfbp;
 	xfs_buf_t	*agibp;
-	daddr_t		agfdaddr;
-	daddr_t		agidaddr;
+	xfs_daddr_t		agfdaddr;
+	xfs_daddr_t		agidaddr;
 	xfs_buf_t	*sbbp;
 #ifdef XFS_LOUD_RECOVERY
 	xfs_sb_t	*sbp;

@@ -96,7 +96,7 @@ typedef	struct xfs_dio {
 	struct pm	*xd_pmp;
 	int		xd_blkalgn;
 	int		xd_ioflag;
-	off_t		xd_start;
+	xfs_off_t		xd_start;
 	size_t		xd_length;
 } xfs_dio_t;
 
@@ -112,12 +112,12 @@ typedef struct xfs_iocore {
 	mutex_t			io_rlock;	/* inode readahead mutex */
 
 	/* I/O state */
-	off_t			io_offset;	/* last buf offset */
-	off_t			io_next_offset;	/* seq read detector */
+	xfs_off_t			io_offset;	/* last buf offset */
+	xfs_off_t			io_next_offset;	/* seq read detector */
 	unsigned int		io_last_req_sz;	/* last read size */
 	unsigned int		io_size;	/* file io buffer len */
 	xfs_fsize_t		io_new_size;	/* sz when write completes */
-	off_t			io_write_offset;
+	xfs_off_t			io_write_offset;
 						/* start off of curr write */
 	xfs_fileoff_t		io_reada_blkno;	/* next blk to start ra */
 	xfs_gap_t		*io_gap_list;	/* hole list in write range */
@@ -207,7 +207,7 @@ typedef struct xfs_ihash {
 typedef struct xfs_chashlist {
 	struct xfs_chashlist	*chl_next;
 	struct xfs_inode	*chl_ip;
-	daddr_t			chl_blkno;	/* starting block number of 
+    xfs_daddr_t			chl_blkno;	/* starting block number of 
 						 * the cluster */
 #ifdef DEBUG
 	struct xfs_buf		*chl_buf;	/* debug: the inode buffer */
@@ -320,7 +320,7 @@ typedef struct xfs_inode {
 
 	/* Inode location stuff */
 	xfs_ino_t		i_ino;		/* inode number (agno/agino)*/
-	daddr_t			i_blkno;	/* blkno of inode buffer */
+	xfs_daddr_t			i_blkno;	/* blkno of inode buffer */
 	dev_t			i_dev;		/* dev for this inode */
 	ushort			i_len;		/* len of inode buffer */
 	ushort			i_boffset;	/* off of inode in buffer */
@@ -436,6 +436,7 @@ void xfs_ifork_next_set(xfs_inode_t *ip, int w, int n);
 #define XFS_IGRIO	0x0001  /* inode will be used for guaranteed rate i/o */
 #define XFS_IUIOSZ	0x0002  /* inode i/o sizes have been explicitly set */
 #define XFS_IQUIESCE    0x0004  /* we have started quiescing for this inode */
+#define XFS_IRECLAIM    0x0008  /* we have started reclaiming this inode    */
 
 /*
  * Per-fork incore inode flags.
@@ -540,6 +541,7 @@ struct vnode *xfs_itov(xfs_inode_t *ip);
 #else
 #define	XFS_ITOV(ip)		BHV_TO_VNODE(XFS_ITOBHV(ip))
 #endif
+#define	XFS_ITOV_NULL(ip)	BHV_TO_VNODE_NULL(XFS_ITOBHV(ip))
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_ITOBHV)
 struct bhv_desc *xfs_itobhv(xfs_inode_t *ip);
 #define	XFS_ITOBHV(ip)		xfs_itobhv(ip)
@@ -575,7 +577,7 @@ xfs_inode_t	*xfs_inode_incore(struct xfs_mount *, xfs_ino_t,
 				  struct xfs_trans *);
 void            xfs_inode_lock_init(xfs_inode_t *, struct vnode *);
 int		xfs_iget(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
-			 uint, xfs_inode_t **, daddr_t);
+			 uint, xfs_inode_t **, xfs_daddr_t);
 void		xfs_iput(xfs_inode_t *, uint);
 void		xfs_ilock(xfs_inode_t *, uint);
 int		xfs_ilock_nowait(xfs_inode_t *, uint);
@@ -587,6 +589,7 @@ uint		xfs_ilock_map_shared(xfs_inode_t *);
 void		xfs_iunlock_map_shared(xfs_inode_t *, uint);
 void		xfs_ifunlock(xfs_inode_t *);
 void		xfs_ireclaim(xfs_inode_t *);
+int		xfs_finish_reclaim(xfs_inode_t *);
 
 /*
  * xfs_inode.c prototypes.
@@ -595,14 +598,14 @@ int		xfs_inotobp(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
 			    xfs_dinode_t **, struct xfs_buf **);
 int		xfs_itobp(struct xfs_mount *, struct xfs_trans *,
 			  xfs_inode_t *, xfs_dinode_t **, struct xfs_buf **,
-			  daddr_t);
+			  xfs_daddr_t);
 int		xfs_iread(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
-			  xfs_inode_t **, daddr_t);
+			  xfs_inode_t **, xfs_daddr_t);
 int		xfs_iread_extents(struct xfs_trans *, xfs_inode_t *, int);
 int		xfs_ialloc(struct xfs_trans *, xfs_inode_t *, mode_t, nlink_t,
 		           dev_t, struct cred *, xfs_prid_t, int,
 			   struct xfs_buf **, boolean_t *, xfs_inode_t **);
-void		xfs_xlate_dinode_core(caddr_t, struct xfs_dinode_core *, int,
+void		xfs_xlate_dinode_core(xfs_caddr_t, struct xfs_dinode_core *, int,
 			   xfs_arch_t);
 #ifndef SIM
 int		xfs_ifree(struct xfs_trans *, xfs_inode_t *);
@@ -649,9 +652,9 @@ void		xfs_inobp_check(struct xfs_mount *, struct xfs_buf *);
 #define	xfs_inobp_check(mp, bp)
 #endif /* DEBUG && !XFS_REPAIR_SIM */
 
-extern struct zone	*xfs_ifork_zone;
-extern struct zone	*xfs_inode_zone;
-extern struct zone	*xfs_ili_zone;
+extern struct xfs_zone	*xfs_ifork_zone;
+extern struct xfs_zone	*xfs_inode_zone;
+extern struct xfs_zone	*xfs_ili_zone;
 extern struct vnodeops	xfs_vnodeops;
 
 #ifdef XFS_ILOCK_TRACE

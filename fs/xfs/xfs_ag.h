@@ -109,8 +109,8 @@ typedef struct xfs_agf
 #define	XFS_AGF_NUM_BITS	11
 #define	XFS_AGF_ALL_BITS	((1 << XFS_AGF_NUM_BITS) - 1)
 
-/* disk block (daddr_t) in the AG */
-#define	XFS_AGF_DADDR		((daddr_t)1)
+/* disk block (xfs_daddr_t) in the AG */
+#define	XFS_AGF_DADDR		((xfs_daddr_t)1)
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_AGF_BLOCK)
 xfs_agblock_t xfs_agf_block(struct xfs_mount *mp);
 #define	XFS_AGF_BLOCK(mp)	xfs_agf_block(mp)
@@ -164,8 +164,8 @@ typedef struct xfs_agi
 #define	XFS_AGI_NUM_BITS	11
 #define	XFS_AGI_ALL_BITS	((1 << XFS_AGI_NUM_BITS) - 1)
 
-/* disk block (daddr_t) in the AG */
-#define	XFS_AGI_DADDR		((daddr_t)2)
+/* disk block (xfs_daddr_t) in the AG */
+#define	XFS_AGI_DADDR		((xfs_daddr_t)2)
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_AGI_BLOCK)
 xfs_agblock_t xfs_agi_block(struct xfs_mount *mp);
 #define	XFS_AGI_BLOCK(mp)	xfs_agi_block(mp)
@@ -177,7 +177,7 @@ xfs_agblock_t xfs_agi_block(struct xfs_mount *mp);
  * The third a.g. block contains the a.g. freelist, an array 
  * of block pointers to blocks owned by the allocation btree code.
  */
-#define	XFS_AGFL_DADDR		((daddr_t)3)
+#define	XFS_AGFL_DADDR		((xfs_daddr_t)3)
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_AGFL_BLOCK)
 xfs_agblock_t xfs_agfl_block(struct xfs_mount *mp);
 #define	XFS_AGFL_BLOCK(mp)	xfs_agfl_block(mp)
@@ -287,23 +287,23 @@ xfs_agblock_t xfs_fsb_to_agbno(struct xfs_mount *mp, xfs_fsblock_t fsbno);
 #endif
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_AGB_TO_DADDR)
-daddr_t xfs_agb_to_daddr(struct xfs_mount *mp, xfs_agnumber_t agno,
+xfs_daddr_t xfs_agb_to_daddr(struct xfs_mount *mp, xfs_agnumber_t agno,
 			 xfs_agblock_t agbno);
 #define	XFS_AGB_TO_DADDR(mp,agno,agbno)	xfs_agb_to_daddr(mp,agno,agbno)
 #else
 #define	XFS_AGB_TO_DADDR(mp,agno,agbno) \
-	((daddr_t)(XFS_FSB_TO_BB(mp, \
+	((xfs_daddr_t)(XFS_FSB_TO_BB(mp, \
 		(xfs_fsblock_t)(agno) * (mp)->m_sb.sb_agblocks + (agbno))))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DADDR_TO_AGNO)
-xfs_agnumber_t xfs_daddr_to_agno(struct xfs_mount *mp, daddr_t d);
+xfs_agnumber_t xfs_daddr_to_agno(struct xfs_mount *mp, xfs_daddr_t d);
 #define	XFS_DADDR_TO_AGNO(mp,d)		xfs_daddr_to_agno(mp,d)
 #else
 #define	XFS_DADDR_TO_AGNO(mp,d) \
 	((xfs_agnumber_t)(XFS_BB_TO_FSBT(mp, d) / (mp)->m_sb.sb_agblocks))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DADDR_TO_AGBNO)
-xfs_agblock_t xfs_daddr_to_agbno(struct xfs_mount *mp, daddr_t d);
+xfs_agblock_t xfs_daddr_to_agbno(struct xfs_mount *mp, xfs_daddr_t d);
 #define	XFS_DADDR_TO_AGBNO(mp,d)	xfs_daddr_to_agbno(mp,d)
 #else
 #define	XFS_DADDR_TO_AGBNO(mp,d) \
@@ -311,7 +311,7 @@ xfs_agblock_t xfs_daddr_to_agbno(struct xfs_mount *mp, daddr_t d);
 #endif
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_AG_DADDR)
-daddr_t xfs_ag_daddr(struct xfs_mount *mp, xfs_agnumber_t agno, daddr_t d);
+xfs_daddr_t xfs_ag_daddr(struct xfs_mount *mp, xfs_agnumber_t agno, xfs_daddr_t d);
 #define	XFS_AG_DADDR(mp,agno,d)		xfs_ag_daddr(mp,agno,d)
 #else
 #define	XFS_AG_DADDR(mp,agno,d)	(XFS_AGB_TO_DADDR(mp, agno, 0) + (d))
@@ -337,11 +337,11 @@ xfs_agfl_t *xfs_buf_to_agfl(struct xfs_buf *bp);
 #endif
 
 /*
- * For checking for bad ranges of daddr_t's, covering multiple
- * allocation groups or a single daddr_t that's a superblock copy.
+ * For checking for bad ranges of xfs_daddr_t's, covering multiple
+ * allocation groups or a single xfs_daddr_t that's a superblock copy.
  */
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_AG_CHECK_DADDR)
-void xfs_ag_check_daddr(struct xfs_mount *mp, daddr_t d, xfs_extlen_t len);
+void xfs_ag_check_daddr(struct xfs_mount *mp, xfs_daddr_t d, xfs_extlen_t len);
 #define	XFS_AG_CHECK_DADDR(mp,d,len)	xfs_ag_check_daddr(mp,d,len)
 #else
 #define	XFS_AG_CHECK_DADDR(mp,d,len)	\
