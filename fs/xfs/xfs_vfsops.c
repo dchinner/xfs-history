@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.136 $"
+#ident  "$Revision: 1.137 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -395,12 +395,14 @@ xfs_cmountfs(
 	struct cred	*cr)
 {
 	xfs_mount_t	*mp;
-	struct vnode 	*ddevvp, *rdevvp, *ldevvp;
+	vnode_t 	*ddevvp, *rdevvp, *ldevvp;
 	int		error = 0;
 	int		vfs_flags;
 	size_t		n;
 	char		*tmp_fsname_buffer;
-	struct vnode 	*makespecvp(dev_t, vtype_t);
+	/*REFERENCED*/
+	int		noerr;
+	vnode_t 	*makespecvp(dev_t, vtype_t);
 
 	/*
 	 * Remounting a XFS file system is bad. The log manager
@@ -536,21 +538,24 @@ xfs_cmountfs(
 
 	return error;
 
+	/*
+	 * Be careful not to clobber the value of 'error' here.
+	 */
  error3:
 	if (ldevvp) {
-		VOP_CLOSE(ldevvp, vfs_flags, L_TRUE, 0, cr, NULL, error);
+		VOP_CLOSE(ldevvp, vfs_flags, L_TRUE, 0, cr, NULL, noerr);
 		binval(logdev);
 		VN_RELE(ldevvp);
 	}
  error2:
 	if (rdevvp) {
-		VOP_CLOSE(rdevvp, vfs_flags, L_TRUE, 0, cr, NULL, error);
+		VOP_CLOSE(rdevvp, vfs_flags, L_TRUE, 0, cr, NULL, noerr);
 		binval(rtdev);
 		VN_RELE(rdevvp);
 	}
  error1:
 	if (ddevvp) {
-		VOP_CLOSE(ddevvp, vfs_flags, L_TRUE, 0, cr, NULL, error);
+		VOP_CLOSE(ddevvp, vfs_flags, L_TRUE, 0, cr, NULL, noerr);
 		binval(ddev);
 		VN_RELE(ddevvp);
 	}
