@@ -283,8 +283,13 @@ linvfs_read_super(
 	if (error)
 		goto fail_unmount;
 
+#ifdef notdef
 	sb->s_blocksize = statvfs.f_bsize;
 	sb->s_blocksize_bits = ffs(sb->s_blocksize) - 1;
+#else
+	sb->s_blocksize = 512;
+	sb->s_blocksize_bits = 9;
+#endif
 	sb->s_magic = XFS_SB_MAGIC;
 	sb->s_dirt = 1;  /*  Make sure we get regular syncs  */
 	LINVFS_SET_VFS(sb, vfsp);

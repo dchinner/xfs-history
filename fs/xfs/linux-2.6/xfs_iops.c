@@ -371,6 +371,12 @@ struct dentry * linvfs_follow_link(struct dentry *dentry,
 	return base;
 }
 
+int linvfs_readpage(struct file *filp, struct page *page)
+{
+	int rval;
+	rval = generic_readpage(filp, page);
+	return(rval);
+}
 
 int linvfs_bmap(struct inode *inode, int block)
 {
@@ -381,6 +387,12 @@ int linvfs_bmap(struct inode *inode, int block)
 	struct	bmapval	bmap;
 	int		nbmaps = 1;
 	int		error;
+	int		blockno;
+
+	if (block < 0) {
+		printk("linvfs_bmap: called with block of -1\n");
+		return 0;
+	}
 
 	vp = LINVFS_GET_VP(inode);
 
@@ -390,9 +402,14 @@ int linvfs_bmap(struct inode *inode, int block)
 
 	if (error)
 		return 0;
-	printk("Mapped offset %d to block 0x%x\n", offset,
-		(int) (bmap.bn & 0xffffffff));
-	return((int)bmap.bn);
+	/*
+	 * JIMJIM This interface needs to be fixed to support 64 bit
+	 * block numbers.
+	 */
+
+	blockno = (int)bmap.bn;
+	if (blockno < 0) return 0;
+	else return(blockno);
 }
 
 
@@ -441,7 +458,7 @@ struct inode_operations linvfs_file_inode_operations =
   NULL,	 /*  rename  */
   NULL,	 /*  readlink  */
   NULL,	 /*  follow_link  */
-  generic_readpage,
+  linvfs_readpage,
   NULL,	 /*  writepage  */
   linvfs_bmap,
   NULL,	 /*  truncate  */

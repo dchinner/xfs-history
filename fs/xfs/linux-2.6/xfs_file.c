@@ -65,7 +65,9 @@ static ssize_t linvfs_read(
 	size_t size,
 	loff_t *offset)
 {
-  return(-ENOSYS);
+	int rval;
+	rval = generic_file_read(filp, buf, size, offset);
+	return(rval);
 }
 
 
