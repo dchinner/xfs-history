@@ -1513,17 +1513,47 @@ xfs_da_path_shift(xfs_da_state_t *state, xfs_da_state_path_t *path,
 /*
  * Implement a simple hash on a character string.
  * Rotate the hash value by 7 bits, then XOR each character in.
+ * This is implemented with some source-level loop unrolling.
  */
 xfs_dahash_t
-xfs_da_hashname(register char *name, register int namelen)
+xfs_da_hashname(char *name, int namelen)
 {
-	register xfs_dahash_t hash;
+	xfs_dahash_t hash;
 
-	hash = 0;
-	for (  ; namelen > 0; namelen--) {
-		hash = *name++ ^ ((hash << 7) | (hash >> (32-7)));
+#define	ROTL(x,y)	(((x) << (y)) | ((x) >> (32 - (y))))
+#ifdef SLOWVERSION
+	/*
+	 * This is the old one-byte-at-a-time version.
+	 */
+	for (hash = 0; namelen > 0; namelen--) {
+		hash = *name++ ^ ROTL(hash, 7);
 	}
 	return(hash);
+#else
+	/*
+	 * Do four characters at a time as long as we can.
+	 */
+	for (hash = 0; namelen >= 4; namelen -= 4, name += 4) {
+		hash = (name[0] << 21) ^ (name[1] << 14) ^ (name[2] << 7) ^
+		       (name[3] << 0) ^ ROTL(hash, 7 * 4);
+	}
+	/*
+	 * Now do the rest of the characters.
+	 */
+	switch (namelen) {
+	case 3:
+		return (name[0] << 14) ^ (name[1] << 7) ^ (name[2] << 0) ^
+		       ROTL(hash, 7 * 3);
+	case 2:
+		return (name[0] << 7) ^ (name[1] << 0) ^ ROTL(hash, 7 * 2);
+	case 1:
+		return (name[0] << 0) ^ ROTL(hash, 7 * 1);
+	case 0:
+		return hash;
+	}
+	/* NOTREACHED */
+#endif
+#undef ROTL
 }
 
 int
