@@ -74,20 +74,6 @@
 #include <sys/pvfs.h>
 #include <xfs_iops.h>
 #include <xfs_sb.h>
-#include <xfs_bmap_btree.h>
-#include <xfs_dir.h>
-#include <xfs_dir_sf.h>
-#include <xfs_dir2.h>
-#include <xfs_dir2_sf.h>
-#include <xfs_attr.h>
-#include <xfs_attr_sf.h>
-#include <xfs_dinode.h>
-#include <xfs_inode.h>
-#include <xfs_log.h>
-#include <xfs_trans.h>
-#include <xfs_mount.h>
-#include <xfs_log_priv.h>
-#include <xfs_lrw.h>
 
 #undef sysinfo
 
@@ -237,7 +223,7 @@ linvfs_read_super(
 
 	/*  Setup up the cvp structure  */
 
-	cip = (struct inode *)kern_malloc(sizeof(struct inode));
+	cip = (struct inode *)kmem_alloc(sizeof(struct inode),0);
 	bzero(cip, sizeof(*cip));
 
 	atomic_set(&cip->i_count, 1);
@@ -559,6 +545,7 @@ linvfs_remount(
 	vfs_t *vfsp;
 	vnode_t *cvp;
 	extern int mountargs_xfs(char *options, struct xfs_args *args);
+	extern void XFS_log_write_unmount_ro(bhv_desc_t	*);
 
 	vfsp = LINVFS_GET_VFS(sb);
 	cvp = LINVFS_GET_CVP(sb);
@@ -576,22 +563,16 @@ linvfs_remount(
 		printk("XFS: Flushing for read-only remount\n");
 		
 		PVFS_SYNC(vfsp->vfs_fbhv,
-				  SYNC_ATTR|SYNC_DELWRI|SYNC_NOWAIT,
+				  SYNC_ATTR|SYNC_WAIT|SYNC_CLOSE,
 				  sys_cred, error);
-		if (error) {
-		  sb->s_flags=save;
-		  printk("XFS: Failed to sync for read-only remount\n");
-		}
-
-		XFS_log_write_unmount_ro(vfsp->vfs_fbhv);
-
-
 		if (error) {
 		  sb->s_flags=save;
 		  printk("XFS: Failed to sync for read-only remount\n");
 		  return 1;
 		}
 		
+		XFS_log_write_unmount_ro(vfsp->vfs_fbhv);
+	
 		printk("XFS: Marking FS read-only\n");
 		
 		vfsp->vfs_flag |= VFS_RDONLY;
