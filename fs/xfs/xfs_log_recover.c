@@ -1,3 +1,5 @@
+#ident	"$Revision: 1.2 $"
+
 #include <sys/types.h>
 #include <sys/param.h>
 
@@ -36,6 +38,7 @@
 #include "xfs_inode_item.h"
 #include "xfs_error.h"
 #include "xfs_log_priv.h"	/* depends on all above */
+#include "xfs_buf_item.h"
 #include "xfs_log_recover.h"
 
 
@@ -525,19 +528,12 @@ xlog_recover_add_to_cont_trans(xlog_recover_t	*trans,
 	item = trans->r_transq;
 	item = item->ri_prev;
 
-	if (item->ri_buf2_len != 0) {
-		old_ptr = item->ri_buf2;
-		old_len = item->ri_buf2_len;
-	} else if (item->ri_buf1_len != 0) {
-		old_ptr = item->ri_buf1;
-		old_len = item->ri_buf1_len;
-	} else {
-		old_ptr = item->ri_desc;
-		old_len = item->ri_desc_len;
-	}
+	old_ptr = item->ri_buf[item->ri_cnt-1].i_addr;
+	old_len = item->ri_buf[item->ri_cnt-1].i_len;
 
 	ptr = kmem_realloc(old_ptr, len, 0);
 	bcopy(&ptr[old_len], dp, len);
+	item->ri_buf[item->ri_cnt-1].i_len += old_len;
 }	/* xlog_recover_add_to_cont_trans */
 
 
@@ -575,23 +571,12 @@ xlog_recover_add_to_trans(xlog_recover_t	*trans,
 
 	if (item->ri_total == 0) {		/* first region to be added */
 		item->ri_total	= in_f->ilf_size;
-		item->ri_cnt	= 1;			/* first region */
-		item->ri_desc	= ptr;
-		item->ri_desc_len = len;
-	} else {
-		ASSERT(item->ri_total > item->ri_cnt);
-		/* XXXmiken: this may need to be generalized;
-		 * we aren't guaranteed only <= 3 regions per item
-		 */
-		if (item->ri_cnt == 1) {
-			item->ri_buf1	  = ptr;
-			item->ri_buf1_len = len;
-		} else {
-			item->ri_buf2	  = ptr;
-			item->ri_buf2_len = len;
-		}
-		item->ri_cnt++;
 	}
+	ASSERT(item->ri_total > item->ri_cnt);
+	/* Description region is ri_buf[0] */
+	item->ri_buf[item->ri_cnt].i_addr = ptr;
+	item->ri_buf[item->ri_cnt].i_len  = len;
+	item->ri_cnt++;
 }	/* xlog_recover_add_to_trans */
 
 
@@ -637,14 +622,57 @@ xlog_recover_delete_tid(xlog_recover_t	**q,
 
 
 static void
+xlog_recover_print_trans(xlog_recover_t *tr)
+{
+    cmn_err(CE_CONT,
+	    "TRANS: tid: 0x%x type: %d #: %d trans: 0x%x q: 0x%x\n",
+	    tr->r_tid, tr->r_type, tr->r_items, tr->r_trans_tid,
+	    tr->r_transq);
+}	/* xlog_recover_print_trans */
+
+static void
+xlog_recover_print_item(xlog_recover_item_t *item)
+{
+	int i;
+
+	cmn_err(CE_CONT,
+		"ITEM: type: %d cnt: %d ttl: %d ",
+		item->ri_type, item->ri_cnt, item->ri_total);
+	for (i=0; i<item->ri_cnt; i++) {
+		cmn_err(CE_CONT, "a: 0x%x len: %d ",
+			item->ri_buf[i].i_addr, item->ri_buf[i].i_len);
+	}
+	cmn_err(CE_CONT, "\n");
+}	/* xlog_recover_print_item */
+
+static void
 xlog_recover_do_trans(xlog_recover_t *trans)
 {
+	xlog_recover_item_t *first_item, *item;
+
+	if (xlog_debug < 2)
+		return;
+	xlog_recover_print_trans(trans);
+	item = first_item = trans->r_transq;
+	do {
+		xlog_recover_print_item(item);
+		item = item->ri_next;
+	} while (first_item != item);
 }	/* xlog_recover_do_trans */
 
 
 static void
 xlog_recover_free_trans(xlog_recover_t *trans)
 {
+	xlog_recover_item_t *first_item, *item, *free_item;
+
+	item = first_item = trans->r_transq;
+	do {
+		free_item = item;
+		item = item->ri_next;
+		kmem_free(free_item, sizeof(xlog_recover_item_t));
+	} while (first_item != item);
+	kmem_free(trans, sizeof(xlog_recover_t));
 }	/* xlog_recover_free_trans */
 
 
@@ -700,7 +728,7 @@ xlog_recover_process_data(xlog_recover_t    *rhash[],
 		xlog_recover_new_tid(&rhash[hash], tid);
 	} else {
 	    ASSERT(dp+ohead->oh_len <= lp);
-	    switch (ohead->oh_flags) {
+	    switch (ohead->oh_flags & ~XLOG_END_TRANS) {
 		case XLOG_COMMIT_TRANS: {
 		    xlog_recover_commit_trans(&rhash[hash], trans);
 		    break;
@@ -717,8 +745,13 @@ xlog_recover_process_data(xlog_recover_t    *rhash[],
 		    xlog_panic("xlog_recover_process_data: bad transaction");
 		    break;
 		}
-		default: {
+		case 0:
+		case XLOG_CONTINUE_TRANS: {
 		    xlog_recover_add_to_trans(trans, dp, ohead->oh_len);
+		    break;
+		}
+		default: {
+		    xlog_panic("xlog_recover_process_data: bad flag");
 		    break;
 		}
 	    }
@@ -760,6 +793,9 @@ xlog_unpack_data(xlog_rec_header_t *rhead,
 }	/* xlog_unpack_data */
 
 
+/*
+ * Do the actual recovery.
+ */
 static int
 xlog_do_recover(xlog_t	*log,
 		daddr_t head_blk,
@@ -793,6 +829,9 @@ xlog_do_recover(xlog_t	*log,
 }	/* xlog_do_recover */
 
 
+/*
+ * Perform recovery and re-initialize some log variables in xlog_find_tail.
+ */
 int
 xlog_recover(xlog_t *log)
 {
