@@ -66,23 +66,17 @@ void _mutex_destroy( mutex_t *mutex);
 #define mutex_unlock(lock)		_mutex_unlock(lock)
 #define mutex_destroy(lock)		_mutex_destroy(lock)
 
-/*
- * mp_mutex_spinlock is used in xfs_rw.c during an interrupt thread so it
- * must be irq safe. This happens when a write finishes and we queue
- * a request to xfsc to update the unwritten extent flag.
- * There may be other places.
- *
- * mutex_spinlock is also called extensively by interrupt threads.
- *
- */
-
-static __inline__ unsigned long mutex_spinlock(spinlock_t *l)
+static inline unsigned long mutex_spinlock(spinlock_t *lock)
 {
-	spin_lock(l);
+	spin_lock(lock);
 	return 0;
 }
 
-#define mutex_spinunlock(lockp,flags)		spin_unlock(lockp)
+/*ARGSUSED*/
+static inline void mutex_spinunlock(spinlock_t *lock, unsigned long s)
+{
+	spin_unlock(lock);
+}
 
 
 /*
