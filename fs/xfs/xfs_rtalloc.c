@@ -1086,7 +1086,7 @@ xfs_rtallocate_extent(
 		if (maxlen < minlen)
 			return NULLRTBLOCK;
 	}
-	xfs_ilock(mp->m_rbmip, XFS_ILOCK_EXCL);
+	(void)xfs_trans_iget(mp, tp, mp->m_sb.sb_rbmino, XFS_ILOCK_EXCL);
 	switch (type) {
 	case XFS_ALLOCTYPE_ANY_AG:
 		r = xfs_rtallocate_extent_size(tp, minlen, maxlen, len, &sumbp,
@@ -1101,7 +1101,6 @@ xfs_rtallocate_extent(
 			&sumbp, &sb, prod);
 		break;
 	}
-	xfs_iunlock(mp->m_rbmip, XFS_ILOCK_EXCL);
 	if (r != NULLRTBLOCK) {
 		int slen = (int)*len;
 
@@ -1125,10 +1124,9 @@ xfs_rtfree_extent(
 	buf_t		*sumbp = 0;
 
 	mp = tp->t_mountp;
-	xfs_ilock(mp->m_rbmip, XFS_ILOCK_EXCL);
+	(void)xfs_trans_iget(mp, tp, mp->m_sb.sb_rbmino, XFS_ILOCK_EXCL);
 	ASSERT(xfs_rtcheck_alloc_range(mp, tp, bno, len));
 	xfs_rtfree_range(tp, bno, len, &sumbp, &sb);
-	xfs_iunlock(mp->m_rbmip, XFS_ILOCK_EXCL);
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_FREXTENTS, (int)len);
 }
 
