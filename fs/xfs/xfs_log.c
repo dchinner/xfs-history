@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.91 $"
+#ident	"$Revision: 1.92 $"
 
 /*
  * High level interface routines for log manager
@@ -420,14 +420,14 @@ xfs_log_stat(caddr_t mnt_pt, int *log_BBstart, int *log_BBsize)
 
 
 /*
- * Mount a log filesystem.
+ * Mount a log filesystem
  *
  * mp		- ubiquitous xfs mount point structure
  * log_dev	- device number of on-disk log device
  * blk_offset	- Start block # where block size is 512 bytes (BBSIZE)
  * num_bblocks	- Number of BBSIZE blocks in on-disk log
- * flags	-
  *
+ * Return error or zero.
  */
 int
 xfs_log_mount(xfs_mount_t	*mp,
@@ -436,14 +436,15 @@ xfs_log_mount(xfs_mount_t	*mp,
 	      int		num_bblks)
 {
 	xlog_t *log;
+	int    error;
 	
 	if (! xlog_debug)
 		return 0;
 
 	log = xlog_alloc_log(mp, log_dev, blk_offset, num_bblks);
-	if (xlog_recover(log) != 0) {
+	if ((error = xlog_recover(log)) != NULL) {
 		xlog_unalloc_log(log);
-		return XFS_ERECOVER;
+		return error;
 	}
 	return 0;
 }	/* xfs_log_mount */
