@@ -3428,8 +3428,9 @@ xfs_iaccess(
 	mode_t		mode,
 	cred_t		*cr)
 {
-	int error;
-	mode_t orgmode = mode;
+	int		error;
+	mode_t		orgmode = mode;
+	struct inode	*inode = LINVFS_GET_IP(XFS_ITOV(ip));
 
 	/*
 	 * Verify that the MAC policy allows the requested access.
@@ -3438,11 +3439,10 @@ xfs_iaccess(
 		return XFS_ERROR(error);
 	
    	if (mode & IWRITE) {
-		struct inode	*inode = LINVFS_GET_IP(XFS_ITOV(ip));
-		umode_t		mode = inode->i_mode;
+		umode_t		imode = inode->i_mode;
 
 		if (IS_RDONLY(inode) &&
-		    (S_ISREG(mode) || S_ISDIR(mode) || S_ISLNK(mode)))
+		    (S_ISREG(imode) || S_ISDIR(imode) || S_ISLNK(imode)))
 			return XFS_ERROR(EROFS);
 	}
 
@@ -3458,8 +3458,19 @@ xfs_iaccess(
 		if (!in_group_p((gid_t)ip->i_d.di_gid))
 			mode >>= 3;
 	}
-	if (((ip->i_d.di_mode & mode) == mode) || capable_cred(cr, CAP_DAC_OVERRIDE))
+
+	/*
+	 * If the DACs are ok we don't need any capability check.
+	 */
+	if ((ip->i_d.di_mode & mode) == mode)
 		return 0;
+	/*
+	 * Read/write DACs are always overridable.
+	 * Executable DACs are overridable if at least one exec bit is set.
+	 */
+	if ((orgmode & (IREAD|IWRITE)) || (inode->i_mode & S_IXUGO))
+		if (capable_cred(cr, CAP_DAC_OVERRIDE))
+			return 0;
 
 	if ((orgmode == IREAD) ||
 	    (((ip->i_d.di_mode & IFMT) == IFDIR) &&
