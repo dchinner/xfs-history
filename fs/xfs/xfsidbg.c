@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.51 $"
+#ident	"$Revision: 1.52 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -406,62 +406,80 @@ static void xfs_xnode_fork(char *name, xfs_ifork_t *f);
 static int
 xfs_alloc_trace_entry(ktrace_entry_t *ktep)
 {		  
-	if ((long)ktep->val[0] == 0)
+	static char *modagf_flags[] = {
+		"magicnum",
+		"versionnum",
+		"seqno",
+		"length",
+		"roots",
+		"levels",
+		"flfirst",
+		"fllast",
+		"flcount",
+		"freeblks",
+		"longest",
+		NULL
+	};
+
+	if ((__psint_t)ktep->val[0] == 0)
 		return 0;
 	switch ((long)ktep->val[0]) {
 	case XFS_ALLOC_KTRACE_ALLOC:
-		qprintf("alloc %s[%s] mp 0x%x agno %d agbno 0x%x\n",
+		qprintf("alloc %s[%s] mp 0x%x agno %d agbno %d\n",
 			(char *)ktep->val[1],
 			ktep->val[2] ? (char *)ktep->val[2] : "",
 			(xfs_mount_t *)ktep->val[3], 
-			(__psint_t)ktep->val[4],
-			(__psint_t)ktep->val[5]);
+			(__psunsigned_t)ktep->val[4],
+			(__psunsigned_t)ktep->val[5]);
 		qprintf("minlen %d maxlen %d mod %d prod %d minleft %d\n",
-			(__psint_t)ktep->val[6], 
-			(__psint_t)ktep->val[7], 
-			(__psint_t)ktep->val[8],
-			(__psint_t)ktep->val[9], 
-			(__psint_t)ktep->val[10]);
-		qprintf("total %d len %d type %s otype %s wasdel %d isfl %d\n",
-			(__psint_t)ktep->val[11], 
-			(__psint_t)ktep->val[12],
-			xfs_alloctype[((__psint_t)ktep->val[13]) >> 16],
-			xfs_alloctype[((__psint_t)ktep->val[13]) & 0xffff],
-			(__psint_t)ktep->val[14], 
-			(__psint_t)ktep->val[15]);
+			(__psunsigned_t)ktep->val[6], 
+			(__psunsigned_t)ktep->val[7], 
+			(__psunsigned_t)ktep->val[8],
+			(__psunsigned_t)ktep->val[9], 
+			(__psunsigned_t)ktep->val[10]);
+		qprintf("total %d alignment %d len %d type %s otype %s\n",
+			(__psunsigned_t)ktep->val[11],
+			(__psunsigned_t)ktep->val[12],
+			(__psunsigned_t)ktep->val[13],
+			xfs_alloctype[((__psint_t)ktep->val[14]) >> 16],
+			xfs_alloctype[((__psint_t)ktep->val[14]) & 0xffff]);
+		qprintf("wasdel %d wasfromfl %d isfl %d userdata %d\n",
+			((__psint_t)ktep->val[15] & (1 << 3)) != 0,
+			((__psint_t)ktep->val[15] & (1 << 2)) != 0,
+			((__psint_t)ktep->val[15] & (1 << 1)) != 0,
+			((__psint_t)ktep->val[15] & (1 << 0)) != 0);
 		break;
 	case XFS_ALLOC_KTRACE_FREE:
 		qprintf("free %s[%s] mp 0x%x agno %d\n",
 			(char *)ktep->val[1],
 			ktep->val[2] ? (char *)ktep->val[2] : "",
 			(xfs_mount_t *)ktep->val[3], 
-			(__psint_t)ktep->val[4]);
-		qprintf("agbno 0x%x len %d isfl %d\n",
-			(__psint_t)ktep->val[5], 
-			(__psint_t)ktep->val[12],
-			(__psint_t)ktep->val[15]);
+			(__psunsigned_t)ktep->val[4]);
+		qprintf("agbno %d len %d isfl %d\n",
+			(__psunsigned_t)ktep->val[5],
+			(__psunsigned_t)ktep->val[6],
+			(__psint_t)ktep->val[7]);
 		break;
 	case XFS_ALLOC_KTRACE_MODAGF:
-		qprintf("modagf %s[%s] mp 0x%x flags 0x%x\n",
+		qprintf("modagf %s[%s] mp 0x%x ",
 			(char *)ktep->val[1],
 			ktep->val[2] ? (char *)ktep->val[2] : "",
-			(xfs_mount_t *)ktep->val[3], 
-			(__psint_t)ktep->val[4]);
-		qprintf("seqno %d length 0x%x\n",
-			(__psint_t)ktep->val[5], 
-			(__psint_t)ktep->val[6]);
-		qprintf("bno root 0x%x cnt root 0x%x bno lvl %d cnt lvl %d\n",
-			(__psint_t)ktep->val[7], 
-			(__psint_t)ktep->val[8],
-			(__psint_t)ktep->val[9], 
-			(__psint_t)ktep->val[10]);
-		qprintf("flfirst %d fllast %d flcount %d\n",
-			(__psint_t)ktep->val[11], 
-			(__psint_t)ktep->val[12],
-			(__psint_t)ktep->val[13]);
+			(xfs_mount_t *)ktep->val[3]);
+		printflags((__psint_t)ktep->val[4], modagf_flags, "modified");
+		qprintf("seqno %d length %d roots b %d c %d\n",
+			(__psunsigned_t)ktep->val[5],
+			(__psunsigned_t)ktep->val[6],
+			(__psunsigned_t)ktep->val[7],
+			(__psunsigned_t)ktep->val[8]);
+		qprintf("levels b %d c %d flfirst %d fllast %d flcount %d\n",
+			(__psunsigned_t)ktep->val[9],
+			(__psunsigned_t)ktep->val[10],
+			(__psunsigned_t)ktep->val[11],
+			(__psunsigned_t)ktep->val[12],
+			(__psunsigned_t)ktep->val[13]);
 		qprintf("freeblks %d longest %d\n",
-			(__psint_t)ktep->val[14], 
-			(__psint_t)ktep->val[15]);
+			(__psunsigned_t)ktep->val[14],
+			(__psunsigned_t)ktep->val[15]);
 		break;
 	default:
 		qprintf("unknown alloc trace record\n");
@@ -1788,8 +1806,9 @@ xfsidbg_xalloc(xfs_alloc_arg_t *args)
 		xfs_fmtfsblock(args->fsbno, args->mp));
 	qprintf("agno 0x%x agbno 0x%x minlen 0x%x maxlen 0x%x\n",
 		args->agno, args->agbno, args->minlen, args->maxlen);
-	qprintf("mod 0x%x prod 0x%x minleft 0x%x total 0x%x\n",
-		args->mod, args->prod, args->minleft, args->total);
+	qprintf("mod 0x%x prod 0x%x minleft 0x%x total 0x%x alignment 0x%x\n",
+		args->mod, args->prod, args->minleft, args->total,
+		args->alignment);
 	qprintf("len 0x%x type %s wasdel %d isfl %d userdata %d\n",
 		args->len, xfs_alloctype[args->type], args->wasdel, args->isfl,
 		args->userdata);
@@ -3359,8 +3378,9 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	printflags(mp->m_flags, xmount_flags,"flags");
 	qprintf("ialloc_inos %d ialloc_blks %d litino %d\n",
 		mp->m_ialloc_inos, mp->m_ialloc_blks, mp->m_litino);
-	qprintf("attroffset %d da_node_ents %d maxicount %lld",
-		mp->m_attroffset, mp->m_da_node_ents, mp->m_maxicount);
+	qprintf("attroffset %d da_node_ents %d maxicount %lld inoalign %u",
+		mp->m_attroffset, mp->m_da_node_ents, mp->m_maxicount,
+		mp->m_inoalign);
 #if XFS_BIG_FILESYSTEMS
 	qprintf(" inoadd %llx\n", mp->m_inoadd);
 #else
@@ -3926,13 +3946,10 @@ xfsidbg_xsb(xfs_sb_t *sbp)
 		sbp->sb_ifree,
 		sbp->sb_fdblocks,
 		sbp->sb_frextents);
-	if (sbp->sb_versionnum >= XFS_SB_VERSION_HASQUOTA) {
-		qprintf("uquotino %s ",
-			xfs_fmtino(sbp->sb_uquotino, NULL));
-		qprintf("pquotino %s ",
-			xfs_fmtino(sbp->sb_pquotino, NULL));
-		qprintf("qflags 0x%x\n", (int) sbp->sb_qflags);
-	}
+	qprintf("uquotino %s ", xfs_fmtino(sbp->sb_uquotino, NULL));
+	qprintf("pquotino %s ", xfs_fmtino(sbp->sb_pquotino, NULL));
+	qprintf("qflags 0x%x inoaligmt %d\n",
+		sbp->sb_qflags, sbp->sb_inoalignmt);
 }
 
 #ifdef DEBUG
