@@ -910,8 +910,8 @@ xfs_mountfs(
 	if ((rip->i_d.di_mode & IFMT) != IFDIR) {
 		cmn_err(CE_WARN, "XFS: corrupted root inode");
 		VMAP(rvp, rip, vmap);
-		prdev("Root inode %Ld is not a directory",
-		      (int)rip->i_dev, rip->i_ino);
+		prdev("Root inode %llu is not a directory",
+		      (int)rip->i_dev, (unsigned long long)rip->i_ino);
 		rvp->v_flag |= VPURGE;
 		xfs_iunlock(rip, XFS_ILOCK_EXCL);
 		VN_RELE(rvp);

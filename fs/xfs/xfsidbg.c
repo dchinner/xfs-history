@@ -1302,7 +1302,7 @@ printflags(register uint64_t flags,
         register uint64_t mask = 1;
 
         if (name)
-                kdb_printf("%s 0x%Lx <", name, flags);
+                kdb_printf("%s 0x%llx <", name, (unsigned long long)flags);
 
         while (flags != 0 && *strings) {
                 if (mask & flags) {
@@ -1805,12 +1805,13 @@ kdbm_pb(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 	kdb_printf("  pb_target 0x%p pb_hold %d pb_next 0x%p pb_prev 0x%p\n",
 		   bp.pb_common.pb_target, bp.pb_common.pb_hold,
 		   bp.pb_common.pb_list.next, bp.pb_common.pb_list.prev);
-	kdb_printf("  pb_file_offset 0x%Lx pb_buffer_length 0x%x pb_addr 0x%p\n",
-		   bp.pb_common.pb_file_offset, bp.pb_common.pb_buffer_length,
+	kdb_printf("  pb_file_offset 0x%llx pb_buffer_length 0x%llx pb_addr 0x%p\n",
+		   (unsigned long long) bp.pb_common.pb_file_offset,
+		   (unsigned long long) bp.pb_common.pb_buffer_length,
 		   bp.pb_common.pb_addr);
-	kdb_printf("  pb_bn 0x%Lx pb_count_desired 0x%x\n",
+	kdb_printf("  pb_bn 0x%Lx pb_count_desired 0x%lx\n",
 		   bp.pb_common.pb_bn,
-		   bp.pb_common.pb_count_desired);
+		   (unsigned long) bp.pb_common.pb_count_desired);
 	kdb_printf("  pb_io_remaining %d pb_error %d\n",
 		   bp.pb_io_remaining.counter, bp.pb_common.pb_error);
 	kdb_printf("  pb_page_count %d pb_offset 0x%x pb_pages 0x%p\n",
@@ -1871,8 +1872,9 @@ kdbm_pbiodesc(int argc, const char **argv, const char **envp,
 	    (diag = kdb_getarea(pbio, addr)))
 
 	kdb_printf("pb_io_desc_t at 0x%lx\n", addr);
-	kdb_printf("  io_rdesc [ written 0x%x count 0x%x buf 0x%p error %d ]\n",
-			pbio.io_rdesc.written, pbio.io_rdesc.count, 
+	kdb_printf("  io_rdesc [ written 0x%lx count 0x%lx buf 0x%p error %d ]\n",
+			(unsigned long) pbio.io_rdesc.written,
+			(unsigned long) pbio.io_rdesc.count, 
 			pbio.io_rdesc.buf, pbio.io_rdesc.error); 
 
 	kdb_printf("  io_dir %d io_offset 0x%Lx io_iovec_nr 0x%d\n",
@@ -1905,8 +1907,9 @@ kdbm_pbmap(int argc, const char **argv, const char **envp,
 	    (diag = kdb_getarea(pbm, addr)))
 
 	kdb_printf("page_buf_bmap_t at 0x%lx\n", addr);
-	kdb_printf("  pbm_bn 0x%Lx pbm_offset 0x%Lx pbm_delta 0x%x pbm_bsize 0x%x\n",
-		pbm.pbm_bn, pbm.pbm_offset, pbm.pbm_delta, pbm.pbm_bsize);
+	kdb_printf("  pbm_bn 0x%llx pbm_offset 0x%Lx pbm_delta 0x%lx pbm_bsize 0x%lx\n",
+		(long long) pbm.pbm_bn, pbm.pbm_offset,
+		(unsigned long) pbm.pbm_delta, (unsigned long) pbm.pbm_bsize);
 
 	kdb_printf("  pbm_flags %s\n", map_flags(pbm.pbm_flags, pbm_flag_vals));
 
@@ -2641,10 +2644,13 @@ xfs_fmtino(xfs_ino_t ino, xfs_mount_t *mp)
 	static char rval[50];
 
 	if (mp)
-		sprintf(rval, "%Ld[%x:%x:%x]", ino, XFS_INO_TO_AGNO(mp, ino),
-			XFS_INO_TO_AGBNO(mp, ino), XFS_INO_TO_OFFSET(mp, ino));
+		sprintf(rval, "%llu[%x:%x:%x]",
+			(unsigned long long) ino,
+			XFS_INO_TO_AGNO(mp, ino),
+			XFS_INO_TO_AGBNO(mp, ino),
+			XFS_INO_TO_OFFSET(mp, ino));
 	else
-		sprintf(rval, "%Ld", ino);
+		sprintf(rval, "%llu", (unsigned long long) ino);
 	return rval;
 }
 
@@ -2699,7 +2705,7 @@ xfs_fmtsize(size_t i)
 	static char rval[20];
 
 	/* size_t is 32 bits in 32-bit kernel, 64 bits in 64-bit kernel */
-	sprintf(rval, "0x%x", i);
+	sprintf(rval, "0x%lx", (unsigned long) i);
 	return rval;
 }
 
@@ -2757,8 +2763,9 @@ xfs_inode_item_print(xfs_inode_log_item_t *ilip, int summary)
 		kdb_printf("\n");
 		return;
 	}
-	kdb_printf("inode 0x%p ino 0x%Lx logged %d flags: ",
-		ilip->ili_inode, ilip->ili_format.ilf_ino, ilip->ili_logged);
+	kdb_printf("inode 0x%p ino 0x%llu logged %d flags: ",
+		ilip->ili_inode, (unsigned long long) ilip->ili_format.ilf_ino,
+		ilip->ili_logged);
 	printflags(ilip->ili_flags, ili_flags, NULL);
 	kdb_printf("\n");
 	kdb_printf("ilock recur %d iolock recur %d ext buf 0x%p\n",
@@ -3517,8 +3524,9 @@ xfsidbg_xdaargs(xfs_da_args_t *n)
 		  n->blkno, n->index, n->rmtblkno, n->rmtblkcnt);
 	kdb_printf(" leaf2: blkno %d index %d rmtblkno %d rmtblkcnt %d\n",
 		  n->blkno2, n->index2, n->rmtblkno2, n->rmtblkcnt2);
-	kdb_printf(" inumber %Ld dp 0x%p firstblock 0x%p flist 0x%p\n",
-		  n->inumber, n->dp, n->firstblock, n->flist);
+	kdb_printf(" inumber %llu dp 0x%p firstblock 0x%p flist 0x%p\n",
+		  (unsigned long long) n->inumber,
+		  n->dp, n->firstblock, n->flist);
 	kdb_printf(" trans 0x%p total %d\n",
 		  n->trans, n->total);
 }
@@ -3621,8 +3629,10 @@ xfsidbg_xdirleaf(xfs_dir_leafblock_t *leaf)
 	for (j = 0, e = leaf->entries; j < INT_GET(h->count, ARCH_CONVERT); j++, e++) {
 		n = XFS_DIR_LEAF_NAMESTRUCT(leaf, INT_GET(e->nameidx, ARCH_CONVERT));
 		XFS_DIR_SF_GET_DIRINO_ARCH(&n->inumber, &ino, ARCH_CONVERT);
-		kdb_printf("leaf %d hashval 0x%x nameidx %d inumber %Ld ",
-			j, (uint_t)INT_GET(e->hashval, ARCH_CONVERT), INT_GET(e->nameidx, ARCH_CONVERT), ino);
+		kdb_printf("leaf %d hashval 0x%x nameidx %d inumber %llu ",
+			j, (uint_t)INT_GET(e->hashval, ARCH_CONVERT),
+			INT_GET(e->nameidx, ARCH_CONVERT),
+			(unsigned long long)ino);
 		kdb_printf("namelen %d name \"", e->namelen);
 		for (k = 0; k < e->namelen; k++)
 			kdb_printf("%c", n->name[k]);
@@ -3670,15 +3680,19 @@ xfs_dir2data(void *addr, int size)
 	for (p = (char *)(h + 1); p < t; ) {
 		u = (xfs_dir2_data_unused_t *)p;
 		if (u->freetag == XFS_DIR2_DATA_FREE_TAG) {
-			kdb_printf("0x%x unused freetag 0x%x length 0x%x tag 0x%x\n",
-				p - (char *)addr, INT_GET(u->freetag, ARCH_CONVERT), INT_GET(u->length, ARCH_CONVERT),
+			kdb_printf("0x%lx unused freetag 0x%x length 0x%x tag 0x%x\n",
+				(unsigned long) (p - (char *)addr),
+				INT_GET(u->freetag, ARCH_CONVERT),
+				INT_GET(u->length, ARCH_CONVERT),
 				INT_GET(*XFS_DIR2_DATA_UNUSED_TAG_P_ARCH(u, ARCH_CONVERT), ARCH_CONVERT));
 			p += INT_GET(u->length, ARCH_CONVERT);
 			continue;
 		}
 		e = (xfs_dir2_data_entry_t *)p;
-		kdb_printf("0x%x entry inumber %Ld namelen %d name \"",
-			p - (char *)addr, INT_GET(e->inumber, ARCH_CONVERT), e->namelen);
+		kdb_printf("0x%lx entry inumber %llu namelen %d name \"",
+			(unsigned long) (p - (char *)addr),
+			(unsigned long long) INT_GET(e->inumber, ARCH_CONVERT),
+			e->namelen);
 		for (k = 0; k < e->namelen; k++)
 			kdb_printf("%c", e->name[k]);
 		kdb_printf("\" tag 0x%x\n", INT_GET(*XFS_DIR2_DATA_ENTRY_TAG_P(e), ARCH_CONVERT));
@@ -3687,14 +3701,16 @@ xfs_dir2data(void *addr, int size)
 	if (INT_GET(h->magic, ARCH_CONVERT) == XFS_DIR2_DATA_MAGIC)
 		return;
 	for (j = 0; j < INT_GET(tail->count, ARCH_CONVERT); j++, l++) {
-		kdb_printf("0x%x leaf %d hashval 0x%x address 0x%x (byte 0x%x)\n",
-			(char *)l - (char *)addr, j,
-			(uint_t)INT_GET(l->hashval, ARCH_CONVERT), INT_GET(l->address, ARCH_CONVERT),
+		kdb_printf("0x%lx leaf %d hashval 0x%x address 0x%x (byte 0x%x)\n",
+			(unsigned long) ((char *)l - (char *)addr), j,
+			(uint_t)INT_GET(l->hashval, ARCH_CONVERT),
+			INT_GET(l->address, ARCH_CONVERT),
 			/* XFS_DIR2_DATAPTR_TO_BYTE */
 			INT_GET(l->address, ARCH_CONVERT) << XFS_DIR2_DATA_ALIGN_LOG);
 	}
-	kdb_printf("0x%x tail count %d\n",
-		(char *)tail - (char *)addr, INT_GET(tail->count, ARCH_CONVERT));
+	kdb_printf("0x%lx tail count %d\n",
+		(unsigned long) ((char *)tail - (char *)addr),
+		INT_GET(tail->count, ARCH_CONVERT));
 }
 
 static void
@@ -3714,9 +3730,10 @@ xfs_dir2leaf(xfs_dir2_leaf_t *leaf, int size)
 		INT_GET(i->forw, ARCH_CONVERT), INT_GET(i->back, ARCH_CONVERT), INT_GET(i->magic, ARCH_CONVERT));
 	kdb_printf("hdr count %d stale %d\n", INT_GET(h->count, ARCH_CONVERT), INT_GET(h->stale, ARCH_CONVERT));
 	for (j = 0; j < INT_GET(h->count, ARCH_CONVERT); j++, e++) {
-		kdb_printf("0x%x ent %d hashval 0x%x address 0x%x (byte 0x%x)\n",
-			(char *)e - (char *)leaf, j,
-			(uint_t)INT_GET(e->hashval, ARCH_CONVERT), INT_GET(e->address, ARCH_CONVERT),
+		kdb_printf("0x%lx ent %d hashval 0x%x address 0x%x (byte 0x%x)\n",
+			(unsigned long) ((char *)e - (char *)leaf), j,
+			(uint_t)INT_GET(e->hashval, ARCH_CONVERT),
+			INT_GET(e->address, ARCH_CONVERT),
 			/* XFS_DIR2_DATAPTR_TO_BYTE */
 			INT_GET(e->address, ARCH_CONVERT) << XFS_DIR2_DATA_ALIGN_LOG);
 	}
@@ -3726,8 +3743,9 @@ xfs_dir2leaf(xfs_dir2_leaf_t *leaf, int size)
 	t = (xfs_dir2_leaf_tail_t *)((char *)leaf + size - sizeof(*t));
 	b = XFS_DIR2_LEAF_BESTS_P_ARCH(t, ARCH_CONVERT);
 	for (j = 0; j < INT_GET(t->bestcount, ARCH_CONVERT); j++, b++) {
-		kdb_printf("0x%x best %d 0x%x\n",
-			(char *)b - (char *)leaf, j, INT_GET(*b, ARCH_CONVERT));
+		kdb_printf("0x%lx best %d 0x%x\n",
+			(unsigned long) ((char *)b - (char *)leaf), j,
+			INT_GET(*b, ARCH_CONVERT));
 	}
 	kdb_printf("tail bestcount %d\n", INT_GET(t->bestcount, ARCH_CONVERT));
 }
@@ -3745,11 +3763,11 @@ xfsidbg_xdirsf(xfs_dir_shortform_t *s)
 
 	sfh = &s->hdr;
 	XFS_DIR_SF_GET_DIRINO_ARCH(&sfh->parent, &ino, ARCH_CONVERT);
-	kdb_printf("hdr parent %Ld", ino);
+	kdb_printf("hdr parent %llu", (unsigned long long)ino);
 	kdb_printf(" count %d\n", sfh->count);
 	for (i = 0, sfe = s->list; i < sfh->count; i++) {
 		XFS_DIR_SF_GET_DIRINO_ARCH(&sfe->inumber, &ino, ARCH_CONVERT);
-		kdb_printf("entry %d inumber %Ld", i, ino);
+		kdb_printf("entry %d inumber %llu", i, (unsigned long long)ino);
 		kdb_printf(" namelen %d name \"", sfe->namelen);
 		for (j = 0; j < sfe->namelen; j++)
 			kdb_printf("%c", sfe->name[j]);
@@ -3771,12 +3789,14 @@ xfsidbg_xdir2sf(xfs_dir2_sf_t *s)
 
 	sfh = &s->hdr;
 	ino = XFS_DIR2_SF_GET_INUMBER_ARCH(s, &sfh->parent, ARCH_CONVERT);
-	kdb_printf("hdr count %d i8count %d parent %Ld\n",
-		sfh->count, sfh->i8count, ino);
+	kdb_printf("hdr count %d i8count %d parent %llu\n",
+		sfh->count, sfh->i8count, (unsigned long long) ino);
 	for (i = 0, sfe = XFS_DIR2_SF_FIRSTENTRY(s); i < sfh->count; i++) {
 		ino = XFS_DIR2_SF_GET_INUMBER_ARCH(s, XFS_DIR2_SF_INUMBERP(sfe), ARCH_CONVERT);
-		kdb_printf("entry %d inumber %Ld offset 0x%x namelen %d name \"",
-			i, ino, XFS_DIR2_SF_GET_OFFSET_ARCH(sfe, ARCH_CONVERT), sfe->namelen);
+		kdb_printf("entry %d inumber %llu offset 0x%x namelen %d name \"",
+			i, (unsigned long long) ino,
+			XFS_DIR2_SF_GET_OFFSET_ARCH(sfe, ARCH_CONVERT),
+			sfe->namelen);
 		for (j = 0; j < sfe->namelen; j++)
 			kdb_printf("%c", sfe->name[j]);
 		kdb_printf("\"\n");
@@ -4034,8 +4054,9 @@ xfsidbg_xlog(xlog_t *log)
 			xfsidbg_get_cstate(log->l_covered_state));
 	kdb_printf("flags: ");
 	printflags(log->l_flags, t_flags,"log");
-	kdb_printf("  dev: 0x%x logBBstart: %Ld logsize: %d logBBsize: %d\n",
-		log->l_dev, log->l_logBBstart, log->l_logsize,log->l_logBBsize);
+	kdb_printf("  dev: 0x%x logBBstart: %lld logsize: %d logBBsize: %d\n",
+		log->l_dev, (long long) log->l_logBBstart,
+		log->l_logsize,log->l_logBBsize);
      kdb_printf("curr_cycle: %d  prev_cycle: %d  curr_block: %d  prev_block: %d\n",
 	     log->l_curr_cycle, log->l_prev_cycle, log->l_curr_block,
 	     log->l_prev_block);
@@ -4446,7 +4467,7 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	kdb_printf("resblks %Ld resblks_avail %Ld\n", mp->m_resblks, 
 		mp->m_resblks_avail);
 #if XFS_BIG_FILESYSTEMS
-	kdb_printf(" inoadd %Lx\n", mp->m_inoadd);
+	kdb_printf(" inoadd %llx\n", (unsigned long long) mp->m_inoadd);
 #else
 	kdb_printf("\n");
 #endif
@@ -4572,8 +4593,8 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	kdb_printf("dev %x ino %s\n",
 		ip->i_dev,
 		xfs_fmtino(ip->i_ino, ip->i_mount));
-	kdb_printf("blkno 0x%Lx len 0x%x boffset 0x%x\n",
-		ip->i_blkno,
+	kdb_printf("blkno 0x%llx len 0x%x boffset 0x%x\n",
+		(long long) ip->i_blkno,
 		ip->i_len,
 		ip->i_boffset);
 	kdb_printf("transp 0x%p &itemp 0x%p\n",
@@ -4656,8 +4677,8 @@ xfsidbg_xchashlist(xfs_chashlist_t *chl)
 		kdb_printf("hashlist inode 0x%p blkno %Ld buf 0x%p",
 		       chl->chl_ip, chl->chl_blkno, chl->chl_buf);
 #else
-		kdb_printf("hashlist inode 0x%p blkno %Ld",
-		       chl->chl_ip, chl->chl_blkno);
+		kdb_printf("hashlist inode 0x%p blkno %lld",
+		       chl->chl_ip, (long long) chl->chl_blkno);
 #endif
 
 		kdb_printf("\n");
@@ -5095,8 +5116,8 @@ xfsidbg_xtp(xfs_trans_t *tp)
 		tp->t_log_res, tp->t_blk_res, tp->t_blk_res_used);
 	kdb_printf("rt res %d rt res used %d\n", tp->t_rtx_res,
 		tp->t_rtx_res_used);
-	kdb_printf("ticket 0x%x lsn %s\n",
-		(uint32_t) tp->t_ticket, xfs_fmtlsn(&tp->t_lsn));
+	kdb_printf("ticket 0x%lx lsn %s\n",
+		(unsigned long) tp->t_ticket, xfs_fmtlsn(&tp->t_lsn));
 	kdb_printf("callback 0x%p callarg 0x%p\n",
 		tp->t_callback, tp->t_callarg);
 	kdb_printf("icount delta %ld ifree delta %ld\n",
