@@ -686,7 +686,7 @@ retry:
 #endif
 	if (direct) {
 		xfs_inval_cached_pages(vp, &xip->i_iocore, *offsetp,
-			(xfs_off_t) size, (void *)vp);
+			(xfs_off_t) size, (void *)vp, 1);
 	}
 
 	/*
