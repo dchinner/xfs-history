@@ -223,17 +223,16 @@ typedef struct xfs_dirent32 {	/* Irix5 view of dirent structure */
 #define FSC_NOTIFY_NAME_CHANGED(vp)
 #endif
 
+#define ENOTSUP		ENOTSUPP	/* Not supported (POSIX 1003.1b) */
+#define	EWRONGFS	EINVAL		/* Mount with wrong filesystem type */
 
 /*
  * XXX these need real values in errno.h. asm-i386/errno.h won't 
  * return errnos out of its known range in errno.
+ * XXX also note these need to be < 1000 and fairly unique on linux
  */
-#define ENOTSUP		ENOTSUPP	/* Not supported (POSIX 1003.1b) */
-#define ENOATTR         ENODATA /* Attribute not found */
-
-/* XXX also note these need to be < 1000 and fairly unique on linux */
-#define EFSCORRUPTED    990     /* Filesystem is corrupted */
-#define	EWRONGFS	991	/* Mount with wrong filesystem type */
+#define EFSCORRUPTED    990		/* Filesystem is corrupted */
+#define ENOATTR         ENODATA 	/* Attribute not found */
 
 #define SYNCHRONIZE()	((void)0)
 #define lbolt		jiffies

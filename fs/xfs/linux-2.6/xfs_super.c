@@ -48,16 +48,16 @@ extern void xfs_cleanup(void);
 extern void dmapi_init(void);
 extern void dmapi_uninit(void);
 #else
-# define dmapi_init()			do { } while (0)
-# define dmapi_uninit()			do { } while (0)
+# define dmapi_init()		do { } while (0)
+# define dmapi_uninit()		do { } while (0)
 #endif
 
 #ifdef CONFIG_XFS_GRIO
 extern void xfs_grio_init(void);
 extern void xfs_grio_uninit(void);
 #else
-# define xfs_grio_init()		do { } while (0)
-# define xfs_grio_uninit()		do { } while (0)
+# define xfs_grio_init()	do { } while (0)
+# define xfs_grio_uninit()	do { } while (0)
 #endif
 
 #ifdef CELL_CAPABLE
@@ -67,16 +67,22 @@ extern int cxfs_parseargs(char *, int, struct xfs_args *);
 #endif
 
 #ifdef CONFIG_FS_POSIX_ACL
-# define set_posix_acl(sb)		((sb)->s_posix_acl_flag = 1)
+# define set_posix_acl(sb)	((sb)->s_posix_acl_flag = 1)
 #else
-# define set_posix_acl(sb)		do { } while (0)
+# define set_posix_acl(sb)	do { } while (0)
 #endif
 
 /* For kernels which have the s_maxbytes field - set it */
 #ifdef MAX_NON_LFS
-# define set_max_bytes(sb)		((sb)->s_maxbytes = XFS_MAX_FILE_OFFSET)
+# define set_max_bytes(sb)	((sb)->s_maxbytes = XFS_MAX_FILE_OFFSET)
 #else
-# define set_max_bytes(sb)		do { } while (0)
+# define set_max_bytes(sb)	do { } while (0)
+#endif
+
+#ifdef CONFIG_XFS_QUOTA
+# define set_quotactl(sb)	((sb)->s_dquot.quotactl = linvfs_quotactl)
+#else
+# define set_quotactl(sb)	do { } while (0)
 #endif
 
 static struct super_operations linvfs_sops;
@@ -375,6 +381,38 @@ linvfs_release_buftarg(
 	}
 }
 
+STATIC int
+linvfs_quotactl(
+	struct super_block *sb,
+	int		cmd,
+	int		type,
+	int		id,
+	void		*addr)
+{
+	xfs_mount_t	*mp;
+	vfs_t		*vfsp;
+	int		error;
+
+	if (!IS_XQM_CMD(cmd))
+		return -EINVAL;
+
+	if (type == USRQUOTA)
+		type = XFS_DQ_USER;
+	else if (type == GRPQUOTA)
+		type = XFS_DQ_GROUP;
+	else
+		return -EINVAL;
+
+	vfsp = LINVFS_GET_VFS(sb);
+	mp = XFS_BHVTOM(vfsp->vfs_fbhv);
+	ASSERT(mp);
+
+	error = xfs_quotactl(mp, vfsp, cmd, id, type, (caddr_t)addr);
+	if (error)
+		return -error;
+	return 0;
+}
+
 struct super_block *
 linvfs_read_super(
 	struct super_block *sb,
@@ -434,8 +472,8 @@ linvfs_read_super(
 	set_blocksize(sb->s_dev, 512);
 	set_posix_acl(sb);
 	set_max_bytes(sb);
+	set_quotactl(sb);
 	sb->s_op = &linvfs_sops;
-	sb->dq_op = NULL;	/* don't use generic Linux VFS quota */
 
 	LINVFS_SET_VFS(sb, vfsp);
 
@@ -781,47 +819,12 @@ linvfs_dmapi_mount(
 	return 0;
 }
 
-int
-linvfs_quotactl(
-	struct super_block *sb,
-	int		cmd,
-	int		type,
-	int		id,
-	caddr_t		addr)
-{
-	xfs_mount_t	*mp;
-	vfs_t		*vfsp;
-	int		error;
-
-	if (!IS_XQM_CMD(cmd))
-		return -EINVAL;
-
-	if (type == USRQUOTA)
-		type = XFS_DQ_USER;
-	else if (type == GRPQUOTA)
-		type = XFS_DQ_GROUP;
-	else
-		return -EINVAL;
-
-	vfsp = LINVFS_GET_VFS(sb);
-	mp = XFS_BHVTOM(vfsp->vfs_fbhv);
-	ASSERT(mp);
-
-	error = xfs_quotactl(mp, vfsp, cmd, id, type, addr);
-	if (error)
-		return -error;
-	return 0;
-}
-
 
 static struct super_operations linvfs_sops = {
 	read_inode:		linvfs_read_inode,
 	write_inode:		linvfs_write_inode,
 #ifdef CONFIG_XFS_DMAPI
 	dmapi_mount_event:	linvfs_dmapi_mount,
-#endif
-#ifdef CONFIG_XFS_QUOTA
-	quotactl:		linvfs_quotactl,
 #endif
 	put_inode:		linvfs_put_inode,
 	delete_inode:		linvfs_delete_inode,
