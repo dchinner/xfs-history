@@ -49,16 +49,16 @@
  * To work within the constraint of one allocation per transaction,
  * xfs_dialloc_ino() is designed to be called twice if it has to do an
  * allocation to replenish the inode freelist.  If an inode is 
- * available without an allocation, agbuf would be set to the current
- * agbuf and alloc_done set to false.
- * If an allocation needed to be done, agbuf would be set to the
+ * available without an allocation, agbp would be set to the current
+ * agbp and alloc_done set to false.
+ * If an allocation needed to be done, agbp would be set to the
  * header of the freelist and alloc_done set to true.  The caller
  * should then commit the current transaction and allocate a new
  * transaction.  xfs_dialloc_ino() should then be called again with
- * the agbuf value returned from the previous call.
+ * the agbp value returned from the previous call.
  *
  * Once we successfully pick an inode its number is returned and the
- * IO_agbuf parameter contains the ag_buf for the inode's ag.  The caller
+ * IO_agbp parameter contains the ag_buf for the inode's ag.  The caller
  * should get its reference to the in-core inode/vnode for the given ino
  * and then call xfs_dialloc_finish() to finalize the allocation.  This
  * must be done to satisfy the ordering of the inode/vnode locking with
@@ -66,7 +66,7 @@
  * to flush a potentially free inode, it forces the order of inode/vnode
  * locking before inode buffer locking.
  *
- * agbuf should be set to NULL on the first call.
+ * agbp should be set to NULL on the first call.
  */
 xfs_ino_t				/* inode number allocated */
 xfs_dialloc_ino(
@@ -74,7 +74,7 @@ xfs_dialloc_ino(
 	xfs_ino_t	parent,		/* parent inode (directory) */
 	int		sameag,		/* 1 => must be in same a.g. */
 	mode_t		mode,		/* mode bits for new inode */
-	buf_t		**agbuf,	/* buf for ag.inode freelist header */
+	buf_t		**agbp,		/* buf for ag.inode freelist header */
 	boolean_t	*alloc_done);	/* an allocation was done to replenish
 					   the inode freelist. */
 /*
@@ -94,17 +94,17 @@ void
 xfs_dialloc_finish(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	ino,		/* ino returned by xfs_dialloc_ino */
-	buf_t		*agbuf);	/* agi buf from xfs_dialloc_ino */
+	buf_t		*agbp);		/* agi buf from xfs_dialloc_ino */
 					   
 /*
  * Return the next (past agino) inode on the freelist for this allocation group
- * (given by agbuf).  Used to traverse the whole list, e.g. for printing.
+ * (given by agbp).  Used to traverse the whole list, e.g. for printing.
  */
 xfs_agino_t				/* a.g. inode next on freelist */
 xfs_dialloc_next_free(
 	xfs_mount_t	*mp,		/* filesystem mount structure */
 	xfs_trans_t	*tp,		/* transaction pointer */
-	buf_t		*agbuf,		/* buffer for ag.inode header */
+	buf_t		*agbp,		/* buffer for ag.inode header */
 	xfs_agino_t	agino);		/* inode to get next free for */
 
 /*

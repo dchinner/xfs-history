@@ -119,7 +119,7 @@ typedef struct xfs_agi
 
 #define	XFS_AG_DADDR(mp,agno,d)	(XFS_AGB_TO_DADDR(mp, agno, 0) + (d))
 
-#define	XFS_BUF_TO_AGF(buf)	((xfs_agf_t *)(buf)->b_un.b_addr)
-#define	XFS_BUF_TO_AGI(buf)	((xfs_agi_t *)(buf)->b_un.b_addr)
+#define	XFS_BUF_TO_AGF(bp)	((xfs_agf_t *)(bp)->b_un.b_addr)
+#define	XFS_BUF_TO_AGI(bp)	((xfs_agi_t *)(bp)->b_un.b_addr)
 
 #endif	/* !_FS_XFS_AG_H */

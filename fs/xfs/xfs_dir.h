@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_H
 #define	_FS_XFS_DIR_H
 
-#ident	"$Revision: 1.10 $"
+#ident	"$Revision: 1.11 $"
 
 /*
  * xfs_dir.h
@@ -213,7 +213,7 @@ buf_t	*xfs_dir_get_buf(xfs_trans_t *trans, xfs_inode_t *dp,
 				xfs_fsblock_t bno);
 buf_t	*xfs_dir_read_buf(xfs_trans_t *trans, xfs_inode_t *dp,
 				xfs_fsblock_t bno);
-int	xfs_dir_put_dirent(xfs_mount_t *mp, struct dirent *buf, xfs_ino_t ino,
+int	xfs_dir_put_dirent(xfs_mount_t *mp, struct dirent *dbp, xfs_ino_t ino,
 				char *name, int namelen, __uint32_t bno,
 				int entry, uio_t *uio, int *done);
 

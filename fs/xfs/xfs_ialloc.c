@@ -44,16 +44,16 @@
 STATIC void
 xfs_ialloc_log_agi(
 	xfs_trans_t	*tp,		/* transaction pointer */
-	buf_t		*buf,		/* allocation group header buffer */
+	buf_t		*bp,		/* allocation group header buffer */
 	int		fields);	/* bitmask of fields to log */
 
 /*
- * Log specified fields for the inode given by buf and off.
+ * Log specified fields for the inode given by bp and off.
  */
 STATIC void
 xfs_ialloc_log_di(
 	xfs_trans_t	*tp,		/* transaction pointer */
-	buf_t		*buf,		/* inode buffer */
+	buf_t		*bp,		/* inode buffer */
 	int		off,		/* index of inode in buffer */
 	int		fields);	/* bitmask of fields to log */
 
@@ -71,13 +71,13 @@ xfs_ialloc_read_agi(
  */
 
 /*
- * Allocate new inodes in the allocation group specified by agbuf.
+ * Allocate new inodes in the allocation group specified by agbp.
  * Return 0 for failure, 1 for success.
  */
 STATIC int				/* success/failure */
 xfs_ialloc_ag_alloc(
 	xfs_trans_t	*tp,		/* transaction pointer */
-	buf_t		*agbuf);	/* alloc group buffer */
+	buf_t		*agbp);		/* alloc group buffer */
 
 /*
  * Select an allocation group to look for a free inode in, based on the parent
@@ -101,7 +101,7 @@ xfs_ialloc_ag_select(
 STATIC void
 xfs_ialloc_log_agi(
 	xfs_trans_t	*tp,		/* transaction pointer */
-	buf_t		*buf,		/* allocation group header buffer */
+	buf_t		*bp,		/* allocation group header buffer */
 	int		fields)		/* bitmask of fields to log */
 {
 	int			first;		/* first byte number */
@@ -127,16 +127,16 @@ xfs_ialloc_log_agi(
 	/*
 	 * Log the allocation group inode header buffer.
 	 */
-	xfs_trans_log_buf(tp, buf, first, last);
+	xfs_trans_log_buf(tp, bp, first, last);
 }
 
 /*
- * Log specified fields for the inode given by buf and off.
+ * Log specified fields for the inode given by bp and off.
  */
 STATIC void
 xfs_ialloc_log_di(
 	xfs_trans_t	*tp,		/* transaction pointer */
-	buf_t		*buf,		/* inode buffer */
+	buf_t		*bp,		/* inode buffer */
 	int		off,		/* index of inode in buffer */
 	int		fields)		/* bitmask of fields to log */
 {
@@ -178,11 +178,11 @@ xfs_ialloc_log_di(
 	/*
 	 * Convert to buffer offsets and log it.
 	 */
-	dip = XFS_MAKE_IPTR(mp, buf, off);
-	ioffset = (caddr_t)dip - (caddr_t)XFS_BUF_TO_DINODE(buf);
+	dip = XFS_MAKE_IPTR(mp, bp, off);
+	ioffset = (caddr_t)dip - (caddr_t)XFS_BUF_TO_DINODE(bp);
 	first += ioffset;
 	last += ioffset;
-	xfs_trans_log_buf(tp, buf, first, last);
+	xfs_trans_log_buf(tp, bp, first, last);
 }
 
 /*
@@ -209,13 +209,13 @@ xfs_ialloc_read_agi(
  */
 
 /*
- * Allocate new inodes in the allocation group specified by agbuf.
+ * Allocate new inodes in the allocation group specified by agbp.
  * Return 0 for failure, 1 for success.
  */
 STATIC int				/* success/failure */
 xfs_ialloc_ag_alloc(
 	xfs_trans_t	*tp,		/* transaction pointer */
-	buf_t		*agbuf)		/* alloc group buffer */
+	buf_t		*agbp)		/* alloc group buffer */
 {
 	xfs_agi_t	*agi;		/* allocation group header */
 	buf_t		*fbuf;		/* new free inodes' buffer */
@@ -236,7 +236,7 @@ xfs_ialloc_ag_alloc(
 	static uuid_t	zuuid;		/* zero uuid */
 
 	mp = tp->t_mountp;
-	agi = XFS_BUF_TO_AGI(agbuf);
+	agi = XFS_BUF_TO_AGI(agbp);
 	/*
 	 * Locking will ensure that we don't have two callers in here
 	 * at one time.
@@ -337,7 +337,7 @@ xfs_ialloc_ag_alloc(
 	/*
 	 * Log allocation group header fields
 	 */
-	xfs_ialloc_log_agi(tp, agbuf, flag);
+	xfs_ialloc_log_agi(tp, agbp, flag);
 	/*
 	 * Modify/log superblock values for inode count and inode free count.
 	 */
@@ -358,7 +358,7 @@ xfs_ialloc_ag_select(
 	int		sameag,		/* =1 to force to same ag. as parent */
 	mode_t		mode)		/* bits set to indicate file type */
 {
-	buf_t		*agbuf;		/* allocation group header buffer */
+	buf_t		*agbp;		/* allocation group header buffer */
 	xfs_agnumber_t	agcount;	/* number of ag's in the filesystem */
 	xfs_agnumber_t	agno;		/* current ag number */
 	int		agoff;		/* ag number relative to parent's */
@@ -425,8 +425,8 @@ xfs_ialloc_ag_select(
 		 * Must be a valid allocation group.
 		 */
 		agno = pagno + agoff;
-		agbuf = xfs_ialloc_read_agi(mp, tp, agno);
-		agi = XFS_BUF_TO_AGI(agbuf);
+		agbp = xfs_ialloc_read_agi(mp, tp, agno);
+		agi = XFS_BUF_TO_AGI(agbp);
 		ASSERT((agi->agi_freecount == 0) == (agi->agi_freelist == NULLAGINO));
 		/*
 		 * Is there enough free space for the file plus a block
@@ -434,8 +434,8 @@ xfs_ialloc_ag_select(
 		 */
 		if (xfs_alloc_ag_freeblks(mp, tp, agno, flags) >=
 		    needspace + (agi->agi_freecount == 0))
-			return agbuf;
-		xfs_trans_brelse(tp, agbuf);
+			return agbp;
+		xfs_trans_brelse(tp, agbp);
 		if (sameag)
 			break;
 	}
@@ -453,24 +453,24 @@ xfs_ialloc_ag_select(
  * The sameag flag is used by mkfs only, to force the root directory
  * inode into the first allocation group.
  *
- * The arguments IO_agbuf and alloc_done are defined to work within
+ * The arguments IO_agbp and alloc_done are defined to work within
  * the constraint of one allocation per transaction,
  * xfs_dialloc() is designed to be called twice if it has to do an
  * allocation to replenish the inode freelist.  On the first call,
- * IO_agbuf should be set to NULL. If the freelist is not empty,
+ * IO_agbp should be set to NULL. If the freelist is not empty,
  * i.e., xfs_dialloc_ino() did not need to do an allocation, an inode
- * number is returned.  In this case, IO_agbuf would be set to the 
+ * number is returned.  In this case, IO_agbp would be set to the 
  * current ag_buf and alloc_done set to false.
  * If an allocation needed to be done, xfs_dialloc would return
- * the current ag_buf in IO_agbuf and set alloc_done to true.
+ * the current ag_buf in IO_agbp and set alloc_done to true.
  * The caller should then commit the current transaction, allocate a new
  * transaction, and call xfs_dialloc_ino() again, passing in the previous
- * value of IO_agbuf.  IO_agbuf should be held across the transactions.
- * Since the agbuf is locked across the two calls, the second call is
+ * value of IO_agbp.  IO_agbp should be held across the transactions.
+ * Since the agbp is locked across the two calls, the second call is
  * guaranteed to have something on the freelist.
  *
  * Once we successfully pick an inode its number is returned and the
- * IO_agbuf parameter contains the ag_buf for the inode's ag.  The caller
+ * IO_agbp parameter contains the ag_buf for the inode's ag.  The caller
  * should get its reference to the in-core inode/vnode for the given ino
  * and then call xfs_dialloc_finish() to finalize the allocation.  This
  * must be done to satisfy the ordering of the inode/vnode locking with
@@ -484,12 +484,12 @@ xfs_dialloc_ino(
 	xfs_ino_t	parent,		/* parent inode (directory) */
 	int		sameag,		/* 1 => must be in same a.g. */
 	mode_t		mode,		/* mode bits for new inode */
-	buf_t		**IO_agbuf,	/* in/out ag header's buffer */
+	buf_t		**IO_agbp,	/* in/out ag header's buffer */
 	boolean_t	*alloc_done)	/* true if we needed to replenish
 					   inode freelist */
 {
 	xfs_agnumber_t	agcount;	/* number of allocation groups */
-	buf_t		*agbuf;		/* allocation group header's buffer */
+	buf_t		*agbp;		/* allocation group header's buffer */
 	xfs_agino_t	agino;		/* ag-relative inode to be returned */
 	xfs_agnumber_t	agno;		/* allocation group number */
 	xfs_agi_t	*agi;		/* allocation group header structure */
@@ -498,28 +498,28 @@ xfs_dialloc_ino(
 	xfs_mount_t	*mp;		/* mount point structure */
 	xfs_agnumber_t	tagno;		/* testing allocation group number */
 
-	if (*IO_agbuf == NULL) {
+	if (*IO_agbp == NULL) {
 
 		/*
-		 * We do not have an agbuf, so select an initial allocation
+		 * We do not have an agbp, so select an initial allocation
 		 * group for inode allocation.
 		 */
-		agbuf = xfs_ialloc_ag_select(tp, parent, sameag, mode);
+		agbp = xfs_ialloc_ag_select(tp, parent, sameag, mode);
 		/*
 		 * Couldn't find an allocation group satisfying the 
 		 * criteria, give up.
 		 */
-		if (!agbuf)
+		if (!agbp)
 			return NULLFSINO;
-		agi = XFS_BUF_TO_AGI(agbuf);
+		agi = XFS_BUF_TO_AGI(agbp);
 		ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
 	} else {
 		/*
 		 * Continue where we left off before.  In this case, we 
 		 * know that the allocation group's freelist is nonempty.
 		 */
-		agbuf = *IO_agbuf;
-		agi = XFS_BUF_TO_AGI(agbuf);
+		agbp = *IO_agbp;
+		agi = XFS_BUF_TO_AGI(agbp);
 		ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
 		ASSERT(agi->agi_freecount > 0);
 		ASSERT(agi->agi_freelist != NULLAGINO);
@@ -538,7 +538,7 @@ xfs_dialloc_ino(
 		/*
 		 * Try to allocate some new inodes in the allocation group.
 		 */
-		if (xfs_ialloc_ag_alloc(tp, agbuf)) {
+		if (xfs_ialloc_ag_alloc(tp, agbp)) {
 			/*
 			 * We successfully allocated some inodes, return
 			 * the current context to the caller so that it
@@ -548,14 +548,14 @@ xfs_dialloc_ino(
 			ASSERT(agi->agi_freecount > 0 &&
 			       agi->agi_freelist != NULLAGINO);
 			*alloc_done = B_TRUE;
-			*IO_agbuf = agbuf;
+			*IO_agbp = agbp;
 			return 0;
 		}
 
 		/*
 		 * If it failed, give up on this ag.
 		 */
-		xfs_trans_brelse(tp, agbuf);
+		xfs_trans_brelse(tp, agbp);
 		/*
 		 * Can't try any other ag's, so give up.
 		 */
@@ -568,14 +568,14 @@ xfs_dialloc_ino(
 			tagno = 0;
 		if (tagno == agno)
 			return NULLFSINO;
-		agbuf = xfs_ialloc_read_agi(mp, tp, tagno);
-		agi = XFS_BUF_TO_AGI(agbuf);
+		agbp = xfs_ialloc_read_agi(mp, tp, tagno);
+		agi = XFS_BUF_TO_AGI(agbp);
 		ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
 	}
 	/*
 	 * Here with an allocation group that has a free inode.
 	 */
-	*IO_agbuf = agbuf;
+	*IO_agbp = agbp;
 	agino = agi->agi_freelist;
 	ASSERT(agino != NULLAGINO && agino != NULLAGINO_ALLOC);
 	ino = XFS_AGINO_TO_INO(mp, tagno, agino);
@@ -600,7 +600,7 @@ void
 xfs_dialloc_finish(
 	xfs_trans_t	*tp,		/* transaction structure */
 	xfs_ino_t	ino,		/* ino chosen by xfs_dialloc_ino() */
-	buf_t		*agbuf)		/* agi buf from xfs_dialloc_ino() */
+	buf_t		*agbp)		/* agi buf from xfs_dialloc_ino() */
 {	 
 	xfs_agblock_t	agbno;		/* starting block number of inode */
 	xfs_agi_t	*agi;		/* allocation group header */
@@ -614,7 +614,7 @@ xfs_dialloc_finish(
 	agno = XFS_INO_TO_AGNO(mp, ino);
 	agbno = XFS_INO_TO_AGBNO(mp, ino);
 	off = XFS_INO_TO_OFFSET(mp, ino);
-	agi = XFS_BUF_TO_AGI(agbuf);
+	agi = XFS_BUF_TO_AGI(agbp);
 	ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
 	/*
 	 * Get a buffer containing the free inode.
@@ -638,20 +638,20 @@ xfs_dialloc_finish(
 	free->di_u.di_next = NULLAGINO_ALLOC;
 	xfs_ialloc_log_di(tp, fbuf, off, XFS_DI_U);
 	agi->agi_freecount--;
-	xfs_ialloc_log_agi(tp, agbuf, XFS_AGI_FREECOUNT | XFS_AGI_FREELIST);
+	xfs_ialloc_log_agi(tp, agbp, XFS_AGI_FREECOUNT | XFS_AGI_FREELIST);
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, -1);
 	return;
 }
 
 /*
  * Return the next (past agino) inode on the freelist for this allocation group
- * (given by agbuf).  Used to traverse the whole list, e.g. for printing.
+ * (given by agbp).  Used to traverse the whole list, e.g. for printing.
  */
 xfs_agino_t				/* a.g. inode next on freelist */
 xfs_dialloc_next_free(
 	xfs_mount_t	*mp,		/* filesystem mount structure */
 	xfs_trans_t	*tp,		/* transaction pointer */
-	buf_t		*agbuf,		/* buffer for ag.inode header */
+	buf_t		*agbp,		/* buffer for ag.inode header */
 	xfs_agino_t	agino)		/* inode to get next free for */
 {
 	xfs_agblock_t	agbno;	/* block number in allocation group */
@@ -661,7 +661,7 @@ xfs_dialloc_next_free(
 	xfs_dinode_t	*free;	/* pointer to the free inode */
 	int		off;	/* index of inode in the buffer */
 
-	agi = XFS_BUF_TO_AGI(agbuf);
+	agi = XFS_BUF_TO_AGI(agbp);
 	agno = agi->agi_seqno;
 	agbno = XFS_AGINO_TO_AGBNO(mp, agino);
 	off = XFS_AGINO_TO_OFFSET(mp, agino);
@@ -689,7 +689,7 @@ xfs_difree(
 	xfs_ino_t	inode)		/* inode to be freed */
 {
 	xfs_agblock_t	agbno;	/* block number of inode relative to ag */
-	buf_t		*agbuf;	/* buffer containing allocation group header */
+	buf_t		*agbp;	/* buffer containing allocation group header */
 	xfs_agino_t	agino;	/* inode number relative to allocation group */
 	xfs_agnumber_t	agno;	/* allocation group number */
 	xfs_agi_t	*agi;	/* allocation group header */
@@ -715,8 +715,8 @@ xfs_difree(
 	/*
 	 * Get the allocation group header.
 	 */
-	agbuf = xfs_ialloc_read_agi(mp, tp, agno);
-	agi = XFS_BUF_TO_AGI(agbuf);
+	agbp = xfs_ialloc_read_agi(mp, tp, agno);
+	agi = XFS_BUF_TO_AGI(agbp);
 	ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
 	ASSERT(agbno < agi->agi_length);
 	/*
@@ -769,7 +769,7 @@ xfs_difree(
 	 */
 	agi->agi_freecount++;
 	flags |= XFS_AGI_FREECOUNT;
-	xfs_ialloc_log_agi(tp, agbuf, flags);
+	xfs_ialloc_log_agi(tp, agbp, flags);
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, 1);
 }
 

@@ -1358,10 +1358,10 @@ xfs_bmap_btree_to_extents(
 #ifdef XFSDEBUG
 	{
 		xfs_bmbt_block_t	*cblock;
-		buf_t			*cbuf;
+		buf_t			*cbp;
 
-		cbuf = xfs_btree_read_bufl(mp, tp, cbno, 0);
-		cblock = XFS_BUF_TO_BMBT_BLOCK(cbuf);
+		cbp = xfs_btree_read_bufl(mp, tp, cbno, 0);
+		cblock = XFS_BUF_TO_BMBT_BLOCK(cbp);
 		ASSERT(cblock->bb_level == 0);
 	}
 #endif
@@ -1664,7 +1664,7 @@ xfs_bmap_extents_to_btree(
 {
 	xfs_bmbt_block_t	*ablock;
 	xfs_fsblock_t		abno;
-	buf_t			*abuf;
+	buf_t			*abp;
 	xfs_bmbt_rec_t		*arp;
 	xfs_bmbt_block_t	*block;
 	xfs_btree_cur_t		*cur;
@@ -1717,11 +1717,11 @@ xfs_bmap_extents_to_btree(
 		*firstblock = abno;
 	cur->bc_private.b.allocated++;
 	ip->i_d.di_nblocks++;
-	abuf = xfs_btree_get_bufl(mp, tp, abno, 0);
+	abp = xfs_btree_get_bufl(mp, tp, abno, 0);
 	/*
 	 * Fill in the child block.
 	 */
-	ablock = XFS_BUF_TO_BMBT_BLOCK(abuf);
+	ablock = XFS_BUF_TO_BMBT_BLOCK(abp);
 	ablock->bb_magic = XFS_BMAP_MAGIC;
 	ablock->bb_level = 0;
 	ablock->bb_numrecs = 0;
@@ -1747,8 +1747,8 @@ xfs_bmap_extents_to_btree(
 	 * Do all this logging at the end so that 
 	 * the root is at the right level.
 	 */
-	xfs_bmbt_log_block(cur, abuf, XFS_BB_ALL_BITS);
-	xfs_bmbt_log_recs(cur, abuf, 1, ablock->bb_numrecs);
+	xfs_bmbt_log_block(cur, abp, XFS_BB_ALL_BITS);
+	xfs_bmbt_log_recs(cur, abp, 1, ablock->bb_numrecs);
 	xfs_bmbt_rcheck(cur);
 	xfs_bmbt_kcheck(cur);
 	*curp = cur;
@@ -1797,7 +1797,7 @@ xfs_bmap_local_to_extents(
 {
 	xfs_fsblock_t	askbno;
 	xfs_fsblock_t	bno;
-	buf_t		*buf;
+	buf_t		*bp;
 	char		*cp;
 	xfs_bmbt_rec_t	*ep;
 	int		flags = 0;
@@ -1828,8 +1828,8 @@ xfs_bmap_local_to_extents(
 		ASSERT(bno != NULLFSBLOCK);
 		if (*firstblock == NULLFSBLOCK)
 			*firstblock = bno;
-		buf = xfs_btree_get_bufl(mp, tp, bno, 0);
-		cp = (char *)buf->b_un.b_addr;
+		bp = xfs_btree_get_bufl(mp, tp, bno, 0);
+		cp = (char *)bp->b_un.b_addr;
 		bcopy(ip->i_u1.iu_data, cp, ip->i_bytes);
 		xfs_idata_realloc(ip, -ip->i_bytes);
 		xfs_iext_realloc(ip, 1);
@@ -2196,7 +2196,7 @@ xfs_bmap_read_extents(
 {
 	xfs_bmbt_block_t	*block;	/* current btree block */
 	xfs_fsblock_t		bno;	/* block # of "block" */
-	buf_t			*buf;	/* buffer for "block" */
+	buf_t			*bp;	/* buffer for "block" */
 	xfs_extnum_t		i;	/* index into the extents list */
 	int			level;	/* btree level, for checking */
 	xfs_mount_t		*mp;	/* file system mount structure */
@@ -2224,8 +2224,8 @@ xfs_bmap_read_extents(
 	 * pointer (leftmost) at each level.
 	 */
 	while (level-- > 0) {
-		buf = xfs_btree_read_bufl(mp, tp, bno, 0);
-		block = XFS_BUF_TO_BMBT_BLOCK(buf);
+		bp = xfs_btree_read_bufl(mp, tp, bno, 0);
+		block = XFS_BUF_TO_BMBT_BLOCK(bp);
 		ASSERT(block->bb_level == level);
 		if (level == 0)
 			break;
@@ -2234,10 +2234,10 @@ xfs_bmap_read_extents(
 		       XFS_FSB_TO_AGNO(mp, *pp) < mp->m_sb.sb_agcount &&
 		       XFS_FSB_TO_AGBNO(mp, *pp) < mp->m_sb.sb_agblocks);
 		bno = *pp;
-		xfs_trans_brelse(tp, buf);
+		xfs_trans_brelse(tp, bp);
 	}
 	/*
-	 * Here with buf and block set to the leftmost leaf node in the tree.
+	 * Here with bp and block set to the leftmost leaf node in the tree.
 	 */
 	trp = ip->i_u1.iu_extents;
 	room = ip->i_bytes / sizeof(*trp);
@@ -2266,15 +2266,15 @@ xfs_bmap_read_extents(
 		 * we could make this illegal.
 		 */
 		if (bno != NULLFSBLOCK)
-			xfs_trans_brelse(tp, buf);
+			xfs_trans_brelse(tp, bp);
 		bno = nextbno;
 		/*
 		 * If we've reached the end, stop.
 		 */
 		if (bno == NULLFSBLOCK)
 			break;
-		buf = xfs_btree_read_bufl(mp, tp, bno, 0);
-		block = XFS_BUF_TO_BMBT_BLOCK(buf);
+		bp = xfs_btree_read_bufl(mp, tp, bno, 0);
+		block = XFS_BUF_TO_BMBT_BLOCK(bp);
 	}
 	kmem_check();
 }

@@ -84,7 +84,7 @@ xfs_alloc_fix_freelist(
 xfs_agblock_t			/* block address retrieved from freelist */
 xfs_alloc_get_freelist(
 	xfs_trans_t	*tp,	/* transaction pointer */
-	buf_t		*agbuf,	/* buffer containing the agf structure */
+	buf_t		*agbp,	/* buffer containing the agf structure */
 	buf_t		**bufp);/* out: buffer pointer for the free block */
 
 /*
@@ -93,7 +93,7 @@ xfs_alloc_get_freelist(
 void
 xfs_alloc_log_agf(
 	xfs_trans_t	*tp,	/* transaction pointer */
-	buf_t		*buf,	/* buffer for a.g. freelist header */
+	buf_t		*bp,	/* buffer for a.g. freelist header */
 	int		fields);/* mask of fields to be logged (XFS_AGF_...) */
 
 /*
@@ -103,7 +103,7 @@ xfs_agblock_t			/* a.g.-relative block number for btree list */
 xfs_alloc_next_free(
 	xfs_mount_t	*mp,	/* file system mount structure */
 	xfs_trans_t	*tp,	/* transaction pointer */
-	buf_t		*agbuf,	/* buffer for a.g. freelist header */
+	buf_t		*agbp,	/* buffer for a.g. freelist header */
 	xfs_agblock_t	bno);	/* current freelist block number */
 
 /*
@@ -112,8 +112,8 @@ xfs_alloc_next_free(
 void
 xfs_alloc_put_freelist(
 	xfs_trans_t	*tp,	/* transaction pointer */
-	buf_t		*agbuf,	/* buffer for a.g. freelist header */
-	buf_t		*buf);	/* buffer for the block being freed */
+	buf_t		*agbp,	/* buffer for a.g. freelist header */
+	buf_t		*bp);	/* buffer for the block being freed */
 
 /*
  * Allocate an extent (variable-size).

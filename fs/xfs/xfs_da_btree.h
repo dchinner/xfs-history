@@ -96,6 +96,6 @@ int	xfs_dir_node_lookup_int(struct xfs_dir_state *state);
  */
 void	xfs_dir_leaf_print_int(buf_t *leaf_buffer, xfs_inode_t *dir_inode);
 int	xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, uio_t *uio,
-					int *eobp, dirent_t *buf);
+					int *eobp, dirent_t *dbp);
 
 #endif	/* !FS_XFS_DIR_BTREE_H */

@@ -163,7 +163,7 @@ xfs_bmbt_delrec(
 {
 	xfs_bmbt_block_t	*block;
 	xfs_fsblock_t		bno;
-	buf_t			*buf;
+	buf_t			*bp;
 	xfs_bmbt_block_t	*cblock;
 	xfs_bmbt_key_t		*ckp;
 	xfs_bmbt_ptr_t		*cpp;
@@ -173,7 +173,7 @@ xfs_bmbt_delrec(
 	xfs_bmbt_key_t		*kp;
 	int			last;
 	xfs_fsblock_t		lbno;
-	buf_t			*lbuf;
+	buf_t			*lbp;
 	xfs_bmbt_block_t	*left;
 	xfs_bmbt_key_t		*lkp;
 	xfs_bmbt_ptr_t		*lpp;
@@ -183,13 +183,13 @@ xfs_bmbt_delrec(
 	xfs_bmbt_ptr_t		*pp;
 	int			ptr;
 	xfs_fsblock_t		rbno;
-	buf_t			*rbuf;
+	buf_t			*rbp;
 	xfs_bmbt_block_t	*right;
 	xfs_bmbt_key_t		*rkp;
 	xfs_bmbt_rec_t		*rp;
 	xfs_bmbt_ptr_t		*rpp;
 	xfs_bmbt_block_t	*rrblock;
-	buf_t			*rrbuf;
+	buf_t			*rrbp;
 	int			rrecs;
 	xfs_bmbt_rec_t		*rrp;
 	xfs_btree_cur_t		*tcur;
@@ -201,7 +201,7 @@ xfs_bmbt_delrec(
 	ptr = cur->bc_ptrs[level];
 	if (ptr == 0)
 		return 0;
-	block = xfs_bmbt_get_block(cur, level, &buf);
+	block = xfs_bmbt_get_block(cur, level, &bp);
 	xfs_btree_check_lblock(cur, block, level);
 	if (ptr > block->bb_numrecs)
 		return 0;
@@ -214,22 +214,22 @@ xfs_bmbt_delrec(
 			pp[i - 1] = pp[i];
 		}
 		if (ptr < i) {
-			xfs_bmbt_log_ptrs(cur, buf, ptr, i - 1);
-			xfs_bmbt_log_keys(cur, buf, ptr, i - 1);
+			xfs_bmbt_log_ptrs(cur, bp, ptr, i - 1);
+			xfs_bmbt_log_keys(cur, bp, ptr, i - 1);
 		}
 	} else {
 		rp = XFS_BMAP_REC_IADDR(block, 1, cur);
 		for (i = ptr; i < block->bb_numrecs; i++)
 			rp[i - 1] = rp[i];
 		if (ptr < i)
-			xfs_bmbt_log_recs(cur, buf, ptr, i - 1);
+			xfs_bmbt_log_recs(cur, bp, ptr, i - 1);
 		if (ptr == 1) {
 			key.br_startoff = xfs_bmbt_get_startoff(rp);
 			kp = &key;
 		}
 	}
 	block->bb_numrecs--;
-	xfs_bmbt_log_block(cur, buf, XFS_BB_NUMRECS);
+	xfs_bmbt_log_block(cur, bp, XFS_BB_NUMRECS);
 	/*
 	 * We just did a join at the previous level.
 	 * Make the cursor point to the good (left) key.
@@ -264,13 +264,13 @@ xfs_bmbt_delrec(
 	ASSERT(rbno != NULLFSBLOCK || lbno != NULLFSBLOCK);
 	tcur = xfs_btree_dup_cursor(cur);
 	bno = NULLFSBLOCK;
-	buf = cur->bc_bufs[level];
+	bp = cur->bc_bufs[level];
 	if (rbno != NULLFSBLOCK) {
 		xfs_btree_lastrec(tcur, level);
 		xfs_bmbt_increment(tcur, level);
 		xfs_btree_lastrec(tcur, level);
-		rbuf = tcur->bc_bufs[level];
-		right = XFS_BUF_TO_BMBT_BLOCK(rbuf);
+		rbp = tcur->bc_bufs[level];
+		right = XFS_BUF_TO_BMBT_BLOCK(rbp);
 		xfs_btree_check_lblock(cur, right, level);
 		bno = right->bb_leftsib;
 		if (right->bb_numrecs - 1 >= XFS_BMAP_BLOCK_IMINRECS(level, cur)) {
@@ -290,8 +290,8 @@ xfs_bmbt_delrec(
 		xfs_btree_firstrec(tcur, level);
 		xfs_bmbt_decrement(tcur, level);	/* to last */
 		xfs_btree_firstrec(tcur, level);
-		lbuf = tcur->bc_bufs[level];
-		left = XFS_BUF_TO_BMBT_BLOCK(lbuf);
+		lbp = tcur->bc_bufs[level];
+		left = XFS_BUF_TO_BMBT_BLOCK(lbp);
 		xfs_btree_check_lblock(cur, left, level);
 		bno = left->bb_rightsib;
 		if (left->bb_numrecs - 1 >= XFS_BMAP_BLOCK_IMINRECS(level, cur)) {
@@ -310,17 +310,17 @@ xfs_bmbt_delrec(
 	    lrecs + block->bb_numrecs <= XFS_BMAP_BLOCK_IMAXRECS(level, cur)) {
 		rbno = bno;
 		right = block;
-		rbuf = buf;
-		lbuf = xfs_btree_read_bufl(mp, tp, lbno, 0);
-		left = XFS_BUF_TO_BMBT_BLOCK(lbuf);
+		rbp = bp;
+		lbp = xfs_btree_read_bufl(mp, tp, lbno, 0);
+		left = XFS_BUF_TO_BMBT_BLOCK(lbp);
 		xfs_btree_check_lblock(cur, left, level);
 	} else if (rbno != NULLFSBLOCK &&
 		   rrecs + block->bb_numrecs <= XFS_BMAP_BLOCK_IMAXRECS(level, cur)) {
 		lbno = bno;
 		left = block;
-		lbuf = buf;
-		rbuf = xfs_btree_read_bufl(mp, tp, rbno, 0);
-		right = XFS_BUF_TO_BMBT_BLOCK(rbuf);
+		lbp = bp;
+		rbp = xfs_btree_read_bufl(mp, tp, rbno, 0);
+		right = XFS_BUF_TO_BMBT_BLOCK(rbp);
 		xfs_btree_check_lblock(cur, right, level);
 	} else {
 		xfs_bmbt_rcheck(cur);
@@ -336,31 +336,31 @@ xfs_bmbt_delrec(
 			xfs_btree_check_lptr(cur, rpp[i], level);
 			lpp[i] = rpp[i];
 		}
-		xfs_bmbt_log_keys(cur, lbuf, left->bb_numrecs + 1, left->bb_numrecs + right->bb_numrecs);
-		xfs_bmbt_log_ptrs(cur, lbuf, left->bb_numrecs + 1, left->bb_numrecs + right->bb_numrecs);
+		xfs_bmbt_log_keys(cur, lbp, left->bb_numrecs + 1, left->bb_numrecs + right->bb_numrecs);
+		xfs_bmbt_log_ptrs(cur, lbp, left->bb_numrecs + 1, left->bb_numrecs + right->bb_numrecs);
 	} else {
 		lrp = XFS_BMAP_REC_IADDR(left, left->bb_numrecs + 1, cur);
 		rrp = XFS_BMAP_REC_IADDR(right, 1, cur);
 		for (i = 0; i < right->bb_numrecs; i++)
 			lrp[i] = rrp[i];
-		xfs_bmbt_log_recs(cur, lbuf, left->bb_numrecs + 1, left->bb_numrecs + right->bb_numrecs);
+		xfs_bmbt_log_recs(cur, lbp, left->bb_numrecs + 1, left->bb_numrecs + right->bb_numrecs);
 	}
-	if (buf != lbuf) {
-		xfs_btree_setbuf(cur, level, lbuf);
+	if (bp != lbp) {
+		xfs_btree_setbuf(cur, level, lbp);
 		cur->bc_ptrs[level] += left->bb_numrecs;
 	} else if (level + 1 < cur->bc_nlevels)
 		xfs_bmbt_increment(cur, level + 1);
 	left->bb_numrecs += right->bb_numrecs;
 	left->bb_rightsib = right->bb_rightsib;
-	xfs_bmbt_log_block(cur, lbuf, XFS_BB_RIGHTSIB | XFS_BB_NUMRECS);
+	xfs_bmbt_log_block(cur, lbp, XFS_BB_RIGHTSIB | XFS_BB_NUMRECS);
 	if (left->bb_rightsib != NULLDFSBNO) {
-		rrbuf = xfs_btree_read_bufl(mp, tp, left->bb_rightsib, 0);
-		rrblock = XFS_BUF_TO_BMBT_BLOCK(rrbuf);
+		rrbp = xfs_btree_read_bufl(mp, tp, left->bb_rightsib, 0);
+		rrblock = XFS_BUF_TO_BMBT_BLOCK(rrbp);
 		xfs_btree_check_lblock(cur, rrblock, level);
 		rrblock->bb_leftsib = lbno;
-		xfs_bmbt_log_block(cur, rrbuf, XFS_BB_LEFTSIB);
+		xfs_bmbt_log_block(cur, rrbp, XFS_BB_LEFTSIB);
 	}
-	xfs_bmap_add_free(XFS_DADDR_TO_FSB(mp, rbuf->b_blkno), 1,
+	xfs_bmap_add_free(XFS_DADDR_TO_FSB(mp, rbp->b_blkno), 1,
 		cur->bc_private.b.flist, mp);
 	xfs_bmbt_rcheck(cur);
 	return 2;
@@ -377,11 +377,11 @@ xfs_bmbt_get_rec(
 	xfs_extlen_t		*len)
 {
 	xfs_bmbt_block_t	*block;
-	buf_t			*buf;
+	buf_t			*bp;
 	int			ptr;
 	xfs_bmbt_rec_t		*rp;
 
-	block = xfs_bmbt_get_block(cur, 0, &buf);
+	block = xfs_bmbt_get_block(cur, 0, &bp);
 	ptr = cur->bc_ptrs[0];
 	xfs_btree_check_lblock(cur, block, 0);
 	if (ptr > block->bb_numrecs || ptr <= 0)
@@ -407,7 +407,7 @@ xfs_bmbt_insrec(
 {
 	xfs_fsblock_t		askbno;
 	xfs_bmbt_block_t	*block;
-	buf_t			*buf;
+	buf_t			*bp;
 	xfs_bmbt_block_t	*cblock;
 	xfs_fsblock_t		cbno;
 	xfs_bmbt_key_t		*ckp;
@@ -435,7 +435,7 @@ xfs_bmbt_insrec(
 	optr = ptr = cur->bc_ptrs[level];
 	if (ptr == 0)
 		return 0;
-	block = xfs_bmbt_get_block(cur, level, &buf);
+	block = xfs_bmbt_get_block(cur, level, &bp);
 	xfs_btree_check_lblock(cur, block, level);
 #ifdef DEBUG
 	if (ptr <= block->bb_numrecs) {
@@ -458,7 +458,7 @@ xfs_bmbt_insrec(
 			 * A root block, that can be made bigger.
 			 */
 			xfs_iroot_realloc(ip, 1);
-			block = xfs_bmbt_get_block(cur, level, &buf);
+			block = xfs_bmbt_get_block(cur, level, &bp);
 		} else if (level == cur->bc_nlevels - 1) {
 			/*
 			 * Copy the root into a real block.
@@ -476,8 +476,8 @@ xfs_bmbt_insrec(
 				return 0;
 			cur->bc_private.b.allocated++;
 			ip->i_d.di_nblocks++;
-			buf = xfs_btree_get_bufl(mp, tp, cbno, 0);
-			cblock = XFS_BUF_TO_BMBT_BLOCK(buf);
+			bp = xfs_btree_get_bufl(mp, tp, cbno, 0);
+			cblock = XFS_BUF_TO_BMBT_BLOCK(bp);
 			*cblock = *block;
 			block->bb_level++;
 			block->bb_numrecs = 1;
@@ -495,14 +495,14 @@ xfs_bmbt_insrec(
 			xfs_btree_check_lptr(cur, (xfs_bmbt_ptr_t)cbno, level);
 			*pp = cbno;
 			xfs_iroot_realloc(ip, 1 - cblock->bb_numrecs);
-			xfs_btree_setbuf(cur, level, buf);
+			xfs_btree_setbuf(cur, level, bp);
 			/*
 			 * Do all this logging at the end so that 
 			 * the root is at the right level.
 			 */
-			xfs_bmbt_log_block(cur, buf, XFS_BB_ALL_BITS);
-			xfs_bmbt_log_keys(cur, buf, 1, cblock->bb_numrecs);
-			xfs_bmbt_log_ptrs(cur, buf, 1, cblock->bb_numrecs);
+			xfs_bmbt_log_block(cur, bp, XFS_BB_ALL_BITS);
+			xfs_bmbt_log_keys(cur, bp, 1, cblock->bb_numrecs);
+			xfs_bmbt_log_ptrs(cur, bp, 1, cblock->bb_numrecs);
 			xfs_trans_log_inode(tp, ip,
 				XFS_ILOG_CORE | XFS_ILOG_BROOT);
 			block = cblock;
@@ -512,7 +512,7 @@ xfs_bmbt_insrec(
 			} else if (xfs_bmbt_lshift(cur, level)) {
 				optr = ptr = cur->bc_ptrs[level];
 			} else if (xfs_bmbt_split(cur, level, &nbno, &nkey, &ncur)) {
-				block = xfs_bmbt_get_block(cur, level, &buf);
+				block = xfs_bmbt_get_block(cur, level, &bp);
 				xfs_btree_check_lblock(cur, block, level);
 				ptr = cur->bc_ptrs[level];
 				xfs_bmbt_set_startoff(&nrec, nkey.br_startoff);
@@ -532,17 +532,17 @@ xfs_bmbt_insrec(
 		kp[i] = key;
 		pp[i] = *bnop;
 		block->bb_numrecs++;
-		xfs_bmbt_log_keys(cur, buf, ptr, block->bb_numrecs);
-		xfs_bmbt_log_ptrs(cur, buf, ptr, block->bb_numrecs);
+		xfs_bmbt_log_keys(cur, bp, ptr, block->bb_numrecs);
+		xfs_bmbt_log_ptrs(cur, bp, ptr, block->bb_numrecs);
 	} else {
 		rp = XFS_BMAP_REC_IADDR(block, 1, cur);
 		for (i = block->bb_numrecs; i >= ptr; i--)
 			rp[i] = rp[i - 1];
 		rp[i] = *recp;
 		block->bb_numrecs++;
-		xfs_bmbt_log_recs(cur, buf, ptr, block->bb_numrecs);
+		xfs_bmbt_log_recs(cur, bp, ptr, block->bb_numrecs);
 	}
-	xfs_bmbt_log_block(cur, buf, XFS_BB_NUMRECS);
+	xfs_bmbt_log_block(cur, bp, XFS_BB_NUMRECS);
 #ifdef DEBUG
 	if (ptr < block->bb_numrecs) {
 		if (level == 0)
@@ -606,15 +606,15 @@ xfs_bmbt_kcheck_btree(
 	xfs_bmbt_key_t		*kp)
 {
 	xfs_bmbt_block_t	*block;
-	buf_t			*buf;
+	buf_t			*bp;
 	xfs_trans_t		*tp;
 
 	ASSERT(bno != NULLFSBLOCK);
 	tp = cur->bc_tp;
-	buf = xfs_btree_read_bufl(cur->bc_mp, tp, bno, 0);
-	block = XFS_BUF_TO_BMBT_BLOCK(buf);
+	bp = xfs_btree_read_bufl(cur->bc_mp, tp, bno, 0);
+	block = XFS_BUF_TO_BMBT_BLOCK(bp);
 	xfs_bmbt_kcheck_body(cur, block, level, kp);
-	xfs_trans_brelse(tp, buf);
+	xfs_trans_brelse(tp, bp);
 }
 #endif
 
@@ -624,7 +624,7 @@ xfs_bmbt_killroot(
 {
 	xfs_bmbt_block_t	*block;
 	xfs_bmbt_block_t	*cblock;
-	buf_t			*cbuf;
+	buf_t			*cbp;
 	xfs_bmbt_key_t		*ckp;
 	xfs_bmbt_ptr_t		*cpp;
 	int			i;
@@ -643,7 +643,7 @@ xfs_bmbt_killroot(
 	 */
 	if (level == 1)
 		return 1;
-	block = xfs_bmbt_get_block(cur, level, &cbuf);
+	block = xfs_bmbt_get_block(cur, level, &cbp);
 	/*
 	 * Give up if the root has multiple children.
 	 */
@@ -654,8 +654,8 @@ xfs_bmbt_killroot(
 	 * Then the data must be copied up to the inode,
 	 * instead of freeing the root you free the next level.
 	 */
-	cbuf = cur->bc_bufs[level - 1];
-	cblock = XFS_BUF_TO_BMBT_BLOCK(cbuf);
+	cbp = cur->bc_bufs[level - 1];
+	cblock = XFS_BUF_TO_BMBT_BLOCK(cbp);
 	if (cblock->bb_numrecs > XFS_BMAP_BLOCK_DMAXRECS(level, cur))
 		return 1;
 	ASSERT(cblock->bb_leftsib == NULLDFSBNO);
@@ -681,7 +681,7 @@ xfs_bmbt_killroot(
 	bcopy((caddr_t)cpp, (caddr_t)pp, block->bb_numrecs * (int)sizeof(*pp));
 	tp = cur->bc_tp;
 	mp = cur->bc_mp;
-	xfs_bmap_add_free(XFS_DADDR_TO_FSB(mp, cbuf->b_blkno), 1,
+	xfs_bmap_add_free(XFS_DADDR_TO_FSB(mp, cbp->b_blkno), 1,
 		cur->bc_private.b.flist, mp);
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_BROOT);
 	xfs_btree_setbuf(cur, level - 1, 0);
@@ -696,24 +696,24 @@ xfs_bmbt_killroot(
 STATIC void
 xfs_bmbt_log_keys(
 	xfs_btree_cur_t	*cur,
-	buf_t		*buf,
+	buf_t		*bp,
 	int		kfirst,
 	int		klast)
 {
 	xfs_trans_t	*tp;
 
 	tp = cur->bc_tp;
-	if (buf) {
+	if (bp) {
 		xfs_bmbt_block_t *block;
 		int first;
 		int last;
 		xfs_bmbt_key_t *kp;
 
-		block = XFS_BUF_TO_BMBT_BLOCK(buf);
+		block = XFS_BUF_TO_BMBT_BLOCK(bp);
 		kp = XFS_BMAP_KEY_DADDR(block, 1, cur);
 		first = (caddr_t)&kp[kfirst - 1] - (caddr_t)block;
 		last = ((caddr_t)&kp[klast] - 1) - (caddr_t)block;
-		xfs_trans_log_buf(tp, buf, first, last);
+		xfs_trans_log_buf(tp, bp, first, last);
 	} else {
 		xfs_inode_t *ip;
 
@@ -728,24 +728,24 @@ xfs_bmbt_log_keys(
 STATIC void
 xfs_bmbt_log_ptrs(
 	xfs_btree_cur_t	*cur,
-	buf_t		*buf,
+	buf_t		*bp,
 	int		pfirst,
 	int		plast)
 {
 	xfs_trans_t	*tp;
 
 	tp = cur->bc_tp;
-	if (buf) {
+	if (bp) {
 		xfs_bmbt_block_t *block;
 		int first;
 		int last;
 		xfs_bmbt_ptr_t *pp;
 
-		block = XFS_BUF_TO_BMBT_BLOCK(buf);
+		block = XFS_BUF_TO_BMBT_BLOCK(bp);
 		pp = XFS_BMAP_PTR_DADDR(block, 1, cur);
 		first = (caddr_t)&pp[pfirst - 1] - (caddr_t)block;
 		last = ((caddr_t)&pp[plast] - 1) - (caddr_t)block;
-		xfs_trans_log_buf(tp, buf, first, last);
+		xfs_trans_log_buf(tp, bp, first, last);
 	} else {
 		xfs_inode_t *ip;
 
@@ -763,7 +763,7 @@ xfs_bmbt_lookup(
 	xfs_lookup_t		dir)
 {
 	xfs_bmbt_block_t	*block;
-	buf_t			*buf;
+	buf_t			*bp;
 	daddr_t			d;
 	int			diff;
 	xfs_fsblock_t		fsbno;
@@ -790,17 +790,17 @@ xfs_bmbt_lookup(
 	for (level = cur->bc_nlevels - 1, diff = 1; level >= 0; level--) {
 		if (level < cur->bc_nlevels - 1) {
 			d = XFS_FSB_TO_DADDR(mp, fsbno);
-			buf = cur->bc_bufs[level];
-			if (buf && buf->b_blkno != d)
-				buf = (buf_t *)0;
-			if (!buf) {
-				buf = xfs_trans_read_buf(tp, mp->m_dev, d,
+			bp = cur->bc_bufs[level];
+			if (bp && bp->b_blkno != d)
+				bp = (buf_t *)0;
+			if (!bp) {
+				bp = xfs_trans_read_buf(tp, mp->m_dev, d,
 					mp->m_bsize, 0);
-				ASSERT(buf && !geterror(buf));
-				xfs_btree_setbuf(cur, level, buf);
+				ASSERT(bp && !geterror(bp));
+				xfs_btree_setbuf(cur, level, bp);
 			}
 		}
-		block = xfs_bmbt_get_block(cur, level, &buf);
+		block = xfs_bmbt_get_block(cur, level, &bp);
 		xfs_btree_check_lblock(cur, block, level);
 		if (diff == 0)
 			keyno = 1;
@@ -878,14 +878,14 @@ xfs_bmbt_lshift(
 	int			i;
 	xfs_bmbt_key_t		key;
 	int			last;
-	buf_t			*lbuf;
+	buf_t			*lbp;
 	xfs_bmbt_block_t	*left;
 	xfs_bmbt_key_t		*lkp;
 	xfs_bmbt_ptr_t		*lpp;
 	xfs_bmbt_rec_t		*lrp;
 	xfs_mount_t		*mp;
 	int			nrec;
-	buf_t			*rbuf;
+	buf_t			*rbp;
 	xfs_bmbt_block_t	*right;
 	xfs_bmbt_key_t		*rkp;
 	xfs_bmbt_ptr_t		*rpp;
@@ -895,8 +895,8 @@ xfs_bmbt_lshift(
 	if (level == cur->bc_nlevels - 1)
 		return 0;
 	xfs_bmbt_rcheck(cur);
-	rbuf = cur->bc_bufs[level];
-	right = XFS_BUF_TO_BMBT_BLOCK(rbuf);
+	rbp = cur->bc_bufs[level];
+	right = XFS_BUF_TO_BMBT_BLOCK(rbp);
 	xfs_btree_check_lblock(cur, right, level);
 	if (right->bb_leftsib == NULLDFSBNO)
 		return 0;
@@ -904,8 +904,8 @@ xfs_bmbt_lshift(
 		return 0;
 	tp = cur->bc_tp;
 	mp = cur->bc_mp;
-	lbuf = xfs_btree_read_bufl(mp, tp, right->bb_leftsib, 0);
-	left = XFS_BUF_TO_BMBT_BLOCK(lbuf);
+	lbp = xfs_btree_read_bufl(mp, tp, right->bb_leftsib, 0);
+	left = XFS_BUF_TO_BMBT_BLOCK(lbp);
 	xfs_btree_check_lblock(cur, left, level);
 	if (left->bb_numrecs == XFS_BMAP_BLOCK_IMAXRECS(level, cur))
 		return 0;
@@ -914,20 +914,20 @@ xfs_bmbt_lshift(
 		lkp = XFS_BMAP_KEY_IADDR(left, left->bb_numrecs + 1, cur);
 		rkp = XFS_BMAP_KEY_IADDR(right, 1, cur);
 		*lkp = *rkp;
-		xfs_bmbt_log_keys(cur, lbuf, nrec, nrec);
+		xfs_bmbt_log_keys(cur, lbp, nrec, nrec);
 		lpp = XFS_BMAP_PTR_IADDR(left, left->bb_numrecs + 1, cur);
 		rpp = XFS_BMAP_PTR_IADDR(right, 1, cur);
 		xfs_btree_check_lptr(cur, *rpp, level);
 		*lpp = *rpp;
-		xfs_bmbt_log_ptrs(cur, lbuf, nrec, nrec);
+		xfs_bmbt_log_ptrs(cur, lbp, nrec, nrec);
 	} else {
 		lrp = XFS_BMAP_REC_IADDR(left, left->bb_numrecs + 1, cur);
 		rrp = XFS_BMAP_REC_IADDR(right, 1, cur);
 		*lrp = *rrp;
-		xfs_bmbt_log_recs(cur, lbuf, nrec, nrec);
+		xfs_bmbt_log_recs(cur, lbp, nrec, nrec);
 	}
 	left->bb_numrecs++;
-	xfs_bmbt_log_block(cur, lbuf, XFS_BB_NUMRECS);
+	xfs_bmbt_log_block(cur, lbp, XFS_BB_NUMRECS);
 #ifdef DEBUG
 	if (level > 0)
 		xfs_btree_check_key(XFS_BTNUM_BMAP, lkp - 1, lkp);
@@ -935,19 +935,19 @@ xfs_bmbt_lshift(
 		xfs_btree_check_rec(XFS_BTNUM_BMAP, lrp - 1, lrp);
 #endif
 	right->bb_numrecs--;
-	xfs_bmbt_log_block(cur, rbuf, XFS_BB_NUMRECS);
+	xfs_bmbt_log_block(cur, rbp, XFS_BB_NUMRECS);
 	if (level > 0) {
 		for (i = 0; i < right->bb_numrecs; i++) {
 			rkp[i] = rkp[i + 1];
 			xfs_btree_check_lptr(cur, rpp[i + 1], level);
 			rpp[i] = rpp[i + 1];
 		}
-		xfs_bmbt_log_keys(cur, rbuf, 1, right->bb_numrecs);
-		xfs_bmbt_log_ptrs(cur, rbuf, 1, right->bb_numrecs);
+		xfs_bmbt_log_keys(cur, rbp, 1, right->bb_numrecs);
+		xfs_bmbt_log_ptrs(cur, rbp, 1, right->bb_numrecs);
 	} else {
 		for (i = 0; i < right->bb_numrecs; i++)
 			rrp[i] = rrp[i + 1];
-		xfs_bmbt_log_recs(cur, rbuf, 1, right->bb_numrecs);
+		xfs_bmbt_log_recs(cur, rbp, 1, right->bb_numrecs);
 		key.br_startoff = xfs_bmbt_get_startoff(rrp);
 		rkp = &key;
 	}
@@ -1023,15 +1023,15 @@ xfs_bmbt_rcheck_btree(
 	int			level)
 {
 	xfs_bmbt_block_t	*block;
-	buf_t			*buf;
+	buf_t			*bp;
 	xfs_fsblock_t		rval;
 	xfs_trans_t		*tp;
 
 	tp = cur->bc_tp;
-	buf = xfs_btree_read_bufl(cur->bc_mp, tp, bno, 0);
-	block = XFS_BUF_TO_BMBT_BLOCK(buf);
+	bp = xfs_btree_read_bufl(cur->bc_mp, tp, bno, 0);
+	block = XFS_BUF_TO_BMBT_BLOCK(bp);
 	rval = xfs_bmbt_rcheck_body(cur, block, fbno, rec, level);
-	xfs_trans_brelse(tp, buf);
+	xfs_trans_brelse(tp, bp);
 	return rval;
 }
 #endif
@@ -1068,13 +1068,13 @@ xfs_bmbt_rshift(
 	int			i;
 	xfs_bmbt_key_t		key;
 	int			last;
-	buf_t			*lbuf;
+	buf_t			*lbp;
 	xfs_bmbt_block_t	*left;
 	xfs_bmbt_key_t		*lkp;
 	xfs_bmbt_ptr_t		*lpp;
 	xfs_bmbt_rec_t		*lrp;
 	xfs_mount_t		*mp;
-	buf_t			*rbuf;
+	buf_t			*rbp;
 	xfs_bmbt_block_t	*right;
 	xfs_bmbt_key_t		*rkp;
 	xfs_bmbt_ptr_t		*rpp;
@@ -1085,8 +1085,8 @@ xfs_bmbt_rshift(
 	if (level == cur->bc_nlevels - 1)
 		return 0;
 	xfs_bmbt_rcheck(cur);
-	lbuf = cur->bc_bufs[level];
-	left = XFS_BUF_TO_BMBT_BLOCK(lbuf);
+	lbp = cur->bc_bufs[level];
+	left = XFS_BUF_TO_BMBT_BLOCK(lbp);
 	xfs_btree_check_lblock(cur, left, level);
 	if (left->bb_rightsib == NULLDFSBNO)
 		return 0;
@@ -1094,8 +1094,8 @@ xfs_bmbt_rshift(
 		return 0;
 	tp = cur->bc_tp;
 	mp = cur->bc_mp;
-	rbuf = xfs_btree_read_bufl(mp, tp, left->bb_rightsib, 0);
-	right = XFS_BUF_TO_BMBT_BLOCK(rbuf);
+	rbp = xfs_btree_read_bufl(mp, tp, left->bb_rightsib, 0);
+	right = XFS_BUF_TO_BMBT_BLOCK(rbp);
 	xfs_btree_check_lblock(cur, right, level);
 	if (right->bb_numrecs == XFS_BMAP_BLOCK_IMAXRECS(level, cur))
 		return 0;
@@ -1112,20 +1112,20 @@ xfs_bmbt_rshift(
 		xfs_btree_check_lptr(cur, *lpp, level);
 		*rkp = *lkp;
 		*rpp = *lpp;
-		xfs_bmbt_log_keys(cur, rbuf, 1, right->bb_numrecs + 1);
-		xfs_bmbt_log_ptrs(cur, rbuf, 1, right->bb_numrecs + 1);
+		xfs_bmbt_log_keys(cur, rbp, 1, right->bb_numrecs + 1);
+		xfs_bmbt_log_ptrs(cur, rbp, 1, right->bb_numrecs + 1);
 	} else {
 		lrp = XFS_BMAP_REC_IADDR(left, left->bb_numrecs, cur);
 		rrp = XFS_BMAP_REC_IADDR(right, 1, cur);
 		for (i = right->bb_numrecs - 1; i >= 0; i--)
 			rrp[i + 1] = rrp[i];
 		*rrp = *lrp;
-		xfs_bmbt_log_recs(cur, rbuf, 1, right->bb_numrecs + 1);
+		xfs_bmbt_log_recs(cur, rbp, 1, right->bb_numrecs + 1);
 		key.br_startoff = xfs_bmbt_get_startoff(rrp);
 		rkp = &key;
 	}
 	left->bb_numrecs--;
-	xfs_bmbt_log_block(cur, lbuf, XFS_BB_NUMRECS);
+	xfs_bmbt_log_block(cur, lbp, XFS_BB_NUMRECS);
 	right->bb_numrecs++;
 #ifdef DEBUG
 	if (level > 0)
@@ -1133,7 +1133,7 @@ xfs_bmbt_rshift(
 	else
 		xfs_btree_check_rec(XFS_BTNUM_BMAP, rrp, rrp + 1);
 #endif
-	xfs_bmbt_log_block(cur, rbuf, XFS_BB_NUMRECS);
+	xfs_bmbt_log_block(cur, rbp, XFS_BB_NUMRECS);
 	tcur = xfs_btree_dup_cursor(cur);
 	xfs_btree_lastrec(tcur, level);
 	xfs_bmbt_increment(tcur, level);
@@ -1163,20 +1163,20 @@ xfs_bmbt_split(
 	xfs_bmbt_key_t		key;
 	int			last;
 	xfs_fsblock_t		lbno;
-	buf_t			*lbuf;
+	buf_t			*lbp;
 	xfs_bmbt_block_t	*left;
 	xfs_bmbt_key_t		*lkp;
 	xfs_bmbt_ptr_t		*lpp;
 	xfs_bmbt_rec_t		*lrp;
 	xfs_mount_t		*mp;
 	xfs_fsblock_t		rbno;
-	buf_t			*rbuf;
+	buf_t			*rbp;
 	xfs_bmbt_rec_t		rec;
 	xfs_bmbt_block_t	*right;
 	xfs_bmbt_key_t		*rkp;
 	xfs_bmbt_ptr_t		*rpp;
 	xfs_bmbt_block_t	*rrblock;
-	buf_t			*rrbuf;
+	buf_t			*rrbp;
 	xfs_bmbt_rec_t		*rrp;
 	xfs_trans_t		*tp;
 	xfs_alloctype_t		type;
@@ -1185,9 +1185,9 @@ xfs_bmbt_split(
 	tp = cur->bc_tp;
 	mp = cur->bc_mp;
 	ip = cur->bc_private.b.ip;
-	lbuf = cur->bc_bufs[level];
-	lbno = XFS_DADDR_TO_FSB(mp, lbuf->b_blkno);
-	left = XFS_BUF_TO_BMBT_BLOCK(lbuf);
+	lbp = cur->bc_bufs[level];
+	lbno = XFS_DADDR_TO_FSB(mp, lbp->b_blkno);
+	left = XFS_BUF_TO_BMBT_BLOCK(lbp);
 	bno = cur->bc_private.b.firstblock;
 	if ((bno = cur->bc_private.b.firstblock) == NULLFSBLOCK) {
 		bno = lbno;
@@ -1200,8 +1200,8 @@ xfs_bmbt_split(
 	cur->bc_private.b.allocated++;
 	ip->i_d.di_nblocks++;
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
-	rbuf = xfs_btree_get_bufl(mp, tp, rbno, 0);
-	right = XFS_BUF_TO_BMBT_BLOCK(rbuf);
+	rbp = xfs_btree_get_bufl(mp, tp, rbno, 0);
+	right = XFS_BUF_TO_BMBT_BLOCK(rbp);
 	xfs_btree_check_lblock(cur, left, level);
 	right->bb_magic = XFS_BMAP_MAGIC;
 	right->bb_level = left->bb_level;
@@ -1219,33 +1219,33 @@ xfs_bmbt_split(
 			xfs_btree_check_lptr(cur, lpp[i], level);
 			rpp[i] = lpp[i];
 		}
-		xfs_bmbt_log_keys(cur, rbuf, 1, right->bb_numrecs);
-		xfs_bmbt_log_ptrs(cur, rbuf, 1, right->bb_numrecs);
+		xfs_bmbt_log_keys(cur, rbp, 1, right->bb_numrecs);
+		xfs_bmbt_log_ptrs(cur, rbp, 1, right->bb_numrecs);
 		*keyp = *rkp;
 	} else {
 		lrp = XFS_BMAP_REC_IADDR(left, i, cur);
 		rrp = XFS_BMAP_REC_IADDR(right, 1, cur);
 		for (i = 0; i < right->bb_numrecs; i++)
 			rrp[i] = lrp[i];
-		xfs_bmbt_log_recs(cur, rbuf, 1, right->bb_numrecs);
+		xfs_bmbt_log_recs(cur, rbp, 1, right->bb_numrecs);
 		keyp->br_startoff = xfs_bmbt_get_startoff(rrp);
 	}
-	d = lbuf->b_blkno;
+	d = lbp->b_blkno;
 	left->bb_numrecs -= right->bb_numrecs;
 	right->bb_rightsib = left->bb_rightsib;
 	left->bb_rightsib = rbno;
 	right->bb_leftsib = lbno;
-	xfs_bmbt_log_block(cur, rbuf, XFS_BB_ALL_BITS);
-	xfs_bmbt_log_block(cur, lbuf, XFS_BB_NUMRECS | XFS_BB_RIGHTSIB);
+	xfs_bmbt_log_block(cur, rbp, XFS_BB_ALL_BITS);
+	xfs_bmbt_log_block(cur, lbp, XFS_BB_NUMRECS | XFS_BB_RIGHTSIB);
 	if (right->bb_rightsib != NULLDFSBNO) {
-		rrbuf = xfs_btree_read_bufl(mp, tp, right->bb_rightsib, 0);
-		rrblock = XFS_BUF_TO_BMBT_BLOCK(rrbuf);
+		rrbp = xfs_btree_read_bufl(mp, tp, right->bb_rightsib, 0);
+		rrblock = XFS_BUF_TO_BMBT_BLOCK(rrbp);
 		xfs_btree_check_lblock(cur, rrblock, level);
 		rrblock->bb_leftsib = rbno;
-		xfs_bmbt_log_block(cur, rrbuf, XFS_BB_LEFTSIB);
+		xfs_bmbt_log_block(cur, rrbp, XFS_BB_LEFTSIB);
 	}
 	if (cur->bc_ptrs[level] > left->bb_numrecs + 1) {
-		xfs_btree_setbuf(cur, level, rbuf);
+		xfs_btree_setbuf(cur, level, rbp);
 		cur->bc_ptrs[level] -= left->bb_numrecs;
 	}
 	if (level + 1 < cur->bc_nlevels) {
@@ -1267,7 +1267,7 @@ xfs_bmbt_updkey(
 	int			level)
 {
 	xfs_bmbt_block_t	*block;
-	buf_t			*buf;
+	buf_t			*bp;
 	xfs_bmbt_key_t		*kp;
 	int			ptr;
 	xfs_trans_t		*tp;
@@ -1276,12 +1276,12 @@ xfs_bmbt_updkey(
 	xfs_bmbt_rcheck(cur);
 	tp = cur->bc_tp;
 	for (ptr = 1; ptr == 1 && level < cur->bc_nlevels; level++) {
-		block = xfs_bmbt_get_block(cur, level, &buf);
+		block = xfs_bmbt_get_block(cur, level, &bp);
 		xfs_btree_check_lblock(cur, block, level);
 		ptr = cur->bc_ptrs[level];
 		kp = XFS_BMAP_KEY_IADDR(block, ptr, cur);
 		*kp = *keyp;
-		xfs_bmbt_log_keys(cur, buf, ptr, ptr);
+		xfs_bmbt_log_keys(cur, bp, ptr, ptr);
 	}
 	xfs_bmbt_rcheck(cur);
 }
@@ -1325,7 +1325,7 @@ xfs_bmbt_decrement(
 	int			level)
 {
 	xfs_bmbt_block_t	*block;
-	buf_t			*buf;
+	buf_t			*bp;
 	xfs_fsblock_t		fsbno;
 	int			lev;
 	xfs_mount_t		*mp;
@@ -1334,7 +1334,7 @@ xfs_bmbt_decrement(
 
 	if (--cur->bc_ptrs[level] > 0)
 		return 1;
-	block = xfs_bmbt_get_block(cur, level, &buf);
+	block = xfs_bmbt_get_block(cur, level, &bp);
 	xfs_btree_check_lblock(cur, block, level);
 	if (block->bb_leftsib == NULLDFSBNO)
 		return 0;
@@ -1347,14 +1347,14 @@ xfs_bmbt_decrement(
 	tp = cur->bc_tp;
 	mp = cur->bc_mp;
 	for (; lev > level; lev--) {
-		block = xfs_bmbt_get_block(cur, lev, &buf);
+		block = xfs_bmbt_get_block(cur, lev, &bp);
 		xfs_btree_check_lblock(cur, block, lev);
 		pp = XFS_BMAP_PTR_IADDR(block, cur->bc_ptrs[lev], cur);
 		xfs_btree_check_lptr(cur, *pp, lev);
 		fsbno = *pp;
-		buf = xfs_btree_read_bufl(mp, tp, fsbno, 0);
-		xfs_btree_setbuf(cur, lev - 1, buf);
-		block = XFS_BUF_TO_BMBT_BLOCK(buf);
+		bp = xfs_btree_read_bufl(mp, tp, fsbno, 0);
+		xfs_btree_setbuf(cur, lev - 1, bp);
+		block = XFS_BUF_TO_BMBT_BLOCK(bp);
 		xfs_btree_check_lblock(cur, block, lev - 1);
 		cur->bc_ptrs[lev - 1] = block->bb_numrecs;
 	}
@@ -1518,21 +1518,21 @@ xfs_bmbt_increment(
 	int			level)
 {
 	xfs_bmbt_block_t	*block;
-	buf_t			*buf;
+	buf_t			*bp;
 	xfs_fsblock_t		fsbno;
 	int			lev;
 	xfs_mount_t		*mp;
 	xfs_bmbt_ptr_t		*pp;
 	xfs_trans_t		*tp;
 
-	block = xfs_bmbt_get_block(cur, level, &buf);
+	block = xfs_bmbt_get_block(cur, level, &bp);
 	xfs_btree_check_lblock(cur, block, level);
 	if (++cur->bc_ptrs[level] <= block->bb_numrecs)
 		return 1;
 	if (block->bb_rightsib == NULLDFSBNO)
 		return 0;
 	for (lev = level + 1; lev < cur->bc_nlevels; lev++) {
-		block = xfs_bmbt_get_block(cur, lev, &buf);
+		block = xfs_bmbt_get_block(cur, lev, &bp);
 		xfs_btree_check_lblock(cur, block, lev);
 		if (++cur->bc_ptrs[lev] <= block->bb_numrecs)
 			break;
@@ -1542,13 +1542,13 @@ xfs_bmbt_increment(
 	tp = cur->bc_tp;
 	mp = cur->bc_mp;
 	for (; lev > level; lev--) {
-		block = xfs_bmbt_get_block(cur, lev, &buf);
+		block = xfs_bmbt_get_block(cur, lev, &bp);
 		xfs_btree_check_lblock(cur, block, lev);
 		pp = XFS_BMAP_PTR_IADDR(block, cur->bc_ptrs[lev], cur);
 		xfs_btree_check_lptr(cur, *pp, lev);
 		fsbno = *pp;
-		buf = xfs_btree_read_bufl(mp, tp, fsbno, 0);
-		xfs_btree_setbuf(cur, lev - 1, buf);
+		bp = xfs_btree_read_bufl(mp, tp, fsbno, 0);
+		xfs_btree_setbuf(cur, lev - 1, bp);
 		cur->bc_ptrs[lev - 1] = 1;
 	}
 	return 1;
@@ -1627,7 +1627,7 @@ xfs_bmbt_kcheck(
 void
 xfs_bmbt_log_block(
 	xfs_btree_cur_t		*cur,
-	buf_t			*buf,
+	buf_t			*bp,
 	int			fields)
 {
 	int			first;
@@ -1643,10 +1643,10 @@ xfs_bmbt_log_block(
 	};
 
 	tp = cur->bc_tp;
-	if (buf) {
+	if (bp) {
 		xfs_btree_offsets(fields, offsets, XFS_BB_NUM_BITS, &first,
 				  &last);
-		xfs_trans_log_buf(tp, buf, first, last);
+		xfs_trans_log_buf(tp, bp, first, last);
 	} else
 		xfs_trans_log_inode(tp, cur->bc_private.b.ip, XFS_ILOG_BROOT);
 }
@@ -1657,7 +1657,7 @@ xfs_bmbt_log_block(
 void
 xfs_bmbt_log_recs(
 	xfs_btree_cur_t		*cur,
-	buf_t			*buf,
+	buf_t			*bp,
 	int			rfirst,
 	int			rlast)
 {
@@ -1667,13 +1667,13 @@ xfs_bmbt_log_recs(
 	xfs_bmbt_rec_t		*rp;
 	xfs_trans_t		*tp;
 
-	ASSERT(buf);
+	ASSERT(bp);
 	tp = cur->bc_tp;
-	block = XFS_BUF_TO_BMBT_BLOCK(buf);
+	block = XFS_BUF_TO_BMBT_BLOCK(bp);
 	rp = XFS_BMAP_REC_DADDR(block, 1, cur);
 	first = (caddr_t)&rp[rfirst - 1] - (caddr_t)block;
 	last = ((caddr_t)&rp[rlast] - 1) - (caddr_t)block;
-	xfs_trans_log_buf(tp, buf, first, last);
+	xfs_trans_log_buf(tp, bp, first, last);
 }
 
 int
@@ -1878,7 +1878,7 @@ xfs_bmbt_update(
 	xfs_extlen_t		len)
 {
 	xfs_bmbt_block_t	*block;
-	buf_t			*buf;
+	buf_t			*bp;
 	int			first;
 	xfs_bmbt_key_t		key;
 	int			last;
@@ -1887,7 +1887,7 @@ xfs_bmbt_update(
 	xfs_trans_t		*tp;
 
 	xfs_bmbt_rcheck(cur);
-	block = xfs_bmbt_get_block(cur, 0, &buf);
+	block = xfs_bmbt_get_block(cur, 0, &bp);
 	xfs_btree_check_lblock(cur, block, 0);
 	ptr = cur->bc_ptrs[0];
 	tp = cur->bc_tp;
@@ -1895,7 +1895,7 @@ xfs_bmbt_update(
 	xfs_bmbt_set_startoff(rp, off);
 	xfs_bmbt_set_startblock(rp, bno);
 	xfs_bmbt_set_blockcount(rp, len);
-	xfs_bmbt_log_recs(cur, buf, ptr, ptr);
+	xfs_bmbt_log_recs(cur, bp, ptr, ptr);
 	if (ptr > 1)
 		return 1;
 	key.br_startoff = off;

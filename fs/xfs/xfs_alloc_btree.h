@@ -31,7 +31,7 @@ typedef xfs_agblock_t xfs_alloc_ptr_t;	/* btree pointer type */
 					/* btree block header type */
 typedef	struct xfs_btree_sblock xfs_alloc_block_t;
 
-#define	XFS_BUF_TO_ALLOC_BLOCK(buf) ((xfs_alloc_block_t *)((buf)->b_un.b_addr))
+#define	XFS_BUF_TO_ALLOC_BLOCK(bp) ((xfs_alloc_block_t *)((bp)->b_un.b_addr))
 
 /*
  * Real block structures have a size equal to the disk block size.

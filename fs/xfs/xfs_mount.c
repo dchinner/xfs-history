@@ -377,7 +377,7 @@ xfs_umount(xfs_mount_t *mp)
 void
 xfs_mod_sb(xfs_trans_t *tp, int fields)
 {
-	buf_t		*buf;
+	buf_t		*bp;
 	int		first;
 	int		last;
 	xfs_mount_t	*mp;
@@ -418,11 +418,11 @@ xfs_mod_sb(xfs_trans_t *tp, int fields)
 	};
  
 	mp = tp->t_mountp;
-	buf = xfs_trans_getsb(tp);
-	sbp = XFS_BUF_TO_SBP(buf);
+	bp = xfs_trans_getsb(tp);
+	sbp = XFS_BUF_TO_SBP(bp);
 	xfs_btree_offsets(fields, offsets, XFS_SB_NUM_BITS, &first, &last);
 	bcopy((caddr_t)&mp->m_sb + first, (caddr_t)sbp + first, last - first + 1);
-	xfs_trans_log_buf(tp, buf, first, last);
+	xfs_trans_log_buf(tp, bp, first, last);
 }
 
 

@@ -256,15 +256,15 @@ xfs_btree_check_sblock(
 	xfs_btree_sblock_t	*block,	/* btree short form block pointer */
 	int			level)	/* level of the btree block */
 {
-	buf_t			*agbuf;	/* buffer for ag. freespace struct */
+	buf_t			*agbp;	/* buffer for ag. freespace struct */
 	xfs_agf_t		*agf;	/* ag. freespace structure */
 
 	ASSERT(block->bb_magic == xfs_magics[cur->bc_btnum]);
 	ASSERT(block->bb_level == level);
 	ASSERT(block->bb_numrecs <=
 	       xfs_btree_maxrecs(cur, (xfs_btree_block_t *)block));
-	agbuf = cur->bc_private.a.agbuf;
-	agf = XFS_BUF_TO_AGF(agbuf);
+	agbp = cur->bc_private.a.agbp;
+	agf = XFS_BUF_TO_AGF(agbp);
 	ASSERT(block->bb_leftsib == NULLAGBLOCK || 
 	       block->bb_leftsib < agf->agf_length);
 	ASSERT(block->bb_rightsib == NULLAGBLOCK || 
@@ -280,12 +280,12 @@ xfs_btree_check_sptr(
 	xfs_agblock_t	ptr,		/* btree block disk address */
 	int		level)		/* btree block level */
 {
-	buf_t		*agbuf;		/* buffer for ag. freespace struct */
+	buf_t		*agbp;		/* buffer for ag. freespace struct */
 	xfs_agf_t	*agf;		/* ag. freespace structure */
 
 	ASSERT(level > 0);
-	agbuf = cur->bc_private.a.agbuf;
-	agf = XFS_BUF_TO_AGF(agbuf);
+	agbp = cur->bc_private.a.agbp;
+	agf = XFS_BUF_TO_AGF(agbp);
 	ASSERT(ptr != NULLAGBLOCK && ptr < agf->agf_length);
 }
 #endif	/* DEBUG */
@@ -297,14 +297,14 @@ void
 xfs_btree_del_cursor(
 	xfs_btree_cur_t	*cur)		/* btree cursor */
 {
-	buf_t		*buf;		/* pointer to btree block buffer */
+	buf_t		*bp;		/* pointer to btree block buffer */
 	int		i;		/* btree level */
 
 	/*
 	 * Clear the buffer pointers, and release the buffers.
 	 */
 	for (i = 0; i < cur->bc_nlevels; i++) {
-		if (buf = cur->bc_bufs[i])
+		if (bp = cur->bc_bufs[i])
 			xfs_btree_setbuf(cur, i, 0);
 		else
 			break;
@@ -329,7 +329,7 @@ xfs_btree_cur_t *			/* new btree cursor */
 xfs_btree_dup_cursor(
 	xfs_btree_cur_t	*cur)		/* btree cursor */
 {
-	buf_t		*buf;		/* btree block's buffer pointer */
+	buf_t		*bp;		/* btree block's buffer pointer */
 	int		i;		/* level number of btree block */
 	xfs_mount_t	*mp;		/* mount structure for filesystem */
 	xfs_btree_cur_t	*ncur;		/* return value */
@@ -340,7 +340,7 @@ xfs_btree_dup_cursor(
 	/*
 	 * Allocate a new cursor like the old one.
 	 */
-	ncur = xfs_btree_init_cursor(mp, tp, cur->bc_private.a.agbuf,
+	ncur = xfs_btree_init_cursor(mp, tp, cur->bc_private.a.agbp,
 				     cur->bc_private.a.agno, cur->bc_btnum,
 				     cur->bc_private.b.ip);
 	/*
@@ -352,10 +352,10 @@ xfs_btree_dup_cursor(
 	 */
 	for (i = 0; i < ncur->bc_nlevels; i++) {
 		ncur->bc_ptrs[i] = cur->bc_ptrs[i];
-		if (buf = cur->bc_bufs[i]) {
-			buf = ncur->bc_bufs[i] = xfs_trans_read_buf(tp,
-				mp->m_dev, buf->b_blkno, mp->m_bsize, 0);
-			ASSERT(buf && !geterror(buf));
+		if (bp = cur->bc_bufs[i]) {
+			bp = ncur->bc_bufs[i] = xfs_trans_read_buf(tp,
+				mp->m_dev, bp->b_blkno, mp->m_bsize, 0);
+			ASSERT(bp && !geterror(bp));
 		} else
 			ncur->bc_bufs[i] = 0;
 	}
@@ -469,7 +469,7 @@ xfs_btree_cur_t *			/* new btree cursor */
 xfs_btree_init_cursor(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
-	buf_t		*agbuf,		/* (A only) buffer for agf structure */
+	buf_t		*agbp,		/* (A only) buffer for agf structure */
 	xfs_agnumber_t	agno,		/* (A only) allocation group number */
 	xfs_btnum_t	btnum,		/* btree identifier */
 	xfs_inode_t	*ip)		/* (B only) inode owning the btree */
@@ -494,7 +494,7 @@ xfs_btree_init_cursor(
 	switch (btnum) {
 	case XFS_BTNUM_BNO:
 	case XFS_BTNUM_CNT:
-		agf = XFS_BUF_TO_AGF(agbuf);
+		agf = XFS_BUF_TO_AGF(agbp);
 		nlevels = agf->agf_levels[btnum];
 		break;
 	case XFS_BTNUM_BMAP:
@@ -518,7 +518,7 @@ xfs_btree_init_cursor(
 		/*
 		 * Allocation btree fields.
 		 */
-		cur->bc_private.a.agbuf = agbuf;
+		cur->bc_private.a.agbp = agbp;
 		cur->bc_private.a.agno = agno;
 		break;
 	case XFS_BTNUM_BMAP:
@@ -664,19 +664,19 @@ xfs_btree_read_bufs(
 }
 
 /*
- * Set the buffer for level "lev" in the cursor to buf, releasing
+ * Set the buffer for level "lev" in the cursor to bp, releasing
  * any previous buffer.
  */
 void
 xfs_btree_setbuf(
 	xfs_btree_cur_t	*cur,		/* btree cursor */
 	int		lev,		/* level in btree */
-	buf_t		*buf)		/* new buffer to set */
+	buf_t		*bp)		/* new buffer to set */
 {
-	buf_t		*obuf;		/* old buffer pointer */
+	buf_t		*obp;		/* old buffer pointer */
 
-	obuf = cur->bc_bufs[lev];
-	if (obuf)
-		xfs_trans_brelse(cur->bc_tp, obuf);
-	cur->bc_bufs[lev] = buf;
+	obp = cur->bc_bufs[lev];
+	if (obp)
+		xfs_trans_brelse(cur->bc_tp, obp);
+	cur->bc_bufs[lev] = bp;
 }

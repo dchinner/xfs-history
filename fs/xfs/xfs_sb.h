@@ -122,6 +122,6 @@ typedef struct xfs_sb
 #define	XFS_BTOD(mp,l)	((daddr_t)((l) << (mp)->m_blkbb_log))
 #define	XFS_DTOBT(mp,l)	((l) >> (mp)->m_blkbb_log)
 
-#define	XFS_BUF_TO_SBP(buf)	((xfs_sb_t *)(buf)->b_un.b_addr)
+#define	XFS_BUF_TO_SBP(bp)	((xfs_sb_t *)(bp)->b_un.b_addr)
 
 #endif	/* !_FS_XFS_SB_H */

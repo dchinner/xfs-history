@@ -128,7 +128,7 @@ typedef struct xfs_btree_cur
 	int		bc_blocklog;	/* log2(blocksize) of btree blocks */
 	union {
 		struct {			/* needed for BNO, CNT */
-			buf_t		*agbuf;	/* agf buffer pointer */
+			buf_t		*agbp;	/* agf buffer pointer */
 			xfs_agnumber_t	agno;	/* ag number */
 		} a;
 		struct {			/* needed for BMAP */
@@ -144,9 +144,9 @@ typedef struct xfs_btree_cur
 /*
  * Convert from buffer to btree block header.
  */
-#define	XFS_BUF_TO_BLOCK(buf)	((xfs_btree_block_t *)((buf)->b_un.b_addr))
-#define	XFS_BUF_TO_LBLOCK(buf)	((xfs_btree_lblock_t *)((buf)->b_un.b_addr))
-#define	XFS_BUF_TO_SBLOCK(buf)	((xfs_btree_sblock_t *)((buf)->b_un.b_addr))
+#define	XFS_BUF_TO_BLOCK(bp)	((xfs_btree_block_t *)((bp)->b_un.b_addr))
+#define	XFS_BUF_TO_LBLOCK(bp)	((xfs_btree_lblock_t *)((bp)->b_un.b_addr))
+#define	XFS_BUF_TO_SBLOCK(bp)	((xfs_btree_sblock_t *)((bp)->b_un.b_addr))
 
 #ifdef DEBUG
 /*
@@ -285,7 +285,7 @@ xfs_btree_cur_t *			/* new btree cursor */
 xfs_btree_init_cursor(
 	xfs_mount_t		*mp,	/* file system mount point */
 	xfs_trans_t		*tp,	/* transaction pointer */
-	buf_t			*agbuf,	/* (A only) buffer for agf structure */
+	buf_t			*agbp,	/* (A only) buffer for agf structure */
 	xfs_agnumber_t		agno,	/* (A only) allocation group number */
 	xfs_btnum_t		btnum,	/* btree identifier */
 	struct xfs_inode	*ip);	/* (B only) inode owning the btree */
@@ -343,14 +343,14 @@ xfs_btree_read_bufs(
 	uint			lock);	/* lock flags for read_buf */
 
 /*
- * Set the buffer for level "lev" in the cursor to buf, releasing
+ * Set the buffer for level "lev" in the cursor to bp, releasing
  * any previous buffer.
  */
 void
 xfs_btree_setbuf(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	int			lev,	/* level in btree */
-	buf_t			*buf);	/* new buffer to set */
+	buf_t			*bp);	/* new buffer to set */
 
 /*
  * Min and max functions for extlen, agblock, and fileoff types.
