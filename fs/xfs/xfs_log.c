@@ -2376,8 +2376,13 @@ xlog_ticket_get(xlog_t		*log,
 	 * round off errors when syncing a LR to disk.  The bytes are
 	 * subtracted if the thread using this ticket is the first writer
 	 * to a new LR.
+	 *
+	 * We add an extra log header for the possibility that the commit
+	 * record is the first data written to a new log record.  In this
+	 * case it is separate from the rest of the transaction data and
+	 * will be charged for the log record header.
 	 */
-	unit_bytes += XLOG_HEADER_SIZE * (XLOG_BTOLRBB(unit_bytes) + 1);
+	unit_bytes += XLOG_HEADER_SIZE * (XLOG_BTOLRBB(unit_bytes) + 2);
 
 	tic->t_unit_res		= unit_bytes;
 	tic->t_curr_res		= unit_bytes;
