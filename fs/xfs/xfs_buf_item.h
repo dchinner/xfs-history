@@ -1,7 +1,7 @@
 #ifndef	_XFS_BUF_ITEM_H
 #define	_XFS_BUF_ITEM_H
 
-#ident "$Revision: 6.0 $"
+#ident "$Revision: 1.22 $"
 
 struct buf;
 struct ktrace;
@@ -136,11 +136,11 @@ void	xfs_buf_iodone(struct buf *, xfs_buf_log_item_t *);
 #ifdef XFS_TRANS_DEBUG
 void
 xfs_buf_item_flush_log_debug(
-	buf_t	*bp,			     
+	struct buf *bp,			     
 	uint	first,
 	uint	last);
 #else
-#define	xfs_buf_item_flush_log_debug(bip, first, last)
+#define	xfs_buf_item_flush_log_debug(bp, first, last)
 #endif
 
 #endif	/* _XFS_BUF_ITEM_H */
