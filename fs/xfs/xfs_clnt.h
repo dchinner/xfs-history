@@ -12,7 +12,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident "$Revision: 1.9 $"
+#ident "$Revision: 1.10 $"
 
 /*
  * XFS arguments to the mount system call.
@@ -59,5 +59,7 @@ struct xfs_args_ver_2 {
 #define XFSMNT_PQUOTAENF	0x0040	/* project quota limit enforcement */
 #define XFSMNT_QUOTAMAYBE	0x0080  /* don't turn off if SB has quotas on */
 #define XFSMNT_NOATIME		0x0100  /* don't modify access times on reads */
+#define XFSMNT_NOALIGN		0x0200	/* don't allocate at stripe boundaries*/
+#define XFSMNT_RETERR		0x0400	/* return error to user */
 
 #endif /* !__SYS_XFS_CLNT_H__ */
