@@ -32,7 +32,8 @@
 #ifndef __XFS_H__
 #define __XFS_H__
 
-#include <support/types.h>
+#include <xfs_types.h>
+
 #include <support/arch.h>
 #include <support/kmem.h>
 #include <support/mrlock.h>
@@ -48,7 +49,6 @@
 #include <support/uuid.h>
 #include <support/time.h>
 
-#include <xfs_types.h>
 #include <xfs_arch.h>
 
 #include <linux/xfs_linux.h>
