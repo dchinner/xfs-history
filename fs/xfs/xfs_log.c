@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.74 $"
+#ident	"$Revision: 1.75 $"
 
 /*
  * High level interface routines for log manager
@@ -317,7 +317,8 @@ xfs_log_init()
  */
 int
 xfs_log_reserve(xfs_mount_t	 *mp,
-		uint		 len,
+		int		 len,
+		int		 cnt,
 		xfs_log_ticket_t *ticket,
 		char		 client,
 		uint		 flags)
@@ -456,7 +457,7 @@ xfs_log_unmount(xfs_mount_t *mp)
 #endif
 	reg[0].i_addr = "Unmount filesystem--";
 	reg[0].i_len  = 20;
-	if (xfs_log_reserve(mp, 64, &tic, XFS_LOG, 0) == -1)
+	if (xfs_log_reserve(mp, 64, 1, &tic, XFS_LOG, 0) == -1)
 		xlog_panic("xfs_log_unmount: xfs_log_reserve failed");
 	((xlog_ticket_t *)tic)->t_flags = 0;	/* remove inited flag */
 	error = xlog_write(mp, reg, 1, tic, &lsn, XLOG_UNMOUNT_TRANS);

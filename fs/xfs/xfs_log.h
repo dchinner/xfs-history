@@ -1,7 +1,7 @@
 #ifndef	_XFS_LOG_H
 #define _XFS_LOG_H
 
-#ident	"$Revision: 1.27 $"
+#ident	"$Revision: 1.29 $"
 
 #define	XFS_LSN_CMP(x,y)	((x) - (y))
 #define	XFS_LSN_DIFF(x,y)	((x) - (y))
@@ -100,7 +100,8 @@ void	  xfs_log_notify(struct xfs_mount   *mp,
 			 xfs_lsn_t	    lsn,
 			 xfs_log_callback_t *callback_entry);
 int	  xfs_log_reserve(struct xfs_mount *mp,
-			  uint		   length,
+			  int		   length,
+			  int		   count,
 			  xfs_log_ticket_t *ticket,
 			  char		   clientid,
 			  uint		   flags);

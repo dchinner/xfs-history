@@ -240,7 +240,7 @@ xfs_trans_reserve(xfs_trans_t	*tp,
 		}
 
 		if (res_logspace) {
-			error = xfs_log_reserve(tp->t_mountp, res_logspace,
+			error = xfs_log_reserve(tp->t_mountp, res_logspace, 1,
 						&tp->t_ticket,
 						XFS_TRANSACTION, log_flags);
 		}
