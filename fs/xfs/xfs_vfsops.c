@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.25 $"
+#ident  "$Revision: 1.26 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -348,22 +348,6 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	 * XXX Anything special for read-only mounts?
 	 * if ((vfsp->vfs_flag & VFS_RDONLY) == 0) {}
 	 */
-
-	/*
-	 * Call the log's mount-time initialization.
-	 * xfs_log_mount() always does XFS_LOG_RECOVER.
-	 */
-	ASSERT(sbp->sb_logblocks > 0);		/* check for volume case */
-	error = xfs_log_mount(mp, logdev,
-		XFS_FSB_TO_DADDR(mp, sbp->sb_logstart),
-		XFS_BTOD(mp, sbp->sb_logblocks), lflags);
-	if (error > 0) {
-		/*
-		 * XXX	log recovery failure - What action should be taken?
-		 * 	Translate log error to something user understandable
-		 */
-		error = XFS_ERROR(EBUSY); /* XXX log recovery fail - errno? */
-	}
 
 	return error;
 } /* end of xfs_cmountfs() */
