@@ -3566,7 +3566,7 @@ xfs_bmapi(
 	lowspace = 0;
 	nallocs = 0;
 	if (XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_LOCAL) {
-		ASSERT(wr);
+		ASSERT(wr && tp);
 		error = xfs_bmap_local_to_extents(tp, ip, firstblock,
 				total, &logflags, whichfork);
 		if (error) {
@@ -3856,7 +3856,7 @@ xfs_bmapi(
 	/*
 	 * Transform from btree to extents, give it cur.
 	 */
-	if (XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_BTREE &&
+	if (tp && XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_BTREE &&
 		 XFS_IFORK_NEXTENTS(ip, whichfork) <= ifp->if_ext_max) {
 		ASSERT(wr);
 		error = xfs_bmap_btree_to_extents(tp, ip, cur, &tmp_logflags,
@@ -3886,7 +3886,7 @@ xfs_bmapi(
 		 XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE)
 		logflags &= ~XFS_ILOG_FBROOT(whichfork);
 	if (logflags) {
-		ASSERT(wr);
+		ASSERT(tp && wr);
 		xfs_trans_log_inode(tp, ip, logflags);
 	}
 	if (cur) {
