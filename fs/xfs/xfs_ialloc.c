@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.92 $"
+#ident	"$Revision: 1.94 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -205,6 +205,8 @@ xfs_ialloc_ag_alloc(
 	    args.mp->m_sb.sb_inoalignmt >= 
 	    XFS_B_TO_FSBT(args.mp, XFS_INODE_CLUSTER_SIZE(args.mp)))
 		args.alignment = args.mp->m_sb.sb_inoalignmt;
+	else
+		args.alignment = 1;
 	agi = XFS_BUF_TO_AGI(agbp);
 	/*
 	 * Need to figure out where to allocate the inode blocks.
