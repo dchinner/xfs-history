@@ -1,4 +1,4 @@
-#ident "$Revision: 1.243 $"
+#ident "$Revision: 1.244 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -243,7 +243,7 @@ xfs_diordwr(
 	uint64_t	rw);
 
 extern int
-xfs_io_is_guaranteed(
+grio_io_is_guaranteed(
 	vfile_t *,
 	stream_id_t	*);
 
@@ -6429,6 +6429,7 @@ xfs_diordwr(
 	int		error, index;
 	__int64_t	iosize;
 	extern int	scache_linemask;
+	int		guartype = -1;
 
 	vp = BHV_TO_VNODE(bdp);
 	ip = XFS_BHVTOI(bdp);
@@ -6508,23 +6509,33 @@ xfs_diordwr(
 	if (!(ioflag & IO_PRIORITY)) {
 		bp->b_grio_private = NULL;
 		bp->b_flags &= ~(B_GR_BUF|B_PRIO_BUF);
-	} else if (xfs_io_is_guaranteed(uiop->uio_fp, &stream_id)) {
-		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
-			bp->b_flags |= B_GR_BUF;
-		else
-			bp->b_flags |= B_PRIO_BUF;
-
-		ASSERT(bp->b_grio_private == NULL);
-		bp->b_grio_private = 
-			kmem_zone_alloc(grio_buf_data_zone, KM_SLEEP);
-		ASSERT(BUF_GRIO_PRIVATE(bp));
-		COPY_STREAM_ID(stream_id,BUF_GRIO_PRIVATE(bp)->grio_id);
-		iosize =  uiop->uio_iov[0].iov_len;
-		index = grio_monitor_io_start(&stream_id, iosize);
-		INIT_GRIO_TIMESTAMP(bp);
 	} else {
-		bp->b_grio_private = NULL;
-		bp->b_flags &= ~(B_GR_BUF|B_PRIO_BUF);
+		guartype = grio_io_is_guaranteed(uiop->uio_fp, &stream_id);
+
+		/*
+		 * If grio is not configed in, just give prio behavior.
+		 */
+		if (guartype == -1) {
+			bp->b_grio_private = NULL;
+			bp->b_flags |= B_PRIO_BUF;
+		} else if (guartype) {
+			if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
+				bp->b_flags |= B_GR_BUF;
+			else
+				bp->b_flags |= B_PRIO_BUF;
+
+			ASSERT(bp->b_grio_private == NULL);
+			bp->b_grio_private = 
+				kmem_zone_alloc(grio_buf_data_zone, KM_SLEEP);
+			ASSERT(BUF_GRIO_PRIVATE(bp));
+			COPY_STREAM_ID(stream_id,BUF_GRIO_PRIVATE(bp)->grio_id);
+			iosize =  uiop->uio_iov[0].iov_len;
+			index = grio_monitor_io_start(&stream_id, iosize);
+			INIT_GRIO_TIMESTAMP(bp);
+		} else {
+			bp->b_grio_private = NULL;
+			bp->b_flags &= ~(B_GR_BUF|B_PRIO_BUF);
+		}
 	}
 
 	/*
@@ -6539,14 +6550,18 @@ xfs_diordwr(
 
 	if (BUF_IS_GRIO(bp) || BUF_IS_PRIO(bp)) {
 
-		grio_monitor_io_end(&stream_id, index);
+		if (guartype == -1)
+			bp->b_flags &= ~B_PRIO_BUF;
+		else {
+			grio_monitor_io_end(&stream_id, index);
 #ifdef GRIO_DEBUG
-		CHECK_GRIO_TIMESTAMP(bp, 400);
+			CHECK_GRIO_TIMESTAMP(bp, 400);
 #endif
-		ASSERT(BUF_GRIO_PRIVATE(bp));
-		kmem_zone_free(grio_buf_data_zone, BUF_GRIO_PRIVATE(bp));
-		bp->b_grio_private = NULL;
-		bp->b_flags &= ~(B_GR_BUF|B_PRIO_BUF);
+			ASSERT(BUF_GRIO_PRIVATE(bp));
+			kmem_zone_free(grio_buf_data_zone, BUF_GRIO_PRIVATE(bp));
+			bp->b_grio_private = NULL;
+			bp->b_flags &= ~(B_GR_BUF|B_PRIO_BUF);
+		}
 	}
 
 	ASSERT((bp->b_flags & B_MAPPED) == 0);
