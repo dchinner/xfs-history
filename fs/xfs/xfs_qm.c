@@ -1,4 +1,4 @@
-#ident "$Revision: 1.31 $"
+#ident "$Revision: 1.32 $"
 
 
 #include <sys/param.h>
@@ -1217,7 +1217,9 @@ xfs_qm_sync(
 		xfs_dqtrace_entry(dqp, "XQM_SYNC: DQFLUSH");
 		error = xfs_qm_dqflush(dqp, flush_flags);
 		xfs_dqunlock(dqp);
-		if (error)
+		if (error && XFS_FORCED_SHUTDOWN(mp))
+			return(0);	/* Need to prevent umount failure */
+		else if (error)
 			return (error);
 
 		xfs_qm_mplist_lock(mp);
