@@ -1,4 +1,4 @@
-#ident "$Revision: 1.372 $"
+#ident "$Revision: 1.373 $"
 
 
 #ifdef SIM
@@ -3922,8 +3922,8 @@ xfs_link(
 		ips[0] = sip;
 		ips[1] = tdp;
 	} else {
-		ips[1] = tdp;
-		ips[0] = sip;
+		ips[0] = tdp;
+		ips[1] = sip;
 	}
 
 	xfs_lock_inodes(ips, 2);
