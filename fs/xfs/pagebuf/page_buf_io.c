@@ -1611,7 +1611,7 @@ pagebuf_delalloc_convert(
 
 	/* Fast path for completely mapped page */
 	if (page_has_buffers(page)) {
-		bh = page_buffers(page);
+		bh = head = page_buffers(page);
 		do {
 			if (!buffer_delay(bh) && buffer_mapped(bh))
 				continue;
