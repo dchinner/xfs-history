@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.32 $"
+#ident "$Revision: 1.33 $"
 
 struct xfs_inode;
 
@@ -86,8 +86,7 @@ int
 xfs_bmap_finish(
 	xfs_trans_t		**tp,		/* transaction pointer addr */
 	xfs_bmap_free_t		*flist,		/* i/o: list extents to free */
-	xfs_fsblock_t		firstblock,	/* controlled a.g. for allocs */
-	int			commit_flags);	/* flags to pass to commit */
+	xfs_fsblock_t		firstblock);	/* controlled a.g. for allocs */
 
 /*
  * Returns the file-relative block number of the first unused block in the file.

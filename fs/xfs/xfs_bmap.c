@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.92 $"
+#ident	"$Revision: 1.98 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -2389,8 +2389,7 @@ int
 xfs_bmap_finish(
 	xfs_trans_t		**tp,		/* transaction pointer addr */
 	xfs_bmap_free_t		*flist,		/* i/o: list extents to free */
-	xfs_fsblock_t		firstblock,	/* controlled ag for allocs */
-	int			commit_flags)	/* flags to pass to commit */
+	xfs_fsblock_t		firstblock)	/* controlled ag for allocs */
 {
 	unsigned int		blkres;
 	xfs_efd_log_item_t	*efd;
@@ -2398,11 +2397,14 @@ xfs_bmap_finish(
 	xfs_agnumber_t		firstag;
 	xfs_bmap_free_item_t	*free;
 	unsigned int		logres;
+	unsigned int		logcount;
 	xfs_mount_t		*mp;
 	xfs_bmap_free_item_t	*next;
 	xfs_trans_t		*ntp;
 	xfs_bmap_free_item_t	*prev;
 	unsigned int		rtblkres;
+
+	ASSERT((*tp)->t_flags & XFS_TRANS_PERM_LOG_RES);
 
 	if (flist->xbf_count == 0)
 		return 0;
@@ -2424,11 +2426,13 @@ xfs_bmap_finish(
 		xfs_trans_log_efi_extent(ntp, efi, free->xbfi_startblock,
 			free->xbfi_blockcount);
 	logres = ntp->t_log_res;
+	logcount = ntp->t_log_count;
 	blkres = ntp->t_blk_res - ntp->t_blk_res_used;
 	rtblkres = ntp->t_rtx_res - ntp->t_rtx_res_used;
-	xfs_trans_commit(ntp, commit_flags);
-	ntp = xfs_trans_alloc(mp, 0);
-	xfs_trans_reserve(ntp, blkres, logres, rtblkres, 0);
+	ntp = xfs_trans_dup(*tp);
+	xfs_trans_commit(*tp, 0);
+	xfs_trans_reserve(ntp, blkres, logres, rtblkres,
+			  XFS_TRANS_PERM_LOG_RES, logcount);
 	efd = xfs_trans_get_efd(ntp, efi, flist->xbf_count);
 	for (free = flist->xbf_first; free != NULL; free = next) {
 		next = free->xbfi_next;

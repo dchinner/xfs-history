@@ -637,6 +637,7 @@ xfs_itruncate_finish(
 	xfs_mount_t	*mp;
 	xfs_trans_t	*ntp;
 	int		done;
+	int		committed;
 	xfs_bmap_free_t	free_list;
 	timestruc_t	tv;
 
@@ -648,7 +649,8 @@ xfs_itruncate_finish(
 	ASSERT(ip->i_transp == *tp);
 	ASSERT(ip->i_item.ili_flags & XFS_ILI_HOLD);
 
-	mp = (*tp)->t_mountp;
+	ntp = *tp;
+	mp = (ntp)->t_mountp;
 	first_unmap_block = XFS_B_TO_FSB(mp, new_size);
 	/*
 	 * Subtract 1 from the size so that we get the correct
@@ -663,7 +665,7 @@ xfs_itruncate_finish(
 		 * Just set the new size of the inode and return.
 		 */
 		ip->i_d.di_size = new_size;
-		xfs_trans_log_inode(*tp, ip, XFS_ILOG_CORE);
+		xfs_trans_log_inode(ntp, ip, XFS_ILOG_CORE);
 		return;
 	}
 	done = 0;
@@ -675,7 +677,7 @@ xfs_itruncate_finish(
 		 * not.
 		 */
 		XFS_BMAP_INIT(&free_list, &first_block);
-		first_block = xfs_bunmapi(*tp, ip, first_unmap_block,
+		first_block = xfs_bunmapi(ntp, ip, first_unmap_block,
 					  unmap_len, XFS_ITRUNC_MAX_EXTENTS,
 					  first_block, &free_list, &done);
 
@@ -683,25 +685,40 @@ xfs_itruncate_finish(
 		 * Duplicate the transaction that has the permanent
 		 * reservation and commit the old transaction.
 		 */
-		ntp = xfs_trans_dup(*tp);
-		(void) xfs_bmap_finish(tp, &free_list, first_block, 0);
+		committed = xfs_bmap_finish(tp, &free_list, first_block);
+		ntp = *tp;
+		if (committed) {
+			/*
+			 * The first xact was committed,
+			 * so add the inode to the new one.
+			 * Mark it dirty so it will be logged
+			 * and moved forward in the log as
+			 * part of every commit.
+			 */
+			xfs_trans_ijoin(ntp, ip,
+					XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
+			xfs_trans_ihold(ntp, ip);
+			xfs_trans_log_inode(ntp, ip, XFS_ILOG_CORE);
+		}
+		ntp = xfs_trans_dup(ntp);
 		xfs_trans_commit(*tp, 0);
 		*tp = ntp;
 		xfs_trans_reserve(ntp, 0, XFS_ITRUNCATE_LOG_RES(mp), 0,
-				  XFS_TRANS_PERM_LOG_RES);
+				  XFS_TRANS_PERM_LOG_RES,
+				  XFS_ITRUNCATE_LOG_COUNT);
 
 		/*
 		 * Add the inode being truncated to the next chained
 		 * transaction.
 		 */
-		xfs_trans_ijoin(*tp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
-		xfs_trans_ihold(*tp, ip);
+		xfs_trans_ijoin(ntp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
+		xfs_trans_ihold(ntp, ip);
 	}
 	ip->i_d.di_size = new_size;
 	nanotime(&tv);
 	ip->i_d.di_ctime.t_sec = tv.tv_sec;
 	ip->i_d.di_mtime.t_sec = tv.tv_sec;
-	xfs_trans_log_inode(*tp, ip, XFS_ILOG_CORE);
+	xfs_trans_log_inode(ntp, ip, XFS_ILOG_CORE);
 }
 
 
@@ -766,6 +783,7 @@ xfs_igrow_finish(
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 
 }
+
 
 /*
  * This is called when the inode's link count goes to 0.
