@@ -1,4 +1,4 @@
-#ident "$Revision: 1.21 $"
+#ident "$Revision: 1.22 $"
 
 
 #include <sys/param.h>
@@ -502,11 +502,14 @@ xfs_qm_unmount_quotas(
 	 * Release the dquots that root inode, et al might be holding,
 	 * before we flush quotas and blow away the quotainfo structure.
 	 */
+	ASSERT(mp->m_rootip);
 	if (mp->m_rootip->i_udquot || mp->m_rootip->i_pdquot)
 		xfs_qm_dqdettach_inode(mp->m_rootip);
-	if (mp->m_rbmip->i_udquot || mp->m_rbmip->i_pdquot)
+	if (mp->m_rbmip && 
+	    (mp->m_rbmip->i_udquot || mp->m_rbmip->i_pdquot))
 		xfs_qm_dqdettach_inode(mp->m_rbmip);
-	if (mp->m_rsumip->i_udquot || mp->m_rsumip->i_pdquot)
+	if (mp->m_rsumip && 
+	    (mp->m_rsumip->i_udquot || mp->m_rsumip->i_pdquot))
 		xfs_qm_dqdettach_inode(mp->m_rsumip);
 	
 	/* 
