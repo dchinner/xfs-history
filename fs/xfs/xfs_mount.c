@@ -27,6 +27,7 @@
 #else
 #include <sys/systm.h>
 #include <sys/conf.h>
+#include <fs/specfs/spec_lsnode.h>
 #endif /* SIM */
 #include <stddef.h>
 #include "xfs_macros.h"
@@ -957,6 +958,10 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	}
 	
 	xfs_log_unmount(mp);			/* Done! No more fs ops. */
+
+#ifndef SIM
+	spec_unmounted(mp->m_ddevp);
+#endif
 
 	if (mp->m_ddevp) {
 		VOP_CLOSE(mp->m_ddevp, vfs_flags, L_TRUE, cr, unused);
