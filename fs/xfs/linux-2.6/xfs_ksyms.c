@@ -141,7 +141,6 @@ EXPORT_SYMBOL(xfs_bmbt_disk_get_all);
 #endif
 
 #if defined(CONFIG_XFS_DEBUG)
-EXPORT_SYMBOL(pagebuf_offset);
 extern struct list_head pbd_delwrite_queue;
 EXPORT_SYMBOL(pbd_delwrite_queue);
 
@@ -237,6 +236,7 @@ EXPORT_SYMBOL(pagebuf_find);
 EXPORT_SYMBOL(pagebuf_iostart);
 EXPORT_SYMBOL(pagebuf_ispin);
 EXPORT_SYMBOL(pagebuf_lock_value);
+EXPORT_SYMBOL(pagebuf_offset);
 EXPORT_SYMBOL(pagebuf_rele);
 EXPORT_SYMBOL(pagebuf_readahead);
 EXPORT_SYMBOL(pagebuf_unlock);
