@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.80 $"
+#ident "$Revision: 1.81 $"
 
 struct buf;
 struct cred;
@@ -97,6 +97,8 @@ typedef struct xfs_inode {
 #ifdef NOTYET
 	xfs_range_lock_t	i_range_lock;	/* range lock base */
 #endif /* NOTYET */
+	struct xfs_inode	**i_refcache;	/* ptr to entry in ref cache */
+	struct xfs_inode	*i_release;	/* inode to unref */
 
 	/* I/O state */
 	off_t			i_next_offset;	/* seq read detector */
