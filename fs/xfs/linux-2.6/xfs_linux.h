@@ -44,7 +44,6 @@
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/bitops.h>
-#include <linux/posix_acl_xattr.h>
 #include <asm/page.h>
 #include <asm/div64.h>
 #include <asm/param.h>
