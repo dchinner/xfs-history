@@ -188,12 +188,15 @@ _xfs_force_shutdown(
 #endif
 
 #if CELL_CAPABLE
-	if (cell_enabled && !(flags & XFS_SHUTDOWN_REMOTE_REQ)) {
+	if (cell_enabled && !(flags & XFS_SHUTDOWN_REMOTE_REQ) &&
+	    (mp->m_cxfstype & XFS_CXFS_SERVER) ) {
 		extern void cxfs_force_shutdown(xfs_mount_t *, int); /*@@@*/
 
 		/* 
 		 * We're being called for a problem discovered locally.
 		 * Tell CXFS to pass along the shutdown request.
+		 * The check for cxfs server is done because xfs_goingdown
+		 * will set forced_shutdown and we don't want it propagated.
 		 */
 		cxfs_force_shutdown(mp, flags);
 	}
