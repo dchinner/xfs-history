@@ -916,8 +916,8 @@ xfs_inobt_log_keys(
 
 	block = XFS_BUF_TO_INOBT_BLOCK(bp);
 	kp = XFS_INOBT_KEY_ADDR(block, 1, cur);
-	first = (caddr_t)&kp[kfirst - 1] - (caddr_t)block;
-	last = ((caddr_t)&kp[klast] - 1) - (caddr_t)block;
+	first = (int)((caddr_t)&kp[kfirst - 1] - (caddr_t)block);
+	last = (int)(((caddr_t)&kp[klast] - 1) - (caddr_t)block);
 	xfs_trans_log_buf(cur->bc_tp, bp, first, last);
 }
 
@@ -938,8 +938,8 @@ xfs_inobt_log_ptrs(
 
 	block = XFS_BUF_TO_INOBT_BLOCK(bp);
 	pp = XFS_INOBT_PTR_ADDR(block, 1, cur);
-	first = (caddr_t)&pp[pfirst - 1] - (caddr_t)block;
-	last = ((caddr_t)&pp[plast] - 1) - (caddr_t)block;
+	first = (int)((caddr_t)&pp[pfirst - 1] - (caddr_t)block);
+	last = (int)(((caddr_t)&pp[plast] - 1) - (caddr_t)block);
 	xfs_trans_log_buf(cur->bc_tp, bp, first, last);
 }
 
@@ -960,8 +960,8 @@ xfs_inobt_log_recs(
 
 	block = XFS_BUF_TO_INOBT_BLOCK(bp);
 	rp = XFS_INOBT_REC_ADDR(block, 1, cur);
-	first = (caddr_t)&rp[rfirst - 1] - (caddr_t)block;
-	last = ((caddr_t)&rp[rlast] - 1) - (caddr_t)block;
+	first = (int)((caddr_t)&rp[rfirst - 1] - (caddr_t)block);
+	last = (int)(((caddr_t)&rp[rlast] - 1) - (caddr_t)block);
 	xfs_trans_log_buf(cur->bc_tp, bp, first, last);
 }
 

@@ -357,7 +357,6 @@ xfs_da_root_split(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 	int error, size;
 	xfs_inode_t *dp;
 	xfs_trans_t *tp;
-	xfs_mount_t *mp;
 
 	/*
 	 * Copy the existing (incorrect) block from the root node position
@@ -370,7 +369,6 @@ xfs_da_root_split(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		return(error);
 	dp = args->dp;
 	tp = args->trans;
-	mp = state->mp;
 	error = xfs_da_get_buf(tp, dp, blkno, -1, &bp, args->whichfork);
 	if (error)
 		return(error);
@@ -378,7 +376,8 @@ xfs_da_root_split(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 	node = (xfs_da_intnode_t *)bp->b_un.b_addr;
 	oldroot = (xfs_da_intnode_t *)blk1->bp->b_un.b_addr;
 	ASSERT(oldroot->hdr.info.magic == XFS_DA_NODE_MAGIC);
-	size = (char *)&oldroot->btree[oldroot->hdr.count] - (char *)oldroot;
+	size = (int)((char *)&oldroot->btree[oldroot->hdr.count] -
+		     (char *)oldroot);
 	bcopy(oldroot, node, size);
 	xfs_trans_log_buf(tp, bp, 0, size - 1);
 	blk1->bp = bp;
@@ -529,7 +528,7 @@ xfs_da_node_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		 */
 		if ((tmp = node2->hdr.count) > 0) {
 			tmp  = node2->hdr.count;
-			tmp *= sizeof(xfs_da_node_entry_t);
+			tmp *= (uint)sizeof(xfs_da_node_entry_t);
 			btree_s = &node2->btree[0];
 			btree_d = &node2->btree[count];
 			ovbcopy(btree_s, btree_d, tmp);
@@ -540,7 +539,7 @@ xfs_da_node_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		 * low in node2.
 		 */
 		node2->hdr.count += count;
-		tmp = count * sizeof(xfs_da_node_entry_t);
+		tmp = count * (uint)sizeof(xfs_da_node_entry_t);
 		btree_s = &node1->btree[node1->hdr.count - count];
 		btree_d = &node2->btree[0];
 		bcopy(btree_s, btree_d, tmp);
@@ -551,7 +550,7 @@ xfs_da_node_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		 * high in node1.
 		 */
 		count = -count;
-		tmp = count * sizeof(xfs_da_node_entry_t);
+		tmp = count * (uint)sizeof(xfs_da_node_entry_t);
 		btree_s = &node2->btree[0];
 		btree_d = &node1->btree[node1->hdr.count];
 		bcopy(btree_s, btree_d, tmp);
@@ -563,7 +562,7 @@ xfs_da_node_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		 * Move elements in node2 down to fill the hole.
 		 */
 		tmp  = node2->hdr.count - count;
-		tmp *= sizeof(xfs_da_node_entry_t);
+		tmp *= (uint)sizeof(xfs_da_node_entry_t);
 		btree_s = &node2->btree[count];
 		btree_d = &node2->btree[0];
 		ovbcopy(btree_s, btree_d, tmp);
@@ -620,7 +619,7 @@ xfs_da_node_add(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 	tmp = 0;
 	btree = &node->btree[ oldblk->index ];
 	if (oldblk->index < node->hdr.count) {
-		tmp = (node->hdr.count - oldblk->index) * sizeof(*btree);
+		tmp = (node->hdr.count - oldblk->index) * (uint)sizeof(*btree);
 		ovbcopy(btree, btree + 1, tmp);
 	}
 	btree->hashval = newblk->hashval;
@@ -990,7 +989,7 @@ xfs_da_node_remove(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk)
 	btree = &node->btree[drop_blk->index];
 	if (drop_blk->index < (node->hdr.count-1)) {
 		tmp  = node->hdr.count - drop_blk->index - 1;
-		tmp *= sizeof(xfs_da_node_entry_t);
+		tmp *= (uint)sizeof(xfs_da_node_entry_t);
 		ovbcopy(btree + 1, btree, tmp);
 		xfs_trans_log_buf(state->args->trans, drop_blk->bp,
 		    XFS_DA_LOGRANGE(node, btree, tmp));
@@ -1038,7 +1037,7 @@ xfs_da_node_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 	     save_node->btree[ save_node->hdr.count-1 ].hashval))
 	{
 		btree = &save_node->btree[ drop_node->hdr.count ];
-		tmp = save_node->hdr.count * sizeof(xfs_da_node_entry_t);
+		tmp = save_node->hdr.count * (uint)sizeof(xfs_da_node_entry_t);
 		ovbcopy(&save_node->btree[0], btree, tmp);
 		btree = &save_node->btree[0];
 		xfs_trans_log_buf(tp, save_blk->bp,
@@ -1056,7 +1055,7 @@ xfs_da_node_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 	/*
 	 * Move all the B-tree elements from drop_blk to save_blk.
 	 */
-	tmp = drop_node->hdr.count * sizeof(xfs_da_node_entry_t);
+	tmp = drop_node->hdr.count * (uint)sizeof(xfs_da_node_entry_t);
 	bcopy(&drop_node->btree[0], btree, tmp);
 	save_node->hdr.count += drop_node->hdr.count;
 
@@ -1649,7 +1648,7 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 		return error;
 	if (lastoff == 0)
 		return XFS_ERROR(EFSCORRUPTED);
-	last_blkno = lastoff - 1;
+	last_blkno = (xfs_dablk_t)lastoff - 1;
 	if (error = xfs_da_read_buf(tp, ip, last_blkno, -1, &last_buf, w))
 		return error;
 	mp = ip->i_mount;

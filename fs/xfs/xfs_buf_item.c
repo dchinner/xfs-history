@@ -170,8 +170,9 @@ xfs_buf_item_format(
 	 * the first element of the bitmap is accounted for in the
 	 * size of the base structure.
 	 */
-	base_size = sizeof(xfs_buf_log_format_t) +
-		((bip->bli_format.blf_map_size - 1) * sizeof(uint));
+	base_size =
+		(uint)(sizeof(xfs_buf_log_format_t) +
+		       ((bip->bli_format.blf_map_size - 1) * sizeof(uint)));
 	vecp->i_addr = (caddr_t)&bip->bli_format;
 	vecp->i_len = base_size;
 	vecp++;
@@ -643,7 +644,7 @@ xfs_buf_item_init(
 	 * bitmap needed to describe the chunks of the buffer.
 	 */
 	chunks = (int)((bp->b_bcount + (XFS_BLI_CHUNK - 1)) >> XFS_BLI_SHIFT);
-	map_size = (chunks + NBWORD) >> BIT_TO_WORD_SHIFT;
+	map_size = (int)((chunks + NBWORD) >> BIT_TO_WORD_SHIFT);
 
 	bip = (xfs_buf_log_item_t*)kmem_zone_zalloc(xfs_buf_item_zone,
 						    KM_SLEEP);
@@ -731,7 +732,7 @@ xfs_buf_item_log(
 	/*
 	 * Calculate the starting bit in the first word.
 	 */
-	bit = first_bit & (NBWORD - 1);
+	bit = first_bit & (uint)(NBWORD - 1);
 
 	/*
 	 * First set any bits in the first word of our range.
@@ -742,7 +743,7 @@ xfs_buf_item_log(
 	 * of the last bit to be set in this word plus one.
 	 */
 	if (bit) {
-		end_bit = MIN(bit + bits_to_set, NBWORD);
+		end_bit = MIN(bit + bits_to_set, (uint)NBWORD);
 		mask = ((1 << (end_bit - bit)) - 1) << bit;
 		*wordp |= mask;
 		wordp++;
@@ -979,7 +980,7 @@ xfs_buf_item_contig_bits(
 		 * Cycle through bits left in word.  If the low bit is
 		 * set, we've found a 'contingous' bit.
 		 */
-		for (cnt = NBPW*NBBY-word_bit; cnt > 0; cnt--) {
+		for (cnt = (int)(NBPW*NBBY-word_bit); cnt > 0; cnt--) {
 			if (cwordp & 0x1)
 				bits++;
 			else
@@ -1018,7 +1019,7 @@ xfs_buf_item_next_bit(
 
 	end_map = map + size;
 	wordp = map + (start_bit >> BIT_TO_WORD_SHIFT);
-	word_bit = start_bit & (NBWORD - 1);
+	word_bit = start_bit & (int)(NBWORD - 1);
 
 	/*
 	 * If the caller has stepped beyond the end of the bitmap,
@@ -1049,7 +1050,7 @@ xfs_buf_item_next_bit(
 		 * next word.
 		 */
 		wordp++;
-		next_bit = ROUNDUPNBWORD(start_bit); 
+		next_bit = (int)ROUNDUPNBWORD(start_bit); 
 	}
 
 	/*

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.43 $"
+#ident	"$Revision$"
 
 /*
  * Free realtime space allocation for XFS.
@@ -1214,7 +1214,7 @@ xfs_rtcheck_bit(
 	error = xfs_rtbuf_get(mp, tp, block, 0, &bp);
 	bufp = (xfs_rtword_t *)bp->b_un.b_addr;
 	word = XFS_BITTOWORD(mp, start);
-	bit = start & (XFS_NBWORD - 1);
+	bit = (int)(start & (XFS_NBWORD - 1));
 	wval = bufp[word];
 	xfs_trans_brelse(tp, bp);
 	wdiff = (wval ^ -val) & ((xfs_rtword_t)1 << bit);
@@ -1284,7 +1284,7 @@ xfs_rtcheck_range(
 	 */
 	word = XFS_BITTOWORD(mp, start);
 	b = &bufp[word];
-	bit = start & (XFS_NBWORD - 1);
+	bit = (int)(start & (XFS_NBWORD - 1));
 	/*
 	 * 0 (allocated) => all zero's; 1 (free) => all one's.
 	 */
@@ -1502,7 +1502,7 @@ xfs_rtfind_back(
 	 */
 	word = XFS_BITTOWORD(mp, start);
 	b = &bufp[word];
-	bit = start & (XFS_NBWORD - 1);
+	bit = (int)(start & (XFS_NBWORD - 1));
 	len = start - limit + 1;
 	/*
 	 * Compute match value, based on the bit at start: if 1 (free)
@@ -1677,7 +1677,7 @@ xfs_rtfind_forw(
 	 */
 	word = XFS_BITTOWORD(mp, start);
 	b = &bufp[word];
-	bit = start & (XFS_NBWORD - 1);
+	bit = (int)(start & (XFS_NBWORD - 1));
 	len = limit - start + 1;
 	/*
 	 * Compute match value, based on the bit at start: if 1 (free)
@@ -1993,7 +1993,7 @@ xfs_rtmodify_range(
 	 */
 	word = XFS_BITTOWORD(mp, start);
 	first = b = &bufp[word];
-	bit = start & (XFS_NBWORD - 1);
+	bit = (int)(start & (XFS_NBWORD - 1));
 	/*
 	 * 0 (allocated) => all zeroes; 1 (free) => all ones.
 	 */
@@ -2025,8 +2025,9 @@ xfs_rtmodify_range(
 			 * Log the changed part of this block.
 			 * Get the next one.
 			 */
-			xfs_trans_log_buf(tp, bp, (char *)first - (char *)bufp,
-				(char *)b - (char *)bufp);
+			xfs_trans_log_buf(tp, bp,
+				(uint)((char *)first - (char *)bufp),
+				(uint)((char *)b - (char *)bufp));
 			error = xfs_rtbuf_get(mp, tp, ++block, 0, &bp);
 			if (error) {
 				return error;
@@ -2064,8 +2065,9 @@ xfs_rtmodify_range(
 			 * Log the changed part of this block.
 			 * Get the next one.
 			 */
-			xfs_trans_log_buf(tp, bp, (char *)first - (char *)bufp,
-				(char *)b - (char *)bufp);
+			xfs_trans_log_buf(tp, bp,
+				(uint)((char *)first - (char *)bufp),
+				(uint)((char *)b - (char *)bufp));
 			error = xfs_rtbuf_get(mp, tp, ++block, 0, &bp);
 			if (error) {
 				return error;
@@ -2102,8 +2104,8 @@ xfs_rtmodify_range(
 	 * Log any remaining changed bytes.
 	 */
 	if (b > first)
-		xfs_trans_log_buf(tp, bp, (char *)first - (char *)bufp,
-			(char *)b - (char *)bufp - 1);
+		xfs_trans_log_buf(tp, bp, (uint)((char *)first - (char *)bufp),
+			(uint)((char *)b - (char *)bufp - 1));
 	return 0;
 }
 
@@ -2168,8 +2170,8 @@ xfs_rtmodify_summary(
 	 */
 	sp = XFS_SUMPTR(mp, bp, so);
 	*sp += delta;
-	xfs_trans_log_buf(tp, bp, (char *)sp - (char *)bp->b_un.b_addr,
-		(char *)sp - (char *)bp->b_un.b_addr + sizeof(*sp) - 1);
+	xfs_trans_log_buf(tp, bp, (uint)((char *)sp - (char *)bp->b_un.b_addr),
+		(uint)((char *)sp - (char *)bp->b_un.b_addr + sizeof(*sp) - 1));
 	return 0;
 }
 
@@ -2230,7 +2232,7 @@ xfs_growfs_rt(
 	nrbmblocks = howmany(nrextents, NBBY * sbp->sb_blocksize);
 	nrextslog = xfs_highbit32(nrextents);
 	nrsumlevels = nrextslog + 1;
-	nrsumsize = sizeof(xfs_suminfo_t) * nrsumlevels * nrbmblocks;
+	nrsumsize = (uint)sizeof(xfs_suminfo_t) * nrsumlevels * nrbmblocks;
 	nrsumblocks = XFS_B_TO_FSB(mp, nrsumsize);
 	nrsumsize = XFS_FSB_TO_B(mp, nrsumblocks);
 	/*
@@ -2285,7 +2287,7 @@ xfs_growfs_rt(
 		nsbp->sb_rextslog = xfs_highbit32(nsbp->sb_rextents);
 		nrsumlevels = nmp->m_rsumlevels = nsbp->sb_rextslog + 1;
 		nrsumsize =
-			sizeof(xfs_suminfo_t) * nrsumlevels *
+			(uint)sizeof(xfs_suminfo_t) * nrsumlevels *
 			nsbp->sb_rbmblocks;
 		nrsumblocks = XFS_B_TO_FSB(mp, nrsumsize);
 		nmp->m_rsumsize = nrsumsize = XFS_FSB_TO_B(mp, nrsumblocks);
@@ -2560,7 +2562,8 @@ xfs_rtmount_init(
 		return XFS_ERROR(E2BIG);
 	mp->m_rsumlevels = sbp->sb_rextslog + 1;
 	mp->m_rsumsize =
-		sizeof(xfs_suminfo_t) * mp->m_rsumlevels * sbp->sb_rbmblocks;
+		(uint)sizeof(xfs_suminfo_t) * mp->m_rsumlevels *
+		sbp->sb_rbmblocks;
 	mp->m_rsumsize = roundup(mp->m_rsumsize, sbp->sb_blocksize);
 	mp->m_rbmip = mp->m_rsumip = NULL;
 	/*

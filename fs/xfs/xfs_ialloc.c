@@ -148,7 +148,7 @@ xfs_ialloc_log_di(
 	 * Convert to buffer offsets and log it.
 	 */
 	dip = XFS_MAKE_IPTR(mp, bp, off);
-	ioffset = (caddr_t)dip - (caddr_t)XFS_BUF_TO_DINODE(bp);
+	ioffset = (int)((caddr_t)dip - (caddr_t)XFS_BUF_TO_DINODE(bp));
 	first += ioffset;
 	last += ioffset;
 	xfs_trans_log_buf(tp, bp, first, last);

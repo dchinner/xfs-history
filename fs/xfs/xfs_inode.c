@@ -1,4 +1,4 @@
-#ident "$Revision: 1.242 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -450,7 +450,7 @@ xfs_iformat(
 	int			error;
 
 	ip->i_df.if_ext_max =
-		XFS_IFORK_DSIZE(ip) / sizeof(xfs_bmbt_rec_t);
+		XFS_IFORK_DSIZE(ip) / (uint)sizeof(xfs_bmbt_rec_t);
 	error = 0;
 
 	if (dip->di_core.di_nextents + dip->di_core.di_anextents >
@@ -526,7 +526,7 @@ xfs_iformat(
 	ASSERT(ip->i_afp == NULL);
 	ip->i_afp = kmem_zone_zalloc(xfs_ifork_zone, KM_SLEEP);
 	ip->i_afp->if_ext_max =
-		XFS_IFORK_ASIZE(ip) / sizeof(xfs_bmbt_rec_t);
+		XFS_IFORK_ASIZE(ip) / (uint)sizeof(xfs_bmbt_rec_t);
 	switch (dip->di_core.di_aformat) {
 	case XFS_DINODE_FMT_LOCAL:
 		atp = (xfs_attr_shortform_t *)XFS_DFORK_APTR(dip);
@@ -624,7 +624,7 @@ xfs_iformat_extents(
 
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	nex = XFS_DFORK_NEXTENTS(dip, whichfork);
-	size = nex * (int)sizeof(xfs_bmbt_rec_t);
+	size = nex * (uint)sizeof(xfs_bmbt_rec_t);
 
 	/*
 	 * If the number of extents is unreasonable, then something
@@ -831,7 +831,7 @@ xfs_iread(
 		 * inode here.  xfs_iformat will do it for old inodes.
 		 */
 		ip->i_df.if_ext_max =
-			XFS_IFORK_DSIZE(ip) / sizeof(xfs_bmbt_rec_t);
+			XFS_IFORK_DSIZE(ip) / (uint)sizeof(xfs_bmbt_rec_t);
 	}	
 
 	/*
@@ -905,7 +905,7 @@ xfs_iread_extents(
 
 	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE)
 		return XFS_ERROR(EFSCORRUPTED);
-	size = XFS_IFORK_NEXTENTS(ip, whichfork) * sizeof(xfs_bmbt_rec_t);
+	size = XFS_IFORK_NEXTENTS(ip, whichfork) * (uint)sizeof(xfs_bmbt_rec_t);
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	/*
 	 * We know that the size is legal (it's checked in iformat_btree)
@@ -913,7 +913,7 @@ xfs_iread_extents(
 	ifp->if_u1.if_extents = kmem_alloc(size, KM_SLEEP);
 	ASSERT(ifp->if_u1.if_extents != NULL);
 	ifp->if_lastex = NULLEXTNUM;
-	ifp->if_bytes = ifp->if_real_bytes = size;
+	ifp->if_bytes = ifp->if_real_bytes = (int)size;
 	ifp->if_flags |= XFS_IFEXTENTS;
 	error = xfs_bmap_read_extents(tp, ip, whichfork);
 	if (error) {
@@ -2024,7 +2024,8 @@ xfs_ifree(
 	ip->i_d.di_flags = 0;
 	ip->i_d.di_dmevmask = 0;
 	ip->i_d.di_forkoff = 0;		/* mark the attr fork not in use */
-	ip->i_df.if_ext_max = XFS_IFORK_DSIZE(ip) / sizeof(xfs_bmbt_rec_t);
+	ip->i_df.if_ext_max =
+		XFS_IFORK_DSIZE(ip) / (uint)sizeof(xfs_bmbt_rec_t);
 	ip->i_d.di_format = XFS_DINODE_FMT_EXTENTS;
 	ip->i_d.di_aformat = XFS_DINODE_FMT_EXTENTS;
 
@@ -2087,7 +2088,7 @@ xfs_iroot_realloc(
 			new_size = (size_t)XFS_BMAP_BROOT_SPACE_CALC(rec_diff);
 			ifp->if_broot = (xfs_bmbt_block_t*)kmem_alloc(new_size,
 								     KM_SLEEP);
-			ifp->if_broot_bytes = new_size;
+			ifp->if_broot_bytes = (int)new_size;
 			return;
 		}
 
@@ -2105,14 +2106,14 @@ xfs_iroot_realloc(
 		op = (char *)XFS_BMAP_BROOT_PTR_ADDR(ifp->if_broot, 1,
 						      ifp->if_broot_bytes);
 		np = (char *)XFS_BMAP_BROOT_PTR_ADDR(ifp->if_broot, 1,
-						      new_size);
-		ifp->if_broot_bytes = new_size;
+						      (int)new_size);
+		ifp->if_broot_bytes = (int)new_size;
 		ASSERT(ifp->if_broot_bytes <=
 			XFS_IFORK_SIZE(ip, whichfork) + XFS_BROOT_SIZE_ADJ);
 		/*
 		 * This depends on bcopy() handling overlapping buffers.
 		 */
-		bcopy(op, np, cur_max * (int)sizeof(xfs_dfsbno_t));
+		bcopy(op, np, cur_max * (uint)sizeof(xfs_dfsbno_t));
 		return;
 	}
 
@@ -2149,20 +2150,22 @@ xfs_iroot_realloc(
 		 */
 		op = (char *)XFS_BMAP_BROOT_REC_ADDR(ifp->if_broot, 1,
 						     ifp->if_broot_bytes);
-		np = (char *)XFS_BMAP_BROOT_REC_ADDR(new_broot, 1, new_size);
-		bcopy(op, np, new_max * (int)sizeof(xfs_bmbt_rec_t));	
+		np = (char *)XFS_BMAP_BROOT_REC_ADDR(new_broot, 1,
+						     (int)new_size);
+		bcopy(op, np, new_max * (uint)sizeof(xfs_bmbt_rec_t));	
 
 		/*
 		 * Then copy the pointers.
 		 */
 		op = (char *)XFS_BMAP_BROOT_PTR_ADDR(ifp->if_broot, 1,
 						     ifp->if_broot_bytes);
-		np = (char *)XFS_BMAP_BROOT_PTR_ADDR(new_broot, 1, new_size);
-		bcopy(op, np, new_max * (int)sizeof(xfs_dfsbno_t));
+		np = (char *)XFS_BMAP_BROOT_PTR_ADDR(new_broot, 1,
+						     (int)new_size);
+		bcopy(op, np, new_max * (uint)sizeof(xfs_dfsbno_t));
 	}
 	kmem_free(ifp->if_broot, ifp->if_broot_bytes);
 	ifp->if_broot = new_broot;
-	ifp->if_broot_bytes = new_size;
+	ifp->if_broot_bytes = (int)new_size;
 	ASSERT(ifp->if_broot_bytes <=
 		XFS_IFORK_SIZE(ip, whichfork) + XFS_BROOT_SIZE_ADJ);
 	return;
@@ -2200,7 +2203,7 @@ xfs_iext_realloc(
 	}
 
 	ifp = XFS_IFORK_PTR(ip, whichfork);
-	byte_diff = ext_diff * (int)sizeof(xfs_bmbt_rec_t);
+	byte_diff = ext_diff * (uint)sizeof(xfs_bmbt_rec_t);
 	new_size = (int)ifp->if_bytes + byte_diff;
 	ASSERT(new_size >= 0);
 
@@ -2629,6 +2632,7 @@ xfs_iextents_copy(
 	int			copied;
 	xfs_bmbt_rec_32_t	*dest_ep;
 	xfs_bmbt_rec_t		*ep;
+				/* REFERENCED */
 	xfs_exntfmt_t		fmt = XFS_EXTFMT_INODE(ip);
 #ifdef XFS_BMAP_TRACE
 	static char		fname[] = "xfs_iextents_copy";
@@ -2642,7 +2646,7 @@ xfs_iextents_copy(
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE|MR_ACCESS));
 	ASSERT(ifp->if_bytes > 0);
 
-	nrecs = ifp->if_bytes / sizeof(xfs_bmbt_rec_t);
+	nrecs = ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t);
 	xfs_bmap_trace_exlist(fname, ip, nrecs, whichfork);
 	ASSERT(nrecs > 0);
 	if (nrecs == XFS_IFORK_NEXTENTS(ip, whichfork)) {
@@ -2653,7 +2657,7 @@ xfs_iextents_copy(
 		ASSERT(ifp->if_bytes <= XFS_IFORK_SIZE(ip, whichfork));
 		ASSERT(ifp->if_bytes ==
 		       (XFS_IFORK_NEXTENTS(ip, whichfork) *
-		        sizeof(xfs_bmbt_rec_t)));
+		        (uint)sizeof(xfs_bmbt_rec_t)));
 		bcopy(ifp->if_u1.if_extents, buffer, ifp->if_bytes);
 		xfs_validate_extents(buffer, nrecs, fmt);
 		return ifp->if_bytes;
@@ -2687,10 +2691,10 @@ xfs_iextents_copy(
 	}
 	ASSERT(copied != 0);
 	ASSERT(copied == ip->i_d.di_nextents);
-	ASSERT((copied * sizeof(xfs_bmbt_rec_t)) <= XFS_IFORK_DSIZE(ip));
+	ASSERT((copied * (uint)sizeof(xfs_bmbt_rec_t)) <= XFS_IFORK_DSIZE(ip));
 	xfs_validate_extents(buffer, copied, fmt);
 
-	return (copied * sizeof(xfs_bmbt_rec_t));
+	return (copied * (uint)sizeof(xfs_bmbt_rec_t));
 }		  
 
 /*
@@ -3275,7 +3279,7 @@ xfs_iprint(
 	xfs_extnum_t i;
 	xfs_extnum_t nextents;
 
-	printf("Inode %x\n", ip);
+	printf("Inode %p\n", ip);
 	printf("    i_dev %x\n", (uint)ip->i_dev);
 	printf("    i_ino %llx\n", ip->i_ino);
 
@@ -3286,9 +3290,9 @@ xfs_iprint(
 	printf("\n");
 
 	printf("    i_df.if_bytes %d\n", ip->i_df.if_bytes);
-	printf("    i_df.if_u1.if_extents/if_data %x\n", ip->i_df.if_u1.if_extents);
+	printf("    i_df.if_u1.if_extents/if_data %p\n", ip->i_df.if_u1.if_extents);
 	if (ip->i_df.if_flags & XFS_IFEXTENTS) {
-		nextents = ip->i_df.if_bytes / sizeof(*ep);
+		nextents = ip->i_df.if_bytes / (uint)sizeof(*ep);
 		for (ep = ip->i_df.if_u1.if_extents, i = 0; i < nextents; i++, ep++) {
 			xfs_bmbt_irec_t rec;
 
@@ -3301,7 +3305,7 @@ xfs_iprint(
 				(int)rec.br_state);
 		}
 	}
-	printf("    i_df.if_broot %x\n", ip->i_df.if_broot);
+	printf("    i_df.if_broot %p\n", ip->i_df.if_broot);
 	printf("    i_df.if_broot_bytes %x\n", ip->i_df.if_broot_bytes);
 
 	dip = &(ip->i_d);
@@ -3474,16 +3478,16 @@ xfs_ichgtime(xfs_inode_t *ip,
 
 	nanotime_syscall(&tv);
 	if (flags & XFS_ICHGTIME_MOD) {
-		ip->i_d.di_mtime.t_sec = tv.tv_sec;
-		ip->i_d.di_mtime.t_nsec = tv.tv_nsec;
+		ip->i_d.di_mtime.t_sec = (__int32_t)tv.tv_sec;
+		ip->i_d.di_mtime.t_nsec = (__int32_t)tv.tv_nsec;
 	}
 	if (flags & XFS_ICHGTIME_ACC) {
-		ip->i_d.di_atime.t_sec = tv.tv_sec;
-		ip->i_d.di_atime.t_nsec = tv.tv_nsec;
+		ip->i_d.di_atime.t_sec = (__int32_t)tv.tv_sec;
+		ip->i_d.di_atime.t_nsec = (__int32_t)tv.tv_nsec;
 	}
 	if (flags & XFS_ICHGTIME_CHG) {
-		ip->i_d.di_ctime.t_sec = tv.tv_sec;
-		ip->i_d.di_ctime.t_nsec = tv.tv_nsec;
+		ip->i_d.di_ctime.t_sec = (__int32_t)tv.tv_sec;
+		ip->i_d.di_ctime.t_nsec = (__int32_t)tv.tv_nsec;
 	}
 
 	/*

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.30 $"
+#ident "$Revision$"
 
 /*
  * This file contains the implementation of the xfs_efi_log_item
@@ -310,8 +310,8 @@ xfs_efi_init(xfs_mount_t	*mp,
 
 	ASSERT(nextents > 0);
 	if (nextents > XFS_EFI_MAX_FAST_EXTENTS) {
-		size = sizeof(xfs_efi_log_item_t) +
-			((nextents - 1) * sizeof(xfs_extent_t));
+		size = (uint)(sizeof(xfs_efi_log_item_t) +
+			((nextents - 1) * sizeof(xfs_extent_t)));
 		efip = (xfs_efi_log_item_t*)kmem_zalloc(size, KM_SLEEP);
 	} else {
 		efip = (xfs_efi_log_item_t*)kmem_zone_zalloc(xfs_efi_zone,
@@ -619,8 +619,8 @@ xfs_efd_init(xfs_mount_t	*mp,
 
 	ASSERT(nextents > 0);
 	if (nextents > XFS_EFD_MAX_FAST_EXTENTS) {
-		size = sizeof(xfs_efd_log_item_t) +
-			((nextents - 1) * sizeof(xfs_extent_t));
+		size = (uint)(sizeof(xfs_efd_log_item_t) +
+			((nextents - 1) * sizeof(xfs_extent_t)));
 		efdp = (xfs_efd_log_item_t*)kmem_zalloc(size, KM_SLEEP);
 	} else {
 		efdp = (xfs_efd_log_item_t*)kmem_zone_zalloc(xfs_efd_zone,

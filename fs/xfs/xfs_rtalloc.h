@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_RTALLOC_H
 #define	_FS_XFS_RTALLOC_H
 
-#ident	"$Revision: 1.11 $"
+#ident	"$Revision$"
 
 struct xfs_mount;
 struct xfs_trans;
@@ -29,16 +29,17 @@ struct xfs_growfs_rt;
 /*
  * Summary and bit manipulation macros.
  */
-#define	XFS_SUMOFFS(mp,ls,bb)	((ls) * (mp)->m_sb.sb_rbmblocks + (bb))
+#define	XFS_SUMOFFS(mp,ls,bb)	((int)((ls) * (mp)->m_sb.sb_rbmblocks + (bb)))
 #define	XFS_SUMOFFSTOBLOCK(mp,s)	\
-	(((s) * sizeof(xfs_suminfo_t)) >> (mp)->m_sb.sb_blocklog)
+	(((s) * (uint)sizeof(xfs_suminfo_t)) >> (mp)->m_sb.sb_blocklog)
 #define	XFS_SUMPTR(mp,bp,so)	\
 	((xfs_suminfo_t *)((char *)bp->b_un.b_addr + \
-		(((so) * sizeof(xfs_suminfo_t)) & XFS_BLOCKMASK(mp))))
+		(((so) * (uint)sizeof(xfs_suminfo_t)) & XFS_BLOCKMASK(mp))))
 
 #define	XFS_BITTOBLOCK(mp,bi)	((bi) >> (mp)->m_blkbit_log)
 #define	XFS_BLOCKTOBIT(mp,bb)	((bb) << (mp)->m_blkbit_log)
-#define	XFS_BITTOWORD(mp,bi)	(((bi) >> XFS_NBWORDLOG) & XFS_BLOCKWMASK(mp))
+#define	XFS_BITTOWORD(mp,bi)	\
+	((int)(((bi) >> XFS_NBWORDLOG) & XFS_BLOCKWMASK(mp)))
 
 #define	XFS_RTMIN(a,b)	((a) < (b) ? (a) : (b))
 #define	XFS_RTMAX(a,b)	((a) > (b) ? (a) : (b))

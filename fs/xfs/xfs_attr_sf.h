@@ -49,16 +49,16 @@ int xfs_attr_sf_entsize_byname(int nlen, int vlen);
 	xfs_attr_sf_entsize_byname(nlen,vlen)
 #else
 #define XFS_ATTR_SF_ENTSIZE_BYNAME(nlen,vlen)	/* space name/value uses */ \
-	(sizeof(xfs_attr_sf_entry_t)-1 + (nlen)+(vlen))
+	((int)sizeof(xfs_attr_sf_entry_t)-1 + (nlen)+(vlen))
 #endif
 #define XFS_ATTR_SF_ENTSIZE_MAX			/* max space for name&value */ \
-	((1 << (NBBY*sizeof(__uint8_t))) - 1)
+	((1 << (NBBY*(int)sizeof(__uint8_t))) - 1)
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_ATTR_SF_ENTSIZE)
 int xfs_attr_sf_entsize(xfs_attr_sf_entry_t *sfep);
 #define XFS_ATTR_SF_ENTSIZE(sfep)	xfs_attr_sf_entsize(sfep)
 #else
 #define XFS_ATTR_SF_ENTSIZE(sfep)		/* space an entry uses */ \
-	(sizeof(xfs_attr_sf_entry_t)-1 + (sfep)->namelen+(sfep)->valuelen)
+	((int)sizeof(xfs_attr_sf_entry_t)-1 + (sfep)->namelen+(sfep)->valuelen)
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_ATTR_SF_NEXTENTRY)
 xfs_attr_sf_entry_t *xfs_attr_sf_nextentry(xfs_attr_sf_entry_t *sfep);

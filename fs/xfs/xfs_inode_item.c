@@ -1,4 +1,4 @@
-#ident "$Revision: 1.74 $"
+#ident "$Revision$"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -92,7 +92,7 @@ xfs_inode_item_size(
 
 	case XFS_DINODE_FMT_BTREE:
 		ASSERT(ip->i_df.if_ext_max ==
-		       XFS_IFORK_DSIZE(ip) / sizeof(xfs_bmbt_rec_t));
+		       XFS_IFORK_DSIZE(ip) / (uint)sizeof(xfs_bmbt_rec_t));
 		iip->ili_format.ilf_fields &=
 			~(XFS_ILOG_DDATA | XFS_ILOG_DEXT |
 			  XFS_ILOG_DEV | XFS_ILOG_UUID);
@@ -322,7 +322,8 @@ xfs_inode_item_format(
 			ASSERT(ip->i_df.if_u1.if_extents != NULL);
 			ASSERT(ip->i_d.di_nextents > 0);
 			ASSERT(iip->ili_extents_buf == NULL);
-			nrecs = ip->i_df.if_bytes / sizeof(xfs_bmbt_rec_t);
+			nrecs = ip->i_df.if_bytes /
+				(uint)sizeof(xfs_bmbt_rec_t);
 			ASSERT(nrecs > 0);
 			if (nrecs == ip->i_d.di_nextents) {
 				/*
@@ -388,10 +389,10 @@ xfs_inode_item_format(
 			data_bytes = roundup(ip->i_df.if_bytes, 4);
 			ASSERT((ip->i_df.if_real_bytes == 0) ||
 			       (ip->i_df.if_real_bytes == data_bytes));
-			vecp->i_len = data_bytes;
+			vecp->i_len = (int)data_bytes;
 			vecp++;
 			nvecs++;
-			iip->ili_format.ilf_dsize = data_bytes;
+			iip->ili_format.ilf_dsize = (unsigned)data_bytes;
 		}
 		break;
 
@@ -442,7 +443,8 @@ xfs_inode_item_format(
 			ASSERT(ip->i_afp->if_u1.if_extents != NULL);
 			ASSERT(ip->i_d.di_anextents > 0);
 #ifdef DEBUG
-			nrecs = ip->i_afp->if_bytes / sizeof(xfs_bmbt_rec_t);
+			nrecs = ip->i_afp->if_bytes /
+				(uint)sizeof(xfs_bmbt_rec_t);
 #endif
 			ASSERT(nrecs > 0);
 			ASSERT(nrecs == ip->i_d.di_anextents);
@@ -488,10 +490,10 @@ xfs_inode_item_format(
 			data_bytes = roundup(ip->i_afp->if_bytes, 4);
 			ASSERT((ip->i_afp->if_real_bytes == 0) ||
 			       (ip->i_afp->if_real_bytes == data_bytes));
-			vecp->i_len = data_bytes;
+			vecp->i_len = (int)data_bytes;
 			vecp++;
 			nvecs++;
-			iip->ili_format.ilf_asize = data_bytes;
+			iip->ili_format.ilf_asize = (unsigned)data_bytes;
 		}
 		break;
 

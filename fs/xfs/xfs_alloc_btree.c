@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.43 $"
+#ident	"$Revision$"
 
 /*
  * Free space allocation for XFS.
@@ -940,8 +940,8 @@ xfs_alloc_log_keys(
 
 	block = XFS_BUF_TO_ALLOC_BLOCK(bp);
 	kp = XFS_ALLOC_KEY_ADDR(block, 1, cur);
-	first = (caddr_t)&kp[kfirst - 1] - (caddr_t)block;
-	last = ((caddr_t)&kp[klast] - 1) - (caddr_t)block;
+	first = (int)((caddr_t)&kp[kfirst - 1] - (caddr_t)block);
+	last = (int)(((caddr_t)&kp[klast] - 1) - (caddr_t)block);
 	xfs_trans_log_buf(cur->bc_tp, bp, first, last);
 }
 
@@ -962,8 +962,8 @@ xfs_alloc_log_ptrs(
 
 	block = XFS_BUF_TO_ALLOC_BLOCK(bp);
 	pp = XFS_ALLOC_PTR_ADDR(block, 1, cur);
-	first = (caddr_t)&pp[pfirst - 1] - (caddr_t)block;
-	last = ((caddr_t)&pp[plast] - 1) - (caddr_t)block;
+	first = (int)((caddr_t)&pp[pfirst - 1] - (caddr_t)block);
+	last = (int)(((caddr_t)&pp[plast] - 1) - (caddr_t)block);
 	xfs_trans_log_buf(cur->bc_tp, bp, first, last);
 }
 
@@ -995,8 +995,8 @@ xfs_alloc_log_recs(
 			       agf->agf_length);
 	}
 #endif
-	first = (caddr_t)&rp[rfirst - 1] - (caddr_t)block;
-	last = ((caddr_t)&rp[rlast] - 1) - (caddr_t)block;
+	first = (int)((caddr_t)&rp[rfirst - 1] - (caddr_t)block);
+	last = (int)(((caddr_t)&rp[rlast] - 1) - (caddr_t)block);
 	xfs_trans_log_buf(cur->bc_tp, bp, first, last);
 }
 

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.177 $"
+#ident	"$Revision$"
 
 #include <limits.h>
 #ifdef SIM
@@ -329,7 +329,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
 	mp->m_agno_log = xfs_highbit32(sbp->sb_agcount - 1) + 1;
 	mp->m_agino_log = sbp->sb_inopblog + sbp->sb_agblklog;
 	mp->m_litino = sbp->sb_inodesize -
-		(sizeof(xfs_dinode_core_t) + sizeof(xfs_agino_t));
+		((uint)sizeof(xfs_dinode_core_t) + (uint)sizeof(xfs_agino_t));
 	mp->m_blockmask = sbp->sb_blocksize - 1;
 	mp->m_blockwsize = sbp->sb_blocksize >> XFS_WORDLOG;
 	mp->m_blockwmask = mp->m_blockwsize - 1;
@@ -444,8 +444,8 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
 	xfs_bmap_compute_maxlevels(mp, XFS_ATTR_FORK);
 	xfs_ialloc_compute_maxlevels(mp);
 	mp->m_bsize = XFS_FSB_TO_BB(mp, 1);
-	vfsp->vfs_bsize = XFS_FSB_TO_B(mp, 1);
-	mp->m_ialloc_inos = MAX(XFS_INODES_PER_CHUNK, sbp->sb_inopblock);
+	vfsp->vfs_bsize = (u_int)XFS_FSB_TO_B(mp, 1);
+	mp->m_ialloc_inos = (int)MAX(XFS_INODES_PER_CHUNK, sbp->sb_inopblock);
 	mp->m_ialloc_blks = mp->m_ialloc_inos >> sbp->sb_inopblog;
 	if (sbp->sb_imax_pct) {
 		/* Make sure the maximum inode count is a multiple of the
@@ -1157,7 +1157,7 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, xfs_sb_field_t field,
 	 */
 	switch (field) {
 	case XFS_SBS_ICOUNT:
-		lcounter = mp->m_sb.sb_icount;
+		lcounter = (long long)mp->m_sb.sb_icount;
 		lcounter += delta;
 		if (lcounter < 0) {
 			ASSERT(0);
@@ -1166,7 +1166,7 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, xfs_sb_field_t field,
 		mp->m_sb.sb_icount = lcounter;
 		return (0);
 	case XFS_SBS_IFREE:
-		lcounter = mp->m_sb.sb_ifree;
+		lcounter = (long long)mp->m_sb.sb_ifree;
 		lcounter += delta;
 		if (lcounter < 0) {
 			ASSERT(0);
@@ -1176,8 +1176,8 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, xfs_sb_field_t field,
 		return (0);
 	case XFS_SBS_FDBLOCKS:
 
-		lcounter = mp->m_sb.sb_fdblocks;
-		res_used = mp->m_resblks - mp->m_resblks_avail;
+		lcounter = (long long)mp->m_sb.sb_fdblocks;
+		res_used = (long long)(mp->m_resblks - mp->m_resblks_avail);
 
 		if (delta > 0) {		/* Putting blocks back */
 			if (res_used > delta) {
@@ -1213,7 +1213,7 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, xfs_sb_field_t field,
 		mp->m_sb.sb_fdblocks = lcounter;
 		return (0);
 	case XFS_SBS_FREXTENTS:
-		lcounter = mp->m_sb.sb_frextents;
+		lcounter = (long long)mp->m_sb.sb_frextents;
 		lcounter += delta;
 		if (lcounter < 0) {
 			return (XFS_ERROR(ENOSPC));
@@ -1221,7 +1221,7 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, xfs_sb_field_t field,
 		mp->m_sb.sb_frextents = lcounter;
 		return (0);
 	case XFS_SBS_DBLOCKS:
-		lcounter = mp->m_sb.sb_dblocks;
+		lcounter = (long long)mp->m_sb.sb_dblocks;
 		lcounter += delta;
 		if (lcounter < 0) {
 			ASSERT(0);
@@ -1266,7 +1266,7 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, xfs_sb_field_t field,
 		mp->m_sb.sb_rbmblocks = scounter;
 		return (0);
 	case XFS_SBS_RBLOCKS:
-		lcounter = mp->m_sb.sb_rblocks;
+		lcounter = (long long)mp->m_sb.sb_rblocks;
 		lcounter += delta;
 		if (lcounter < 0) {
 			ASSERT(0);
@@ -1275,7 +1275,7 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, xfs_sb_field_t field,
 		mp->m_sb.sb_rblocks = lcounter;
 		return (0);
 	case XFS_SBS_REXTENTS:
-		lcounter = mp->m_sb.sb_rextents;
+		lcounter = (long long)mp->m_sb.sb_rextents;
 		lcounter += delta;
 		if (lcounter < 0) {
 			ASSERT(0);

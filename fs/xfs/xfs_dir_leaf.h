@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_LEAF_H
 #define	_FS_XFS_DIR_LEAF_H
 
-#ident	"$Revision: 1.14 $"
+#ident	"$Revision$"
 
 /*
  * xfs_dir_leaf.h
@@ -89,8 +89,9 @@ typedef struct xfs_dir_leaf_name xfs_dir_leaf_name_t;
  * can get a double split.
  */
 #define	XFS_DIR_LEAF_CAN_DOUBLE_SPLIT_LEN	\
-	(512 - sizeof(xfs_dir_leaf_hdr_t) - sizeof(xfs_dir_leaf_entry_t) * 2 - \
-	 sizeof(xfs_dir_leaf_name_t) * 2 - (MAXNAMELEN - 2) + 1 + 1)
+	(512 - (uint)sizeof(xfs_dir_leaf_hdr_t) - \
+	 (uint)sizeof(xfs_dir_leaf_entry_t) * 2 - \
+	 (uint)sizeof(xfs_dir_leaf_name_t) * 2 - (MAXNAMELEN - 2) + 1 + 1)
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_LEAFDIRBLK)
 xfs_dir_leafblock_t *xfs_buf_to_leafdirblk(struct buf *bp);
@@ -148,7 +149,7 @@ int xfs_dir_leaf_entsize_byname(int len);
 #define XFS_DIR_LEAF_ENTSIZE_BYNAME(len)	xfs_dir_leaf_entsize_byname(len)
 #else
 #define XFS_DIR_LEAF_ENTSIZE_BYNAME(len)	/* space a name will use */ \
-	(sizeof(xfs_dir_leaf_name_t)-1 + len)
+	((uint)sizeof(xfs_dir_leaf_name_t)-1 + len)
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR_LEAF_ENTSIZE_BYENTRY)
 int xfs_dir_leaf_entsize_byentry(xfs_dir_leaf_entry_t *entry);
@@ -156,7 +157,7 @@ int xfs_dir_leaf_entsize_byentry(xfs_dir_leaf_entry_t *entry);
 	xfs_dir_leaf_entsize_byentry(entry)
 #else
 #define XFS_DIR_LEAF_ENTSIZE_BYENTRY(entry)	/* space an entry will use */ \
-	(sizeof(xfs_dir_leaf_name_t)-1 + (entry)->namelen)
+	((uint)sizeof(xfs_dir_leaf_name_t)-1 + (entry)->namelen)
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR_LEAF_NAMESTRUCT)
 xfs_dir_leaf_name_t *

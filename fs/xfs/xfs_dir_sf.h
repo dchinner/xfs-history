@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_SF_H
 #define	_FS_XFS_DIR_SF_H
 
-#ident	"$Revision: 1.10 $"
+#ident	"$Revision$"
 
 /*
  * xfs_dir_sf.h
@@ -66,14 +66,14 @@ int xfs_dir_sf_entsize_byname(int len);
 #define XFS_DIR_SF_ENTSIZE_BYNAME(len)		xfs_dir_sf_entsize_byname(len)
 #else
 #define XFS_DIR_SF_ENTSIZE_BYNAME(len)		/* space a name uses */ \
-	(sizeof(xfs_dir_sf_entry_t)-1 + (len))
+	((uint)sizeof(xfs_dir_sf_entry_t)-1 + (len))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR_SF_ENTSIZE_BYENTRY)
 int xfs_dir_sf_entsize_byentry(xfs_dir_sf_entry_t *sfep);
 #define XFS_DIR_SF_ENTSIZE_BYENTRY(sfep)	xfs_dir_sf_entsize_byentry(sfep)
 #else
 #define XFS_DIR_SF_ENTSIZE_BYENTRY(sfep)	/* space an entry uses */ \
-	(sizeof(xfs_dir_sf_entry_t)-1 + (sfep)->namelen)
+	((uint)sizeof(xfs_dir_sf_entry_t)-1 + (sfep)->namelen)
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR_SF_NEXTENTRY)
 xfs_dir_sf_entry_t *xfs_dir_sf_nextentry(xfs_dir_sf_entry_t *sfep);
@@ -89,8 +89,8 @@ int xfs_dir_sf_allfit(int count, int totallen);
 	xfs_dir_sf_allfit(count,totallen)
 #else
 #define XFS_DIR_SF_ALLFIT(count,totallen)	/* will all entries fit? */ \
-	(sizeof(xfs_dir_sf_hdr_t) + \
-	       (sizeof(xfs_dir_sf_entry_t)-1)*(count) + (totallen))
+	((uint)sizeof(xfs_dir_sf_hdr_t) + \
+	       ((uint)sizeof(xfs_dir_sf_entry_t)-1)*(count) + (totallen))
 #endif
 
 struct xfs_dinode;

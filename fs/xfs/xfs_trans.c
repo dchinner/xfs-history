@@ -1,4 +1,4 @@
-#ident "$Revision: 1.99 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -75,28 +75,39 @@ xfs_trans_init(
 	xfs_trans_reservations_t	*resp;
 
 	resp = &(mp->m_reservations);
-	resp->tr_write = XFS_CALC_WRITE_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
-	resp->tr_itruncate = XFS_CALC_ITRUNCATE_LOG_RES(mp) + 
-		XFS_DQUOT_LOGRES(mp);
-	resp->tr_rename = XFS_CALC_RENAME_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
-	resp->tr_link = XFS_CALC_LINK_LOG_RES(mp);
-	resp->tr_remove = XFS_CALC_REMOVE_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
-	resp->tr_symlink = XFS_CALC_SYMLINK_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
-	resp->tr_create = XFS_CALC_CREATE_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
-	resp->tr_mkdir = XFS_CALC_MKDIR_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
-	resp->tr_ifree = XFS_CALC_IFREE_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
-	resp->tr_ichange = XFS_CALC_ICHANGE_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
-	resp->tr_growdata = XFS_CALC_GROWDATA_LOG_RES(mp);
-	resp->tr_swrite = XFS_CALC_SWRITE_LOG_RES(mp);
-	resp->tr_writeid = XFS_CALC_WRITEID_LOG_RES(mp);
-	resp->tr_addafork = XFS_CALC_ADDAFORK_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
-	resp->tr_attrinval = XFS_CALC_ATTRINVAL_LOG_RES(mp);
-	resp->tr_attrset = XFS_CALC_ATTRSET_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
-	resp->tr_attrrm = XFS_CALC_ATTRRM_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
-	resp->tr_clearagi = XFS_CALC_CLEAR_AGI_BUCKET_LOG_RES(mp);
-	resp->tr_growrtalloc = XFS_CALC_GROWRTALLOC_LOG_RES(mp);
-	resp->tr_growrtzero = XFS_CALC_GROWRTZERO_LOG_RES(mp);
-	resp->tr_growrtfree = XFS_CALC_GROWRTFREE_LOG_RES(mp);
+	resp->tr_write =
+		(uint)(XFS_CALC_WRITE_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp));
+	resp->tr_itruncate =
+		(uint)(XFS_CALC_ITRUNCATE_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp));
+	resp->tr_rename =
+		(uint)(XFS_CALC_RENAME_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp));
+	resp->tr_link = (uint)XFS_CALC_LINK_LOG_RES(mp);
+	resp->tr_remove =
+		(uint)(XFS_CALC_REMOVE_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp));
+	resp->tr_symlink =
+		(uint)(XFS_CALC_SYMLINK_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp));
+	resp->tr_create =
+		(uint)(XFS_CALC_CREATE_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp));
+	resp->tr_mkdir =
+		(uint)(XFS_CALC_MKDIR_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp));
+	resp->tr_ifree =
+		(uint)(XFS_CALC_IFREE_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp));
+	resp->tr_ichange =
+		(uint)(XFS_CALC_ICHANGE_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp));
+	resp->tr_growdata = (uint)XFS_CALC_GROWDATA_LOG_RES(mp);
+	resp->tr_swrite = (uint)XFS_CALC_SWRITE_LOG_RES(mp);
+	resp->tr_writeid = (uint)XFS_CALC_WRITEID_LOG_RES(mp);
+	resp->tr_addafork =
+		(uint)(XFS_CALC_ADDAFORK_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp));
+	resp->tr_attrinval = (uint)XFS_CALC_ATTRINVAL_LOG_RES(mp);
+	resp->tr_attrset =
+		(uint)(XFS_CALC_ATTRSET_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp));
+	resp->tr_attrrm =
+		(uint)(XFS_CALC_ATTRRM_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp));
+	resp->tr_clearagi = (uint)XFS_CALC_CLEAR_AGI_BUCKET_LOG_RES(mp);
+	resp->tr_growrtalloc = (uint)XFS_CALC_GROWRTALLOC_LOG_RES(mp);
+	resp->tr_growrtzero = (uint)XFS_CALC_GROWRTZERO_LOG_RES(mp);
+	resp->tr_growrtfree = (uint)XFS_CALC_GROWRTFREE_LOG_RES(mp);
 }
 
 /*
@@ -555,62 +566,62 @@ xfs_trans_unreserve_and_mod_sb(
 	if (tp->t_flags & XFS_TRANS_SB_DIRTY) {
 		if (tp->t_icount_delta != 0) {
 			msbp->msb_field = XFS_SBS_ICOUNT;
-			msbp->msb_delta = tp->t_icount_delta;
+			msbp->msb_delta = (int)tp->t_icount_delta;
 			msbp++;
 		}
 		if (tp->t_ifree_delta != 0) {
 			msbp->msb_field = XFS_SBS_IFREE;
-			msbp->msb_delta = tp->t_ifree_delta;
+			msbp->msb_delta = (int)tp->t_ifree_delta;
 			msbp++;
 		}
 		if (tp->t_fdblocks_delta != 0) {
 			msbp->msb_field = XFS_SBS_FDBLOCKS;
-			msbp->msb_delta = tp->t_fdblocks_delta;
+			msbp->msb_delta = (int)tp->t_fdblocks_delta;
 			msbp++;
 		}
 		if (tp->t_frextents_delta != 0) {
 			msbp->msb_field = XFS_SBS_FREXTENTS;
-			msbp->msb_delta = tp->t_frextents_delta;
+			msbp->msb_delta = (int)tp->t_frextents_delta;
 			msbp++;
 		}
 		if (tp->t_dblocks_delta != 0) {
 			msbp->msb_field = XFS_SBS_DBLOCKS;
-			msbp->msb_delta = tp->t_dblocks_delta;
+			msbp->msb_delta = (int)tp->t_dblocks_delta;
 			msbp++;
 		}
 		if (tp->t_agcount_delta != 0) {
 			msbp->msb_field = XFS_SBS_AGCOUNT;
-			msbp->msb_delta = tp->t_agcount_delta;
+			msbp->msb_delta = (int)tp->t_agcount_delta;
 			msbp++;
 		}
 		if (tp->t_imaxpct_delta != 0) {
 			msbp->msb_field = XFS_SBS_IMAX_PCT;
-			msbp->msb_delta = tp->t_imaxpct_delta;
+			msbp->msb_delta = (int)tp->t_imaxpct_delta;
 			msbp++;
 		}
 		if (tp->t_rextsize_delta != 0) {
 			msbp->msb_field = XFS_SBS_REXTSIZE;
-			msbp->msb_delta = tp->t_rextsize_delta;
+			msbp->msb_delta = (int)tp->t_rextsize_delta;
 			msbp++;
 		}
 		if (tp->t_rbmblocks_delta != 0) {
 			msbp->msb_field = XFS_SBS_RBMBLOCKS;
-			msbp->msb_delta = tp->t_rbmblocks_delta;
+			msbp->msb_delta = (int)tp->t_rbmblocks_delta;
 			msbp++;
 		}
 		if (tp->t_rblocks_delta != 0) {
 			msbp->msb_field = XFS_SBS_RBLOCKS;
-			msbp->msb_delta = tp->t_rblocks_delta;
+			msbp->msb_delta = (int)tp->t_rblocks_delta;
 			msbp++;
 		}
 		if (tp->t_rextents_delta != 0) {
 			msbp->msb_field = XFS_SBS_REXTENTS;
-			msbp->msb_delta = tp->t_rextents_delta;
+			msbp->msb_delta = (int)tp->t_rextents_delta;
 			msbp++;
 		}
 		if (tp->t_rextslog_delta != 0) {
 			msbp->msb_field = XFS_SBS_REXTSLOG;
-			msbp->msb_delta = tp->t_rextslog_delta;
+			msbp->msb_delta = (int)tp->t_rextslog_delta;
 			msbp++;
 		}
 	}
@@ -619,7 +630,8 @@ xfs_trans_unreserve_and_mod_sb(
 	 * If we need to change anything, do it.
 	 */
 	if (msbp > msb) {
-		error = xfs_mod_incore_sb_batch(tp->t_mountp, msb, msbp - msb, rsvd);
+		error = xfs_mod_incore_sb_batch(tp->t_mountp, msb,
+			(uint)(msbp - msb), rsvd);
 		ASSERT(error == 0);
 	}
 }

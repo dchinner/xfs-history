@@ -1367,6 +1367,7 @@ xfs_is_nested_locking_enabled(void)
  * maxdmasz.  the pages should be unlocked ASAP after the biomove
  * using xfs_unlock_iopages().
  */
+/* ARGSUSED */
 int
 xfs_lockdown_iopages(
 	struct bmapval	*bmapp,

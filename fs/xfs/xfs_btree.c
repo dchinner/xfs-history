@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.60 $"
+#ident	"$Revision$"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -86,11 +86,11 @@ xfs_btree_maxrecs(
 	switch (cur->bc_btnum) {
 	case XFS_BTNUM_BNO:
 	case XFS_BTNUM_CNT:
-		return XFS_ALLOC_BLOCK_MAXRECS(block->bb_h.bb_level, cur);
+		return (int)XFS_ALLOC_BLOCK_MAXRECS(block->bb_h.bb_level, cur);
 	case XFS_BTNUM_BMAP:
-		return XFS_BMAP_BLOCK_IMAXRECS(block->bb_h.bb_level, cur);
+		return (int)XFS_BMAP_BLOCK_IMAXRECS(block->bb_h.bb_level, cur);
 	case XFS_BTNUM_INO:
-		return XFS_INOBT_BLOCK_MAXRECS(block->bb_h.bb_level, cur);
+		return (int)XFS_INOBT_BLOCK_MAXRECS(block->bb_h.bb_level, cur);
 	default:
 		ASSERT(0);
 		return 0;

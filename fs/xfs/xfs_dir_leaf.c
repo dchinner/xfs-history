@@ -266,7 +266,7 @@ xfs_dir_shortform_addname(xfs_da_args_t *args)
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
 	}
 
-	offset = (char *)sfe - (char *)sf;
+	offset = (int)((char *)sfe - (char *)sf);
 	size = XFS_DIR_SF_ENTSIZE_BYNAME(args->namelen);
 	xfs_idata_realloc(dp, size, XFS_DATA_FORK);
 	sf = (xfs_dir_shortform_t *)dp->i_df.if_u1.if_data;
@@ -942,8 +942,8 @@ xfs_dir_leaf_add(buf_t *bp, xfs_da_args_t *args, int index)
 	 * Search through freemap for first-fit on new name length.
 	 * (may need to figure in size of entry struct too)
 	 */
-	tablesize = (hdr->count + 1) * sizeof(xfs_dir_leaf_entry_t)
-			+ sizeof(xfs_dir_leaf_hdr_t);
+	tablesize = (hdr->count + 1) * (uint)sizeof(xfs_dir_leaf_entry_t)
+			+ (uint)sizeof(xfs_dir_leaf_hdr_t);
 	map = &hdr->freemap[XFS_DIR_LEAF_MAPSIZE-1];
 	for (sum = 0, i = XFS_DIR_LEAF_MAPSIZE-1; i >= 0; map--, i--) {
 		if (tablesize > hdr->firstused) {
@@ -954,7 +954,7 @@ xfs_dir_leaf_add(buf_t *bp, xfs_da_args_t *args, int index)
 			continue;	/* no space in this map */
 		tmp = entsize;
 		if (map->base < hdr->firstused)
-			tmp += sizeof(xfs_dir_leaf_entry_t);
+			tmp += (uint)sizeof(xfs_dir_leaf_entry_t);
 		if (map->size >= tmp) {
 			if (!args->justcheck)
 				xfs_dir_leaf_add_work(bp, args, index, i);
@@ -978,7 +978,8 @@ xfs_dir_leaf_add(buf_t *bp, xfs_da_args_t *args, int index)
 	 */
 	error = xfs_dir_leaf_compact(args->trans, bp,
 			args->total == 0 ?
-				entsize + sizeof(xfs_dir_leaf_entry_t) : 0,
+				entsize +
+				(uint)sizeof(xfs_dir_leaf_entry_t) : 0,
 			args->justcheck);
 	if (error)
 		return(error);
@@ -986,7 +987,8 @@ xfs_dir_leaf_add(buf_t *bp, xfs_da_args_t *args, int index)
 	 * After compaction, the block is guaranteed to have only one
 	 * free region, in freemap[0].  If it is not big enough, give up.
 	 */
-	if (hdr->freemap[0].size < (entsize + sizeof(xfs_dir_leaf_entry_t)))
+	if (hdr->freemap[0].size <
+	    (entsize + (uint)sizeof(xfs_dir_leaf_entry_t)))
 		return(XFS_ERROR(ENOSPC));
 
 	if (!args->justcheck)
@@ -1021,10 +1023,10 @@ xfs_dir_leaf_add_work(buf_t *bp, xfs_da_args_t *args, int index, int mapindex)
 	entry = &leaf->entries[index];
 	if (index < hdr->count) {
 		tmp  = hdr->count - index;
-		tmp *= sizeof(xfs_dir_leaf_entry_t);
+		tmp *= (uint)sizeof(xfs_dir_leaf_entry_t);
 		bcopy((char *)entry, (char *)(entry+1), tmp);
 		xfs_trans_log_buf(args->trans, bp,
-		    XFS_DA_LOGRANGE(leaf, entry, tmp + sizeof(*entry)));
+		    XFS_DA_LOGRANGE(leaf, entry, tmp + (uint)sizeof(*entry)));
 	}
 	hdr->count++;
 
@@ -1058,13 +1060,13 @@ xfs_dir_leaf_add_work(buf_t *bp, xfs_da_args_t *args, int index, int mapindex)
 	if (entry->nameidx < hdr->firstused)
 		hdr->firstused = entry->nameidx;
 	ASSERT(hdr->firstused >= ((hdr->count*sizeof(*entry))+sizeof(*hdr)));
-	tmp = (hdr->count-1) * sizeof(xfs_dir_leaf_entry_t)
-			+ sizeof(xfs_dir_leaf_hdr_t);
+	tmp = (hdr->count-1) * (uint)sizeof(xfs_dir_leaf_entry_t)
+			+ (uint)sizeof(xfs_dir_leaf_hdr_t);
 	map = &hdr->freemap[0];
 	for (i = 0; i < XFS_DIR_LEAF_MAPSIZE; map++, i++) {
 		if (map->base == tmp) {
-			map->base += sizeof(xfs_dir_leaf_entry_t);
-			map->size -= sizeof(xfs_dir_leaf_entry_t);
+			map->base += (uint)sizeof(xfs_dir_leaf_entry_t);
+			map->size -= (uint)sizeof(xfs_dir_leaf_entry_t);
 		}
 	}
 	hdr->namebytes += args->namelen;
@@ -1203,14 +1205,14 @@ xfs_dir_leaf_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		 */
 		count = hdr1->count - count;	/* number entries being moved */
 		space  = hdr1->namebytes - totallen;
-		space += count * (sizeof(xfs_dir_leaf_name_t)-1);
-		space += count * sizeof(xfs_dir_leaf_entry_t);
+		space += count * ((uint)sizeof(xfs_dir_leaf_name_t)-1);
+		space += count * (uint)sizeof(xfs_dir_leaf_entry_t);
 
 		/*
 		 * leaf2 is the destination, compact it if it looks tight.
 		 */
-		max  = hdr2->firstused - sizeof(xfs_dir_leaf_hdr_t);
-		max -= hdr2->count * sizeof(xfs_dir_leaf_entry_t);
+		max  = hdr2->firstused - (uint)sizeof(xfs_dir_leaf_hdr_t);
+		max -= hdr2->count * (uint)sizeof(xfs_dir_leaf_entry_t);
 		if (space > max) {
 			xfs_dir_leaf_compact(state->args->trans, blk2->bp,
 								 0, 0);
@@ -1233,14 +1235,14 @@ xfs_dir_leaf_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		 */
 		count -= hdr1->count;		/* number entries being moved */
 		space  = totallen - hdr1->namebytes;
-		space += count * (sizeof(xfs_dir_leaf_name_t)-1);
-		space += count * sizeof(xfs_dir_leaf_entry_t);
+		space += count * ((uint)sizeof(xfs_dir_leaf_name_t)-1);
+		space += count * (uint)sizeof(xfs_dir_leaf_entry_t);
 
 		/*
 		 * leaf1 is the destination, compact it if it looks tight.
 		 */
-		max  = hdr1->firstused - sizeof(xfs_dir_leaf_hdr_t);
-		max -= hdr1->count * sizeof(xfs_dir_leaf_entry_t);
+		max  = hdr1->firstused - (uint)sizeof(xfs_dir_leaf_hdr_t);
+		max -= hdr1->count * (uint)sizeof(xfs_dir_leaf_entry_t);
 		if (space > max) {
 			xfs_dir_leaf_compact(state->args->trans, blk1->bp,
 								 0, 0);
@@ -1307,7 +1309,7 @@ xfs_dir_leaf_figure_balance(xfs_da_state_t *state,
 	 * byte usage between the two blocks to a minimum.
 	 */
 	max = hdr1->count + hdr2->count;
-	half  = (max+1) * (sizeof(*entry)+sizeof(xfs_dir_leaf_entry_t)-1);
+	half  = (max+1) * (uint)(sizeof(*entry)+sizeof(xfs_dir_leaf_entry_t)-1);
 	half += hdr1->namebytes + hdr2->namebytes + state->args->namelen;
 	half /= 2;
 	lastdelta = state->blocksize;
@@ -1319,7 +1321,7 @@ xfs_dir_leaf_figure_balance(xfs_da_state_t *state,
 		 * The new entry is in the first block, account for it.
 		 */
 		if (count == blk1->index) {
-			tmp = totallen + sizeof(*entry)
+			tmp = totallen + (uint)sizeof(*entry)
 				+ XFS_DIR_LEAF_ENTSIZE_BYNAME(state->args->namelen);
 			if (XFS_DIR_ABS(half - tmp) > lastdelta)
 				break;
@@ -1339,7 +1341,7 @@ xfs_dir_leaf_figure_balance(xfs_da_state_t *state,
 		/*
 		 * Figure out if next leaf entry would be too much.
 		 */
-		tmp = totallen + sizeof(*entry)
+		tmp = totallen + (uint)sizeof(*entry)
 				+ XFS_DIR_LEAF_ENTSIZE_BYENTRY(entry);
 		if (XFS_DIR_ABS(half - tmp) > lastdelta)
 			break;
@@ -1352,10 +1354,11 @@ xfs_dir_leaf_figure_balance(xfs_da_state_t *state,
 	 * Calculate the number of namebytes that will end up in lower block.
 	 * If new entry not in lower block, fix up the count.
 	 */
-	totallen -= count * (sizeof(*entry)+sizeof(xfs_dir_leaf_entry_t)-1);
+	totallen -=
+		count * (uint)(sizeof(*entry)+sizeof(xfs_dir_leaf_entry_t)-1);
 	if (foundit) {
-		totallen -= ( (sizeof(*entry)+sizeof(xfs_dir_leaf_entry_t)-1) +
-			      state->args->namelen );
+		totallen -= (sizeof(*entry)+sizeof(xfs_dir_leaf_entry_t)-1) +
+			    state->args->namelen;
 	}
 
 	*countarg = count;
@@ -1396,9 +1399,9 @@ xfs_dir_leaf_toosmall(xfs_da_state_t *state, int *action)
 	ASSERT(info->magic == XFS_DIR_LEAF_MAGIC);
 	leaf = (xfs_dir_leafblock_t *)info;
 	count = leaf->hdr.count;
-	bytes = sizeof(xfs_dir_leaf_hdr_t) +
-		count * sizeof(xfs_dir_leaf_entry_t) +
-		count * (sizeof(xfs_dir_leaf_name_t)-1) +
+	bytes = (uint)sizeof(xfs_dir_leaf_hdr_t) +
+		count * (uint)sizeof(xfs_dir_leaf_entry_t) +
+		count * ((uint)sizeof(xfs_dir_leaf_name_t)-1) +
 		leaf->hdr.namebytes;
 	if (bytes > (state->blocksize >> 1)) {
 		*action = 0;	/* blk over 50%, dont try to join */
@@ -1460,9 +1463,9 @@ xfs_dir_leaf_toosmall(xfs_da_state_t *state, int *action)
 		ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
 		count += leaf->hdr.count;
 		bytes -= leaf->hdr.namebytes;
-		bytes -= count * (sizeof(xfs_dir_leaf_name_t) - 1);
-		bytes -= count * sizeof(xfs_dir_leaf_entry_t);
-		bytes -= sizeof(xfs_dir_leaf_hdr_t);
+		bytes -= count * ((uint)sizeof(xfs_dir_leaf_name_t) - 1);
+		bytes -= count * (uint)sizeof(xfs_dir_leaf_entry_t);
+		bytes -= (uint)sizeof(xfs_dir_leaf_hdr_t);
 		if (bytes >= 0)
 			break;	/* fits with at least 25% to spare */
 
@@ -1530,8 +1533,8 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *bp, int index)
 	 *    find smallest free region in case we need to replace it,
 	 *    adjust any map that borders the entry table,
 	 */
-	tablesize = hdr->count * sizeof(xfs_dir_leaf_entry_t)
-			+ sizeof(xfs_dir_leaf_hdr_t);
+	tablesize = hdr->count * (uint)sizeof(xfs_dir_leaf_entry_t)
+			+ (uint)sizeof(xfs_dir_leaf_hdr_t);
 	map = &hdr->freemap[0];
 	tmp = map->size;
 	before = after = -1;
@@ -1541,8 +1544,8 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *bp, int index)
 		ASSERT(map->base < XFS_LBSIZE(mp));
 		ASSERT(map->size < XFS_LBSIZE(mp));
 		if (map->base == tablesize) {
-			map->base -= sizeof(xfs_dir_leaf_entry_t);
-			map->size += sizeof(xfs_dir_leaf_entry_t);
+			map->base -= (uint)sizeof(xfs_dir_leaf_entry_t);
+			map->size += (uint)sizeof(xfs_dir_leaf_entry_t);
 		}
 
 		if ((map->base + map->size) == entry->nameidx) {
@@ -1601,11 +1604,11 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *bp, int index)
 	xfs_trans_log_buf(trans, bp, XFS_DA_LOGRANGE(leaf, namest, entsize));
 
 	hdr->namebytes -= entry->namelen;
-	tmp = (hdr->count - index) * sizeof(xfs_dir_leaf_entry_t);
+	tmp = (hdr->count - index) * (uint)sizeof(xfs_dir_leaf_entry_t);
 	bcopy((char *)(entry+1), (char *)entry, tmp);
 	hdr->count--;
 	xfs_trans_log_buf(trans, bp,
-	    XFS_DA_LOGRANGE(leaf, entry, tmp + sizeof(*entry)));
+	    XFS_DA_LOGRANGE(leaf, entry, tmp + (uint)sizeof(*entry)));
 	entry = &leaf->entries[hdr->count];
 	bzero((char *)entry, sizeof(xfs_dir_leaf_entry_t));
 
@@ -1637,9 +1640,9 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *bp, int index)
 	 * Check if leaf is less than 50% full, caller may want to
 	 * "join" the leaf with a sibling if so.
 	 */
-	tmp  = sizeof(xfs_dir_leaf_hdr_t);
-	tmp += leaf->hdr.count * sizeof(xfs_dir_leaf_entry_t);
-	tmp += leaf->hdr.count * (sizeof(xfs_dir_leaf_name_t) - 1);
+	tmp  = (uint)sizeof(xfs_dir_leaf_hdr_t);
+	tmp += leaf->hdr.count * (uint)sizeof(xfs_dir_leaf_entry_t);
+	tmp += leaf->hdr.count * ((uint)sizeof(xfs_dir_leaf_name_t) - 1);
 	tmp += leaf->hdr.namebytes;
 	if (tmp < mp->m_da_magicpct)
 		return(1);			/* leaf is < 37% full */
@@ -1869,7 +1872,7 @@ xfs_dir_leaf_moveents(xfs_dir_leafblock_t *leaf_s, int start_s,
 	 */
 	if (start_d < hdr_d->count) {
 		tmp  = hdr_d->count - start_d;
-		tmp *= sizeof(xfs_dir_leaf_entry_t);
+		tmp *= (uint)sizeof(xfs_dir_leaf_entry_t);
 		entry_s = &leaf_d->entries[start_d];
 		entry_d = &leaf_d->entries[start_d + count];
 		bcopy((char *)entry_s, (char *)entry_d, tmp);
@@ -1900,8 +1903,8 @@ xfs_dir_leaf_moveents(xfs_dir_leafblock_t *leaf_s, int start_s,
 		hdr_d->namebytes += entry_d->namelen;
 		hdr_s->count--;
 		hdr_d->count++;
-		tmp  = hdr_d->count * sizeof(xfs_dir_leaf_entry_t)
-				+ sizeof(xfs_dir_leaf_hdr_t);
+		tmp  = hdr_d->count * (uint)sizeof(xfs_dir_leaf_entry_t)
+				+ (uint)sizeof(xfs_dir_leaf_hdr_t);
 		ASSERT(hdr_d->firstused >= tmp);
 
 	}
@@ -1910,7 +1913,7 @@ xfs_dir_leaf_moveents(xfs_dir_leafblock_t *leaf_s, int start_s,
 	 * Zero out the entries we just copied.
 	 */
 	if (start_s == hdr_s->count) {
-		tmp = count * sizeof(xfs_dir_leaf_entry_t);
+		tmp = count * (uint)sizeof(xfs_dir_leaf_entry_t);
 		entry_s = &leaf_s->entries[start_s];
 		ASSERT((char *)entry_s + tmp <= (char *)leaf_s + XFS_LBSIZE(mp));
 		bzero((char *)entry_s, tmp);
@@ -1920,12 +1923,12 @@ xfs_dir_leaf_moveents(xfs_dir_leafblock_t *leaf_s, int start_s,
 		 * then zero the entries at the top.
 		 */
 		tmp  = hdr_s->count - count;
-		tmp *= sizeof(xfs_dir_leaf_entry_t);
+		tmp *= (uint)sizeof(xfs_dir_leaf_entry_t);
 		entry_s = &leaf_s->entries[start_s + count];
 		entry_d = &leaf_s->entries[start_s];
 		bcopy((char *)entry_s, (char *)entry_d, tmp);
 
-		tmp = count * sizeof(xfs_dir_leaf_entry_t);
+		tmp = count * (uint)sizeof(xfs_dir_leaf_entry_t);
 		entry_s = &leaf_s->entries[hdr_s->count];
 		ASSERT((char *)entry_s + tmp <= (char *)leaf_s + XFS_LBSIZE(mp));
 		bzero((char *)entry_s, tmp);
@@ -1934,8 +1937,9 @@ xfs_dir_leaf_moveents(xfs_dir_leafblock_t *leaf_s, int start_s,
 	/*
 	 * Fill in the freemap information
 	 */
-	hdr_d->freemap[0].base = sizeof(xfs_dir_leaf_hdr_t);
-	hdr_d->freemap[0].base += hdr_d->count * sizeof(xfs_dir_leaf_entry_t);
+	hdr_d->freemap[0].base = (uint)sizeof(xfs_dir_leaf_hdr_t);
+	hdr_d->freemap[0].base +=
+		hdr_d->count * (uint)sizeof(xfs_dir_leaf_entry_t);
 	hdr_d->freemap[0].size = hdr_d->firstused - hdr_d->freemap[0].base;
 	hdr_d->freemap[1].base = hdr_d->freemap[2].base = 0;
 	hdr_d->freemap[1].size = hdr_d->freemap[2].size = 0;

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BTREE_H
 #define	_FS_XFS_BTREE_H
 
-#ident "$Revision: 1.42 $"
+#ident "$Revision$"
 
 struct buf;
 struct xfs_bmap_free;
@@ -103,7 +103,10 @@ extern const __uint32_t	xfs_magics[];
  * compiler warnings.
  */
 #define	XFS_BTREE_BLOCK_MAXRECS(bsz,t,lf)	\
-	((((int)(bsz)) - (int)(sizeof(t ## _block_t))) / (((lf) * sizeof(t ## _rec_t)) + ((1 - (lf)) * (sizeof(t ## _key_t) + sizeof(t ## _ptr_t)))))
+	((int)(((bsz) - (uint)sizeof(t ## _block_t)) / \
+	 (((lf) * (uint)sizeof(t ## _rec_t)) + \
+	  ((1 - (lf)) * \
+	   ((uint)sizeof(t ## _key_t) + (uint)sizeof(t ## _ptr_t))))))
 #define	XFS_BTREE_BLOCK_MINRECS(bsz,t,lf)	\
 	(XFS_BTREE_BLOCK_MAXRECS(bsz,t,lf) / 2)
 

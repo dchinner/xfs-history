@@ -1,7 +1,7 @@
 #ifndef	_XFS_RW_H
 #define	_XFS_RW_H
 
-#ident "$Revision: 1.39 $"
+#ident "$Revision$"
 
 struct bhv_desc;
 struct bdevsw;
@@ -93,7 +93,7 @@ daddr_t xfs_fsb_to_db(struct xfs_inode *ip, xfs_fsblock_t fsb);
 #else
 #define	XFS_FSB_TO_DB(ip,fsb) \
 		(((ip)->i_d.di_flags & XFS_DIFLAG_REALTIME) ? \
-		 XFS_FSB_TO_BB((ip)->i_mount, (fsb)) : \
+		 (daddr_t)XFS_FSB_TO_BB((ip)->i_mount, (fsb)) : \
 		 XFS_FSB_TO_DADDR((ip)->i_mount, (fsb)))
 #endif
 

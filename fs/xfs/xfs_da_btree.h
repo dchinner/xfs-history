@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DA_BTREE_H
 #define	_FS_XFS_DA_BTREE_H
 
-#ident	"$Revision: 1.31 $"
+#ident	"$Revision$"
 
 /*
  * xfs_da_btree.h
@@ -217,7 +217,8 @@ typedef struct xfs_da_state {
  */
 #define XFS_DA_LOGOFF(BASE, ADDR)	((char *)(ADDR) - (char *)(BASE))
 #define XFS_DA_LOGRANGE(BASE, ADDR, SIZE)	\
-		XFS_DA_LOGOFF(BASE, ADDR), XFS_DA_LOGOFF(BASE, ADDR)+(SIZE)-1
+		(uint)(XFS_DA_LOGOFF(BASE, ADDR)), \
+		(uint)(XFS_DA_LOGOFF(BASE, ADDR)+(SIZE)-1)
 
 /*========================================================================
  * Function prototypes for the kernel.

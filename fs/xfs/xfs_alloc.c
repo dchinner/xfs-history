@@ -2250,8 +2250,8 @@ xfs_alloc_put_freelist(
 	*blockp = bno;
 	TRACE_MODAGF(NULL, agf, XFS_AGF_FLLAST | XFS_AGF_FLCOUNT);
 	xfs_alloc_log_agf(tp, agbp, XFS_AGF_FLLAST | XFS_AGF_FLCOUNT);
-	xfs_trans_log_buf(tp, agflbp, (caddr_t)blockp - (caddr_t)agfl,
-		(caddr_t)blockp - (caddr_t)agfl + sizeof(*blockp) - 1);
+	xfs_trans_log_buf(tp, agflbp, (int)((caddr_t)blockp - (caddr_t)agfl),
+		(int)((caddr_t)blockp - (caddr_t)agfl + sizeof(*blockp) - 1));
 	return 0;
 }
 

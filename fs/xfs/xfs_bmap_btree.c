@@ -1051,8 +1051,8 @@ xfs_bmbt_log_keys(
 
 		block = XFS_BUF_TO_BMBT_BLOCK(bp);
 		kp = XFS_BMAP_KEY_DADDR(block, 1, cur);
-		first = (caddr_t)&kp[kfirst - 1] - (caddr_t)block;
-		last = ((caddr_t)&kp[klast] - 1) - (caddr_t)block;
+		first = (int)((caddr_t)&kp[kfirst - 1] - (caddr_t)block);
+		last = (int)(((caddr_t)&kp[klast] - 1) - (caddr_t)block);
 		xfs_trans_log_buf(tp, bp, first, last);
 	} else {
 		xfs_inode_t		 *ip;
@@ -1090,8 +1090,8 @@ xfs_bmbt_log_ptrs(
 
 		block = XFS_BUF_TO_BMBT_BLOCK(bp);
 		pp = XFS_BMAP_PTR_DADDR(block, 1, cur);
-		first = (caddr_t)&pp[pfirst - 1] - (caddr_t)block;
-		last = ((caddr_t)&pp[plast] - 1) - (caddr_t)block;
+		first = (int)((caddr_t)&pp[pfirst - 1] - (caddr_t)block);
+		last = (int)(((caddr_t)&pp[plast] - 1) - (caddr_t)block);
 		xfs_trans_log_buf(tp, bp, first, last);
 	} else {
 		xfs_inode_t		*ip;
@@ -1966,7 +1966,7 @@ xfs_bmdr_to_bmbt(
 	ASSERT(rblock->bb_level > 0);
 	rblock->bb_numrecs = dblock->bb_numrecs;
 	rblock->bb_leftsib = rblock->bb_rightsib = NULLDFSBNO;
-	dmxr = XFS_BTREE_BLOCK_MAXRECS(dblocklen, xfs_bmdr, 0);
+	dmxr = (int)XFS_BTREE_BLOCK_MAXRECS(dblocklen, xfs_bmdr, 0);
 	fkp = XFS_BTREE_KEY_ADDR(dblocklen, xfs_bmdr, dblock, 1, dmxr);
 	tkp = XFS_BMAP_BROOT_KEY_ADDR(rblock, 1, rblocklen);
 	fpp = XFS_BTREE_PTR_ADDR(dblocklen, xfs_bmdr, dblock, 1, dmxr);
@@ -2106,7 +2106,7 @@ xfs_bmbt_get_all(
 	xfs_exntst_t st;
 
 #if BMBT_USE_64
-	ext_flag = (r->l0) >> (64 - BMBT_EXNTFLAG_BITLEN);
+	ext_flag = (int)((r->l0) >> (64 - BMBT_EXNTFLAG_BITLEN));
 #if XFS_BIG_FILES
 	s->br_startoff = ((xfs_fileoff_t)r->l0 &
 			   XFS_MASK64LO(64 - BMBT_EXNTFLAG_BITLEN)) >> 9;
@@ -2326,7 +2326,7 @@ xfs_bmbt_get_state(
 	int	ext_flag;
 
 #if BMBT_USE_64
-	ext_flag = (r->l0) >> (64 - BMBT_EXNTFLAG_BITLEN);
+	ext_flag = (int)((r->l0) >> (64 - BMBT_EXNTFLAG_BITLEN));
 #else	/* !BMBT_USE_64 */
 	ext_flag = (r->l0 >> (32 - BMBT_EXNTFLAG_BITLEN));
 #endif	/* BMBT_USE_64 */
@@ -2542,8 +2542,8 @@ xfs_bmbt_log_recs(
 	tp = cur->bc_tp;
 	block = XFS_BUF_TO_BMBT_BLOCK(bp);
 	rp = XFS_BMAP_REC_DADDR(block, 1, cur);
-	first = (caddr_t)&rp[rfirst - 1] - (caddr_t)block;
-	last = ((caddr_t)&rp[rlast] - 1) - (caddr_t)block;
+	first = (int)((caddr_t)&rp[rfirst - 1] - (caddr_t)block);
+	last = (int)(((caddr_t)&rp[rlast] - 1) - (caddr_t)block);
 	xfs_trans_log_buf(tp, bp, first, last);
 	XFS_BMBT_TRACE_CURSOR(cur, EXIT);
 }
@@ -2986,7 +2986,7 @@ xfs_bmbt_to_bmdr(
 	ASSERT(rblock->bb_level > 0);
 	dblock->bb_level = rblock->bb_level;
 	dblock->bb_numrecs = rblock->bb_numrecs;
-	dmxr = XFS_BTREE_BLOCK_MAXRECS(dblocklen, xfs_bmdr, 0);
+	dmxr = (int)XFS_BTREE_BLOCK_MAXRECS(dblocklen, xfs_bmdr, 0);
 	fkp = XFS_BMAP_BROOT_KEY_ADDR(rblock, 1, rblocklen);
 	tkp = XFS_BTREE_KEY_ADDR(dblocklen, xfs_bmdr, dblock, 1, dmxr);
 	fpp = XFS_BMAP_BROOT_PTR_ADDR(rblock, 1, rblocklen);
