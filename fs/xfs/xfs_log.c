@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.108 $"
+#ident	"$Revision: 1.110 $"
 
 /*
  * High level interface routines for log manager
@@ -442,7 +442,7 @@ xfs_log_mount(xfs_mount_t	*mp,
 	xlog_t *log;
 	int    error;
 	
-
+	cmn_err(CE_NOTE, "Start mounting filesystem: %s", mp->m_fsname);
 	log = xlog_alloc_log(mp, log_dev, blk_offset, num_bblks);
 
 	if (! xlog_debug) {
@@ -457,6 +457,7 @@ xfs_log_mount(xfs_mount_t	*mp,
 	/* Normal transactions can now occur */
 	log->l_flags &= ~XLOG_ACTIVE_RECOVERY;
 
+	/* End mounting message in xfs_log_mount_finish */
 	return error;
 }	/* xfs_log_mount */
 
@@ -884,9 +885,6 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	initnlock(&log->l_icloglock, "iclog");
 	initnlock(&log->l_grant_lock, "grhead_iclog");
 	initnsema(&log->l_flushsema, 0, "ic-flush");
-/*
-	initnsema(&log->l_flushsema, log->l_iclog_bufs, "ic-flush");
-*/
 	xlog_state_ticket_alloc(log);  /* wait until after icloglock inited */
 	
 	/* log record size must be multiple of BBSIZE; see xlog_rec_header_t */
