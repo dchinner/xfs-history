@@ -4546,11 +4546,9 @@ xfs_set_dmattrs (
  */
 STATIC int
 xfs_reclaim(
-	bhv_desc_t	*bdp,
-	int		flag)
+	bhv_desc_t	*bdp)
 {
 	xfs_inode_t	*ip;
-	int		locked;
 	vnode_t		*vp;
 
 	vp = BHV_TO_VNODE(bdp);
@@ -4560,59 +4558,6 @@ xfs_reclaim(
 	ASSERT(!VN_MAPPED(vp));
 	ip = XFS_BHVTOI(bdp);
 
-	locked = 0;
-
-	/*
-	 * If this is not an unmount (flag == 0) and the inode's data
-	 * still needs to be flushed, then we do not allow
-	 * the inode to be reclaimed.  This is to avoid many different
-	 * deadlocks.
-	 *
-	 * Doing the VOP_FLUSHINVAL_PAGES() can cause
-	 * us to wait in the buffer cache.  We can be called here via
-	 * vn_alloc() from xfs_iget().	We can be holding any number of
-	 * locks at that point in the middle of a transaction, so we
-	 * can't do anything that might need log space or the locks we
-	 * might be holding.  Flushing our buffers can require log space
-	 * to allocate the space for delayed allocation extents underlying
-	 * them.  If the transaction we're already in has all the log
-	 * space, then we won't be able to get any more and we'll hang.
-	 *
-	 * Not allowing the inode to be reclaimed if it has dirty data
-	 * also prevents memory deadlocks where it is vhand calling here
-	 * via the vnode shake routine.	 Since our dirty data might be
-	 * delayed allocation dirty data which will require us to allocate
-	 * memory to flush, we can't do this from vhand.
-	 *
-	 * It is OK to return an error here.  The vnode cache will just
-	 * come back later.
-	 *
-	 * XXXajs Distinguish vhand from vn_alloc and fail vhand case
-	 * if the inode is dirty.  This will prevent deadlocks where the
-	 * process with the inode buffer locked needs memory.  We can't
-	 * always fail when the inode is dirty because then we don't
-	 * reclaim enough.  The vnode cache then grows far too large.
-	 */
-	if (!(flag & FSYNC_INVAL)) {
-		if (VN_DIRTY(vp)) {
-			return XFS_ERROR(EAGAIN);
-		}
-		if (!xfs_ilock_nowait(ip, XFS_ILOCK_EXCL)) {
-			return XFS_ERROR(EAGAIN);
-		}
-		if (!xfs_iflock_nowait(ip)) {
-			xfs_iunlock(ip, XFS_ILOCK_EXCL);
-			return XFS_ERROR(EAGAIN);
-		}
-		if ((ip->i_itemp != NULL) &&
-		    ((ip->i_itemp->ili_format.ilf_fields != 0) ||
-		     (ip->i_itemp->ili_last_fields != 0))) {
-			(void) xfs_iflush(ip, XFS_IFLUSH_DELWRI);
-			xfs_iunlock(ip, XFS_ILOCK_EXCL);
-			return XFS_ERROR(EAGAIN);
-		}
-		locked = 1;
-	}
 	if ((ip->i_d.di_mode & IFMT) == IFREG) {
 		if (ip->i_d.di_size > 0) {
 			/*
@@ -4628,11 +4573,6 @@ xfs_reclaim(
 			 * cannot be any mapped file references to this vnode
 			 * since it is being reclaimed.
 			 */
-			if (locked) {
-				xfs_ifunlock(ip);
-				xfs_iunlock(ip, XFS_ILOCK_EXCL);
-				locked = 0;
-			}
 			xfs_ilock(ip, XFS_IOLOCK_EXCL);
 
 			/*
@@ -4667,12 +4607,7 @@ xfs_reclaim(
 	vn_bhv_remove(VN_BHV_HEAD(vp), XFS_ITOBHV(ip));
 
 	if (!ip->i_update_core && (ip->i_itemp == NULL)) {
-		return xfs_finish_reclaim(ip, locked, 0);
-	}
-
-	if (locked) {
-		xfs_ifunlock(ip);
-		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+		return xfs_finish_reclaim(ip, 0, 0);
 	}
 
 	return 0;
