@@ -1446,6 +1446,12 @@ xfs_write_file(
 		}
 	} while ((uiop->uio_resid > 0) && !error);
 
+#ifdef DEBUG
+	xfs_ilock(ip, XFS_ILOCK_SHARED);
+	xfs_isize_check(ip->i_mount, ip, ip->i_d.di_size);
+	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+#endif
+
 	ip->i_new_size = 0;
 	kmem_zone_free(xfs_bmap_zone, bmaps);
 	return error;

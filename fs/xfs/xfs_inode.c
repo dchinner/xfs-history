@@ -227,6 +227,7 @@ xfs_iformat(
 				xfs_bmap_trace_exlist("xfs_iformat", ip, nex);
 			}
 			ip->i_flags |= XFS_IEXTENTS;
+			xfs_isize_check(mp, ip, ip->i_d.di_size);
 			return;
 
 		case XFS_DINODE_FMT_BTREE:
@@ -497,6 +498,35 @@ xfs_ialloc(
 }
 
 /*
+ * Check to make sure that there are no blocks allocated to the
+ * file beyond the size of the file.  We don't check this for
+ * files with fixed size extents or real time extents, but we
+ * at least do it for regular files.
+ */
+#ifdef DEBUG
+void
+xfs_isize_check(
+	xfs_mount_t	*mp,
+	xfs_inode_t	*ip,
+	xfs_fsize_t	isize)
+{
+	xfs_fsblock_t	map_first;
+	int		nimaps;
+	xfs_bmbt_irec_t	imaps[2];
+
+	nimaps = 2;
+	map_first = XFS_B_TO_FSB(mp, isize);
+	(void) xfs_bmapi(NULL, ip, map_first,
+			 (XFS_B_TO_FSB(mp, (off_t)XFS_MAX_FILE_OFFSET) -
+			  map_first),
+			 XFS_BMAPI_ENTIRE, NULLFSBLOCK, 0, imaps, &nimaps,
+			 NULL);
+	ASSERT(nimaps == 1);
+	ASSERT(imaps[0].br_startblock == HOLESTARTBLOCK);
+}
+#endif	/* DEBUG */
+
+/*
  * Start the truncation of the file to new_size.  The new size
  * must be smaller than the current size.  This routine will
  * clear the buffer and page caches of file data in the removed
@@ -608,6 +638,7 @@ xfs_itruncate_finish(
 	ASSERT((*tp)->t_flags & XFS_TRANS_PERM_LOG_RES);
 	ASSERT(ip->i_transp == *tp);
 	ASSERT(ip->i_item.ili_flags & XFS_ILI_HOLD);
+	xfs_isize_check(ip->i_mount, ip, ip->i_d.di_size);
 
 	ntp = *tp;
 	mp = (ntp)->t_mountp;
@@ -626,6 +657,7 @@ xfs_itruncate_finish(
 		 */
 		ip->i_d.di_size = new_size;
 		xfs_trans_log_inode(ntp, ip, XFS_ILOG_CORE);
+		xfs_isize_check(mp, ip, ip->i_d.di_size);
 		return;
 	}
 	done = 0;
@@ -674,6 +706,7 @@ xfs_itruncate_finish(
 		xfs_trans_ijoin(ntp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 		xfs_trans_ihold(ntp, ip);
 	}
+	xfs_isize_check(mp, ip, new_size);
 	ip->i_d.di_size = new_size;
 	nanotime(&tv);
 	ip->i_d.di_ctime.t_sec = tv.tv_sec;
@@ -733,6 +766,7 @@ xfs_igrow_finish(
 	ASSERT(ismrlocked(&(ip->i_iolock), MR_UPDATE) != 0);
 	ASSERT(ip->i_transp == tp);
 	ASSERT(new_size > ip->i_d.di_size);
+	xfs_isize_check(ip->i_mount, ip, ip->i_d.di_size);
 
 	/*
 	 * Update the file size and inode change timestamp.
@@ -786,7 +820,9 @@ xfs_iunlink(
 	 * list this inode will go on.
 	 */
 	agino = XFS_INO_TO_AGINO(mp, ip->i_ino);
+	ASSERT(agino != 0);
 	bucket_index = agino % XFS_AGI_UNLINKED_BUCKETS;
+	ASSERT(agi->agi_unlinked[bucket_index] != 0);
 
 	if (agi->agi_unlinked[bucket_index] != NULLAGINO) {
 		/*
@@ -797,6 +833,7 @@ xfs_iunlink(
 		 */
 		ibp = xfs_inotobp(mp, tp, ip->i_ino, &dip);
 		ASSERT(dip->di_next_unlinked == NULLAGINO);
+		ASSERT(dip->di_next_unlinked != 0);
 		dip->di_next_unlinked = agi->agi_unlinked[bucket_index];
 		offset = ((char *)dip - (char *)(ibp->b_un.b_addr)) +
 			offsetof(xfs_dinode_t, di_next_unlinked);
@@ -856,8 +893,10 @@ xfs_iunlink_remove(
 	 * list this inode will go on.
 	 */
 	agino = XFS_INO_TO_AGINO(mp, ip->i_ino);
+	ASSERT(agino != 0);
 	bucket_index = agino % XFS_AGI_UNLINKED_BUCKETS;
 	ASSERT(agi->agi_unlinked[bucket_index] != NULLAGINO);
+	ASSERT(agi->agi_unlinked[bucket_index] != 0);
 
 	if (agi->agi_unlinked[bucket_index] == agino) {
 		/*
@@ -870,6 +909,7 @@ xfs_iunlink_remove(
 		 */
 		ibp = xfs_inotobp(mp, tp, ip->i_ino, &dip);
 		next_agino = dip->di_next_unlinked;
+		ASSERT(next_agino != 0);
 		if (next_agino != NULLAGINO) {
 			dip->di_next_unlinked = NULLAGINO;
 			offset = ((char *)dip - (char *)(ibp->b_un.b_addr)) +
@@ -906,6 +946,7 @@ xfs_iunlink_remove(
 			last_ibp = xfs_inotobp(mp, tp, next_ino, &last_dip);
 			next_agino = last_dip->di_next_unlinked;
 			ASSERT(next_agino != NULLAGINO);
+			ASSERT(next_agino != 0);
 		}
 		/*
 		 * Now last_ibp points to the buffer previous to us on
@@ -913,6 +954,7 @@ xfs_iunlink_remove(
 		 */
 		ibp = xfs_inotobp(mp, tp, ip->i_ino, &dip);
 		next_agino = dip->di_next_unlinked;
+		ASSERT(next_agino != 0);
 		if (next_agino != NULLAGINO) {
 			dip->di_next_unlinked = NULLAGINO;
 			offset = ((char *)dip - (char *)(ibp->b_un.b_addr)) +
