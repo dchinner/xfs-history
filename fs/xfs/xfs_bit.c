@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -151,9 +151,9 @@ xfs_lowbit64(
 {
 	int n;
 	n = ffs((unsigned)v);
-	if (n == 0) { 
+	if (n == 0) {
 		n = ffs(v >> 32);
-		if (n >= 0) 
+		if (n >= 0)
 			n+=32;
 	}
 	return n-1;
@@ -166,10 +166,10 @@ int
 xfs_highbit64(
 	__uint64_t	v)
 {
-	__uint32_t h = v >> 32; 
-	if (h) 
+	__uint32_t h = v >> 32;
+	if (h)
 		return xfs_highbit32(h) + 32;
-	return xfs_highbit32((__u32)v); 
+	return xfs_highbit32((__u32)v);
 }
 
 
@@ -225,20 +225,20 @@ xfs_count_bits(uint *map, uint size, uint start_bit)
 
 	return (bits);
 }
-	
+
 /*
  * Count the number of contiguous bits set in the bitmap starting with bit
  * start_bit.  Size is the size of the bitmap in words.
  */
 int
-xfs_contig_bits(uint *map, uint	size, uint start_bit)
+xfs_contig_bits(uint *map, uint size, uint start_bit)
 {
-	return find_next_zero_bit(map,size*sizeof(uint)*8,start_bit) - start_bit; 
-} 
-	
+	return find_next_zero_bit(map,size*sizeof(uint)*8,start_bit) - start_bit;
+}
+
 /*
  * This takes the bit number to start looking from and
- * returns the next set bit from there.  It returns -1
+ * returns the next set bit from there.	 It returns -1
  * if there are no more bits set or the start bit is
  * beyond the end of the bitmap.
  *
@@ -246,37 +246,37 @@ xfs_contig_bits(uint *map, uint	size, uint start_bit)
  */
 int xfs_next_bit(uint *map, uint size, uint start_bit)
 {
-        uint * p = ((unsigned int *) map) + (start_bit >> BIT_TO_WORD_SHIFT);
-        uint result = start_bit & ~(NBWORD - 1);
-        uint tmp;
+	uint * p = ((unsigned int *) map) + (start_bit >> BIT_TO_WORD_SHIFT);
+	uint result = start_bit & ~(NBWORD - 1);
+	uint tmp;
 
 	size <<= BIT_TO_WORD_SHIFT;
 
-        if (start_bit >= size) 
+	if (start_bit >= size)
 		return -1;
-        size -= result;
-        start_bit &= (NBWORD - 1);
-        if (start_bit) {
-                tmp = *p++;
-                /* set to zero first offset bits */
-                tmp &= (~0U << start_bit);
-                if (size < NBWORD)
-                        goto found_first;
-                if (tmp != 0U)
-                        goto found_middle;
-                size -= NBWORD;
-                result += NBWORD;
-        }
-        while (size >= NBWORD) {
-                if ((tmp = *p++) != 0U)
-                        goto found_middle;
-                result += NBWORD;
-                size -= NBWORD;
-        }
-        if (!size) 
-                return -1;
-        tmp = *p;
+	size -= result;
+	start_bit &= (NBWORD - 1);
+	if (start_bit) {
+		tmp = *p++;
+		/* set to zero first offset bits */
+		tmp &= (~0U << start_bit);
+		if (size < NBWORD)
+			goto found_first;
+		if (tmp != 0U)
+			goto found_middle;
+		size -= NBWORD;
+		result += NBWORD;
+	}
+	while (size >= NBWORD) {
+		if ((tmp = *p++) != 0U)
+			goto found_middle;
+		result += NBWORD;
+		size -= NBWORD;
+	}
+	if (!size)
+		return -1;
+	tmp = *p;
 found_first:
 found_middle:
-        return result + ffs(tmp) - 1;
+	return result + ffs(tmp) - 1;
 }

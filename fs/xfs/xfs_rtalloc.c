@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -70,7 +70,7 @@ STATIC int
 xfs_lowbit32(
 	__uint32_t	v)
 {
-	return ffs(v)-1; 
+	return ffs(v)-1;
 }
 
 /*
@@ -90,10 +90,10 @@ xfs_growfs_rt_alloc(
 	xfs_daddr_t	d;		/* disk block address */
 	int		error;		/* error return value */
 	xfs_fsblock_t	firstblock;	/* first block allocated in xaction */
-	xfs_bmap_free_t	flist;		/* list of freed blocks */
+	xfs_bmap_free_t flist;		/* list of freed blocks */
 	xfs_fsblock_t	fsbno;		/* filesystem block for bno */
 	xfs_inode_t	*ip;		/* pointer to incore inode */
-	xfs_bmbt_irec_t	map;		/* block map output */
+	xfs_bmbt_irec_t map;		/* block map output */
 	int		nmap;		/* number of block maps */
 	int		resblks;	/* space reservation */
 	xfs_trans_t	*tp;		/* transaction pointer */
@@ -217,7 +217,7 @@ xfs_rtallocate_extent_block(
 	int		stat;		/* status from internal calls */
 
 	/*
-	 * Loop over all the extents starting in this bitmap block, 
+	 * Loop over all the extents starting in this bitmap block,
 	 * looking for one that's long enough.
 	 */
 	for (i = XFS_BLOCKTOBIT(mp, bbno), besti = -1, bestlen = 0,
@@ -303,7 +303,7 @@ xfs_rtallocate_extent_block(
 
 /*
  * Allocate an extent of length minlen<=len<=maxlen, starting at block
- * bno.  If we don't get maxlen then use prod to trim the length, if given.
+ * bno.	 If we don't get maxlen then use prod to trim the length, if given.
  * Returns error; returns starting block in *rtblock.
  * The lengths are all in rtextents.
  */
@@ -383,7 +383,7 @@ xfs_rtallocate_extent_exact(
 
 /*
  * Allocate an extent of length minlen<=len<=maxlen, starting as near
- * to bno as possible.  If we don't get maxlen then use prod to trim
+ * to bno as possible.	If we don't get maxlen then use prod to trim
  * the length, if given.  The lengths are all in rtextents.
  */
 STATIC int				/* error */
@@ -498,7 +498,7 @@ xfs_rtallocate_extent_near(
 					 * If there's no extent given in the
 					 * summary that means the extent we
 					 * found must carry over from an
-					 * earlier block.  If there is an 
+					 * earlier block.  If there is an
 					 * extent given, we've already tried
 					 * that allocation, don't do it again.
 					 */
@@ -532,7 +532,7 @@ xfs_rtallocate_extent_near(
 				if (error) {
 					return error;
 				}
-				/* 
+				/*
 				 * If it works, return the extent.
 				 */
 				if (r != NULLRTBLOCK) {
@@ -553,7 +553,7 @@ xfs_rtallocate_extent_near(
 		 */
 		else if (i > 0 && (int)bbno + i < mp->m_sb.sb_rbmblocks - 1)
 			i++;
-		/* 
+		/*
 		 * If negative or 0 (just started), and there are positive
 		 * blocks to go, go there.  The 0 case moves to block 1.
 		 */
@@ -650,14 +650,14 @@ xfs_rtallocate_extent_size(
 		}
 	}
 	/*
-	 * Didn't find any maxlen blocks.  Try smaller ones, unless 
+	 * Didn't find any maxlen blocks.  Try smaller ones, unless
 	 * we're asking for a fixed size extent.
 	 */
 	if (minlen > --maxlen) {
 		*rtblock = NULLRTBLOCK;
 		return 0;
 	}
-	/* 
+	/*
 	 * Loop over sizes, from maxlen down to minlen.
 	 * This time, when we do the allocations, allow smaller ones
 	 * to succeed.
@@ -671,7 +671,7 @@ xfs_rtallocate_extent_size(
 			/*
 			 * Get the summary information for this level/block.
 			 */
-			error =	xfs_rtget_summary(mp, tp, l, i, rbpp, rsb,
+			error = xfs_rtget_summary(mp, tp, l, i, rbpp, rsb,
 						  &sum);
 			if (error) {
 				return error;
@@ -682,7 +682,7 @@ xfs_rtallocate_extent_size(
 			if (!sum)
 				continue;
 			/*
-			 * Try the allocation.  Make sure the specified
+			 * Try the allocation.	Make sure the specified
 			 * minlen/maxlen are in the possible range for
 			 * this summary level.
 			 */
@@ -794,7 +794,7 @@ xfs_rtallocate_range(
 }
 
 /*
- * Return whether there are any free extents in the size range given 
+ * Return whether there are any free extents in the size range given
  * by low and high, for the bitmap block bbno.
  */
 STATIC int				/* error */
@@ -953,7 +953,7 @@ xfs_rtcheck_free_range(
 #endif
 
 /*
- * Check that the given range is either all allocated (val = 0) or 
+ * Check that the given range is either all allocated (val = 0) or
  * all free (val = 1).
  */
 STATIC int				/* error */
@@ -1645,7 +1645,7 @@ xfs_rtget_summary(
 			*rsb = sb;
 		}
 	}
-	/* 
+	/*
 	 * Point to the summary information & copy it out.
 	 */
 	sp = XFS_SUMPTR(mp, bp, so);
@@ -1881,7 +1881,7 @@ xfs_rtmodify_summary(
 	return 0;
 }
 
-/* 
+/*
  * Visible (exported) functions.
  */
 
@@ -1891,7 +1891,7 @@ xfs_rtmodify_summary(
 int
 xfs_growfs_rt(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
-	xfs_growfs_rt_t	*in)		/* growfs rt input struct */
+	xfs_growfs_rt_t *in)		/* growfs rt input struct */
 {
 	xfs_rtblock_t	bmbno;		/* bitmap block number */
 	xfs_buf_t	*bp;		/* temporary buffer */
@@ -1941,7 +1941,7 @@ xfs_growfs_rt(
 	nrsumblocks = XFS_B_TO_FSB(mp, nrsumsize);
 	nrsumsize = XFS_FSB_TO_B(mp, nrsumblocks);
 	/*
-	 * New summary size can't be more than half the size of 
+	 * New summary size can't be more than half the size of
 	 * the log.  This prevents us from getting a log overflow,
 	 * since we'll log basically the whole summary file at once.
 	 */
@@ -2100,7 +2100,7 @@ error_exit:
 
 /*
  * Allocate an extent in the realtime subvolume, with the usual allocation
- * parameters.  The length units are all in realtime extents, as is the
+ * parameters.	The length units are all in realtime extents, as is the
  * result block number.
  */
 int					/* error */
@@ -2110,7 +2110,7 @@ xfs_rtallocate_extent(
 	xfs_extlen_t	minlen,		/* minimum length to allocate */
 	xfs_extlen_t	maxlen,		/* maximum length to allocate */
 	xfs_extlen_t	*len,		/* out: actual length allocated */
-	xfs_alloctype_t	type,		/* allocation type XFS_ALLOCTYPE... */
+	xfs_alloctype_t type,		/* allocation type XFS_ALLOCTYPE... */
 	int		wasdel,		/* was a delayed allocation extent */
 	xfs_extlen_t	prod,		/* extent product factor */
 	xfs_rtblock_t	*rtblock)	/* out: start block allocated */
@@ -2153,7 +2153,7 @@ xfs_rtallocate_extent(
 	switch (type) {
 	case XFS_ALLOCTYPE_ANY_AG:
 		error = xfs_rtallocate_extent_size(mp, tp, minlen, maxlen, len,
-				&sumbp,	&sb, prod, &r);
+				&sumbp, &sb, prod, &r);
 		break;
 	case XFS_ALLOCTYPE_NEAR_BNO:
 		error = xfs_rtallocate_extent_near(mp, tp, bno, minlen, maxlen,
@@ -2163,8 +2163,8 @@ xfs_rtallocate_extent(
 		error = xfs_rtallocate_extent_exact(mp, tp, bno, minlen, maxlen,
 				len, &sumbp, &sb, prod, &r);
 		break;
-        default:
-                ASSERT(0);
+	default:
+		ASSERT(0);
 	}
 	if (error) {
 		return error;
@@ -2186,7 +2186,7 @@ xfs_rtallocate_extent(
 }
 
 /*
- * Free an extent in the realtime subvolume.  Length is expressed in 
+ * Free an extent in the realtime subvolume.  Length is expressed in
  * realtime extents, as is the block number.
  */
 int					/* error */
@@ -2298,7 +2298,7 @@ xfs_rtmount_init(
 }
 
 /*
- * Get the bitmap and summary inodes into the mount structure 
+ * Get the bitmap and summary inodes into the mount structure
  * at mount time.
  */
 int					/* error */
@@ -2371,7 +2371,7 @@ xfs_rtpick_extent(
 		    (log2 + 1);
 		if (b >= mp->m_sb.sb_rextents)
 			b = do_mod(b, mp->m_sb.sb_rextents);
-		if (b + len > mp->m_sb.sb_rextents) 
+		if (b + len > mp->m_sb.sb_rextents)
 			b = mp->m_sb.sb_rextents - len;
 	}
 	*seqp = seq + 1;

@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -34,7 +34,7 @@
 #include <linux/posix_acl_xattr.h>
 
 STATIC int	xfs_acl_setmode(vnode_t *, xfs_acl_t *);
-STATIC void     xfs_acl_filter_mode(mode_t, xfs_acl_t *);
+STATIC void	xfs_acl_filter_mode(mode_t, xfs_acl_t *);
 STATIC void	xfs_acl_get_endian(xfs_acl_t *);
 STATIC int	xfs_acl_access(uid_t, gid_t, xfs_acl_t *, mode_t, cred_t *);
 STATIC int	xfs_acl_invalid(xfs_acl_t *);
@@ -139,14 +139,14 @@ posix_acl_xattr_to_xfs(
 
 /*
  * Comparison function called from qsort().
- * Primary key is ae_tag, secondary key is ae_id.  
+ * Primary key is ae_tag, secondary key is ae_id.
  */
 STATIC int
 xfs_acl_entry_compare(
 	const void	*va,
 	const void	*vb)
 {
-	xfs_acl_entry_t	*a = (xfs_acl_entry_t *)va,
+	xfs_acl_entry_t *a = (xfs_acl_entry_t *)va,
 			*b = (xfs_acl_entry_t *)vb;
 
 	if (a->ae_tag == b->ae_tag)
@@ -169,7 +169,7 @@ posix_acl_xfs_to_xattr(
 	xfs_acl_entry_t		*src_entry;
 
 	if (size < new_size)
-		return -ERANGE;	
+		return -ERANGE;
 
 	/* Need to sort src XFS ACL by <ae_tag,ae_id> */
 	qsort(src->acl_entry, src->acl_cnt, sizeof(src->acl_entry[0]),
@@ -233,7 +233,7 @@ xfs_acl_vget(
 			goto out;
 		}
 		if (kind == _ACL_TYPE_ACCESS) {
-			vattr_t	va;
+			vattr_t va;
 
 			va.va_mask = AT_MODE;
 			VOP_GETATTR(vp, &va, 0, sys_cred, error);
@@ -394,9 +394,9 @@ xfs_acl_capability_check(
 
 /*
  * Note: cr is only used here for the capability check if the ACL test fails.
- *       It is not used to find out the credentials uid or groups etc, as was
- *       done in IRIX. It is assumed that the uid and groups for the current
- *       thread are taken from "current" instead of the cr parameter. 
+ *	 It is not used to find out the credentials uid or groups etc, as was
+ *	 done in IRIX. It is assumed that the uid and groups for the current
+ *	 thread are taken from "current" instead of the cr parameter.
  */
 STATIC int
 xfs_acl_access(
@@ -406,7 +406,7 @@ xfs_acl_access(
 	mode_t		md,
 	cred_t		*cr)
 {
-	xfs_acl_entry_t	matched;
+	xfs_acl_entry_t matched;
 	int		i, allows;
 	int		maskallows = -1;	/* true, but not 1, either */
 	int		seen_userobj = 0;
@@ -416,7 +416,7 @@ xfs_acl_access(
 
 	for (i = 0; i < fap->acl_cnt; i++) {
 		/*
-		 * Break out if we've got a user_obj entry or 
+		 * Break out if we've got a user_obj entry or
 		 * a user entry and the mask (and have processed USER_OBJ)
 		 */
 		if (matched.ae_tag == ACL_USER_OBJ)
@@ -504,7 +504,7 @@ STATIC int
 xfs_acl_invalid(
 	xfs_acl_t	*aclp)
 {
-	xfs_acl_entry_t	*entry, *e;
+	xfs_acl_entry_t *entry, *e;
 	int		user = 0, group = 0, other = 0, mask = 0;
 	int		mask_required = 0;
 	int		i, j;
@@ -563,7 +563,7 @@ STATIC void
 xfs_acl_get_endian(
 	xfs_acl_t	*aclp)
 {
-	xfs_acl_entry_t	*ace, *end;
+	xfs_acl_entry_t *ace, *end;
 
 	INT_SET(aclp->acl_cnt, ARCH_CONVERT, aclp->acl_cnt);
 	end = &aclp->acl_entry[0]+aclp->acl_cnt;
@@ -606,7 +606,7 @@ xfs_acl_set_attr(
 	int		kind,
 	int		*error)
 {
-	xfs_acl_entry_t	*ace, *newace, *end;
+	xfs_acl_entry_t *ace, *newace, *end;
 	xfs_acl_t	*newacl;
 	int		len;
 
@@ -627,7 +627,7 @@ xfs_acl_set_attr(
 	}
 	INT_SET(newacl->acl_cnt, ARCH_CONVERT, aclp->acl_cnt);
 	VOP_ATTR_SET(vp,
-		kind == _ACL_TYPE_ACCESS ? SGI_ACL_FILE: SGI_ACL_DEFAULT, 
+		kind == _ACL_TYPE_ACCESS ? SGI_ACL_FILE: SGI_ACL_DEFAULT,
 		(char *)newacl, len, ATTR_ROOT, sys_cred, *error);
 	_ACL_FREE(newacl);
 }
@@ -705,7 +705,7 @@ xfs_acl_inherit(
 	xfs_acl_setmode(vp, cacl);
 
 	/*
-	 * Set the Default and Access ACL on the file.  The mode is already
+	 * Set the Default and Access ACL on the file.	The mode is already
 	 * set on the file, so we don't need to worry about that.
 	 *
 	 * If the new file is a directory, its default ACL is a copy of
@@ -732,8 +732,8 @@ xfs_acl_setmode(
 	xfs_acl_t	*acl)
 {
 	vattr_t		va;
-	xfs_acl_entry_t	*ap;
-	xfs_acl_entry_t	*gap = NULL;
+	xfs_acl_entry_t *ap;
+	xfs_acl_entry_t *gap = NULL;
 	int		i, error, nomask = 1;
 
 	if (acl->acl_cnt == XFS_ACL_NOT_PRESENT)
@@ -799,16 +799,16 @@ xfs_acl_setmode(
  * most accurately reflects what the special ACL entries should permit/deny.
  *
  * CAVEAT: If someone sets the SGI_ACL_FILE attribute directly,
- *         the existing mode bits will override whatever is in the
- *         ACL. Similarly, if there is a pre-existing ACL that was
- *         never in sync with its mode (owing to a bug in 6.5 and
- *         before), it will now magically (or mystically) be
- *         synchronized.  This could cause slight astonishment, but
- *         it is better than inconsistent permissions.
+ *	   the existing mode bits will override whatever is in the
+ *	   ACL. Similarly, if there is a pre-existing ACL that was
+ *	   never in sync with its mode (owing to a bug in 6.5 and
+ *	   before), it will now magically (or mystically) be
+ *	   synchronized.  This could cause slight astonishment, but
+ *	   it is better than inconsistent permissions.
  *
  * The supplied ACL is a template that may contain any combination
- * of special entries.  These are treated as place holders when we fill
- * out the ACL.  This routine does not add or remove special entries, it
+ * of special entries.	These are treated as place holders when we fill
+ * out the ACL.	 This routine does not add or remove special entries, it
  * simply unites each special entry with its associated set of permissions.
  */
 STATIC void
@@ -817,8 +817,8 @@ xfs_acl_sync_mode(
 	xfs_acl_t	*acl)
 {
 	int		i, nomask = 1;
-	xfs_acl_entry_t	*ap;
-	xfs_acl_entry_t	*gap = NULL;
+	xfs_acl_entry_t *ap;
+	xfs_acl_entry_t *gap = NULL;
 
 	/*
 	 * Set ACL entries. POSIX1003.1eD16 requires that the MASK
@@ -848,9 +848,9 @@ xfs_acl_sync_mode(
 		gap->ae_perm = (mode >> 3) & 0x7;
 }
 
-/* 
+/*
  * When inheriting an Access ACL from a directory Default ACL,
- * the ACL bits are set to the intersection of the ACL default 
+ * the ACL bits are set to the intersection of the ACL default
  * permission bits and the file permission bits in mode. If there
  * are no permission bits on the file then we must not give them
  * the ACL. This is what what makes umask() work with ACLs.
@@ -861,8 +861,8 @@ xfs_acl_filter_mode(
 	xfs_acl_t	*acl)
 {
 	int		i, nomask = 1;
-	xfs_acl_entry_t	*ap;
-	xfs_acl_entry_t	*gap = NULL;
+	xfs_acl_entry_t *ap;
+	xfs_acl_entry_t *gap = NULL;
 
 	/*
 	 * Set ACL entries. POSIX1003.1eD16 requires that the MASK

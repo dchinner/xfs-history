@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -56,8 +56,8 @@ typedef struct page_buf_private_s {
 	struct semaphore	pb_sema;	/* semaphore for lockables  */
 	unsigned long		pb_flushtime;	/* time to flush pagebuf    */
 	atomic_t		pb_io_remaining;/* #outstanding I/O requests */
-	atomic_t		pb_pin_count;	/* pin count                */
-	wait_queue_head_t	pb_waiters;	/* unpin waiters            */
+	atomic_t		pb_pin_count;	/* pin count		    */
+	wait_queue_head_t	pb_waiters;	/* unpin waiters	    */
 #ifdef PAGEBUF_LOCK_TRACKING
 	int			pb_last_holder;
 #endif
@@ -91,13 +91,13 @@ typedef struct {
 } pagebuf_trace_t;
 
 struct pagebuf_trace_buf {
-        pagebuf_trace_t		*buf;
-        volatile int		start;
-        volatile int		end;
+	pagebuf_trace_t		*buf;
+	volatile int		start;
+	volatile int		end;
 };
 
 #define PB_TRACE_BUFSIZE	1024
-#define CIRC_INC(i)     (((i) + 1) & (PB_TRACE_BUFSIZE - 1))
+#define CIRC_INC(i)	(((i) + 1) & (PB_TRACE_BUFSIZE - 1))
 
 typedef struct pagebuf_daemon {
 	int			active;
@@ -107,13 +107,13 @@ typedef struct pagebuf_daemon {
 	int			pb_delwri_cnt;
 } pagebuf_daemon_t;
 
-#define NBITS   5
-#define NHASH   (1<<NBITS)
+#define NBITS	5
+#define NHASH	(1<<NBITS)
 
 typedef struct {
-	struct list_head        pb_hash;
-	int                     pb_count;
-	spinlock_t              pb_hash_lock;
+	struct list_head	pb_hash;
+	int			pb_count;
+	spinlock_t		pb_hash_lock;
 } pb_hash_t;
 
 extern pb_hash_t	pbhash[];
@@ -124,14 +124,14 @@ extern pb_hash_t	pbhash[];
  * Tunable pagebuf parameters
  */
 
-#define P_PARAM	4
+#define P_PARAM 4
 
 typedef union pagebuf_param {
 	struct {
-		ulong	flush_interval;	/* interval between runs of the
-					 * delwri flush daemon.  */
+		ulong	flush_interval; /* interval between runs of the
+					 * delwri flush daemon.	 */
 		ulong	age_buffer;	/* time for buffer to age before
-					 * we flush it.  */
+					 * we flush it.	 */
 		ulong	debug;		/* debug tracing on or off */
 		ulong	stats_clear;	/* clear the pagebuf stats */
 	} p_un;
@@ -197,17 +197,17 @@ extern void pagebuf_terminate(void);
 #undef assert
 #ifdef PAGEBUF_DEBUG
 # define assert(expr) \
-	if (!(expr)) {                                          \
+	if (!(expr)) {						\
 		printk("Assertion failed: %s\n%s::%s line %d\n",\
-		#expr,__FILE__,__FUNCTION__,__LINE__);          \
-		BUG();                                          \
+		#expr,__FILE__,__FUNCTION__,__LINE__);		\
+		BUG();						\
 	}
 #else
 # define assert(x)	do { } while (0)
 #endif
 
 #ifndef STATIC
-# define STATIC	static
+# define STATIC static
 #endif
 
 #endif /* __PAGE_BUF_PRIVATE_H__ */

@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -35,11 +35,11 @@
 
 #ifdef PB_DEFINE_TRACES
 #define PB_TRACE_START	typedef enum {
-#define PB_TRACE_REC(x)	pb_trace_point_##x
+#define PB_TRACE_REC(x) pb_trace_point_##x
 #define PB_TRACE_END	} pb_trace_var_t;
 #else
 #define PB_TRACE_START	static char	*event_names[] = {
-#define PB_TRACE_REC(x)	#x
+#define PB_TRACE_REC(x) #x
 #define PB_TRACE_END	};
 #endif
 
@@ -86,7 +86,7 @@ PB_TRACE_END
 extern void pb_trace_func(page_buf_t *, int, void *, void *);
 #ifdef PAGEBUF_TRACE
 # define PB_TRACE(pb, event, misc)		\
-	pb_trace_func(pb, event, (void *) misc,	\
+	pb_trace_func(pb, event, (void *) misc, \
 			(void *)__builtin_return_address(0))
 #else
 # define PB_TRACE(pb, event, misc)	do { } while (0)

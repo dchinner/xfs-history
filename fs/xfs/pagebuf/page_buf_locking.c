@@ -1,33 +1,33 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
  * Portions Copyright (c) 2002 Christoph Hellwig.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -37,13 +37,13 @@
  *	The page_buf module provides an abstract buffer cache model on top of
  *	the Linux page cache.  Cached blocks for a file are hashed to the
  *	inode for that file, and can be held dirty in delayed write mode in
- *	the page cache.  Cached metadata blocks for a file system are hashed
+ *	the page cache.	 Cached metadata blocks for a file system are hashed
  *	to the inode for the mounted device.  The page_buf module assembles
  *	buffer (page_buf_t) objects on demand to aggregate such cached pages
  *	for I/O.  The page_buf_locking module adds support for locking such
- *      page buffers.
+ *	page buffers.
  *
- *      Written by Steve Lord at SGI 
+ *	Written by Steve Lord at SGI
  *
  *
  */
@@ -71,18 +71,18 @@ pb_hash_t	pbhash[NHASH];
 static int
 _bhash(kdev_t d, loff_t b)
 {
-        int bit, hval;
+	int bit, hval;
 
 	b >>= 9;
-        /*
-         * dev_t is 32 bits, daddr_t is always 64 bits
-         */
-        b ^= kdev_val(d);
-        for (bit = hval = 0; b != 0 && bit < sizeof(b) * 8; bit += NBITS) {
-                hval ^= (int)b & (NHASH-1);
-                b >>= NBITS;
+	/*
+	 * dev_t is 32 bits, daddr_t is always 64 bits
+	 */
+	b ^= kdev_val(d);
+	for (bit = hval = 0; b != 0 && bit < sizeof(b) * 8; bit += NBITS) {
+		hval ^= (int)b & (NHASH-1);
+		b >>= NBITS;
 	}
-        return hval;
+	return hval;
 }
 
 
@@ -94,8 +94,8 @@ _bhash(kdev_t d, loff_t b)
  *	_pagebuf_get_lockable_buffer
  *
  *	Looks up, and creates if absent, a lockable buffer for
- * 	a given range of an inode.  The buffer is returned
- *	locked.  If other overlapping buffers exist, they are
+ *	a given range of an inode.  The buffer is returned
+ *	locked.	 If other overlapping buffers exist, they are
  *	released before the new buffer is created and locked,
  *	which may imply that this call will block until those buffers
  *	are unlocked.  No I/O is implied by this call.
@@ -181,7 +181,7 @@ found:
 	}
 
 	if (pb->pb_flags & PBF_STALE)
-		pb->pb_flags &=	PBF_MAPPABLE | \
+		pb->pb_flags &= PBF_MAPPABLE | \
 				PBF_MAPPED | \
 				_PBF_LOCKABLE | \
 				_PBF_ALL_PAGES_MAPPED | \
@@ -220,7 +220,7 @@ _pagebuf_get_lockable_buffer(pb_target_t *target,
 }
 
 /*
- *	Locking and Unlocking Buffers 
+ *	Locking and Unlocking Buffers
  */
 
 /*
@@ -234,9 +234,9 @@ _pagebuf_get_lockable_buffer(pb_target_t *target,
  */
 
 int
-pagebuf_cond_lock(  		        /* lock buffer, if not locked   */
-					/* returns -EBUSY if locked)    */
-		  page_buf_t *pb) 	/* buffer to lock               */
+pagebuf_cond_lock(			/* lock buffer, if not locked	*/
+					/* returns -EBUSY if locked)	*/
+		  page_buf_t *pb)	/* buffer to lock		*/
 {
 	int	locked;
 
@@ -264,7 +264,7 @@ pagebuf_cond_lock(  		        /* lock buffer, if not locked   */
 
 int
 pagebuf_is_locked(			/* test if buffer is locked	*/
-		  page_buf_t *pb) 	/* buffer to test               */
+		  page_buf_t *pb)	/* buffer to test		*/
 {
 	assert(pb->pb_flags & _PBF_LOCKABLE);
 
@@ -297,8 +297,8 @@ pagebuf_lock_value(page_buf_t *pb)
  */
 
 int
-pagebuf_lock(                        	/* lock buffer                  */
-	     page_buf_t *pb)            /* buffer to lock               */
+pagebuf_lock(				/* lock buffer			*/
+	     page_buf_t *pb)		/* buffer to lock		*/
 {
 	assert(pb->pb_flags & _PBF_LOCKABLE);
 
@@ -320,7 +320,7 @@ pagebuf_lock(                        	/* lock buffer                  */
 
 int
 pagebuf_lock_disable(			/* disable buffer locking	*/
-		     pb_target_t *target)  /* inode for buffers	        */
+		     pb_target_t *target)  /* inode for buffers		*/
 {
 	bdput(target->pbr_bdev);
 	kfree(target);
@@ -383,8 +383,8 @@ pagebuf_target_clear(
  */
 
 void
-pagebuf_unlock(                     	/* unlock buffer                */
-	       page_buf_t *pb)          /* buffer to unlock             */
+pagebuf_unlock(				/* unlock buffer		*/
+	       page_buf_t *pb)		/* buffer to unlock		*/
 {
 	assert(pb->pb_flags & _PBF_LOCKABLE);
 

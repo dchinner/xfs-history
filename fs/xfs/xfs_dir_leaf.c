@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -328,7 +328,7 @@ xfs_dir_shortform_to_leaf(xfs_da_args_t *iargs)
 
 	sf = (xfs_dir_shortform_t *)tmpbuffer;
 	XFS_DIR_SF_GET_DIRINO_ARCH(&sf->hdr.parent, &inumber, ARCH_CONVERT);
-        
+
 	xfs_idata_realloc(dp, -size, XFS_DATA_FORK);
 	dp->i_d.di_size = 0;
 	xfs_trans_log_inode(iargs->trans, dp, XFS_ILOG_CORE);
@@ -510,7 +510,7 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 			break;
 	}
 
-	/* 
+	/*
 	 * Did we fail to find anything?  We stop at the last entry,
 	 * the one we put maxhash into.
 	 */
@@ -601,7 +601,7 @@ xfs_dir_shortform_replace(xfs_da_args_t *args)
 	sf = (xfs_dir_shortform_t *)dp->i_df.if_u1.if_data;
 	if (args->namelen == 2 &&
 	    args->name[0] == '.' && args->name[1] == '.') {
-                /* XXX - replace assert? */
+		/* XXX - replace assert? */
 		XFS_DIR_SF_PUT_DIRINO_ARCH(&args->inumber, &sf->hdr.parent, ARCH_CONVERT);
 		xfs_trans_log_inode(args->trans, dp, XFS_ILOG_DDATA);
 		return(0);
@@ -908,7 +908,7 @@ xfs_dir_leaf_add(xfs_dabuf_t *bp, xfs_da_args_t *args, int index)
 
 	/*
 	 * Compact the entries to coalesce free space.
-	 * Pass the justcheck flag so the checking pass can return 
+	 * Pass the justcheck flag so the checking pass can return
 	 * an error, without changing anything, if it won't fit.
 	 */
 	error = xfs_dir_leaf_compact(args->trans, bp,
@@ -920,7 +920,7 @@ xfs_dir_leaf_add(xfs_dabuf_t *bp, xfs_da_args_t *args, int index)
 		return(error);
 	/*
 	 * After compaction, the block is guaranteed to have only one
-	 * free region, in freemap[0].  If it is not big enough, give up.
+	 * free region, in freemap[0].	If it is not big enough, give up.
 	 */
 	if (INT_GET(hdr->freemap[0].size, ARCH_CONVERT) <
 	    (entsize + (uint)sizeof(xfs_dir_leaf_entry_t)))
@@ -1036,9 +1036,9 @@ xfs_dir_leaf_compact(xfs_trans_t *trans, xfs_dabuf_t *bp, int musthave,
 	 * below destroys the original.
 	 */
 	if (musthave || justcheck) {
-	        tmpbuffer2 = kmem_alloc(lbsize, KM_SLEEP);
+		tmpbuffer2 = kmem_alloc(lbsize, KM_SLEEP);
 		bcopy(bp->data, tmpbuffer2, lbsize);
-	} 
+	}
 	bzero(bp->data, lbsize);
 
 	/*
@@ -1069,9 +1069,9 @@ xfs_dir_leaf_compact(xfs_trans_t *trans, xfs_dabuf_t *bp, int musthave,
 		rval = XFS_ERROR(ENOSPC);
 	else
 		rval = 0;
-	
+
 	if (justcheck || rval == ENOSPC) {
-	        ASSERT(tmpbuffer2);
+		ASSERT(tmpbuffer2);
 		bcopy(tmpbuffer2, bp->data, lbsize);
 	} else {
 		xfs_da_log_buf(trans, bp, 0, lbsize - 1);
@@ -1079,7 +1079,7 @@ xfs_dir_leaf_compact(xfs_trans_t *trans, xfs_dabuf_t *bp, int musthave,
 
 	kmem_free(tmpbuffer, lbsize);
 	if (musthave || justcheck)
-	  	kmem_free(tmpbuffer2, lbsize);
+		kmem_free(tmpbuffer2, lbsize);
 	return(rval);
 }
 
@@ -1512,7 +1512,7 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, xfs_dabuf_t *bp, int index)
 			INT_MOD(map->size, ARCH_CONVERT, entsize);
 		} else {
 			map = &hdr->freemap[after];
-			INT_COPY(map->base, entry->nameidx, ARCH_CONVERT); 
+			INT_COPY(map->base, entry->nameidx, ARCH_CONVERT);
 			INT_MOD(map->size, ARCH_CONVERT, entsize);
 		}
 	} else {
@@ -1521,7 +1521,7 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, xfs_dabuf_t *bp, int index)
 		 */
 		map = &hdr->freemap[smallest];
 		if (INT_GET(map->size, ARCH_CONVERT) < entsize) {
-			INT_COPY(map->base, entry->nameidx, ARCH_CONVERT); 
+			INT_COPY(map->base, entry->nameidx, ARCH_CONVERT);
 			INT_SET(map->size, ARCH_CONVERT, entsize);
 		}
 	}
@@ -1645,7 +1645,7 @@ xfs_dir_leaf_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 		bzero(tmpbuffer, state->blocksize);
 		tmp_leaf = (xfs_dir_leafblock_t *)tmpbuffer;
 		tmp_hdr = &tmp_leaf->hdr;
-		tmp_hdr->info = save_hdr->info;	/* struct copy */
+		tmp_hdr->info = save_hdr->info; /* struct copy */
 		INT_ZERO(tmp_hdr->count, ARCH_CONVERT);
 		INT_SET(tmp_hdr->firstused, ARCH_CONVERT, state->blocksize);
 		if (INT_ISZERO(tmp_hdr->firstused, ARCH_CONVERT))
@@ -1658,7 +1658,7 @@ xfs_dir_leaf_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 					      tmp_leaf, INT_GET(tmp_leaf->hdr.count, ARCH_CONVERT),
 					      (int)INT_GET(save_hdr->count, ARCH_CONVERT), mp);
 		} else {
-			xfs_dir_leaf_moveents(save_leaf, 0, tmp_leaf, 0,	
+			xfs_dir_leaf_moveents(save_leaf, 0, tmp_leaf, 0,
 						 (int)INT_GET(save_hdr->count, ARCH_CONVERT), mp);
 			xfs_dir_leaf_moveents(drop_leaf, 0,
 					      tmp_leaf, INT_GET(tmp_leaf->hdr.count, ARCH_CONVERT),
@@ -1795,10 +1795,10 @@ xfs_dir_leaf_moveents(xfs_dir_leafblock_t *leaf_s, int start_s,
 	hdr_s = &leaf_s->hdr;
 	hdr_d = &leaf_d->hdr;
 	ASSERT((INT_GET(hdr_s->count, ARCH_CONVERT) > 0) && (INT_GET(hdr_s->count, ARCH_CONVERT) < (XFS_LBSIZE(mp)/8)));
-	ASSERT(INT_GET(hdr_s->firstused, ARCH_CONVERT) >= 
+	ASSERT(INT_GET(hdr_s->firstused, ARCH_CONVERT) >=
 		((INT_GET(hdr_s->count, ARCH_CONVERT)*sizeof(*entry_s))+sizeof(*hdr_s)));
 	ASSERT(INT_GET(hdr_d->count, ARCH_CONVERT) < (XFS_LBSIZE(mp)/8));
-	ASSERT(INT_GET(hdr_d->firstused, ARCH_CONVERT) >= 
+	ASSERT(INT_GET(hdr_d->firstused, ARCH_CONVERT) >=
 		((INT_GET(hdr_d->count, ARCH_CONVERT)*sizeof(*entry_d))+sizeof(*hdr_d)));
 
 	ASSERT(start_s < INT_GET(hdr_s->count, ARCH_CONVERT));
@@ -1828,7 +1828,7 @@ xfs_dir_leaf_moveents(xfs_dir_leafblock_t *leaf_s, int start_s,
 		tmp = XFS_DIR_LEAF_ENTSIZE_BYENTRY(entry_s);
 		INT_MOD(hdr_d->firstused, ARCH_CONVERT, -(tmp));
 		entry_d->hashval = entry_s->hashval; /* INT_: direct copy */
-		INT_COPY(entry_d->nameidx, hdr_d->firstused, ARCH_CONVERT); 
+		INT_COPY(entry_d->nameidx, hdr_d->firstused, ARCH_CONVERT);
 		entry_d->namelen = entry_s->namelen;
 		ASSERT(INT_GET(entry_d->nameidx, ARCH_CONVERT) + tmp <= XFS_LBSIZE(mp));
 		bcopy(XFS_DIR_LEAF_NAMESTRUCT(leaf_s, INT_GET(entry_s->nameidx, ARCH_CONVERT)),
@@ -1894,7 +1894,7 @@ xfs_dir_leaf_order(xfs_dabuf_t *leaf1_bp, xfs_dabuf_t *leaf2_bp)
 	leaf2 = leaf2_bp->data;
 	ASSERT((INT_GET(leaf1->hdr.info.magic, ARCH_CONVERT) == XFS_DIR_LEAF_MAGIC) &&
 	       (INT_GET(leaf2->hdr.info.magic, ARCH_CONVERT) == XFS_DIR_LEAF_MAGIC));
-	if ((INT_GET(leaf1->hdr.count, ARCH_CONVERT) > 0) && (INT_GET(leaf2->hdr.count, ARCH_CONVERT) > 0) && 
+	if ((INT_GET(leaf1->hdr.count, ARCH_CONVERT) > 0) && (INT_GET(leaf2->hdr.count, ARCH_CONVERT) > 0) &&
 	    ((INT_GET(leaf2->entries[ 0 ].hashval, ARCH_CONVERT) <
 	      INT_GET(leaf1->entries[ 0 ].hashval, ARCH_CONVERT)) ||
 	     (INT_GET(leaf2->entries[ INT_GET(leaf2->hdr.count, ARCH_CONVERT)-1 ].hashval, ARCH_CONVERT) <
@@ -2101,14 +2101,14 @@ xfs_dir_leaf_getdents_int(
 		/*
 		 * Save off the cookie so we can fall back should the
 		 * 'put' into the outgoing buffer fails.  To handle a run
-		 * of equal-hashvals, the off_t structure on 64bit 
+		 * of equal-hashvals, the off_t structure on 64bit
 		 * builds has entno built into the cookie to ID the
-		 * entry.  On 32bit builds, we only have space for the 
+		 * entry.  On 32bit builds, we only have space for the
 		 * hashval so we can't ID specific entries within a group
-		 * of same hashval entries.   For this, lastoffset is set 
-		 * to the first in the run of equal hashvals so we don't 
+		 * of same hashval entries.   For this, lastoffset is set
+		 * to the first in the run of equal hashvals so we don't
 		 * include any entries unless we can include all entries
-		 * that share the same hashval.  Hopefully the buffer 
+		 * that share the same hashval.	 Hopefully the buffer
 		 * provided is big enough to handle it (see pv763517).
 		 */
 #if (BITS_PER_LONG == 32)
@@ -2207,7 +2207,7 @@ xfs_dir_put_dirent64_uio(xfs_dir_put_args_t *pa)
 
 	namelen = pa->namelen;
 	reclen = DIRENTSIZE(namelen);
-        uio = pa->uio;
+	uio = pa->uio;
 	if (reclen > uio->uio_resid) {
 		pa->done = 0;
 		return 0;

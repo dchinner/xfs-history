@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -45,14 +45,14 @@ struct xfsstats xfsstats;
  */
 int
 xfs_dir_lookup_int(
-	bhv_desc_t     		*dir_bdp,
-	int		 	flags,
-	struct dentry  		*dentry,
-	xfs_ino_t    		*inum,
-	xfs_inode_t  		**ipp,
+	bhv_desc_t		*dir_bdp,
+	int			flags,
+	struct dentry		*dentry,
+	xfs_ino_t		*inum,
+	xfs_inode_t		**ipp,
 	uint			*dir_unlocked)
 {
-	vnode_t		*dir_vp;	   
+	vnode_t		*dir_vp;
 	xfs_inode_t	*dp;
 	xfs_ino_t	curr_inum;
 	char		*name = (char *) dentry->d_name.name;
@@ -75,7 +75,7 @@ xfs_dir_lookup_int(
 	}
 
 	if (dentry->d_inode) {
-		vnode_t	*vp = LINVFS_GET_VPTR(dentry->d_inode);
+		vnode_t *vp = LINVFS_GET_VPTR(dentry->d_inode);
 		bdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(vp), &xfs_vnodeops);
 		if (!bdp) {
 			return ENOENT;
@@ -99,7 +99,7 @@ xfs_dir_lookup_int(
 			*ipp = XFS_BHVTOI(dir_bdp);
 		}
 		return 0;
-        }
+	}
 	if (flags & DLF_LOCK_SHARED) {
 		lock_mode = XFS_ILOCK_SHARED;
 	} else {
@@ -134,7 +134,7 @@ xfs_dir_lookup_int(
 				VN_RELE(BHV_TO_VNODE(bdp));
 				bdp = NULL;
 			}
-				
+
 			error = xfs_iget(dp->i_mount, NULL, *inum,
 					 0, ipp, 0);
 
@@ -152,7 +152,7 @@ xfs_dir_lookup_int(
 			 * (ENOENT).  If the inode number has changed, then
 			 * drop the inode we have and get the latest one.
 			 * If the inode number is the same, then we just
-			 * go with it.  This includes the case where the
+			 * go with it.	This includes the case where the
 			 * inode is freed and recreated under the same
 			 * name while we're doing the iget.  It is OK
 			 * to use the inode we already have in that case,
@@ -286,9 +286,9 @@ xfs_dir_ialloc(
 	 * need to call xfs_ialloc again to get the inode.
 	 *
 	 * If xfs_ialloc did an allocation to replenish the freelist,
-	 * it returns the bp containing the head of the freelist as 
+	 * it returns the bp containing the head of the freelist as
 	 * ialloc_context. We will hold a lock on it across the
-	 * transaction commit so that no other process can steal 
+	 * transaction commit so that no other process can steal
 	 * the inode(s) that we've just allocated.
 	 */
 	code = xfs_ialloc(tp, dp, mode, nlink, rdev, credp, prid, okalloc,
@@ -318,9 +318,9 @@ xfs_dir_ialloc(
 
 		/*
 		 * Normally, xfs_trans_commit releases all the locks.
-	         * We call bhold to hang on to the ialloc_context across
-		 * the commit.  Holding this buffer prevents any other
-		 * processes from doing any allocations in this 
+		 * We call bhold to hang on to the ialloc_context across
+		 * the commit.	Holding this buffer prevents any other
+		 * processes from doing any allocations in this
 		 * allocation group.
 		 */
 		xfs_trans_bhold(tp, ialloc_context);
@@ -330,7 +330,7 @@ xfs_dir_ialloc(
 		 */
 		log_res = xfs_trans_get_log_res(tp);
 		log_count = xfs_trans_get_log_count(tp);
-		
+
 		/*
 		 * We want the quota changes to be associated with the next
 		 * transaction, NOT this one. So, detach the dqinfo from this
@@ -375,7 +375,7 @@ xfs_dir_ialloc(
 			tp->t_dqinfo = dqinfo;
 			tp->t_flags |= tflags;
 		}
-		
+
 		if (code) {
 			xfs_buf_relse(ialloc_context);
 			*tpp = ntp;
@@ -429,20 +429,20 @@ xfs_droplink(
 
 	xfs_ichgtime(ip, XFS_ICHGTIME_CHG);
 
-        ASSERT (ip->i_d.di_nlink > 0);
-        ip->i_d.di_nlink--;
-        xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+	ASSERT (ip->i_d.di_nlink > 0);
+	ip->i_d.di_nlink--;
+	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 
 	error = 0;
-        if (ip->i_d.di_nlink == 0) {
-                /*
-                 * We're dropping the last link to this file.
+	if (ip->i_d.di_nlink == 0) {
+		/*
+		 * We're dropping the last link to this file.
 		 * Move the on-disk inode to the AGI unlinked list.
 		 * From xfs_inactive() we will pull the inode from
 		 * the list and free it.
-                 */
+		 */
 		error = xfs_iunlink(tp, ip);
-        }
+	}
 	return error;
 }
 
@@ -450,7 +450,7 @@ xfs_droplink(
  * This gets called when the inode's version needs to be changed from 1 to 2.
  * Currently this happens when the nlink field overflows the old 16-bit value
  * or when chproj is called to change the project for the first time.
- * As a side effect the superblock version will also get rev'd 
+ * As a side effect the superblock version will also get rev'd
  * to contain the NLINK bit.
  */
 void
@@ -494,26 +494,26 @@ xfs_bumplink(
 	xfs_ichgtime(ip, XFS_ICHGTIME_CHG);
 
 	ASSERT(ip->i_d.di_nlink > 0);
-        ip->i_d.di_nlink++;
+	ip->i_d.di_nlink++;
 	if ((ip->i_d.di_version == XFS_DINODE_VERSION_1) &&
 	    (ip->i_d.di_nlink > XFS_MAXLINK_1)) {
 		/*
 		 * The inode has increased its number of links beyond
-		 * what can fit in an old format inode.  It now needs
+		 * what can fit in an old format inode.	 It now needs
 		 * to be converted to a version 2 inode with a 32 bit
-		 * link count.  If this is the first inode in the file
+		 * link count.	If this is the first inode in the file
 		 * system to do this, then we need to bump the superblock
 		 * version number as well.
 		 */
 		xfs_bump_ino_vers2(tp, ip);
 	}
 
-        xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	return 0;
 }
 
 /*
- * Try to truncate the given file to 0 length.  Currently called
+ * Try to truncate the given file to 0 length.	Currently called
  * only out of xfs_remove when it has to truncate a file to free
  * up space for the remove to proceed.
  */
@@ -526,7 +526,7 @@ xfs_truncate_file(
 	int		error;
 
 #ifdef QUOTADEBUG
-	/* 
+	/*
 	 * This is called to truncate the quotainodes too.
 	 */
 	if (XFS_IS_UQUOTA_ON(mp)) {
@@ -556,7 +556,7 @@ xfs_truncate_file(
 	}
 
 	/*
-	 * Follow the normal truncate locking protocol.  Since we
+	 * Follow the normal truncate locking protocol.	 Since we
 	 * hold the inode in the transaction, we know that it's number
 	 * of references will stay constant.
 	 */

@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 #ifndef __XFS_QUOTA_PRIV_H__
@@ -37,7 +37,7 @@
  * We make this restriction to keep the memory usage to a minimum.
  */
 #define XFS_DQITER_MAP_SIZE	10
-	
+
 /* Number of dquots that fit in to a dquot block */
 #define XFS_QM_DQPERBLK(mp)	((mp)->m_quotainfo->qi_dqperchunk)
 
@@ -53,7 +53,7 @@
 #define XFS_QI_GQIP(mp)		((mp)->m_quotainfo->qi_gquotaip)
 #define XFS_QI_DQCHUNKLEN(mp)	((mp)->m_quotainfo->qi_dqchunklen)
 #define XFS_QI_BTIMELIMIT(mp)	((mp)->m_quotainfo->qi_btimelimit)
-#define XFS_QI_RTBTIMELIMIT(mp)	((mp)->m_quotainfo->qi_rtbtimelimit)
+#define XFS_QI_RTBTIMELIMIT(mp) ((mp)->m_quotainfo->qi_rtbtimelimit)
 #define XFS_QI_ITIMELIMIT(mp)	((mp)->m_quotainfo->qi_itimelimit)
 #define XFS_QI_BWARNLIMIT(mp)	((mp)->m_quotainfo->qi_bwarnlimit)
 #define XFS_QI_IWARNLIMIT(mp)	((mp)->m_quotainfo->qi_iwarnlimit)
@@ -86,9 +86,9 @@ XQMISLCKD(xfs_dqhash_t *h)
 #define xfs_qm_mplist_unlock(mp)	XQMUNLCK(&(XFS_QI_MPL_LIST(mp)))
 #define XFS_QM_IS_MPLIST_LOCKED(mp)	XQMISLCKD(&(XFS_QI_MPL_LIST(mp)))
 
-#define xfs_qm_freelist_lock(qm) 	XQMLCK(&((qm)->qm_dqfreelist))
-#define xfs_qm_freelist_unlock(qm) 	XQMUNLCK(&((qm)->qm_dqfreelist))
-#define XFS_QM_IS_FREELIST_LOCKED(qm) 	XQMISLCKD(&((qm)->qm_dqfreelist))
+#define xfs_qm_freelist_lock(qm)	XQMLCK(&((qm)->qm_dqfreelist))
+#define xfs_qm_freelist_unlock(qm)	XQMUNLCK(&((qm)->qm_dqfreelist))
+#define XFS_QM_IS_FREELIST_LOCKED(qm)	XQMISLCKD(&((qm)->qm_dqfreelist))
 
 /*
  * Hash into a bucket in the dquot hash table, based on <mp, id>.
@@ -103,14 +103,14 @@ XQMISLCKD(xfs_dqhash_t *h)
 				      XFS_DQ_HASHVAL(mp, id)))
 #define XFS_IS_DQTYPE_ON(mp, type)   (type == XFS_DQ_USER ? \
 				      XFS_IS_UQUOTA_ON(mp):XFS_IS_GQUOTA_ON(mp))
-#define XFS_IS_DQUOT_UNINITIALIZED(dqp)	( \
+#define XFS_IS_DQUOT_UNINITIALIZED(dqp) ( \
 	INT_ISZERO(dqp->q_core.d_blk_hardlimit, ARCH_CONVERT) && \
 	INT_ISZERO(dqp->q_core.d_blk_softlimit, ARCH_CONVERT) && \
 	INT_ISZERO(dqp->q_core.d_rtb_hardlimit, ARCH_CONVERT) && \
 	INT_ISZERO(dqp->q_core.d_rtb_softlimit, ARCH_CONVERT) && \
 	INT_ISZERO(dqp->q_core.d_ino_hardlimit, ARCH_CONVERT) && \
 	INT_ISZERO(dqp->q_core.d_ino_softlimit, ARCH_CONVERT) && \
-	INT_ISZERO(dqp->q_core.d_bcount, ARCH_CONVERT)        && \
+	INT_ISZERO(dqp->q_core.d_bcount, ARCH_CONVERT)	      && \
 	INT_ISZERO(dqp->q_core.d_rtbcount, ARCH_CONVERT)      && \
 	INT_ISZERO(dqp->q_core.d_icount, ARCH_CONVERT))
 
@@ -121,15 +121,15 @@ XQMISLCKD(xfs_dqhash_t *h)
 
 
 #define _LIST_REMOVE(h, dqp, PVP, NXT)				\
-        {							\
-                 xfs_dquot_t *d;				\
-                 if (((d) = (dqp)->NXT))				\
-                         (d)->PVP = (dqp)->PVP;			\
-                 *((dqp)->PVP) = d;				\
-                 (dqp)->NXT = NULL;				\
-                 (dqp)->PVP = NULL;				\
-                 (h)->qh_version++;				\
-                 (h)->qh_nelems--;				\
+	{							\
+		 xfs_dquot_t *d;				\
+		 if (((d) = (dqp)->NXT))				\
+			 (d)->PVP = (dqp)->PVP;			\
+		 *((dqp)->PVP) = d;				\
+		 (dqp)->NXT = NULL;				\
+		 (dqp)->PVP = NULL;				\
+		 (h)->qh_version++;				\
+		 (h)->qh_nelems--;				\
 	}
 
 #define _LIST_INSERT(h, dqp, PVP, NXT)				\
@@ -141,31 +141,31 @@ XQMISLCKD(xfs_dqhash_t *h)
 		 (dqp)->PVP = &((h)->qh_next);			\
 		 (h)->qh_next = dqp;				\
 		 (h)->qh_version++;				\
-                 (h)->qh_nelems++;				\
+		 (h)->qh_nelems++;				\
 	 }
 
 #define FOREACH_DQUOT_IN_MP(dqp, mp) \
-	for ((dqp) = XFS_QI_MPLNEXT(mp); (dqp) != NULL; (dqp) = (dqp)->MPL_NEXT) 
+	for ((dqp) = XFS_QI_MPLNEXT(mp); (dqp) != NULL; (dqp) = (dqp)->MPL_NEXT)
 
-#define FOREACH_DQUOT_IN_FREELIST(dqp, qlist) 	\
+#define FOREACH_DQUOT_IN_FREELIST(dqp, qlist)	\
 for ((dqp) = (qlist)->qh_next; (dqp) != (xfs_dquot_t *)(qlist); \
-     (dqp) = (dqp)->dq_flnext)		
-		
+     (dqp) = (dqp)->dq_flnext)
+
 #define XQM_HASHLIST_INSERT(h, dqp)	\
-         _LIST_INSERT(h, dqp, HL_PREVP, HL_NEXT)
+	 _LIST_INSERT(h, dqp, HL_PREVP, HL_NEXT)
 
 #define XQM_FREELIST_INSERT(h, dqp)	\
-         xfs_qm_freelist_append(h, dqp)
+	 xfs_qm_freelist_append(h, dqp)
 
 #define XQM_MPLIST_INSERT(h, dqp)	\
-         _LIST_INSERT(h, dqp, MPL_PREVP, MPL_NEXT)
-		
+	 _LIST_INSERT(h, dqp, MPL_PREVP, MPL_NEXT)
+
 #define XQM_HASHLIST_REMOVE(h, dqp)	\
-         _LIST_REMOVE(h, dqp, HL_PREVP, HL_NEXT)
+	 _LIST_REMOVE(h, dqp, HL_PREVP, HL_NEXT)
 #define XQM_FREELIST_REMOVE(dqp)	\
-         xfs_qm_freelist_unlink(dqp)
+	 xfs_qm_freelist_unlink(dqp)
 #define XQM_MPLIST_REMOVE(h, dqp)	\
-        { _LIST_REMOVE(h, dqp, MPL_PREVP, MPL_NEXT); \
+	{ _LIST_REMOVE(h, dqp, MPL_PREVP, MPL_NEXT); \
 	  XFS_QI_MPLRECLAIMS((dqp)->q_mount)++; }
 
 #define XFS_DQ_IS_LOGITEM_INITD(dqp)	((dqp)->q_logitem.qli_dquot == (dqp))
@@ -176,8 +176,8 @@ for ((dqp) = (qlist)->qh_next; (dqp) != (xfs_dquot_t *)(qlist); \
 #define XFS_IS_SUSER_DQUOT(dqp)		\
 	(INT_ISZERO((dqp)->q_core.d_id, ARCH_CONVERT))
 
-#define XFS_PURGE_INODE(ip) 		\
-	{ 				\
+#define XFS_PURGE_INODE(ip)		\
+	{				\
 	  vmap_t dqvmap;		\
 	  vnode_t *dqvp;		\
 	  dqvp = XFS_ITOV(ip);		\
@@ -185,7 +185,7 @@ for ((dqp) = (qlist)->qh_next; (dqp) != (xfs_dquot_t *)(qlist); \
 	  VN_RELE(dqvp);		\
 	}
 
-#define DQFLAGTO_TYPESTR(d) 	(((d)->dq_flags & XFS_DQ_USER) ? "USR" : \
+#define DQFLAGTO_TYPESTR(d)	(((d)->dq_flags & XFS_DQ_USER) ? "USR" : \
 				 (((d)->dq_flags & XFS_DQ_GROUP) ? "GRP" : "???"))
 #define DQFLAGTO_DIRTYSTR(d)	(XFS_DQ_IS_DIRTY(d) ? "DIRTY" : "NOTDIRTY")
 

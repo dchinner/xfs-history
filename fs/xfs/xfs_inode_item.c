@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -195,7 +195,7 @@ xfs_inode_item_size(
 		break;
 	}
 
-	return nvecs; 
+	return nvecs;
 }
 
 /*
@@ -244,15 +244,15 @@ xfs_inode_item_format(
 	 * update the timestamps BEFORE setting i_update_core,
 	 * so if we clear i_update_core after they set it we
 	 * are guaranteed to see their updates to the timestamps
-	 * either here.  Likewise, if they set it after we clear it
+	 * either here.	 Likewise, if they set it after we clear it
 	 * here, we'll see it either on the next commit of this
 	 * inode or the next time the inode gets flushed via
 	 * xfs_iflush().  This depends on strongly ordered memory
-	 * semantics, but we have that.  We use the SYNCHRONIZE
+	 * semantics, but we have that.	 We use the SYNCHRONIZE
 	 * macro to make sure that the compiler does not reorder
 	 * the i_update_core access below the data copy below.
 	 */
-	if (ip->i_update_core)  {
+	if (ip->i_update_core)	{
 		ip->i_update_core = 0;
 		SYNCHRONIZE();
 	}
@@ -274,7 +274,7 @@ xfs_inode_item_format(
 	/*
 	 * If this is really an old format inode, then we need to
 	 * log it as such.  This means that we have to copy the link
-	 * count from the new field to the old.  We don't have to worry
+	 * count from the new field to the old.	 We don't have to worry
 	 * about the new fields, because nothing trusts them as long as
 	 * the old inode version number is there.  If the superblock already
 	 * has a new version number, then we don't bother converting back.
@@ -494,11 +494,11 @@ xfs_inode_item_format(
 	ASSERT(nvecs == iip->ili_item.li_desc->lid_size);
 	iip->ili_format.ilf_size = nvecs;
 }
-	
+
 
 /*
  * This is called to pin the inode associated with the inode log
- * item in memory so it cannot be written out.  Do this by calling
+ * item in memory so it cannot be written out.	Do this by calling
  * xfs_ipin() to bump the pin count in the inode while holding the
  * inode pin lock.
  */
@@ -541,7 +541,7 @@ xfs_inode_item_unpin_remove(
  * been or is in the process of being flushed, then (ideally) we'd like to
  * see if the inode's buffer is still incore, and if so give it a nudge.
  * We delay doing so until the pushbuf routine, though, to avoid holding
- * the AIL lock across a call to the blackhole which is the buffercache. 
+ * the AIL lock across a call to the blackhole which is the buffercache.
  * Also we don't want to sleep in any device strategy routines, which can happen
  * if we do the subsequent bawrite in here.
  */
@@ -600,7 +600,7 @@ xfs_inode_item_trylock(
  * Unlock the inode associated with the inode log item.
  * Clear the fields of the inode and inode log item that
  * are specific to the current transaction.  If the
- * hold flags is set, do not unlock the inode.  
+ * hold flags is set, do not unlock the inode.
  */
 STATIC void
 xfs_inode_item_unlock(
@@ -693,7 +693,7 @@ xfs_inode_item_committed(
 /*
  * The transaction with the inode locked has aborted.  The inode
  * must not be dirty within the transaction (unless we're forcibly
- * shutting down).  We simply unlock just as if the transaction 
+ * shutting down).  We simply unlock just as if the transaction
  * had been cancelled.
  */
 STATIC void
@@ -720,12 +720,12 @@ xfs_inode_item_pushbuf(
 	xfs_inode_log_item_t	*iip)
 {
 	xfs_inode_t	*ip;
-	xfs_mount_t 	*mp;
+	xfs_mount_t	*mp;
 	xfs_buf_t	*bp;
 	uint		dopush;
 
 	ip = iip->ili_inode;
-	
+
 	ASSERT(ismrlocked(&(ip->i_lock), MR_ACCESS));
 
 	/*
@@ -744,9 +744,9 @@ xfs_inode_item_pushbuf(
 	    ((iip->ili_item.li_flags & XFS_LI_IN_AIL) == 0)) {
 		iip->ili_pushbuf_flag = 0;
 		xfs_iunlock(ip, XFS_ILOCK_SHARED);
-	    	return;
+		return;
 	}
-	
+
 	mp = ip->i_mount;
 	bp = xfs_incore(mp->m_ddev_targ, iip->ili_format.ilf_blkno,
 		    iip->ili_format.ilf_len, XFS_INCORE_TRYLOCK);
@@ -761,7 +761,7 @@ xfs_inode_item_pushbuf(
 			 * this item is already taken off the AIL.
 			 * If not, we can flush it async.
 			 */
-			dopush = ((iip->ili_item.li_flags & XFS_LI_IN_AIL) && 
+			dopush = ((iip->ili_item.li_flags & XFS_LI_IN_AIL) &&
 				  (valusema(&(ip->i_flock)) <= 0));
 			iip->ili_pushbuf_flag = 0;
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
@@ -777,7 +777,7 @@ xfs_inode_item_pushbuf(
 			}
 		} else {
 			iip->ili_pushbuf_flag = 0;
-			xfs_iunlock(ip, XFS_ILOCK_SHARED); 
+			xfs_iunlock(ip, XFS_ILOCK_SHARED);
 			xfs_buf_relse(bp);
 		}
 		return;
@@ -791,7 +791,7 @@ xfs_inode_item_pushbuf(
 	 * another doing the same thing
 	 */
 	iip->ili_pushbuf_flag = 0;
-	xfs_iunlock(ip, XFS_ILOCK_SHARED); 
+	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 	return;
 }
 
@@ -815,7 +815,7 @@ xfs_inode_item_push(
 	 * Since we were able to lock the inode's flush lock and
 	 * we found it on the AIL, the inode must be dirty.  This
 	 * is because the inode is removed from the AIL while still
-	 * holding the flush lock in xfs_iflush_done().  Thus, if
+	 * holding the flush lock in xfs_iflush_done().	 Thus, if
 	 * we found it in the AIL and were able to obtain the flush
 	 * lock without sleeping, then there must not have been
 	 * anyone in the process of flushing the inode.
@@ -824,7 +824,7 @@ xfs_inode_item_push(
 	       iip->ili_format.ilf_fields != 0);
 
 	/*
-	 * Write out the inode.  The completion routine ('iflush_done') will
+	 * Write out the inode.	 The completion routine ('iflush_done') will
 	 * pull it from the AIL, mark it clean, unlock the flush lock.
 	 */
 	(void) xfs_iflush(ip, XFS_IFLUSH_DELWRI);
@@ -865,7 +865,7 @@ struct xfs_item_ops xfs_inode_item_ops = {
 	iop_push:	(void(*)(xfs_log_item_t*))xfs_inode_item_push,
 	iop_abort:	(void(*)(xfs_log_item_t*))xfs_inode_item_abort,
 	iop_pushbuf:	(void(*)(xfs_log_item_t*))xfs_inode_item_pushbuf,
-	iop_committing:	(void(*)(xfs_log_item_t*, xfs_lsn_t))
+	iop_committing: (void(*)(xfs_log_item_t*, xfs_lsn_t))
 					xfs_inode_item_committing
 };
 
@@ -939,7 +939,7 @@ xfs_iflush_done(
 	/*
 	 * We only want to pull the item from the AIL if it is
 	 * actually there and its location in the log has not
-	 * changed since we started the flush.  Thus, we only bother
+	 * changed since we started the flush.	Thus, we only bother
 	 * if the ili_logged flag is set and the inode's lsn has not
 	 * changed.  First we check the lsn outside
 	 * the lock since it's cheaper, and then we recheck while
@@ -958,7 +958,7 @@ xfs_iflush_done(
 			AIL_UNLOCK(ip->i_mount, s);
 		}
 	}
-	
+
 	iip->ili_logged = 0;
 
 	/*

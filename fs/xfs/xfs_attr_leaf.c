@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 /*
@@ -430,7 +430,7 @@ xfs_attr_shortform_list(xfs_attr_list_context_t *context)
 			}
 			else {
 				if (xfs_attr_put_listent(context, ns,
-						   (char *)sfe->nameval, 
+						   (char *)sfe->nameval,
 						   (int)sfe->namelen,
 						   (int)INT_GET(sfe->valuelen,
 								ARCH_CONVERT)))
@@ -604,7 +604,7 @@ xfs_attr_leaf_to_shortform(xfs_dabuf_t *bp, xfs_da_args_t *args)
 		goto out;
 	error = xfs_attr_shortform_create(args);
 	if (error)
-		goto out;	
+		goto out;
 
 	/*
 	 * Copy the attributes
@@ -685,7 +685,7 @@ xfs_attr_leaf_to_node(xfs_da_args_t *args)
 	ASSERT(INT_GET(leaf->hdr.info.magic, ARCH_CONVERT)
 						== XFS_ATTR_LEAF_MAGIC);
 	/* both on-disk, don't endian-flip twice */
-	node->btree[0].hashval = 
+	node->btree[0].hashval =
 		leaf->entries[INT_GET(leaf->hdr.count, ARCH_CONVERT)-1 ].hashval;
 	INT_SET(node->btree[0].before, ARCH_CONVERT, blkno);
 	INT_SET(node->hdr.count, ARCH_CONVERT, 1);
@@ -861,7 +861,7 @@ xfs_attr_leaf_add(xfs_dabuf_t *bp, xfs_da_args_t *args)
 
 	/*
 	 * After compaction, the block is guaranteed to have only one
-	 * free region, in freemap[0].  If it is not big enough, give up.
+	 * free region, in freemap[0].	If it is not big enough, give up.
 	 */
 	if (INT_GET(hdr->freemap[0].size, ARCH_CONVERT)
 				< (entsize + sizeof(xfs_attr_leaf_entry_t)))
@@ -945,7 +945,7 @@ xfs_attr_leaf_add_work(xfs_dabuf_t *bp, xfs_da_args_t *args, int mapindex)
 	/*
 	 * Copy the attribute name and value into the new space.
 	 *
-	 * For "remote" attribute values, simply note that we need to 
+	 * For "remote" attribute values, simply note that we need to
 	 * allocate space for the "remote" value.  We can't actually
 	 * allocate the extents in this transaction, and we can't decide
 	 * which blocks they should be as we might allocate more blocks
@@ -1064,7 +1064,7 @@ xfs_attr_leaf_compact(xfs_trans_t *trans, xfs_dabuf_t *bp)
  *
  * This code adjusts the args->index/blkno and args->index2/blkno2 fields
  * to match what it is doing in splitting the attribute leaf block.  Those
- * values are used in "atomic rename" operations on attributes.  Note that
+ * values are used in "atomic rename" operations on attributes.	 Note that
  * the "new" and "old" values can end up in different blocks.
  */
 STATIC void
@@ -1281,7 +1281,7 @@ xfs_attr_leaf_figure_balance(xfs_da_state_t *state,
 	entry = &leaf1->entries[0];
 	for (count = index = 0; count < max; entry++, index++, count++) {
 
-#define XFS_ATTR_ABS(A)	(((A) < 0) ? -(A) : (A))
+#define XFS_ATTR_ABS(A) (((A) < 0) ? -(A) : (A))
 		/*
 		 * The new entry is in the first block, account for it.
 		 */
@@ -1324,7 +1324,7 @@ xfs_attr_leaf_figure_balance(xfs_da_state_t *state,
 	 */
 	totallen -= count * sizeof(*entry);
 	if (foundit) {
-		totallen -= sizeof(*entry) + 
+		totallen -= sizeof(*entry) +
 				xfs_attr_leaf_newentsize(state->args,
 							 state->blocksize,
 							 NULL);
@@ -1704,7 +1704,7 @@ xfs_attr_leaf_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 		bzero(tmpbuffer, state->blocksize);
 		tmp_leaf = (xfs_attr_leafblock_t *)tmpbuffer;
 		tmp_hdr = &tmp_leaf->hdr;
-		tmp_hdr->info = save_hdr->info;	/* struct copy */
+		tmp_hdr->info = save_hdr->info; /* struct copy */
 		INT_ZERO(tmp_hdr->count, ARCH_CONVERT);
 		INT_SET(tmp_hdr->firstused, ARCH_CONVERT, state->blocksize);
 		if (INT_ISZERO(tmp_hdr->firstused, ARCH_CONVERT)) {
@@ -1832,7 +1832,7 @@ xfs_attr_leaf_lookup_int(xfs_dabuf_t *bp, xfs_da_args_t *args)
 		 * If we are looking for INCOMPLETE entries, show only those.
 		 * If we are looking for complete entries, show only those.
 		 */
-		if ((args->flags & XFS_ATTR_INCOMPLETE) != 
+		if ((args->flags & XFS_ATTR_INCOMPLETE) !=
 		    (entry->flags & XFS_ATTR_INCOMPLETE)) {
 			continue;
 		}
@@ -1963,11 +1963,11 @@ xfs_attr_leaf_moveents(xfs_attr_leafblock_t *leaf_s, int start_s,
 	ASSERT((INT_GET(hdr_s->count, ARCH_CONVERT) > 0)
 				&& (INT_GET(hdr_s->count, ARCH_CONVERT)
 						< (XFS_LBSIZE(mp)/8)));
-	ASSERT(INT_GET(hdr_s->firstused, ARCH_CONVERT) >= 
+	ASSERT(INT_GET(hdr_s->firstused, ARCH_CONVERT) >=
 		((INT_GET(hdr_s->count, ARCH_CONVERT)
 					* sizeof(*entry_s))+sizeof(*hdr_s)));
 	ASSERT(INT_GET(hdr_d->count, ARCH_CONVERT) < (XFS_LBSIZE(mp)/8));
-	ASSERT(INT_GET(hdr_d->firstused, ARCH_CONVERT) >= 
+	ASSERT(INT_GET(hdr_d->firstused, ARCH_CONVERT) >=
 		((INT_GET(hdr_d->count, ARCH_CONVERT)
 					* sizeof(*entry_d))+sizeof(*hdr_d)));
 
@@ -2000,7 +2000,7 @@ xfs_attr_leaf_moveents(xfs_attr_leafblock_t *leaf_s, int start_s,
 #ifdef GROT
 		/*
 		 * Code to drop INCOMPLETE entries.  Difficult to use as we
-		 * may also need to change the insertion index.  Code turned
+		 * may also need to change the insertion index.	 Code turned
 		 * off for 6.2, should be revisited later.
 		 */
 		if (entry_s->flags & XFS_ATTR_INCOMPLETE) { /* skip partials? */
@@ -2104,7 +2104,7 @@ xfs_attr_leaf_order(xfs_dabuf_t *leaf1_bp, xfs_dabuf_t *leaf2_bp)
 	    && (INT_GET(leaf2->hdr.count, ARCH_CONVERT) > 0)
 	    && (   (INT_GET(leaf2->entries[ 0 ].hashval, ARCH_CONVERT) <
 		      INT_GET(leaf1->entries[ 0 ].hashval, ARCH_CONVERT))
-	        || (INT_GET(leaf2->entries[INT_GET(leaf2->hdr.count,
+		|| (INT_GET(leaf2->entries[INT_GET(leaf2->hdr.count,
 				ARCH_CONVERT)-1].hashval, ARCH_CONVERT) <
 		      INT_GET(leaf1->entries[INT_GET(leaf1->hdr.count,
 				ARCH_CONVERT)-1].hashval, ARCH_CONVERT))) ) {
@@ -2169,7 +2169,7 @@ xfs_attr_leaf_newentsize(xfs_da_args_t *args, int blocksize, int *local)
 	int size;
 
 	size = XFS_ATTR_LEAF_ENTSIZE_LOCAL(args->namelen, args->valuelen);
-	if (size < XFS_ATTR_LEAF_ENTSIZE_LOCAL_MAX(blocksize)) { 
+	if (size < XFS_ATTR_LEAF_ENTSIZE_LOCAL_MAX(blocksize)) {
 		if (local) {
 			*local = 1;
 		}
@@ -2213,7 +2213,7 @@ xfs_attr_leaf_list_int(xfs_dabuf_t *bp, xfs_attr_list_context_t *context)
 							== cursor->hashval) {
 				if (cursor->offset == context->dupcnt) {
 					context->dupcnt = 0;
-					break;	
+					break;
 				}
 				context->dupcnt++;
 			} else if (INT_GET(entry->hashval, ARCH_CONVERT)
@@ -2261,7 +2261,7 @@ xfs_attr_leaf_list_int(xfs_dabuf_t *bp, xfs_attr_list_context_t *context)
 			} else {
 				retval = xfs_attr_put_listent(context, ns,
 					(char *)name_loc->nameval,
-					(int)name_loc->namelen, 
+					(int)name_loc->namelen,
 					(int)INT_GET(name_loc->valuelen,
 								ARCH_CONVERT));
 			}
@@ -2274,7 +2274,7 @@ xfs_attr_leaf_list_int(xfs_dabuf_t *bp, xfs_attr_list_context_t *context)
 			} else {
 				retval = xfs_attr_put_listent(context, ns,
 					(char *)name_rmt->name,
-					(int)name_rmt->namelen, 
+					(int)name_rmt->namelen,
 					(int)INT_GET(name_rmt->valuelen,
 								ARCH_CONVERT));
 			}
@@ -2287,9 +2287,9 @@ xfs_attr_leaf_list_int(xfs_dabuf_t *bp, xfs_attr_list_context_t *context)
 	return(retval);
 }
 
-#define	ATTR_ENTBASESIZE		/* minimum bytes used by an attr */ \
+#define ATTR_ENTBASESIZE		/* minimum bytes used by an attr */ \
 	(((struct attrlist_ent *) 0)->a_name - (char *) 0)
-#define	ATTR_ENTSIZE(namelen)		/* actual bytes used by an attr */ \
+#define ATTR_ENTSIZE(namelen)		/* actual bytes used by an attr */ \
 	((ATTR_ENTBASESIZE + (namelen) + 1 + sizeof(u_int32_t)-1) \
 	 & ~(sizeof(u_int32_t)-1))
 
@@ -2654,7 +2654,7 @@ xfs_attr_root_inactive(xfs_trans_t **trans, xfs_inode_t *dp)
 	 */
 	error = xfs_attr_rolltrans(trans, dp);
 
-	return (error);	
+	return (error);
 }
 
 /*
@@ -2761,7 +2761,7 @@ xfs_attr_node_inactive(xfs_trans_t **trans, xfs_inode_t *dp, xfs_dabuf_t *bp,
 			return (error);
 	}
 
-	return(0);	
+	return(0);
 }
 
 /*
@@ -2886,7 +2886,7 @@ xfs_attr_leaf_freextent(xfs_trans_t **trans, xfs_inode_t *dp,
 		ASSERT(map.br_startblock != DELAYSTARTBLOCK);
 
 		/*
-		 * If it's a hole, these are already unmapped 
+		 * If it's a hole, these are already unmapped
 		 * so there's nothing to invalidate.
 		 */
 		if (map.br_startblock != HOLESTARTBLOCK) {
@@ -2922,7 +2922,7 @@ xfs_attr_rolltrans(xfs_trans_t **transp, xfs_inode_t *dp)
 {
 	xfs_trans_t *trans;
 	unsigned int logres, count;
-	int 	error;
+	int	error;
 
 	/*
 	 * Ensure that the inode is always logged.
@@ -2938,7 +2938,7 @@ xfs_attr_rolltrans(xfs_trans_t **transp, xfs_inode_t *dp)
 	*transp = xfs_trans_dup(trans);
 
 	/*
-	 * Commit the current transaction. 
+	 * Commit the current transaction.
 	 * If this commit failed, then it'd just unlock those items that
 	 * are not marked ihold. That also means that a filesystem shutdown
 	 * is in progress. The caller takes the responsibility to cancel
@@ -2953,11 +2953,11 @@ xfs_attr_rolltrans(xfs_trans_t **transp, xfs_inode_t *dp)
 	 * Reserve space in the log for th next transaction.
 	 * This also pushes items in the "AIL", the list of logged items,
 	 * out to disk if they are taking up space at the tail of the log
-	 * that we want to use.  This requires that either nothing be locked
+	 * that we want to use.	 This requires that either nothing be locked
 	 * across this call, or that anything that is locked be logged in
 	 * the prior and the next transactions.
 	 */
-	error = xfs_trans_reserve(trans, 0, logres, 0, 
+	error = xfs_trans_reserve(trans, 0, logres, 0,
 				  XFS_TRANS_PERM_LOG_RES, count);
 	/*
 	 *  Ensure that the inode is in the new transaction and locked.

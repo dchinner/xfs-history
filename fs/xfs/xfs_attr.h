@@ -1,36 +1,36 @@
 /*
  * Copyright (c) 2000, 2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 #ifndef __XFS_ATTR_H__
-#define	__XFS_ATTR_H__
+#define __XFS_ATTR_H__
 
 /*
  * xfs_attr.h
@@ -46,7 +46,7 @@
  */
 
 #ifdef XFS_ALL_TRACE
-#define	XFS_ATTR_TRACE
+#define XFS_ATTR_TRACE
 #endif
 
 #if !defined(DEBUG)
@@ -68,15 +68,15 @@
 
 /*
  * The maximum size (into the kernel or returned from the kernel) of an
- * attribute value or the buffer used for an attr_list() call.  Larger
+ * attribute value or the buffer used for an attr_list() call.	Larger
  * sizes will result in an E2BIG return code.
  */
-#define	ATTR_MAX_VALUELEN	(64*1024)	/* max length of a value */
+#define ATTR_MAX_VALUELEN	(64*1024)	/* max length of a value */
 
 /*
  * Define how lists of attribute names are returned to the user from
  * the attr_list() call.  A large, 32bit aligned, buffer is passed in
- * along with its size.  We put an array of offsets at the top that each
+ * along with its size.	 We put an array of offsets at the top that each
  * reference an attrlist_ent_t and pack the attrlist_ent_t's at the bottom.
  */
 typedef struct attrlist {
@@ -98,7 +98,7 @@ typedef struct attrlist_ent {	/* data from attr_list() */
  * Given a pointer to the (char*) buffer containing the attr_list() result,
  * and an index, return a pointer to the indicated attribute in the buffer.
  */
-#define	ATTR_ENTRY(buffer, index)		\
+#define ATTR_ENTRY(buffer, index)		\
 	((attrlist_ent_t *)			\
 	 &((char *)buffer)[ ((attrlist_t *)(buffer))->al_offset[index] ])
 

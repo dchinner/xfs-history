@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -52,10 +52,10 @@
 #endif
 
 /* NODE_SIZE is the number of bytes used for the node identifier portion. */
-#define	NODE_SIZE	6
+#define NODE_SIZE	6
 
 /*
- * Total size must be 128 bits.  N.B. definition of uuid_t in uuid.h!
+ * Total size must be 128 bits.	 N.B. definition of uuid_t in uuid.h!
  */
 typedef struct {
 	u_int32_t	uu_timelow;	/* time "low" */
@@ -70,11 +70,11 @@ typedef struct {
  * time value (i.e. seconds since 1 Jan. 1970) to convert it to the
  * time base for UUIDs (15 Oct. 1582).
  */
-#define	UUID_TBC	0x01B21DD2138140LL
+#define UUID_TBC	0x01B21DD2138140LL
 
 static	short		uuid_eaddr[NODE_SIZE / 2];	/* ethernet address */
 static	__int64_t	uuid_time;	/* last time basis used */
-static	u_int16_t 	uuid_clockseq;	/* boot-time randomizer */
+static	u_int16_t	uuid_clockseq;	/* boot-time randomizer */
 DECLARE_MUTEX(uuid_lock);
 
 /*
@@ -94,15 +94,15 @@ uuid_init(void)
 void
 uuid_getnodeuniq(uuid_t *uuid, int fsid [2])
 {
-        char    *uu=(char*)uuid;
-        
-        /* on IRIX, this function assumes big-endian fields within
-         * the uuid, so we use INT_GET to get the same result on
-         * little-endian systems
-         */
+	char	*uu=(char*)uuid;
+
+	/* on IRIX, this function assumes big-endian fields within
+	 * the uuid, so we use INT_GET to get the same result on
+	 * little-endian systems
+	 */
 
 	fsid[0] = (INT_GET(*(u_int16_t*)(uu+8), ARCH_CONVERT) << 16) +
-                   INT_GET(*(u_int16_t*)(uu+4), ARCH_CONVERT);
+		   INT_GET(*(u_int16_t*)(uu+4), ARCH_CONVERT);
 	fsid[1] =  INT_GET(*(u_int32_t*)(uu  ), ARCH_CONVERT);
 }
 
@@ -134,9 +134,9 @@ uuid_equal(uuid_t *uuid1, uuid_t *uuid2)
 
 /*
  * Given a 128-bit uuid, return a 64-bit value by adding the top and bottom
- * 64-bit words.  NOTE: This function can not be changed EVER.  Although
+ * 64-bit words.  NOTE: This function can not be changed EVER.	Although
  * brain-dead, some applications depend on this 64-bit value remaining
- * persistent.  Specifically, DMI vendors store the value as a persistent
+ * persistent.	Specifically, DMI vendors store the value as a persistent
  * filehandle.
  */
 __uint64_t
@@ -159,7 +159,7 @@ get_eaddr(char *junk)
 	if (!dev || !dev->addr_len) {
 		get_random_bytes(uuid_eaddr, sizeof(uuid_eaddr));
 	} else {
-		memcpy(uuid_eaddr, dev->dev_addr, 
+		memcpy(uuid_eaddr, dev->dev_addr,
 			dev->addr_len<sizeof(uuid_eaddr)?
 			dev->addr_len:sizeof(uuid_eaddr));
 		dev_put(dev);
@@ -220,7 +220,7 @@ uuid_compare(uuid_t *uuid1, uuid_t *uuid2)
 	if (uuid1 == NULL) {
 		if (uuid2 == NULL) {
 			return 0;	/* equal because both are nil */
-		} else  {
+		} else	{
 			return -1;	/* uuid1 nil, so precedes uuid2 */
 		}
 	} else if (uuid2 == NULL) {

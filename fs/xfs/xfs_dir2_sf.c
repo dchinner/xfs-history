@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -52,7 +52,7 @@ static int xfs_dir2_sf_addname_pick(xfs_da_args_t *args, int objchange,
 #ifdef DEBUG
 static void xfs_dir2_sf_check(xfs_da_args_t *args);
 #else
-#define	xfs_dir2_sf_check(args)
+#define xfs_dir2_sf_check(args)
 #endif /* DEBUG */
 #if XFS_BIG_FILESYSTEMS
 static void xfs_dir2_sf_toino4(xfs_da_args_t *args);
@@ -90,7 +90,7 @@ xfs_dir2_block_sfsize(
 	count = i8count = namelen = 0;
 	btp = XFS_DIR2_BLOCK_TAIL_P(mp, block);
 	blp = XFS_DIR2_BLOCK_LEAF_P_ARCH(btp, ARCH_CONVERT);
-        
+
 	/*
 	 * Iterate over the block's data entries by using the leaf pointers.
 	 */
@@ -165,8 +165,8 @@ xfs_dir2_block_to_sf(
 	char			*ptr;		/* current data pointer */
 	xfs_dir2_sf_entry_t	*sfep;		/* shortform entry */
 	xfs_dir2_sf_t		*sfp;		/* shortform structure */
-        xfs_ino_t               temp;
-                
+	xfs_ino_t		temp;
+
 	xfs_dir2_trace_args_sb("block_to_sf", args, size, bp);
 	dp = args->dp;
 	mp = dp->i_mount;
@@ -242,7 +242,7 @@ xfs_dir2_block_to_sf(
 				(xfs_dir2_data_aoff_t)
 				((char *)dep - (char *)block), ARCH_CONVERT);
 			bcopy(dep->name, sfep->name, dep->namelen);
-                        temp=INT_GET(dep->inumber, ARCH_CONVERT);
+			temp=INT_GET(dep->inumber, ARCH_CONVERT);
 			XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp, &temp,
 				XFS_DIR2_SF_INUMBERP(sfep), ARCH_CONVERT);
 			sfep = XFS_DIR2_SF_NEXTENTRY(sfp, sfep);
@@ -259,7 +259,7 @@ out:
 
 /*
  * Add a name to a shortform directory.
- * There are two algorithms, "easy" and "hard" which we decide on 
+ * There are two algorithms, "easy" and "hard" which we decide on
  * before changing anything.
  * Convert to block form if necessary, if the new entry won't fit.
  */
@@ -477,7 +477,7 @@ xfs_dir2_sf_addname_hard(
 	}
 	/*
 	 * Get rid of the old directory, then allocate space for
-	 * the new one.  We do this so xfs_idata_realloc won't copy
+	 * the new one.	 We do this so xfs_idata_realloc won't copy
 	 * the data.
 	 */
 	xfs_idata_realloc(dp, -old_isize, XFS_DATA_FORK);
@@ -620,7 +620,7 @@ xfs_dir2_sf_check(
 	offset = XFS_DIR2_DATA_FIRST_OFFSET;
 	ino = XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, &sfp->hdr.parent, ARCH_CONVERT);
 	i8count = ino > XFS_DIR2_MAX_SHORT_INUM;
-        
+
 	for (i = 0, sfep = XFS_DIR2_SF_FIRSTENTRY(sfp);
 	     i < sfp->hdr.count;
 	     i++, sfep = XFS_DIR2_SF_NEXTENTRY(sfp, sfep)) {
@@ -643,7 +643,7 @@ xfs_dir2_sf_check(
 }
 #endif	/* DEBUG */
 
-/* 
+/*
  * Create a new (shortform) directory.
  */
 int					/* error, always 0 */
@@ -662,7 +662,7 @@ xfs_dir2_sf_create(
 	ASSERT(dp != NULL);
 	ASSERT(dp->i_d.di_size == 0);
 	/*
-	 * If it's currently a zero-length extent file, 
+	 * If it's currently a zero-length extent file,
 	 * convert it to local format.
 	 */
 	if (dp->i_d.di_format == XFS_DINODE_FMT_EXTENTS) {
@@ -1102,7 +1102,7 @@ xfs_dir2_sf_replace(
 	 */
 	else {
 		for (i = 0, sfep = XFS_DIR2_SF_FIRSTENTRY(sfp);
-		     i < sfp->hdr.count; 
+		     i < sfp->hdr.count;
 		     i++, sfep = XFS_DIR2_SF_NEXTENTRY(sfp, sfep)) {
 			if (sfep->namelen == args->namelen &&
 			    sfep->name[0] == args->name[0] &&

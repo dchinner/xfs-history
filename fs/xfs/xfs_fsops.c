@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -54,7 +54,7 @@ xfs_fs_geometry(
 	geo->rtblocks = mp->m_sb.sb_rblocks;
 	geo->rtextents = mp->m_sb.sb_rextents;
 	geo->logstart = mp->m_sb.sb_logstart;
-        ASSERT(sizeof(geo->uuid)==sizeof(mp->m_sb.sb_uuid));
+	ASSERT(sizeof(geo->uuid)==sizeof(mp->m_sb.sb_uuid));
 	memcpy(geo->uuid, &mp->m_sb.sb_uuid, sizeof(mp->m_sb.sb_uuid));
 	if (new_version >= 2) {
 		geo->sunit = mp->m_sb.sb_unit;
@@ -173,7 +173,7 @@ xfs_growfs_data_private(
 		disk_addr = XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR);
 		bp = xfs_buf_get(mp->m_ddev_targp,
 				  disk_addr,
-			          sectbb, 0);
+				  sectbb, 0);
 		agf = XFS_BUF_TO_AGF(bp);
 		bzero(agf, mp->m_sb.sb_sectsize);
 		INT_SET(agf->agf_magicnum, ARCH_CONVERT, XFS_AGF_MAGIC);
@@ -238,7 +238,7 @@ xfs_growfs_data_private(
 		INT_ZERO(block->bb_level, ARCH_CONVERT);
 		INT_SET(block->bb_numrecs, ARCH_CONVERT, 1);
 		INT_SET(block->bb_leftsib, ARCH_CONVERT, NULLAGBLOCK);
-                INT_SET(block->bb_rightsib, ARCH_CONVERT, NULLAGBLOCK);
+		INT_SET(block->bb_rightsib, ARCH_CONVERT, NULLAGBLOCK);
 		arec = XFS_BTREE_REC_ADDR(bsize, xfs_alloc, block, 1,
 			mp->m_alloc_mxr[0]);
 		INT_SET(arec->ar_startblock, ARCH_CONVERT, XFS_PREALLOC_BLOCKS(mp));
@@ -260,7 +260,7 @@ xfs_growfs_data_private(
 		INT_ZERO(block->bb_level, ARCH_CONVERT);
 		INT_SET(block->bb_numrecs, ARCH_CONVERT, 1);
 		INT_SET(block->bb_leftsib, ARCH_CONVERT, NULLAGBLOCK);
-                INT_SET(block->bb_rightsib, ARCH_CONVERT, NULLAGBLOCK);
+		INT_SET(block->bb_rightsib, ARCH_CONVERT, NULLAGBLOCK);
 		arec = XFS_BTREE_REC_ADDR(bsize, xfs_alloc, block, 1,
 			mp->m_alloc_mxr[0]);
 		INT_SET(arec->ar_startblock, ARCH_CONVERT, XFS_PREALLOC_BLOCKS(mp));
@@ -283,11 +283,11 @@ xfs_growfs_data_private(
 		INT_ZERO(block->bb_level, ARCH_CONVERT);
 		INT_ZERO(block->bb_numrecs, ARCH_CONVERT);
 		INT_SET(block->bb_leftsib, ARCH_CONVERT, NULLAGBLOCK);
-                INT_SET(block->bb_rightsib, ARCH_CONVERT, NULLAGBLOCK);
+		INT_SET(block->bb_rightsib, ARCH_CONVERT, NULLAGBLOCK);
 		error = xfs_bwrite(mp, bp);
 		if (error) {
 			goto error0;
-		}		
+		}
 	}
 	xfs_trans_agblocks_delta(tp, nfree);
 	/*
@@ -348,7 +348,7 @@ xfs_growfs_data_private(
 	} else
 		mp->m_maxicount = 0;
 	for (agno = 1; agno < nagcount; agno++) {
-	        error = xfs_read_buf(mp, mp->m_ddev_targp,
+		error = xfs_read_buf(mp, mp->m_ddev_targp,
 				  XFS_AGB_TO_DADDR(mp, agno, XFS_SB_BLOCK(mp)),
 				  sectbb, 0, &bp);
 		if (error) {
@@ -472,12 +472,12 @@ xfs_fs_counts(
 
 int
 xfs_reserve_blocks(
-	xfs_mount_t             *mp, 
-	__uint64_t              *inval, 
-	xfs_fsop_resblks_t      *outval)
+	xfs_mount_t		*mp,
+	__uint64_t		*inval,
+	xfs_fsop_resblks_t	*outval)
 {
-	__uint64_t              lcounter, delta;
-	__uint64_t              request;
+	__uint64_t		lcounter, delta;
+	__uint64_t		request;
 	unsigned long s;
 
 	/* If inval is null, report current values and return */
@@ -487,16 +487,16 @@ xfs_reserve_blocks(
 		outval->resblks_avail = mp->m_resblks_avail;
 		return(0);
 	}
-	
+
 	request = *inval;
 	s = XFS_SB_LOCK(mp);
 
 	/*
-	 * If our previous reservation was larger than the current value, 
+	 * If our previous reservation was larger than the current value,
 	 * then move any unused blocks back to the free pool.
 	 */
 
-	if (mp->m_resblks > request) { 
+	if (mp->m_resblks > request) {
 		lcounter = mp->m_resblks_avail - request;
 		if (lcounter  > 0) {		/* release unused blocks */
 			mp->m_sb.sb_fdblocks += lcounter;
@@ -526,7 +526,7 @@ xfs_reserve_blocks(
 }
 
 void
-xfs_fs_log_dummy(xfs_mount_t *mp) 
+xfs_fs_log_dummy(xfs_mount_t *mp)
 {
 	xfs_trans_t *tp;
 	xfs_inode_t *ip;
@@ -534,7 +534,7 @@ xfs_fs_log_dummy(xfs_mount_t *mp)
 
 	tp = _xfs_trans_alloc(mp, XFS_TRANS_DUMMY1);
 	atomic_inc(&mp->m_active_trans);
-        if (xfs_trans_reserve(tp, 0, XFS_ICHANGE_LOG_RES(mp), 0, 0, 0)) {
+	if (xfs_trans_reserve(tp, 0, XFS_ICHANGE_LOG_RES(mp), 0, 0, 0)) {
 		xfs_trans_cancel(tp, 0);
 		return;
 	}

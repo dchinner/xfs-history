@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 #ifndef __XFS_CLNT_H__
@@ -43,9 +43,9 @@
  * and the set of valid options for it, and converts the users
  * argument string into a binary structure _before_ making the
  * system call), and the ABI issues that this implies.
- * 
+ *
  * In Linux, we are passed a comma separated set of options;
- * ie. a NULL terminated string of characters.  Userspace mount
+ * ie. a NULL terminated string of characters.	Userspace mount
  * code does not have any knowledge of mount options expected by
  * each filesystem type and so each filesystem parses its mount
  * options in kernel space.
@@ -66,9 +66,9 @@ struct xfs_args {
 	char	mtpt[MAXNAMELEN];	/* filesystem mount point */
 	int	sunit;		/* stripe unit (BBs) */
 	int	swidth;		/* stripe width (BBs), multiple of sunit */
-	uchar_t	iosizelog;	/* log2 of the preferred I/O size */
+	uchar_t iosizelog;	/* log2 of the preferred I/O size */
 
-	/*  The remainder is for CXFS support.  */
+	/*  The remainder is for CXFS support.	*/
 	char	**servlist;	/* Table of hosts which may be servers */
 	int	*servlistlen;	/* Table of hostname lengths. */
 	int	slcount;	/* Count of hosts which may be servers. */
@@ -82,10 +82,10 @@ struct xfs_args {
 /*
  * XFS mount option flags
  */
-#define	XFSMNT_CHKLOG		0x00000001	/* check log */
-#define	XFSMNT_WSYNC		0x00000002	/* safe mode nfs mount
+#define XFSMNT_CHKLOG		0x00000001	/* check log */
+#define XFSMNT_WSYNC		0x00000002	/* safe mode nfs mount
 						 * compatible */
-#define	XFSMNT_INO64		0x00000004	/* move inode numbers up
+#define XFSMNT_INO64		0x00000004	/* move inode numbers up
 						 * past 2^32 */
 #define XFSMNT_UQUOTA		0x00000008	/* user quota accounting */
 #define XFSMNT_PQUOTA		0x00000010	/* IRIX prj quota accounting */
@@ -106,17 +106,17 @@ struct xfs_args {
 #define XFSMNT_IOSIZE		0x00002000	/* optimize for I/O size */
 #define XFSMNT_OSYNCISOSYNC	0x00004000	/* o_sync is REALLY o_sync */
 						/* (osyncisdsync is now default) */
-#define XFSMNT_CLNTONLY         0x00008000	/* cxfs mount as client only */
-#define XFSMNT_UNSHARED         0x00010000	/* cxfs filesystem mounted
-                                                 * unshared */
-#define XFSMNT_CHGCLNTONLY      0x00020000      /* changing client only flag */
-                                                /* (for remount only) */
-#define XFSMNT_SERVCELL         0x00040000      /* setting server cell */
-                                                /* (allowed on remount) */
-#define XFSMNT_MAKESERVER       0x00080000      /* become the server (remount */
-                                                /* only) */
-#define XFSMNT_NOTSERVER        0x00100000      /* give up being the server */
-                                                /* (remount only) */
+#define XFSMNT_CLNTONLY		0x00008000	/* cxfs mount as client only */
+#define XFSMNT_UNSHARED		0x00010000	/* cxfs filesystem mounted
+						 * unshared */
+#define XFSMNT_CHGCLNTONLY	0x00020000	/* changing client only flag */
+						/* (for remount only) */
+#define XFSMNT_SERVCELL		0x00040000	/* setting server cell */
+						/* (allowed on remount) */
+#define XFSMNT_MAKESERVER	0x00080000	/* become the server (remount */
+						/* only) */
+#define XFSMNT_NOTSERVER	0x00100000	/* give up being the server */
+						/* (remount only) */
 #define XFSMNT_DMAPI		0x00200000	/* enable dmapi/xdsm */
 #define XFSMNT_GQUOTA		0x00400000	/* group quota accounting */
 #define XFSMNT_GQUOTAENF	0x00800000	/* group quota limit

@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2001 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -56,7 +56,7 @@ STATIC void	xfs_efd_item_abort(xfs_efd_log_item_t *);
 STATIC uint
 xfs_efi_item_size(xfs_efi_log_item_t *efip)
 {
-	return 1; 
+	return 1;
 }
 
 /*
@@ -84,7 +84,7 @@ xfs_efi_item_format(xfs_efi_log_item_t	*efip,
 	log_vector->i_len = size;
 	ASSERT(size >= sizeof(xfs_efi_log_format_t));
 }
-	
+
 
 /*
  * Pinning has no meaning for an efi item, so just return.
@@ -213,7 +213,7 @@ xfs_efi_item_unlock(xfs_efi_log_item_t *efip)
 /*
  * The EFI is logged only once and cannot be moved in the log, so
  * simply return the lsn at which it's been logged.  The canceled
- * flag is not paid any attention here.  Checking for that is delayed
+ * flag is not paid any attention here.	 Checking for that is delayed
  * until the EFI is unpinned.
  */
 /*ARGSUSED*/
@@ -225,8 +225,8 @@ xfs_efi_item_committed(xfs_efi_log_item_t *efip, xfs_lsn_t lsn)
 
 /*
  * This is called when the transaction logging the EFI is aborted.
- * Free up the EFI and return.  No need to clean up the slot for
- * the item in the transaction.  That was done by the unpin code
+ * Free up the EFI and return.	No need to clean up the slot for
+ * the item in the transaction.	 That was done by the unpin code
  * which is called prior to this routine in the abort/fs-shutdown path.
  */
 STATIC void
@@ -247,7 +247,7 @@ xfs_efi_item_abort(xfs_efi_log_item_t *efip)
 }
 
 /*
- * There isn't much you can do to push on an efi item.  It is simply
+ * There isn't much you can do to push on an efi item.	It is simply
  * stuck waiting for all of its corresponding efd items to be
  * committed to disk.
  */
@@ -290,7 +290,7 @@ struct xfs_item_ops xfs_efi_item_ops = {
 	iop_push:	(void(*)(xfs_log_item_t*))xfs_efi_item_push,
 	iop_abort:	(void(*)(xfs_log_item_t*))xfs_efi_item_abort,
 	iop_pushbuf:	NULL,
-	iop_committing:	(void(*)(xfs_log_item_t*, xfs_lsn_t))
+	iop_committing: (void(*)(xfs_log_item_t*, xfs_lsn_t))
 					xfs_efi_item_committing
 };
 
@@ -301,7 +301,7 @@ struct xfs_item_ops xfs_efi_item_ops = {
 xfs_efi_log_item_t *
 xfs_efi_init(xfs_mount_t	*mp,
 	     uint		nextents)
-	     
+
 {
 	xfs_efi_log_item_t	*efip;
 	uint			size;
@@ -327,7 +327,7 @@ xfs_efi_init(xfs_mount_t	*mp,
 
 /*
  * This is called by the efd item code below to release references to
- * the given efi item.  Each efd calls this with the number of
+ * the given efi item.	Each efd calls this with the number of
  * extents that it has logged, and when the sum of these reaches
  * the total number of extents logged by this efi item we can free
  * the efi item.
@@ -427,7 +427,7 @@ xfs_efi_cancel(
 STATIC uint
 xfs_efd_item_size(xfs_efd_log_item_t *efdp)
 {
-	return 1; 
+	return 1;
 }
 
 /*
@@ -455,7 +455,7 @@ xfs_efd_item_format(xfs_efd_log_item_t	*efdp,
 	log_vector->i_len = size;
 	ASSERT(size >= sizeof(xfs_efd_log_format_t));
 }
-	
+
 
 /*
  * Pinning has no meaning for an efd item, so just return.
@@ -522,7 +522,7 @@ xfs_efd_item_committed(xfs_efd_log_item_t *efdp, xfs_lsn_t lsn)
 {
 	uint	size;
 	int	nexts;
-	
+
 	/*
 	 * If we got a log I/O error, it's always the case that the LR with the
 	 * EFI got unpinned and freed before the EFD got aborted.
@@ -546,7 +546,7 @@ xfs_efd_item_committed(xfs_efd_log_item_t *efdp, xfs_lsn_t lsn)
  * The transaction of which this EFD is a part has been aborted.
  * Inform its companion EFI of this fact and then clean up after
  * ourselves.  No need to clean up the slot for the item in the
- * transaction.  That was done by the unpin code which is called
+ * transaction.	 That was done by the unpin code which is called
  * prior to this routine in the abort/fs-shutdown path.
  */
 STATIC void
@@ -575,7 +575,7 @@ xfs_efd_item_abort(xfs_efd_log_item_t *efdp)
 }
 
 /*
- * There isn't much you can do to push on an efd item.  It is simply
+ * There isn't much you can do to push on an efd item.	It is simply
  * stuck waiting for the log to be flushed to disk.
  */
 /*ARGSUSED*/
@@ -617,7 +617,7 @@ struct xfs_item_ops xfs_efd_item_ops = {
 	iop_push:	(void(*)(xfs_log_item_t*))xfs_efd_item_push,
 	iop_abort:	(void(*)(xfs_log_item_t*))xfs_efd_item_abort,
 	iop_pushbuf:	NULL,
-	iop_committing:	(void(*)(xfs_log_item_t*, xfs_lsn_t))
+	iop_committing: (void(*)(xfs_log_item_t*, xfs_lsn_t))
 					xfs_efd_item_committing
 };
 
@@ -627,9 +627,9 @@ struct xfs_item_ops xfs_efd_item_ops = {
  */
 xfs_efd_log_item_t *
 xfs_efd_init(xfs_mount_t	*mp,
-	     xfs_efi_log_item_t	*efip,
+	     xfs_efi_log_item_t *efip,
 	     uint		nextents)
-	     
+
 {
 	xfs_efd_log_item_t	*efdp;
 	uint			size;

@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -41,7 +41,7 @@ STATIC xfs_buf_t *xfs_trans_buf_item_match_all(xfs_trans_t *, buftarg_t *,
 
 /*
  * Get and lock the buffer for the caller if it is not already
- * locked within the given transaction.  If it is already locked
+ * locked within the given transaction.	 If it is already locked
  * within the transaction, just increment its lock recursion count
  * and return a pointer to it.
  *
@@ -143,7 +143,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t*);
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
 	ASSERT(!(bip->bli_format.blf_flags & XFS_BLI_CANCEL));
- 	ASSERT(!(bip->bli_flags & XFS_BLI_LOGGED));
+	ASSERT(!(bip->bli_flags & XFS_BLI_LOGGED));
 	bip->bli_recur = 0;
 
 	/*
@@ -226,7 +226,7 @@ xfs_trans_getsb(xfs_trans_t	*tp,
 	bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t*);
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
 	ASSERT(!(bip->bli_format.blf_flags & XFS_BLI_CANCEL));
- 	ASSERT(!(bip->bli_flags & XFS_BLI_LOGGED));
+	ASSERT(!(bip->bli_flags & XFS_BLI_LOGGED));
 	bip->bli_recur = 0;
 
 	/*
@@ -258,7 +258,7 @@ int	xfs_error_mod = 33;
 
 /*
  * Get and lock the buffer for the caller if it is not already
- * locked within the given transaction.  If it has not yet been
+ * locked within the given transaction.	 If it has not yet been
  * read in, read it from disk. If it is already locked
  * within the transaction and already read in, just increment its
  * lock recursion count and return a pointer to it.
@@ -287,7 +287,7 @@ xfs_trans_read_buf(
 	xfs_buf_t		*bp;
 	xfs_buf_log_item_t	*bip;
 	int			error;
-	
+
 	if (flags == 0)
 		flags = XFS_BUF_LOCK | XFS_BUF_MAPPED;
 
@@ -296,7 +296,7 @@ xfs_trans_read_buf(
 	 */
 	if (tp == NULL) {
 		bp = xfs_buf_read_flags(target, blkno, len, flags | BUF_BUSY);
-		if (!bp) 
+		if (!bp)
 			return XFS_ERROR(ENOMEM);
 
 		if ((bp != NULL) && (XFS_BUF_GETERROR(bp) != 0)) {
@@ -317,7 +317,7 @@ xfs_trans_read_buf(
 			}
 		}
 #endif
-		if (XFS_FORCED_SHUTDOWN(mp))   
+		if (XFS_FORCED_SHUTDOWN(mp))
 			goto shutdown_abort;
 		*bpp = bp;
 		return 0;
@@ -348,7 +348,7 @@ xfs_trans_read_buf(
 			xfsbdstrat(tp->t_mountp, bp);
 			xfs_iowait(bp);
 			if (XFS_BUF_GETERROR(bp) != 0) {
-				xfs_ioerror_alert("xfs_trans_read_buf", mp, 
+				xfs_ioerror_alert("xfs_trans_read_buf", mp,
 						  bp, blkno);
 				error = XFS_BUF_GETERROR(bp);
 				xfs_buf_relse(bp);
@@ -359,13 +359,13 @@ xfs_trans_read_buf(
 				 * already dirty.
 				 */
 				if (tp->t_flags & XFS_TRANS_DIRTY)
-					xfs_force_shutdown(tp->t_mountp, 
-							   XFS_METADATA_IO_ERROR); 
+					xfs_force_shutdown(tp->t_mountp,
+							   XFS_METADATA_IO_ERROR);
 				return error;
 			}
 		}
 		/*
-		 * We never locked this buf ourselves, so we shouldn't 
+		 * We never locked this buf ourselves, so we shouldn't
 		 * brelse it either. Just get out.
 		 */
 		if (XFS_FORCED_SHUTDOWN(mp)) {
@@ -373,7 +373,7 @@ xfs_trans_read_buf(
 			*bpp = NULL;
 			return XFS_ERROR(EIO);
 		}
-		
+
 
 		bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t*);
 		bip->bli_recur++;
@@ -401,11 +401,11 @@ xfs_trans_read_buf(
 	    XFS_BUF_SUPER_STALE(bp);
 		xfs_buftrace("READ ERROR", bp);
 		error = XFS_BUF_GETERROR(bp);
-			
-		xfs_ioerror_alert("xfs_trans_read_buf", mp, 
+
+		xfs_ioerror_alert("xfs_trans_read_buf", mp,
 				  bp, blkno);
 		if (tp->t_flags & XFS_TRANS_DIRTY)
-			xfs_force_shutdown(tp->t_mountp, XFS_METADATA_IO_ERROR); 
+			xfs_force_shutdown(tp->t_mountp, XFS_METADATA_IO_ERROR);
 		xfs_buf_relse(bp);
 		return error;
 	}
@@ -413,7 +413,7 @@ xfs_trans_read_buf(
 	if (xfs_do_error && !(tp->t_flags & XFS_TRANS_DIRTY)) {
 		if (kdev_same(xfs_error_dev, target->dev)) {
 			if (((xfs_req_num++) % xfs_error_mod) == 0) {
-				xfs_force_shutdown(tp->t_mountp, 
+				xfs_force_shutdown(tp->t_mountp,
 						   XFS_METADATA_IO_ERROR);
 				xfs_buf_relse(bp);
 				printk("Returning error in trans!\n");
@@ -422,7 +422,7 @@ xfs_trans_read_buf(
 		}
 	}
 #endif
-	if (XFS_FORCED_SHUTDOWN(mp)) 
+	if (XFS_FORCED_SHUTDOWN(mp))
 		goto shutdown_abort;
 
 	/*
@@ -439,7 +439,7 @@ xfs_trans_read_buf(
 	bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t*);
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
 	ASSERT(!(bip->bli_format.blf_flags & XFS_BLI_CANCEL));
- 	ASSERT(!(bip->bli_flags & XFS_BLI_LOGGED));
+	ASSERT(!(bip->bli_flags & XFS_BLI_LOGGED));
 	bip->bli_recur = 0;
 
 	/*
@@ -478,7 +478,7 @@ shutdown_abort:
 						(XFS_B_STALE|XFS_B_DELWRI));
 
 	xfs_buftrace("READ_BUF XFSSHUTDN", bp);
-	xfs_buf_relse(bp);	
+	xfs_buf_relse(bp);
 	*bpp = NULL;
 	return XFS_ERROR(EIO);
 }
@@ -489,7 +489,7 @@ shutdown_abort:
  * xfs_trans_... buffer allocation routines if the buffer has not
  * been modified within this transaction.  If the buffer is modified
  * within this transaction, do decrement the recursion count but do
- * not release the buffer even if the count goes to 0.  If the buffer is not
+ * not release the buffer even if the count goes to 0.	If the buffer is not
  * modified within the transaction, decrement the recursion count and
  * release the buffer if the recursion count goes to 0.
  *
@@ -566,14 +566,14 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 	/*
 	 * If the buffer has been invalidated, then we can't release
 	 * it until the transaction commits to disk unless it is re-dirtied
-	 * as part of this transaction.  This prevents us from pulling
+	 * as part of this transaction.	 This prevents us from pulling
 	 * the item from the AIL before we should.
 	 */
 	if (bip->bli_flags & XFS_BLI_STALE) {
 		xfs_buf_item_trace("RELSE STALE", bip);
 		return;
 	}
-	 
+
 	ASSERT(!(bip->bli_flags & XFS_BLI_LOGGED));
 	xfs_buf_item_trace("RELSE", bip);
 
@@ -701,7 +701,7 @@ xfs_trans_bhold(xfs_trans_t	*tp,
 
 /*
  * This function is used to indicate that the buffer should not be
- * unlocked until the transaction is committed to disk.  Since we
+ * unlocked until the transaction is committed to disk.	 Since we
  * are going to keep the lock held, make the transaction synchronous
  * so that the lock is not held too long.
  *
@@ -806,7 +806,7 @@ xfs_trans_log_buf(xfs_trans_t	*tp,
  * This called to invalidate a buffer that is being used within
  * a transaction.  Typically this is because the blocks in the
  * buffer are being freed, so we need to prevent it from being
- * written out when we're done.  Allowing it to be written again
+ * written out when we're done.	 Allowing it to be written again
  * might overwrite data in the free blocks if they are reallocated
  * to a file.
  *
@@ -856,7 +856,7 @@ xfs_trans_binval(
 
 	/*
 	 * Clear the dirty bit in the buffer and set the STALE flag
-	 * in the buf log item.  The STALE flag will be used in
+	 * in the buf log item.	 The STALE flag will be used in
 	 * xfs_buf_item_unpin() to determine if it should clean up
 	 * when the last reference to the buf item is given up.
 	 * We set the XFS_BLI_CANCEL flag in the buf log format structure
@@ -1017,7 +1017,7 @@ xfs_trans_buf_item_match(
 			    (XFS_BUF_ADDR(bp) == blkno) &&
 			    (XFS_BUF_COUNT(bp) == len)) {
 				/*
-				 * We found it.  Break out and
+				 * We found it.	 Break out and
 				 * return the pointer to the buffer.
 				 */
 				break;
@@ -1074,7 +1074,7 @@ xfs_trans_buf_item_match_all(
 			    (XFS_BUF_ADDR(bp) == blkno) &&
 			    (XFS_BUF_COUNT(bp) == len)) {
 				/*
-				 * We found it.  Break out and
+				 * We found it.	 Break out and
 				 * return the pointer to the buffer.
 				 */
 				return bp;

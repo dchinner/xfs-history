@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -134,8 +134,8 @@ _xfs_trans_alloc(
 
 /*
  * This is called to create a new transaction which will share the
- * permanent log reservation of the given transaction.  The remaining
- * unused block and rt extent reservations are also inherited.  This
+ * permanent log reservation of the given transaction.	The remaining
+ * unused block and rt extent reservations are also inherited.	This
  * implies that the original transaction is no longer allowed to allocate
  * blocks.  Locks and log items, however, are no inherited.  They must
  * be added to the new transaction explicitly.
@@ -173,10 +173,10 @@ xfs_trans_dup(
 	ntp->t_rtx_res = tp->t_rtx_res - tp->t_rtx_res_used;
 	tp->t_rtx_res = tp->t_rtx_res_used;
 
-	/* 
-	 * dup the dquot stuff too. 
+	/*
+	 * dup the dquot stuff too.
 	 */
-	if (tp->t_dqinfo) 
+	if (tp->t_dqinfo)
 		xfs_trans_dup_dqinfo(tp, ntp);
 
 	atomic_inc(&tp->t_mountp->m_active_trans);
@@ -193,8 +193,8 @@ xfs_trans_dup(
  * The only valid value for the flags parameter is XFS_RES_LOG_PERM, which
  * is used by long running transactions.  If any one of the reservations
  * fails then they will all be backed out.
- * 
- * This does not do quota reservations. That typically is done by the 
+ *
+ * This does not do quota reservations. That typically is done by the
  * caller afterwards.
  */
 int
@@ -208,7 +208,7 @@ xfs_trans_reserve(
 {
 	int		log_flags;
 	int		error;
-	int 	rsvd;
+	int	rsvd;
 
 	error = 0;
 	rsvd = (tp->t_flags & XFS_TRANS_RESERVE) != 0;
@@ -218,7 +218,7 @@ xfs_trans_reserve(
 
 	/*
 	 * Attempt to reserve the needed disk blocks by decrementing
-	 * the number needed from the number available.  This will
+	 * the number needed from the number available.	 This will
 	 * fail if the count would go below zero.
 	 */
 	if (blocks > 0) {
@@ -259,7 +259,7 @@ xfs_trans_reserve(
 
 	/*
 	 * Attempt to reserve the needed realtime extents by decrementing
-	 * the number needed from the number available.  This will
+	 * the number needed from the number available.	 This will
 	 * fail if the count would go below zero.
 	 */
 	if (rtextents > 0) {
@@ -349,7 +349,7 @@ xfs_trans_mod_sb(
 	case XFS_TRANS_SB_FDBLOCKS:
 		/*
 		 * Track the number of blocks allocated in the
-		 * transaction.  Make sure it does not exceed the
+		 * transaction.	 Make sure it does not exceed the
 		 * number reserved.
 		 */
 		if (delta < 0) {
@@ -370,7 +370,7 @@ xfs_trans_mod_sb(
 	case XFS_TRANS_SB_FREXTENTS:
 		/*
 		 * Track the number of blocks allocated in the
-		 * transaction.  Make sure it does not exceed the
+		 * transaction.	 Make sure it does not exceed the
 		 * number reserved.
 		 */
 		if (delta < 0) {
@@ -449,14 +449,14 @@ xfs_trans_apply_sb_deltas(
 		tp->t_ag_btree_delta));
 
 	if (tp->t_icount_delta != 0) {
-                INT_MOD(sbp->sb_icount, ARCH_CONVERT, tp->t_icount_delta);
+		INT_MOD(sbp->sb_icount, ARCH_CONVERT, tp->t_icount_delta);
 	}
 	if (tp->t_ifree_delta != 0) {
-                INT_MOD(sbp->sb_ifree, ARCH_CONVERT, tp->t_ifree_delta);
+		INT_MOD(sbp->sb_ifree, ARCH_CONVERT, tp->t_ifree_delta);
 	}
 
 	if (tp->t_fdblocks_delta != 0) {
-                INT_MOD(sbp->sb_fdblocks, ARCH_CONVERT, tp->t_fdblocks_delta);
+		INT_MOD(sbp->sb_fdblocks, ARCH_CONVERT, tp->t_fdblocks_delta);
 	}
 	if (tp->t_res_fdblocks_delta != 0) {
 		INT_MOD(sbp->sb_fdblocks, ARCH_CONVERT, tp->t_res_fdblocks_delta);
@@ -467,35 +467,35 @@ xfs_trans_apply_sb_deltas(
 	}
 	if (tp->t_dblocks_delta != 0) {
 		INT_MOD(sbp->sb_dblocks, ARCH_CONVERT, tp->t_dblocks_delta);
-	        whole = 1;
+		whole = 1;
 	}
 	if (tp->t_agcount_delta != 0) {
-                INT_MOD(sbp->sb_agcount, ARCH_CONVERT, tp->t_agcount_delta);
-	        whole = 1;
+		INT_MOD(sbp->sb_agcount, ARCH_CONVERT, tp->t_agcount_delta);
+		whole = 1;
 	}
 	if (tp->t_imaxpct_delta != 0) {
 		INT_MOD(sbp->sb_imax_pct, ARCH_CONVERT, tp->t_imaxpct_delta);
-	        whole = 1;
+		whole = 1;
 	}
 	if (tp->t_rextsize_delta != 0) {
 		INT_MOD(sbp->sb_rextsize, ARCH_CONVERT, tp->t_rextsize_delta);
-	        whole = 1;
+		whole = 1;
 	}
 	if (tp->t_rbmblocks_delta != 0) {
 		INT_MOD(sbp->sb_rbmblocks, ARCH_CONVERT, tp->t_rbmblocks_delta);
-	        whole = 1;
+		whole = 1;
 	}
 	if (tp->t_rblocks_delta != 0) {
 		INT_MOD(sbp->sb_rblocks, ARCH_CONVERT, tp->t_rblocks_delta);
-	    	whole = 1;
+		whole = 1;
 	}
 	if (tp->t_rextents_delta != 0) {
 		INT_MOD(sbp->sb_rextents, ARCH_CONVERT, tp->t_rextents_delta);
-	        whole = 1;
+		whole = 1;
 	}
 	if (tp->t_rextslog_delta != 0) {
 		INT_MOD(sbp->sb_rextslog, ARCH_CONVERT, tp->t_rextslog_delta);
-	        whole = 1;
+		whole = 1;
 	}
 
 	if (whole)
@@ -536,7 +536,7 @@ xfs_trans_unreserve_and_mod_sb(
 	rsvd = (tp->t_flags & XFS_TRANS_RESERVE) != 0;
 
 	/*
-	 * Release any reserved blocks.  Any that were allocated
+	 * Release any reserved blocks.	 Any that were allocated
 	 * will be taken back again by fdblocks_delta below.
 	 */
 	if (tp->t_blk_res > 0) {
@@ -546,7 +546,7 @@ xfs_trans_unreserve_and_mod_sb(
 	}
 
 	/*
-	 * Release any reserved real time extents .  Any that were 
+	 * Release any reserved real time extents .  Any that were
 	 * allocated will be taken back again by frextents_delta below.
 	 */
 	if (tp->t_rtx_res > 0) {
@@ -639,14 +639,14 @@ xfs_trans_unreserve_and_mod_sb(
  * xfs_trans_commit
  *
  * Commit the given transaction to the log a/synchronously.
- * 
+ *
  * XFS disk error handling mechanism is not based on a typical
  * transaction abort mechanism. Logically after the filesystem
  * gets marked 'SHUTDOWN', we can't let any new transactions
  * be durable - ie. committed to disk - because some metadata might
  * be inconsistent. In such cases, this returns an error, and the
  * caller may assume that all locked objects joined to the transaction
- * have already been unlocked as if the commit had succeeded. 
+ * have already been unlocked as if the commit had succeeded.
  * It's illegal to reference the transaction structure after this call.
  */
  /*ARGSUSED*/
@@ -664,7 +664,7 @@ xfs_trans_commit(
 	int			error;
 	int			log_flags;
 	int			sync;
-#define	XFS_TRANS_LOGVEC_COUNT	16
+#define XFS_TRANS_LOGVEC_COUNT	16
 	xfs_log_iovec_t		log_vector_fast[XFS_TRANS_LOGVEC_COUNT];
 #if defined(XLOG_NOLOG) || defined(DEBUG)
 	static xfs_lsn_t	trans_lsn = 1;
@@ -747,7 +747,7 @@ shut_us_down:
 		xfs_force_shutdown(mp, XFS_LOG_IO_ERROR);
 		goto shut_us_down;
 	}
-		
+
 
 	if (nvec <= XFS_TRANS_LOGVEC_COUNT) {
 		log_vector = log_vector_fast;
@@ -762,14 +762,14 @@ shut_us_down:
 	 * then write the transaction to the log.
 	 */
 	xfs_trans_fill_vecs(tp, log_vector);
-	
+
 	/*
 	 * Ignore errors here. xfs_log_done would do the right thing.
 	 * We need to put the ticket, etc. away.
 	 */
 	error = xfs_log_write(mp, log_vector, nvec, tp->t_ticket,
 			     &(tp->t_lsn));
-	
+
 #if defined(XLOG_NOLOG) || defined(DEBUG)
 	if (xlog_debug) {
 		commit_lsn = xfs_log_done(mp, tp->t_ticket,
@@ -799,12 +799,12 @@ shut_us_down:
 	 * If we got a log write error. Unpin the logitems that we
 	 * had pinned, clean up, free trans structure, and return error.
 	 */
-	if (error || commit_lsn == -1) { 
+	if (error || commit_lsn == -1) {
 		xfs_trans_uncommit(tp, flags|XFS_TRANS_ABORT);
 		current->flags &= ~PF_FSTRANS;
 		return XFS_ERROR(EIO);
 	}
-	
+
 	/*
 	 * Once all the items of the transaction have been copied
 	 * to the in core log we can release them.  Do that here.
@@ -829,12 +829,12 @@ shut_us_down:
 	sync = tp->t_flags & XFS_TRANS_SYNC;
 
 	/*
- 	 * Tell the LM to call the transaction completion routine
+	 * Tell the LM to call the transaction completion routine
 	 * when the log write with LSN commit_lsn completes (e.g.
 	 * when the transaction commit really hits the on-disk log).
 	 * After this call we cannot reference tp, because the call
 	 * can happen at any time and the call will free the transaction
-	 * structure pointed to by tp.  The only case where we call
+	 * structure pointed to by tp.	The only case where we call
 	 * the completion routine (xfs_trans_committed) directly is
 	 * if the log is turned off on a debug kernel or we're
 	 * running in simulation mode (the log is explicitly turned
@@ -858,7 +858,7 @@ shut_us_down:
 	 * log out now and wait for it.
 	 */
 	if (sync) {
-		error = xfs_log_force(mp, commit_lsn, 
+		error = xfs_log_force(mp, commit_lsn,
 				      XFS_LOG_FORCE | XFS_LOG_SYNC);
 		XFS_STATS_INC(xfsstats.xs_trans_sync);
 	} else {
@@ -874,8 +874,8 @@ shut_us_down:
 
 /*
  * Total up the number of log iovecs needed to commit this
- * transaction.  The transaction itself needs one for the
- * transaction header.  Ask each dirty item in turn how many
+ * transaction.	 The transaction itself needs one for the
+ * transaction header.	Ask each dirty item in turn how many
  * it needs to get the total.
  */
 STATIC uint
@@ -923,7 +923,7 @@ xfs_trans_uncommit(
 {
 	xfs_log_item_desc_t	*lidp;
 
-	for (lidp = xfs_trans_first_item(tp); 
+	for (lidp = xfs_trans_first_item(tp);
 	     lidp != NULL;
 	     lidp = xfs_trans_next_item(tp, lidp)) {
 		/*
@@ -937,7 +937,7 @@ xfs_trans_uncommit(
 	if (tp->t_dqinfo && (tp->t_flags & XFS_TRANS_DQ_DIRTY)) {
 		xfs_trans_unreserve_and_mod_dquots(tp);
 	}
-	
+
 	xfs_trans_free_items(tp, flags);
 	xfs_trans_free_busy(tp);
 	xfs_trans_free(tp);
@@ -945,7 +945,7 @@ xfs_trans_uncommit(
 
 /*
  * Fill in the vector with pointers to data to be logged
- * by this transaction.  The transaction header takes
+ * by this transaction.	 The transaction header takes
  * the first vector, and then each dirty item takes the
  * number of vectors it indicated it needed in xfs_trans_count_vecs().
  *
@@ -959,7 +959,7 @@ xfs_trans_fill_vecs(
 {
 	xfs_log_item_desc_t	*lidp;
 	xfs_log_iovec_t		*vecp;
-	uint			nitems;			
+	uint			nitems;
 
 	/*
 	 * Skip over the entry for the transaction header, we'll
@@ -1024,21 +1024,21 @@ xfs_trans_cancel(
 	xfs_log_item_t		*lip;
 	int			i;
 #endif
-	
+
 	/*
 	 * See if the caller is being too lazy to figure out if
 	 * the transaction really needs an abort.
 	 */
 	if ((flags & XFS_TRANS_ABORT) && !(tp->t_flags & XFS_TRANS_DIRTY))
 		flags &= ~XFS_TRANS_ABORT;
-	/* 
+	/*
 	 * See if the caller is relying on us to shut down the
-	 * filesystem.  This happens in paths where we detect
+	 * filesystem.	This happens in paths where we detect
 	 * corruption and decide to give up.
 	 */
 	if ((tp->t_flags & XFS_TRANS_DIRTY) &&
 	    !XFS_FORCED_SHUTDOWN(tp->t_mountp))
-		xfs_force_shutdown(tp->t_mountp, XFS_CORRUPT_INCORE); 
+		xfs_force_shutdown(tp->t_mountp, XFS_CORRUPT_INCORE);
 #ifdef DEBUG
 	if (!(flags & XFS_TRANS_ABORT)) {
 		licp = &(tp->t_items);
@@ -1058,7 +1058,7 @@ xfs_trans_cancel(
 	}
 #endif
 	xfs_trans_unreserve_and_mod_sb(tp);
-		
+
 	if (tp->t_dqinfo && (tp->t_flags & XFS_TRANS_DQ_DIRTY))
 		xfs_trans_unreserve_and_mod_dquots(tp);
 
@@ -1243,7 +1243,7 @@ xfs_trans_chunk_committed(
 		 * same item could complete first with a higher lsn.
 		 * This would cause the earlier transaction to fail
 		 * the test below.
-		 */ 
+		 */
 		mp = lip->li_mountp;
 		AIL_LOCK(mp,s);
 		if (XFS_LSN_CMP(item_lsn, lip->li_lsn) > 0) {

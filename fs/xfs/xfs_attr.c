@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -71,7 +71,7 @@ STATIC int xfs_attr_rmtval_set(xfs_da_args_t *args);
 STATIC int xfs_attr_rmtval_remove(xfs_da_args_t *args);
 
 #define ATTR_RMTVALUE_MAPSIZE	1	/* # of map entries at once */
-#define ATTR_RMTVALUE_TRANSBLKS	8	/* max # of blks in a transaction */
+#define ATTR_RMTVALUE_TRANSBLKS 8	/* max # of blks in a transaction */
 
 #if defined(DEBUG)
 ktrace_t *xfs_attr_trace_buf;
@@ -85,12 +85,12 @@ ktrace_t *xfs_attr_trace_buf;
 
 /*ARGSUSED*/
 int								/* error */
-xfs_attr_get(bhv_desc_t *bdp, char *name, char *value, int *valuelenp, 
+xfs_attr_get(bhv_desc_t *bdp, char *name, char *value, int *valuelenp,
 	     int flags, struct cred *cred)
 {
-	xfs_da_args_t   args;
-	int             error;
-        int             namelen;
+	xfs_da_args_t	args;
+	int		error;
+	int		namelen;
 	xfs_inode_t	*ip = XFS_BHVTOI(bdp);
 
 	if (!name)
@@ -114,7 +114,7 @@ xfs_attr_get(bhv_desc_t *bdp, char *name, char *value, int *valuelenp,
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 	if ((error = xfs_iaccess(XFS_BHVTOI(bdp), IREAD, cred))) {
 		xfs_iunlock(ip, XFS_ILOCK_SHARED);
-                return(XFS_ERROR(error));
+		return(XFS_ERROR(error));
 	}
 
 	/*
@@ -162,20 +162,20 @@ int								/* error */
 xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 		     struct cred *cred)
 {
-	xfs_da_args_t 	args;
-	xfs_inode_t 	*dp;
-	xfs_fsblock_t 	firstblock;
+	xfs_da_args_t	args;
+	xfs_inode_t	*dp;
+	xfs_fsblock_t	firstblock;
 	xfs_bmap_free_t flist;
-	int 		error, err2, committed;
+	int		error, err2, committed;
 	int		local, size;
-	uint	      	nblks;
+	uint		nblks;
 	xfs_mount_t	*mp;
-	int             rsvd = (flags & ATTR_ROOT) != 0;
-        int             namelen;
+	int		rsvd = (flags & ATTR_ROOT) != 0;
+	int		namelen;
 
-        ASSERT(MAXNAMELEN-1 <= 0xff); /* length is stored in uint8 */
-        namelen = strlen(name);
-        if (namelen >= MAXNAMELEN)
+	ASSERT(MAXNAMELEN-1 <= 0xff); /* length is stored in uint8 */
+	namelen = strlen(name);
+	if (namelen >= MAXNAMELEN)
 		return EFAULT; /* match irix behaviour */
 
 	XFS_STATS_INC(xfsstats.xs_attr_set);
@@ -190,7 +190,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	xfs_ilock(dp, XFS_ILOCK_SHARED);
 	if ((error = xfs_iaccess(dp, IWRITE, cred))) {
 		xfs_iunlock(dp, XFS_ILOCK_SHARED);
-                return(XFS_ERROR(error));
+		return(XFS_ERROR(error));
 	}
 	xfs_iunlock(dp, XFS_ILOCK_SHARED);
 
@@ -201,7 +201,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 		if ((error = xfs_qm_dqattach(dp, 0)))
 			return (error);
 	}
-	
+
 	/*
 	 * If the inode doesn't have an attribute fork, add one.
 	 * (inode must not be locked when we call this routine)
@@ -264,7 +264,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	args.trans = xfs_trans_alloc(mp, XFS_TRANS_ATTR_SET);
 
 	/*
-	 * Root fork attributes can use reserved data blocks for this 
+	 * Root fork attributes can use reserved data blocks for this
 	 * operation if necessary
 	 */
 
@@ -306,7 +306,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	    ((dp->i_d.di_aformat == XFS_DINODE_FMT_EXTENTS) &&
 	     (dp->i_d.di_anextents == 0))) {
 
-		/* 
+		/*
 		 * Build initial attribute list (if required).
 		 */
 		if (dp->i_d.di_aformat == XFS_DINODE_FMT_EXTENTS)
@@ -332,7 +332,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 			if (mp->m_flags & XFS_MOUNT_WSYNC) {
 				xfs_trans_set_sync(args.trans);
 			}
-			err2 = xfs_trans_commit(args.trans, 
+			err2 = xfs_trans_commit(args.trans,
 						 XFS_TRANS_RELEASE_LOG_RES,
 						 NULL);
 			xfs_iunlock(dp, XFS_ILOCK_EXCL);
@@ -378,7 +378,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 		 */
 		if ((error = xfs_attr_rolltrans(&args.trans, dp)))
 			goto out;
-			
+
 	}
 
 	if (xfs_bmap_one_block(dp, XFS_ATTR_FORK)) {
@@ -431,19 +431,19 @@ out:
 int								/* error */
 xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 {
-	xfs_da_args_t       args;
-	xfs_inode_t         *dp;
-	xfs_fsblock_t       firstblock;
-	xfs_bmap_free_t     flist;
-	int                 error;
-	xfs_mount_t         *mp;
-        int                 namelen;
+	xfs_da_args_t	    args;
+	xfs_inode_t	    *dp;
+	xfs_fsblock_t	    firstblock;
+	xfs_bmap_free_t	    flist;
+	int		    error;
+	xfs_mount_t	    *mp;
+	int		    namelen;
 
 	ASSERT(MAXNAMELEN-1<=0xff); /* length is stored in uint8 */
 	namelen = strlen(name);
 	if (namelen>=MAXNAMELEN)
 		return EFAULT; /* match irix behaviour */
-        
+
 	XFS_STATS_INC(xfsstats.xs_attr_remove);
 
 	/*
@@ -456,15 +456,15 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 
 	xfs_ilock(dp, XFS_ILOCK_SHARED);
 	if ((error = xfs_iaccess(dp, IWRITE, cred))) {
-		xfs_iunlock(dp, XFS_ILOCK_SHARED);	
-                return(XFS_ERROR(error));
+		xfs_iunlock(dp, XFS_ILOCK_SHARED);
+		return(XFS_ERROR(error));
 	} else if (XFS_IFORK_Q(dp) == 0 ||
 		   (dp->i_d.di_aformat == XFS_DINODE_FMT_EXTENTS &&
 		    dp->i_d.di_anextents == 0)) {
 		xfs_iunlock(dp, XFS_ILOCK_SHARED);
 		return(XFS_ERROR(ENOATTR));
 	}
-	xfs_iunlock(dp, XFS_ILOCK_SHARED);	
+	xfs_iunlock(dp, XFS_ILOCK_SHARED);
 
 	/*
 	 * Fill in the arg structure for this request.
@@ -502,7 +502,7 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	args.trans = xfs_trans_alloc(mp, XFS_TRANS_ATTR_RM);
 
 	/*
-	 * Root fork attributes can use reserved data blocks for this 
+	 * Root fork attributes can use reserved data blocks for this
 	 * operation if necessary
 	 */
 
@@ -516,11 +516,11 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 				      XFS_ATTRRM_LOG_COUNT))) {
 		xfs_trans_cancel(args.trans, 0);
 		return(error);
-	
+
 	}
 
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
-	/* 
+	/*
 	 * No need to make quota reservations here. We expect to release some
 	 * blocks not allocate in the common case.
 	 */
@@ -586,7 +586,7 @@ out:
 
 /*
  * Generate a list of extended attribute names and optionally
- * also value lengths.  Positive return value follows the XFS
+ * also value lengths.	Positive return value follows the XFS
  * convention of being an error, zero or negative return code
  * is the length of the buffer returned (negated), indicating
  * success.
@@ -628,7 +628,7 @@ xfs_attr_list(bhv_desc_t *bdp, char *buffer, int bufsize, int flags,
 	context.resynch = 1;
 	context.flags = flags;
 	if (!(flags & ATTR_KERNAMELS)) {
-		context.bufsize = (bufsize & ~(sizeof(int)-1));  /* align */
+		context.bufsize = (bufsize & ~(sizeof(int)-1));	 /* align */
 		context.firstu = context.bufsize;
 		context.alist = (attrlist_t *)buffer;
 		context.alist->al_count = 0;
@@ -723,7 +723,7 @@ xfs_attr_inactive(xfs_inode_t *dp)
 	}
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
 
-	/* 
+	/*
 	 * No need to make quota reservations here. We expect to release some
 	 * blocks, not allocate, in the common case.
 	 */
@@ -1002,7 +1002,7 @@ xfs_attr_leaf_addname(xfs_da_args_t *args)
 		 * Commit the remove and start the next trans in series.
 		 */
 		error = xfs_attr_rolltrans(&args->trans, dp);
-		
+
 	} else if (args->rmtblkno > 0) {
 		/*
 		 * Added a "remote" value, just clear the incomplete flag.
@@ -1193,7 +1193,7 @@ restart:
 		args->rmtblkno = 0;
 		args->rmtblkcnt = 0;
 	}
-		
+
 	retval = xfs_attr_leaf_add(blk->bp, state->args);
 	if (retval == ENOSPC) {
 		if (state->path.active == 1) {
@@ -1273,7 +1273,7 @@ restart:
 	}
 
 	/*
-	 * Kill the state structure, we're done with it and need to 
+	 * Kill the state structure, we're done with it and need to
 	 * allow the buffers to come back later.
 	 */
 	xfs_da_state_free(state);
@@ -1717,7 +1717,7 @@ xfs_attr_node_get(xfs_da_args_t *args)
 		}
 	}
 
-	/* 
+	/*
 	 * If not in a transaction, we have to release all the buffers.
 	 */
 	for (i = 0; i < state->path.active; i++) {
@@ -2114,7 +2114,7 @@ xfs_attr_rmtval_remove(xfs_da_args_t *args)
 		}
 
 		valuelen -= map.br_blockcount;
-		
+
 		lblkno += map.br_blockcount;
 	}
 

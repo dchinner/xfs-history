@@ -2,33 +2,33 @@
  * XFS filesystem operations.
  *
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -54,7 +54,7 @@ extern void cxfs_unmount(mp);
  * xfs_init
  *
  * This is called through the vfs switch at system initialization
- * to initialize any global state associated with XFS.  All we
+ * to initialize any global state associated with XFS.	All we
  * need to do currently is save the type given to XFS in xfs_fstype.
  *
  * vswp -- pointer to the XFS entry in the vfs switch table
@@ -73,17 +73,17 @@ xfs_init(int	fstype)
 	extern xfs_zone_t	*xfs_efd_zone;
 	extern xfs_zone_t	*xfs_efi_zone;
 	extern xfs_zone_t	*xfs_dabuf_zone;
-	extern mutex_t	        xfs_uuidtabmon;
+	extern mutex_t		xfs_uuidtabmon;
 #ifdef DEBUG_NOT
-	extern ktrace_t	        *xfs_alloc_trace_buf;
-	extern ktrace_t	        *xfs_bmap_trace_buf;
-	extern ktrace_t	        *xfs_bmbt_trace_buf;
-	extern ktrace_t	        *xfs_dir_trace_buf;
-	extern ktrace_t	        *xfs_attr_trace_buf;
-	extern ktrace_t	        *xfs_dir2_trace_buf;
+	extern ktrace_t		*xfs_alloc_trace_buf;
+	extern ktrace_t		*xfs_bmap_trace_buf;
+	extern ktrace_t		*xfs_bmbt_trace_buf;
+	extern ktrace_t		*xfs_dir_trace_buf;
+	extern ktrace_t		*xfs_attr_trace_buf;
+	extern ktrace_t		*xfs_dir2_trace_buf;
 #endif	/* DEBUG */
 #ifdef XFS_DABUF_DEBUG
-	extern lock_t	        xfs_dabuf_global_lock;
+	extern lock_t		xfs_dabuf_global_lock;
 #endif
 	extern int		xfs_refcache_size;
 
@@ -116,7 +116,7 @@ xfs_init(int	fstype)
 	xfs_buf_item_zone =
 		kmem_zone_init((sizeof(xfs_buf_log_item_t) +
 				(((XFS_MAX_BLOCKSIZE / XFS_BLI_CHUNK) /
-                                  NBWORD) * sizeof(int))),
+				  NBWORD) * sizeof(int))),
 			       "xfs_buf_item");
 	xfs_efd_zone = kmem_zone_init((sizeof(xfs_efd_log_item_t) +
 				       ((XFS_EFD_MAX_FAST_EXTENTS - 1) * sizeof(xfs_extent_t))),
@@ -131,10 +131,10 @@ xfs_init(int	fstype)
 	_ACL_ZONE_INIT(xfs_acl_zone, "xfs_acl");
 
 #ifdef CONFIG_XFS_VNODE_TRACING
-        ktrace_init(VNODE_TRACE_SIZE);
+	ktrace_init(VNODE_TRACE_SIZE);
 #else
 #ifdef DEBUG
-        ktrace_init(64);
+	ktrace_init(64);
 #endif
 #endif
 
@@ -161,9 +161,9 @@ xfs_init(int	fstype)
 #endif
 
 	xfs_dir_startup();
-	
+
 	/*
-         * Special initialization for cxfs
+	 * Special initialization for cxfs
 	 */
 	cxfs_arrinit();
 
@@ -202,7 +202,7 @@ xfs_cleanup(void)
 	xfs_cleanup_procfs();
 	xfs_sysctl_unregister();
 	if (xfs_refcache) {
-		kmem_free(xfs_refcache, 
+		kmem_free(xfs_refcache,
 			XFS_REFCACHE_SIZE_MAX * sizeof(xfs_inode_t *));
 	}
 
@@ -222,7 +222,7 @@ xfs_cleanup(void)
 	_XQM_ZONE_DESTROY(qm_dqtrxzone);
 	_ACL_ZONE_DESTROY(xfs_acl_zone);
 #if  (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
-        ktrace_uninit();
+	ktrace_uninit();
 #endif
 }
 
@@ -237,12 +237,12 @@ xfs_cmountfs(
 	kdev_t		ddev,
 	kdev_t		logdev,
 	kdev_t		rtdev,
-	struct xfs_args	*ap,
+	struct xfs_args *ap,
 	struct cred	*cr)
 {
 	xfs_mount_t	*mp;
 	int		error = 0;
-	int             client = 0;
+	int		client = 0;
 	int		vfs_flags;
 
 	mp = xfs_get_vfsmount(vfsp, ddev, logdev, rtdev);
@@ -346,11 +346,11 @@ xfs_cmountfs(
 #endif
 		if (ap->flags & XFSMNT_NOATIME)
 			mp->m_flags |= XFS_MOUNT_NOATIME;
-		
-		if (ap->flags & (XFSMNT_UQUOTA | XFSMNT_GQUOTA | 
-				 XFSMNT_QUOTAMAYBE)) 
+
+		if (ap->flags & (XFSMNT_UQUOTA | XFSMNT_GQUOTA |
+				 XFSMNT_QUOTAMAYBE))
 			xfs_qm_mount_quotainit(mp, ap->flags);
-		
+
 		if (ap->flags & XFSMNT_RETERR)
 			mp->m_flags |= XFS_MOUNT_RETERR;
 
@@ -392,10 +392,10 @@ xfs_cmountfs(
 			mp->m_flags |= XFS_MOUNT_NORECOVERY;
 		}
 
-		if (ap->flags & XFSMNT_NOUUID) 
-			mp->m_flags |= XFS_MOUNT_NOUUID; 
+		if (ap->flags & XFSMNT_NOUUID)
+			mp->m_flags |= XFS_MOUNT_NOUUID;
 		if (ap->flags & XFSMNT_NOLOGFLUSH)
-			mp->m_flags |= XFS_MOUNT_NOLOGFLUSH; 
+			mp->m_flags |= XFS_MOUNT_NOLOGFLUSH;
 	}
 
 	/*
@@ -503,7 +503,7 @@ xfs_cmountfs(
 	}
  error2:
 	if (error) {
-	        cxfs_unmount(mp);
+		cxfs_unmount(mp);
 		xfs_mount_free(mp, 1);
 	}
 	return error;
@@ -550,7 +550,7 @@ xfs_get_vfsmount(
  *	(1) device (partition) with data and internal log
  *	(2) logical volume with data and log subvolumes.
  *	(3) logical volume with data, log, and realtime subvolumes.
- */ 
+ */
 STATIC int
 xfs_mount(
 	vfs_t		*vfsp,
@@ -558,7 +558,7 @@ xfs_mount(
 	struct mounta	*uap,
 	cred_t		*credp)
 {
-	struct xfs_args	*args;
+	struct xfs_args *args;
 	kdev_t		ddev;
 	kdev_t		logdev;
 	kdev_t		rtdev;
@@ -578,13 +578,13 @@ xfs_mount(
 /*ARGSUSED*/
 STATIC int
 xfs_vfsmount(
-	vfs_t           *vfsp,
-        vnode_t         *mvp,
-        struct mounta   *uap,
-	char 		*attrs,
-        cred_t          *credp)
+	vfs_t		*vfsp,
+	vnode_t		*mvp,
+	struct mounta	*uap,
+	char		*attrs,
+	cred_t		*credp)
 {
-        int		error;
+	int		error;
 
 	vfs_lock(vfsp);
 	error = xfs_mount(vfsp, mvp, uap, credp);
@@ -625,7 +625,7 @@ xfs_ibusy(
 		vp = XFS_ITOV_NULL(ip);
 
 		if (vp && vn_count(vp) != 0) {
-		  	if (xfs_ibusy_check(ip, vn_count(vp)) == 0) {
+			if (xfs_ibusy_check(ip, vn_count(vp)) == 0) {
 				ip = ip->i_mnext;
 				continue;
 			}
@@ -637,7 +637,7 @@ xfs_ibusy(
 		}
 		ip = ip->i_mnext;
 	} while ((ip != mp->m_inodes) && !busy);
-	
+
 	XFS_MOUNT_IUNLOCK(mp);
 
 	return busy;
@@ -654,7 +654,7 @@ xfs_unmount(
 	xfs_inode_t	*rip;
 	vnode_t		*rvp = 0;
 	int		vfs_flags;
-	struct vfs 	*vfsp = bhvtovfs(bdp);
+	struct vfs	*vfsp = bhvtovfs(bdp);
 	int		unmount_event_wanted = 0;
 	int		unmount_event_flags = 0;
 	int		xfs_unmountfs_needed = 0;
@@ -695,7 +695,7 @@ xfs_unmount(
 		printk("xfs_unmount: xfs_ibusy says error/%d\n", error);
 		goto out;
 	}
-	
+
 	XFS_bflush(mp->m_ddev_targ);
 	error = xfs_unmount_flush(mp, 0);
 	if (error)
@@ -722,7 +722,7 @@ xfs_unmount(
 			 (SYNC_WAIT | SYNC_CLOSE), credp);
 		ASSERT(error != EFSCORRUPTED);
 	}
-	xfs_unmountfs_needed = 1;	
+	xfs_unmountfs_needed = 1;
 
 out:
 	/*	Send DMAPI event, if required.
@@ -730,7 +730,7 @@ out:
 	 *	Then return error (or zero).
 	 */
 	if (unmount_event_wanted) {
-		/* Note: mp structure must still exist for 
+		/* Note: mp structure must still exist for
 		 * dm_send_unmount_event() call.
 		 */
 		dm_send_unmount_event(vfsp, error == 0 ? rvp : NULL,
@@ -749,21 +749,21 @@ out:
 }
 
 /*
- * xfs_unmount_flush implements a set of flush operation on special 
+ * xfs_unmount_flush implements a set of flush operation on special
  * inodes, which are needed as a separate set of operations so that
  * they can be called as part of relocation process.
  */
-int 
+int
 xfs_unmount_flush(
-	xfs_mount_t	*mp,		/* Mount structure we are getting 
+	xfs_mount_t	*mp,		/* Mount structure we are getting
 					   rid of. */
-	int             relocation)	/* Called from vfs relocation. */
+	int		relocation)	/* Called from vfs relocation. */
 {
 	xfs_inode_t	*rip = mp->m_rootip;
-        xfs_inode_t     *rbmip;
-	xfs_inode_t     *rsumip=NULL;
-	vnode_t         *rvp = XFS_ITOV(rip);
-	int             error;
+	xfs_inode_t	*rbmip;
+	xfs_inode_t	*rsumip=NULL;
+	vnode_t		*rvp = XFS_ITOV(rip);
+	int		error;
 
 	xfs_ilock(rip, XFS_ILOCK_EXCL);
 	xfs_iflock(rip);
@@ -837,17 +837,17 @@ fscorrupt_out2:
  * xfs_root extracts the root vnode from a vfs.
  *
  * vfsp -- the vfs struct for the desired file system
- * vpp  -- address of the caller's vnode pointer which should be
- *         set to the desired fs root vnode
+ * vpp	-- address of the caller's vnode pointer which should be
+ *	   set to the desired fs root vnode
  */
 STATIC int
 xfs_root(
 	bhv_desc_t	*bdp,
 	vnode_t		**vpp)
 {
-	vnode_t	*vp;
+	vnode_t *vp;
 
-	vp = XFS_ITOV((XFS_BHVTOM(bdp))->m_rootip);	
+	vp = XFS_ITOV((XFS_BHVTOM(bdp))->m_rootip);
 	VN_HOLD(vp);
 	*vpp = vp;
 
@@ -920,24 +920,24 @@ xfs_statvfs(
  * vfs_sync() so that items at the tail of the log are always moving out.
  *
  * Flags:
- *      SYNC_BDFLUSH - We're being called from vfs_sync() so we don't want
+ *	SYNC_BDFLUSH - We're being called from vfs_sync() so we don't want
  *		       to sleep if we can help it.  All we really need
  *		       to do is ensure that the log is synced at least
  *		       periodically.  We also push the inodes and
  *		       superblock if we can lock them without sleeping
  *			and they are not pinned.
- *      SYNC_ATTR    - We need to flush the inodes.  If SYNC_BDFLUSH is not
+ *	SYNC_ATTR    - We need to flush the inodes.  If SYNC_BDFLUSH is not
  *		       set, then we really want to lock each inode and flush
  *		       it.
- *      SYNC_WAIT    - All the flushes that take place in this call should
+ *	SYNC_WAIT    - All the flushes that take place in this call should
  *		       be synchronous.
- *      SYNC_DELWRI  - This tells us to push dirty pages associated with
- *		       inodes.  SYNC_WAIT and SYNC_BDFLUSH are used to
+ *	SYNC_DELWRI  - This tells us to push dirty pages associated with
+ *		       inodes.	SYNC_WAIT and SYNC_BDFLUSH are used to
  *		       determine if they should be flushed sync, async, or
  *		       delwri.
- *      SYNC_CLOSE   - This flag is passed when the system is being
+ *	SYNC_CLOSE   - This flag is passed when the system is being
  *		       unmounted.  We should sync and invalidate everthing.
- *      SYNC_FSDATA  - This indicates that the caller would like to make
+ *	SYNC_FSDATA  - This indicates that the caller would like to make
  *		       sure the superblock is safe on disk.  We can ensure
  *		       this by simply makeing sure the log gets flushed
  *		       if SYNC_BDFLUSH is set, and by actually writing it
@@ -961,23 +961,23 @@ xfs_sync(
  * xfs sync routine for internal use
  *
  * This routine supports all of the flags defined for the generic VFS_SYNC
- * interface as explained above under xys_sync.  In the interests of not
+ * interface as explained above under xys_sync.	 In the interests of not
  * changing interfaces within the 6.5 family, additional internallly-
  * required functions are specified within a separate xflags parameter,
  * only available by calling this routine.
  *
  * xflags:
- * 	XFS_XSYNC_RELOC - Sync for relocation.  Don't try to get behavior
- *                        locks as this will cause you to hang.  Not all
- *                        combinations of flags are necessarily supported
- *                        when this is specified.
+ *	XFS_XSYNC_RELOC - Sync for relocation.	Don't try to get behavior
+ *			  locks as this will cause you to hang.	 Not all
+ *			  combinations of flags are necessarily supported
+ *			  when this is specified.
  */
 int
 xfs_syncsub(
 	xfs_mount_t	*mp,
 	int		flags,
-	int             xflags,
-	int             *bypassed)
+	int		xflags,
+	int		*bypassed)
 {
 	xfs_inode_t	*ip = NULL;
 	xfs_inode_t	*ip_next;
@@ -1012,7 +1012,7 @@ xfs_syncsub(
  * must be locked when this is called. After the call the list will no
  * longer be locked.
  */
-#define IPOINTER_INSERT(ip, mp)	{ \
+#define IPOINTER_INSERT(ip, mp) { \
 		ASSERT(ipointer_in == B_FALSE); \
 		ipointer->ip_mnext = ip->i_mnext; \
 		ipointer->ip_mprev = ip; \
@@ -1029,7 +1029,7 @@ xfs_syncsub(
  * the whole list. If we are the current head of the list then move the head
  * past us.
  */
-#define IPOINTER_REMOVE(ip, mp)	{ \
+#define IPOINTER_REMOVE(ip, mp) { \
 		ASSERT(ipointer_in == B_TRUE); \
 		if (ipointer->ip_mnext != (xfs_inode_t *)ipointer) { \
 			ip = ipointer->ip_mnext; \
@@ -1164,7 +1164,7 @@ xfs_syncsub(
 		 * then we can skip inodes for which it looks like
 		 * there is nothing to do.  Since we don't have the
 		 * inode locked this is racey, but these are periodic
-		 * calls so it doesn't matter.  For the others we want
+		 * calls so it doesn't matter.	For the others we want
 		 * to know for sure, so we at least try to lock them.
 		 */
 		if (flags & SYNC_BDFLUSH) {
@@ -1191,7 +1191,7 @@ xfs_syncsub(
 		 * lock in xfs_ireclaim() after the inode is pulled from
 		 * the mount list will sleep until we release it here.
 		 * This keeps the vnode from being freed while we reference
-		 * it.  It is also cheaper and simpler than actually doing
+		 * it.	It is also cheaper and simpler than actually doing
 		 * a vn_get() for every inode we touch here.
 		 */
 		if (xfs_ilock_nowait(ip, lock_flags) == 0) {
@@ -1255,14 +1255,14 @@ xfs_syncsub(
 			 *
 			 * We don't set the VREMAPPING bit in the vnode
 			 * here, because we don't hold the vnode lock
-			 * exclusively.  It doesn't really matter, though,
+			 * exclusively.	 It doesn't really matter, though,
 			 * because we only come here when we're shutting
 			 * down anyway.
 			 */
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
 			if (XFS_FORCED_SHUTDOWN(mp)) {
-                                if (xflags & XFS_XSYNC_RELOC) {
+				if (xflags & XFS_XSYNC_RELOC) {
 					fs_tosspages(XFS_ITOBHV(ip), 0, -1,
 						     FI_REMAPF);
 				}
@@ -1270,7 +1270,7 @@ xfs_syncsub(
 					VOP_TOSS_PAGES(vp, 0, -1, FI_REMAPF);
 				}
 			} else {
-                                if (xflags & XFS_XSYNC_RELOC) {
+				if (xflags & XFS_XSYNC_RELOC) {
 					fs_flushinval_pages(XFS_ITOBHV(ip),
 							    0, -1, FI_REMAPF);
 				}
@@ -1474,7 +1474,7 @@ xfs_syncsub(
 			/*
 			 * If we had to take a reference on the vnode
 			 * above, then wait until after we've unlocked
-			 * the inode to release the reference.  This is
+			 * the inode to release the reference.	This is
 			 * because we can be already holding the inode
 			 * lock when VN_RELE() calls xfs_inactive().
 			 *
@@ -1612,7 +1612,7 @@ xfs_syncsub(
 
 	/*
 	 * If this is the 30 second sync, then kick some entries out of
-	 * the reference cache.  This ensures that idle entries are
+	 * the reference cache.	 This ensures that idle entries are
 	 * eventually kicked out of the cache.
 	 */
 	if (flags & SYNC_BDFLUSH) {
@@ -1674,8 +1674,8 @@ xfs_vget(
 	vnode_t		**vpp,
 	fid_t		*fidp)
 {
-        xfs_fid_t	*xfid;
-        xfs_inode_t	*ip;
+	xfs_fid_t	*xfid;
+	xfs_inode_t	*ip;
 	int		error;
 	xfs_ino_t	ino;
 	unsigned int	igen;
@@ -1701,27 +1701,27 @@ xfs_vget(
 		*vpp = NULL;
 		return error;
 	}
-        if (ip == NULL) {
-                *vpp = NULL;
-                return XFS_ERROR(EIO);
-        }
+	if (ip == NULL) {
+		*vpp = NULL;
+		return XFS_ERROR(EIO);
+	}
 
 	if (ip->i_d.di_mode == 0 || (igen && (ip->i_d.di_gen != igen))) {
 		xfs_iput_new(ip, XFS_ILOCK_SHARED);
 		*vpp = NULL;
 		return XFS_ERROR(ENOENT);
-        }
+	}
 
-        *vpp = XFS_ITOV(ip);
+	*vpp = XFS_ITOV(ip);
 	inode = LINVFS_GET_IP((*vpp));
-        xfs_iunlock(ip, XFS_ILOCK_SHARED);
+	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
 	error = linvfs_revalidate_core(inode, ATTR_COMM);
 	if (error) {
 		iput(inode);
 		return XFS_ERROR(error);
 	}
-        return 0;
+	return 0;
 }
 
 

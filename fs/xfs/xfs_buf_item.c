@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -40,14 +40,14 @@
 #include <xfs.h>
 
 
-#define	ROUNDUPNBWORD(x)	(((x) + (NBWORD - 1)) & ~(NBWORD - 1))
+#define ROUNDUPNBWORD(x)	(((x) + (NBWORD - 1)) & ~(NBWORD - 1))
 
 xfs_zone_t	*xfs_buf_item_zone;
 
 #ifdef XFS_TRANS_DEBUG
 /*
  * This function uses an alternate strategy for tracking the bytes
- * that the user requests to be logged.  This can then be used
+ * that the user requests to be logged.	 This can then be used
  * in conjunction with the bli_orig array in the buf log item to
  * catch bugs in our callers' code.
  *
@@ -73,7 +73,7 @@ xfs_buf_item_log_debug(
 	byte = first;
 	nbytes = last - first + 1;
 	bfset(bip->bli_logged, first, nbytes);
-	for (x = 0; x < nbytes; x++) { 
+	for (x = 0; x < nbytes; x++) {
 		chunk_num = byte >> XFS_BLI_SHIFT;
 		word_num = chunk_num >> BIT_TO_WORD_SHIFT;
 		bit_num = chunk_num & (NBWORD - 1);
@@ -86,7 +86,7 @@ xfs_buf_item_log_debug(
 
 /*
  * This function is called when we flush something into a buffer without
- * logging it.  This happens for things like inodes which are logged
+ * logging it.	This happens for things like inodes which are logged
  * separately from the buffer.
  */
 void
@@ -143,7 +143,7 @@ xfs_buf_item_log_check(
 }
 #else
 #define		xfs_buf_item_log_debug(x,y,z)
-#define 	xfs_buf_item_log_check(x)
+#define		xfs_buf_item_log_check(x)
 #endif
 
 STATIC void	xfs_buf_error_relse(xfs_buf_t *bp);
@@ -186,10 +186,10 @@ xfs_buf_item_size(
 					 bip->bli_format.blf_map_size, 0);
 	ASSERT(last_bit != -1);
 	nvecs++;
-	while (last_bit != -1) {	
+	while (last_bit != -1) {
 		/*
 		 * This takes the bit number to start looking from and
-		 * returns the next set bit from there.  It returns -1
+		 * returns the next set bit from there.	 It returns -1
 		 * if there are no more bits set or the start bit is
 		 * beyond the end of the bitmap.
 		 */
@@ -204,12 +204,12 @@ xfs_buf_item_size(
 		if (next_bit == -1) {
 			last_bit = -1;
 		} else if (next_bit != last_bit + 1) {
-			last_bit = next_bit;	
+			last_bit = next_bit;
 			nvecs++;
 		} else if (xfs_buf_offset(bp, next_bit * XFS_BLI_CHUNK) !=
 			   (xfs_buf_offset(bp, last_bit * XFS_BLI_CHUNK) +
 			    XFS_BLI_CHUNK)) {
-			last_bit = next_bit;	
+			last_bit = next_bit;
 			nvecs++;
 		} else {
 			last_bit++;
@@ -222,7 +222,7 @@ xfs_buf_item_size(
 
 /*
  * This is called to fill in the vector of log iovecs for the
- * given log buf item.  It fills the first entry with a buf log
+ * given log buf item.	It fills the first entry with a buf log
  * format structure, and the rest point to contiguous chunks
  * within the buffer.
  */
@@ -233,7 +233,7 @@ xfs_buf_item_format(
 {
 	uint		base_size;
 	uint		nvecs;
-	xfs_log_iovec_t	*vecp;
+	xfs_log_iovec_t *vecp;
 	xfs_buf_t	*bp;
 	int		first_bit;
 	int		last_bit;
@@ -286,7 +286,7 @@ xfs_buf_item_format(
 	for (;;) {
 		/*
 		 * This takes the bit number to start looking from and
-		 * returns the next set bit from there.  It returns -1
+		 * returns the next set bit from there.	 It returns -1
 		 * if there are no more bits set or the start bit is
 		 * beyond the end of the bitmap.
 		 */
@@ -315,7 +315,7 @@ xfs_buf_item_format(
 			nvecs++;
 			vecp++;
 			first_bit = next_bit;
-			last_bit = next_bit;	
+			last_bit = next_bit;
 			nbits = 1;
 		} else if (xfs_buf_offset(bp, next_bit * XFS_BLI_CHUNK) !=
 			   (xfs_buf_offset(bp, last_bit * XFS_BLI_CHUNK) +
@@ -343,7 +343,7 @@ xfs_buf_item_format(
 
 /*
  * This is called to pin the buffer associated with the buf log
- * item in memory so it cannot be written out.  Simply call bpin()
+ * item in memory so it cannot be written out.	Simply call bpin()
  * on the buffer to do this.
  */
 void
@@ -597,9 +597,9 @@ xfs_buf_item_unlock(
  * buf log item in the on disk log resides now that the last log
  * write of it completed at the given lsn.
  * We always re-log all the dirty data in a buffer, so usually the
- * latest copy in the on disk log is the only one that matters.  For
+ * latest copy in the on disk log is the only one that matters.	 For
  * those cases we simply return the given lsn.
- * 
+ *
  * The one exception to this is for buffers full of newly allocated
  * inodes.  These buffers are only relogged with the XFS_BLI_INODE_BUF
  * flag set, indicating that only the di_next_unlinked fields from the
@@ -633,7 +633,7 @@ void
 xfs_buf_item_abort(
 	xfs_buf_log_item_t	*bip)
 {
-	xfs_buf_t 	*bp;
+	xfs_buf_t	*bp;
 
 	bp = bip->bli_buf;
 	xfs_buftrace("XFS_ABORT", bp);
@@ -645,7 +645,7 @@ xfs_buf_item_abort(
 /*
  * This is called to asynchronously write the buffer associated with this
  * buf log item out to disk. The buffer will already have been locked by
- * a successful call to xfs_buf_item_trylock().  If the buffer still has
+ * a successful call to xfs_buf_item_trylock().	 If the buffer still has
  * B_DELWRI set, then get it going out to disk with a call to bawrite().
  * If not, then just release the buffer.
  */
@@ -691,7 +691,7 @@ struct xfs_item_ops xfs_buf_item_ops = {
 	iop_push:	(void(*)(xfs_log_item_t*))xfs_buf_item_push,
 	iop_abort:	(void(*)(xfs_log_item_t*))xfs_buf_item_abort,
 	iop_pushbuf:	NULL,
-	iop_committing:	(void(*)(xfs_log_item_t*, xfs_lsn_t))
+	iop_committing: (void(*)(xfs_log_item_t*, xfs_lsn_t))
 					xfs_buf_item_committing
 };
 
@@ -715,7 +715,7 @@ xfs_buf_item_init(
 
 	/*
 	 * Check to see if there is already a buf log item for
-	 * this buffer.  If there is, it is guaranteed to be
+	 * this buffer.	 If there is, it is guaranteed to be
 	 * the first.  If we do already have one, there is
 	 * nothing to do here so return.
 	 */
@@ -728,11 +728,11 @@ xfs_buf_item_init(
 			return;
 		}
 	}
-		
+
 	/*
 	 * chunks is the number of XFS_BLI_CHUNK size pieces
 	 * the buffer can be divided into. Make sure not to
-	 * truncate any pieces.  map_size is the size of the
+	 * truncate any pieces.	 map_size is the size of the
 	 * bitmap needed to describe the chunks of the buffer.
 	 */
 	chunks = (int)((XFS_BUF_COUNT(bp) + (XFS_BLI_CHUNK - 1)) >> XFS_BLI_SHIFT);
@@ -813,7 +813,7 @@ xfs_buf_item_log(
 	/*
 	 * Calculate the total number of bits to be set.
 	 */
-	bits_to_set = last_bit - first_bit + 1;	
+	bits_to_set = last_bit - first_bit + 1;
 
 	/*
 	 * Get a pointer to the first word in the bitmap
@@ -830,7 +830,7 @@ xfs_buf_item_log(
 	/*
 	 * First set any bits in the first word of our range.
 	 * If it starts at bit 0 of the word, it will be
-	 * set below rather than here.  That is what the variable
+	 * set below rather than here.	That is what the variable
 	 * bit tells us. The variable bits_set tracks the number
 	 * of bits that have been set so far.  End_bit is the number
 	 * of the last bit to be set in this word plus one.
@@ -922,7 +922,7 @@ xfs_buf_item_relse(
  * to be called when the buffer's I/O completes.  If it is not set
  * already, set the buffer's b_iodone() routine to be
  * xfs_buf_iodone_callbacks() and link the log item into the list of
- * items rooted at b_fsprivate.  Items are always added as the second
+ * items rooted at b_fsprivate.	 Items are always added as the second
  * entry in the list if there is a first, because the buf item code
  * assumes that the buf log item is first.
  */
@@ -934,7 +934,7 @@ xfs_buf_attach_iodone(
 {
 	xfs_log_item_t	*head_lip;
 
-	ASSERT(XFS_BUF_ISBUSY(bp)); 
+	ASSERT(XFS_BUF_ISBUSY(bp));
 	ASSERT(XFS_BUF_VALUSEMA(bp) <= 0);
 
 	lip->li_cb = cb;
@@ -972,10 +972,10 @@ xfs_buf_do_callbacks(
 		lip = nlip;
 	}
 }
-		       
+
 /*
  * This is the iodone() function for buffers which have had callbacks
- * attached to them by xfs_buf_attach_iodone().  It should remove each
+ * attached to them by xfs_buf_attach_iodone().	 It should remove each
  * log item from the buffer's list and call the callback of each in turn.
  * When done, the buffer's fsprivate field is set to NULL and the buffer
  * is unlocked with a call to iodone().
@@ -997,7 +997,7 @@ xfs_buf_iodone_callbacks(
 		 * If we've already decided to shutdown the filesystem
 		 * because of IO errors, there's no point in giving this
 		 * a retry.
-		 */ 
+		 */
 		mp = lip->li_mountp;
 		if (XFS_FORCED_SHUTDOWN(mp)) {
 			ASSERT(kdev_same(XFS_BUF_TARGET_DEV(bp), mp->m_dev));
@@ -1086,13 +1086,13 @@ xfs_buf_iodone_callbacks(
 
 /*
  * This is a callback routine attached to a buffer which gets an error
- * when being written out synchronously. 
+ * when being written out synchronously.
  */
 STATIC void
 xfs_buf_error_relse(
 	xfs_buf_t	*bp)
 {
-	xfs_log_item_t 	*lip;
+	xfs_log_item_t	*lip;
 	xfs_mount_t	*mp;
 
 	lip = XFS_BUF_FSPRIVATE(bp, xfs_log_item_t *);
@@ -1104,7 +1104,7 @@ xfs_buf_error_relse(
 	XFS_BUF_UNDELAYWRITE(bp);
 	XFS_BUF_ERROR(bp,0);
 	xfs_buftrace("BUF_ERROR_RELSE", bp);
-	if (! XFS_FORCED_SHUTDOWN(mp)) 		
+	if (! XFS_FORCED_SHUTDOWN(mp))
 		xfs_force_shutdown(mp, XFS_METADATA_IO_ERROR);
 	/*
 	 * We have to unpin the pinned buffers so do the
@@ -1124,7 +1124,7 @@ xfs_buf_error_relse(
  * It should remove the buf item from the AIL, and free the buf item.
  * It is called by xfs_buf_iodone_callbacks() above which will take
  * care of cleaning up the buffer itself.
- */ 
+ */
 /* ARGSUSED */
 void
 xfs_buf_iodone(

@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -43,7 +43,7 @@ STATIC int prohibited_mr_events(bhv_desc_t	*bdp);
    on-disk attribute names start with the 8-byte string "SGI_DMI_".
 */
 
-typedef	struct	{
+typedef struct	{
 	char	dan_chars[DMATTR_PREFIXLEN + DM_ATTR_NAME_SIZE + 1];
 } dm_dkattrname_t;
 
@@ -59,15 +59,15 @@ STATIC	dm_size_t  dm_min_dio_xfer = 0; /* direct I/O disabled for now */
 
 /* See xfs_dm_get_dmattr() for a description of why this is needed. */
 
-#define XFS_BUG_KLUDGE  256     /* max size of an in-inode attribute value */
+#define XFS_BUG_KLUDGE	256	/* max size of an in-inode attribute value */
 
-#define DM_MAX_ATTR_BYTES_ON_DESTROY    256
+#define DM_MAX_ATTR_BYTES_ON_DESTROY	256
 
 #define DM_STAT_SIZE(namelen)	\
 	(sizeof(dm_stat_t) + sizeof(xfs_handle_t) + namelen)
 #define MAX_DIRENT_SIZE		(sizeof(dirent_t) + MAXNAMELEN)
 
-#define DM_STAT_ALIGN		(sizeof(__uint64_t))		
+#define DM_STAT_ALIGN		(sizeof(__uint64_t))
 
 /* DMAPI's E2BIG == EA's ERANGE */
 #define DM_EA_XLATE_ERR(err) { if (err == ERANGE) err = E2BIG; }
@@ -80,10 +80,10 @@ STATIC	dm_size_t  dm_min_dio_xfer = 0; /* direct I/O disabled for now */
  */
 int
 xfs_dm_send_data_event(
-	dm_eventtype_t	event, 
+	dm_eventtype_t	event,
 	bhv_desc_t	*bdp,
 	xfs_off_t	offset,
-	size_t		length, 
+	size_t		length,
 	int		flags,
 	vrwlock_t	*locktype)
 {
@@ -107,18 +107,18 @@ xfs_dm_send_data_event(
 		if (locktype)
 			xfs_rwlock(bdp, *locktype);
 	}  while (!error && DM_EVENT_ENABLED(vp->v_vfsp, ip, event));
-	
+
 	return error;
 }
 
-/*	xfs_dm_create_event 
+/*	xfs_dm_create_event
  *
  *	Conditionally send a DM_EVENT_CREATE.  The event will not be sent if
  *	we can check the directory and find the name (to be created) already
- *	there.  Some sort of a "double check" is required since in the
- *	xfs_create and 	xfs_mkdir routines, we determine that there is not a
+ *	there.	Some sort of a "double check" is required since in the
+ *	xfs_create and	xfs_mkdir routines, we determine that there is not a
  *	duplicate with the directory ilock held.  We cannot send an event with
- *	the ilock held, since this can potentially lead to a deadlock. 
+ *	the ilock held, since this can potentially lead to a deadlock.
  *	Dropping the ilock while the event is being sent is unwise since the
  *	directory may have changed by the time we reacquire the lock.  Hence
  *	this workaround.
@@ -128,7 +128,7 @@ xfs_dm_send_data_event(
  *	xfs_create/xfs_mkdir.  So the workaround does not really solve the
  *	problem.  The results can be missing or redundant create events.
  */
-                                                                                
+
 int
 xfs_dm_send_create_event(
 	bhv_desc_t	*dir_bdp,
@@ -144,9 +144,9 @@ xfs_dm_send_create_event(
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
 
-	if (*name == '\0') 
+	if (*name == '\0')
 		return 0;
-	
+
 	dip = XFS_BHVTOI (dir_bdp);
 	xfs_ilock (dip, XFS_ILOCK_EXCL);
 
@@ -158,14 +158,14 @@ xfs_dm_send_create_event(
 	 */
 
 #ifdef __sgi
-        /*
-         * Try the directory name lookup cache.
-         */
-        if (bdp = dnlc_lookup_fast(dir_vp, name, NULL, &fd, NOCRED, VN_GET_NOWAIT)) {
+	/*
+	 * Try the directory name lookup cache.
+	 */
+	if (bdp = dnlc_lookup_fast(dir_vp, name, NULL, &fd, NOCRED, VN_GET_NOWAIT)) {
 		xfs_iunlock (dip, XFS_ILOCK_EXCL);
 		VN_RELE (BHV_TO_VNODE(bdp));
 		return 0;
-        }
+	}
 #endif
 
 	/*
@@ -196,13 +196,13 @@ xfs_dm_send_create_event(
  */
 
 STATIC int
-prohibited_mr_events(bhv_desc_t	*bdp)
+prohibited_mr_events(bhv_desc_t *bdp)
 {
 	int	prohibited;
 	struct address_space *mapping;
 	struct vm_area_struct *vma;
 
-	vnode_t	*vp = BHV_TO_VNODE(bdp);
+	vnode_t *vp = BHV_TO_VNODE(bdp);
 
 	if(!VN_MAPPED(vp))
 		return 0;
@@ -224,7 +224,7 @@ prohibited_mr_events(bhv_desc_t	*bdp)
 }
 
 
-#ifdef  DEBUG_RIGHTS
+#ifdef	DEBUG_RIGHTS
 STATIC int
 xfs_bdp_to_hexhandle(
 	bhv_desc_t	*bdp,
@@ -255,7 +255,7 @@ xfs_bdp_to_hexhandle(
 	*buffer = '\0';
 	return(0);
 }
-#endif  /* DEBUG_RIGHTS */
+#endif	/* DEBUG_RIGHTS */
 
 
 
@@ -328,7 +328,7 @@ xfs_ip_to_stat(
 	} else if ((vp->v_type == VCHR) || (vp->v_type == VBLK) ) {
 		buf->dt_rdev = IRIX_DEV_TO_KDEVT(ip->i_df.if_u2.if_rdev);
 	} else {
-		buf->dt_rdev = 0;       /* not a b/c spec. */
+		buf->dt_rdev = 0;	/* not a b/c spec. */
 	}
 
 	buf->dt_atime = ip->i_d.di_atime.t_sec;
@@ -419,7 +419,7 @@ xfs_dm_bulkstat_one(
 	int		*res)		/* bulkstat result code */
 {
 	xfs_inode_t	*ip;
-	dm_stat_t 	*buf;
+	dm_stat_t	*buf;
 	xfs_handle_t	handle;
 	u_int		statstruct_sz;
 	int		error;
@@ -477,15 +477,15 @@ xfs_dm_bulkstat_one(
 
 STATIC int
 xfs_get_dirents(
-	xfs_inode_t    	*dirp,
-	void 		*bufp,
+	xfs_inode_t	*dirp,
+	void		*bufp,
 	size_t		bufsz,
 	off_t		*locp,
 	size_t		*nreadp)
 {
-	int 		sink;
-	struct uio 	auio;
-	struct iovec 	aiov;
+	int		sink;
+	struct uio	auio;
+	struct iovec	aiov;
 	int		rval;
 
 	*nreadp = 0;
@@ -534,7 +534,7 @@ xfs_dirents_to_stats(
 	*nwrittenp = 0;
 	prevoff = 0;  /* sizeof this getdents record */
 
-	/* 
+	/*
 	 * Go thru all the dirent records, making dm_stat structures from
 	 * them, one by one, until dirent buffer is empty or stat buffer
 	 * is full.
@@ -552,17 +552,17 @@ xfs_dirents_to_stats(
 		 * Make sure we have enough space.
 		 */
 		if (spaceleft <= DM_STAT_SIZE(namelen)) {
-			/* 
+			/*
 			 * d_off field in dirent_t points at the next entry.
 			 */
 			if (prevoff)	/* did at least one; update location */
 				*locp = prevoff;
 			*spaceleftp = 0;
 
-			/* 
+			/*
 			 * The last link is NULL.
 			 */
-			statp->_link = 0; 
+			statp->_link = 0;
 			return(0);
 		}
 
@@ -571,8 +571,8 @@ xfs_dirents_to_stats(
 		(void)xfs_dm_bulkstat_one(mp, NULL, (xfs_ino_t)p->d_ino, statp, 0, 0, &res);
 		if (res != BULKSTAT_RV_DIDONE)
 			continue;
-		
-		/* 
+
+		/*
 		 * On return from bulkstat_one(), stap->_link points
 		 * at the end of the handle in the stat structure.
 		 */
@@ -585,20 +585,20 @@ xfs_dirents_to_stats(
 		bcopy(p->d_name, (char *) statp + statp->_link, namelen);
 
 		/* Word-align the record */
-		statp->_link = (statp->_link + namelen + (DM_STAT_ALIGN - 1)) 
+		statp->_link = (statp->_link + namelen + (DM_STAT_ALIGN - 1))
 			& ~(DM_STAT_ALIGN - 1);
 
 		spaceleft -= statp->_link;
 		*nwrittenp += statp->_link;
 		bufp = (char *)statp + statp->_link;
 
-		/* 
+		/*
 		 * We need to rollback to this position if something happens.
 		 * So we remember it.
 		 */
-		prevoff = p->d_off;	
+		prevoff = p->d_off;
 	}
-	statp->_link = 0; 
+	statp->_link = 0;
 
 	/*
 	 * If there's space left to put in more, caller should know that..
@@ -629,14 +629,14 @@ xfs_dm_f_get_eventlist(
 	/* Note that we MUST return a regular file's managed region bits as
 	   part of the mask because dm_get_eventlist is supposed to return the
 	   union of all managed region flags in those bits.  Since we only
-	   support one region, we can just return the bits as they are.  For
+	   support one region, we can just return the bits as they are.	 For
 	   all other object types, the bits will already be zero.  Handy, huh?
 	*/
 
 	ip = XFS_BHVTOI(bdp);
 	eventset = ip->i_d.di_dmevmask;
 
-	/* Now copy the event mask and event count back to the caller.  We
+	/* Now copy the event mask and event count back to the caller.	We
 	   return the lesser of nelem and DM_EVENT_MAX.
 	*/
 
@@ -736,7 +736,7 @@ xfs_dm_fs_get_eventlist(
 	mp = XFS_BHVTOI(bdp)->i_mount;
 	eventset = mp->m_dmevmask;
 
-	/* Now copy the event mask and event count back to the caller.  We
+	/* Now copy the event mask and event count back to the caller.	We
 	   return the lesser of nelem and DM_EVENT_MAX.
 	*/
 
@@ -838,7 +838,7 @@ xfs_dm_direct_ok(
 
 /* We need to be able to select various combinations of FINVIS, O_NONBLOCK,
    O_DIRECT, and O_SYNC, yet we don't have a file descriptor and we don't have
-   the file's pathname.  All we have is a handle.
+   the file's pathname.	 All we have is a handle.
 */
 
 STATIC int
@@ -864,15 +864,15 @@ xfs_dm_rdwr(
 		return(EINVAL);
 
 	if (fmode & FMODE_READ) {
-	        XFS_STATS_INC(xfsstats.xs_read_calls);
+		XFS_STATS_INC(xfsstats.xs_read_calls);
 		oflags = O_RDONLY;
 	} else {
-	        XFS_STATS_INC(xfsstats.xs_write_calls);
+		XFS_STATS_INC(xfsstats.xs_write_calls);
 		oflags = O_WRONLY;
 	}
 
 	/* Build file descriptor flags and I/O flags.  O_NONBLOCK is needed so
-	   that we don't block on mandatory file locks.  FINVIS is needed so
+	   that we don't block on mandatory file locks.	 FINVIS is needed so
 	   that we don't change any file timestamps.
 	*/
 
@@ -1070,7 +1070,7 @@ xfs_dm_get_allocinfo_rvp(
 	elem = 0;
 
 	while (fsb_length && elem < nelem) {
-		xfs_bmbt_irec_t	bmp[50];
+		xfs_bmbt_irec_t bmp[50];
 		xfs_fsblock_t	firstblock;	/* start block for bmapi */
 		dm_extent_t	extent;
 		xfs_filblks_t	fsb_bias;
@@ -1141,7 +1141,7 @@ xfs_dm_get_allocinfo_rvp(
 
 
 /* ARGSUSED */
-STATIC int 
+STATIC int
 xfs_dm_get_bulkall_rvp(
 	bhv_desc_t	*bdp,
 	dm_right_t	right,
@@ -1158,7 +1158,7 @@ xfs_dm_get_bulkall_rvp(
 
 
 /* ARGSUSED */
-STATIC int 
+STATIC int
 xfs_dm_get_bulkattr_rvp(
 	bhv_desc_t	*bdp,
 	dm_right_t	right,
@@ -1174,7 +1174,7 @@ xfs_dm_get_bulkattr_rvp(
 	u_int		statstruct_sz;
 	dm_attrloc_t	loc;
 	vnode_t		*vp = BHV_TO_VNODE(bdp);
-        bhv_desc_t	*vfs_bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vp->v_vfsp), &xfs_vfsops);
+	bhv_desc_t	*vfs_bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vp->v_vfsp), &xfs_vfsops);
 	xfs_mount_t	*mp = XFS_BHVTOM (vfs_bdp);
 
 	if (right < DM_RIGHT_SHARED)
@@ -1195,23 +1195,23 @@ xfs_dm_get_bulkattr_rvp(
 	statstruct_sz = DM_STAT_SIZE(0);
 	statstruct_sz = (statstruct_sz+(DM_STAT_ALIGN-1)) & ~(DM_STAT_ALIGN-1);
 
-	nelems = buflen / statstruct_sz; 
+	nelems = buflen / statstruct_sz;
 	if (nelems < 1) {
 		if (put_user( statstruct_sz, rlenp ))
 			return(EFAULT);
 		return(E2BIG);
-	} 
+	}
 
 	/*
-	 * fill the buffer with dm_stat_t's 
+	 * fill the buffer with dm_stat_t's
 	 */
 
 	error = xfs_bulkstat(mp, NULL,
 			     (xfs_ino_t *)&loc,
-			     &nelems, 
+			     &nelems,
 			     xfs_dm_bulkstat_one,
 			     statstruct_sz,
-			     bufp, 
+			     bufp,
 			     BULKSTAT_FG_IGET,
 			     &done);
 	if (error)
@@ -1319,7 +1319,7 @@ xfs_dm_get_config_events(
 
 	eventset = DM_XFS_SUPPORTED_EVENTS;
 
-	/* Now copy the event mask and event count back to the caller.  We
+	/* Now copy the event mask and event count back to the caller.	We
 	   return the lesser of nelem and DM_EVENT_MAX.
 	*/
 
@@ -1346,7 +1346,7 @@ xfs_dm_get_destroy_dmattr(
 	int		*vlenp)
 {
 	char		buffer[XFS_BUG_KLUDGE];
-	dm_dkattrname_t	dkattrname;
+	dm_dkattrname_t dkattrname;
 	int		alloc_size;
 	int		value_len;
 	char		*value;
@@ -1373,7 +1373,7 @@ xfs_dm_get_destroy_dmattr(
 	*/
 
 	alloc_size = 0;
-	value_len = sizeof(buffer); 	/* in/out parameter */
+	value_len = sizeof(buffer);	/* in/out parameter */
 	value = buffer;
 
 	VOP_ATTR_GET(vp, dkattrname.dan_chars, value, &value_len,
@@ -1488,7 +1488,7 @@ xfs_dm_get_dirattrs_rvp(
 	size_t		*rlenp,		/* user space address */
 	int		*rvp)
 {
-	xfs_inode_t    	*dp;
+	xfs_inode_t	*dp;
 	xfs_mount_t	*mp;
 	size_t		direntbufsz, statbufsz;
 	size_t		nread, spaceleft, nwritten=0;
@@ -1517,7 +1517,7 @@ xfs_dm_get_dirattrs_rvp(
 	/*
 	 * Don't get more dirents than are guaranteed to fit.
 	 * The minimum that the stat buf holds is the buf size over
-	 * maximum entry size.  That times the minimum dirent size
+	 * maximum entry size.	That times the minimum dirent size
 	 * is an overly conservative size for the dirent buf.
 	 */
 	statbufsz = NBPP;
@@ -1527,7 +1527,7 @@ xfs_dm_get_dirattrs_rvp(
 	statbufp = kmem_alloc(statbufsz, KM_SLEEP);
 	error = 0;
 	spaceleft = buflen;
-	/* 
+	/*
 	 * Keep getting dirents until the ubuffer is packed with
 	 * dm_stat structures.
 	 */
@@ -1558,15 +1558,15 @@ xfs_dm_get_dirattrs_rvp(
 		}
 		if (nread == 0)
 			break;
-		/* 
-		 * Now iterate thru them and call bulkstat_one() on all 
-		 * of them 
+		/*
+		 * Now iterate thru them and call bulkstat_one() on all
+		 * of them
 		 */
 		error = xfs_dirents_to_stats(mp,
 					  (xfs_dirent_t *) direntp,
 					  statbufp,
 					  nread,
-					  &spaceleft, 
+					  &spaceleft,
 					  &nwritten,
 					  (off_t *)&loc);
 		if (error) {
@@ -1618,7 +1618,7 @@ xfs_dm_get_dmattr(
 	char		*value;
 	int		value_len;
 	int		alloc_size;
-	int 		error;
+	int		error;
 	vnode_t		*vp = BHV_TO_VNODE(bdp);
 
 	if (right < DM_RIGHT_SHARED)
@@ -1627,7 +1627,7 @@ xfs_dm_get_dmattr(
 	if ((error = xfs_copyin_attrname(attrnamep, &name)) != 0)
 		return(error);
 
-	/* Allocate a buffer to receive the attribute's value.  We allocate
+	/* Allocate a buffer to receive the attribute's value.	We allocate
 	   at least one byte even if the caller specified a buflen of zero.
 	   (A buflen of zero is considered valid.)
 
@@ -1648,7 +1648,7 @@ xfs_dm_get_dmattr(
 
 	/* Get the attribute's value. */
 
-	value_len = alloc_size; 	/* in/out parameter */
+	value_len = alloc_size;		/* in/out parameter */
 
 	VOP_ATTR_GET(vp, name.dan_chars, value, &value_len,
 			ATTR_ROOT, get_current_cred(), error);
@@ -1791,7 +1791,7 @@ xfs_dm_getall_dmattr(
 	int		alignment;
 	int		total_size;
 	int		list_size = 8192;	/* should be big enough */
-	int 		error;
+	int		error;
 	vnode_t		*vp = BHV_TO_VNODE(bdp);
 
 	if (right < DM_RIGHT_SHARED)
@@ -1824,7 +1824,7 @@ xfs_dm_getall_dmattr(
 	/* Use VOP_ATTR_LIST to get the names of DMAPI attributes, and use
 	   VOP_ATTR_GET to get their values.  There is a risk here that the
 	   DMAPI attributes could change between the VOP_ATTR_LIST and
-	   VOP_ATTR_GET calls.  If we can detect it, we return EIO to notify
+	   VOP_ATTR_GET calls.	If we can detect it, we return EIO to notify
 	   the user.
 	*/
 
@@ -1848,7 +1848,7 @@ xfs_dm_getall_dmattr(
 			int		size_needed;
 			int		value_len;
 
-			/* Skip over all non-DMAPI attributes.  If the
+			/* Skip over all non-DMAPI attributes.	If the
 			   attribute name is too long, we assume it is
 			   non-DMAPI even if it starts with the correct
 			   prefix.
@@ -1883,7 +1883,7 @@ xfs_dm_getall_dmattr(
 				DM_ATTR_NAME_SIZE);
 			ulist->al_data.vd_offset = sizeof(*ulist);
 			ulist->al_data.vd_length = entry->a_valuelen;
-			ulist->_link =  size_needed;
+			ulist->_link =	size_needed;
 			last_link = &ulist->_link;
 
 			/* Next read the attribute's value into its correct
@@ -1943,7 +1943,7 @@ xfs_dm_getall_inherit(
 */
 
 /* ARGSUSED */
-STATIC int 
+STATIC int
 xfs_dm_init_attrloc(
 	bhv_desc_t	*bdp,
 	dm_right_t	right,
@@ -1985,7 +1985,7 @@ xfs_dm_probe_hole(
 {
 	dm_off_t	roff;
 	dm_size_t	rlen;
-	xfs_inode_t     *ip;
+	xfs_inode_t	*ip;
 	xfs_mount_t	*mp;
 	uint		lock_flags;
 	xfs_fsize_t	realsize;
@@ -2025,7 +2025,7 @@ xfs_dm_punch_hole(
 	dm_off_t	off,
 	dm_size_t	len)
 {
-	xfs_inode_t     *ip;
+	xfs_inode_t	*ip;
 	xfs_trans_t	*tp;
 	xfs_trans_t	*tp2;
 	xfs_mount_t	*mp;
@@ -2065,7 +2065,7 @@ xfs_dm_punch_hole(
 	/*
 	 * Before we join the inode to the transaction, take care of
 	 * the part of the truncation that must be done without the
-	 * inode lock.  This needs to be done before joining the inode
+	 * inode lock.	This needs to be done before joining the inode
 	 * to the transaction, because the inode cannot be unlocked
 	 * once it is a part of the transaction.
 	 */
@@ -2172,7 +2172,7 @@ xfs_dm_remove_dmattr(
 {
 	dm_dkattrname_t name;
 	vnode_t		*vp = BHV_TO_VNODE(bdp);
-	int 		error;
+	int		error;
 
 	if (right < DM_RIGHT_EXCL)
 		return(EACCES);
@@ -2230,7 +2230,7 @@ xfs_dm_set_dmattr(
 	char		*value;
 	int		alloc_size;
 	vnode_t		*vp = BHV_TO_VNODE(bdp);
-	int 		error;
+	int		error;
 
 	if (right < DM_RIGHT_EXCL)
 		return(EACCES);
@@ -2241,7 +2241,7 @@ xfs_dm_set_dmattr(
 		return(E2BIG);
 
 	/* Copy in the attribute's value and store the <name,value> pair in
-	   the object.  We allocate a buffer of at least one byte even if the
+	   the object.	We allocate a buffer of at least one byte even if the
 	   caller specified a buflen of zero.  (A buflen of zero is considered
 	   valid.)
 	*/
@@ -2251,7 +2251,7 @@ xfs_dm_set_dmattr(
 	if (copy_from_user( value, bufp, buflen)) {
 		error = EFAULT;
 	} else {
-		VOP_ATTR_SET(vp, name.dan_chars, value, buflen, 
+		VOP_ATTR_SET(vp, name.dan_chars, value, buflen,
 			(setdtime ? ATTR_ROOT : ATTR_ROOT|ATTR_KERNOTIME),
 			get_current_cred(), error);
 		DM_EA_XLATE_ERR(error);
@@ -2471,7 +2471,7 @@ xfs_dm_sync_by_handle (
 	bhv_desc_t	*bdp,
 	dm_right_t	right)
 {
-	int 		error;
+	int		error;
 	vnode_t		*vp = BHV_TO_VNODE(bdp);
 
 	if (right < DM_RIGHT_EXCL)
@@ -2621,13 +2621,13 @@ xfs_dm_get_fsys_vector(
 /*	xfs_dm_mapevent - send events needed for memory mapping a file.
  *
  *	xfs_dm_map is a workaround called for files that are about to be
- *	mapped.  DMAPI events are not being generated at a low enough level
+ *	mapped.	 DMAPI events are not being generated at a low enough level
  *	in the kernel for page reads/writes to generate the correct events.
  *	So for memory-mapped files we generate read  or write events for the
- *	whole byte range being mapped.  If the mmap call can never cause a
+ *	whole byte range being mapped.	If the mmap call can never cause a
  *	write to the file, then only a read event is sent.
  *
- *	Code elsewhere prevents adding managed regions to a file while it 
+ *	Code elsewhere prevents adding managed regions to a file while it
  *	is still mapped.
  */
 
@@ -2643,7 +2643,7 @@ xfs_dm_mapevent(
 	xfs_inode_t	*ip;
 	off_t		end_of_area, evsize;
 	vnode_t		*vp = BHV_TO_VNODE(bdp);
-	struct vfs      *vfsp = vp->v_vfsp;
+	struct vfs	*vfsp = vp->v_vfsp;
 
 	/* exit immediately if not regular file in a DMAPI file system */
 
@@ -2678,7 +2678,7 @@ xfs_dm_mapevent(
 	evsize = end_of_area - offset;
 	if (evsize < 0)
 		evsize = 0;
-	
+
 	/* If write possible, try a DMAPI write event */
 	if (mapevp->max_event == DM_EVENT_WRITE &&
 		DM_EVENT_ENABLED (vp->v_vfsp, ip, DM_EVENT_WRITE)) {
@@ -2689,7 +2689,7 @@ xfs_dm_mapevent(
 
 	/* Try a read event if max_event was != DM_EVENT_WRITE or if it
 	 * was DM_EVENT_WRITE but the WRITE event was not enabled.
-         */
+	 */
 	if (DM_EVENT_ENABLED (vp->v_vfsp, ip, DM_EVENT_READ)) {
 		mapevp->error = xfs_dm_send_data_event(DM_EVENT_READ, bdp,
 				offset, evsize, 0, NULL);
@@ -2755,7 +2755,7 @@ xfs_dmapi_mmap_event(
  *
  *	xfs_dm_testevent() is called when a page from a memory mapped
  *	file is about to be modified.  xfs_dm_testevent() will check if
- *	an event should be generated for the region specified.  If (at
+ *	an event should be generated for the region specified.	If (at
  *	least) one should be generated, it is up to the caller to drop
  *	any critical locks held and then issue the events via a
  *	DM_FCNTL_MAPEVENT fcntl() call.
@@ -2772,13 +2772,13 @@ STATIC int
 xfs_dm_testevent(
 	bhv_desc_t	*bdp,
 	int		flags,
-	off_t           offset,
+	off_t		offset,
 	dm_fcntl_t	*dmfcntlp)
 {
 	dm_fcntl_testevent_t  *testevp;
 	xfs_inode_t	*ip;
 	vnode_t		*vp = BHV_TO_VNODE(bdp);
-	struct vfs      *vfsp = vp->v_vfsp;
+	struct vfs	*vfsp = vp->v_vfsp;
 
 	/* exit immediately if not regular file in a DMAPI file system */
 
@@ -2805,7 +2805,7 @@ xfs_dm_testevent(
 
 	/* Read event needed if max_event was != DM_EVENT_WRITE or if it
 	 * was DM_EVENT_WRITE but the WRITE event was not enabled.
-         */
+	 */
 		testevp->issue_event = DM_EVENT_READ;
 	}
 	return 0;

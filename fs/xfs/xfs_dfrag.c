@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -39,17 +39,17 @@
  */
 int
 xfs_swapext(
-	xfs_swapext_t   *sxp)
+	xfs_swapext_t	*sxp)
 {
-	xfs_swapext_t 	sx;
-	xfs_inode_t     *ip=NULL, *tip=NULL, *ips[2];
-	xfs_trans_t     *tp;
-	xfs_mount_t     *mp;
+	xfs_swapext_t	sx;
+	xfs_inode_t	*ip=NULL, *tip=NULL, *ips[2];
+	xfs_trans_t	*tp;
+	xfs_mount_t	*mp;
 	xfs_bstat_t	*sbp;
 	struct file	*fp = NULL, *tfp = NULL;
-	vnode_t 	*vp, *tvp;
-	bhv_desc_t      *bdp, *tbdp;
-	vn_bhv_head_t   *bhp, *tbhp;
+	vnode_t		*vp, *tvp;
+	bhv_desc_t	*bdp, *tbdp;
+	vn_bhv_head_t	*bhp, *tbhp;
 	uint		lock_flags=0;
 	int		ilf_fields, tilf_fields;
 	int		error = 0;
@@ -65,10 +65,10 @@ xfs_swapext(
 
 	/* Pull information for the target fd */
 	if (((fp = fget((int)sx.sx_fdtarget)) == NULL) ||
-            ((vp = LINVFS_GET_VP(fp->f_dentry->d_inode)) == NULL))  {
-                error = XFS_ERROR(EINVAL);
-                goto error0;
-        }
+	    ((vp = LINVFS_GET_VP(fp->f_dentry->d_inode)) == NULL))  {
+		error = XFS_ERROR(EINVAL);
+		goto error0;
+	}
 
 	bhp = VN_BHV_HEAD(vp);
 	VN_BHV_READ_LOCK(bhp);
@@ -76,17 +76,17 @@ xfs_swapext(
 	if (bdp == NULL) {
 		VN_BHV_READ_UNLOCK(bhp);
 		error = XFS_ERROR(EBADF);
-                goto error0;
+		goto error0;
 	} else {
 		ip = XFS_BHVTOI(bdp);
 		VN_BHV_READ_UNLOCK(bhp);
 	}
 
-        if (((tfp = fget((int)sx.sx_fdtmp)) == NULL) ||
-            ((tvp = LINVFS_GET_VP(tfp->f_dentry->d_inode)) == NULL)) {
-                error = XFS_ERROR(EINVAL);
-                goto error0;
-        }
+	if (((tfp = fget((int)sx.sx_fdtmp)) == NULL) ||
+	    ((tvp = LINVFS_GET_VP(tfp->f_dentry->d_inode)) == NULL)) {
+		error = XFS_ERROR(EINVAL);
+		goto error0;
+	}
 
 	tbhp = VN_BHV_HEAD(tvp);
 	VN_BHV_READ_LOCK(tbhp);
@@ -94,15 +94,15 @@ xfs_swapext(
 	if (tbdp == NULL) {
 		VN_BHV_READ_UNLOCK(tbhp);
 		error = XFS_ERROR(EBADF);
-                goto error0;
+		goto error0;
 	} else {
 		tip = XFS_BHVTOI(tbdp);
 		VN_BHV_READ_UNLOCK(tbhp);
 	}
 
 	if (ip->i_ino == tip->i_ino) {
-		error =  XFS_ERROR(EINVAL);
-                goto error0;
+		error =	 XFS_ERROR(EINVAL);
+		goto error0;
 	}
 
 	mp = ip->i_mount;
@@ -110,9 +110,9 @@ xfs_swapext(
 	sbp = &sx.sx_stat;
 
 	if (XFS_FORCED_SHUTDOWN(mp)) {
-		error =  XFS_ERROR(EIO);
-                goto error0;
- 	}
+		error =	 XFS_ERROR(EIO);
+		goto error0;
+	}
 
 	locked = 1;
 	CELL_ONLY(cxfs_val = cfs_start_defrag(vp));
@@ -129,22 +129,22 @@ xfs_swapext(
 	xfs_lock_inodes(ips, 2, 0, lock_flags);
 
 	/* Check permissions */
-        if ((error = _MAC_XFS_IACCESS(ip, MACWRITE, NULL))) {
+	if ((error = _MAC_XFS_IACCESS(ip, MACWRITE, NULL))) {
 		goto error0;
 	}
-        if ((error = _MAC_XFS_IACCESS(tip, MACWRITE, NULL))) {
+	if ((error = _MAC_XFS_IACCESS(tip, MACWRITE, NULL))) {
 		goto error0;
 	}
 	if ((current->fsuid != ip->i_d.di_uid) &&
 	    (error = xfs_iaccess(ip, IWRITE, NULL)) &&
 	    !capable_cred(NULL, CAP_FOWNER)) {
 		goto error0;
-	}	
+	}
 	if ((current->fsuid != tip->i_d.di_uid) &&
 	    (error = xfs_iaccess(tip, IWRITE, NULL)) &&
 	    !capable_cred(NULL, CAP_FOWNER)) {
 		goto error0;
-	}	
+	}
 
 	/* Verify both files are either real-time or non-realtime */
 	if ((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) !=
@@ -171,7 +171,7 @@ xfs_swapext(
 	}
 
 	/* Verify all data are being swapped */
-	if (sx.sx_offset != 0 || 
+	if (sx.sx_offset != 0 ||
 	    sx.sx_length != ip->i_d.di_size ||
 	    sx.sx_length != tip->i_d.di_size) {
 		error = XFS_ERROR(EFAULT);
@@ -187,9 +187,9 @@ xfs_swapext(
 		error = XFS_ERROR(EINVAL);
 		goto error0;
 	}
-		
-	/* 
-	 * Compare the current change & modify times with that 
+
+	/*
+	 * Compare the current change & modify times with that
 	 * passed in.  If they differ, we abort this swap.
 	 * This is the mechanism used to ensure the calling
 	 * process that the file was not changed out from
@@ -217,10 +217,10 @@ xfs_swapext(
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	xfs_iunlock(tip, XFS_ILOCK_EXCL);
 
-	/* 
+	/*
 	 * There is a race condition here since we gave up the
 	 * ilock.  However, the data fork will not change since
-	 * we have the iolock (locked for truncation too) so we 
+	 * we have the iolock (locked for truncation too) so we
 	 * are safe.  We don't really care if non-io related
 	 * fields change.
 	 */
@@ -231,7 +231,7 @@ xfs_swapext(
 	if ((error = xfs_trans_reserve(tp, 0,
 				     XFS_ICHANGE_LOG_RES(mp), 0,
 				     0, 0))) {
-		xfs_iunlock(ip,  XFS_IOLOCK_EXCL);
+		xfs_iunlock(ip,	 XFS_IOLOCK_EXCL);
 		xfs_iunlock(tip, XFS_IOLOCK_EXCL);
 		xfs_trans_cancel(tp, 0);
 		return error;
@@ -239,13 +239,13 @@ xfs_swapext(
 	xfs_lock_inodes(ips, 2, 0, XFS_ILOCK_EXCL);
 
 	/*
-	 * Count the number of extended attribute blocks 
+	 * Count the number of extended attribute blocks
 	 */
 	if ( ((XFS_IFORK_Q(ip) != 0) && (ip->i_d.di_anextents > 0)) &&
 	     (ip->i_d.di_aformat != XFS_DINODE_FMT_LOCAL)) {
 		error = xfs_bmap_count_blocks(tp, ip, XFS_ATTR_FORK, &aforkblks);
 		if (error) {
-			xfs_iunlock(ip,  lock_flags);
+			xfs_iunlock(ip,	 lock_flags);
 			xfs_iunlock(tip, lock_flags);
 			xfs_trans_cancel(tp, 0);
 			return error;
@@ -253,26 +253,26 @@ xfs_swapext(
 	}
 	if ( ((XFS_IFORK_Q(tip) != 0) && (tip->i_d.di_anextents > 0)) &&
 	     (tip->i_d.di_aformat != XFS_DINODE_FMT_LOCAL)) {
-		error = xfs_bmap_count_blocks(tp, tip, XFS_ATTR_FORK, 
+		error = xfs_bmap_count_blocks(tp, tip, XFS_ATTR_FORK,
 			&taforkblks);
 		if (error) {
-			xfs_iunlock(ip,  lock_flags);
+			xfs_iunlock(ip,	 lock_flags);
 			xfs_iunlock(tip, lock_flags);
 			xfs_trans_cancel(tp, 0);
 			return error;
 		}
 	}
 
-	/* 
-	 * Swap the data forks of the inodes 
+	/*
+	 * Swap the data forks of the inodes
 	 */
 	ifp = &ip->i_df;
 	tifp = &tip->i_df;
 	tempif = *ifp;	/* struct copy */
 	*ifp = *tifp;	/* struct copy */
-	*tifp = tempif;	/* struct copy */
+	*tifp = tempif; /* struct copy */
 
-	/* 
+	/*
 	 * Fix the on-disk inode values
 	 */
 	tmp = (__uint64_t)ip->i_d.di_nblocks;
@@ -291,12 +291,12 @@ xfs_swapext(
 
 	switch(ip->i_d.di_format) {
 	case XFS_DINODE_FMT_EXTENTS:
-		/* If the extents fit in the inode, fix the 
-		 * pointer.  Otherwise it's already NULL or 
+		/* If the extents fit in the inode, fix the
+		 * pointer.  Otherwise it's already NULL or
 		 * pointing to the extent.
 		 */
 		if (ip->i_d.di_nextents <= XFS_INLINE_EXTS) {
-			ifp->if_u1.if_extents = 
+			ifp->if_u1.if_extents =
 				ifp->if_u2.if_inline_ext;
 		}
 		ilf_fields |= XFS_ILOG_DEXT;
@@ -305,17 +305,17 @@ xfs_swapext(
 		ilf_fields |= XFS_ILOG_DBROOT;
 		break;
 	}
-	
+
 	tilf_fields = XFS_ILOG_CORE;
 
 	switch(tip->i_d.di_format) {
 	case XFS_DINODE_FMT_EXTENTS:
-		/* If the extents fit in the inode, fix the 
-		 * pointer.  Otherwise it's already NULL or 
+		/* If the extents fit in the inode, fix the
+		 * pointer.  Otherwise it's already NULL or
 		 * pointing to the extent.
 		 */
 		if (tip->i_d.di_nextents <= XFS_INLINE_EXTS) {
-			tifp->if_u1.if_extents = 
+			tifp->if_u1.if_extents =
 				tifp->if_u2.if_inline_ext;
 		}
 		tilf_fields |= XFS_ILOG_DEXT;
@@ -339,32 +339,32 @@ xfs_swapext(
 	xfs_trans_log_inode(tp, ip,  ilf_fields);
 	xfs_trans_log_inode(tp, tip, tilf_fields);
 
-        /*
-         * If this is a synchronous mount, make sure that the
-         * transaction goes to disk before returning to the user.
-         */
-        if (mp->m_flags & XFS_MOUNT_WSYNC) {
-                xfs_trans_set_sync(tp);
-        }
+	/*
+	 * If this is a synchronous mount, make sure that the
+	 * transaction goes to disk before returning to the user.
+	 */
+	if (mp->m_flags & XFS_MOUNT_WSYNC) {
+		xfs_trans_set_sync(tp);
+	}
 
-        error = xfs_trans_commit(tp, XFS_TRANS_SWAPEXT, NULL);
+	error = xfs_trans_commit(tp, XFS_TRANS_SWAPEXT, NULL);
 
 	CELL_ONLY(cfs_end_defrag(vp, cxfs_val));
 
-        fput(fp);
-        fput(tfp);
+	fput(fp);
+	fput(tfp);
 
 	return error;
 
  error0:
 	if (locked) {
 		CELL_ONLY(cfs_end_defrag(vp, cxfs_val));
-		xfs_iunlock(ip,  lock_flags);
+		xfs_iunlock(ip,	 lock_flags);
 		xfs_iunlock(tip, lock_flags);
 	}
 
-        if (fp != NULL) fput(fp);
-        if (tfp != NULL) fput(tfp);
+	if (fp != NULL) fput(fp);
+	if (tfp != NULL) fput(tfp);
 
 	return error;
 }

@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -79,7 +79,7 @@ xfs_write_clear_setuid(
  * Force a shutdown of the filesystem instantly while keeping
  * the filesystem consistent. We don't do an unmount here; just shutdown
  * the shop, make sure that absolutely nothing persistent happens to
- * this filesystem after this point. 
+ * this filesystem after this point.
  */
 
 void
@@ -89,12 +89,12 @@ _xfs_force_shutdown(
 	char		*fname,
 	int		lnnum)
 {
-	int             logerror;
+	int		logerror;
 
 #if defined(XFSDEBUG) && 0
-        printk("xfs_force_shutdown entered [0x%p, %d]\n",
-                mp, flags);
-        KDB_ENTER();
+	printk("xfs_force_shutdown entered [0x%p, %d]\n",
+		mp, flags);
+	KDB_ENTER();
 #endif
 
 #define XFS_MAX_DRELSE_RETRIES	10
@@ -103,7 +103,7 @@ _xfs_force_shutdown(
 	if (!(flags & XFS_FORCE_UMOUNT)) {
 		cmn_err(CE_NOTE,
 		"xfs_force_shutdown(%s,0x%x) called from line %d of file %s.  Return address = 0x%x",
-			mp->m_fsname,flags,lnnum,fname,__return_address); 
+			mp->m_fsname,flags,lnnum,fname,__return_address);
 	}
 	/*
 	 * No need to duplicate efforts.
@@ -155,7 +155,7 @@ _xfs_force_shutdown(
 	    (mp->m_cxfstype & XFS_CXFS_SERVER) ) {
 		extern void cxfs_force_shutdown(xfs_mount_t *, int); /*@@@*/
 
-		/* 
+		/*
 		 * We're being called for a problem discovered locally.
 		 * Tell CXFS to pass along the shutdown request.
 		 * The check for cxfs server is done because xfs_goingdown
@@ -200,7 +200,7 @@ xfs_bioerror(
 
 	XFS_BUF_CLR_BDSTRAT_FUNC(bp);
 	xfs_biodone(bp);
-	
+
 	return (EIO);
 }
 
@@ -234,7 +234,7 @@ xfs_bioerror_relse(
 	XFS_BUF_DONE(bp);
 	XFS_BUF_STALE(bp);
 	XFS_BUF_CLR_IODONE_FUNC(bp);
- 	XFS_BUF_CLR_BDSTRAT_FUNC(bp);
+	XFS_BUF_CLR_BDSTRAT_FUNC(bp);
 	if (!(fl & XFS_B_ASYNC)) {
 		/*
 		 * Mark b_error and B_ERROR _both_.
@@ -250,18 +250,18 @@ xfs_bioerror_relse(
 	return (EIO);
 }
 /*
- * Prints out an ALERT message about I/O error. 
+ * Prints out an ALERT message about I/O error.
  */
 void
 xfs_ioerror_alert(
-	char 			*func,
+	char			*func,
 	struct xfs_mount	*mp,
 	xfs_buf_t		*bp,
 	xfs_daddr_t		blkno)
 {
 	cmn_err(CE_ALERT,
  "I/O error in filesystem (\"%s\") meta-data dev 0x%x block 0x%llx\n"
- "       (\"%s\") error %d buf count %u",
+ "	 (\"%s\") error %d buf count %u",
 		(!mp || !mp->m_fsname) ? "(fs name not set)" : mp->m_fsname,
 		kdev_t_to_nr(XFS_BUF_TARGET_DEV(bp)),
 		(__uint64_t)blkno,
@@ -284,13 +284,13 @@ int
 xfs_read_buf(
 	struct xfs_mount *mp,
 	buftarg_t	 *target,
-	xfs_daddr_t 	 blkno,
-	int              len,
-	uint             flags,
+	xfs_daddr_t	 blkno,
+	int		 len,
+	uint		 flags,
 	xfs_buf_t	 **bpp)
 {
 	xfs_buf_t	 *bp;
-	int 		 error;
+	int		 error;
 
 	if (flags)
 		bp = xfs_buf_read_flags(target, blkno, len, flags);
@@ -312,7 +312,7 @@ xfs_read_buf(
 			XFS_BUF_UNDONE(bp);
 			XFS_BUF_UNDELAYWRITE(bp);
 			XFS_BUF_STALE(bp);
-			/* 
+			/*
 			 * brelse clears B_ERROR and b_error
 			 */
 			xfs_buf_relse(bp);
@@ -320,9 +320,9 @@ xfs_read_buf(
 	}
 	return (error);
 }
-	
+
 /*
- * Wrapper around bwrite() so that we can trap 
+ * Wrapper around bwrite() so that we can trap
  * write errors, and act accordingly.
  */
 int
@@ -339,12 +339,12 @@ xfs_bwrite(
 	XFS_BUF_SET_FSPRIVATE3(bp, mp);
 	XFS_BUF_WRITE(bp);
 
-   	if ((error = XFS_bwrite(bp))) {
+	if ((error = XFS_bwrite(bp))) {
 		ASSERT(mp);
-		/* 
-		 * Cannot put a buftrace here since if the buffer is not 
-		 * B_HOLD then we will brelse() the buffer before returning 
-		 * from bwrite and we could be tracing a buffer that has 
+		/*
+		 * Cannot put a buftrace here since if the buffer is not
+		 * B_HOLD then we will brelse() the buffer before returning
+		 * from bwrite and we could be tracing a buffer that has
 		 * been reused.
 		 */
 		xfs_force_shutdown(mp, XFS_METADATA_IO_ERROR);
@@ -446,7 +446,7 @@ xfs_refcache_insert(
 	 * If we tuned the refcache down to zero, don't do anything.
 	 */
 	 if (!xfs_refcache_size) {
-	 	return;
+		return;
 	}
 
 	/*
@@ -477,7 +477,7 @@ xfs_refcache_insert(
 
 	/*
 	 * If we allocated memory for the refcache above and it still
-	 * needs it, then use the memory we allocated.  Otherwise we'll
+	 * needs it, then use the memory we allocated.	Otherwise we'll
 	 * free the memory below.
 	 */
 	if (refcache != NULL) {
@@ -548,7 +548,7 @@ void
 xfs_refcache_purge_ip(
 	xfs_inode_t	*ip)
 {
-	vnode_t	*vp;
+	vnode_t *vp;
 	int	error;
 
 	/*
@@ -587,7 +587,7 @@ xfs_refcache_purge_ip(
 
 /*
  * This is called from the XFS unmount code to purge all entries for the
- * given mount from the cache.  It uses the refcache busy counter to
+ * given mount from the cache.	It uses the refcache busy counter to
  * make sure that new entries are not added to the cache as we purge them.
  */
 void
@@ -651,8 +651,8 @@ xfs_refcache_purge_some(xfs_mount_t *mp)
 
 	iplist_index = 0;
 	purge_count = xfs_params.xfs_un.refcache_purge;
-	iplist = (xfs_inode_t **)kmem_zalloc(purge_count * 
-				          sizeof(xfs_inode_t *), KM_SLEEP);
+	iplist = (xfs_inode_t **)kmem_zalloc(purge_count *
+					  sizeof(xfs_inode_t *), KM_SLEEP);
 
 	spin_lock(&xfs_refcache_lock);
 
@@ -690,7 +690,7 @@ xfs_refcache_purge_some(xfs_mount_t *mp)
 	 */
 	if (xfs_refcache_count) {
 		del_timer_sync(&mp->m_sbdirty_timer);
-		mp->m_sbdirty_timer.data = 
+		mp->m_sbdirty_timer.data =
 		    (unsigned long)LINVFS_GET_IP(XFS_ITOV(mp->m_rootip))->i_sb;
 		mp->m_sbdirty_timer.expires = jiffies + 2*HZ;
 		add_timer(&mp->m_sbdirty_timer);
@@ -724,7 +724,7 @@ xfs_refcache_purge_some(xfs_mount_t *mp)
 void
 xfs_refcache_resize(int xfs_refcache_new_size)
 {
-	int 		i;
+	int		i;
 	xfs_inode_t	*ip;
 	int		iplist_index = 0;
 	xfs_inode_t	**iplist;
@@ -738,7 +738,7 @@ xfs_refcache_resize(int xfs_refcache_new_size)
 	 */
 	if (xfs_refcache && (xfs_refcache_new_size < xfs_refcache_size)) {
 
-		iplist = (xfs_inode_t **)kmem_zalloc(XFS_REFCACHE_SIZE_MAX * 
+		iplist = (xfs_inode_t **)kmem_zalloc(XFS_REFCACHE_SIZE_MAX *
 				sizeof(xfs_inode_t *), KM_SLEEP);
 
 		spin_lock(&xfs_refcache_lock);
@@ -757,7 +757,7 @@ xfs_refcache_resize(int xfs_refcache_new_size)
 
 		xfs_refcache_size = xfs_refcache_new_size;
 
-		/* 
+		/*
 		 * Move index to beginning of cache if it's now past the end
 		 */
 		if (xfs_refcache_index >= xfs_refcache_new_size)

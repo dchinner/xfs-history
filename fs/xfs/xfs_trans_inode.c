@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -38,13 +38,13 @@ STATIC void
 xfs_trans_inode_broot_debug(
 	xfs_inode_t	*ip);
 #else
-#define	xfs_trans_inode_broot_debug(ip)
+#define xfs_trans_inode_broot_debug(ip)
 #endif
 
 
 /*
  * Get and lock the inode for the caller if it is not already
- * locked within the given transaction.  If it is already locked
+ * locked within the given transaction.	 If it is already locked
  * within the transaction, just increment its lock recursion count
  * and return a pointer to it.
  *
@@ -52,8 +52,8 @@ xfs_trans_inode_broot_debug(
  * opposed to the io lock, must be taken exclusively.  This ensures
  * that the inode can be involved in only 1 transaction at a time.
  * Lock recursion is handled on the io lock, but only for lock modes
- * of equal or lesser strength.  That is, you can recur on the io lock
- * held EXCL with a SHARED request but not vice versa.  Also, if
+ * of equal or lesser strength.	 That is, you can recur on the io lock
+ * held EXCL with a SHARED request but not vice versa.	Also, if
  * the inode is already a part of the transaction then you cannot
  * go from not holding the io lock to having it EXCL or SHARED.
  *
@@ -169,7 +169,7 @@ xfs_trans_iget(
  * Release the inode ip which was previously acquired with xfs_trans_iget()
  * or added with xfs_trans_ijoin(). This will decrement the lock
  * recursion count of the inode item.  If the count goes to less than 0,
- * the inode will be unlocked and disassociated from the transaction. 
+ * the inode will be unlocked and disassociated from the transaction.
  *
  * If the inode has been modified within the transaction, it will not be
  * unlocked until the transaction commits.
@@ -191,7 +191,7 @@ xfs_trans_iput(
 	}
 
 	ASSERT(ip->i_transp == tp);
-	iip = ip->i_itemp;	
+	iip = ip->i_itemp;
 	ASSERT(iip != NULL);
 
 	/*
@@ -218,10 +218,10 @@ xfs_trans_iput(
 			iip->ili_iolock_recur--;
 		}
 	}
- 
+
 	/*
 	 * If the release is just for a recursive lock on the inode lock,
-	 * then decrement the count and return.  We can assert that
+	 * then decrement the count and return.	 We can assert that
 	 * the caller is dropping an EXCL lock on the inode, because
 	 * inode must be locked EXCL within transactions.
 	 */
@@ -268,7 +268,7 @@ xfs_trans_iput(
 /*
  * Add the locked inode to the transaction.
  * The inode must be locked, and it cannot be associated with any
- * transaction.  The caller must specify the locks already held
+ * transaction.	 The caller must specify the locks already held
  * on the inode.
  */
 void

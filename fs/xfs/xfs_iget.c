@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -38,7 +38,7 @@
  * Initialize the inode hash table for the newly mounted file system.
  *
  * mp -- this is the mount point structure for the file system being
- *       initialized
+ *	 initialized
  */
 void
 xfs_ihash_init(xfs_mount_t *mp)
@@ -72,7 +72,7 @@ xfs_ihash_free(xfs_mount_t *mp)
  * Initialize the inode cluster hash table for the newly mounted file system.
  *
  * mp -- this is the mount point structure for the file system being
- *       initialized
+ *	 initialized
  */
 void
 xfs_chash_init(xfs_mount_t *mp)
@@ -84,12 +84,12 @@ xfs_chash_init(xfs_mount_t *mp)
 	 * with a minimum of 37 entries
 	 */
 	mp->m_chsize = (XFS_BUCKETS(mp)) /
-		         (XFS_INODE_CLUSTER_SIZE(mp) >> mp->m_sb.sb_inodelog);
+			 (XFS_INODE_CLUSTER_SIZE(mp) >> mp->m_sb.sb_inodelog);
 	if (mp->m_chsize < 37) {
 		mp->m_chsize = 37;
 	}
 	mp->m_chash = (xfs_chash_t *)kmem_zalloc(mp->m_chsize
-						 * sizeof(xfs_chash_t), 
+						 * sizeof(xfs_chash_t),
 						 KM_SLEEP);
 	ASSERT(mp->m_chash != NULL);
 
@@ -126,7 +126,7 @@ xfs_iget_vnode_init(
 	vp->v_type  = IFTOVT(ip->i_d.di_mode);
 
 	/* If we have a real type for an on-disk inode, we can set ops(&unlock)
-	 * now.  If it's a new inode being created, xfs_ialloc will handle it.
+	 * now.	 If it's a new inode being created, xfs_ialloc will handle it.
 	 */
 	if (vp->v_type != VNON) {
 		linvfs_set_inode_ops(LINVFS_GET_IP(vp));
@@ -137,11 +137,11 @@ xfs_iget_vnode_init(
 /*
  * Look up an inode by number in the given file system.
  * The inode is looked up in the hash table for the file system
- * represented by the mount point parameter mp.  Each bucket of
+ * represented by the mount point parameter mp.	 Each bucket of
  * the hash table is guarded by an individual semaphore.
  *
  * If the inode is found in the hash table, its corresponding vnode
- * is obtained with a call to vn_get().  This call takes care of
+ * is obtained with a call to vn_get().	 This call takes care of
  * coordination with the reclamation of the inode and vnode.  Note
  * that the vmap structure is filled in while holding the hash lock.
  * This gives us the state of the inode/vnode when we found it and
@@ -154,12 +154,12 @@ xfs_iget_vnode_init(
  * This flag parameter indicates how and if the inode's IO lock and inode lock
  * should be taken.
  *
- * mp -- the mount point structure for the current file system.  It points
- *       to the inode hash table.
- * tp -- a pointer to the current transaction if there is one.  This is
- *       simply passed through to the xfs_iread() call.
+ * mp -- the mount point structure for the current file system.	 It points
+ *	 to the inode hash table.
+ * tp -- a pointer to the current transaction if there is one.	This is
+ *	 simply passed through to the xfs_iread() call.
  * ino -- the number of the inode desired.  This is the unique identifier
- *        within the file system for the inode being requested.
+ *	  within the file system for the inode being requested.
  * lock_flags -- flags indicating how to lock the inode.  See the comment
  *		 for xfs_ilock() for a list of valid values.
  * bno -- the block number starting the buffer containing the inode,
@@ -184,7 +184,7 @@ xfs_iget_core(
 	/* REFERENCED */
 	int		newnode;
 	xfs_chash_t	*ch;
-	xfs_chashlist_t	*chl, *chlnew;
+	xfs_chashlist_t *chl, *chlnew;
 	SPLDECL(s);
 
 
@@ -194,7 +194,7 @@ again:
 	mraccess(&ih->ih_lock);
 
 	for (ip = ih->ih_next; ip != NULL; ip = ip->i_next) {
-  		if (ip->i_ino == ino) {
+		if (ip->i_ino == ino) {
 
 			inode_vp = XFS_ITOV_NULL(ip);
 
@@ -206,7 +206,7 @@ again:
 
 					goto again;
 				}
-					
+
 				xfs_iget_vnode_init(mp, vp, ip);
 
 				vn_trace_exit(vp, "xfs_iget.alloc",
@@ -300,7 +300,7 @@ finish_inode:
 
 	/*
 	 * Read the disk inode attributes into a new inode structure and get
-	 * a new vnode for it.  Initialize the inode lock so we can idestroy
+	 * a new vnode for it.	Initialize the inode lock so we can idestroy
 	 * it soon if it's a dup.  This should also initialize i_dev, i_ino,
 	 * i_bno, i_mount, and i_index.
 	 */
@@ -363,7 +363,7 @@ finish_inode:
 	/*
 	 * put ip on its cluster's hash chain
 	 */
-	ASSERT(ip->i_chash == NULL && ip->i_cprev == NULL && 
+	ASSERT(ip->i_chash == NULL && ip->i_cprev == NULL &&
 	       ip->i_cnext == NULL);
 
 	chlnew = NULL;
@@ -373,7 +373,7 @@ finish_inode:
 	for (chl = ch->ch_list; chl != NULL; chl = chl->chl_next) {
 		if (chl->chl_blkno == ip->i_blkno) {
 
-			/* insert this inode into the doubly-linked list 
+			/* insert this inode into the doubly-linked list
 			 * where chl points */
 			if ((iq = chl->chl_ip)) {
 				ip->i_cprev = iq->i_cprev;
@@ -518,7 +518,7 @@ retry:
 			error = 0;
 		}
 	} else
-		error = ENOMEM;	/* If we got no inode we are out of memory */
+		error = ENOMEM; /* If we got no inode we are out of memory */
 
 	return error;
 }
@@ -606,7 +606,7 @@ xfs_inode_incore(xfs_mount_t	*mp,
 			}
 			break;
 		}
-	}	
+	}
 	mrunlock(&ih->ih_lock);
 	return (NULL);
 }
@@ -616,14 +616,14 @@ xfs_inode_incore(xfs_mount_t	*mp,
  *
  * ip -- the inode being released
  * lock_flags -- this parameter indicates the inode's locks to be
- *       to be released.  See the comment on xfs_iunlock() for a list
+ *	 to be released.  See the comment on xfs_iunlock() for a list
  *	 of valid values.
  */
 void
 xfs_iput(xfs_inode_t	*ip,
 	 uint		lock_flags)
 {
-	vnode_t	*vp = XFS_ITOV(ip);
+	vnode_t *vp = XFS_ITOV(ip);
 
 	vn_trace_entry(vp, "xfs_iput", (inst_t *)__return_address);
 
@@ -675,7 +675,7 @@ xfs_ireclaim(xfs_inode_t *ip)
 
 	/*
 	 * Here we do a spurious inode lock in order to coordinate with
-	 * xfs_sync().  This is because xfs_sync() references the inodes
+	 * xfs_sync().	This is because xfs_sync() references the inodes
 	 * in the mount list without taking references on the corresponding
 	 * vnodes.  We make that OK here by ensuring that we wait until
 	 * the inode is unlocked in xfs_sync() before we go ahead and
@@ -686,13 +686,13 @@ xfs_ireclaim(xfs_inode_t *ip)
 	xfs_ilock(ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 
 	/*
-	 * Release dquots (and their references) if any. An inode may escape 
+	 * Release dquots (and their references) if any. An inode may escape
 	 * xfs_inactive and get here via vn_alloc->vn_reclaim path.
 	 */
 	if (ip->i_udquot || ip->i_gdquot) {
 		xfs_qm_dqdettach_inode(ip);
 	}
-	
+
 	/*
 	 * Pull our behavior descriptor from the vnode chain.
 	 */
@@ -700,7 +700,7 @@ xfs_ireclaim(xfs_inode_t *ip)
 	if (vp) {
 		vn_bhv_remove(VN_BHV_HEAD(vp), XFS_ITOBHV(ip));
 	}
- 
+
 	/*
 	 * Free all memory associated with the inode.
 	 */
@@ -708,10 +708,10 @@ xfs_ireclaim(xfs_inode_t *ip)
 }
 
 /*
- * This routine removes an about-to-be-destroyed inode from 
+ * This routine removes an about-to-be-destroyed inode from
  * all of the lists in which it is lcoated with the exception
  * of the behavior chain.  It is used by xfs_ireclaim and
- * by cxfs relocation cocde, in which case, we are removing 
+ * by cxfs relocation cocde, in which case, we are removing
  * the xfs_inode but leaving the vnode alone since it has
  * been transformed into a client vnode.
  */
@@ -725,7 +725,7 @@ xfs_iextract(
 	xfs_chash_t	*ch;
 	xfs_chashlist_t *chl, *chm;
 	SPLDECL(s);
- 
+
 	ih = ip->i_hash;
 	mrupdate(&ih->ih_lock);
 	if ((iq = ip->i_next)) {
@@ -798,14 +798,14 @@ xfs_iextract(
 			mp->m_inodes = iq;
 		}
 	}
-	
+
 	mp->m_ireclaims++;
 	XFS_MOUNT_IUNLOCK(mp);
 }
 
 /*
  * This is a wrapper routine around the xfs_ilock() routine
- * used to centralize some grungy code.  It is used in places
+ * used to centralize some grungy code.	 It is used in places
  * that wish to lock the inode solely for reading the extents.
  * The reason these places can't just call xfs_ilock(SHARED)
  * is that the inode lock also guards to bringing in of the
@@ -853,7 +853,7 @@ xfs_iunlock_map_shared(
 
 /*
  * The xfs inode contains 2 locks: a multi-reader lock called the
- * i_iolock and a multi-reader lock called the i_lock.  This routine
+ * i_iolock and a multi-reader lock called the i_lock.	This routine
  * allows either or both of the locks to be obtained.
  *
  * The 2 locks should always be ordered so that the IO lock is
@@ -861,10 +861,10 @@ xfs_iunlock_map_shared(
  *
  * ip -- the inode being locked
  * lock_flags -- this parameter indicates the inode's locks
- *       to be locked.  It can be:
+ *	 to be locked.	It can be:
  *		XFS_IOLOCK_SHARED,
  *		XFS_IOLOCK_EXCL,
- *	 	XFS_ILOCK_SHARED,
+ *		XFS_ILOCK_SHARED,
  *		XFS_ILOCK_EXCL,
  *		XFS_IOLOCK_SHARED | XFS_ILOCK_SHARED,
  *		XFS_IOLOCK_SHARED | XFS_ILOCK_EXCL,
@@ -903,14 +903,14 @@ xfs_ilock(xfs_inode_t	*ip,
 
 /*
  * This is just like xfs_ilock(), except that the caller
- * is guaranteed not to sleep.  It returns 1 if it gets
- * the requested locks and 0 otherwise.  If the IO lock is
+ * is guaranteed not to sleep.	It returns 1 if it gets
+ * the requested locks and 0 otherwise.	 If the IO lock is
  * obtained but the inode lock cannot be, then the IO lock
  * is dropped before returning.
  *
  * ip -- the inode being locked
  * lock_flags -- this parameter indicates the inode's locks to be
- *       to be locked.  See the comment for xfs_ilock() for a list
+ *	 to be locked.	See the comment for xfs_ilock() for a list
  *	 of valid values.
  *
  */
@@ -969,18 +969,18 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 
 /*
  * xfs_iunlock() is used to drop the inode locks acquired with
- * xfs_ilock() and xfs_ilock_nowait().  The caller must pass
+ * xfs_ilock() and xfs_ilock_nowait().	The caller must pass
  * in the flags given to xfs_ilock() or xfs_ilock_nowait() so
  * that we know which locks to drop.
  *
  * ip -- the inode being unlocked
  * lock_flags -- this parameter indicates the inode's locks to be
- *       to be unlocked.  See the comment for xfs_ilock() for a list
+ *	 to be unlocked.  See the comment for xfs_ilock() for a list
  *	 of valid values for this parameter.
  *
  */
 void
-xfs_iunlock(xfs_inode_t	*ip,
+xfs_iunlock(xfs_inode_t *ip,
 	    uint	lock_flags)
 {
 	/*
@@ -1027,7 +1027,7 @@ xfs_iunlock(xfs_inode_t	*ip,
 }
 
 /*
- * give up write locks.  the i/o lock cannot be held nested
+ * give up write locks.	 the i/o lock cannot be held nested
  * if it is being demoted.
  */
 void

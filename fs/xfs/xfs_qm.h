@@ -1,40 +1,40 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 #ifndef __XFS_QM_H__
 #define __XFS_QM_H__
 
-struct  xfs_dqhash;
-struct  xfs_inode;
-struct  xfs_dquot;
+struct	xfs_dqhash;
+struct	xfs_inode;
+struct	xfs_dquot;
 
 extern xfs_zone_t	*qm_dqzone;
 extern xfs_zone_t	*qm_dqtrxzone;
@@ -70,9 +70,9 @@ extern xfs_zone_t	*qm_dqtrxzone;
 #define XFS_QM_BIG_QCHECK_NBLKS		500
 
 /*
- * This defines the unit of allocation of dquots. 
- * Currently, it is just one file system block, and a 4K blk contains 30 
- * (136 * 30 = 4080) dquots. It's probably not worth trying to make 
+ * This defines the unit of allocation of dquots.
+ * Currently, it is just one file system block, and a 4K blk contains 30
+ * (136 * 30 = 4080) dquots. It's probably not worth trying to make
  * this more dynamic.
  * XXXsup However, if this number is changed, we have to make sure that we don't
  * implicitly assume that we do allocations in chunks of a single filesystem
@@ -91,11 +91,11 @@ typedef xfs_dqhash_t	xfs_dqlist_t;
  * xfs_dquot_t structure (in xfs_dqmarker_t)
  */
 typedef struct xfs_frlist {
-       struct xfs_dquot	*qh_next;
-       struct xfs_dquot	*qh_prev;
-       mutex_t	 	 qh_lock;
-       uint      	 qh_version;
-       uint	 	 qh_nelems;
+       struct xfs_dquot *qh_next;
+       struct xfs_dquot *qh_prev;
+       mutex_t		 qh_lock;
+       uint		 qh_version;
+       uint		 qh_nelems;
 } xfs_frlist_t;
 
 /*
@@ -104,8 +104,8 @@ typedef struct xfs_frlist {
 typedef struct xfs_qm {
 	xfs_dqlist_t	*qm_usr_dqhtable;/* udquot hash table */
 	xfs_dqlist_t	*qm_grp_dqhtable;/* gdquot hash table */
-	uint		 qm_dqhashmask;  /* # buckets in dq hashtab - 1 */
-	xfs_frlist_t	 qm_dqfreelist;  /* freelist of dquots */
+	uint		 qm_dqhashmask;	 /* # buckets in dq hashtab - 1 */
+	xfs_frlist_t	 qm_dqfreelist;	 /* freelist of dquots */
 	atomic_t	 qm_totaldquots; /* total incore dquots */
 	uint		 qm_nrefs;	 /* file systems with quota on */
 	int		 qm_dqfree_ratio;/* ratio of free to inuse dquots */
@@ -118,22 +118,22 @@ typedef struct xfs_qm {
  * The mount structure keeps a pointer to this.
  */
 typedef struct xfs_quotainfo {
- 	xfs_inode_t	*qi_uquotaip;	 /* user quota inode */
+	xfs_inode_t	*qi_uquotaip;	 /* user quota inode */
 	xfs_inode_t	*qi_gquotaip;	 /* group quota inode */
-	lock_t           qi_pinlock;     /* dquot pinning mutex */
-	xfs_dqlist_t	 qi_dqlist;      /* all dquots in filesys */
-	int		 qi_dqreclaims;  /* a change here indicates
+	lock_t		 qi_pinlock;	 /* dquot pinning mutex */
+	xfs_dqlist_t	 qi_dqlist;	 /* all dquots in filesys */
+	int		 qi_dqreclaims;	 /* a change here indicates
 					    a removal in the dqlist */
-	time_t		 qi_btimelimit;  /* limit for blks timer */	
-	time_t		 qi_itimelimit;  /* limit for inodes timer */	
-	time_t		 qi_rtbtimelimit;/* limit for rt blks timer */	
+	time_t		 qi_btimelimit;	 /* limit for blks timer */
+	time_t		 qi_itimelimit;	 /* limit for inodes timer */
+	time_t		 qi_rtbtimelimit;/* limit for rt blks timer */
 	xfs_qwarncnt_t	 qi_bwarnlimit;	 /* limit for num warnings */
 	xfs_qwarncnt_t	 qi_iwarnlimit;	 /* limit for num warnings */
 	mutex_t		 qi_quotaofflock;/* to serialize quotaoff */
 	/* Some useful precalculated constants */
-	xfs_filblks_t	 qi_dqchunklen;  /* # BBs in a chunk of dqs */
-	uint		 qi_dqperchunk;  /* # ondisk dqs in above chunk */
-} xfs_quotainfo_t;	
+	xfs_filblks_t	 qi_dqchunklen;	 /* # BBs in a chunk of dqs */
+	uint		 qi_dqperchunk;	 /* # ondisk dqs in above chunk */
+} xfs_quotainfo_t;
 
 
 /*
@@ -154,7 +154,7 @@ typedef struct xfs_dqtrx {
 	long		qt_rtbcount_delta;/* dquot realtime blk changes */
 	long		qt_delrtb_delta;  /* delayed RT blk count changes */
 } xfs_dqtrx_t;
- 
+
 /*
  * We keep the usr and grp dquots separately so that locking will be easier
  * to do at commit time. All transactions that we know of at this point
@@ -183,16 +183,16 @@ typedef struct xfs_dquot_acct {
 #define XFS_QM_RELE(xqm)	((xqm)->qm_nrefs--)
 
 extern int		xfs_qm_init_quotainfo(xfs_mount_t *);
-extern void 		xfs_qm_destroy_quotainfo(xfs_mount_t *);
+extern void		xfs_qm_destroy_quotainfo(xfs_mount_t *);
 extern void		xfs_qm_dqunlink(xfs_dquot_t *);
 extern boolean_t	xfs_qm_dqalloc_incore(xfs_dquot_t **);
-extern int 		xfs_qm_write_sb_changes(xfs_mount_t *, __int64_t);
+extern int		xfs_qm_write_sb_changes(xfs_mount_t *, __int64_t);
 
 /* list stuff */
 extern void		xfs_qm_freelist_init(xfs_frlist_t *);
 extern void		xfs_qm_freelist_destroy(xfs_frlist_t *);
 extern void		xfs_qm_freelist_insert(xfs_frlist_t *, xfs_dquot_t *);
-extern void 		xfs_qm_freelist_append(xfs_frlist_t *, xfs_dquot_t *);
+extern void		xfs_qm_freelist_append(xfs_frlist_t *, xfs_dquot_t *);
 extern void		xfs_qm_freelist_unlink(xfs_dquot_t *);
 extern int		xfs_qm_freelist_lock_nowait(xfs_qm_t *);
 extern int		xfs_qm_mplist_nowait(xfs_mount_t *);

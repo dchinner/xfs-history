@@ -1,42 +1,42 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
 /*
  *	page_buf_io.c
  *
- * 	See generic comments about page_bufs in page_buf.c. This file deals with
- * 	file I/O (reads & writes) including delayed allocation & direct IO.
+ *	See generic comments about page_bufs in page_buf.c. This file deals with
+ *	file I/O (reads & writes) including delayed allocation & direct IO.
  *
- *      Written by Steve Lord, Jim Mostek, Russell Cattelan
+ *	Written by Steve Lord, Jim Mostek, Russell Cattelan
  *		    and Rajagopal Ananthanarayanan ("ananth") at SGI.
  *
  */
@@ -49,7 +49,7 @@
 
 #include "page_buf_internal.h"
 
-#define MAX_BUF_PER_PAGE 	(PAGE_CACHE_SIZE / 512)
+#define MAX_BUF_PER_PAGE	(PAGE_CACHE_SIZE / 512)
 #define PBF_MAX_MAPS		1 /* TODO: XFS_BMAP_MAX_NMAP? */
 
 /*
@@ -187,7 +187,7 @@ probe_unmapped_page(
 	struct address_space	*mapping,
 	unsigned long		index,
 	unsigned int		pg_offset)
-{ 
+{
 	struct page		*page;
 	int			ret = 0;
 
@@ -322,7 +322,7 @@ map_page(
 	int			startio,
 	int			all_bh)
 {
-	struct buffer_head 	*bh, *head;
+	struct buffer_head	*bh, *head;
 	page_buf_bmap_t		*mp = maps, *tmp;
 	unsigned long		end, offset, end_index;
 	int			i = 0, index = 0;
@@ -423,7 +423,7 @@ pagebuf_delalloc_convert(
 	int			startio,	/* start io on the page */
 	int			allocate_space)
 {
-	struct buffer_head 	*bh, *head;
+	struct buffer_head	*bh, *head;
 	struct buffer_head	*bh_arr[MAX_BUF_PER_PAGE];
 	page_buf_bmap_t		*mp, maps[PBF_MAX_MAPS];
 	int			i, cnt = 0;

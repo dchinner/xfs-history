@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -42,8 +42,8 @@ STATIC uint
 xfs_qm_dquot_logitem_size(
 	xfs_dq_logitem_t	*logitem)
 {
-	/* 
-	 * we need only two iovecs, one for the format, one for the real thing 
+	/*
+	 * we need only two iovecs, one for the format, one for the real thing
 	 */
 	return (2);
 }
@@ -67,7 +67,7 @@ xfs_qm_dquot_logitem_format(
 
 	ASSERT(2 == logitem->qli_item.li_desc->lid_size);
 	logitem->qli_format.qlf_size = 2;
-	
+
 }
 
 /*
@@ -78,9 +78,9 @@ STATIC void
 xfs_qm_dquot_logitem_pin(
 	xfs_dq_logitem_t *logitem)
 {
-	unsigned long 	s;
+	unsigned long	s;
 	xfs_dquot_t *dqp;
-	
+
 	dqp = logitem->qli_dquot;
 	ASSERT(XFS_DQ_IS_LOCKED(dqp));
 	s = XFS_DQ_PINLOCK(dqp);
@@ -90,14 +90,14 @@ xfs_qm_dquot_logitem_pin(
 
 /*
  * Decrement the pin count of the given dquot, and wake up
- * anyone in xfs_dqwait_unpin() if the count goes to 0.  The
+ * anyone in xfs_dqwait_unpin() if the count goes to 0.	 The
  * dquot must have been previously pinned with a call to xfs_dqpin().
  */
 STATIC void
 xfs_qm_dquot_logitem_unpin(
 	xfs_dq_logitem_t *logitem)
 {
-	unsigned long 	s;
+	unsigned long	s;
 	xfs_dquot_t *dqp;
 
 	dqp = logitem->qli_dquot;
@@ -132,19 +132,19 @@ xfs_qm_dquot_logitem_push(
 	xfs_dquot_t	*dqp;
 
 	dqp = logitem->qli_dquot;
-	
+
 	ASSERT(XFS_DQ_IS_LOCKED(dqp));
-	ASSERT(XFS_DQ_IS_FLUSH_LOCKED(dqp));  
-     
-        /*
-         * Since we were able to lock the dquot's flush lock and
-         * we found it on the AIL, the dquot must be dirty.  This
-         * is because the dquot is removed from the AIL while still
-         * holding the flush lock in xfs_dqflush_done().  Thus, if
-         * we found it in the AIL and were able to obtain the flush
-         * lock without sleeping, then there must not have been
-         * anyone in the process of flushing the dquot.
-         */
+	ASSERT(XFS_DQ_IS_FLUSH_LOCKED(dqp));
+
+	/*
+	 * Since we were able to lock the dquot's flush lock and
+	 * we found it on the AIL, the dquot must be dirty.  This
+	 * is because the dquot is removed from the AIL while still
+	 * holding the flush lock in xfs_dqflush_done().  Thus, if
+	 * we found it in the AIL and were able to obtain the flush
+	 * lock without sleeping, then there must not have been
+	 * anyone in the process of flushing the dquot.
+	 */
 	xfs_qm_dqflush(dqp, XFS_B_DELWRI);
 	xfs_dqunlock(dqp);
 }
@@ -172,7 +172,7 @@ xfs_qm_dqunpin_wait(
 	xfs_dquot_t	*dqp)
 {
 	SPLDECL(s);
-	
+
 	ASSERT(XFS_DQ_IS_LOCKED(dqp));
 	if (dqp->q_pincount == 0) {
 		return;
@@ -204,11 +204,11 @@ xfs_qm_dqunpin_wait(
  */
 STATIC void
 xfs_qm_dquot_logitem_pushbuf(
-        xfs_dq_logitem_t    *qip)
+	xfs_dq_logitem_t    *qip)
 {
 	xfs_dquot_t	*dqp;
 	xfs_mount_t	*mp;
-	xfs_buf_t 	*bp;
+	xfs_buf_t	*bp;
 	uint		dopush;
 
 	dqp = qip->qli_dquot;
@@ -220,7 +220,7 @@ xfs_qm_dquot_logitem_pushbuf(
 	 */
 	ASSERT(qip->qli_pushbuf_flag != 0);
 	ASSERT(qip->qli_push_owner == get_thread_id());
-	
+
 	/*
 	 * If flushlock isn't locked anymore, chances are that the
 	 * inode flush completed and the inode was taken off the AIL.
@@ -230,15 +230,15 @@ xfs_qm_dquot_logitem_pushbuf(
 	    ((qip->qli_item.li_flags & XFS_LI_IN_AIL) == 0)) {
 		qip->qli_pushbuf_flag = 0;
 		xfs_dqunlock(dqp);
-	    	return;
+		return;
 	}
 	mp = dqp->q_mount;
-	bp = xfs_incore(mp->m_ddev_targ, qip->qli_format.qlf_blkno, 
+	bp = xfs_incore(mp->m_ddev_targ, qip->qli_format.qlf_blkno,
 		    XFS_QI_DQCHUNKLEN(mp),
 		    XFS_INCORE_TRYLOCK);
 	if (bp != NULL) {
 		if (XFS_BUF_ISDELAYWRITE(bp)) {
-			dopush = ((qip->qli_item.li_flags & XFS_LI_IN_AIL) && 
+			dopush = ((qip->qli_item.li_flags & XFS_LI_IN_AIL) &&
 				  (valusema(&(dqp->q_flock)) <= 0));
 			qip->qli_pushbuf_flag = 0;
 			xfs_dqunlock(dqp);
@@ -251,21 +251,21 @@ xfs_qm_dquot_logitem_pushbuf(
 #ifdef XFSRACEDEBUG
 				delay_for_intr();
 				delay(300);
-#endif				
+#endif
 				xfs_bawrite(mp, bp);
 			} else {
 				xfs_buf_relse(bp);
 			}
 		} else {
 			qip->qli_pushbuf_flag = 0;
-			xfs_dqunlock(dqp);		
+			xfs_dqunlock(dqp);
 			xfs_buf_relse(bp);
 		}
 		return;
 	}
 
 	qip->qli_pushbuf_flag = 0;
-	xfs_dqunlock(dqp);	
+	xfs_dqunlock(dqp);
 }
 
 /*
@@ -280,36 +280,36 @@ xfs_qm_dquot_logitem_pushbuf(
  */
 STATIC uint
 xfs_qm_dquot_logitem_trylock(
-        xfs_dq_logitem_t	*qip)
+	xfs_dq_logitem_t	*qip)
 {
-	xfs_dquot_t	        *dqp;
+	xfs_dquot_t		*dqp;
 	uint			retval;
 
 	dqp = qip->qli_dquot;
 	if (dqp->q_pincount > 0)
 		return (XFS_ITEM_PINNED);
-	
+
 	if (! xfs_qm_dqlock_nowait(dqp))
 		return (XFS_ITEM_LOCKED);
-	
+
 	retval = XFS_ITEM_SUCCESS;
 	if (! xfs_qm_dqflock_nowait(dqp)) {
-		/* 
-                 * The dquot is already being flushed.  It may have been
-                 * flushed delayed write, however, and we don't want to
-                 * get stuck waiting for that to complete.  So, we want to check
-                 * to see if we can lock the dquot's buffer without sleeping.
-                 * If we can and it is marked for delayed write, then we
-                 * hold it and send it out from the push routine.  We don't
-                 * want to do that now since we might sleep in the device
-                 * strategy routine.  We also don't want to grab the buffer lock
+		/*
+		 * The dquot is already being flushed.	It may have been
+		 * flushed delayed write, however, and we don't want to
+		 * get stuck waiting for that to complete.  So, we want to check
+		 * to see if we can lock the dquot's buffer without sleeping.
+		 * If we can and it is marked for delayed write, then we
+		 * hold it and send it out from the push routine.  We don't
+		 * want to do that now since we might sleep in the device
+		 * strategy routine.  We also don't want to grab the buffer lock
 		 * here because we'd like not to call into the buffer cache
 		 * while holding the AIL_LOCK.
 		 * Make sure to only return PUSHBUF if we set pushbuf_flag
-		 * ourselves.  If someone else is doing it then we don't 
+		 * ourselves.  If someone else is doing it then we don't
 		 * want to go to the push routine and duplicate their efforts.
-                 */
-                if (qip->qli_pushbuf_flag == 0) {
+		 */
+		if (qip->qli_pushbuf_flag == 0) {
 			qip->qli_pushbuf_flag = 1;
 			ASSERT(qip->qli_format.qlf_blkno == dqp->q_blkno);
 #ifdef DEBUG
@@ -324,7 +324,7 @@ xfs_qm_dquot_logitem_trylock(
 			xfs_dqunlock_nonotify(dqp);
 		}
 	}
-	
+
 	ASSERT(qip->qli_item.li_flags & XFS_LI_IN_AIL);
 	return (retval);
 }
@@ -334,11 +334,11 @@ xfs_qm_dquot_logitem_trylock(
  * Unlock the dquot associated with the log item.
  * Clear the fields of the dquot and dquot log item that
  * are specific to the current transaction.  If the
- * hold flags is set, do not unlock the dquot.  
+ * hold flags is set, do not unlock the dquot.
  */
 STATIC void
 xfs_qm_dquot_logitem_unlock(
-        xfs_dq_logitem_t    *ql)
+	xfs_dq_logitem_t    *ql)
 {
 	xfs_dquot_t	*dqp;
 
@@ -347,8 +347,8 @@ xfs_qm_dquot_logitem_unlock(
 	ASSERT(XFS_DQ_IS_LOCKED(dqp));
 
 	/*
-         * Clear the transaction pointer in the dquot
-         */
+	 * Clear the transaction pointer in the dquot
+	 */
 	dqp->q_transp = NULL;
 
 	/*
@@ -368,9 +368,9 @@ xfs_qm_dquot_logitem_unlock(
  */
 STATIC void
 xfs_qm_dquot_logitem_abort(
-        xfs_dq_logitem_t    *ql)
+	xfs_dq_logitem_t    *ql)
 {
-        xfs_qm_dquot_logitem_unlock(ql);
+	xfs_qm_dquot_logitem_unlock(ql);
 }
 
 /*
@@ -406,7 +406,7 @@ struct xfs_item_ops xfs_dquot_item_ops = {
 	iop_push:	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_push,
 	iop_abort:	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_abort,
 	iop_pushbuf:	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_pushbuf,
-	iop_committing:	(void(*)(xfs_log_item_t*, xfs_lsn_t))
+	iop_committing: (void(*)(xfs_log_item_t*, xfs_lsn_t))
 					xfs_qm_dquot_logitem_committing
 };
 
@@ -433,7 +433,7 @@ xfs_qm_dquot_logitem_init(
 	/*
 	 * This is just the offset of this dquot within its buffer
 	 * (which is currently 1 FSB and probably won't change).
-	 * Hence 32 bits for this offset should be just fine. 
+	 * Hence 32 bits for this offset should be just fine.
 	 * Alternatively, we can store (bufoffset / sizeof(xfs_dqblk_t))
 	 * here, and recompute it at recovery time.
 	 */
@@ -471,7 +471,7 @@ xfs_qm_qoff_logitem_format(xfs_qoff_logitem_t	*qf,
 	log_vector->i_len = sizeof(xfs_qoff_logitem_t);
 	qf->qql_format.qf_size = 1;
 }
-	
+
 
 /*
  * Pinning has no meaning for an quotaoff item, so just return.
@@ -525,7 +525,7 @@ xfs_qm_qoff_logitem_unlock(xfs_qoff_logitem_t *qf)
 
 /*
  * The quotaoff-start-item is logged only once and cannot be moved in the log,
- * so simply return the lsn at which it's been logged.  
+ * so simply return the lsn at which it's been logged.
  */
 /*ARGSUSED*/
 STATIC xfs_lsn_t
@@ -560,12 +560,12 @@ xfs_qm_qoff_logitem_push(xfs_qoff_logitem_t *qf)
 /*ARGSUSED*/
 STATIC xfs_lsn_t
 xfs_qm_qoffend_logitem_committed(
-	xfs_qoff_logitem_t *qfe, 
+	xfs_qoff_logitem_t *qfe,
 	xfs_lsn_t lsn)
 {
-	xfs_qoff_logitem_t 	*qfs;
+	xfs_qoff_logitem_t	*qfs;
 	SPLDECL(s);
-	
+
 	qfs = qfe->qql_start_lip;
 	AIL_LOCK(qfs->qql_item.li_mountp,s);
 	/*
@@ -621,7 +621,7 @@ struct xfs_item_ops xfs_qm_qoffend_logitem_ops = {
 	iop_push:	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_push,
 	iop_abort:	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_abort,
 	iop_pushbuf:	NULL,
-	iop_committing:	(void(*)(xfs_log_item_t*, xfs_lsn_t))
+	iop_committing: (void(*)(xfs_log_item_t*, xfs_lsn_t))
 					xfs_qm_qoffend_logitem_committing
 };
 
@@ -643,7 +643,7 @@ struct xfs_item_ops xfs_qm_qoff_logitem_ops = {
 	iop_push:	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_push,
 	iop_abort:	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_abort,
 	iop_pushbuf:	NULL,
-	iop_committing:	(void(*)(xfs_log_item_t*, xfs_lsn_t))
+	iop_committing: (void(*)(xfs_log_item_t*, xfs_lsn_t))
 					xfs_qm_qoff_logitem_committing
 };
 
@@ -652,7 +652,7 @@ struct xfs_item_ops xfs_qm_qoff_logitem_ops = {
  */
 xfs_qoff_logitem_t *
 xfs_qm_qoff_logitem_init(
-	struct xfs_mount *mp, 
+	struct xfs_mount *mp,
 	xfs_qoff_logitem_t *start,
 	uint flags)
 {
@@ -661,7 +661,7 @@ xfs_qm_qoff_logitem_init(
 	qf = (xfs_qoff_logitem_t*) kmem_zalloc(sizeof(xfs_qoff_logitem_t), KM_SLEEP);
 
 	qf->qql_item.li_type = XFS_LI_QUOTAOFF;
-	if (start) 
+	if (start)
 		qf->qql_item.li_ops = &xfs_qm_qoffend_logitem_ops;
 	else
 		qf->qql_item.li_ops = &xfs_qm_qoff_logitem_ops;
