@@ -21,7 +21,7 @@
 #include <sys/vfs.h>
 #include <sys/pvfs.h>
 #include <sys/vnode.h>
-#include <sys/behavior.h>
+#include <ksys/behavior.h>
 #include <sys/statvfs.h>
 
 #undef MS_RDONLY
@@ -33,6 +33,7 @@
 #include <xfs_clnt.h>
 #include <xfs_inum.h>
 #include <sys/uuid.h>
+#include <sys/pvfs.h>
 #include <xfs_sb.h>
 
 /*

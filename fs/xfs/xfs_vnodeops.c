@@ -63,7 +63,10 @@
 #include <sys/capability.h>
 #include <sys/flock.h>
 #include <sys/kfcntl.h>
+#ifndef __linux__
+/* don't want userland mem* */
 #include <string.h>
+#endif
 #include <sys/dirent.h>
 #include <sys/attributes.h>
 #include <sys/major.h>

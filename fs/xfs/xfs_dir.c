@@ -39,7 +39,9 @@
 #ifdef CELL_CAPABLE
 #include <sys/kthread.h>
 #endif
+#ifndef __linux__
 #include <string.h>
+#endif
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"

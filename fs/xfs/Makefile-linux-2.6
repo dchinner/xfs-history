@@ -76,10 +76,12 @@ O_OBJS :=  $(XFS_OBJS) $(LINO_OBJS) libgcc.a
 
 include $(TOPDIR)/Rules.make
 
+CFLAGS	= -Wstrict-prototypes -O2 -fomit-frame-pointer
+
 #%.o: %.c
 #	$(CC) $(XFS_CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$@) -c -o $@ $<
 #	@ ( \
-#		echo 'ifeq ($(strip $(subst $(comma),:,$(XFS_CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$@))),$$(strip $$(subst $$(comma),:,$$(CFLAGS) $$(EXTRA_CFLAGS) $$(CFLAGS_$@))))' ; \
+#		echo 'ifeq ($(strip $(subst $(comma),:,$(XFS_CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$@))),$$(strip $$(subst $$(comma),:,$$(XFS_CFLAGS) $$(EXTRA_CFLAGS) $$(CFLAGS_$@))))' ; \
 #		echo 'FILES_FLAGS_UP_TO_DATE += $@' ; \
 #		echo 'endif' \
 #	) > $(dir $@)/.$(notdir $@).flags
