@@ -123,14 +123,16 @@ typedef struct xfs_dirent32 {	/* Irix5 view of dirent structure */
 /* try 64 bit first */
 #define get_current_abi()	ABI_IRIX5_64
 
-#define _PAGESZ		PAGE_SIZE
 #define NBPP		PAGE_SIZE 
 #define DPPSHFT		(PAGE_SHIFT - 9)
 #define NDPP		(1 << (PAGE_SHIFT - 9))
 #define dtop(DD)	(((DD) + NDPP - 1) >> DPPSHFT)
 #define dtopt(DD)	((DD) >> DPPSHFT)
 #define dpoff(DD)	((DD) & (NDPP-1))
-#define NBBY    8       /* number of bits per byte */
+
+#define NBBY		8		/* number of bits per byte */
+#define	NBPC		PAGE_SIZE	/* Number of bytes per click */
+#define	BPCSHIFT	PAGE_SHIFT	/* LOG2(NBPC) if exact */
 
 /*
  * Size of block device i/o is parameterized here.
@@ -141,77 +143,29 @@ typedef struct xfs_dirent32 {	/* Irix5 view of dirent structure */
 /* number of BB's per block device block */
 #define	BLKDEV_BB		BTOBB(BLKDEV_IOSIZE)
 
-#define	NBPC		_PAGESZ	/* Number of bytes per click */
-
-#if	NBPC == 4096
-#define	BPCSHIFT	12	/* LOG2(NBPC) if exact */
-#define CPSSHIFT	10	/* LOG2(NCPS) if exact */
-#endif
-#if	NBPC == 8192
-#define	BPCSHIFT	13	/* LOG2(NBPC) if exact */
-#define CPSSHIFT	11	/* LOG2(NCPS) if exact */
-#endif
-#if	NBPC == 16384
-#define	BPCSHIFT	14	/* LOG2(NBPC) if exact */
-#ifndef	PTE_64BIT
-#define CPSSHIFT	12	/* LOG2(NCPS) if exact */
-#else	/* PTE_64BIT */
-#define CPSSHIFT	11	/* LOG2(NCPS) if exact */
-#endif	/* PTE_64BIT */
-#endif
-
 /* bytes to clicks */
-#ifdef BPCSHIFT
 #define	btoc(x)		(((__psunsigned_t)(x)+(NBPC-1))>>BPCSHIFT)
 #define	btoct(x)	((__psunsigned_t)(x)>>BPCSHIFT)
 #define	btoc64(x)	(((__uint64_t)(x)+(NBPC-1))>>BPCSHIFT)
 #define	btoct64(x)	((__uint64_t)(x)>>BPCSHIFT)
 #define	io_btoc(x)	(((__psunsigned_t)(x)+(IO_NBPC-1))>>IO_BPCSHIFT)
 #define	io_btoct(x)	((__psunsigned_t)(x)>>IO_BPCSHIFT)
-#else
-#define	btoc(x)		(((__psunsigned_t)(x)+(NBPC-1))/NBPC)
-#define	btoct(x)	((__psunsigned_t)(x)/NBPC)
-#define	btoc64(x)	(((__uint64_t)(x)+(NBPC-1))/NBPC)
-#define	btoct64(x)	((__uint64_t)(x)/NBPC)
-#define	io_btoc(x)	(((__psunsigned_t)(x)+(IO_NBPC-1))/IO_NBPC)
-#define	io_btoct(x)	((__psunsigned_t)(x)/IO_NBPC)
-#endif
 
 /* off_t bytes to clicks */
-#ifdef BPCSHIFT
 #define offtoc(x)       (((__uint64_t)(x)+(NBPC-1))>>BPCSHIFT)
 #define offtoct(x)      ((xfs_off_t)(x)>>BPCSHIFT)
-#else
-#define offtoc(x)       (((__uint64_t)(x)+(NBPC-1))/NBPC)
-#define offtoct(x)      ((xfs_off_t)(x)/NBPC)
-#endif
 
 /* clicks to off_t bytes */
-#ifdef BPCSHIFT
 #define	ctooff(x)	((xfs_off_t)(x)<<BPCSHIFT)
-#else
-#define	ctooff(x)	((xfs_off_t)(x)*NBPC)
-#endif
 
 /* clicks to bytes */
-#ifdef BPCSHIFT
 #define	ctob(x)		((__psunsigned_t)(x)<<BPCSHIFT)
 #define btoct(x)        ((__psunsigned_t)(x)>>BPCSHIFT)
 #define	ctob64(x)	((__uint64_t)(x)<<BPCSHIFT)
 #define	io_ctob(x)	((__psunsigned_t)(x)<<IO_BPCSHIFT)
-#else
-#define	ctob(x)		((__psunsigned_t)(x)*NBPC)
-#define btoct(x)        ((__psunsigned_t)(x)/NBPC)
-#define	ctob64(x)	((__uint64_t)(x)*NBPC)
-#define	io_ctob(x)	((__psunsigned_t)(x)*IO_NBPC)
-#endif
 
 /* bytes to clicks */
-#ifdef BPCSHIFT
 #define btoc(x)         (((__psunsigned_t)(x)+(NBPC-1))>>BPCSHIFT)
-#else
-#define btoc(x)         (((__psunsigned_t)(x)+(NBPC-1))/NBPC)
-#endif
 
 #ifndef CELL_CAPABLE
 #define CELL_ONLY(x)
