@@ -521,7 +521,7 @@ finish_inode:
 	}
 #endif
 
-	error = vn_revalidate(vp, ATTR_LAZY);	/* Update the linux inode */
+	error = vn_revalidate(vp, ATTR_COMM|ATTR_LAZY);	/* Update the linux inode */
 
 	/*
 	 * If we got this vnode via vn_alloc, it's been

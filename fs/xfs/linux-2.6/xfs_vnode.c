@@ -211,7 +211,7 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 
 		linvfs_set_inode_ops(inode);
 		{ int error;
-		error = linvfs_revalidate_core(inode);
+		error = linvfs_revalidate_core(inode, ATTR_COMM);
 		if(error)
 			printk("vn_initialize: linvfs_revalidate_core "
 				"error %d\n",error);
@@ -390,7 +390,7 @@ vn_revalidate(struct vnode *vp, int flags)
 
 	ASSERT(vp->v_bh.bh_first != NULL);
 
-	VOP_GETATTR(vp, &va, flags, NULL, error);
+	VOP_GETATTR(vp, &va, flags & ATTR_LAZY, NULL, error);
 
 	if (! error) {
 		inode = LINVFS_GET_IP(vp);
@@ -404,7 +404,8 @@ vn_revalidate(struct vnode *vp, int flags)
 		inode->i_rdev       = va.va_rdev;
 		inode->i_blksize    = va.va_blksize;
 		inode->i_generation = va.va_gencount;
-		if (S_ISREG(inode->i_mode) ||
+		if ((flags & ATTR_COMM) ||
+		    S_ISREG(inode->i_mode) ||
 		    S_ISDIR(inode->i_mode) ||
 		    S_ISLNK(inode->i_mode)) {
 			inode->i_size       = va.va_size;

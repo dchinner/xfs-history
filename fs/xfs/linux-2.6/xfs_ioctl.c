@@ -347,7 +347,7 @@ xfs_open_by_handle(
 	/*
 	 * Fix the mode flags that linvfs_set_inode_ops bashes.
 	 */
-	error = linvfs_revalidate_core(inode);
+	error = linvfs_revalidate_core(inode, ATTR_COMM);
 	if (error) {
 		iput(inode);
 		return -XFS_ERROR(error);

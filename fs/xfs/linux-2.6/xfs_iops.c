@@ -119,7 +119,7 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 		}
 		linvfs_set_inode_ops(ip);
 		/* linvfs_revalidate_core returns (-) errors */
-		error = -linvfs_revalidate_core(ip);
+		error = -linvfs_revalidate_core(ip, ATTR_COMM);
 		validate_fields(dir);
 		d_instantiate(dentry, ip);
 	}
@@ -169,7 +169,7 @@ struct dentry * linvfs_lookup(struct inode *dir, struct dentry *dentry)
 			return ERR_PTR(-EACCES);
 		}
 		linvfs_set_inode_ops(ip);
-		error = linvfs_revalidate_core(ip);
+		error = linvfs_revalidate_core(ip, ATTR_COMM);
 	}
 	d_add(dentry, ip);	/* Negative entry goes in if ip is NULL */
 	return NULL;
@@ -258,7 +258,7 @@ int linvfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname
 		} else {
 			linvfs_set_inode_ops(ip);
 			/* linvfs_revalidate_core returns (-) errors */
-			error = -linvfs_revalidate_core(ip);
+			error = -linvfs_revalidate_core(ip, ATTR_COMM);
 			d_instantiate(dentry, ip);
 		}
 	}
@@ -575,7 +575,7 @@ int linvfs_permission(struct inode *ip, int mode)
  * from the results of a getattr. This gets called out of things
  * like stat.
  */
-int linvfs_revalidate_core(struct inode *inode)
+int linvfs_revalidate_core(struct inode *inode, int flags)
 {
         vnode_t *vp;
 
@@ -583,12 +583,12 @@ int linvfs_revalidate_core(struct inode *inode)
 	ASSERT(vp);
 
 	/* vn_revalidate returns (-) error so this is ok */
-	return vn_revalidate(vp, 0);
+	return vn_revalidate(vp, flags);
 }
 
 int linvfs_revalidate(struct dentry *dentry)
 {
-	return linvfs_revalidate_core(dentry->d_inode);
+	return linvfs_revalidate_core(dentry->d_inode, 0);
 }
 
 
