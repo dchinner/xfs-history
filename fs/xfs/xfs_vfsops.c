@@ -426,6 +426,41 @@ xfs_fill_buftarg(buftarg_t *btp, dev_t dev, struct super_block *sb)
 	btp->dev    = dev;
 }
 
+#ifndef SIM
+extern int	kmem_cache_destroy(zone_t *);
+
+void
+xfs_cleanup()
+{
+	extern zone_t	*xfs_bmap_free_item_zone;
+	extern zone_t	*xfs_btree_cur_zone;
+	extern zone_t	*xfs_inode_zone;
+	extern zone_t	*xfs_trans_zone;
+	extern zone_t	*xfs_gap_zone;
+	extern zone_t	*xfs_da_state_zone;
+	extern zone_t	*xfs_dabuf_zone;
+	extern zone_t	*xfs_efd_zone;
+	extern zone_t	*xfs_efi_zone;
+	extern zone_t	*xfs_buf_item_zone;
+	extern zone_t	*xfs_chashlist_zone;
+
+	kmem_cache_destroy(xfs_bmap_free_item_zone);
+	kmem_cache_destroy(xfs_btree_cur_zone);
+	kmem_cache_destroy(xfs_inode_zone);
+	kmem_cache_destroy(xfs_trans_zone);
+	kmem_cache_destroy(xfs_gap_zone);
+	kmem_cache_destroy(xfs_da_state_zone);
+	kmem_cache_destroy(xfs_dabuf_zone);
+	kmem_cache_destroy(xfs_buf_item_zone);
+	kmem_cache_destroy(xfs_efd_zone);
+	kmem_cache_destroy(xfs_efi_zone);
+	kmem_cache_destroy(xfs_ifork_zone);
+	kmem_cache_destroy(xfs_ili_zone);
+	kmem_cache_destroy(xfs_chashlist_zone);
+
+}
+#endif
+
 /*
  * xfs_cmountfs
  *
