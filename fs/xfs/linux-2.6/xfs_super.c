@@ -305,6 +305,12 @@ linvfs_read_inode(
 		init_special_inode(inode, inode->i_mode, inode->i_rdev);
 }
 
+void
+linvfs_delete_inode(
+	struct inode	*inode)
+{
+}
+
 
 void
 linvfs_put_inode(
@@ -498,6 +504,7 @@ linvfs_remount(
 static struct super_operations linvfs_sops = {
 	read_inode:		linvfs_read_inode,
 	put_inode:		linvfs_put_inode,
+	delete_inode:		linvfs_delete_inode,
 	notify_change:		linvfs_notify_change,
 	put_super:		linvfs_put_super,
 	write_super:		linvfs_write_super,
