@@ -32,6 +32,7 @@ typedef struct xfs_buf_log_item {
 	buf_t			*bli_buf;	/* real buffer pointer */
 	unsigned int		bli_flags;	/* misc flags */
 	unsigned int		bli_recur;	/* lock recursion count */
+	unsigned int		bli_refcount;	/* cnt of tp refs */
 #ifdef XFSDEBUG
 	char			*bli_orig;	/* original buffer copy */
 	char			*bli_logged;	/* bytes to be logged */
@@ -44,6 +45,12 @@ typedef struct xfs_buf_log_item {
  */
 #define	XFS_BLI_HOLD	0x1
 #define	XFS_BLI_DIRTY	0x2
+#define	XFS_BLI_STALE	0x4
+
+/*
+ * This lock guards the bli_refcount fields of the buf items.
+ */
+extern lock_t	xfs_bli_reflock;
 
 void	xfs_buf_item_init(buf_t *, struct xfs_mount *);
 void	xfs_buf_item_relse(buf_t *);
