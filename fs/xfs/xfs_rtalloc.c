@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.7 $"
+#ident	"$Revision: 1.10 $"
 
 /*
  * Free realtime space allocation for xFS.
@@ -9,6 +9,7 @@
 #define _KERNEL
 #endif
 #include <sys/buf.h>
+#include <sys/uuid.h>
 #include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL

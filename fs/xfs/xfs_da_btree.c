@@ -17,6 +17,7 @@
 #ifdef SIM
 #define _KERNEL
 #endif
+#include <sys/uuid.h>
 #include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL

@@ -12,6 +12,7 @@
 #include <sys/dnlc.h>
 #include <sys/sysmacros.h>
 #include <sys/cred.h>
+#include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/pfdat.h>
 #ifdef SIM

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.22 $"
+#ident	"$Revision: 1.27 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -20,6 +20,7 @@
 #define _KERNEL
 #endif
 #include <sys/buf.h>
+#include <sys/uuid.h>
 #include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL
