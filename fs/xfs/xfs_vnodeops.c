@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.461 $"
+#ident "$Revision: 1.462 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -3347,9 +3347,8 @@ xfs_remove(
 #endif
 
 	/* From this point on, return through std_return */
-	bdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(vp), &xfs_vnodeops);
  retry:
-        ip = bdp ? XFS_BHVTOI(bdp) : NULL;
+        ip = NULL;
 
 	/*
 	 * We need to get a reference to ip before we get our log
@@ -4168,9 +4167,8 @@ xfs_rmdir(
 
 	/* Return through std_return after this point. */
 
-	bdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(vp), &xfs_vnodeops);
  retry:
-	cdp = bdp ? XFS_BHVTOI(bdp) : NULL;
+	cdp = NULL;
 
 	/*
 	 * We need to get a reference to cdp before we get our log
@@ -6316,6 +6314,7 @@ vnodeops_t xfs_vnodeops = {
 	xfs_readlink,
 	xfs_fsync,
 	xfs_inactive,
+	(vop_fid2_t)fs_nosys,
 	xfs_release,
 	xfs_rwlock,/* fs_nosys, */
 	xfs_rwunlock,/* fs_nosys, */
