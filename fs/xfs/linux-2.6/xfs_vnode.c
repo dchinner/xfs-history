@@ -84,7 +84,8 @@ vn_init(void)
 int
 vn_reclaim(struct vnode *vp, int flag)
 {
-	int error, s;
+	int error;
+	unsigned long s;
 
 	XFS_STATS_INC(xfsstats.vn_reclaim);
 
@@ -121,7 +122,7 @@ vn_reclaim(struct vnode *vp, int flag)
 STATIC void
 vn_wakeup(struct vnode *vp)
 {
-	int s = VN_LOCK(vp);
+	unsigned long s = VN_LOCK(vp);
 	if (vp->v_flag & VWAIT) {
 		sv_broadcast(vptosync(vp));
 	}
@@ -135,7 +136,7 @@ vn_wait(struct vnode *vp)
 	NESTED_VN_LOCK(vp);
 
 	if (vp->v_flag & (VINACT | VRECLM)) {
-		int	s;
+		unsigned long	s;
 
 		local_irq_save(s);
 		vp->v_flag |= VWAIT;
@@ -151,7 +152,7 @@ struct vnode *
 vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 {
 	struct vnode	*vp;
-	int		s = 0;
+	unsigned long	s = 0;
 
 	
 	XFS_STATS_INC(xfsstats.vn_active);
@@ -318,7 +319,7 @@ again:
 	 * reclaim can fail.
 	 */
 	if (vp->v_flag & (VINACT | VRECLM)) {
-		int	s;
+		unsigned long	s;
 
 		local_irq_save(s);
 		ASSERT(vn_count(vp) == 0);
@@ -360,7 +361,7 @@ again:
 struct vnode *
 vn_hold(struct vnode *vp)
 {
-	register int s = VN_LOCK(vp);
+	unsigned long s = VN_LOCK(vp);
 	struct inode *inode;
 
 	XFS_STATS_INC(xfsstats.vn_hold);
@@ -382,7 +383,7 @@ vn_hold(struct vnode *vp)
 void
 vn_rele(struct vnode *vp)
 {
-	int	s;
+	unsigned long s;
 	int	vcnt;
 	/* REFERENCED */
 	int cache;
