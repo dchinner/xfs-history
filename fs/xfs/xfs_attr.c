@@ -1,4 +1,4 @@
-#ident "$Revision: 1.39 $"
+#ident "$Revision: 1.40 $"
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/buf.h>
@@ -41,6 +41,7 @@
 #include "xfs_error.h"
 #include "xfs_bit.h"
 #include "xfs_quota.h"
+#include "xfs_rw.h"
 
 /*
  * xfs_attr.c
@@ -117,6 +118,9 @@ xfs_attr_get(bhv_desc_t *bdp, char *name, char *value, int *valuelenp,
 	args.whichfork = XFS_ATTR_FORK;
 	args.trans = NULL;
 
+	if (XFS_FORCED_SHUTDOWN(args.dp->i_mount))
+		return (EIO);
+
 	/*
 	 * Do we answer them, or ignore them?
 	 */
@@ -168,6 +172,9 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	 * Do we answer them, or ignore them?
 	 */
 	dp = XFS_BHVTOI(bdp);
+	if (XFS_FORCED_SHUTDOWN(dp->i_mount))
+		return (EIO);
+
 	xfs_ilock(dp, XFS_ILOCK_SHARED);
 	if (error = xfs_iaccess(dp, IWRITE, cred)) {
 		xfs_iunlock(dp, XFS_ILOCK_SHARED);
@@ -378,6 +385,9 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	 * Do we answer them, or ignore them?
 	 */
 	dp = XFS_BHVTOI(bdp);
+	if (XFS_FORCED_SHUTDOWN(dp->i_mount))
+		return (EIO);
+
 	xfs_ilock(dp, XFS_ILOCK_SHARED);
 	if (error = xfs_iaccess(dp, IWRITE, cred)) {
 		xfs_iunlock(dp, XFS_ILOCK_SHARED);	
@@ -536,6 +546,8 @@ xfs_attr_list(bhv_desc_t *bdp, char *buffer, int bufsize, int flags,
 	context.alist->al_more = 0;
 	context.alist->al_offset[0] = context.bufsize;
 
+	if (XFS_FORCED_SHUTDOWN(dp->i_mount))
+		return (EIO);
 	/*
 	 * Do they have permission?
 	 */
@@ -572,6 +584,8 @@ xfs_attr_inactive(xfs_inode_t *dp)
 	int error;
 
 	ASSERT(! XFS_NOT_DQATTACHED(dp->i_mount, dp));
+
+	/* XXXsup - why on earth are we taking ILOCK_EXCL here??? */
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
 	if ((XFS_IFORK_Q(dp) == 0) ||
 	    (dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL)) {
@@ -1694,8 +1708,9 @@ xfs_attr_rmtval_get(xfs_da_args_t *args)
 			       (map[i].br_startblock != HOLESTARTBLOCK));
 			dblkno = XFS_FSB_TO_DADDR(mp, map[i].br_startblock);
 			blkcnt = XFS_FSB_TO_BB(mp, map[i].br_blockcount);
-			bp = read_buf(mp->m_dev, dblkno, blkcnt, 0);
-			if (error = geterror(bp))
+			error = xfs_read_buf(mp, mp->m_dev, dblkno, blkcnt,
+					     0, &bp);
+			if (error)
 				return(error);
 
 			tmp = (valuelen < bp->b_bufsize)
@@ -1827,7 +1842,9 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 		bcopy(src, bp->b_un.b_addr, tmp);
 		if (tmp < bp->b_bufsize)
 			bzero(bp->b_un.b_addr + tmp, bp->b_bufsize - tmp);
-		bwrite(bp);		/* GROT: NOTE: synchronous write */
+		if (error = xfs_bwrite(mp, bp)) {/* GROT: NOTE: synchronous write */
+			return (error);
+		}
 		src += tmp;
 		valuelen -= tmp;
 
