@@ -208,9 +208,6 @@ xfs_dm_send_create_event(
 	xfs_inode_t	*dip;
 	xfs_ino_t	inum;
 	vnode_t		*dir_vp;
-#ifdef __sgi
-	struct ncfastdata fd;
-#endif
 	int		error;
 	int		name_len;
 
@@ -318,11 +315,7 @@ xfs_bdp_to_hexhandle(
 	if (type == DM_FSYS_OBJ) {	/* a filesystem handle */
 		length = FSHSIZE;
 	} else {
-#ifdef __sgi
-		length = HSIZE(handle);
-#else
 		length = XFS_HSIZE(handle);
-#endif
 	}
 	for (ip = (u_char *)&handle, i = 0; i < length; i++) {
 		*buffer++ = "0123456789abcdef"[ip[i] >> 4];
@@ -334,23 +327,6 @@ xfs_bdp_to_hexhandle(
 #endif  /* DEBUG_RIGHTS */
 
 
-#ifdef __sgi
-/*
- *  Copy out a size_t possibly adjusting its size according to the abi.
- */
-
-STATIC int
-xfs_cpoutsizet(
-	void		*userptr,	/* a user addr (of unknown size) */
-	size_t		value)		/* value to set in the user addr */
-{
-#ifdef _K64U64
-	if (get_current_abi())
-		return(copyout(&value, userptr, sizeof(value)));
-#endif
-	return(suword(userptr, (int)value));
-}
-#endif
 
 
 /* Copy in and validate an attribute name from user space.  It should be a
@@ -370,13 +346,8 @@ xfs_copyin_attrname(
 
 	strcpy(to->dan_chars, dmattr_prefix);
 
-#ifdef __sgi
-	error = copyinstr((char *)from, &to->dan_chars[DMATTR_PREFIXLEN],
-		DM_ATTR_NAME_SIZE + 1, NULL);
-#else
 	len = strnlen_user((char*)from, DM_ATTR_NAME_SIZE);
 	error = copy_from_user(&to->dan_chars[DMATTR_PREFIXLEN], from, len);
-#endif
 
 	if (!error && (to->dan_chars[DMATTR_PREFIXLEN] == '\0'))
 		error = EINVAL;
@@ -592,10 +563,6 @@ xfs_get_dirents(
 	aiov.iov_len = bufsz;
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-#ifdef __sgi
-	auio.uio_pio = 0;
-	auio.uio_pbuf = 0;
-#endif
 	auio.uio_offset = *locp;
 	auio.uio_segflg = UIO_SYSSPACE;
 	auio.uio_resid = bufsz;
@@ -1159,25 +1126,15 @@ xfs_dm_get_allocinfo_rvp(
 	if (right < DM_RIGHT_SHARED)
 		return(EACCES);
 
-#ifdef __sgi
-	if (copyin(offp, &startoff, sizeof(startoff)))
-		return(EFAULT);
-#else
 	if (copy_from_user( &startoff, offp, sizeof(startoff)))
 		return(EFAULT);
-#endif
 
 	if (startoff > XFS_MAX_FILE_OFFSET)
 		return(EINVAL);
 
 	if (nelem == 0) {
-#ifdef __sgi
-		if (suword(nelemp, 1))
-			return(EFAULT);
-#else
 		if (put_user(1, nelemp))
 			return(EFAULT);
-#endif
 		return(E2BIG);
 	}
 
@@ -1239,13 +1196,8 @@ xfs_dm_get_allocinfo_rvp(
 			}
 			startoff = extent.ex_offset + extent.ex_length;
 
-#ifdef __sgi
-			if (copyout(&extent, extentp, sizeof(extent)))
-				return(EFAULT);
-#else
 			if (copy_to_user( extentp, &extent, sizeof(extent)))
 				return(EFAULT);
-#endif
 
 			fsb_bias = fsb_offset - bmp[i].br_startoff;
 			fsb_offset += bmp[i].br_blockcount - fsb_bias;
@@ -1257,27 +1209,13 @@ xfs_dm_get_allocinfo_rvp(
 	if (fsb_length == 0) {
 		startoff = 0;
 	}
-#ifdef __sgi
-	if (copyout(&startoff, offp, sizeof(startoff)))
-		return(EFAULT);
-#else
 	if (copy_to_user( offp, &startoff, sizeof(startoff)))
 		return(EFAULT);
-#endif
 
-#ifdef __sgi
-	if (copyout(&elem, nelemp, sizeof(elem)))
-		return(EFAULT);
-#else
 	if (copy_to_user( nelemp, &elem, sizeof(elem)))
 		return(EFAULT);
-#endif
 
-#ifdef __sgi
-	rvp->r_val1 = (fsb_length == 0 ? 0 : 1);
-#else
 	*rvp = (fsb_length == 0 ? 0 : 1);
-#endif
 
 	return(0);
 }
@@ -1323,13 +1261,8 @@ xfs_dm_get_bulkattr_rvp(
 	if (right < DM_RIGHT_SHARED)
 		return(EACCES);
 
-#ifdef __sgi
-	if (copyin(locp, &loc, sizeof(loc)))
-		return(EFAULT);
-#else
 	if (copy_from_user( &loc, locp, sizeof(loc)))
 		return(EFAULT);
-#endif
 
 	/* Because we will write directly to the user's buffer, make sure that
 	   the buffer is properly aligned.
@@ -1345,13 +1278,8 @@ xfs_dm_get_bulkattr_rvp(
 
 	nelems = buflen / statstruct_sz; 
 	if (! nelems) {
-#ifdef __sgi
-		if (xfs_cpoutsizet(rlenp, statstruct_sz))
-			return(EFAULT);
-#else
 		if (put_user( statstruct_sz, rlenp ))
 			return(EFAULT);
-#endif
 		return(E2BIG);
 	} 
 
@@ -1370,51 +1298,27 @@ xfs_dm_get_bulkattr_rvp(
 	if (error)
 		return(error);
 	if (!done) {
-#ifdef __sgi
-		rvalp->r_val1 = 1;
-#else
 		*rvalp = 1;
-#endif
 	} else {
-#ifdef __sgi
-		rvalp->r_val1 = 0;
-#else
 		*rvalp = 0;
-#endif
 	}
-#ifdef __sgi
-	if (xfs_cpoutsizet(rlenp, statstruct_sz * nelems))
-		return(EFAULT);
-#else
+
 	if (put_user( statstruct_sz * nelems, rlenp ))
 		return(EFAULT);
-#endif
 
-#ifdef __sgi
-	if (copyout(&loc, locp, sizeof(loc)))
-		return(EFAULT);
-#else
 	if (copy_to_user( locp, &loc, sizeof(loc)))
 		return(EFAULT);
-#endif
+
 	/*
 	 *  If we didn't do any, we must not have any more to do.
 	 */
 	if (nelems < 1)
 		return(0);
 	/* set _link in the last struct to zero */
-#ifdef __sgi
-	if (suword(
-	    &((dm_stat_t *)((char *)bufp + statstruct_sz*(nelems-1)))->_link,
-		   0)
-	   )
-		return(EFAULT);
-#else
 	if (put_user( 0,
 	    &((dm_stat_t *)((char *)bufp + statstruct_sz*(nelems-1)))->_link)
 	   )
 		return(EFAULT);
-#endif
 	return(0);
 }
 
@@ -1474,13 +1378,8 @@ xfs_dm_get_config(
 
 	/* Copy the results back to the user. */
 
-#ifdef __sgi
-	if (copyout(&retval, retvalp, sizeof(retval)))
-		return(EFAULT);
-#else
 	if (copy_to_user( retvalp, &retval, sizeof(retval)))
 		return(EFAULT);
-#endif
 	return(0);
 }
 
@@ -1509,21 +1408,11 @@ xfs_dm_get_config_events(
 		nelem = DM_EVENT_MAX;
 	eventset &= (1 << nelem) - 1;
 
-#ifdef __sgi
-	if (copyout(&eventset, eventsetp, sizeof(eventset)))
-		return(EFAULT);
-#else
 	if (copy_to_user( eventsetp, &eventset, sizeof(eventset)))
 		return(EFAULT);
-#endif
 
-#ifdef __sgi
-	if (suword(nelemp, nelem))
-		return(EFAULT);
-#else
 	if (put_user(nelem, nelemp))
 		return(EFAULT);
-#endif
 	return(0);
 }
 
@@ -1632,35 +1521,6 @@ xfs_dm_get_dioinfo(
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
 
-#ifdef __sgi
-	/*
-	 * We align to the secondary cache line size so that we
-	 * don't have to worry about nasty writeback caches on
-	 * I/O incoherent machines.  Making this less than a page
-	 * requires setting the maximum I/O size to 1 page less
-	 * than maxdmasz.  This is for the case of a maximum
-	 * size I/O that is not page aligned.  It requires the
-	 * maximum size plus 1 pages.
-	 */
-	ASSERT(scache_linemask != 0);
-
-#ifdef MH_R10000_SPECULATION_WAR
-		if (IS_R10000())
-			dio.d_mem = _PAGESZ;
-		else
-			dio.d_mem = scache_linemask + 1;
-#elif R10000_SPECULATION_WAR	/* makes tlb invalidate during dma more
-	effective, by decreasing the likelihood of a valid reference in the
-	same page as dma user address space; leaving the tlb invalid avoids
-	the speculative reference. We return the more stringent
-	"requirements" on the fcntl(), but do *NOT* enforced them
-	in the read/write code, to be sure we don't break apps... */
-		dio.d_mem = _PAGESZ;
-#else
-		dio.d_mem = scache_linemask + 1;
-#endif
-#endif /* __sgi */
-
 	/*
 	 * this only really needs to be BBSIZE.
 	 * it is set to the file system block size to
@@ -1677,13 +1537,8 @@ xfs_dm_get_dioinfo(
 		dio.d_dio_only = DM_FALSE;
 	}
 
-#ifdef __sgi
-	if (copyout(&dio, diop, sizeof(dio)))
-		return(EFAULT);
-#else
 	if (copy_to_user(diop, &dio, sizeof(dio)))
 		return(EFAULT);
-#endif
 	return(0);
 }
 
@@ -1712,22 +1567,12 @@ xfs_dm_get_dirattrs_rvp(
 	if (right < DM_RIGHT_SHARED)
 		return(EACCES);
 
-#ifdef __sgi
-	if (copyin(locp, &loc, sizeof(loc)))
-		return(EFAULT);
-#else
 	if (copy_from_user( &loc, locp, sizeof(loc)))
 		return(EFAULT);
-#endif
 
 	if ((buflen / DM_STAT_SIZE(MAXNAMLEN)) == 0) {
-#ifdef __sgi
-		if (xfs_cpoutsizet(rlenp, DM_STAT_SIZE(MAXNAMLEN)))
-			return(EFAULT);
-#else
 		if (put_user( DM_STAT_SIZE(MAXNAMLEN), rlenp ))
 			return(EFAULT);
-#endif
 		return(E2BIG);
 	}
 
@@ -1794,11 +1639,7 @@ xfs_dm_get_dirattrs_rvp(
 		}
 
 		if (nwritten) {
-#ifdef __sgi
-			if (copyout(statbufp, bufp, nwritten)) {
-#else
 			if (copy_to_user( bufp, statbufp, nwritten)) {
-#endif
 				error = EFAULT;
 				break;
 			}
@@ -1811,38 +1652,20 @@ xfs_dm_get_dirattrs_rvp(
 	 *  (Doesn't matter either way if there was an error.)
 	 */
 	if (nread) {
-#ifdef __sgi
-		rvp->r_val1 = 1;
-#else
 		*rvp = 1;
-#endif
 	} else {
-#ifdef __sgi
-		rvp->r_val1 = 0;
-#else
 		*rvp = 0;
-#endif
 	}
 
 	kmem_free(statbufp, statbufsz);
 	kmem_free(direntp, direntbufsz);
 	if (!error){
-#ifdef __sgi
-		if (xfs_cpoutsizet(rlenp, buflen - spaceleft))
-			return(EFAULT);
-#else
 		if (put_user( buflen - spaceleft, rlenp))
 			return(EFAULT);
-#endif
 	}
 
-#ifdef __sgi
-	if (!error && copyout(&loc, locp, sizeof(loc)))
-		error = EFAULT;
-#else
 	if (!error && copy_to_user(locp, &loc, sizeof(loc)))
 		error = EFAULT;
-#endif
 	return(error);
 }
 
@@ -1903,21 +1726,11 @@ xfs_dm_get_dmattr(
 		error = ENOENT;
 	if (!error && value_len > buflen)
 		error = E2BIG;
-#ifdef __sgi
-	if (!error && copyout(value, bufp, value_len))
-		error = EFAULT;
-#else
 	if (!error && copy_to_user(bufp, value, value_len))
 		error = EFAULT;
-#endif
 	if (!error || error == E2BIG) {
-#ifdef __sgi
-		if (xfs_cpoutsizet(rlenp, value_len))
-			error = EFAULT;
-#else
 		if (put_user(value_len, rlenp))
 			error = EFAULT;
-#endif
 	}
 
 	kmem_free(value, alloc_size);
@@ -1970,13 +1783,8 @@ xfs_dm_get_fileattr(
 	xfs_ip_to_stat(mp, &stat, ip);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
-#ifdef __sgi
-	if (copyout(&stat, statp, sizeof(stat)))
-		return(EFAULT);
-#else
 	if (copy_to_user( statp, &stat, sizeof(stat)))
 		return(EFAULT);
-#endif
 	return(0);
 }
 
@@ -2022,22 +1830,12 @@ xfs_dm_get_region(
 
 	elem = (region.rg_flags ? 1 : 0);
 
-#ifdef __sgi
-	if (copyout(&elem, nelemp, sizeof(elem)))
-		return(EFAULT);
-#else
 	if (copy_to_user( nelemp, &elem, sizeof(elem)))
 		return(EFAULT);
-#endif
 	if (elem > nelem)
 		return(E2BIG);
-#ifdef __sgi
-	if (elem && copyout(&region, regbufp, sizeof(region)))
-		return(EFAULT);
-#else
 	if (elem && copy_to_user(regbufp, &region, sizeof(region)))
 		return(EFAULT);
-#endif
 	return(0);
 }
 
@@ -2177,18 +1975,10 @@ xfs_dm_getall_dmattr(
 	if (!error && total_size > buflen)
 		error = E2BIG;
 	if (!error || error == E2BIG) {
-#ifdef __sgi
-		if (xfs_cpoutsizet(rlenp, total_size))
-			error = EFAULT;
-#else
 		if (put_user(total_size, rlenp))
 			error = EFAULT;
-#endif
 	}
 
-#if defined(HAVE_USERACC)
-	unuseracc(bufp, buflen, B_READ);
-#endif
 	kmem_free(attrlist, list_size);
 	return(error);
 }
@@ -2226,13 +2016,8 @@ xfs_dm_init_attrloc(
 	if (right < DM_RIGHT_SHARED)
 		return(EACCES);
 
-#ifdef __sgi
-	if (copyout(&loc, locp, sizeof(loc)))
-		return(EFAULT);
-#else
 	if (copy_to_user( locp, &loc, sizeof(loc)))
 		return(EFAULT);
-#endif
 	return(0);
 }
 
@@ -2287,20 +2072,10 @@ xfs_dm_probe_hole(
 
 	roff = (off + bsize-1) & ~(bsize-1);
 	rlen = 0;		/* Only support punches to EOF for now */
-#ifdef __sgi
-	if (copyout(&roff, roffp, sizeof(roff)))
-		return(EFAULT);
-#else
 	if (copy_to_user( roffp, &roff, sizeof(roff)))
 		return(EFAULT);
-#endif
-#ifdef __sgi
-	if (copyout(&rlen, rlenp, sizeof(rlen)))
-		return(EFAULT);
-#else
 	if (copy_to_user( rlenp, &rlen, sizeof(rlen)))
 		return(EFAULT);
-#endif
 	return(0);
 }
 
@@ -2537,11 +2312,7 @@ xfs_dm_set_dmattr(
 
 	alloc_size = (buflen == 0) ? 1 : buflen;
 	value = kmem_alloc(alloc_size, KM_SLEEP);
-#ifdef __sgi
-	if (copyin(bufp, value, buflen)) {
-#else
 	if (copy_from_user( value, bufp, buflen)) {
-#endif
 		error = EFAULT;
 	} else {
 		VOP_ATTR_SET(vp, name.dan_chars, value, buflen, 
@@ -2590,13 +2361,8 @@ xfs_dm_set_fileattr(
 	if (right < DM_RIGHT_EXCL)
 		return(EACCES);
 
-#ifdef __sgi
-	if (copyin(statp, &stat, sizeof(stat)))
-		return(EFAULT);
-#else
 	if (copy_from_user( &stat, statp, sizeof(stat)))
 		return(EFAULT);
-#endif
 
 	vat.va_mask = 0;
 
@@ -2743,13 +2509,8 @@ xfs_dm_set_region(
 	} else {
 		exactflag = DM_TRUE;	/* user region was unchanged */
 	}
-#ifdef __sgi
-	if (copyout(&exactflag, exactflagp, sizeof(exactflag)))
-		return(EFAULT);
-#else
 	if (copy_to_user( exactflagp, &exactflag, sizeof(exactflag)))
 		return(EFAULT);
-#endif
 	return(0);
 }
 
@@ -3089,14 +2850,6 @@ xfs_dm_fcntl(
 	dmfcntlp = (dm_fcntl_t *)arg;
 
 	switch (dmfcntlp->dmfc_subfunc) {
-#ifdef __sgi
-	case DM_FCNTL_FSYSVECTOR:
-		return(xfs_dm_get_fsys_vector(dmfcntlp));
-	case DM_FCNTL_MAPEVENT:
-		return(xfs_dm_mapevent(bdp, flags, offset, dmfcntlp));
-	case DM_FCNTL_TESTEVENT:
-		return(xfs_dm_testevent(bdp, flags, offset, dmfcntlp));
-#endif
 	case DM_FCNTL_FSSETDM:
 		return xfs_set_dmattrs(bdp, dmfcntlp->u_fcntl.setdmrq.fsd_dmevmask,
 					dmfcntlp->u_fcntl.setdmrq.fsd_dmstate,
