@@ -6111,6 +6111,7 @@ vnodeops_t xfs_vnodeops = {
 	xfs_seek,
 	(vop_realvp_t)fs_nosys,
 	(vop_bmap_t)xfs_bmap,
+	(vop_strategy_t)xfs_strategy,
 #ifdef CELL_CAPABLE
         xfs_allocstore,
 #endif

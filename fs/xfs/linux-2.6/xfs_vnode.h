@@ -215,6 +215,7 @@ typedef	void	(*vop_rwunlock_t)(bhv_desc_t *, vrwlock_t);
 typedef	int	(*vop_seek_t)(bhv_desc_t *, xfs_off_t, xfs_off_t*);
 typedef	int	(*vop_realvp_t)(bhv_desc_t *, vnode_t **);
 typedef	int	(*vop_bmap_t)(bhv_desc_t *, xfs_off_t, ssize_t, int, struct cred *, struct page_buf_bmap_s *, int *);
+typedef	int	(*vop_strategy_t)(bhv_desc_t *, xfs_off_t, ssize_t, int, struct cred *, struct page_buf_bmap_s *, int *);
 #ifdef CELL_CAPABLE
 typedef int     (*vop_allocstore_t)(bhv_desc_t *, xfs_off_t, size_t, struct cred *);
 #endif
@@ -268,6 +269,7 @@ typedef struct vnodeops {
 	vop_seek_t		vop_seek;
 	vop_realvp_t		vop_realvp;
 	vop_bmap_t		vop_bmap;
+	vop_strategy_t		vop_strategy;
 #ifdef CELL_CAPABLE
         vop_allocstore_t        vop_allocstore;
 #endif
@@ -314,6 +316,12 @@ typedef struct vnodeops {
 {									\
 	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_bmap, vp)((vp)->v_fbhv,of,sz,rw,cr,b,n);	        \
+	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
+}
+#define	VOP_STRATEGY(vp,of,sz,rw,cr,b,n,rv) 				\
+{									\
+	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
+	rv = _VOP_(vop_strategy, vp)((vp)->v_fbhv,of,sz,rw,cr,b,n);     \
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define	VOP_OPEN(vp, vpp, mode, cr, rv) 				\

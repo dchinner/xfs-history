@@ -687,8 +687,13 @@ linvfs_pb_bmap(struct inode *inode,
 
 	*retpbbm = maxpbbm;
 
-	VOP_BMAP(vp, offset, count, flags, NULL,
+	if (flags & PBF_FILE_ALLOCATE) {
+		VOP_STRATEGY(vp, offset, count, flags, NULL,
 			(struct page_buf_bmap_s *) pbmapp, retpbbm, error);
+	} else {
+		VOP_BMAP(vp, offset, count, flags, NULL,
+			(struct page_buf_bmap_s *) pbmapp, retpbbm, error);
+	}
 
 	return -error;
 }
