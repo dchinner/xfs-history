@@ -570,19 +570,20 @@ mapit:
 			    (caddr_t) page_address(pb->pb_pages[0]) + 
 					pb->pb_offset;
 			pb->pb_flags |= PBF_MAPPED;
+		}
 #ifdef REMAPPING_SUPPORT
-		} else if ((flags & PBF_MAPPED) && (pb->pb_offset == 0)) {
+		else if (flags & PBF_MAPPED) {
 			if (as_list_len > 64)
 				purge_addresses();
-			pb->pb_addr = (caddr_t) remap_page_array(pb->pb_pages,
-			    page_count, gfp_mask);
-			if (pb->pb_addr) {
-				pb->pb_flags |= PBF_MAPPED |
-				    _PBF_ADDR_ALLOCATED;
-			}
+			pb->pb_addr = remap_page_array(pb->pb_pages,
+							page_count, gfp_mask);
+			if (!pb->pb_addr)
+				BUG();
+			pb->pb_addr += pb->pb_offset;
+			pb->pb_flags |= PBF_MAPPED | _PBF_ADDR_ALLOCATED;
 		}
 #else
-		} else if (flags & PBF_MAPPED) {
+		else if (flags & PBF_MAPPED) {
 			printk("request for a mapped pagebuf > page size\n");
 			BUG();
 		}
@@ -1379,15 +1380,15 @@ int pagebuf_iowait(page_buf_t * pb) /* buffer to wait on              */
 
 
 /* reverse pagebuf_mapin()      */ 
-STATIC void
-*pagebuf_mapout_locked(
-   page_buf_t * pb)	/* buffer to unmap                */
+STATIC void *
+pagebuf_mapout_locked(
+    page_buf_t * pb)	/* buffer to unmap                */
 {				
 	void *old_addr = NULL;
 
 	if (pb->pb_flags & PBF_MAPPED) {
 		if (pb->pb_flags & _PBF_ADDR_ALLOCATED)
-			old_addr = pb->pb_addr;
+			old_addr = pb->pb_addr - pb->pb_offset;
 		pb->pb_addr = NULL;
 		pb->pb_flags &= ~(PBF_MAPPED | _PBF_ADDR_ALLOCATED);
 	}
