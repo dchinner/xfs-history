@@ -617,27 +617,9 @@ linvfs_put_super(
 {
 	int		error;
 	int		sector_size = 512;
-	struct inode	*rootip;
 	kdev_t		dev = sb->s_dev;
 	vfs_t 		*vfsp = LINVFS_GET_VFS(sb);
-	vnode_t		*rootvp, *cvp;
-
-	/*
-	 * Find the root vnode/inode, we can't
-	 * use sb->s_root->d_inode 'cause it
-	 * appears to be gone already?
-	 */
-	VFS_ROOT(vfsp, &rootvp, error);
-
-	if (error) {
-		printk("XFS unmount got error %d\n", error);
-		printk("linvfs_put_super: vfsp/0x%p left dangling!\n", vfsp);
-		return;
-	}
-
-	VN_RELE(rootvp);	/* Release the hold taken by VFS_ROOT */
-
-	rootip = LINVFS_GET_IP(rootvp);
+	vnode_t		*cvp;
 
 	VFS_DOUNMOUNT(vfsp, 0, NULL, sys_cred, error); 
 
@@ -693,19 +675,11 @@ linvfs_statfs(
 	struct statfs	*buf)
 {
 	vfs_t		*vfsp = LINVFS_GET_VFS(sb);
-	vnode_t		*rootvp;
 	statvfs_t	stat;
 
 	int		error;
 	
-	VFS_ROOT(vfsp, &rootvp, error);
-	if (error){
-		return(-error);
-	}
-
-	VFS_STATVFS(vfsp, &stat, rootvp, error);
-
-	VN_RELE(rootvp);
+	VFS_STATVFS(vfsp, &stat, NULL, error);
 
 	if (error){
 		return(-error);
