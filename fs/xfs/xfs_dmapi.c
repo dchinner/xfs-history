@@ -110,10 +110,6 @@ xfs_dm_send_data_event(
 				offset, length, flags);
 		if (locktype)
 			xfs_rwlock(bdp, *locktype);
-
-		if(!error && (ip->i_iocore.io_dmstate != dmstate))
-			printk("xfs_dm_send_data_event: go around again\n");
-
 	} while (!error && (ip->i_iocore.io_dmstate != dmstate));
 
 	return error;
