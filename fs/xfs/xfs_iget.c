@@ -247,7 +247,7 @@ again:
 	ip->i_prevp = &ih->ih_next;
 	ih->ih_next = ip;
 	ih->ih_version++;
-	ip->i_dmevents = 0;
+	ip->i_dmevents = ip->i_d.di_dmevmask;	/* FIX: OR in vfs mask */
 	XFS_IHUNLOCK(ih);
 
 	/*

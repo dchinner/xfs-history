@@ -1107,11 +1107,6 @@ xfs_read(
 			ip->i_d.di_atime.t_sec = tv.tv_sec;
 			ip->i_update_core = 1;
 		}
-		if (!(ioflag & IO_INVIS) && !error &&
-		    DM_EVENT_ENABLED(ip, DM_POSTREAD)) {
-			(void) dm_data_event(vp, DM_POSTREAD, offset,
-					     count - uiop->uio_resid);
-		}
 		break;
 
 	case IFDIR:
@@ -2013,6 +2008,8 @@ xfs_write(
 	off_t		n;
 	int		resid;
 	timestruc_t	tv;
+	off_t		savedsize;
+	int		eventsent = 0;
 
 
 	ip = XFS_VTOI(vp);
@@ -2022,13 +2019,14 @@ xfs_write(
 	ASSERT(type == IFREG || type == IFDIR ||
 	       type == IFLNK || type == IFSOCK);
 
+start:
 	if (ioflag & IO_APPEND) {
 		/*
 		 * In append mode, start at the end of the file.
 		 * Since I've got the iolock exclusive I can look
 		 * at di_size.
 		 */
-		uiop->uio_offset = ip->i_d.di_size;
+		uiop->uio_offset = savedsize = ip->i_d.di_size;
 	}
 
 	offset = uiop->uio_offset;
@@ -2072,12 +2070,34 @@ xfs_write(
 #endif
 		id.ino = ip->i_ino;
 
-		if (!(ioflag & IO_INVIS) && DM_EVENT_ENABLED(ip, DM_WRITE)) {
+		if (DM_EVENT_ENABLED(ip, DM_WRITE) &&
+				!(ioflag & IO_INVIS) &&
+				!eventsent) {
 			if (error = dm_data_event(vp, DM_WRITE, offset, count))
 				return error;
+			eventsent = 1;
 		}
+		/*
+		 *  The iolock is dropped and reaquired in dm_data_event(),
+		 *  so we have to recheck the size when appending.  Will
+		 *  only "goto start;" once, since having sent the event 
+		 *  prevents another call to dm_data_event, which is what
+		 *  allows the size to change in the first place.
+		 */
+		if ((ioflag & IO_APPEND) && savedsize != ip->i_d.di_size)
+			goto start;
+retry:
 		error = xfs_grio_req(ip, &id, uiop, ioflag, credp, offset,
 				     UIO_WRITE);
+
+		if (error == ENOSPC && DM_EVENT_ENABLED(ip, DM_NOSPACE) &&
+				!(ioflag & IO_INVIS)) {
+			error = dm_data_event(vp, DM_NOSPACE, 0, 0);
+			if (error)
+				return error;
+			offset = uiop->uio_offset;
+			goto retry;
+		}
 		/*
 		 * Add back whatever we refused to do because of
 		 * uio_limit.
