@@ -58,24 +58,16 @@
  
 #include <linux/autoconf.h>
 
-#ifdef SIM
-/* 
- * if we're in SIM, force the MULTI architecture version of the macros,
- * overriding the mode specified in the config file.
- * - this will propably cause problems later when we don't always have 
- * the architecture number handy
- */
-#undef CONFIG_XFS_ARCH_NATIVE
-#undef CONFIG_XFS_ARCH_MIPS
-#define CONFIG_XFS_ARCH_MULTI
-#endif
-
 /* select native architecture */
   
 #ifdef CONFIG_X86
 #define XFS_ARCH_NATIVE ARCH_INTEL_IA32
 #else
 #error support for XFS on non X86 architectures not yet implemented
+#endif
+
+#ifdef CONFIG_XFS_ARCH_MULTI
+#error xfs architecture mode "multi" not currently supported
 #endif
 
 /* check for multiple defines */
@@ -102,16 +94,19 @@
 
 #ifdef CONFIG_XFS_ARCH_MIPS
 #define ARCH_SUPPORTED(A) ((A)==ARCH_MIPS)
+#define XFS_ARCH_DEFAULT (ARCH_MIPS)
 #define XFS_MODE "MIPS"
 #endif
 
 #ifdef CONFIG_XFS_ARCH_NATIVE
 #define ARCH_SUPPORTED(A) ((A)==XFS_ARCH_NATIVE)
+#define XFS_ARCH_DEFAULT (XFS_ARCH_NATIVE)
 #define XFS_MODE "NATIVE"
 #endif
 
 #ifdef CONFIG_XFS_ARCH_MULTI
 #define ARCH_SUPPORTED(A) ((A)==ARCH_MIPS || (A)==ARCH_INTEL_IA32)
+#define XFS_ARCH_DEFAULT (XFS_ARCH_NATIVE)
 #define XFS_MODE "MULTI"
 #endif
 
