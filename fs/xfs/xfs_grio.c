@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.34 1994/09/20 18:57:17 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.35 1994/09/21 21:12:05 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -442,35 +442,22 @@ retry_request:
 			current_disk 	= (sec + ticket->rotator_slot) % 
 						set_size;
 
-			if (which_disk == current_disk) {
+			if (which_disk != current_disk) {
 				/*
-				 * Fall thru and issue the request.
-				 * This is the correct disk at this time
-				 * for a request in this slot.
+				 * put the process to sleep until the
+				 * next second, then check again.
 				 */
-				;
-			} else {
-
-#ifdef CLOSER_TIMING
-				if (current_disk > which_disk) {
-					num_sec =  set_size - 1 - 
-						current_disk + which_disk;
-				} else {
-					ASSERT( which_disk > current_disk );
-					num_sec = which_disk - current_disk - 1;
-				}
-
 				delay_ticks = HZ - (snap_lbolt % HZ);
-				delay_ticks += ( num_sec * HZ);
-
-#else
-				delay_ticks = 1;
-#endif
-
                         	ticket_unlock(ip, s );
 		                delay( delay_ticks );
 				goto retry_request;
 			}
+
+			/*
+			 * Issue the request.
+			 * This is the correct disk at this time
+			 * for a request in this slot.
+			 */
         		ticket->lastreq.tv_sec  = 0;
         		ticket->lastreq.tv_nsec = 0;
 		}
@@ -508,16 +495,10 @@ retry_request:
         		nexttv.tv_sec  = ticket->lastreq.tv_sec + 1;
         		nexttv.tv_nsec = ticket->lastreq.tv_nsec;
 			
-			if (LESS_THAN_ONE_SECOND( tv, nexttv ) ) {
-		 		/*
-			 	 * It has been less than 1 second 
-			 	 * since the last request.
-			 	 */
-				;
-			} else {
+			if ( !(LESS_THAN_ONE_SECOND( tv, nexttv )) ) {
 				/*
-			 	 * If has been more than 1 second	
-			 	 * since the last request.	
+			 	 * It has been more than 1 second	
+			 	 * since the last request on this ticket.
 			 	 */
 				ticket->iothissecond    = 0;
 				ticket->lastreq.tv_sec  = tv.tv_sec;
@@ -527,7 +508,7 @@ retry_request:
 			/*
 			 * Only allow a single request per process each second.
 			 */
-                	if (ticket->iothissecond ==  0) {
+                	if (ticket->iothissecond == 0) {
 
                         	/*
                          	 * Issue the largest I/O possible. 
@@ -580,6 +561,7 @@ retry_request:
 		                fasthz_delay( &tvl );
 #endif
 			}
+
 			/*
 		 	 * Check if rate guarantee was removed while
 		 	 * I/O was taking place.
@@ -588,6 +570,7 @@ retry_request:
        				ticket_unlock(ip, s);
 		        	uiop->uio_resid += remainingio;
 				uiop->uio_iov[0].iov_len = uiop->uio_resid;
+				ioflag &= ~IO_GRIO;
 				if (uiop->uio_resid) {
 					vp = XFS_ITOV(ip);
 					ret = xfs_grio_issue_io(vp, uiop, 
@@ -598,26 +581,27 @@ retry_request:
                 }
 
 		/*
+		 * release inode ticket lock
+		 */
+       		ticket_unlock(ip, s);
+
+		/*
 		 * Add unperformed I/O back into resid.
 		 */
 		uiop->uio_resid += remainingio;
 		uiop->uio_iov[0].iov_len = uiop->uio_resid;
 
-       		ticket_unlock(ip, s);
 	} else {
+
+		/*
+		 * release inode ticket lock
+		 */
        		ticket_unlock(ip, s);
+
 		vp = XFS_ITOV(ip);
-
-#ifndef SIM
-     		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
-#endif
 		ret = xfs_grio_issue_io(vp, uiop, ioflag, credp, rw);
-#ifndef SIM
-     		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
-#endif
-
-
 	}
+
         return (ret) ;
 }
 
