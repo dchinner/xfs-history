@@ -241,6 +241,12 @@ void		xfs_iprint(xfs_inode_t *);
 int		xfs_iaccess(xfs_inode_t *, mode_t, struct cred *);
 uint		xfs_iroundup(uint);
 
+#ifdef DEBUG
+void		xfs_isize_check(xfs_mount_t *, xfs_inode_t *, xfs_fsize_t);
+#else	/* DEBUG */
+#define xfs_isize_check(mp, ip, isize)
+#endif	/* DEBUG */
+
 extern struct zone	*xfs_inode_zone;
 
 #endif	/* _XFS_INODE_H */
