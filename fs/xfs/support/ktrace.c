@@ -32,6 +32,7 @@
 
 #include <linux/module.h>
 #include <linux/types.h>
+#include <linux/slab.h>
 
 #include <xfs_types.h>
 #include "kmem.h"
