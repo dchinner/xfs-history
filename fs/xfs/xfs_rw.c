@@ -2614,7 +2614,7 @@ xfs_diostrat( buf_t *bp)
 	     			nbp->b_proc      = bp->b_proc;
 	     			nbp->b_edev      = bp->b_edev;
 				if (rt) {
-	     				nbp->b_blkno = XFS_BTOD(mp,
+	     				nbp->b_blkno = XFS_FSB_TO_BB(mp,
 						imapp->br_startblock);
 				} else {
 	     				nbp->b_blkno = XFS_FSB_TO_DADDR(mp,

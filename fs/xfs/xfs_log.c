@@ -410,7 +410,7 @@ xfs_log_stat(caddr_t mnt_pt, int *log_BBstart, int *log_BBsize)
 	} else {
 		xmp = (xfs_mount_t *)vp->v_vfsp->vfs_data;
 		start = XFS_FSB_TO_DADDR(xmp, xmp->m_sb.sb_logstart);
-		size  = XFS_BTOD(xmp, xmp->m_sb.sb_logblocks);
+		size  = XFS_FSB_TO_BB(xmp, xmp->m_sb.sb_logblocks);
 		if ((error = copyout(&start, log_BBstart, sizeof(int))) == 0)
 			error = copyout(&size, log_BBsize, sizeof(int));
 	}

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.63 $"
+#ident	"$Revision: 1.64 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -182,7 +182,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	xfs_alloc_compute_maxlevels(mp);
 	xfs_bmap_compute_maxlevels(mp);
 	xfs_ialloc_compute_maxlevels(mp);
-	mp->m_bsize = XFS_BTOD(mp, 1);
+	mp->m_bsize = XFS_FSB_TO_BB(mp, 1);
 	vfsp->vfs_bsize = XFS_FSB_TO_B(mp, 1);
 
 	/*
@@ -230,7 +230,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	ASSERT(sbp->sb_logblocks > 0);		/* check for volume case */
 	error = xfs_log_mount(mp, mp->m_logdev,
 			      XFS_FSB_TO_DADDR(mp, sbp->sb_logstart),
-			      XFS_BTOD(mp, sbp->sb_logblocks));
+			      XFS_FSB_TO_BB(mp, sbp->sb_logblocks));
 	if (error > 0) {
 		/*
 		 * XXX	log recovery failure - What action should be taken?
@@ -334,7 +334,7 @@ xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 		sbp = XFS_BUF_TO_SBP(mp->m_sb_bp);
 		logstart = sbp->sb_logstart;
 		xfs_log_mount(mp, logdev, XFS_FSB_TO_DADDR(mp, logstart),
-			      XFS_BTOD(mp, sbp->sb_logblocks));
+			      XFS_FSB_TO_BB(mp, sbp->sb_logblocks));
 	}
 
 	return mp;
