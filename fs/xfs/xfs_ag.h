@@ -1,11 +1,11 @@
 #ifndef _FS_XFS_AG_H
 #define	_FS_XFS_AG_H
 
-#ident	"$Revision: 1.16 $"
+#ident	"$Revision: 1.17 $"
 
 /*
  * Allocation group header
- * This is divided into two structures, placed in sequential 512-byte 
+ * This is divided into three structures, placed in sequential 512-byte 
  * buffers after a copy of the superblock (also in a 512-byte buffer).
  */
 
@@ -28,8 +28,9 @@ typedef struct xfs_agf
 	 */
 	xfs_agblock_t	agf_roots[XFS_BTNUM_MAX - 1];
 	__uint32_t	agf_levels[XFS_BTNUM_MAX - 1];
-	xfs_agblock_t	agf_freelist;	/* free blocks */
-	xfs_extlen_t	agf_freecount;	/* #blocks on agf_freelist */
+	__uint32_t	agf_flfirst;	/* first freelist block's index */
+	__uint32_t	agf_fllast;	/* last freelist block's index */
+	__uint32_t	agf_flcount;	/* count of blocks in freelist */
 	xfs_extlen_t	agf_freeblks;	/* total free blocks */
 	xfs_extlen_t	agf_longest;	/* longest free space */
 } xfs_agf_t;
@@ -40,11 +41,12 @@ typedef struct xfs_agf
 #define	XFS_AGF_LENGTH		0x00000008
 #define	XFS_AGF_ROOTS		0x00000010
 #define	XFS_AGF_LEVELS		0x00000020
-#define	XFS_AGF_FREELIST	0x00000040
-#define	XFS_AGF_FREECOUNT	0x00000080
-#define	XFS_AGF_FREEBLKS	0x00000100
-#define	XFS_AGF_LONGEST		0x00000200
-#define	XFS_AGF_NUM_BITS	10
+#define	XFS_AGF_FLFIRST		0x00000040
+#define	XFS_AGF_FLLAST		0x00000080
+#define	XFS_AGF_FLCOUNT		0x00000100
+#define	XFS_AGF_FREEBLKS	0x00000200
+#define	XFS_AGF_LONGEST		0x00000400
+#define	XFS_AGF_NUM_BITS	11
 #define	XFS_AGF_ALL_BITS	((1 << XFS_AGF_NUM_BITS) - 1)
 
 /* disk block (daddr_t) in the AG */
@@ -99,6 +101,18 @@ typedef struct xfs_agi
 #define	XFS_AGI_DADDR		((daddr_t)2)
 #define	XFS_AGI_BLOCK(mp)	XFS_HDR_BLOCK(mp, XFS_AGI_DADDR)
 
+/*
+ * The third a.g. block contains the a.g. freelist, an array 
+ * of block pointers to blocks owned by the allocation btree code.
+ */
+#define	XFS_AGFL_DADDR		((daddr_t)3)
+#define	XFS_AGFL_BLOCK(mp)	XFS_HDR_BLOCK(mp, XFS_AGFL_DADDR)
+#define	XFS_AGFL_SIZE		(BBSIZE / sizeof(xfs_agblock_t))
+typedef	struct xfs_agfl
+{
+	xfs_agblock_t	agfl_bno[XFS_AGFL_SIZE];
+} xfs_agfl_t;
+
 #define	XFS_AG_MIN_BYTES	(1LL << 24)	/* 16 MB */
 #define	XFS_AG_MAX_BYTES	(1LL << 32)	/*  4 GB */
 
@@ -132,6 +146,7 @@ typedef struct xfs_agi
 
 #define	XFS_BUF_TO_AGF(bp)	((xfs_agf_t *)(bp)->b_un.b_addr)
 #define	XFS_BUF_TO_AGI(bp)	((xfs_agi_t *)(bp)->b_un.b_addr)
+#define	XFS_BUF_TO_AGFL(bp)	((xfs_agfl_t *)(bp)->b_un.b_addr)
 
 /*
  * For checking for bad ranges of daddr_t's, covering multiple

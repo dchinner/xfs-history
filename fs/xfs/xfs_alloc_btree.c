@@ -354,13 +354,14 @@ xfs_alloc_delrec(
 			 * lpp is still set to the first pointer in the block.
 			 * Make it the new root of the btree.
 			 */
+			bno = agf->agf_roots[cur->bc_btnum];
 			agf->agf_roots[cur->bc_btnum] = *lpp;
 			agf->agf_levels[cur->bc_btnum]--;
 			/*
 			 * Put this buffer/block on the ag's freelist.
 			 */
 			xfs_alloc_put_freelist(cur->bc_tp,
-				cur->bc_private.a.agbp, bp);
+				cur->bc_private.a.agbp, NULL, bno);
 			xfs_alloc_log_agf(cur->bc_tp, cur->bc_private.a.agbp,
 				XFS_AGF_ROOTS | XFS_AGF_LEVELS);
 			/*
@@ -617,7 +618,7 @@ xfs_alloc_delrec(
 	/*
 	 * Free the deleting block by putting it on the freelist.
 	 */
-	xfs_alloc_put_freelist(cur->bc_tp, cur->bc_private.a.agbp, rbp);
+	xfs_alloc_put_freelist(cur->bc_tp, cur->bc_private.a.agbp, NULL, rbno);
 	xfs_alloc_rcheck(cur);
 	kmem_check();
 	/* 
@@ -1352,12 +1353,14 @@ xfs_alloc_newroot(
 	/*
 	 * Get a buffer from the freelist blocks, for the new root.
 	 */
-	nbno = xfs_alloc_get_freelist(cur->bc_tp, cur->bc_private.a.agbp, &nbp);
+	nbno = xfs_alloc_get_freelist(cur->bc_tp, cur->bc_private.a.agbp);
 	/*
 	 * None available, we fail.
 	 */
 	if (nbno == NULLAGBLOCK)
 		return 0;
+	nbp = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp, 
+		cur->bc_private.a.agno, nbno, 0);
 	new = XFS_BUF_TO_ALLOC_BLOCK(nbp);
 	/*
 	 * Set the root data in the a.g. freespace structure.
@@ -1716,11 +1719,13 @@ xfs_alloc_split(
 	 * Allocate the new block from the freelist.
 	 * If we can't do it, we're toast.  Give up.
 	 */
-	rbno = xfs_alloc_get_freelist(cur->bc_tp, cur->bc_private.a.agbp, &rbp);
+	rbno = xfs_alloc_get_freelist(cur->bc_tp, cur->bc_private.a.agbp);
 	if (rbno == NULLAGBLOCK) {
 		kmem_check();
 		return 0;
 	}
+	rbp = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
+		cur->bc_private.a.agno, rbno, 0);
 	/*
 	 * Set up the new block as "right".
 	 */

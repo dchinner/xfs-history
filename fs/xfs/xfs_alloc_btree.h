@@ -54,9 +54,9 @@ typedef	struct xfs_btree_sblock xfs_alloc_block_t;
 #define	XFS_MAX_BLOCKSIZE	(1 << XFS_MAX_BLOCKSIZE_LOG)
 
 /*
- * block numbers in the AG; SB is BB 0, AGF is BB 1, AGI is BB 2
+ * block numbers in the AG; SB is BB 0, AGF is BB 1, AGI is BB 2, AGFL is BB 3
  */
-#define	XFS_BNO_BLOCK(mp)	((xfs_agblock_t)(XFS_AGI_BLOCK(mp) + 1))
+#define	XFS_BNO_BLOCK(mp)	((xfs_agblock_t)(XFS_AGFL_BLOCK(mp) + 1))
 #define	XFS_CNT_BLOCK(mp)	((xfs_agblock_t)(XFS_BNO_BLOCK(mp) + 1))
 
 /*
