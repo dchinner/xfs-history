@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.41 $"
+#ident  "$Revision: 1.42 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -63,6 +63,7 @@
 #include <sys/user.h>
 #include <sys/vnode.h>
 #include <sys/grio.h>
+#include <fs/specfs/snode.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -158,17 +159,17 @@ STATIC int	_xfs_ibusy(xfs_mount_t *mp);
 
 
 /*
- * xfs_type is the number given to xfs to indicate
+ * xfs_fstype is the number given to xfs to indicate
  * its type among vfs's.  It is initialized in xfs_init().
  */
-int	xfs_type;
+int	xfs_fstype;
 
 /*
  * xfs_init
  *
  * This is called through the vfs switch at system initialization
  * to initialize any global state associated with XFS.  All we
- * need to do currently is save the type given to XFS in xfs_type.
+ * need to do currently is save the type given to XFS in xfs_fstype.
  *
  * vswp -- pointer to the XFS entry in the vfs switch table
  * fstype -- index of XFS in the vfs switch table used as the XFS fs type.
@@ -196,7 +197,7 @@ xfs_init(vfssw_t	*vswp,
 	extern ktrace_t	*xfs_bmap_trace_buf;
 	extern ktrace_t	*xfs_bmbt_trace_buf;
 
-	xfs_type = fstype;
+	xfs_fstype = fstype;
 
 	initnlock(&xfs_strat_lock, "xfsstrat");
 	initnsema(&xfs_ancestormon, 1, "xfs_ancestor");
@@ -445,9 +446,9 @@ _xfs_get_vfsmount(struct vfs	*vfsp,
 
 		vfsp->vfs_flag |= VFS_NOTRUNC|VFS_LOCAL;
 		/* vfsp->vfs_bsize filled in later from the superblock. */
-		vfsp->vfs_fstype = xfs_type;
+		vfsp->vfs_fstype = xfs_fstype;
 		vfsp->vfs_fsid.val[0] = ddev;
-		vfsp->vfs_fsid.val[1] = xfs_type;
+		vfsp->vfs_fsid.val[1] = xfs_fstype;
 		vfsp->vfs_data = mp;
 		vfsp->vfs_dev = ddev;
 		vfsp->vfs_nsubmounts = 0;
@@ -888,6 +889,91 @@ xfs_root(vfs_t		*vfsp,
 	return 0;
 }
 
+/*
+ * Get a buffer containing the superblock from an XFS filesystem given its
+ * device vnode pointer.
+ * Used by statfs.
+ */
+static int
+devvptoxfs(vnode_t *devvp, buf_t **bpp, xfs_sb_t **fsp, cred_t *cr)
+{
+	buf_t		*bp;
+	dev_t		dev;
+	int		error;
+	xfs_sb_t	*fs;
+
+	if (devvp->v_type != VBLK)
+		return ENOTBLK;
+	if (error = VOP_OPEN(&devvp, FREAD, cr))
+		return error;
+	dev = devvp->v_rdev;
+	VOP_RWLOCK(devvp, 1);
+	if (VTOS(devvp)->s_flag & SMOUNTED) {
+		/*
+		 * Device is mounted.  Get an empty buffer to hold a
+		 * copy of its superblock, so we don't have to worry
+		 * about racing with unmount.  Hold devvp's lock to
+		 * block unmount here.
+		 */
+		bp = ngeteblk(BBSIZE);
+		fs = (xfs_sb_t *)bp->b_un.b_addr;
+		bcopy(&XFS_VFSTOM(vfs_devsearch(dev))->m_sb, fs, sizeof(*fs));
+	} else {
+		/*
+		 * If the buffer is already in core, it might be stale.
+		 * User might have been doing block reads, then mkfs.
+		 * Very unlikely, but would cause a buffer to contain
+		 * stale information.
+		 * If buffer is marked DELWRI, then use it since it reflects
+		 * what should be on the disk.
+		 */
+		bp = incore(dev, XFS_SB_DADDR, BLKDEV_BB, 1);
+		if (bp && !(bp->b_flags & B_DELWRI)) {
+			bp->b_flags |= B_STALE;
+			brelse(bp);
+			bp = NULL;
+		}
+		if (!bp)
+			bp = bread(dev, XFS_SB_DADDR, BLKDEV_BB);
+		if (bp->b_flags & B_ERROR) {
+			error = bp->b_error;
+			brelse(bp);
+		} else
+			fs = (xfs_sb_t *)bp->b_un.b_addr;
+	}
+	VOP_RWUNLOCK(devvp, 1);
+	*bpp = bp;
+	*fsp = fs;
+	return error;
+}
+
+/*
+ * Get file system statistics - from a device vp - used by statfs only
+ */
+int
+xfs_statdevvp(struct statvfs *sp, vnode_t *devvp)
+{
+	buf_t		*bp;
+	int		error;
+	xfs_sb_t	*sbp;
+
+	if (error = devvptoxfs(devvp, &bp, &sbp, u.u_cred))
+		return error;
+	sp->f_bsize = sbp->sb_blocksize;
+	sp->f_frsize = sbp->sb_blocksize;
+	sp->f_blocks = sbp->sb_dblocks + sbp->sb_rextents * sbp->sb_rextsize;
+	sp->f_bfree = sbp->sb_fdblocks + sbp->sb_frextents * sbp->sb_rextsize;
+	sp->f_files = sbp->sb_icount;
+	sp->f_ffree = sbp->sb_ifree;
+	sp->f_fsid = devvp->v_rdev;
+	(void) strcpy(sp->f_basetype, vfssw[xfs_fstype].vsw_name);
+	sp->f_flag = 0;
+	sp->f_namemax = MAXNAMELEN;
+	bzero(sp->f_fstr, sizeof(sp->f_fstr));
+	brelse(bp);
+	(void) VOP_CLOSE(devvp, FREAD, 1, 0, u.u_cred);
+	return 0;
+}
 
 /*
  * xfs_statvfs
@@ -919,7 +1005,7 @@ xfs_statvfs(vfs_t	*vfsp,
 	XFS_SB_UNLOCK(mp, s);
 
 	statp->f_fsid = mp->m_dev;
-	(void) strcpy(statp->f_basetype, vfssw[xfs_type].vsw_name);
+	(void) strcpy(statp->f_basetype, vfssw[xfs_fstype].vsw_name);
 	statp->f_namemax = MAXNAMELEN;
 	bzero(statp->f_fstr, sizeof(statp->f_fstr));
 
