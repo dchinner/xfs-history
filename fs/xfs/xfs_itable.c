@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.28 $"
+#ident	"$Revision$"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -51,6 +51,7 @@ xfs_bulkstat_one(
 	xfs_bstat_t	*buf;		/* return buffer */
 	int		error;		/* error value */
 	xfs_inode_t	*ip;		/* incore inode pointer */
+	static uuid_t	zuuid;		/* a zeroed uuid structure */
 
 	buf = (xfs_bstat_t *)buffer;
 	if (ino == mp->m_sb.sb_rbmino || ino == mp->m_sb.sb_rsumino) {
@@ -91,7 +92,7 @@ xfs_bulkstat_one(
 	buf->bs_extsize = ip->i_d.di_extsize << mp->m_sb.sb_blocklog;
 	buf->bs_extents = ip->i_d.di_nextents;
 	buf->bs_gen = ip->i_d.di_gen;
-	buf->bs_uuid = ip->i_d.di_uuid;
+	buf->bs_uuid = zuuid;
 	buf->bs_dmevmask = ip->i_d.di_dmevmask;
 	buf->bs_dmstate = ip->i_d.di_dmstate;
 	buf->bs_aextents = ip->i_d.di_anextents;

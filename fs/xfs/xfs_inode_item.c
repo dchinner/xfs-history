@@ -225,6 +225,7 @@ xfs_inode_item_format(
 	size_t			data_bytes;
 	xfs_bmbt_rec_32_t	*ext_buffer;
 	int			nrecs;
+	xfs_mount_t		*mp;
 
 	ip = iip->ili_inode;
 	vecp = log_vector;
@@ -239,6 +240,37 @@ xfs_inode_item_format(
 	vecp++;
 	nvecs++;
 	iip->ili_format.ilf_fields |= XFS_ILOG_CORE;
+
+	/*
+	 * If this is really an old format inode, then we need to
+	 * log it as such.  This means that we have to copy the link
+	 * count from the new field to the old.  We don't have to worry
+	 * about the new fields, because nothing trusts them as long as
+	 * the old inode version number is there.  If the superblock already
+	 * has a new version number, then we don't bother converting back.
+	 */
+	mp = ip->i_mount;
+	ASSERT((ip->i_d.di_version == XFS_DINODE_VERSION_1) ||
+	       (mp->m_sb.sb_versionnum >= XFS_SB_VERSION_HASNLINK));
+	if (ip->i_d.di_version == XFS_DINODE_VERSION_1) {
+		if (mp->m_sb.sb_versionnum < XFS_SB_VERSION_HASNLINK) {
+			/*
+			 * Convert it back.
+			 */
+			ASSERT(ip->i_d.di_nlink <= XFS_MAXLINK_1);
+			ip->i_d.di_onlink = ip->i_d.di_nlink;
+		} else {
+			/*
+			 * The superblock version has already been bumped,
+			 * so just make the conversion to the new inode
+			 * format permanent.
+			 */
+			ip->i_d.di_version = XFS_DINODE_VERSION_2;
+			ip->i_d.di_onlink = 0;
+			bzero(&(ip->i_d.di_pad[0]), sizeof(ip->i_d.di_pad));
+			ASSERT(ip->i_d.di_projid == 0);
+		}
+	}
 
 	switch (ip->i_d.di_format) {
 	case XFS_DINODE_FMT_EXTENTS:
