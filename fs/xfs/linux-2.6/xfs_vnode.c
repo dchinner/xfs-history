@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.32 $"
+#ident	"$Revision: 1.33 $"
 
 #include <xfs_os_defs.h>
 
@@ -746,7 +746,6 @@ vn_rele(struct vnode *vp)
 
 /*
  * Finish the removal of a vnode.
- * A 'special' case of vn_rele.
  */
 void
 vn_remove(struct vnode *vp)
@@ -756,41 +755,7 @@ vn_remove(struct vnode *vp)
 	int cache;
 	vmap_t  vmap;
 
-	vn_trace_entry(vp, "vn_remove", (inst_t *)__return_address);
-
 	VOPINFO.vn_remove++;
-
-	s = VN_LOCK(vp);
-
-	ASSERT(vn_count(vp) == 0);
-
-	/*
-	 * It is absolutely, positively the case that
-	 * the lock manager will not be releasing vnodes
-	 * without first having released all of its locks.
-	 */
-	ASSERT(!(vp->v_flag & VLOCKHOLD));
-
-	/*
-	 * As soon as we turn this on, noone can find us in vn_get
-	 * until we turn off VINACT or VRECLM
-	 */
-	vp->v_flag |= VINACT;
-	VN_UNLOCK(vp, s);
-
-	/*
-	 * Do not make the VOP_INACTIVE call if there
-	 * are no behaviors attached to the vnode to call.
-	 */
-	if (vp->v_fbhv != NULL) {
-		VOP_INACTIVE(vp, get_current_cred(), cache);
-	}
-
-	s = VN_LOCK(vp);
-
-	vp->v_flag &= ~(VINACT|VWAIT|VRECLM|VGONE);
-
-	VN_UNLOCK(vp, s);
 
 	vn_trace_exit(vp, "vn_remove", (inst_t *)__return_address);
 
