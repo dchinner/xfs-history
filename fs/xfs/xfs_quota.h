@@ -1,16 +1,17 @@
 #ifndef __XFS_QUOTA_H__
 #define __XFS_QUOTA_H__
-#ident "$Revision: 1.13 $"
+#ident "$Revision: 1.14 $"
 /*
  * External Interface to the XFS disk quota subsystem.
  */
-struct  xfs_dqhash;
-struct  xfs_inode;
+struct	bhv_desc;
+struct  vfs;
 struct  xfs_disk_dquot;
+struct  xfs_dqhash;
 struct  xfs_dquot;
+struct  xfs_inode;
 struct  xfs_mount;
 struct  xfs_trans;
-struct  vfs;
 
 /* 
  * We use only 16-bit prid's in the inode, not the 64-bit version in the proc.

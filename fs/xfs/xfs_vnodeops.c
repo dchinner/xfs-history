@@ -1,4 +1,4 @@
-#ident "$Revision: 1.308 $"
+#ident "$Revision: 1.309 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -404,15 +404,16 @@ xfs_close(
 	lastclose_t	lastclose,
 	cred_t		*credp)
 {
-
+#if 0
         xfs_inode_t	*ip;
+#endif
+	/* REFERENCED */
 	vnode_t 	*vp;
 
 	vp = BHV_TO_VNODE(bdp);
 	vn_trace_entry(vp, "xfs_close", (inst_t *)__return_address);
-	ip = XFS_BHVTOI(bdp);
-
 #if 0
+	ip = XFS_BHVTOI(bdp);
 	/*
 	 * If this is the last close of a file, and this process
 	 * no longer has the file open via another file descriptor, 
@@ -422,7 +423,6 @@ xfs_close(
 	    !fdt_vnode_isopen(vp))
 		grio_remove_reservation(current_pid(), ip->i_dev, ip->i_ino);
 #endif
-
 	return 0;
 }
 
