@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.1 $"
+#ident "$Revision: 1.2 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -126,6 +126,53 @@ fd_to_handle (
 	if (suword (hlen, hsize))
 		return EFAULT;
 	return 0;
+}
+
+
+/*
+ *  Just like readlink, except that it uses a handle instead of a path
+ *  to locate the vnode.
+ */
+
+int
+readlink_by_handle (
+	void		*hanp,			/* handle data */
+	size_t		hlen,			/* size of handle data */
+	void		*buf,			/* return buffer */
+	size_t		bufsiz,			/* size provided */
+	rval_t		*rvp)
+{
+	int		error;
+	handle_t	handle;
+	vnode_t		*vp;
+	struct	iovec	aiov;
+	struct	uio	auio;
+
+	error = gethandle (hanp, hlen, &handle);
+	if (error)
+		return error;
+	vp = handle_to_vp (&handle);
+	if (vp == NULL)
+		return EINVAL;
+	if (vp->v_type != VLNK) {
+		error = EINVAL;
+		goto out;
+        }
+
+	aiov.iov_base	= buf;
+	aiov.iov_len	= bufsiz;
+	auio.uio_iov	= &aiov;
+	auio.uio_iovcnt	= 1;
+	auio.uio_pio	= 0;
+	auio.uio_pbuf	= 0;
+	auio.uio_offset	= 0;
+	auio.uio_segflg	= UIO_USERSPACE;
+	auio.uio_resid	= bufsiz;
+	error = VOP_READLINK (vp, &auio, u.u_cred);
+out:
+	VN_RELE (vp);
+	rvp->r_val1 = bufsiz - auio.uio_resid;
+	return error;
 }
 
 
