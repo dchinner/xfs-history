@@ -73,7 +73,8 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	 * Default to a normal get_buf() call if the tp is NULL.
 	 */
 	if (tp == NULL) {
-		bp = xfs_buf_get_flags(target_dev, blkno, len, flags);
+		bp = xfs_buf_get_flags(target_dev, blkno, len,
+							flags | BUF_BUSY);
 		return(bp);
 	}
 
@@ -294,7 +295,10 @@ xfs_trans_read_buf(
 	 * Default to a normal get_buf() call if the tp is NULL.
 	 */
 	if (tp == NULL) {
-		bp = xfs_buf_read_flags(target, blkno, len, flags);
+		bp = xfs_buf_read_flags(target, blkno, len, flags | BUF_BUSY);
+		if (!bp) 
+			return XFS_ERROR(ENOMEM);
+
 		if ((bp != NULL) && (XFS_BUF_GETERROR(bp) != 0)) {
 			xfs_ioerror_alert("xfs_trans_read_buf", mp,
 					  bp, blkno);
