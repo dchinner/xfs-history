@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.158 $"
+#ident	"$Revision$"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -2590,6 +2590,12 @@ xfs_bmap_search_extents(
 		*eofp = 0;
 	} else if (nextents == 0) {
 		*eofp = 1;
+	} else if (bno == 0 &&
+		   (got.br_startoff = xfs_bmbt_get_startoff(base)) == 0) {
+		ep = base;
+		lastx = 0;
+		got.br_blockcount = xfs_bmbt_get_blockcount(ep);
+		*eofp = 0;
 	} else {
 		/* binary search the extents array */
 		low = 0;
@@ -3544,20 +3550,14 @@ xfs_bmapi(
 	lowspace = 0;
 	nallocs = 0;
 	if (XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_LOCAL) {
-		if (!wr) {
-			/* change to assert later */
-ASSERT( 0 );
-			*nmap = 0;
-			kmem_check();
-			return 0;
-		}
+		ASSERT(wr);
 		error = xfs_bmap_local_to_extents(tp, ip, firstblock,
 				total, &logflags, whichfork);
 		if (error) {
 			return error;
 		}
 	}
-	if (*firstblock == NULLFSBLOCK) {
+	if (wr && *firstblock == NULLFSBLOCK) {
 		if (XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_BTREE)
 			minleft = ifp->if_broot->bb_level + 1;
 		else
@@ -3589,13 +3589,13 @@ ASSERT( 0 );
 		if (eof && !wr)
 			got.br_startoff = end;
 		inhole = eof || got.br_startoff > bno;
-		wasdelay = !inhole && !delay &&
+		wasdelay = wr && !inhole && !delay &&
 			ISNULLSTARTBLOCK(got.br_startblock);
 		/*
 		 * First, deal with the hole before the allocated space 
 		 * that we found, if any.
 		 */
-		if ((inhole || wasdelay) && wr) {
+		if (wr && (inhole || wasdelay)) {
 			/*
 			 * For the wasdelay case, we could also just
 			 * allocate the stuff asked for in this bmap call
@@ -3756,7 +3756,8 @@ ASSERT( 0 );
 		 */
 		ASSERT(ep != NULL);
 		if (trim && (got.br_startoff + got.br_blockcount > obno)) {
-			bno = XFS_FILEOFF_MAX(bno, obno);
+			if (obno > bno)
+				bno = obno;
 			ASSERT((bno >= obno) || (n == 0));
 			ASSERT(bno < end);
 			mval->br_startoff = bno;
@@ -3818,7 +3819,7 @@ ASSERT( 0 );
 		/*
 		 * If we're done, stop now.  Stop when we've allocated
 		 * XFS_BMAP_MAX_NMAP extents no matter what.  Otherwise
-		 * the transaction may get too bit.
+		 * the transaction may get too big.
 		 */
 		if (bno >= end || n >= *nmap || nallocs >= *nmap)
 			break;
