@@ -1491,9 +1491,9 @@ xfs_create(vnode_t	*dir_vp,
 	   vnode_t	**vpp,
 	   cred_t	*credp)
 {
-	xfs_inode_t      	*dp, *ip = NULL;
+	xfs_inode_t      	*dp, *ip;
         vnode_t		        *vp, *newvp;
-	xfs_trans_t      	*tp = NULL;
+	xfs_trans_t      	*tp;
         xfs_ino_t               e_inum;
         xfs_mount_t	        *mp;
 	dev_t			rdev;
@@ -1501,8 +1501,8 @@ xfs_create(vnode_t	*dir_vp,
         int                     error;
         xfs_bmap_free_t 	free_list;
         xfs_fsblock_t   	first_block;
-	boolean_t		dp_joined_to_trans = B_FALSE;
-	boolean_t		truncated = B_FALSE;
+	boolean_t		dp_joined_to_trans;
+	boolean_t		truncated;
 	uint			cancel_flags;
 	int			committed;
 	uint			truncate_flag;
@@ -1512,6 +1512,9 @@ xfs_create(vnode_t	*dir_vp,
 
 try_again:
 
+	ip = NULL;
+	dp_joined_to_trans = B_FALSE;
+	truncated = B_FALSE;
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
 	tp = xfs_trans_alloc (mp, 0);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
