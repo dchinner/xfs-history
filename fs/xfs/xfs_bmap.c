@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.176 $"
+#ident	"$Revision: 1.179 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -3135,11 +3135,6 @@ xfs_bmap_finish(
 
 	ASSERT((*tp)->t_flags & XFS_TRANS_PERM_LOG_RES);
 
-#ifdef SIM
-	ASSERT(flist->xbf_count == 0);
-	*committed = 0;
-	return 0;
-#else
 	if (flist->xbf_count == 0) {
 		*committed = 0;
 		return 0;
@@ -3179,7 +3174,6 @@ xfs_bmap_finish(
 		xfs_bmap_del_free(flist, NULL, free);
 	}
 	return 0;
-#endif
 }
 
 /*
