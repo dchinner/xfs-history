@@ -4094,7 +4094,7 @@ xfsidbg_xlog_ritem(xlog_recover_item_t *item)
 
 	kdb_printf("(xlog_recover_item 0x%p) ", item);
 	kdb_printf("next: 0x%p prev: 0x%p type: %d cnt: %d ttl: %d\n",
-		item->ri_next, item->ri_prev, item->ri_type, item->ri_cnt,
+		item->ri_next, item->ri_prev, ITEM_TYPE(item), item->ri_cnt,
 		item->ri_total);
 	for ( ; i > 0; i--) {
 		if (!item->ri_buf[XLOG_MAX_REGIONS_IN_ITEM-i].i_addr)
@@ -4124,7 +4124,7 @@ xfsidbg_xlog_rtrans(xlog_recover_t *trans)
 		do {
 			kdb_printf("(recovery item: 0x%p) ", rip);
 			kdb_printf("type: %d cnt: %d total: %d\n",
-				rip->ri_type, rip->ri_cnt, rip->ri_total);
+				ITEM_TYPE(rip), rip->ri_cnt, rip->ri_total);
 			rip = rip->ri_next;
 		} while (rip != first_rip);
 	}
@@ -4149,19 +4149,23 @@ xfsidbg_xlog_buf_logitem(xlog_recover_item_t *item)
 		kdb_printf("\tDQUOT BUF <blkno=0x%Lx, len=0x%x>\n",
 			buf_f->blf_blkno, buf_f->blf_len);
 	} else {
-		kdb_printf("\tREG BUF <blkno=0x%Lx, len=0x%x>\n",
-			buf_f->blf_blkno, buf_f->blf_len);
 		data_map = buf_f->blf_data_map;
 		map_size = buf_f->blf_map_size;
+		kdb_printf("\tREG BUF <blkno=0x%Lx, len=0x%x map 0x%p size %d>\n",
+			buf_f->blf_blkno, buf_f->blf_len, data_map, map_size);
 		bit = 0;
-		i = 1;	/* 0 is the buf format structure */
+		i = 0;  /* 0 is the buf format structure */
 		while (1) {
-			size = 1;
-			kdb_printf("\t\tlogbuf.i_addr 0x%p, size 0x%xB\n",
+			bit = xfs_next_bit(data_map, map_size, bit);
+			if (bit == -1)
+				break;
+			nbits = xfs_contig_bits(data_map, map_size, bit);
+			size = ((uint)bit << XFS_BLI_SHIFT)+(nbits<<XFS_BLI_SHIFT);
+			kdb_printf("\t\tlogbuf.i_addr 0x%p, size 0x%x\n",
 				item->ri_buf[i].i_addr, size);
 			kdb_printf("\t\t\t\"");
 			for (j=0; j<8 && j<size; j++) {
-				kdb_printf("%c", ((char *)item->ri_buf[i].i_addr)[j]);
+				kdb_printf("%02x", ((char *)item->ri_buf[i].i_addr)[j]);
 			}
 			kdb_printf("...\"\n");
 			i++;
