@@ -70,10 +70,8 @@
 extern int
 xfs_dm_mount(
 	vfs_t		*vfsp,
-	vnode_t		*mvp,
 	char		*dir_name,
-	char		*fsname,
-	struct vfsmount *mnt);
+	char		*fsname);
 
 int
 xfs_dm_get_fsys_vector(
