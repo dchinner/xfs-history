@@ -140,6 +140,8 @@ STATIC	dm_size_t  dm_min_dio_xfer = 0; /* direct I/O disabled for now */
 
 #define DM_STAT_ALIGN		(sizeof(__uint64_t))		
 
+/* DMAPI's E2BIG == EA's ERANGE */
+#define DM_EA_XLATE_ERR(err) { if (err == ERANGE) err = E2BIG; }
 
 /*
  *	xfs_dm_send_data_event()
@@ -1457,6 +1459,7 @@ xfs_dm_get_destroy_dmattr(
 
 	VOP_ATTR_GET(vp, dkattrname.dan_chars, value, &value_len,
 			ATTR_ROOT, sys_cred, error);
+	DM_EA_XLATE_ERR(error);
 
 	if (error == E2BIG) {
 		alloc_size = value_len;
@@ -1464,6 +1467,7 @@ xfs_dm_get_destroy_dmattr(
 
 		VOP_ATTR_GET(vp, dkattrname.dan_chars, value,
 			&value_len, ATTR_ROOT, sys_cred, error);
+		DM_EA_XLATE_ERR(error);
 	}
 	if (error) {
 		if (alloc_size)
@@ -1715,6 +1719,7 @@ xfs_dm_get_dmattr(
 
 	VOP_ATTR_GET(vp, name.dan_chars, value, &value_len,
 			ATTR_ROOT, get_current_cred(), error);
+	DM_EA_XLATE_ERR(error);
 
 	/* DMAPI requires an errno of ENOENT if an attribute does not exist,
 	   so remap ENOATTR here.
@@ -1899,6 +1904,7 @@ xfs_dm_getall_dmattr(
 
 		VOP_ATTR_LIST(vp, (char *)attrlist, list_size,
 			ATTR_ROOT, &cursor, get_current_cred(), error);
+		DM_EA_XLATE_ERR(error);
 
 		if (error || attrlist->al_count == 0)
 			break;
@@ -1958,6 +1964,7 @@ xfs_dm_getall_dmattr(
 			VOP_ATTR_GET(vp, entry->a_name,
 				(void *)(ulist + 1), &value_len,
 				ATTR_ROOT, get_current_cred(), error);
+			DM_EA_XLATE_ERR(error);
 
 			if (error || value_len != entry->a_valuelen) {
 				error = EIO;
@@ -2245,6 +2252,7 @@ xfs_dm_remove_dmattr(
 	VOP_ATTR_REMOVE(vp, name.dan_chars,
 			(setdtime ? ATTR_ROOT : ATTR_ROOT|ATTR_KERNOTIME),
 			get_current_cred(), error);
+	DM_EA_XLATE_ERR(error);
 
 	if (error == ENOATTR)
 		error = ENOENT;
@@ -2313,6 +2321,7 @@ xfs_dm_set_dmattr(
 		VOP_ATTR_SET(vp, name.dan_chars, value, buflen, 
 			(setdtime ? ATTR_ROOT : ATTR_ROOT|ATTR_KERNOTIME),
 			get_current_cred(), error);
+		DM_EA_XLATE_ERR(error);
 	}
 	kmem_free(value, alloc_size);
 	return(error);

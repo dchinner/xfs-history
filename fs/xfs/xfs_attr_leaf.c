@@ -261,7 +261,7 @@ xfs_attr_shortform_getvalue(xfs_da_args_t *args)
 		}
 		if (args->valuelen < INT_GET(sfe->valuelen, ARCH_CONVERT)) {
 			args->valuelen = INT_GET(sfe->valuelen, ARCH_CONVERT);
-			return(XFS_ERROR(E2BIG));
+			return(XFS_ERROR(ERANGE));
 		}
 		args->valuelen = INT_GET(sfe->valuelen, ARCH_CONVERT);
 		bcopy(&sfe->nameval[args->namelen], args->value,
@@ -1903,7 +1903,7 @@ xfs_attr_leaf_getvalue(xfs_dabuf_t *bp, xfs_da_args_t *args)
 		}
 		if (args->valuelen < valuelen) {
 			args->valuelen = valuelen;
-			return(XFS_ERROR(E2BIG));
+			return(XFS_ERROR(ERANGE));
 		}
 		args->valuelen = valuelen;
 		bcopy(&name_loc->nameval[args->namelen], args->value, valuelen);
@@ -1920,7 +1920,7 @@ xfs_attr_leaf_getvalue(xfs_dabuf_t *bp, xfs_da_args_t *args)
 		}
 		if (args->valuelen < valuelen) {
 			args->valuelen = valuelen;
-			return(XFS_ERROR(E2BIG));
+			return(XFS_ERROR(ERANGE));
 		}
 		args->valuelen = valuelen;
 	}

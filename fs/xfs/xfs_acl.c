@@ -143,7 +143,7 @@ acl_xfs_to_ext_attr(xfs_acl_t *src, acl_ea_header *ext_acl, size_t size)
 	int n;
 
 	if (size < new_size)
-		return -E2BIG;	
+		return -ERANGE;	
 
 	/* Need to sort src XFS ACL by <ae_tag,ae_id> */
 	qsort(src->acl_entry, src->acl_cnt, sizeof(src->acl_entry[0]),
