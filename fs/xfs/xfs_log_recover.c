@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.4 $"
+#ident	"$Revision: 1.2 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -36,6 +36,9 @@
 #include "xfs_sb.h"		/* depends on xfs_types.h & xfs_inum.h */
 #include "xfs_trans.h"
 #include "xfs_mount.h"		/* depends on xfs_trans.h & xfs_sb.h */
+#include "xfs_bmap_btree.h"
+#include "xfs_dinode.h"
+#include "xfs_imap.h"
 #include "xfs_inode_item.h"
 #include "xfs_error.h"
 #include "xfs_log_priv.h"	/* depends on all above */
@@ -376,7 +379,7 @@ xlog_find_tail(xlog_t  *log,
 	if (*head_blk == i+2 && rhead->h_num_logops == 1) {
 		xlog_bread(log, i+1, 1, bp);
 		op_head = (xlog_op_header_t *)bp->b_dmaaddr;
-		if ((op_head->oh_flags & XLOG_UNMOUNT_TRANS) != 0) {
+		if (op_head->oh_flags & XLOG_UNMOUNT_TRANS) {
 			log->l_tail_lsn =
 			     ((long long)log->l_curr_cycle << 32)|((uint)(i+2));
 		}
@@ -550,6 +553,8 @@ xlog_recover_add_to_trans(xlog_recover_t	*trans,
 	caddr_t			 ptr;
 	int			 total;
 
+	if (!len)
+		return;
 	ptr = kmem_zalloc(len, 0);
 	bcopy(dp, ptr, len);
 	
@@ -744,26 +749,119 @@ xlog_recover_reorder_trans(xlog_t	  *log,
 }	/* xlog_recover_reorder_trans */
 
 static void
-xlog_recover_do_buffer_trans(xlog_recover_item_t *item)
+xlog_recover_do_buffer_trans(xlog_t		 *log,
+			     xlog_recover_item_t *item)
 {
+	xfs_buf_log_format_t *buf_f;
+	xfs_mount_t	     *mp;
+	buf_t		     *bp;
+	int		     nbits, bit = 0;
+	int		     i = 1;	/* 0 is format structure */
+
+	buf_f = (xfs_buf_log_format_t *)item->ri_buf[0].i_addr;
+	mp = log->l_mp;
+	bp = bread(mp->m_dev, buf_f->blf_blkno, buf_f->blf_len);
+	if (bp->b_flags & B_ERROR)
+		xlog_panic("xlog_recover_do_buffer_trans: bread error");
+	while (1) {
+		bit = xfs_buf_item_next_bit(buf_f->blf_data_map,
+					    buf_f->blf_map_size,
+					    bit);
+		if (bit == -1)
+			break;
+		nbits = xfs_buf_item_bits(buf_f->blf_data_map,
+					    buf_f->blf_map_size,
+					    bit);
+		ASSERT(item->ri_buf[i].i_addr != 0);
+		ASSERT(item->ri_buf[i].i_len % XFS_BLI_CHUNK == 0);
+		bcopy(item->ri_buf[i].i_addr,		           /* source */
+		      bp->b_un.b_addr+((uint)bit << XFS_BLI_SHIFT),  /* dest */
+		      nbits<<XFS_BLI_SHIFT);			   /* length */
+		i++;
+		bit += nbits;
+	}
+	bp->b_flags = (B_BUSY | B_HOLD);	/* synchronous */
+	bwrite(bp);
+	if (bp->b_flags & B_ERROR)
+		xlog_panic("xlog_recover_do_buffer_trans: bwrite error");
+	/* Shouldn't be any more regions */
+	if (i < XLOG_MAX_REGIONS_IN_ITEM) {
+		ASSERT(item->ri_buf[i].i_addr == 0);
+		ASSERT(item->ri_buf[i].i_len == 0);
+	}
+	brelse(bp);
 }	/* xlog_recover_do_buffer_trans */
 
 static void
-xlog_recover_do_inode_trans(xlog_recover_item_t *item)
+xlog_recover_do_inode_trans(xlog_t		*log,
+			    xlog_recover_item_t *item)
 {
+	xfs_inode_log_format_t	*in_f;
+	xfs_mount_t		*mp;
+	buf_t			*bp;
+	xfs_imap_t		imap;
+	xfs_dinode_t		*dip;
+	int			len;
+	caddr_t			src;
+
+	in_f = (xfs_inode_log_format_t *)item->ri_buf[0].i_addr;
+	mp = log->l_mp;
+	xfs_imap(log->l_mp, 0, in_f->ilf_ino, &imap);
+	bp = bread(mp->m_dev, imap.im_blkno, imap.im_len);
+	if (bp->b_flags & B_ERROR)
+		xlog_panic("xlog_recover_do_buffer_trans: bread error");
+	ASSERT(in_f->ilf_fields & XFS_ILOG_CORE);
+	dip = (xfs_dinode_t *)(bp->b_un.b_addr+imap.im_boffset);
+	bcopy(item->ri_buf[1].i_addr, dip, item->ri_buf[1].i_len);
+	if (in_f->ilf_size == 2)
+		goto write_inode_buffer;
+	len = item->ri_buf[2].i_len;
+	src = item->ri_buf[2].i_addr;
+	ASSERT(in_f->ilf_size == 3);
+	switch (in_f->ilf_fields & XFS_ILOG_NONCORE) {
+	    case XFS_ILOG_DATA:
+	    case XFS_ILOG_EXT: {
+		    bcopy(src, &dip->di_u, len);
+		    break;
+	    }
+	    case XFS_ILOG_BROOT: {
+		xfs_bmbt_to_bmdr((xfs_bmbt_block_t *)src, len,
+				 &(dip->di_u.di_bmbt),
+				 XFS_BMAP_BROOT_SIZE(mp->m_sb.sb_inodesize));
+		break;
+	    }
+	    case XFS_ILOG_DEV: {
+		    dip->di_u.di_dev = in_f->ilf_u.ilfu_rdev;
+		    break;
+	    }
+	    case XFS_ILOG_UUID: {
+		    dip->di_u.di_muuid = in_f->ilf_u.ilfu_uuid;
+		    break;
+	    }
+	    default: {
+		    xlog_panic("xlog_recover_do_inode_trans: Illegal flag");
+	    }
+	}
+write_inode_buffer:
+	bp->b_flags = (B_BUSY | B_HOLD);	/* synchronous */
+	bwrite(bp);
+	if (bp->b_flags & B_ERROR)
+		xlog_panic("xlog_recover_do_inode_trans: bwrite error");
+	brelse(bp);
 }	/* xlog_recover_do_inode_trans */
 
 static void
-xlog_recover_do_buffer_inode_trans(xlog_recover_t *trans)
+xlog_recover_do_buffer_inode_trans(xlog_t	  *log,
+				   xlog_recover_t *trans)
 {
 	xlog_recover_item_t *item, *first_item;
 
 	first_item = item = trans->r_buf_inq;
 	do {
 		if (ITEM_TYPE(item) == XFS_LI_BUF) {
-			xlog_recover_do_buffer_trans(item);
+			xlog_recover_do_buffer_trans(log, item);
 		} else if (ITEM_TYPE(item) == XFS_LI_INODE) {
-			xlog_recover_do_inode_trans(item);
+			xlog_recover_do_inode_trans(log, item);
 		} else {
 			xlog_panic("xlog_recover_do_buffer_inode_trans");
 		}
@@ -778,7 +876,7 @@ xlog_recover_do_trans(xlog_t	     *log,
 	xlog_recover_print_trans(trans, trans->r_itemq, xlog_debug);
 	xlog_recover_reorder_trans(log, trans);
 	xlog_recover_print_trans(trans, trans->r_buf_inq, xlog_debug+1);
-	xlog_recover_do_buffer_inode_trans(trans);
+	xlog_recover_do_buffer_inode_trans(log, trans);
 }	/* xlog_recover_do_trans */
 
 
@@ -846,8 +944,8 @@ xlog_recover_process_data(xlog_t	    *log,
 	tid = ohead->oh_tid;
 	hash = XLOG_RHASH(tid);
 	trans = xlog_recover_find_tid(rhash[hash], tid);
-	if (trans == NULL) {			    /* not found; add new tid */
-		if ((ohead->oh_flags & XLOG_START_TRANS) != 0)
+	if (trans == NULL) {			   /* not found; add new tid */
+		if (ohead->oh_flags & XLOG_START_TRANS)
 			xlog_recover_new_tid(&rhash[hash], tid);
 	} else {
 	    ASSERT(dp+ohead->oh_len <= lp);
@@ -877,8 +975,8 @@ xlog_recover_process_data(xlog_t	    *log,
 		    xlog_panic("xlog_recover_process_data: bad flag");
 		    break;
 		}
-	    }
-	}
+	    } /* switch */
+	} /* if */
 	dp += ohead->oh_len;
 	num_logops--;
     }
@@ -929,15 +1027,19 @@ xlog_do_recover(xlog_t	*log,
 	buf_t		  *hbp, *dbp;
 	int		  bblks;
 	xlog_recover_t	  *rhash[XLOG_RHASH_SIZE];
+#ifdef DEBUG
 	int		  stop_block = 3000;
+#endif
 
 	hbp = xlog_get_bp(1);
 	dbp = xlog_get_bp(BTOBB(XLOG_RECORD_BSIZE));
 	bzero(rhash, sizeof(rhash));
 	if (tail_blk <= head_blk) {
 		for (blk_no = tail_blk; blk_no < head_blk; ) {
+#ifdef DEBUG
 			if (stop_block == blk_no)
 				stop_block--;
+#endif
 			xlog_bread(log, blk_no, 1, hbp);
 			rhead = (xlog_rec_header_t *)hbp->b_dmaaddr;
 			ASSERT(rhead->h_magicno == XLOG_HEADER_MAGIC_NUM);
@@ -951,6 +1053,7 @@ xlog_do_recover(xlog_t	*log,
 			blk_no += (bblks+1);
 		}
 	} else {
+		xlog_warning("no recovery");
 	}
 }	/* xlog_do_recover */
 
