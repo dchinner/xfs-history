@@ -2,7 +2,7 @@
 #
 # Makefile for SGI xFS
 #
-# $Revision: 1.20 $
+# $Revision: 1.22 $
 DEPTH?=../..
 include ${DEPTH}/kcommondefs
 KPATH=$(TOP)/fs/xfs
@@ -13,7 +13,6 @@ KCOPTS=-fullwarn -g
 XFS_NAME=xfs.a
 XFS_CSRCS=	xfs_alloc.c \
 		xfs_alloc_btree.c \
-		xfs_bio.c \
 		xfs_bit.c \
 		xfs_bmap.c \
 		xfs_bmap_btree.c \
@@ -54,7 +53,6 @@ CFILES=$(XFS_CSRCS)
 HFILES=	xfs_ag.h \
 	xfs_alloc.h \
 	xfs_alloc_btree.h \
-	xfs_bio.h \
 	xfs_bit.h \
 	xfs_bmap.h \
 	xfs_bmap_btree.h \
