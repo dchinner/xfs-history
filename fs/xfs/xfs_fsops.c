@@ -45,6 +45,7 @@ xfs_fs_geometry(
 	geo->logblocks = mp->m_sb.sb_logblocks;
 	geo->sectsize = mp->m_sb.sb_sectsize;
 	geo->inodesize = mp->m_sb.sb_inodesize;
+	geo->imaxpct = mp->m_sb.sb_imax_pct;
 	geo->datablocks = mp->m_sb.sb_dblocks;
 	geo->rtblocks = mp->m_sb.sb_rblocks;
 	geo->rtextents = mp->m_sb.sb_rextents;
@@ -67,19 +68,23 @@ xfs_growfs_data(
 	buf_t			*bp;
 	int			bsize;
 	int			bucket;
+	int			dpct;
 	int			error;
 	xfs_agnumber_t		nagcount;
 	xfs_rfsblock_t		nb;
 	xfs_rfsblock_t		new;
 	xfs_rfsblock_t		nfree;
 	xfs_agnumber_t		oagcount;
+	int			pct;
 	xfs_sb_t		*sbp;
 	int			sectbb;
 	xfs_trans_t		*tp;
 
 	nb = in->newblocks;
-	if (nb <= mp->m_sb.sb_dblocks)
+	pct = in->imaxpct;
+	if (nb < mp->m_sb.sb_dblocks || pct < 0 || pct > 100)
 		return XFS_ERROR(EINVAL);
+	dpct = pct - mp->m_sb.sb_imax_pct;
 	bp = read_buf(mp->m_dev, XFS_FSB_TO_BB(mp, nb) - 1, 1, 0);
 	if (bp == NULL)
 		return XFS_ERROR(EINVAL);
@@ -89,10 +94,11 @@ xfs_growfs_data(
 		return XFS_ERROR(error);
 	nagcount = (nb / mp->m_sb.sb_agblocks) +
 		   ((nb % mp->m_sb.sb_agblocks) != 0);
-	if (nb % mp->m_sb.sb_agblocks < XFS_MIN_AG_BLOCKS) {
+	if (nb % mp->m_sb.sb_agblocks &&
+	    nb % mp->m_sb.sb_agblocks < XFS_MIN_AG_BLOCKS) {
 		nagcount--;
 		nb = nagcount * mp->m_sb.sb_agblocks;
-		if (nb <= mp->m_sb.sb_dblocks)
+		if (nb < mp->m_sb.sb_dblocks)
 			return XFS_ERROR(EINVAL);
 	}
 	new = nb - mp->m_sb.sb_dblocks;
@@ -258,13 +264,23 @@ xfs_growfs_data(
 	}
 	if (nagcount > oagcount)
 		xfs_trans_mod_sb(tp, XFS_TRANS_SB_AGCOUNT, nagcount - oagcount);
-	xfs_trans_mod_sb(tp, XFS_TRANS_SB_DBLOCKS, nb - mp->m_sb.sb_dblocks);
+	if (nb > mp->m_sb.sb_dblocks)
+		xfs_trans_mod_sb(tp, XFS_TRANS_SB_DBLOCKS,
+				 nb - mp->m_sb.sb_dblocks);
 	if (nfree)
 		xfs_trans_mod_sb(tp, XFS_TRANS_SB_FDBLOCKS, nfree);
+	if (dpct)
+		xfs_trans_mod_sb(tp, XFS_TRANS_SB_IMAXPCT, dpct);
 	error = xfs_trans_commit(tp, 0);
 	if (error) {
 		return error;
 	}
+	if (mp->m_sb.sb_imax_pct)
+		mp->m_maxicount =
+			((mp->m_sb.sb_dblocks * mp->m_sb.sb_imax_pct) / 100) <<
+			mp->m_sb.sb_inopblog;
+	else
+		mp->m_maxicount = 0;
 	for (agno = 1; agno < nagcount; agno++) {
 		bp = read_buf(mp->m_dev,
 			XFS_AGB_TO_DADDR(mp, agno, XFS_SB_BLOCK(mp)),

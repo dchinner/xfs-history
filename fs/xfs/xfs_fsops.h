@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_GROW_H
 #define	_FS_XFS_GROW_H
 
-#ident	"$Revision: 1.3 $"
+#ident	"$Revision$"
 
 /*
  * File system growth interfaces
@@ -37,6 +37,7 @@ typedef struct xfs_fsop_geom
 	__uint32_t	logblocks;
 	__uint32_t	sectsize;
 	__uint32_t	inodesize;
+	__uint32_t	imaxpct;
 	__uint64_t	datablocks;
 	__uint64_t	rtblocks;
 	__uint64_t	rtextents;
@@ -57,13 +58,14 @@ typedef struct xfs_fsop_counts
 typedef struct xfs_growfs_data
 {
 	__uint64_t	newblocks;
+	__uint32_t	imaxpct;
 } xfs_growfs_data_t;
 
 /* Input for growfs log op */
 typedef struct xfs_growfs_log
 {
 	__uint32_t	newblocks;
-	int		isint;
+	__int32_t	isint;
 } xfs_growfs_log_t;
 
 /* Input for growfs rt op */
