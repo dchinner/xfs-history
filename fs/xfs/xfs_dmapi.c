@@ -1062,9 +1062,9 @@ xfs_dm_rdwr(
 	uio.uio_iov->iov_len = uio.uio_resid = len;
 
 	if (fflag & FMODE_READ) {
-		VOP_READ(vp, &uio, 0, NULL, NULL, error);
+		VOP_READ(vp, &uio, file.f_flags, NULL, NULL, error);
 	} else {
-		VOP_WRITE(vp, &uio, 0, NULL, NULL, error);
+		VOP_WRITE(vp, &uio, file.f_flags, NULL, NULL, error);
 	}
 
 	dput(dentry);
