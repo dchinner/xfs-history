@@ -1,7 +1,7 @@
 #ifndef __XFS_QM_H__
 #define __XFS_QM_H__
 
-#ident "$Revision: 1.5 $"
+#ident "$Revision: 1.6 $"
 
 #include "xfs_quota.h"
 
@@ -17,13 +17,6 @@ struct  xfs_qm;
  * tables of dquots.
  */
 extern	struct xfs_qm		*G_xqm;		
-
-/*
- * If the number of incore dquots go over this high water mark, we start
- * popping dquots out of the freelist (instead of allocating more on heap).
- */
-#define XFS_QM_NDQUOT_HIWAT_1		64
-#define XFS_QM_NDQUOT_HIWAT_2		16
 
 /*
  * Used in xfs_qm_sync called by xfs_sync to count the max times that it can
@@ -48,6 +41,12 @@ extern	struct xfs_qm		*G_xqm;
 #define XFS_QM_NCSIZE_THRESHOLD		5000
 #define XFS_QM_HASHSIZE_LOW		32
 #define XFS_QM_HASHSIZE_HIGH		64
+
+/*
+ * We output a cmn_err when quotachecking a quota file with more than
+ * this many fsbs.
+ */
+#define XFS_QM_BIG_QCHECK_NBLKS		500
 
 /*
  * This defines the unit of allocation of dquots. 
@@ -75,9 +74,6 @@ typedef struct xfs_frlist {
        struct xfs_dquot	*qh_prev;
        mutex_t	 	 qh_lock;
        uint      	 qh_version;
-#ifdef QUOTADEBUG
-       uint	 	 qh_flags;
-#endif
        uint	 	 qh_nelems;
 } xfs_frlist_t;
 
@@ -90,7 +86,6 @@ typedef struct xfs_qm {
 	uint		 qm_dqhashmask;  /* # buckets in dq hashtab - 1 */
 	xfs_frlist_t	 qm_dqfreelist;  /* freelist of dquots */
 	uint		 qm_totaldquots; /* total incore dquots */
-	uint		 qm_ndqhiwat; 	 /* soft HWM for ndquots in core */
 	uint		 qm_nrefs;	 /* file systems with quota on */
 	int		 qm_dqfree_ratio;/* ratio of free to inuse dquots */
 	zone_t		*qm_dqzone;	 /* dquot mem-alloc zone */
@@ -176,12 +171,12 @@ typedef struct xfs_qoff_logitem {
  * Users are allowed to have a usage exceeding their softlimit for
  * a period this long.
  */
-#define XFS_QM_BTIMELIMIT	(7 * 24*60*60) /* one week */
-#define XFS_QM_RTBTIMELIMIT	(7 * 24*60*60) /* one week */
-#define XFS_QM_ITIMELIMIT	(7 * 24*60*60) /* one week */
+#define XFS_QM_BTIMELIMIT	DQ_BTIMELIMIT
+#define XFS_QM_RTBTIMELIMIT	DQ_BTIMELIMIT
+#define XFS_QM_ITIMELIMIT	DQ_FTIMELIMIT
 
-#define XFS_QM_BWARNLIMIT	7
-#define XFS_QM_IWARNLIMIT	7
+#define XFS_QM_BWARNLIMIT	5
+#define XFS_QM_IWARNLIMIT	5
 
 #define XFS_QM_HOLD(xqm)	(atomicAddUint(&(xqm)->qm_nrefs, 1))
 #define XFS_QM_RELE(xqm)	(atomicAddUint(&(xqm)->qm_nrefs, -1))
