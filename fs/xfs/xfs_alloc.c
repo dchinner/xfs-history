@@ -2081,9 +2081,6 @@ xfs_alloc_fix_freelist(
 		args->agbp = NULL;
 		return 0;
 	}
-#ifdef SIM
-	ASSERT(agf->agf_flcount <= need);
-#else
 	/*
 	 * Make the freelist shorter if it's too long.
 	 */
@@ -2116,7 +2113,6 @@ xfs_alloc_fix_freelist(
 		 */
 		xfs_trans_set_sync(tp);
 	}
-#endif	/* SIM */
 	/*
 	 * Initialize the args structure.
 	 */
