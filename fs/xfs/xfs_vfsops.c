@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.118 $"
+#ident  "$Revision$"
 
 #include <limits.h>
 #ifdef SIM
@@ -439,7 +439,7 @@ xfs_cmountfs(
 			}
 			mp->m_logdevp = ldevvp;
 		}
-		if (ap != NULL) {
+		if (ap != NULL && ap->version != 0) {
 			/* Called through the mount system call */
 			if (ap->version != 1) {
 				error = XFS_ERROR(EINVAL);
@@ -457,19 +457,24 @@ xfs_cmountfs(
 			}
 			tmp_fsname_buffer[PATH_MAX - 1] = '\0';
 			mp->m_fsname_len = strlen(tmp_fsname_buffer) + 1;
-			mp->m_fsname = (char*)kmem_alloc(mp->m_fsname_len, 0);
+			mp->m_fsname = kmem_alloc(mp->m_fsname_len, KM_SLEEP);
 			strcpy(mp->m_fsname, tmp_fsname_buffer);
 			kmem_free(tmp_fsname_buffer, PATH_MAX);
 		} else {
 			/*
 			 * Called through vfs_mountroot/xfs_mountroot.
+			 * Or, called by mount with no args structure.
+			 * In this case use the dev number (in hex) for 
+			 * the filesystem name.
 			 */
 			mp->m_logbufs = -1;
 			mp->m_logbsize = -1;
-			mp->m_fsname_len = 2;
-			mp->m_fsname = (char*)kmem_alloc(mp->m_fsname_len, 0);
-			mp->m_fsname[0] = '/';
-			mp->m_fsname[1] = '\0';
+			mp->m_fsname_len = ap ? 2 : 11;
+			mp->m_fsname = kmem_alloc(mp->m_fsname_len, KM_SLEEP);
+			if (ap)
+				sprintf(mp->m_fsname, "0x%x", ddev);
+			else
+				strcpy(mp->m_fsname, "/");
 		}
 	} else {
 		ldevvp = NULL;
@@ -643,7 +648,8 @@ xfs_vfsmount(
 	 * Copy in XFS-specific arguments.
 	 */
 	bzero(&args, sizeof args);
-	if (COPYIN_XLATE(uap->dataptr, &args, sizeof(args),
+	if (uap->datalen && uap->dataptr &&
+	    COPYIN_XLATE(uap->dataptr, &args, sizeof(args),
 			 irix5_to_xfs_args, get_current_abi(), 1))
 		return XFS_ERROR(EFAULT);
 
