@@ -14,7 +14,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished - 
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident	"$Revision: 1.2 $"
+#ident	"$Revision: 1.3 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -72,6 +72,11 @@ acl_xfs_iaccess( xfs_inode_t *ip, mode_t mode, struct cred *cr )
 	 */
 	if (acl.acl_cnt == ACL_NOT_PRESENT)
 		return -1;
+
+	/*
+	 * Synchronize ACL with mode bits
+	 */
+	acl_sync_mode(ip->i_d.di_mode, &acl);
 
 	return acl_access(ip->i_d.di_uid, ip->i_d.di_gid, &acl, mode, cr);
 }
