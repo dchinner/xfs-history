@@ -185,7 +185,7 @@ xfs_bulkstat(
 	/* 
 	 * Lock down the user's buffer.
 	 */
-	if (error = useracc(ubuffer, ubcount * statstruct_size, B_READ, NULL))
+	if (error = useracc(ubuffer, ubcount * statstruct_size, (B_READ|B_PHYS), NULL))
 		return error;
 	/*
 	 * Allocate a page-sized buffer for inode btree records.
@@ -408,7 +408,7 @@ xfs_bulkstat(
 	 * Done, we're either out of filesystem or space to put the data.
 	 */
 	kmem_free(irbuf, NBPC);
-	unuseracc(ubuffer, ubcount * statstruct_size, B_READ);
+	unuseracc(ubuffer, ubcount * statstruct_size, (B_READ|B_PHYS));
 	*ubcountp = ubcount - ubleft;
 	if (agno >= mp->m_sb.sb_agcount) {
 		/*

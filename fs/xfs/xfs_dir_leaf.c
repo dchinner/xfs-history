@@ -356,7 +356,7 @@ xfs_dir_shortform_compare(const void *a, const void *b)
 int
 xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 				       int *eofp, dirent_t *dbp,
-				       xfs_dir_put_t *putp)
+				       xfs_dir_put_t put)
 {
 	xfs_dir_shortform_t *sf;
 	xfs_dir_sf_entry_t *sfe;
@@ -439,8 +439,7 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	 * Set up put routine.
 	 */
 	p.dbp = dbp;
-	p.put = *putp;
-	p.putp = putp;
+	p.put = put;
 	p.uio = uio;
 	/*
 	 * Find our place.
@@ -1788,7 +1787,7 @@ xfs_dir_leaf_lasthash(buf_t *bp, int *count)
 int
 xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 				uio_t *uio, int *eobp, dirent_t *dbp,
-				xfs_dir_put_t *putp, daddr_t nextda)
+				xfs_dir_put_t put, daddr_t nextda)
 {
 	xfs_dir_leafblock_t *leaf;
 	xfs_dir_leaf_entry_t *entry;
@@ -1847,8 +1846,7 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 	xfs_dir_trace_g_due("leaf: hash found", dp, uio, entry);
 
 	p.dbp = dbp;
-	p.put = *putp;
-	p.putp = putp;
+	p.put = put;
 	p.uio = uio;
 
 	/*
@@ -1946,55 +1944,7 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
  * Format a dirent structure and copy it out the the user's buffer.
  */
 int
-xfs_dir_put_dirent32_first(xfs_dir_put_args_t *pa)
-{
-	iovec_t *iovp;
-	int error, reclen, namelen;
-	irix5_dirent_t *idbp;
-	uio_t *uio;
-
-#if XFS_BIG_FILESYSTEMS
-	if (pa->ino > XFS_MAXINUMBER_32) {
-		pa->done = 0;
-		return XFS_ERROR(EOVERFLOW);
-	}
-#endif
-	namelen = pa->namelen;
-	reclen = IRIX5_DIRENTSIZE(namelen);
-	uio = pa->uio;
-	if (reclen > uio->uio_resid) {
-		pa->done = 0;
-		return 0;
-	}
-	/*
-	 * If this is the first time here and we have a properly aligned 
-	 * user-mode buffer then we can just "map" it in.
-	 */
-	if (error = useracc(uio->uio_iov[0].iov_base,
-		    uio->uio_iov[0].iov_len, B_READ, NULL)) {
-		pa->done = 0;
-		return(XFS_ERROR(error));
-	}
-	*(pa->putp) = pa->put = xfs_dir_put_dirent32_rest;
-	iovp = uio->uio_iov;
-	idbp = (irix5_dirent_t *)iovp->iov_base;
-	iovp->iov_base = (char *)idbp + reclen;
-	iovp->iov_len -= reclen;
-	uio->uio_resid -= reclen;
-	idbp->d_reclen = reclen;
-	idbp->d_ino = pa->ino;
-	idbp->d_off = pa->cook.o;
-	idbp->d_name[namelen] = '\0';
-	pa->done = 1;
-	bcopy(pa->name, idbp->d_name, namelen);
-	return 0;
-}
-
-/*
- * Format a dirent structure and copy it out the the user's buffer.
- */
-int
-xfs_dir_put_dirent32_rest(xfs_dir_put_args_t *pa)
+xfs_dir_put_dirent32_direct(xfs_dir_put_args_t *pa)
 {
 	iovec_t *iovp;
 	int reclen, namelen;
@@ -2066,49 +2016,7 @@ xfs_dir_put_dirent32_uio(xfs_dir_put_args_t *pa)
  * Format a dirent64 structure and copy it out the the user's buffer.
  */
 int
-xfs_dir_put_dirent64_first(xfs_dir_put_args_t *pa)
-{
-	iovec_t *iovp;
-	int error, reclen, namelen;
-	dirent_t *idbp;
-	uio_t *uio;
-
-	namelen = pa->namelen;
-	reclen = DIRENTSIZE(namelen);
-	uio = pa->uio;
-	if (reclen > uio->uio_resid) {
-		pa->done = 0;
-		return 0;
-	}
-	/*
-	 * If this is the first time here and we have a properly aligned 
-	 * user-mode buffer then we can just "map" it in.
-	 */
-	if (error = useracc(uio->uio_iov[0].iov_base,
-		    uio->uio_iov[0].iov_len, B_READ, NULL)) {
-		pa->done = 0;
-		return(XFS_ERROR(error));
-	}
-	*(pa->putp) = pa->put = xfs_dir_put_dirent64_rest;
-	iovp = uio->uio_iov;
-	idbp = (dirent_t *)iovp->iov_base;
-	iovp->iov_base = (char *)idbp + reclen;
-	iovp->iov_len -= reclen;
-	uio->uio_resid -= reclen;
-	idbp->d_reclen = reclen;
-	idbp->d_ino = pa->ino;
-	idbp->d_off = pa->cook.o;
-	idbp->d_name[namelen] = '\0';
-	pa->done = 1;
-	bcopy(pa->name, idbp->d_name, namelen);
-	return 0;
-}
-
-/*
- * Format a dirent64 structure and copy it out the the user's buffer.
- */
-int
-xfs_dir_put_dirent64_rest(xfs_dir_put_args_t *pa)
+xfs_dir_put_dirent64_direct(xfs_dir_put_args_t *pa)
 {
 	iovec_t *iovp;
 	int reclen, namelen;
@@ -2164,3 +2072,5 @@ xfs_dir_put_dirent64_uio(xfs_dir_put_args_t *pa)
 	return retval;
 }
 #endif	/* !SIM */
+
+
