@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.194 $"
+#ident	"$Revision: 1.195 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -61,6 +61,7 @@
 #include "xfs_bit.h"
 #include "xfs_rw.h"
 #include "xfs_quota.h"
+#include "xfs_trans_space.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -430,6 +431,7 @@ xfs_bmap_add_attrfork_btree(
 			return XFS_ERROR(ENOSPC);
 		}
 		*firstblock = cur->bc_private.b.firstblock;
+		cur->bc_private.b.allocated = 0;
 		xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
 	}
 	return 0;
@@ -2933,6 +2935,7 @@ int						/* error code */
 xfs_bmap_add_attrfork(
 	xfs_inode_t		*ip)		/* incore inode pointer */
 {
+	int			blks;		/* space reservation */
 	int			committed;	/* xaction was committed */
 	int			error;		/* error return value */
 	xfs_fsblock_t		firstblock;	/* 1st block/ag allocated */
@@ -2949,12 +2952,13 @@ xfs_bmap_add_attrfork(
 	mp = ip->i_mount;
 	ASSERT(!XFS_NOT_DQATTACHED(mp, ip));
 	tp = xfs_trans_alloc(mp, XFS_TRANS_ADDAFORK);
-	if (error = xfs_trans_reserve(tp, 1, XFS_ADDAFORK_LOG_RES(mp), 0,
+	blks = XFS_ADDAFORK_SPACE_RES(mp);
+	if (error = xfs_trans_reserve(tp, blks, XFS_ADDAFORK_LOG_RES(mp), 0,
 			XFS_TRANS_PERM_LOG_RES, XFS_ADDAFORK_LOG_COUNT))
 		goto error0;
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	if (XFS_IS_QUOTA_ON(mp) &&
-	    (error = xfs_trans_reserve_blkquota(tp, ip, 1L))) {
+	    (error = xfs_trans_reserve_blkquota(tp, ip, blks))) {
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES);
 		return error;
