@@ -127,8 +127,8 @@ xfs_iozero(
 		if (!status) {
 			pos += bytes;
 			count -= bytes;
-			if (pos > ip->i_size)
-				ip->i_size = pos < end_size ? pos : end_size;
+			if (pos > i_size_read(ip))
+				i_size_write(ip, pos < end_size ? pos : end_size);
 		}
 
 unlock:
@@ -145,13 +145,14 @@ unlock:
 ssize_t			/* bytes read, or (-)  error */
 xfs_read(
 	bhv_desc_t		*bdp,
-	struct file		*filp,
+	struct kiocb		*iocb,
 	const struct iovec	*iovp,
-	unsigned long		segs,
-	loff_t			*offp,
+	unsigned int		segs,
+	loff_t			*offset,
 	int			ioflags,
 	cred_t			*credp)
 {
+	struct file		*file = iocb->ki_filp;
 	size_t			size = 0;
 	ssize_t			ret;
 	xfs_fsize_t		n;
@@ -159,8 +160,8 @@ xfs_read(
 	xfs_mount_t		*mp;
 	vnode_t			*vp;
 	unsigned long		seg;
-	int			direct = (filp->f_flags & O_DIRECT);
-	int			invisible = (filp->f_mode & FINVIS);
+	int			direct = (file->f_flags & O_DIRECT);
+	int			invisible = (file->f_mode & FINVIS);
 
 	ip = XFS_BHVTOI(bdp);
 	vp = BHV_TO_VNODE(bdp);
@@ -180,33 +181,20 @@ xfs_read(
 		size += iv->iov_len;
 		if (unlikely((ssize_t)(size|iv->iov_len) < 0))
 			return XFS_ERROR(-EINVAL);
-		if (direct) {	/* XFS specific check */
-			if ((__psint_t)iv->iov_base & BBMASK) {
-				if (*offp == ip->i_d.di_size)
-					return 0;
-				return XFS_ERROR(-EINVAL);
-			}
-		}
-		if (access_ok(VERIFY_WRITE, iv->iov_base, iv->iov_len))
-			continue;
-		if (seg == 0)
-			return XFS_ERROR(-EFAULT);
-		segs = seg;
-		break;
 	}
 	/* END copy & waste from filemap.c */
 
 	if (direct) {
-		if ((*offp & mp->m_blockmask) ||
+		if ((*offset & mp->m_blockmask) ||
 		    (size & mp->m_blockmask)) {
-			if (*offp == ip->i_d.di_size) {
+			if (*offset == ip->i_d.di_size) {
 				return (0);
 			}
 			return -XFS_ERROR(EINVAL);
 		}
 	}
 
-	n = XFS_MAXIOFFSET(mp) - *offp;
+	n = XFS_MAXIOFFSET(mp) - *offset;
 	if ((n <= 0) || (size == 0))
 		return 0;
 
@@ -217,6 +205,11 @@ xfs_read(
 		return -EIO;
 	}
 
+	/* OK so we are holding the I/O lock for the duration
+	 * of the submission, then what happens if the I/O
+	 * does not really happen here, but is scheduled 
+	 * later?
+	 */
 	if (!(ioflags & IO_ISLOCKED))
 		xfs_ilock(ip, XFS_IOLOCK_SHARED);
 
@@ -224,8 +217,8 @@ xfs_read(
 		int error;
 		vrwlock_t locktype = VRWLOCK_READ;
 
-		error = XFS_SEND_DATA(mp, DM_EVENT_READ, bdp, *offp, size,
-				      FILP_DELAY_FLAG(filp), &locktype);
+		error = XFS_SEND_DATA(mp, DM_EVENT_READ, bdp, *offset, size,
+				      FILP_DELAY_FLAG(file), &locktype);
 		if (error) {
 			if (!(ioflags & IO_ISLOCKED))
 				xfs_iunlock(ip, XFS_IOLOCK_SHARED);
@@ -233,7 +226,7 @@ xfs_read(
 		}
 	}
 
-	ret = generic_file_readv(filp, iovp, segs, offp);
+	ret = __generic_file_aio_read(iocb, iovp, segs, offset);
 	if (!(ioflags & IO_ISLOCKED))
 		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
@@ -249,7 +242,7 @@ ssize_t
 xfs_sendfile(
 	bhv_desc_t		*bdp,
 	struct file		*filp,
-	loff_t			*offp,
+	loff_t			*offset,
 	int			ioflags,
 	size_t			count,
 	read_actor_t		actor,
@@ -270,7 +263,7 @@ xfs_sendfile(
 
 	XFS_STATS_INC(xfsstats.xs_read_calls);
 
-	n = XFS_MAXIOFFSET(mp) - *offp;
+	n = XFS_MAXIOFFSET(mp) - *offset;
 	if ((n <= 0) || (count == 0))
 		return 0;
 
@@ -287,7 +280,7 @@ xfs_sendfile(
 		vrwlock_t locktype = VRWLOCK_READ;
 		int error;
 
-		error = XFS_SEND_DATA(mp, DM_EVENT_READ, bdp, *offp, count,
+		error = XFS_SEND_DATA(mp, DM_EVENT_READ, bdp, *offset, count,
 				      FILP_DELAY_FLAG(filp), &locktype);
 		if (error) {
 			if (!(ioflags & IO_ISLOCKED))
@@ -295,7 +288,7 @@ xfs_sendfile(
 			return -error;
 		}
 	}
-	ret = generic_file_sendfile(filp, offp, count, actor, target);
+	ret = generic_file_sendfile(filp, offset, count, actor, target);
 	if (!(ioflags & IO_ISLOCKED))
 		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
@@ -525,13 +518,14 @@ out_lock:
 ssize_t				/* bytes written, or (-) error */
 xfs_write(
 	bhv_desc_t		*bdp,
-	struct file		*file,
+	struct kiocb		*iocb,
 	const struct iovec	*iovp,
-	unsigned long		segs,
+	unsigned int		segs,
 	loff_t			*offset,
 	int			ioflags,
 	cred_t			*credp)
 {
+	struct file		*file = iocb->ki_filp;
 	size_t			size = 0;
 	xfs_inode_t		*xip;
 	xfs_mount_t		*mp;
@@ -565,16 +559,6 @@ xfs_write(
 		size += iv->iov_len;
 		if (unlikely((ssize_t)(size|iv->iov_len) < 0))
 			return XFS_ERROR(-EINVAL);
-		if (direct) {	/* XFS specific check */
-			if ((__psint_t)iv->iov_base & BBMASK)
-				return XFS_ERROR(-EINVAL);
-		}
-		if (access_ok(VERIFY_READ, iv->iov_base, iv->iov_len))
-			continue;
-		if (seg == 0)
-			return XFS_ERROR(-EFAULT);
-		segs = seg;
-		break;
 	}
 	/* END copy & waste from filemap.c */
 
@@ -586,7 +570,7 @@ xfs_write(
 
 	xfs_check_frozen(mp, bdp, XFS_FREEZE_WRITE);
 
-	if (XFS_FORCED_SHUTDOWN(xip->i_mount)) {
+	if (XFS_FORCED_SHUTDOWN(mp)) {
 		return -EIO;
 	}
 
@@ -708,7 +692,7 @@ retry:
 		xfs_inval_cached_pages(vp, &xip->i_iocore, *offset, 1, 1);
 	}
 
-	ret = generic_file_write_nolock(file, iovp, segs, offset);
+	ret = generic_file_aio_write_nolock(iocb, iovp, segs, offset);
 
 	if ((ret == -ENOSPC) &&
 	    DM_EVENT_ENABLED(vp->v_vfsp, xip, DM_EVENT_NOSPACE) && !invisible) {
@@ -725,24 +709,25 @@ retry:
 
 	}
 
+	if (*offset > xip->i_d.di_size) {
+		xfs_ilock(xip, XFS_ILOCK_EXCL);
+		if (*offset > xip->i_d.di_size) {
+			struct inode	*inode = LINVFS_GET_IP(vp);
+
+			xip->i_d.di_size = *offset;
+			i_size_write(inode, *offset);
+			xip->i_update_core = 1;
+			xip->i_update_size = 1;
+		}
+		xfs_iunlock(xip, XFS_ILOCK_EXCL);
+	}
+
 	if (ret <= 0) {
 		xfs_rwunlock(bdp, locktype);
 		return ret;
 	}
 
 	XFS_STATS_ADD(xfsstats.xs_write_bytes, ret);
-
-	if (*offset > xip->i_d.di_size) {
-		xfs_ilock(xip, XFS_ILOCK_EXCL);
-		if (*offset > xip->i_d.di_size) {
-			struct inode	*inode = LINVFS_GET_IP(vp);
-
-			inode->i_size = xip->i_d.di_size = *offset;
-			xip->i_update_core = 1;
-			xip->i_update_size = 1;
-		}
-		xfs_iunlock(xip, XFS_ILOCK_EXCL);
-	}
 
 	/* Handle various SYNC-type writes */
 	if ((file->f_flags & O_SYNC) || IS_SYNC(file->f_dentry->d_inode)) {
