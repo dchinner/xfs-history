@@ -404,10 +404,6 @@ xfs_close(
 	    !fdt_vnode_isopen(vp))
 		grio_remove_reservation(current_pid(), ip->i_dev, ip->i_ino);
 
-	xfs_ilock(ip, XFS_ILOCK_SHARED);
-	cleanlocks(vp, fl);
-	xfs_iunlock(ip, XFS_ILOCK_SHARED);
-
 	return 0;
 }
 
