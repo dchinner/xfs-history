@@ -51,6 +51,8 @@ typedef struct xfs_bmbt_rec
 	 ((r)->l3 = ((((__uint32_t)(s).br_startblock) << 21) | \
 		    ((__uint32_t)((s).br_blockcount & 0x001fffff)))))
 
+#define	NULLSTARTBLOCK	((xfs_fsblock_t)((1LL << 52) - 1))
+
 /*
  * Incore version of above.
  */
@@ -77,9 +79,10 @@ typedef xfs_fsblock_t xfs_bmbt_ptr_t;	/* btree pointer type */
  */
 typedef	struct xfs_bmap_free
 {
-	xfs_fsblock_t	xbf_startblock;		/* starting fs block number */
-	xfs_extlen_t	xbf_blockcount;		/* number of blocks in extent */
+	xfs_fsblock_t		xbf_startblock;	/* starting fs block number */
+	xfs_extlen_t		xbf_blockcount;	/* number of blocks in extent */
 	struct xfs_bmap_free	*xbf_next;	/* link to next entry */
+	struct xfs_efi_log_item	*xbf_efip;	/* pointer to efi entry */
 } xfs_bmap_free_t;
 
 #ifndef XFSDEBUG
