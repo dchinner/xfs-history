@@ -4402,15 +4402,15 @@ xfs_bmap_read_extents(
 
 		if (!(XFS_FSB_SANITY_CHECK(mp, INT_GET(*pp, ARCH_CONVERT)))) {
 			cmn_err(CE_NOTE,
-			"xfs_bmap_read_extents: FSB Sanity Check:\n");
+			"xfs_bmap_read_extents: FSB Sanity Check:");
 			if (!(XFS_FSB_TO_AGNO(mp, INT_GET(*pp, ARCH_CONVERT)) < mp->m_sb.sb_agcount))
 				cmn_err(CE_NOTE,
-					"bad AG count %d < agcount %d\n",
+					"bad AG count %d < agcount %d",
 					XFS_FSB_TO_AGNO(mp, INT_GET(*pp, ARCH_CONVERT)),
 					mp->m_sb.sb_agcount);
 			if (!(XFS_FSB_TO_AGBNO(mp, INT_GET(*pp, ARCH_CONVERT)) < mp->m_sb.sb_agblocks))
 				cmn_err(CE_NOTE,
-					"bad AG BNO %d < %d\n",
+					"bad AG BNO %d < %d",
 					XFS_FSB_TO_AGBNO(mp, INT_GET(*pp, ARCH_CONVERT)),
 					mp->m_sb.sb_agblocks);
 			error = XFS_ERROR(EFSCORRUPTED);
@@ -4447,22 +4447,22 @@ xfs_bmap_read_extents(
 			error0);*/
 		if (!(XFS_BMAP_SANITY_CHECK(mp, block, 0))) {
 			cmn_err(CE_NOTE,
-			"xfs_bmap_read_extents: BMAP Sanity Check:\n");
+			"xfs_bmap_read_extents: BMAP Sanity Check:");
 			if (!(block->bb_magic == XFS_BMAP_MAGIC))
 				cmn_err(CE_NOTE,
-					"bb_magic 0x%x\n",
+					"bb_magic 0x%x",
 					block->bb_magic);
 			if (!(block->bb_level == level))
 				cmn_err(CE_NOTE,
-					"bb_level %d\n",
+					"bb_level %d",
 					block->bb_level);
 			if (!(block->bb_numrecs > 0))
 				cmn_err(CE_NOTE,
-					"bb_numrecs %d\n",
+					"bb_numrecs %d",
 					block->bb_numrecs);
 			if (!(block->bb_numrecs <= (mp)->m_bmap_dmxr[(level) != 0]))
 				cmn_err(CE_NOTE,
-					"bb_numrecs %d < m_bmap_dmxr[] %d\n",
+					"bb_numrecs %d < m_bmap_dmxr[] %d",
 					block->bb_numrecs,
 					(mp)->m_bmap_dmxr[(level) != 0]);
 			error = XFS_ERROR(EFSCORRUPTED);

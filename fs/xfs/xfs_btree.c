@@ -316,9 +316,9 @@ xfs_btree_check_sblock(
 		if (bp)
 			xfs_buftrace("SBTREE ERROR", bp);
 		cmn_err(CE_NOTE,
-			"xfs_btree_check_sblock: Not OK:\n");
+			"xfs_btree_check_sblock: Not OK:");
 		cmn_err(CE_NOTE,
-			"magic 0x%x level %d numrecs %d leftsib %d rightsib %d\n",
+			"magic 0x%x level %d numrecs %d leftsib %d rightsib %d",
 			block->bb_magic,
 			block->bb_level,
 			block->bb_numrecs,
