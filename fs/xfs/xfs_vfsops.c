@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.20 $"
+#ident  "$Revision: 1.23 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -896,6 +896,12 @@ xfs_sync(vfs_t		*vfsp,
 		lock_flags |= XFS_IOLOCK_SHARED;
 	}
 
+	/*
+	 * Sync out the log.  This ensures that the log is periodically
+	 * flushed even if there is not enough activity to fill it up.
+	 */
+	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_SYNC|XFS_LOG_FORCE);
+
  loop:
 	XFS_MOUNT_ILOCK(mp);
 	mount_locked = B_TRUE;
@@ -1068,13 +1074,6 @@ xfs_sync(vfs_t		*vfsp,
 		}
 	}
 
-#ifdef XXXajs
-	/*
-	 * Sync out the log.  This ensures that the log is periodically
-	 * flushed even if there is not enough activity to fill it up.
-	 */
-	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
-#endif
 
 	return last_error;
 }
