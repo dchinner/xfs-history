@@ -92,34 +92,10 @@ typedef struct xfs_dirent {		/* data from readdir() */
 	char d_name[1];		/* name of file */
 } xfs_dirent_t;
 
-typedef struct xfs_dirent32 {	/* Irix5 view of dirent structure */
-	app32_ulong_t d_ino;	/* inode number of entry */
-	xfs32_off_t d_off;	/* offset of disk directory entry */
-	unsigned short d_reclen;/* length of this record */
-	char d_name[1];		/* name of file */
-} xfs_dirent32_t;
-
-#define GETDENTS_ABI(abi, uiop)	1
 #define DIRENTBASESIZE		(((xfs_dirent_t *)0)->d_name - (char *)0)
 #define DIRENTSIZE(namelen)	\
 	((DIRENTBASESIZE + (namelen) + \
 		sizeof(xfs_off_t)) & ~(sizeof(xfs_off_t) - 1))
-#define DIRENT32BASESIZE	(((xfs_dirent32_t *)0)->d_name - (char *)0)
-#define DIRENT32SIZE(namelen) \
-	((DIRENT32BASESIZE + (namelen) + \
-		sizeof(xfs32_off_t)) & ~(sizeof(xfs32_off_t) - 1))
-
-#define ABI_IRIX5	0x02	/* an IRIX5/SVR4 ABI binary */
-#define ABI_IRIX5_64	0x04	/* an IRIX5-64 bit binary */
-#define ABI_IRIX5_N32	0x08	/* an IRIX5-32 bit binary (new abi) */
-
-#define ABI_IS(set,abi)		(((set) & (abi)) != 0)
-#define ABI_IS_IRIX5(abi)	(ABI_IS(ABI_IRIX5, abi))
-#define ABI_IS_IRIX5_N32(abi)	(ABI_IS(ABI_IRIX5_N32, abi))
-#define ABI_IS_IRIX5_64(abi)	(ABI_IS(ABI_IRIX5_64, abi))
-#define ABI_IS_IRIX5_N32(abi)	(ABI_IS(ABI_IRIX5_N32, abi))
-/* try 64 bit first */
-#define get_current_abi()	ABI_IRIX5_64
 
 #define NBPP		PAGE_SIZE 
 #define DPPSHFT		(PAGE_SHIFT - 9)
