@@ -1,4 +1,4 @@
-#ident "$Revision: 1.360 $"
+#ident "$Revision: 1.361 $"
 
 
 #ifdef SIM
@@ -4806,21 +4806,11 @@ xfs_fast_fid(
 	xfs_fid_t	*xfid)
 {
 	xfs_inode_t	*ip;
-	xfs_mount_t	*mp;
 
 	ip = XFS_BHVTOI(bdp);
-	mp = ip->i_mount;
-	if (XFS_INO_BITS(mp) > (NBBY * sizeof(xfs_fid_ino_t))) {
-		/*
-		 * If the ino won't fit into the __uint32_t that's
-		 * in our xfs_fid structure, then return an error.
-		 */
-		return XFS_ERROR(EFBIG);
-	}
-
 
 	xfid->fid_len = sizeof(xfs_fid_t) - sizeof(xfid->fid_len);
-	xfid->fid_pad = 0;
+	xfid->fid_pad = ip->i_ino >> 32;
 	xfid->fid_ino = (xfs_fid_ino_t)ip->i_ino;
 	xfid->fid_gen = ip->i_d.di_gen;	
 
@@ -4828,40 +4818,30 @@ xfs_fast_fid(
 }
 
 /*
- * xfs_fid
- *
+ * xfs_fid this returns the old ten-byte version for NFS.
  */
 STATIC int
 xfs_fid(
 	bhv_desc_t	*bdp,
 	fid_t		**fidpp)
 {
-	xfs_fid_t	*fid;
 	xfs_mount_t	*mp;
-	xfs_inode_t	*ip;
 
 	vn_trace_entry(BHV_TO_VNODE(bdp), "xfs_fid",
 		       (inst_t *)__return_address);
-	ip = XFS_BHVTOI(bdp);
-	mp = ip->i_mount;
-	if (XFS_INO_BITS(mp) > (NBBY * sizeof(xfs_fid_ino_t))) {
-		/*
-		 * If the ino won't fit into the __uint32_t that's
-		 * in our xfs_fid structure, then return an error.
-		 */
+
+	mp = XFS_BHVTOI(bdp)->i_mount;
+	if (XFS_INO_BITS(mp) > (NBBY * (sizeof(xfs_fid_ino_t)+sizeof(u_short)))) {
+	  /*
+	   * If the ino won't fit into the space that is
+	   * in our xfs_fid structure, then return an error.
+	   */
 		*fidpp = NULL;
 		return XFS_ERROR(EFBIG);
 	}
 	
-	fid = (xfs_fid_t *)kmem_alloc(sizeof(xfs_fid_t), KM_SLEEP);
-	fid->fid_len = sizeof(xfs_fid_t) - sizeof(fid->fid_len);
-	fid->fid_pad = 0;
-	fid->fid_gen = ip->i_d.di_gen;
-	fid->fid_ino = (xfs_fid_ino_t)ip->i_ino;
-
-	*fidpp = (struct fid *)fid;
-
-	return 0;
+	*fidpp = (struct fid *)kmem_alloc(sizeof(xfs_fid_t), KM_SLEEP);
+	return (xfs_fast_fid(bdp, (xfs_fid_t *)*fidpp));
 }
 
 
@@ -4870,8 +4850,6 @@ xfs_fid(
  *
  * A fid routine that takes a pointer to a previously allocated
  * fid structure (like xfs_fast_fid) but uses a 64 bit inode number.
- * (xfs_fid_t uses the 32 bit type xfs_fid_ino_t for the ino because
- * NFS 2 won't accept the additional 4 bytes.)
  */
 STATIC int
 xfs_fid2(
