@@ -563,9 +563,6 @@ xfs_fs_freeze(
 	/* Flush delalloc and delwri data */
 	VFS_SYNC(vfsp, SYNC_DELWRI|SYNC_WAIT, sys_cred, error);
 
-	/* Flush inactive inodes */
-	xfs_iflush_all(mp, XFS_FLUSH_ALL);
-
 	/* Pause transaction subsystem */
 	xfs_start_freeze(mp, XFS_FREEZE_TRANS);
 
