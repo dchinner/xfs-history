@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.8 $"
+#ident "$Revision: 1.9 $"
 /*
  * xfsrt stubs
  */
@@ -80,15 +80,6 @@ xfs_rtfree_extent(
 { 
     return nopkg(); 
 }
-
-int
-xfs_growfs_rt(
-	struct xfs_mount	*mp,
-	struct xfs_growfs_rt	*in)
-{ 
-    return nopkg(); 
-}
-
 
 int
 xfs_rtpick_extent(
