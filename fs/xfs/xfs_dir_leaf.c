@@ -120,7 +120,7 @@ xfs_dir_ino_validate(xfs_mount_t *mp, xfs_ino_t ino)
 		return;
 	}
 	agblkno = XFS_INO_TO_AGBNO(mp, ino);
-	if (agblkno >= mp->m_sb.sb_agblocks) {
+	if (agblkno >= mp->m_sb.sb_agblocks || agblkno == 0) {
 		cmn_err(CE_PANIC, "Invalid inode number 0x%x\n", (long)ino);
 		return;
 	}
@@ -131,6 +131,8 @@ xfs_dir_ino_validate(xfs_mount_t *mp, xfs_ino_t ino)
 	}
 	return;
 }
+
+#ifndef XFS_REPAIR_SIM
 /*
  * Validate a given shortform directory inode.
  */
@@ -153,6 +155,23 @@ xfs_dir_shortform_validate(xfs_mount_t *mp, xfs_inode_t *dp)
 	if (!(dp->i_flags & XFS_IFINLINE)) {
 		return;
 	}
+
+	return;
+#if 0
+	/*
+	 * rcc - We can never look at the fork because we don't
+	 * log the fork on rmdir's.  So it's possible that
+	 * the inode could have been flushed to disk so during
+	 * recovery, we'll see what looks to us like bogus stuff
+	 * in the fork when we replay the log.  In actuality,
+	 * the fork contains the future state of the inode that
+	 * we'll recreate when we finish recovery.  But that
+	 * future state is inconsistent with the state of the
+	 * inode during recovery as the rmdir is replayed
+	 * since the data fork isn't logged on an rmdir or
+	 * an inactive.
+	 */
+
 	sf = (xfs_dir_shortform_t *)dp->i_df.if_u1.if_data;
 	ino = XFS_GET_DIR_INO(mp, sf->hdr.parent);
 	xfs_dir_ino_validate(mp, ino);
@@ -180,6 +199,7 @@ xfs_dir_shortform_validate(xfs_mount_t *mp, xfs_inode_t *dp)
 	if (namelen_sum >= XFS_LITINO(mp)) {
 		cmn_err(CE_PANIC, "Invalid shortform namelen: dp 0x%x\n", dp);
 	}
+#endif
 }
 
 void
@@ -226,7 +246,17 @@ xfs_dir_shortform_validate_ondisk(xfs_mount_t *mp, xfs_dinode_t *dp)
 		cmn_err(CE_PANIC, "Invalid shortform namelen: dp 0x%x\n", dp);
 	}
 }
+#else
+void
+xfs_dir_shortform_validate(xfs_mount_t *mp, xfs_inode_t *dp)
+{
+}
 
+void
+xfs_dir_shortform_validate_ondisk(xfs_mount_t *mp, xfs_dinode_t *dp)
+{
+}
+#endif /* XFS_REPAIR_SIM */
 
 /*
  * Create the initial contents of a shortform directory.
