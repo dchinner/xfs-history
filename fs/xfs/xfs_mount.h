@@ -1,8 +1,8 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.56 $"
-#ident	"$Revision: 1.56 $"
+#ident	"$Revision: 1.57 $"
+#ident	"$Revision: 1.57 $"
 
 struct buf;
 struct cred;
@@ -40,13 +40,11 @@ typedef struct xfs_mount {
 	mutex_t			m_ail_lock;	/* fs AIL mutex */
 	xfs_ail_entry_t		m_ail;		/* fs active log item list */
 	uint			m_ail_gen;	/* fs AIL generation count */
-	xfs_ail_ticket_t	*m_ail_wait;	/* list of AIL push waiters*/
-	xfs_trans_t		*m_async_trans;	/* list of async transactions */
-	mutex_t			m_async_lock;	/* async trans list mutex */
 	xfs_sb_t		m_sb;		/* copy of fs superblock */
 	mutex_t			m_sb_lock;	/* sb counter mutex */
 	struct buf		*m_sb_bp;	/* buffer for superblock */
-	char			*m_fsname; /* filesystem name */
+	char			*m_fsname; 	/* filesystem name */
+	int			m_fsname_len;	/* strlen of fs name */
 	dev_t			m_dev;		/* dev of fs meta-data */
 	dev_t			m_logdev;	/* dev of fs log data */
 	dev_t			m_rtdev;	/* dev of fs realtime data */
