@@ -219,13 +219,6 @@ typedef struct xfs_inode {
 #define	XFS_MAX_FILE_OFFSET	((1LL<<40)-1LL)
 #endif
 
-/*
- * This is used to figure out what to pass to flush/inval
- * routines since the write code allocates pages beyond the
- * end of the file.
- */
-#define	XFS_ISIZE_MAX(ip)	((ip)->i_d.di_size + \
-				 (1 << (ip)->i_mount->m_writeio_log))
 
 #define	XFS_ITOV(ip)	((vnode_t*)((ip)->i_vnode))
 #define	XFS_VTOI(vp)	((xfs_inode_t*)((vp)->v_data))
@@ -310,6 +303,7 @@ void		xfs_iprint(xfs_inode_t *);
 int		xfs_iaccess(xfs_inode_t *, mode_t, struct cred *);
 uint		xfs_iroundup(uint);
 void		xfs_ichgtime(xfs_inode_t *, int);
+xfs_fsize_t	xfs_file_last_byte(xfs_inode_t *);
 
 #ifdef DEBUG
 void		xfs_isize_check(xfs_mount_t *, xfs_inode_t *, xfs_fsize_t);
