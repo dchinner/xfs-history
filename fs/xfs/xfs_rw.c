@@ -1333,7 +1333,7 @@ xfs_disable_nested_locking(void)
 int
 xfs_is_nested_locking_enabled(void)
 {
-	return curuthread->ut_vnlock & UT_FSNESTED;
+	return curuthread && curuthread->ut_vnlock & UT_FSNESTED;
 }
 
 /*
