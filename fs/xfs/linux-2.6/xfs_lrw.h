@@ -23,6 +23,9 @@
  * $Id$
  *
  * $Log$
+ * Revision 1.7  2000/03/28 20:31:53  lord
+ * Simplify bmap code, add support for NEW extents.
+ *
  * Revision 1.6  2000/03/25 01:15:49  lord
  * use linux security mechanisms
  * Merge of 2.3.42-xfs:slinx:46379a by ananth.
@@ -66,11 +69,12 @@
 
 extern int xfs_bmap(bhv_desc_t *,off_t,ssize_t,int,pb_bmap_t *,int *);
 extern int xfs_iomap_read(xfs_iocore_t *,off_t,size_t,pb_bmap_t *,int *,struct pm *);
-STATIC int xfs_iomap_write(xfs_iocore_t	*,off_t,size_t,pb_bmap_t *,int *,int,struct pm *);
-STATIC int xfs_iomap_extra(xfs_iocore_t	*,off_t,size_t,pb_bmap_t *,int *,struct pm	*);
+extern int xfs_iomap_write(xfs_iocore_t	*,off_t,size_t,pb_bmap_t *,int *,int,struct pm *);
+
 /*
  * Needed by xfs_rw.c
  */
+
 void
 xfs_rwlock(
 	bhv_desc_t	*bdp,
