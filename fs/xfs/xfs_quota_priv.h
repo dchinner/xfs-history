@@ -13,11 +13,6 @@ struct xfs_dquotblk;
 /* Number of dquots that fit in to a dquot block */
 #define XFS_QM_DQPERBLK(mp)	((mp)->m_quotainfo->qi_dqperchunk)
 
-/*
- * relative position of dquot in the (fixed size) block
- */
-#define XFS_QM_ID_TO_DQOFF(mp, id)	(((int)id) % XFS_QM_DQPERBLK(mp))
-
 #define XFS_ISLOCKED_INODE(ip)		(ismrlocked(&(ip)->i_lock, \
 					    MR_UPDATE | MR_ACCESS) != 0)
 #define XFS_ISLOCKED_INODE_EXCL(ip)	(ismrlocked(&(ip)->i_lock, \
@@ -27,17 +22,11 @@ struct xfs_dquotblk;
 
 #define QM_FLLOCK	qm_dqfreelist.qh_lock
 #define QM_FLNEXT	qm_dqfreelist.qh_next
-#ifdef QUOTADEBUG
-#define QM_FLFLAGS	qm_dqfreelist.qh_flags
-#endif
 
 #define QI_MPL_LIST	m_quotainfo->qi_dqlist
 #define QI_MPLLOCK	m_quotainfo->qi_dqlist.qh_lock
 #define QI_MPLNEXT	m_quotainfo->qi_dqlist.qh_next
 #define QI_MPLNDQUOTS	m_quotainfo->qi_dqlist.qh_nelems
-#ifdef QUOTADEBUG
-#define QI_MPLFLAGS	m_quotainfo->qi_dqlist.qh_flags
-#endif
 
 #define QI_UQIP		m_quotainfo->qi_uquotaip
 #define QI_PQIP		m_quotainfo->qi_pquotaip
@@ -51,16 +40,8 @@ struct xfs_dquotblk;
 #define QI_MPLRECLAIMS	m_quotainfo->qi_dqreclaims
 
 
-#ifdef QUOTADEBUG
-#define XQMLCK(h)			{ mutex_lock(&((h)->qh_lock), PINOD); \
-					 (h)->qh_flags |= XFS_DQ_LOCKED; }
-#define XQMUNLCK(h)			{ mutex_unlock(&((h)->qh_lock)); \
-					 (h)->qh_flags &= ~(XFS_DQ_LOCKED); }
-#else
 #define XQMLCK(h)			mutex_lock(&((h)->qh_lock), PINOD)
 #define XQMUNLCK(h)			mutex_unlock(&((h)->qh_lock))
-#endif
-
 #define XQMISLCKD(h)			(mutex_mine(&((h)->qh_lock)))
 
 #define XFS_DQ_HASH_LOCK(h)		XQMLCK(h)
@@ -160,15 +141,6 @@ for ((dqp) = (qlist)->qh_next; (dqp) != (xfs_dquot_t *)(qlist); \
 					 (tp)->t_dqinfo->dqa_prjdquots)
 #define XFS_IS_SUSER_DQUOT(dqp)		((dqp)->q_core.d_id == 0)
 
-#define XFS_DO_FLUSH_INODE(ip) \
-	{ \
-	  xfs_ilock(ip, XFS_ILOCK_EXCL); \
-	  xfs_iflock(ip);\
-	  xfs_iflush(ip, XFS_IFLUSH_SYNC);\
-	  xfs_iunlock(ip, XFS_ILOCK_EXCL);\
-	  ASSERT(XFS_ITOV(ip)->v_count == 1); \
-        }
-
 #define XFS_PURGE_INODE(vp) 		\
 	{ 				\
 	  vmap_t dqvmap;		\
@@ -179,22 +151,6 @@ for ((dqp) = (qlist)->qh_next; (dqp) != (xfs_dquot_t *)(qlist); \
 
 #define DQFLAGTO_TYPESTR(d) 	(((d)->dq_flags & XFS_DQ_USER) ? "USR" : \
 				 (((d)->dq_flags & XFS_DQ_PROJ) ? "PRJ" : "???"))
-
-#ifdef QUOTADEBUG
-#define XQM_LIST_PRINT(l, NXT, title) \
-{ \
-	  xfs_dquot_t	*dqp; int i = 0;\
-	  printf("%s (#%d)\n", title, (int) (l)->qh_nelems); \
-	  for (dqp = (l)->qh_next; dqp != NULL; dqp = dqp->NXT) { \
-	    printf("\t%d.\t\"%d (%s)\"\t bcnt = %d, icnt = %d refs = %d\n", \
-			 ++i, (int) dqp->q_core.d_id, \
-		         DQFLAGTO_TYPESTR(dqp),      \
-			 (int) dqp->q_core.d_bcount, \
-			 (int) dqp->q_core.d_icount, \
-                         (int) dqp->q_nrefs);  } \
-}
-
 #define DQFLAGTO_DIRTYSTR(d)	(XFS_DQ_IS_DIRTY(d) ? "DIRTY" : "NOTDIRTY")
-#endif
 
 #endif
