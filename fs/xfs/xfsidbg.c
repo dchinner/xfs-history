@@ -2612,7 +2612,7 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 			printk("buf 0x%p attr leaf 0x%p\n", bp, aleaf);
 			xfsidbg_xattrleaf(aleaf);
 		}
-	} else if ((dleaf = d)->hdr.info.magic == XFS_DIR_LEAF_MAGIC) {
+	} else if (INT_GET((dleaf = d)->hdr.info.magic, ARCH_UNKNOWN) == XFS_DIR_LEAF_MAGIC) {
 		if (summary) {
 			printk("Dir Leaf, 1st hash 0x%x (at 0x%p)\n",
 				     dleaf->entries[0].hashval, dleaf);
@@ -2620,7 +2620,7 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 			printk("buf 0x%p dir leaf 0x%p\n", bp, dleaf);
 			xfsidbg_xdirleaf(dleaf);
 		}
-	} else if ((node = d)->hdr.info.magic == XFS_DA_NODE_MAGIC) {
+	} else if (INT_GET((node = d)->hdr.info.magic, ARCH_UNKNOWN) == XFS_DA_NODE_MAGIC) {
 		if (summary) {
 			printk("Dir/Attr Node, level %d, 1st hash 0x%x (at 0x%p)\n",
 			      node->hdr.level, node->btree[0].hashval, node);
@@ -2663,14 +2663,14 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 			printk("buf 0x%p dir2 data 0x%p\n", bp, d2data);
 			xfs_dir2data((void *)d2data, XFS_BUF_COUNT(bp));
 		}
-	} else if ((d2leaf = d)->hdr.info.magic == XFS_DIR2_LEAF1_MAGIC) {
+	} else if (INT_GET((d2leaf = d)->hdr.info.magic, ARCH_UNKNOWN) == XFS_DIR2_LEAF1_MAGIC) {
 		if (summary) {
 			printk("Dir2 leaf(1) (at 0x%p)\n", d2leaf);
 		} else {
 			printk("buf 0x%p dir2 leaf 0x%p\n", bp, d2leaf);
 			xfs_dir2leaf(d2leaf, XFS_BUF_COUNT(bp));
 		}
-	} else if (d2leaf->hdr.info.magic == XFS_DIR2_LEAFN_MAGIC) {
+	} else if (INT_GET(d2leaf->hdr.info.magic, ARCH_UNKNOWN) == XFS_DIR2_LEAFN_MAGIC) {
 		if (summary) {
 			printk("Dir2 leaf(n) (at 0x%p)\n", d2leaf);
 		} else {
@@ -2944,7 +2944,7 @@ xfs_dir2leaf(xfs_dir2_leaf_t *leaf, int size)
 			/* XFS_DIR2_DATAPTR_TO_BYTE */
 			e->address << XFS_DIR2_DATA_ALIGN_LOG);
 	}
-	if (i->magic == XFS_DIR2_LEAFN_MAGIC)
+	if (INT_GET(i->magic, ARCH_UNKNOWN) == XFS_DIR2_LEAFN_MAGIC)
 		return;
 	/* XFS_DIR2_LEAF_TAIL_P */
 	t = (xfs_dir2_leaf_tail_t *)((char *)leaf + size - sizeof(*t));
