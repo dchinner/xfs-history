@@ -19,7 +19,7 @@
 #ifndef _FS_XFS_DIR2_SF_H
 #define	_FS_XFS_DIR2_SF_H
 
-#ident	"$Revision: 1.2 $"
+#ident	"$Revision$"
 
 /*
  * xfs_dir2_sf.h
@@ -51,12 +51,13 @@ struct xfs_trans;
  */
 typedef	struct { __uint8_t i[8]; } xfs_dir2_ino8_t;
 
+/* XXX - no architecture mods here YET */
 #if XFS_BIG_FILESYSTEMS
 #define	XFS_DIR2_SF_GET_INO8(di)	\
-	(((xfs_intino_t)XFS_DI_LO((di).i8) & 0xffffffffULL) | \
-	 ((xfs_intino_t)XFS_DI_HI((di).i8) << 32))
+	(xfs_intino_t)(INT_GET_UNALIGNED_64(&di))
 #else
-#define	XFS_DIR2_SF_GET_INO8(di)	XFS_DI_LO((di).i8)
+#define	XFS_DIR2_SF_GET_INO8(di)	\
+	(xfs_intino_t)(INT_GET_UNALIGNED_64(&di))
 #endif
 
 /*

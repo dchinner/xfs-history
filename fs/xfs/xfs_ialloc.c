@@ -63,6 +63,7 @@
 #ifdef SIM
 #include "sim.h"
 #endif
+#include "xfs_arch.h"
 
 /*
  * Prototypes for internal routines.
@@ -153,6 +154,9 @@ xfs_ialloc_log_di(
 		offsetof(xfs_dinode_t, di_a),
 		sizeof(xfs_dinode_t)
 	};
+        xfs_arch_t  arch;
+        
+        arch=((xfs_mount_t *)bp->b_fsprivate)->m_arch;
 
 	ASSERT(offsetof(xfs_dinode_t, di_core) == 0);
 	ASSERT((fields & (XFS_DI_U|XFS_DI_A)) == 0);
@@ -204,7 +208,12 @@ xfs_ialloc_ag_alloc(
 	static xfs_timestamp_t ztime;	/* zero xfs timestamp */
 	int		isaligned;	/* inode allocation at stripe unit */
 					/* boundary */
-
+        xfs_dinode_core_t dic;          /* a dinode_core to copy to new */
+                                        /* inodes */
+        xfs_arch_t  arch;
+        
+        arch=tp->t_mountp->m_arch;
+        
 	args.tp = tp;
 	args.mp = tp->t_mountp;
 	/*
@@ -324,34 +333,41 @@ xfs_ialloc_ag_alloc(
 		/*
 		 * Loop over the inodes in this buffer.
 		 */
+		INT_SET(dic.di_magic, arch, XFS_DINODE_MAGIC);
+		INT_ZERO(dic.di_mode, arch);
+		INT_SET(dic.di_version, arch, version);
+		INT_ZERO(dic.di_format, arch);
+		INT_ZERO(dic.di_onlink, arch);
+		INT_ZERO(dic.di_uid, arch);
+		INT_ZERO(dic.di_gid, arch);
+		INT_ZERO(dic.di_nlink, arch);
+		INT_ZERO(dic.di_projid, arch);
+		bzero(&(dic.di_pad[0]),sizeof(dic.di_pad));
+		INT_SET(dic.di_atime.t_sec, arch, ztime.t_sec);
+		INT_SET(dic.di_atime.t_nsec, arch, ztime.t_nsec);
+                
+		INT_SET(dic.di_mtime.t_sec, arch, ztime.t_sec);
+		INT_SET(dic.di_mtime.t_nsec, arch, ztime.t_nsec);
+                
+		INT_SET(dic.di_ctime.t_sec, arch, ztime.t_sec);
+		INT_SET(dic.di_ctime.t_nsec, arch, ztime.t_nsec);
+                
+		INT_ZERO(dic.di_size, arch);
+		INT_ZERO(dic.di_nblocks, arch);
+		INT_ZERO(dic.di_extsize, arch);
+		INT_ZERO(dic.di_nextents, arch);
+		INT_ZERO(dic.di_anextents, arch);
+		INT_ZERO(dic.di_forkoff, arch);
+		INT_ZERO(dic.di_aformat, arch);
+		INT_ZERO(dic.di_dmevmask, arch);
+		INT_ZERO(dic.di_dmstate, arch);
+		INT_ZERO(dic.di_flags, arch);
+		INT_ZERO(dic.di_gen, arch);
+                
 		for (i = 0; i < ninodes; i++) {
 			free = XFS_MAKE_IPTR(args.mp, fbuf, i);
-			free->di_core.di_magic = XFS_DINODE_MAGIC;
-			free->di_core.di_mode = 0;
-			free->di_core.di_version = version;
-			free->di_core.di_format = 0;
-			free->di_core.di_onlink = 0;
-			free->di_core.di_uid = 0;
-			free->di_core.di_gid = 0;
-			free->di_core.di_nlink = 0;
-			free->di_core.di_projid = 0;
-			bzero(&(free->di_core.di_pad[0]),
-			      sizeof(free->di_core.di_pad));
-			free->di_core.di_atime = ztime;
-			free->di_core.di_mtime = ztime;
-			free->di_core.di_ctime = ztime;
-			free->di_core.di_size = 0;
-			free->di_core.di_nblocks = 0;
-			free->di_core.di_extsize = 0;
-			free->di_core.di_nextents = 0;
-			free->di_core.di_anextents = 0;
-			free->di_core.di_forkoff = 0;
-			free->di_core.di_aformat = 0;
-			free->di_core.di_dmevmask = 0;
-			free->di_core.di_dmstate = 0;
-			free->di_core.di_flags = 0;
-			free->di_core.di_gen = 0;
-			free->di_next_unlinked = NULLAGINO;
+                        bcopy (&dic, &(free->di_core), sizeof(xfs_dinode_core_t));
+		        free->di_next_unlinked=NULLAGINO;
 			xfs_ialloc_log_di(tp, fbuf, i,
 				XFS_DI_CORE_BITS | XFS_DI_NEXT_UNLINKED);
 		}

@@ -54,7 +54,7 @@
 #include "xfs_ialloc.h"
 #include "xfs_itable.h"
 #include "xfs_error.h"
-
+#include "xfs_arch.h"
 #ifdef CELL_CAPABLE
 #include "xfs_cxfs.h"
 #endif
@@ -79,6 +79,8 @@ xfs_bulkstat_one(
 	xfs_dinode_t	*dip;		/* dinode inode pointer */
 	xfs_dinode_core_t *dic;		/* dinode core info pointer */
 	xfs_inode_t	*ip = NULL;	/* incore inode pointer */
+        xfs_arch_t  arch;           /* these are set according to      */
+        __uint16_t      di_flags;       /* temp */
 
 	buf = (xfs_bstat_t *)buffer;
 	dip = (xfs_dinode_t *)dibuff;
@@ -106,6 +108,7 @@ xfs_bulkstat_one(
 			return XFS_ERROR(ENOENT);
 		}
 		dic = &ip->i_d;
+                arch=XFS_ARCH_NATIVE; /* in-core dinode_core is NATIVE */
 		ASSERT(dic != NULL);
 
 		/* xfs_iget returns the following without needing
@@ -117,6 +120,7 @@ xfs_bulkstat_one(
 	} else {
 		dic = &dip->di_core;
 		ASSERT(dic != NULL);
+                arch = mp->m_arch; /* buffer dinode_core is in on-disk arch */
 
 		/*
 		 * The inode format changed when we moved the link count and
@@ -129,51 +133,55 @@ xfs_bulkstat_one(
 		 * the new format. We don't change the version number so that we
 		 * can distinguish this from a real new format inode.
 		 */
-		if (dic->di_version == XFS_DINODE_VERSION_1) {
-			buf->bs_nlink = dic->di_onlink;
+		if (INT_GET(dic->di_version, arch) == XFS_DINODE_VERSION_1) {
+			buf->bs_nlink = INT_GET(dic->di_onlink, arch);
 			buf->bs_projid = 0;
 		}
 		else {
-			buf->bs_nlink = dic->di_nlink;
-			buf->bs_projid = dic->di_projid;
+			buf->bs_nlink = INT_GET(dic->di_nlink, arch);
+			buf->bs_projid = INT_GET(dic->di_projid, arch);
 		}
 
 	}
 
 	buf->bs_ino = ino;
-	buf->bs_mode = dic->di_mode;
-	buf->bs_uid = dic->di_uid;
-	buf->bs_gid = dic->di_gid;
-	buf->bs_size = dic->di_size;
-	buf->bs_atime.tv_sec = dic->di_atime.t_sec;
-	buf->bs_atime.tv_nsec = dic->di_atime.t_nsec;
-	buf->bs_mtime.tv_sec = dic->di_mtime.t_sec;
-	buf->bs_mtime.tv_nsec = dic->di_mtime.t_nsec;
-	buf->bs_ctime.tv_sec = dic->di_ctime.t_sec;
-	buf->bs_ctime.tv_nsec = dic->di_ctime.t_nsec;
+	buf->bs_mode = INT_GET(dic->di_mode, arch);
+	buf->bs_uid = INT_GET(dic->di_uid, arch);
+	buf->bs_gid = INT_GET(dic->di_gid, arch);
+	buf->bs_size = INT_GET(dic->di_size, arch);
+	buf->bs_atime.tv_sec = INT_GET(dic->di_atime.t_sec, arch);
+	buf->bs_atime.tv_nsec = INT_GET(dic->di_atime.t_nsec, arch);
+	buf->bs_mtime.tv_sec = INT_GET(dic->di_mtime.t_sec, arch);
+	buf->bs_mtime.tv_nsec = INT_GET(dic->di_mtime.t_nsec, arch);
+	buf->bs_ctime.tv_sec = INT_GET(dic->di_ctime.t_sec, arch);
+	buf->bs_ctime.tv_nsec = INT_GET(dic->di_ctime.t_nsec, arch);
 	/*
 	 * convert di_flags to bs_xflags.
 	 */
+        di_flags=INT_GET(dic->di_flags, arch);
+        
 	buf->bs_xflags =
-		((dic->di_flags & XFS_DIFLAG_REALTIME) ?
+		((di_flags & XFS_DIFLAG_REALTIME) ?
 			XFS_XFLAG_REALTIME : 0) |
-		((dic->di_flags & XFS_DIFLAG_PREALLOC) ?
+		((di_flags & XFS_DIFLAG_PREALLOC) ?
 			XFS_XFLAG_PREALLOC : 0) |
-		(XFS_CFORK_Q(dic) ?
+		(XFS_CFORK_Q_ARCH(dic, arch) ?
 			XFS_XFLAG_HASATTR : 0);
-	buf->bs_extsize = dic->di_extsize << mp->m_sb.sb_blocklog;
-	buf->bs_extents = dic->di_nextents;
-	buf->bs_gen = dic->di_gen;
+        
+	buf->bs_extsize = INT_GET(dic->di_extsize, arch) << mp->m_sb.sb_blocklog;
+	buf->bs_extents = INT_GET(dic->di_nextents, arch);
+	buf->bs_gen = INT_GET(dic->di_gen, arch);
 	bzero(buf->bs_pad, sizeof(buf->bs_pad));
-	buf->bs_dmevmask = dic->di_dmevmask;
-	buf->bs_dmstate = dic->di_dmstate;
-	buf->bs_aextents = dic->di_anextents;
-	switch (dic->di_format) {
+	buf->bs_dmevmask = INT_GET(dic->di_dmevmask, arch);
+	buf->bs_dmstate = INT_GET(dic->di_dmstate, arch);
+	buf->bs_aextents = INT_GET(dic->di_anextents, arch);
+        
+	switch (INT_GET(dic->di_format, arch)) {
 	case XFS_DINODE_FMT_DEV:
 		if ( ip ) {
 			buf->bs_rdev = ip->i_df.if_u2.if_rdev;
 		} else {
-			buf->bs_rdev = dip->di_u.di_dev;
+			buf->bs_rdev = INT_GET(dip->di_u.di_dev, arch);
 		}
 
 		buf->bs_blksize = BLKDEV_IOSIZE;
@@ -190,9 +198,9 @@ xfs_bulkstat_one(
 		buf->bs_rdev = 0;
 		buf->bs_blksize = mp->m_sb.sb_blocksize;
 		if ( ip ) {
-			buf->bs_blocks = dic->di_nblocks + ip->i_delayed_blks;
+			buf->bs_blocks = INT_GET(dic->di_nblocks, arch) + ip->i_delayed_blks;
 		} else {
-			buf->bs_blocks = dic->di_nblocks;
+			buf->bs_blocks = INT_GET(dic->di_nblocks, arch);
 		}
 		break;
 	}
@@ -256,6 +264,9 @@ xfs_bulkstat(
 	xfs_inode_t		*ip;	/* ptr to in-core inode struct */
 	vfs_t			*vfsp;
 	int			vfs_unbusy_needed = 0;
+        xfs_arch_t  arch;
+        
+        arch=mp->m_arch;
 
 	/*
 	 * Check that the device is valid/mounted and mark it busy
@@ -554,10 +565,10 @@ xfs_bulkstat(
 					dip = (xfs_dinode_t *)(XFS_BUF_PTR(bp) + 
 					      (clustidx << mp->m_sb.sb_inodelog));
 
-					if (dip->di_core.di_magic 
+					if (INT_GET(dip->di_core.di_magic, arch)
 					            != XFS_DINODE_MAGIC
 					    || !XFS_DINODE_GOOD_VERSION(
-					            dip->di_core.di_version))
+					            INT_GET(dip->di_core.di_version, arch)))
 						continue;
 				}
 

@@ -69,6 +69,8 @@
 #include "sim.h"
 #endif
 
+#include "xfs_arch.h"
+
 zone_t *xfs_ifork_zone;
 zone_t *xfs_inode_zone;
 zone_t *xfs_chashlist_zone;
@@ -171,7 +173,7 @@ xfs_inobp_check(
 	for (i = 0; i < j; i++) {
 		dip = (xfs_dinode_t *)((char *)XFS_BUF_PTR(bp) +
 				       (i * mp->m_sb.sb_inodesize));
-		if (dip->di_next_unlinked == 0)  {
+		if (INT_ISZERO(dip->di_next_unlinked, arch))  {
 			xfs_fs_cmn_err(CE_ALERT, mp,
 				"Detected a bogus zero next_unlinked field in incore inode buffer 0x%p.  About to pop an ASSERT.",
 				bp);
@@ -192,26 +194,28 @@ xfs_inobp_bwcheck(xfs_buf_t *bp)
 	int		i;
 	int		j;
 	xfs_dinode_t	*dip;
+        xfs_arch_t  arch;
 
 	ASSERT(XFS_BUF_FSPRIVATE3(bp, void *) != NULL);
 
 	mp = XFS_BUF_FSPRIVATE3(bp, xfs_mount_t *);
+        arch=mp->m_arch;
 
 	j = mp->m_inode_cluster_size >> mp->m_sb.sb_inodelog;
 	dip = (xfs_dinode_t *) XFS_BUF_PTR(bp);
 
 	for (i = 0; i < j; i++)  {
-		if (dip->di_core.di_magic != XFS_DINODE_MAGIC)  {
+                if (INT_GET(dip->di_core.di_magic, arch) != XFS_DINODE_MAGIC) {
 			cmn_err(CE_WARN,
 "Bad magic # 0x%x in XFS inode buffer 0x%Lx, starting blockno %Ld, offset 0x%x",
-				dip->di_core.di_magic,
+				INT_GET(dip->di_core.di_magic, arch),
 				(__uint64_t)(__psunsigned_t) bp,
 				(__int64_t) XFS_BUF_ADDR(bp),
 				(__psint_t) dip - (__psint_t) XFS_BUF_PTR(bp));
 			xfs_fs_cmn_err(CE_WARN, mp,
 				"corrupt, unmount and run xfs_repair");
 		}
-		if (dip->di_next_unlinked == 0)  {
+		if (INT_ISZERO(dip->di_next_unlinked, arch))  {
 			cmn_err(CE_WARN,
 "Bad next_unlinked field (0) in XFS inode buffer 0x%x, starting blockno %Ld, offset 0x%x",
 				(__uint64_t)(__psunsigned_t) bp,
@@ -254,6 +258,7 @@ xfs_inotobp(
 	xfs_buf_t	*bp;
 	int		error;
 	xfs_dinode_t	*dip;
+        xfs_arch_t  arch = mp->m_arch;
 
 	/*
 	 * Call the space managment code to find the location of the
@@ -287,8 +292,8 @@ xfs_inotobp(
 	}
 	dip = (xfs_dinode_t *)(XFS_BUF_PTR(bp));
 	di_ok =
-		dip->di_core.di_magic == XFS_DINODE_MAGIC &&
-		XFS_DINODE_GOOD_VERSION(dip->di_core.di_version);
+		INT_GET(dip->di_core.di_magic, arch) == XFS_DINODE_MAGIC &&
+		XFS_DINODE_GOOD_VERSION(INT_GET(dip->di_core.di_version, arch));
 	if (XFS_TEST_ERROR(!di_ok, mp, XFS_ERRTAG_ITOBP_INOTOBP,
 			XFS_RANDOM_ITOBP_INOTOBP)) {
 		xfs_trans_brelse(tp, bp);
@@ -342,6 +347,7 @@ xfs_itobp(
 	int		i;
 	int		ni;
 #endif
+        xfs_arch_t  arch = mp->m_arch;
 
 	if (ip->i_blkno == (daddr_t)0) {
 		/*
@@ -409,8 +415,8 @@ xfs_itobp(
 
 		dip = (xfs_dinode_t *)(XFS_BUF_PTR(bp) +
 					(i << mp->m_sb.sb_inodelog));
-		di_ok = dip->di_core.di_magic == XFS_DINODE_MAGIC &&
-			XFS_DINODE_GOOD_VERSION(dip->di_core.di_version);
+		di_ok = INT_GET(dip->di_core.di_magic, arch) == XFS_DINODE_MAGIC &&
+			    XFS_DINODE_GOOD_VERSION(INT_GET(dip->di_core.di_version, arch));
 		if (XFS_TEST_ERROR(!di_ok, mp, XFS_ERRTAG_ITOBP_INOTOBP,
 				 XFS_RANDOM_ITOBP_INOTOBP)) {
 #ifdef DEBUG
@@ -455,25 +461,27 @@ xfs_iformat(
 	xfs_attr_shortform_t	*atp;
 	int			size;
 	int			error;
-
+        xfs_fsize_t             di_size;
+        xfs_arch_t          arch=ip->i_mount->m_arch;
 	ip->i_df.if_ext_max =
 		XFS_IFORK_DSIZE(ip) / (uint)sizeof(xfs_bmbt_rec_t);
 	error = 0;
 
-	if (dip->di_core.di_nextents + dip->di_core.di_anextents >
-	    dip->di_core.di_nblocks) {
+	if (INT_GET(dip->di_core.di_nextents, arch) + 
+                INT_GET(dip->di_core.di_anextents, arch) >
+	    INT_GET(dip->di_core.di_nblocks, arch)) {
 		xfs_fs_cmn_err(CE_WARN, ip->i_mount,
 			"corrupt dinode %Lu, extent total = %d, nblocks = %Ld.  Unmount and run xfs_repair.",
 			ip->i_ino,
-			dip->di_core.di_nextents + dip->di_core.di_anextents,
-			dip->di_core.di_nblocks);
+			(int)(INT_GET(dip->di_core.di_nextents, arch) + INT_GET(dip->di_core.di_anextents, arch)),
+			INT_GET(dip->di_core.di_nblocks, arch));
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
-	if (dip->di_core.di_forkoff > ip->i_mount->m_sb.sb_inodesize) {
+	if (INT_GET(dip->di_core.di_forkoff, arch) > ip->i_mount->m_sb.sb_inodesize) {
 		xfs_fs_cmn_err(CE_WARN, ip->i_mount,
 			"corrupt dinode %Lu, forkoff = 0x%x.  Unmount and run xfs_repair.",
-			ip->i_ino, dip->di_core.di_forkoff);
+			ip->i_ino, (int)(INT_GET(dip->di_core.di_forkoff, arch)));
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
@@ -482,34 +490,37 @@ xfs_iformat(
 	case IFCHR:
 	case IFBLK:
 	case IFSOCK:
-		if (dip->di_core.di_format != XFS_DINODE_FMT_DEV)
+		if (INT_GET(dip->di_core.di_format, arch) != XFS_DINODE_FMT_DEV)
 			return XFS_ERROR(EFSCORRUPTED);
 		ip->i_d.di_size = 0;
-		ip->i_df.if_u2.if_rdev = dip->di_u.di_dev;
+		ip->i_df.if_u2.if_rdev = INT_GET(dip->di_u.di_dev, arch);
 		break;
 
 	case IFREG:
 	case IFLNK:
 	case IFDIR:
-		switch (dip->di_core.di_format) {
+		switch (INT_GET(dip->di_core.di_format, arch)) {
 		case XFS_DINODE_FMT_LOCAL:
 			/*
 			 * no local regular files yet
 			 */
-			if ((dip->di_core.di_mode & IFMT) == IFREG) {
+			if ((INT_GET(dip->di_core.di_mode, arch) & IFMT) == IFREG) {
 				xfs_fs_cmn_err(CE_WARN, ip->i_mount,
 					"corrupt inode (local format for regular file) %Lu.  Unmount and run xfs_repair.",
 					ip->i_ino);
 				return XFS_ERROR(EFSCORRUPTED);
 			}
-			if (dip->di_core.di_size >
-			    XFS_DFORK_DSIZE(dip, ip->i_mount)) {
+                        
+                        di_size=INT_GET(dip->di_core.di_size, arch);
+			if (di_size >
+			    XFS_DFORK_DSIZE_ARCH(dip, ip->i_mount, arch)) {
 				xfs_fs_cmn_err(CE_WARN, ip->i_mount,
 					"corrupt inode %Lu (bad size %Ld for local inode).  Unmount and run xfs_repair.",
-					ip->i_ino, dip->di_core.di_size);
+					ip->i_ino, di_size);
 				return XFS_ERROR(EFSCORRUPTED);
 			}
-			size = (int)dip->di_core.di_size;
+
+			size = (int)di_size;
 			error = xfs_iformat_local(ip, dip, XFS_DATA_FORK, size);
 			break;
 		case XFS_DINODE_FMT_EXTENTS:
@@ -526,17 +537,18 @@ xfs_iformat(
 	default:
 		return XFS_ERROR(EFSCORRUPTED);
 	}
-	if (error)
+	if (error) {
 		return error;
-	if (!XFS_DFORK_Q(dip))
+        }
+	if (!XFS_DFORK_Q_ARCH(dip, arch))
 		return 0;
 	ASSERT(ip->i_afp == NULL);
 	ip->i_afp = kmem_zone_zalloc(xfs_ifork_zone, KM_SLEEP);
 	ip->i_afp->if_ext_max =
 		XFS_IFORK_ASIZE(ip) / (uint)sizeof(xfs_bmbt_rec_t);
-	switch (dip->di_core.di_aformat) {
+	switch (INT_GET(dip->di_core.di_aformat, arch)) {
 	case XFS_DINODE_FMT_LOCAL:
-		atp = (xfs_attr_shortform_t *)XFS_DFORK_APTR(dip);
+		atp = (xfs_attr_shortform_t *)XFS_DFORK_APTR_ARCH(dip, arch);
 		size = (int)atp->hdr.totsize;
 		error = xfs_iformat_local(ip, dip, XFS_ATTR_FORK, size);
 		break;
@@ -577,17 +589,18 @@ xfs_iformat_local(
 {
 	xfs_ifork_t	*ifp;
 	int		real_size;
+        xfs_arch_t  arch=ip->i_mount->m_arch;
 
 	/*
 	 * If the size is unreasonable, then something
 	 * is wrong and we just bail out rather than crash in
 	 * kmem_alloc() or bcopy() below.
 	 */
-	if (size > XFS_DFORK_SIZE(dip, ip->i_mount, whichfork)) {
+	if (size > XFS_DFORK_SIZE_ARCH(dip, ip->i_mount, whichfork, arch)) {
 		xfs_fs_cmn_err(CE_WARN, ip->i_mount,
 			"corrupt inode %Lu (bad size %d for local fork, size = %d).  Unmount and run xfs_repair.",
 			ip->i_ino, size,
-			XFS_DFORK_SIZE(dip, ip->i_mount, whichfork));
+			XFS_DFORK_SIZE_ARCH(dip, ip->i_mount, whichfork, arch));
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 	ifp = XFS_IFORK_PTR(ip, whichfork);
@@ -603,7 +616,7 @@ xfs_iformat_local(
 	ifp->if_bytes = size;
 	ifp->if_real_bytes = real_size;
 	if (size)
-		bcopy(XFS_DFORK_PTR(dip, whichfork), ifp->if_u1.if_data, size);
+		bcopy(XFS_DFORK_PTR_ARCH(dip, whichfork, arch), ifp->if_u1.if_data, size);
 	ifp->if_flags &= ~XFS_IFEXTENTS;
 	ifp->if_flags |= XFS_IFINLINE;
 	return 0;
@@ -628,9 +641,10 @@ xfs_iformat_extents(
 	int		nex;
 	int		real_size;
 	int		size;
+        xfs_arch_t  arch=ip->i_mount->m_arch;
 
 	ifp = XFS_IFORK_PTR(ip, whichfork);
-	nex = XFS_DFORK_NEXTENTS(dip, whichfork);
+	nex = XFS_DFORK_NEXTENTS_ARCH(dip, whichfork, arch);
 	size = nex * (uint)sizeof(xfs_bmbt_rec_t);
 
 	/*
@@ -638,7 +652,7 @@ xfs_iformat_extents(
 	 * is wrong and we just bail out rather than crash in
 	 * kmem_alloc() or bcopy() below.
 	 */
-	if (size < 0 || size > XFS_DFORK_SIZE(dip, ip->i_mount, whichfork)) {
+	if (size < 0 || size > XFS_DFORK_SIZE_ARCH(dip, ip->i_mount, whichfork, arch)) {
 		xfs_fs_cmn_err(CE_WARN, ip->i_mount,
 			"corrupt inode %Lu ((a)extents = %d).  Unmount and run xfs_repair.",
 			ip->i_ino, nex);
@@ -659,9 +673,9 @@ xfs_iformat_extents(
 	ifp->if_real_bytes = real_size;
 	if (size) {
 		xfs_validate_extents(
-			(xfs_bmbt_rec_32_t *)XFS_DFORK_PTR(dip, whichfork),
+			(xfs_bmbt_rec_32_t *)XFS_DFORK_PTR_ARCH(dip, whichfork, arch),
 			nex, XFS_EXTFMT_INODE(ip));
-		bcopy(XFS_DFORK_PTR(dip, whichfork), ifp->if_u1.if_extents,
+		bcopy(XFS_DFORK_PTR_ARCH(dip, whichfork, arch), ifp->if_u1.if_extents,
 		      size);
 		xfs_bmap_trace_exlist("xfs_iformat_extents", ip, nex,
 			whichfork);
@@ -694,9 +708,10 @@ xfs_iformat_btree(
 	/* REFERENCED */
 	int			nrecs;
 	int			size;
+        xfs_arch_t          arch=ip->i_mount->m_arch;
 
 	ifp = XFS_IFORK_PTR(ip, whichfork);
-	dfp = (xfs_bmdr_block_t *)XFS_DFORK_PTR(dip, whichfork);
+	dfp = (xfs_bmdr_block_t *)XFS_DFORK_PTR_ARCH(dip, whichfork, arch);
 	size = XFS_BMAP_BROOT_SPACE(dfp);
 	nrecs = XFS_BMAP_BROOT_NUMRECS(dfp);
 
@@ -709,7 +724,7 @@ xfs_iformat_btree(
 	 */
 	if (XFS_IFORK_NEXTENTS(ip, whichfork) <= ifp->if_ext_max
 	    || XFS_BMDR_SPACE_CALC(nrecs) >
-			XFS_DFORK_SIZE(dip, ip->i_mount, whichfork)
+			XFS_DFORK_SIZE_ARCH(dip, ip->i_mount, whichfork, arch)
 	    || XFS_IFORK_NEXTENTS(ip, whichfork) > ip->i_d.di_nblocks) {
 		xfs_fs_cmn_err(CE_WARN, ip->i_mount,
 			"corrupt inode %Lu (btree).  Unmount and run xfs_repair.",
@@ -724,12 +739,88 @@ xfs_iformat_btree(
 	 * Copy and convert from the on-disk structure
 	 * to the in-memory structure.
 	 */
-	xfs_bmdr_to_bmbt(dfp, XFS_DFORK_SIZE(dip, ip->i_mount, whichfork),
+	xfs_bmdr_to_bmbt(dfp, XFS_DFORK_SIZE_ARCH(dip, ip->i_mount, whichfork, arch),
 		ifp->if_broot, size);
 	ifp->if_flags &= ~XFS_IFEXTENTS;
 	ifp->if_flags |= XFS_IFBROOT;
 
 	return 0;
+}
+
+/*
+ * xfs_xlate_dinode_core - translate an xfs_inode_core_t between ondisk
+ * and native format
+ *
+ * buf  = on-disk representation 
+ * dip  = native representation 
+ * dir  = direction - +ve -> disk to native
+ *                    -ve -> native to disk
+ * arch = on-disk architecture
+ */
+ 
+static void 
+xfs_xlate_dinode_core(caddr_t buf, xfs_dinode_core_t *dip, 
+    int dir, xfs_arch_t arch)
+{
+    xfs_dinode_core_t   *src;
+    xfs_dinode_core_t   *dst;
+    xfs_arch_t      src_arch;
+    xfs_arch_t      dst_arch;
+    
+    ASSERT(dir);
+    
+    if (dir<0) {
+        src=(xfs_dinode_core_t*)dip;
+        dst=(xfs_dinode_core_t*)buf;   
+        src_arch=XFS_ARCH_NATIVE;
+        dst_arch=arch;         
+    } else {
+        src=(xfs_dinode_core_t*)buf;               
+        dst=(xfs_dinode_core_t*)dip;
+        src_arch=arch;
+        dst_arch=XFS_ARCH_NATIVE;         
+    }
+    
+    if (src_arch == dst_arch) {
+        bcopy((caddr_t)src, (caddr_t)dst, sizeof(xfs_dinode_core_t));
+        return;
+    }
+    
+    
+    INT_COPY(src->di_magic,       src_arch, dst->di_magic,        dst_arch);
+    INT_COPY(src->di_mode,        src_arch, dst->di_mode,         dst_arch);
+    INT_COPY(src->di_version,     src_arch, dst->di_version,      dst_arch);
+    INT_COPY(src->di_format,      src_arch, dst->di_format,       dst_arch);
+    INT_COPY(src->di_onlink,      src_arch, dst->di_onlink,       dst_arch);
+    INT_COPY(src->di_uid,         src_arch, dst->di_uid,          dst_arch);
+    INT_COPY(src->di_gid,         src_arch, dst->di_gid,          dst_arch);
+    INT_COPY(src->di_nlink,       src_arch, dst->di_nlink,        dst_arch);
+    INT_COPY(src->di_projid,      src_arch, dst->di_projid,       dst_arch);
+    
+    bcopy(src->di_pad, dst->di_pad, sizeof(src->di_pad));
+    
+    INT_COPY(src->di_atime.t_sec, src_arch, dst->di_atime.t_sec,  dst_arch);
+    INT_COPY(src->di_atime.t_nsec,src_arch, dst->di_atime.t_nsec, dst_arch);
+    
+    INT_COPY(src->di_mtime.t_sec, src_arch, dst->di_mtime.t_sec,  dst_arch);
+    INT_COPY(src->di_mtime.t_nsec,src_arch, dst->di_mtime.t_nsec, dst_arch);
+    
+    INT_COPY(src->di_ctime.t_sec, src_arch, dst->di_ctime.t_sec,  dst_arch);
+    INT_COPY(src->di_ctime.t_nsec,src_arch, dst->di_ctime.t_nsec, dst_arch);
+    
+    INT_COPY(src->di_size,        src_arch, dst->di_size,         dst_arch);
+    INT_COPY(src->di_nblocks,     src_arch, dst->di_nblocks,      dst_arch);
+    INT_COPY(src->di_extsize,     src_arch, dst->di_extsize,      dst_arch);
+    
+    INT_COPY(src->di_nextents,    src_arch, dst->di_nextents,     dst_arch);
+    INT_COPY(src->di_anextents,   src_arch, dst->di_anextents,    dst_arch);
+    INT_COPY(src->di_forkoff,     src_arch, dst->di_forkoff,      dst_arch);
+    INT_COPY(src->di_aformat,     src_arch, dst->di_aformat,      dst_arch);
+    INT_COPY(src->di_dmevmask,    src_arch, dst->di_dmevmask,     dst_arch);
+    INT_COPY(src->di_dmstate,     src_arch, dst->di_dmstate,      dst_arch);
+    INT_COPY(src->di_flags,       src_arch, dst->di_flags,        dst_arch);
+    INT_COPY(src->di_gen,         src_arch, dst->di_gen,          dst_arch);
+    
 }
 
 /*
@@ -752,6 +843,7 @@ xfs_iread(
 	xfs_dinode_t	*dip;
 	xfs_inode_t	*ip;
 	int		error;
+        xfs_arch_t  arch=mp->m_arch;
 
 	ASSERT(xfs_inode_zone != NULL);
 
@@ -803,7 +895,7 @@ xfs_iread(
 	 * If we got something that isn't an inode it means someone
 	 * (nfs or dmi) has a stale handle.
 	 */
-	if (dip->di_core.di_magic != XFS_DINODE_MAGIC) {
+        if (INT_GET(dip->di_core.di_magic, arch) != XFS_DINODE_MAGIC) {
 		kmem_zone_free(xfs_inode_zone, ip);
 		xfs_trans_brelse(tp, bp);
 		return XFS_ERROR(EINVAL);
@@ -816,8 +908,9 @@ xfs_iread(
 	 * specific information.
 	 * Otherwise, just get the truly permanent information.
 	 */
-	if (dip->di_core.di_mode != 0) {
-		bcopy(&(dip->di_core), &(ip->i_d),sizeof(xfs_dinode_core_t));
+	if (!INT_ISZERO(dip->di_core.di_mode, arch)) {
+                xfs_xlate_dinode_core((caddr_t)&dip->di_core, 
+                     &(ip->i_d), 1, arch);
 		error = xfs_iformat(ip, dip);
 		if (error)  {
 			kmem_zone_free(xfs_inode_zone, ip);
@@ -825,9 +918,9 @@ xfs_iread(
 			return error;
 		}
 	} else {
-		ip->i_d.di_magic = dip->di_core.di_magic;
-		ip->i_d.di_version = dip->di_core.di_version;
-		ip->i_d.di_gen = dip->di_core.di_gen;
+		ip->i_d.di_magic = INT_GET(dip->di_core.di_magic, arch);
+		ip->i_d.di_version = INT_GET(dip->di_core.di_version, arch);
+		ip->i_d.di_gen = INT_GET(dip->di_core.di_gen, arch);
 		/*
 		 * Make sure to pull in the mode here as well in
 		 * case the inode is released without being used.
@@ -2736,6 +2829,7 @@ xfs_iflush_fork(
 		{ XFS_ILOG_DDATA, XFS_ILOG_ADATA };
 	static const short	extflag[2] =
 		{ XFS_ILOG_DEXT, XFS_ILOG_AEXT };
+        xfs_arch_t          arch=ip->i_mount->m_arch;
 
 	if (iip == NULL)
 		return 0;
@@ -2748,7 +2842,7 @@ xfs_iflush_fork(
 		ASSERT(whichfork == XFS_ATTR_FORK);
 		return 0;
 	}
-	cp = XFS_DFORK_PTR(dip, whichfork);
+	cp = XFS_DFORK_PTR_ARCH(dip, whichfork, arch);
 	mp = ip->i_mount;
 	switch (XFS_IFORK_FORMAT(ip, whichfork)) {
 	case XFS_DINODE_FMT_LOCAL:
@@ -2801,7 +2895,7 @@ xfs_iflush_fork(
 				XFS_BROOT_SIZE_ADJ));
 			xfs_bmbt_to_bmdr(ifp->if_broot, ifp->if_broot_bytes,
 				(xfs_bmdr_block_t *)cp,
-				XFS_DFORK_SIZE(dip, mp, whichfork));
+				XFS_DFORK_SIZE_ARCH(dip, mp, whichfork, arch));
 #ifdef XFS_TRANS_DEBUG
 			/*
 			 * Just give up and assume we wrote over the entire
@@ -2817,7 +2911,7 @@ xfs_iflush_fork(
 	case XFS_DINODE_FMT_DEV:
 		if (iip->ili_format.ilf_fields & XFS_ILOG_DEV) {
 			ASSERT(whichfork == XFS_DATA_FORK);
-			dip->di_u.di_dev = ip->i_df.if_u2.if_rdev;
+			INT_SET(dip->di_u.di_dev, arch, ip->i_df.if_u2.if_rdev);
 #ifdef XFS_TRANS_DEBUG
 			first = (char*)&(dip->di_u.di_dev) -
 				XFS_BUF_PTR(bp);
@@ -3149,6 +3243,7 @@ xfs_iflush_int(
 #ifdef XFS_TRANS_DEBUG
 	int			first;
 #endif
+        xfs_arch_t  arch;
 	SPLDECL(s);
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE|MR_ACCESS));
@@ -3158,6 +3253,7 @@ xfs_iflush_int(
 
 	iip = ip->i_itemp;
 	mp = ip->i_mount;
+        arch=mp->m_arch;
 
 	/*
 	 * If the inode isn't dirty, then just release the inode
@@ -3187,11 +3283,11 @@ xfs_iflush_int(
 	ip->i_update_core = 0;
 	SYNCHRONIZE();
 
-	if (XFS_TEST_ERROR(dip->di_core.di_magic != XFS_DINODE_MAGIC,
-				mp, XFS_ERRTAG_IFLUSH_1, XFS_RANDOM_IFLUSH_1)) {
+        if (XFS_TEST_ERROR(INT_GET(dip->di_core.di_magic,arch) != XFS_DINODE_MAGIC,
+		               mp, XFS_ERRTAG_IFLUSH_1, XFS_RANDOM_IFLUSH_1)) {
 		xfs_cmn_err(XFS_PTAG_IFLUSH, CE_ALERT, mp,
 		    "xfs_iflush: Bad inode %Lu magic number 0x%x, ptr 0x%p",
-			ip->i_ino, (int) dip->di_core.di_magic, dip);
+			ip->i_ino, (int) INT_GET(dip->di_core.di_magic, arch), dip);
 		goto corrupt_out;
 	}
 	if (XFS_TEST_ERROR(ip->i_d.di_magic != XFS_DINODE_MAGIC,
@@ -3247,7 +3343,8 @@ xfs_iflush_int(
 	 * because if the inode is dirty at all the core must
 	 * be.
 	 */
-	bcopy(&(ip->i_d), &(dip->di_core), sizeof(xfs_dinode_core_t));
+        xfs_xlate_dinode_core((caddr_t)&(dip->di_core), &(ip->i_d),
+                -1, arch);
 #ifdef XFS_TRANS_DEBUG
 	first = (char*)&(dip->di_core) - XFS_BUF_PTR(bp);
 	xfs_buf_item_flush_log_debug(bp, first,
@@ -3268,7 +3365,7 @@ xfs_iflush_int(
 			 * Convert it back.
 			 */
 			ASSERT(ip->i_d.di_nlink <= XFS_MAXLINK_1);
-			dip->di_core.di_onlink = ip->i_d.di_nlink;
+			INT_SET(dip->di_core.di_onlink, arch, ip->i_d.di_nlink);
 		} else {
 			/*
 			 * The superblock version has already been bumped,
@@ -3276,9 +3373,9 @@ xfs_iflush_int(
 			 * format permanent.
 			 */
 			ip->i_d.di_version = XFS_DINODE_VERSION_2;
-			dip->di_core.di_version = XFS_DINODE_VERSION_2;
+			INT_SET(dip->di_core.di_version, arch, XFS_DINODE_VERSION_2);
 			ip->i_d.di_onlink = 0;
-			dip->di_core.di_onlink = 0;
+			INT_ZERO(dip->di_core.di_onlink, arch);
 			bzero(&(ip->i_d.di_pad[0]), sizeof(ip->i_d.di_pad));
 			bzero(&(dip->di_core.di_pad[0]),
 			      sizeof(dip->di_core.di_pad));

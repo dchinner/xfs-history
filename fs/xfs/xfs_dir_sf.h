@@ -69,15 +69,21 @@ typedef struct xfs_dir_sf_sort {
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR_SF_GET_DIRINO)
 void xfs_dir_sf_get_dirino(xfs_dir_ino_t *from, xfs_ino_t *to);
-#define	XFS_DIR_SF_GET_DIRINO(from,to)		xfs_dir_sf_get_dirino(from, to)
+void xfs_dir_sf_get_dirino_arch(xfs_dir_ino_t *from, xfs_ino_t *to, xfs_arch_t arch);
+#define	XFS_DIR_SF_GET_DIRINO_ARCH(from,to,arch)    xfs_dir_sf_get_dirino_arch(from, to, arch)
+#define	XFS_DIR_SF_GET_DIRINO(from,to)		    xfs_dir_sf_get_dirino(from, to)
 #else
-#define	XFS_DIR_SF_GET_DIRINO(from,to)	(*(xfs_dir_ino_t *)(to) = *(from))
+#define	XFS_DIR_SF_GET_DIRINO_ARCH(from,to,arch)    DIRINO_COPY(from,to,arch)	
+#define	XFS_DIR_SF_GET_DIRINO(from,to)	            DIRINO_COPY(from,to,XFS_ARCH_NATIVE)
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR_SF_PUT_DIRINO)
 void xfs_dir_sf_put_dirino(xfs_ino_t *from, xfs_dir_ino_t *to);
-#define	XFS_DIR_SF_PUT_DIRINO(from,to)		xfs_dir_sf_put_dirino(from, to)
+void xfs_dir_sf_put_dirino_arch(xfs_ino_t *from, xfs_dir_ino_t *to, xfs_arch_t arch);
+#define	XFS_DIR_SF_PUT_DIRINO_ARCH(from,to,arch)    xfs_dir_sf_put_dirino_arch(from, to, arch)
+#define	XFS_DIR_SF_PUT_DIRINO(from,to)		    xfs_dir_sf_put_dirino(from, to)
 #else
-#define	XFS_DIR_SF_PUT_DIRINO(from,to)	(*(to) = *(xfs_dir_ino_t *)(from))
+#define	XFS_DIR_SF_PUT_DIRINO_ARCH(from,to,arch)    DIRINO_COPY(from,to,arch)
+#define	XFS_DIR_SF_PUT_DIRINO(from,to)	            DIRINO_COPY(from,to,XFS_ARCH_NATIVE)
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR_SF_ENTSIZE_BYNAME)
 int xfs_dir_sf_entsize_byname(int len);
