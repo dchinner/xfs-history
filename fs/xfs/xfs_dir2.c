@@ -94,17 +94,17 @@ static int	xfs_dir2_put_dirent64_uio(xfs_dir2_put_args_t *pa);
  * Directory operations vector.
  */
 xfs_dirops_t	xfsv2_dirops = {
-	xfs_dir2_mount,
-	xfs_dir2_isempty,
-	xfs_dir2_init,
-	xfs_dir2_createname,
-	xfs_dir2_lookup,
-	xfs_dir2_removename,
-	xfs_dir2_getdents,
-	xfs_dir2_replace,
-	xfs_dir2_canenter,
-	xfs_dir2_shortform_validate_ondisk,
-	xfs_dir2_sf_to_block,
+	xd_mount:			xfs_dir2_mount,
+	xd_isempty:			xfs_dir2_isempty,
+	xd_init:			xfs_dir2_init,
+	xd_createname:			xfs_dir2_createname,
+	xd_lookup:			xfs_dir2_lookup,
+	xd_removename:			xfs_dir2_removename,
+	xd_getdents:			xfs_dir2_getdents,
+	xd_replace:			xfs_dir2_replace,
+	xd_canenter:			xfs_dir2_canenter,
+	xd_shortform_validate_ondisk:	xfs_dir2_shortform_validate_ondisk,
+	xd_shortform_to_single:		xfs_dir2_sf_to_block,
 };
 
 /*

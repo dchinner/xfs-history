@@ -91,23 +91,27 @@ xfs_setsize_fn(
 
 
 xfs_ioops_t	xfs_iocore_xfs = {
-	(xfs_dio_write_t)fs_nosys,   /*(xfs_dio_write_t) xfs_dio_write, */
-	(xfs_dio_read_t)fs_nosys,    /*(xfs_dio_read_t) xfs_dio_read, */
-	(xfs_strat_write_t)fs_nosys, /*(xfs_strat_write_t) xfs_strat_write, */
-	(xfs_bmapi_t) xfs_bmapi,
-	(xfs_bmap_eof_t) xfs_bmap_eof,
-	(xfs_rsync_t) xfs_rsync_fn,
-	(xfs_lck_map_shared_t) xfs_ilock_map_shared,
-	(xfs_lock_t) xfs_ilock,
-	(xfs_lock_demote_t) xfs_ilock_demote,
-	(xfs_lock_nowait_t) xfs_ilock_nowait,
-	(xfs_unlk_t) xfs_iunlock,
-	(xfs_chgtime_t) xfs_ichgtime,
-	(xfs_size_t) xfs_size_fn,
-	(xfs_setsize_t) xfs_setsize_fn,
-	(xfs_lastbyte_t) xfs_file_last_byte,
+/*	xfs_dio_write_func:	(xfs_dio_write_t) xfs_dio_write, */
+	xfs_dio_write_func:	(xfs_dio_write_t)fs_nosys,
+/*	xfs_dio_read_func:	(xfs_dio_read_t) xfs_dio_read, */
+	xfs_dio_read_func:	(xfs_dio_read_t)fs_nosys,
+/*	xfs_strat_write_func:	(xfs_strat_write_t) xfs_strat_write, */
+	xfs_strat_write_func:	(xfs_strat_write_t)fs_nosys,
+	xfs_bmapi_func:		(xfs_bmapi_t) xfs_bmapi,
+	xfs_bmap_eof_func:	(xfs_bmap_eof_t) xfs_bmap_eof,
+	xfs_rsync_func:		(xfs_rsync_t) xfs_rsync_fn,
+	xfs_lck_map_shared:	(xfs_lck_map_shared_t) xfs_ilock_map_shared,
+	xfs_ilock:		(xfs_lock_t) xfs_ilock,
+	xfs_ilock_demote:	(xfs_lock_demote_t) xfs_ilock_demote,
+	xfs_ilock_nowait:	(xfs_lock_nowait_t) xfs_ilock_nowait,
+	xfs_unlock:		(xfs_unlk_t) xfs_iunlock,
+	xfs_chgtime:		(xfs_chgtime_t) xfs_ichgtime,
+	xfs_size_func:		(xfs_size_t) xfs_size_fn,
+	xfs_setsize_func:	(xfs_setsize_t) xfs_setsize_fn,
+	xfs_lastbyte:		(xfs_lastbyte_t) xfs_file_last_byte,
 #ifdef CELL_CAPABLE
-        (xfs_checklock_t) fs_nosys, /* (xfs_checklock_t) xfs_checklock */
+/*	xfs_checklock:		(xfs_checklock_t) xfs_checklock */
+	xfs_checklock:		(xfs_checklock_t) fs_nosys,
 #endif
 };
 
