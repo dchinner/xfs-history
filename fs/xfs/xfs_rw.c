@@ -1034,7 +1034,7 @@ xfs_zero_eof(
 	zero_offset = isize_fsb_offset;
 	zero_len = mp->m_sb.sb_blocksize - isize_fsb_offset;
 	xfs_zero_bp(bp, zero_offset, zero_len);
-	bawrite(bp);
+	bwrite(bp);
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	return;
 }
@@ -1999,6 +1999,24 @@ xfs_strat_write(
 		xfs_ilock(locals->ip, XFS_ILOCK_EXCL);
 		xfs_trans_ijoin(locals->tp, locals->ip, XFS_ILOCK_EXCL);
 		xfs_trans_ihold(locals->tp, locals->ip);
+		
+		/*
+		 * If new_size is greater than the actual size at this
+		 * point, then raise the inode size to equal the new
+		 * size in this transaction.  Before unlocking the inode
+		 * put it back to where it was so it can be moved up
+		 * normally.  We need to do this so that we don't allocate
+		 * space beyond the inode size here, crash, and then
+		 * come back with blocks beyond the EOF.  We don't
+		 * leave it so that error recovery in xfs_write_file()
+		 * can work.
+		 */
+		locals->real_size = locals->ip->i_d.di_size;
+		if (locals->ip->i_new_size > locals->ip->i_d.di_size) {
+			locals->ip->i_d.di_size = locals->ip->i_new_size;
+			xfs_trans_log_inode(locals->tp, locals->ip,
+					    XFS_ILOG_CORE);
+		}
 
 		/*
 		 * Allocate the backing store for the file.
@@ -2025,6 +2043,7 @@ xfs_strat_write(
 		 * invalid.
 		 */
 		XFS_INODE_CLEAR_READ_AHEAD(locals->ip);
+		locals->ip->i_d.di_size = locals->real_size;
 		xfs_iunlock(locals->ip, XFS_ILOCK_EXCL);
 
 		/*
