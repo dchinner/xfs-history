@@ -231,6 +231,7 @@ again:
 		      ip->i_df.if_u2.if_rdev);
 	bhv_desc_init(&(ip->i_bhv_desc), ip, vp, &xfs_vnodeops);
 	bhv_insert_initial(VN_BHV_HEAD(vp), &(ip->i_bhv_desc));
+	VN_CELL_SUPPORT(vp);
 
 	init_mrlock(&ip->i_lock, "xfsino", (long)vp->v_number);
 	init_mrlock(&ip->i_iolock, "xfsio", (long)vp->v_number);
