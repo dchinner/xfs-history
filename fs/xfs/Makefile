@@ -13,8 +13,9 @@ SGI_VERSION = `cat $(WORKAREA)/SPECS/_sgi_kvers_`
 COMMANDS =	cmd/attr cmd/xfsprogs cmd/xfsdump cmd/acl cmd/dmapi
 COMMANDRPMS =	attr attr-devel xfsprogs xfsprogs-devel xfsdump acl acl-devel \
 		dmapi dmapi-devel
+QUOTA_SPEC =	quota-xfs.spec
 
-default all: checkproc tarballs kernel cmds
+default all: checkproc tarballs kernel cmds quota
 
 checkproc:
 	if [ ! -e /proc/stat ]; then \
@@ -38,20 +39,27 @@ ifeq ($(ARCH),i386)
 endif
 	echo "=== Done Making $@ `date`";
 
-cmds:
+cmds: builddirs
 	echo "=== Making $@ `date`"
 	for d in $(COMMANDS); do \
 		( cd $(WORKAREA)/$$d && ./Makepkgs verbose ) || exit 1; \
 		( rpm -Uh $(WORKAREA)/$$d/build/rpm/*.$(ARCH).rpm ) || exit 1; \
 	done
-	[ -d $(WORKAREA)/SRPMS ] || mkdir $(WORKAREA)/SRPMS
 	for d in $(COMMANDS); do \
 		( cd $(WORKAREA) && cp $$d/build/rpm/*.src.rpm SRPMS ) \
 	done
-	[ -d $(WORKAREA)/RPMS/$(ARCH) ] || mkdir -p $(WORKAREA)/RPMS/$(ARCH)
 	for d in $(COMMANDS); do \
 		( cd $(WORKAREA) && cp $$d/build/rpm/*.$(ARCH).rpm RPMS/$(ARCH) ) \
 	done
+
+quota: builddirs
+	@echo "=== Making $@ `date`";
+	rpm -ba --target=$(ARCH) $(WORKAREA)/SPECS/${QUOTA_SPEC};
+
+builddirs:
+	[ -d $(WORKAREA)/BUILD ] || mkdir $(WORKAREA)/BUILD
+	[ -d $(WORKAREA)/SRPMS ] || mkdir $(WORKAREA)/SRPMS
+	[ -d $(WORKAREA)/RPMS/$(ARCH) ] || mkdir -p $(WORKAREA)/RPMS/$(ARCH)
 
 clean:
 	rm -rf RPMS SRPMS BUILD SOURCES/linux-${KERNEL_VERSION}-xfs.patch
