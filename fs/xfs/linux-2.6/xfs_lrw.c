@@ -95,7 +95,7 @@ xfs_rdwr(
 
 	if (read) {
 		ret = pagebuf_generic_file_read(filp, buf, size, offsetp); 
-		/* if (!(ioflag & IO_INVIS)) add this somehow with DMAPI */
+		if (!(filp->f_flags & O_INVISIBLE))
 			xfs_ichgtime(xip, XFS_ICHGTIME_ACC);
 	} else {
 		ret = pagebuf_generic_file_write(filp, buf, size, offsetp);
@@ -114,6 +114,8 @@ xfs_read(
 {
 	ssize_t ret;
 	xfs_fsize_t	n, limit = XFS_MAX_FILE_OFFSET;
+	vnode_t		*vp;
+	xfs_inode_t	*ip;
 
 	n = XFS_MAX_FILE_OFFSET - *offsetp;
 	if (n <= 0)
@@ -121,6 +123,25 @@ xfs_read(
 
 	if (n < size)
 		size = n;
+
+#ifdef CONFIG_XFS_DMAPI
+	vp = BHV_TO_VNODE(bdp);
+	ip = XFS_BHVTOI(bdp);
+
+	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&
+	    !(filp->f_flags & (O_INVISIBLE))) {
+
+		/* linux does not hold a lock across reads */
+		/*vrwlock_t locktype = VRWLOCK_READ;*/
+
+		ret = xfs_dm_send_data_event(DM_EVENT_READ, bdp,
+					     *offsetp, size,
+					     UIO_DELAY_FLAG(filp),
+					     NULL /*&locktype*/);
+		if (ret)
+			return -ret;
+	}
+#endif /* CONFIG_XFS_DMAPI */
 
 	ret = xfs_rdwr(bdp, filp, buf, size, offsetp, 1);
 	return(ret);
@@ -603,7 +624,11 @@ xfs_write(
 	xfs_fsize_t     isize;
 	xfs_fsize_t	n, limit = XFS_MAX_FILE_OFFSET;
 	xfs_iocore_t    *io;
+	vnode_t		*vp;
+	int		eventsent = 0;
+	loff_t		savedsize = *offsetp;
 
+	vp = BHV_TO_VNODE(bdp);
 	xip = XFS_BHVTOI(bdp);
 	io = &(xip->i_iocore);
 	mp = io->io_mount;
@@ -614,6 +639,7 @@ xfs_write(
 	     ("xfsw(%d): ip 0x%p(is 0x%Lx) offset 0x%Lx size 0x%x\n",
 		current->pid, ip, ip->i_size, *offsetp, size));
 
+start:
 	n = limit - *offsetp;
 	if (n <= 0) {
 		xfs_iunlock(xip, XFS_ILOCK_EXCL|XFS_IOLOCK_EXCL);
@@ -622,6 +648,37 @@ xfs_write(
 	if (n < size)
 		size = n;
 
+#ifdef CONFIG_XFS_DMAPI
+	if ((DM_EVENT_ENABLED_IO(vp->v_vfsp, io, DM_EVENT_WRITE) &&
+	    !(filp->f_flags & O_INVISIBLE) && !eventsent)) {
+		vrwlock_t	locktype;
+
+		locktype = (filp->f_flags & O_DIRECT) ?
+			VRWLOCK_WRITE_DIRECT:VRWLOCK_WRITE;
+
+		ret = xfs_dm_send_data_event(DM_EVENT_WRITE, bdp,
+				*offsetp, size,
+				UIO_DELAY_FLAG(filp), &locktype);
+		if (ret) {
+			xfs_iunlock(xip, XFS_ILOCK_EXCL|XFS_IOLOCK_EXCL);
+			return -ret;
+		}
+		eventsent = 1;
+	}
+	/*
+	 * The iolock was dropped and reaquired in
+	 * xfs_dm_send_data_event so we have to recheck the size
+	 *  when appending.  We will only "goto start;" once,
+	 *  since having sent the event prevents another call
+	 *  to xfs_dm_send_data_event, which is what
+	 *  allows the size to change in the first place.
+	 */
+	if ((filp->f_flags & O_APPEND) && savedsize != xip->i_d.di_size) {
+		*offsetp = isize = xip->i_d.di_size;
+		goto start;
+	}
+#endif /* CONFIG_XFS_DMAPI */
+
 	/*
 	 * On Linux, generic_file_write updates the times even if
 	 * no data is copied in so long as the write had a size.
@@ -629,9 +686,10 @@ xfs_write(
 	 * We must update xfs' times since revalidate will overcopy xfs.
 	 */
 	if (size) {
-		/* if (!(ioflag & IO_INVIS)) add this somehow with DMAPI */
+		if (!(filp->f_flags & O_INVISIBLE))
 			xfs_ichgtime(xip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 	}
+
 	/*
 	 * If the offset is beyond the size of the file, we have a couple
 	 * of things to do. First, if there is already space allocated
@@ -652,7 +710,30 @@ xfs_write(
 	}
 	xfs_iunlock(xip, XFS_ILOCK_EXCL);
 
+retry:
 	ret = xfs_rdwr(bdp, filp, buf, size, offsetp, 0);
+
+#ifdef CONFIG_XFS_DMAPI
+	if ((ret == -ENOSPC) &&
+	    DM_EVENT_ENABLED_IO(vp->v_vfsp, io, DM_EVENT_NOSPACE) &&
+	    !(filp->f_flags & O_INVISIBLE)) {
+		vrwlock_t	locktype;
+
+		locktype = (filp->f_flags & O_DIRECT) ?
+			VRWLOCK_WRITE_DIRECT:VRWLOCK_WRITE;
+
+		VOP_RWUNLOCK(vp, locktype);
+		ret = dm_send_namesp_event(DM_EVENT_NOSPACE, bdp,
+				DM_RIGHT_NULL, bdp, DM_RIGHT_NULL, NULL, NULL,
+				0, 0, 0); /* Delay flag intentionally  unused */
+		if (ret)
+			return -ret;
+		VOP_RWLOCK(vp, locktype);
+		*offsetp = ip->i_size;
+		goto retry;
+		
+	}
+#endif /* CONFIG_XFS_DMAPI */
 
 	/* JIMJIM Lock? around the stuff below if Linux doesn't lock above */
 	if (ret > 0) {
