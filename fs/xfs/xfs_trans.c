@@ -2,10 +2,12 @@
 
 #include <sys/param.h>
 #ifdef SIM
-#define _KERNEL
+#define _KERNEL 1
 #endif
 #include <sys/buf.h>
 #include <sys/sysmacros.h>
+#include <sys/sysinfo.h>
+#include <sys/ksa.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -15,7 +17,6 @@
 #include <sys/kmem.h>
 #include <stddef.h>
 #ifndef SIM
-#include <sys/sysinfo.h>
 #include <sys/conf.h>
 #include <sys/user.h>
 #include <sys/systm.h>
@@ -544,6 +545,7 @@ xfs_trans_commit(
 		}
 		xfs_trans_free_items(tp);
 		xfs_trans_free(tp);
+		XFSSTATS.xs_trans_empty++;
 		return;
 	}
 
@@ -619,6 +621,9 @@ xfs_trans_commit(
 	 */
 	if (sync) {
 		xfs_log_force(mp, commit_lsn, XFS_LOG_FORCE | XFS_LOG_SYNC);
+		XFSSTATS.xs_trans_sync++;
+	} else {
+		XFSSTATS.xs_trans_async++;
 	}
 }
 

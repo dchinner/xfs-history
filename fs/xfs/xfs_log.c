@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.93 $"
+#ident	"$Revision: 1.95 $"
 
 /*
  * High level interface routines for log manager
@@ -7,12 +7,14 @@
 #include <sys/param.h>
 
 #ifdef SIM
-#define _KERNEL
+#define _KERNEL 1
 #endif
 
 #include <sys/sysmacros.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
+#include <sys/sysinfo.h>
+#include <sys/ksa.h>
 
 #ifdef SIM
 #undef _KERNEL
@@ -870,6 +872,7 @@ xlog_sync(xlog_t		*log,
 	uint		count;		/* byte count of bwrite */
 	int		split = 0;	/* split write into two regions */
 	
+	XFSSTATS.xs_log_writes++;
 	ASSERT(iclog->ic_refcnt == 0);
 
 	if (flags != 0 && (flags & XFS_LOG_SYNC) )
@@ -898,6 +901,7 @@ xlog_sync(xlog_t		*log,
 
 	/* Add for LR header */
 	count += XLOG_HEADER_SIZE;
+	XFSSTATS.xs_log_blocks += BTOBB(count);
 
 	/* Do we need to split this write into 2 parts? */
 	if (bp->b_blkno + BTOBB(count) > log->l_logBBsize) {

@@ -1,8 +1,6 @@
-
-#include <sys/types.h>
 #include <sys/param.h>
 #ifdef SIM
-#define _KERNEL
+#define _KERNEL 1
 #endif
 #include <sys/mode.h>
 #include <sys/stat.h>
@@ -10,11 +8,11 @@
 #include <sys/sysmacros.h>
 #include <sys/vnode.h>
 #include <sys/grio.h>
+#include <sys/sysinfo.h>
+#include <sys/ksa.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
-#include <sys/sysinfo.h>
-#include <sys/ksa.h>
 #include <sys/debug.h>
 #include <sys/uuid.h>
 #include <sys/kmem.h>
@@ -40,8 +38,6 @@
 #ifdef SIM
 #include "sim.h"
 #endif /* SIM */
-
-struct igetstats	XFS_IGETINFO;
 
 extern struct vnodeops xfs_vnodeops;
 
@@ -141,14 +137,14 @@ xfs_iget(xfs_mount_t	*mp,
 	char		name[8];
 
 	SYSINFO.iget++;
-	XFS_IGETINFO.ig_attempts++;
+	XFSSTATS.xs_ig_attempts++;
 
 	ih = XFS_IHASH(mp, ino);
 again:
 	XFS_IHLOCK(ih);
 	for (ip = ih->ih_next; ip != NULL; ip = ip->i_next) {
 		if (ip->i_ino == ino) {
-			XFS_IGETINFO.ig_found++;
+			XFSSTATS.xs_ig_found++;
 			vp = XFS_ITOV(ip);
 			VMAP(vp, vmap);
 			XFS_IHUNLOCK(ih);
@@ -164,7 +160,7 @@ again:
 			 * least look.
 			 */
 			if (!(vp = vn_get(vp, &vmap))) {
-				XFS_IGETINFO.ig_frecycle++;
+				XFSSTATS.xs_ig_frecycle++;
 				goto again;
 			}
 
@@ -197,7 +193,7 @@ again:
 	 * Inode cache miss: save the hash chain version stamp and unlock
 	 * the chain, so we don't deadlock in vn_alloc.
 	 */
-	XFS_IGETINFO.ig_missed++;
+	XFSSTATS.xs_ig_missed++;
 	version = ih->ih_version;
 	XFS_IHUNLOCK(ih);
 
@@ -232,7 +228,7 @@ again:
 				XFS_IHUNLOCK(ih);
 				vn_free(vp);
 				xfs_idestroy(ip);
-				XFS_IGETINFO.ig_dup++;
+				XFSSTATS.xs_ig_dup++;
 				goto again;
 			}
 		}
@@ -353,7 +349,7 @@ xfs_ireclaim(xfs_inode_t *ip)
 	/*
 	 * Remove from old hash list.
 	 */
-	XFS_IGETINFO.ig_reclaims++;
+	XFSSTATS.xs_ig_reclaims++;
 	ih = ip->i_hash;
 	XFS_IHLOCK(ih);
 	if (iq = ip->i_next) {

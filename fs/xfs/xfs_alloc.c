@@ -5,10 +5,12 @@
  */
 
 #include <sys/param.h>
+#include <sys/sysinfo.h>
 #ifdef SIM
-#define _KERNEL
+#define _KERNEL 1
 #endif
 #include <sys/buf.h>
+#include <sys/ksa.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -531,6 +533,8 @@ xfs_alloc_ag_vextent(
 			xfs_trans_mod_sb(args->tp,
 				args->wasdel ? XFS_TRANS_SB_RES_FDBLOCKS :
 					XFS_TRANS_SB_FDBLOCKS, -slen);
+		XFSSTATS.xs_allocx++;
+		XFSSTATS.xs_allocb += args->len;
 	}
 }
 
@@ -1663,6 +1667,8 @@ xfs_free_ag_extent(
 		xfs_alloc_log_agf(tp, agbp, XFS_AGF_FREEBLKS);
 		if (!isfl)
 			xfs_trans_mod_sb(tp, XFS_TRANS_SB_FDBLOCKS, (int)len);
+		XFSSTATS.xs_freex++;
+		XFSSTATS.xs_freeb += len;
 	}
 	xfs_alloc_trace_free(fname, NULL, mp, agno, bno, len, isfl);
 	return 1;

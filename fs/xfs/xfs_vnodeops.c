@@ -17,6 +17,8 @@
 #include <sys/cred.h>
 #include <sys/grio.h>
 #include <sys/pfdat.h>
+#include <sys/sysinfo.h>
+#include <sys/ksa.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -42,8 +44,6 @@
 #include <sys/stat.h>
 #include <sys/file.h>
 #include <sys/mode.h>
-#include <sys/sysinfo.h>
-#include <sys/ksa.h>
 #include <sys/var.h>
 #include <string.h>
 #include "xfs_types.h"
@@ -232,8 +232,6 @@ STATIC int	xfs_reclaim(vnode_t	*vp,
 			    int		flag);
 
 #ifndef SIM
-
-extern struct igetstats XFS_IGETINFO;
 
 sema_t xfs_ancestormon;		/* initialized in xfs_init */
 
@@ -784,7 +782,7 @@ xfs_setattr(vnode_t	*vp,
 		xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	}
 
-	XFS_IGETINFO.ig_attrchg++;
+	XFSSTATS.xs_ig_attrchg++;
 
 	if (!ip_held)
 		IHOLD (ip);

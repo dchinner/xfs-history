@@ -5,11 +5,15 @@
 #include <sys/kmem.h>
 #include <sys/uio.h>
 #include <sys/debug.h>
+#include <sys/proc.h>
 #ifdef SIM
 #define _KERNEL 1
 #endif /* SIM */
 #include <sys/dirent.h>
 #include <sys/user.h>
+#include <sys/grio.h>
+#include <sys/sysinfo.h>
+#include <sys/ksa.h>
 #ifdef SIM
 #undef _KERNEL
 #include <bstring.h>
@@ -20,14 +24,6 @@
 #include <string.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
-#ifdef SIM
-#define _KERNEL
-#endif
-#include <sys/grio.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
-#include <sys/proc.h>
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
@@ -193,6 +189,7 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	xfsdir_t_reinit("create", __FILE__, __LINE__);
 #endif /* XFSDIRDEBUG */
 
+	XFSSTATS.xs_dir_create++;
 	/*
 	 * Fill in the arg structure for this request.
 	 */
@@ -253,6 +250,7 @@ xfs_dir_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	xfsdir_t_reinit("remove", __FILE__, __LINE__);
 #endif /* XFSDIRDEBUG */
 
+	XFSSTATS.xs_dir_remove++;
 	/*
 	 * Fill in the arg structure for this request.
 	 */
@@ -301,6 +299,7 @@ xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 	xfsdir_t_reinit("lookup", __FILE__, __LINE__);
 #endif /* XFSDIRDEBUG */
 
+	XFSSTATS.xs_dir_lookup++;
 	/*
 	 * Fill in the arg structure for this request.
 	 */
@@ -364,6 +363,7 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	xfsdir_t_reinit("getdents", __FILE__, __LINE__);
 #endif /* XFSDIRDEBUG */
 
+	XFSSTATS.xs_dir_getdents++;
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 	dbp = kmem_alloc(sizeof(*dbp) + MAXNAMELEN, KM_SLEEP);
 	*eofp = 0;

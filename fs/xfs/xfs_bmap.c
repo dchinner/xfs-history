@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.111 $"
+#ident	"$Revision: 1.113 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -20,6 +20,8 @@
 #include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/pfdat.h>
+#include <sys/sysinfo.h>
+#include <sys/ksa.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -352,6 +354,7 @@ xfs_bmap_add_extent(
 	xfs_extnum_t		nextents; /* number of extents in file now */
 	xfs_bmbt_irec_t		prev;	/* old extent at offset idx */
 
+	XFSSTATS.xs_add_exlist++;
 	cur = *curp;
 	nextents = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
 	ASSERT(idx <= nextents);
@@ -1610,6 +1613,7 @@ xfs_bmap_del_extent(
 	xfs_extlen_t		temp;	/* for indirect length calculations */
 	xfs_extlen_t		temp2;	/* for indirect length calculations */
 
+	XFSSTATS.xs_del_exlist++;
 	nextents = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
 	ASSERT(idx >= 0 && idx < nextents);
 	ep = &ip->i_u1.iu_extents[idx];
@@ -2104,6 +2108,7 @@ xfs_bmap_search_extents(
 	int		low;
 	xfs_extnum_t	nextents;
 
+	XFSSTATS.xs_look_exlist++;
 	lastx = ip->i_lastex;
 	nextents = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
 	base = &ip->i_u1.iu_extents[0];
@@ -2130,6 +2135,7 @@ xfs_bmap_search_extents(
 		low = 0;
 		high = nextents - 1;
 		while (low <= high) {
+			XFSSTATS.xs_cmp_exlist++;
 			lastx = (low + high) >> 1;
 			ep = base + lastx;
 			got.br_startoff = xfs_bmbt_get_startoff(ep);
@@ -2740,7 +2746,10 @@ xfs_bmapi(
 	ASSERT(ip->i_d.di_format == XFS_DINODE_FMT_BTREE ||
 	       ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS ||
 	       ip->i_d.di_format == XFS_DINODE_FMT_LOCAL);
-	l->wr = (flags & XFS_BMAPI_WRITE) != 0;
+	if (l->wr = (flags & XFS_BMAPI_WRITE) != 0)
+		XFSSTATS.xs_blk_mapw++;
+	else
+		XFSSTATS.xs_blk_mapr++;
 	l->delay = (flags & XFS_BMAPI_DELAY) != 0;
 	l->trim = (flags & XFS_BMAPI_ENTIRE) == 0;
 	l->userdata = (flags & XFS_BMAPI_METADATA) == 0;
@@ -3101,6 +3110,7 @@ xfs_bunmapi(
 		*done = 1;
 		return firstblock;
 	}
+	XFSSTATS.xs_blk_unmap++;
 	start = bno;
 	bno = start + len - 1;
 	ep = xfs_bmap_search_extents(ip, bno, &eof, &lastx, &got, &prev);

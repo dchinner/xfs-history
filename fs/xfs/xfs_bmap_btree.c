@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.48 $"
+#ident	"$Revision: 1.49 $"
 
 #include <sys/param.h>
 #include <sys/vnode.h>
@@ -18,6 +18,8 @@
 #include <sys/buf.h>
 #include <sys/grio.h>
 #include <sys/ktrace.h>
+#include <sys/sysinfo.h>
+#include <sys/ksa.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -370,6 +372,7 @@ xfs_bmbt_delrec(
 		xfs_bmbt_trace_cursor("xfs_bmbt_delrec exit1", cur);
 		return 0;
 	}
+	XFSSTATS.xs_bmbt_delrec++;
 	if (level > 0) {
 		l->kp = XFS_BMAP_KEY_IADDR(l->block, 1, cur);
 		l->pp = XFS_BMAP_PTR_IADDR(l->block, 1, cur);
@@ -622,6 +625,7 @@ xfs_bmbt_insrec(
 		xfs_bmbt_trace_cursor("xfs_bmbt_insrec exit0", cur);
 		return 0;
 	}
+	XFSSTATS.xs_bmbt_insrec++;
 	l->block = xfs_bmbt_get_block(cur, level, &l->bp);
 	xfs_btree_check_lblock(cur, l->block, level);
 #ifdef DEBUG
@@ -1008,6 +1012,7 @@ xfs_bmbt_lookup(
 	xfs_fileoff_t		startoff;
 	xfs_trans_t		*tp;
 
+	XFSSTATS.xs_bmbt_lookup++;
 	xfs_bmbt_rcheck(cur);
 	xfs_bmbt_kcheck(cur);
 	xfs_bmbt_trace_cursor("xfs_bmbt_lookup entry", cur);
@@ -1048,6 +1053,7 @@ xfs_bmbt_lookup(
 				return 0;
 			}
 			while (low <= high) {
+				XFSSTATS.xs_bmbt_compare++;
 				keyno = (low + high) >> 1;
 				if (level > 0) {
 					kkp = kkbase + keyno - 1;

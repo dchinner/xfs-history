@@ -5,10 +5,12 @@
  */
 
 #include <sys/param.h>
+#include <sys/sysinfo.h>
 #ifdef SIM
-#define _KERNEL
+#define _KERNEL 1
 #endif
 #include <sys/buf.h>
+#include <sys/ksa.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -260,6 +262,7 @@ xfs_alloc_delrec(
 	 */
 	if (ptr > block->bb_numrecs)
 		return 0;
+	XFSSTATS.xs_abt_delrec++;
 	/*
 	 * It's a nonleaf.  Excise the key and ptr being deleted, by
 	 * sliding the entries past them down one.
@@ -672,6 +675,7 @@ xfs_alloc_insrec(
 	 * and we're done.
 	 */
 	if (level >= cur->bc_nlevels) {
+		XFSSTATS.xs_abt_insrec++;
 		i = xfs_alloc_newroot(cur);
 		*bnop = NULLAGBLOCK;
 		kmem_check();
@@ -691,6 +695,7 @@ xfs_alloc_insrec(
 		kmem_check();
 		return 0;
 	}
+	XFSSTATS.xs_abt_insrec++;
 	/*
 	 * Get pointers to the btree buffer and block.
 	 */
@@ -1032,6 +1037,7 @@ xfs_alloc_lookup(
 	int			level;	/* level in the btree */
 	xfs_mount_t		*mp;	/* file system mount point */
 
+	XFSSTATS.xs_abt_lookup++;
 	xfs_alloc_rcheck(cur);
 	xfs_alloc_kcheck(cur);
 	/*
@@ -1124,6 +1130,7 @@ xfs_alloc_lookup(
 				xfs_extlen_t	blockcount;	/* key value */
 				xfs_agblock_t	startblock;	/* key value */
 
+				XFSSTATS.xs_abt_compare++;
 				/*
 				 * keyno is average of low and high.
 				 */
