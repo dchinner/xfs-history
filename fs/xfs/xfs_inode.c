@@ -1,4 +1,4 @@
-#ident "$Revision: 1.222 $"
+#ident "$Revision: 1.223 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -102,7 +102,7 @@ xfs_iformat_extents(
 	xfs_dinode_t	*dip,
 	int		whichfork);
 
-STATIC void
+STATIC int
 xfs_iformat_btree(
 	xfs_inode_t	*ip,
 	xfs_dinode_t	*dip,
@@ -466,7 +466,7 @@ xfs_iformat(
 			error = xfs_iformat_extents(ip, dip, XFS_DATA_FORK);
 			break;
 		case XFS_DINODE_FMT_BTREE:
-			xfs_iformat_btree(ip, dip, XFS_DATA_FORK);
+			error = xfs_iformat_btree(ip, dip, XFS_DATA_FORK);
 			break;
 		default:
 			return XFS_ERROR(EINVAL);
@@ -495,7 +495,7 @@ xfs_iformat(
 		error = xfs_iformat_extents(ip, dip, XFS_ATTR_FORK);
 		break;
 	case XFS_DINODE_FMT_BTREE:
-		xfs_iformat_btree(ip, dip, XFS_ATTR_FORK);
+		error = xfs_iformat_btree(ip, dip, XFS_ATTR_FORK);
 		break;
 	default:
 		error = XFS_ERROR(EINVAL);
@@ -534,6 +534,9 @@ xfs_iformat_local(
 	 * kmem_alloc() or bcopy() below.
 	 */
 	if (size > XFS_DFORK_SIZE(dip, ip->i_mount, whichfork)) {
+		cmn_err(CE_WARN,
+"corrupt inode %lld (local) on filesystem \"%s\".  Unmount and run xfs_repair.\n",
+			ip->i_ino, ip->i_mount->m_fsname);
 		return XFS_ERROR(EIO);
 	}
 	ifp = XFS_IFORK_PTR(ip, whichfork);
@@ -584,6 +587,9 @@ xfs_iformat_extents(
 	 * kmem_alloc() or bcopy() below.
 	 */
 	if (size > XFS_DFORK_SIZE(dip, ip->i_mount, whichfork)) {
+		cmn_err(CE_WARN,
+"corrupt inode %lld (extents) on filesystem \"%s\".  Unmount and run xfs_repair.\n",
+			ip->i_ino, ip->i_mount->m_fsname);
 		return XFS_ERROR(EIO);
 	}
 	real_size = 0;
@@ -592,7 +598,12 @@ xfs_iformat_extents(
 	else if (nex <= XFS_INLINE_EXTS)
 		ifp->if_u1.if_extents = ifp->if_u2.if_inline_ext;
 	else {
-		ifp->if_u1.if_extents = kmem_alloc(size, KM_SLEEP);
+		if ((ifp->if_u1.if_extents = kmem_alloc(size, KM_SLEEP)) == 0) {
+			cmn_err(CE_WARN,
+"couldn't allocate memory to read inode %lld ext list on filesystem \"%s\".\n",
+				ip->i_ino, ip->i_mount->m_fsname);
+			return XFS_ERROR(EIO);
+		}
 		real_size = size;
 	}
 	ifp->if_bytes = size;
@@ -618,7 +629,7 @@ xfs_iformat_extents(
  * field will remain NULL until all of the
  * extents are read in (when they are needed).
  */
-STATIC void
+STATIC int
 xfs_iformat_btree(
 	xfs_inode_t		*ip,
 	xfs_dinode_t		*dip,
@@ -634,9 +645,27 @@ xfs_iformat_btree(
 	dfp = (xfs_bmdr_block_t *)XFS_DFORK_PTR(dip, whichfork);
 	size = XFS_BMAP_BROOT_SPACE(dfp);
 	nrecs = XFS_BMAP_BROOT_NUMRECS(dfp);
-	ASSERT(nrecs > 0);
+
+	/*
+	 * blow out if -- fork has less extents than can fit in
+	 * fork (fork shouldn't be a btree format), root btree
+	 * block has more records than can fit into the fork,
+	 * or the number of extents is greater than the number of
+	 * blocks.
+	 */
+	if (XFS_IFORK_NEXTENTS(ip, whichfork) <= ifp->if_ext_max
+	    || XFS_BMDR_SPACE_CALC(nrecs) >
+			XFS_DFORK_SIZE(dip, ip->i_mount, whichfork)
+	    || XFS_IFORK_NEXTENTS(ip, whichfork) > ip->i_d.di_nblocks) {
+		cmn_err(CE_WARN,
+"corrupt inode %lld (btree) on filesystem \"%s\".  Unmount and run xfs_repair.\n",
+			ip->i_ino, ip->i_mount->m_fsname);
+		return XFS_ERROR(EIO);
+	}
+
 	ifp->if_broot_bytes = size;
-	ifp->if_broot = kmem_alloc(size, KM_SLEEP);
+	if ((ifp->if_broot = kmem_alloc(size, KM_SLEEP)) == 0)
+		return XFS_ERROR(EIO);
 	/*
 	 * Copy and convert from the on-disk structure
 	 * to the in-memory structure.
@@ -645,6 +674,8 @@ xfs_iformat_btree(
 		ifp->if_broot, size);
 	ifp->if_flags &= ~XFS_IFEXTENTS;
 	ifp->if_flags |= XFS_IFBROOT;
+
+	return 0;
 }
 
 /*
@@ -829,7 +860,15 @@ xfs_iread_extents(
 		return XFS_ERROR(EIO);
 	size = XFS_IFORK_NEXTENTS(ip, whichfork) * sizeof(xfs_bmbt_rec_t);
 	ifp = XFS_IFORK_PTR(ip, whichfork);
-	ifp->if_u1.if_extents = kmem_alloc(size, KM_SLEEP);
+	/*
+	 * We know that the size is legal (it's checked in iformat_btree)
+	 */
+	if ((ifp->if_u1.if_extents = kmem_alloc(size, KM_SLEEP)) == 0) {
+		cmn_err(CE_WARN,
+"cannot read in inode %lld btree on filesystem \"%s\".  Couldn't allocate kernel virtual memory for extents.\n",
+			ip->i_ino, ip->i_mount->m_fsname);
+		return XFS_ERROR(EIO);
+	}
 	ifp->if_lastex = NULLEXTNUM;
 	ifp->if_bytes = ifp->if_real_bytes = size;
 	ifp->if_flags |= XFS_IFEXTENTS;
@@ -2549,6 +2588,7 @@ xfs_idestroy(
 #endif /* NOTYET */
 	freesema(&ip->i_flock);
 	sv_destroy(&ip->i_pinsema);
+	spinlock_destroy(&ip->i_ipinlock);
 #ifndef SIM
 #ifdef XFS_BMAP_TRACE
 	ktrace_free(ip->i_xtrace);
@@ -2582,15 +2622,12 @@ xfs_ipin(
 	xfs_inode_t	*ip)
 {
 	int		s;
-	/* REFERENCED */
-	xfs_mount_t	*mp;
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE));
 
-	mp = ip->i_mount;
-	s = mutex_spinlock(&mp->m_ipinlock);
+	s = mutex_spinlock(&ip->i_ipinlock);
 	ip->i_pincount++;
-	mutex_spinunlock(&mp->m_ipinlock, s);
+	mutex_spinunlock(&ip->i_ipinlock, s);
 }
 
 /*
@@ -2603,18 +2640,15 @@ xfs_iunpin(
 	xfs_inode_t	*ip)
 {
 	int		s;
-	/* REFERENCED */
-	xfs_mount_t	*mp;
 
 	ASSERT(ip->i_pincount > 0);
 
-	mp = ip->i_mount;
-	s = mutex_spinlock(&mp->m_ipinlock);
+	s = mutex_spinlock(&ip->i_ipinlock);
 	ip->i_pincount--;
 	if (ip->i_pincount == 0) {
 		sv_broadcast(&ip->i_pinsema);
 	}
-	mutex_spinunlock(&mp->m_ipinlock, s);
+	mutex_spinunlock(&ip->i_ipinlock, s);
 }
 
 /*
@@ -2627,13 +2661,10 @@ xfs_ipincount(
 {
 	int		s;
 	unsigned int	cnt;
-	/* REFERENCED */
-	xfs_mount_t	*mp;
 
-	mp = ip->i_mount;
-	s = mutex_spinlock(&mp->m_ipinlock);
+	s = mutex_spinlock(&ip->i_ipinlock);
 	cnt = ip->i_pincount;
-	mutex_spinunlock(&mp->m_ipinlock, s);
+	mutex_spinunlock(&ip->i_ipinlock, s);
 
 	return cnt;
 }
@@ -2654,7 +2685,6 @@ xfs_iunpin_wait(
 	xfs_inode_t	*ip)
 {
 	int		s;
-	xfs_mount_t	*mp;
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE | MR_ACCESS));
 
@@ -2662,18 +2692,17 @@ xfs_iunpin_wait(
 		return;
 	}
 
-	mp = ip->i_mount;
 	/*
 	 * Give the log a push so we don't wait here too long.
 	 */
-	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
+	xfs_log_force(ip->i_mount, (xfs_lsn_t)0, XFS_LOG_FORCE);
 
-	s = mutex_spinlock(&mp->m_ipinlock);
+	s = mutex_spinlock(&ip->i_ipinlock);
 	if (ip->i_pincount == 0) {
-		mutex_spinunlock(&mp->m_ipinlock, s);
+		mutex_spinunlock(&ip->i_ipinlock, s);
 		return;
 	}
-	sv_wait(&(ip->i_pinsema), PINOD, &mp->m_ipinlock, s);
+	sv_wait(&(ip->i_pinsema), PINOD, &ip->i_ipinlock, s);
 	return;
 }
 
