@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision: 1.84 $"
+#ident "$Revision: 1.85 $"
 
 struct buf;
 struct xfs_efd_log_item;
@@ -579,10 +579,11 @@ typedef struct xfs_trans {
 #define	XFS_IFREE_LOG_RES(mp)	((mp)->m_reservations.tr_ifree)
      
 /*
- * When only changeing the inode we log the inode and we add a
- * bit of slop for the transaction stuff.
+ * When only changeing the inode we log the inode and possibly the superblock
+ * We also add a bit of slop for the transaction stuff.
  */
-#define	XFS_CALC_ICHANGE_LOG_RES(mp)	((mp)->m_sb.sb_inodesize + 512)     
+#define	XFS_CALC_ICHANGE_LOG_RES(mp)	((mp)->m_sb.sb_inodesize + \
+					 (mp)->m_sb.sb_sectsize + 512)
 
 #define	XFS_ICHANGE_LOG_RES(mp)	((mp)->m_reservations.tr_ichange)
      
