@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.18 $"
+#ident	"$Revision: 1.20 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -132,6 +132,7 @@ void	idbg_xlog_rtrans(xlog_recover_t *);
 void	idbg_xlog_tic(xlog_ticket_t *);
 void	idbg_xlogitem(xfs_log_item_t *);
 void	idbg_xmount(xfs_mount_t *);
+void	idbg_xtrans_res(xfs_mount_t *);
 void 	idbg_xnode(xfs_inode_t *ip);
 void	idbg_xperag(xfs_mount_t *);
 #ifdef NOTYET
@@ -216,6 +217,7 @@ static struct xif {
     "xlog",	VD idbg_xlog,		"Dump XFS log",
     "xlogitm",	VD idbg_xlogitem,	"Dump XFS log item structure",
     "xmount",	VD idbg_xmount,		"Dump XFS mount structure",
+    "xtrres",	VD idbg_xtrans_res,	"Dump XFS reservation values",
     "xnode",	VD idbg_xnode,		"Dump XFS inode",
     "xperag",	VD idbg_xperag,		"Dump XFS per-allocation group data",
 #ifdef NOTYET
@@ -2644,6 +2646,26 @@ idbg_xmount(xfs_mount_t *mp)
 	printflags(mp->m_flags, xmount_flags,"mount");
 	qprintf("\n");
 }
+
+void
+idbg_xtrans_res(
+	xfs_mount_t	*mp)
+{
+	xfs_trans_reservations_t	*xtrp;
+
+	xtrp = &mp->m_reservations;
+	qprintf("write: %d\ttruncate: %d\trename: %d\n",
+		xtrp->tr_write, xtrp->tr_itruncate, xtrp->tr_rename);
+	qprintf("link: %d\tremove: %d\tsymlink: %d\n",
+		xtrp->tr_link, xtrp->tr_remove, xtrp->tr_symlink);
+	qprintf("create: %d\tmkdir: %d\tifree: %d\n",
+		xtrp->tr_create, xtrp->tr_mkdir, xtrp->tr_ifree);
+	qprintf("ichange: %d\tgrowdata: %d\tswrite: %d\n",
+		xtrp->tr_ichange, xtrp->tr_growdata, xtrp->tr_swrite);
+	qprintf("addafork: %d\twriteid: %d\tainval: %d\n",
+		xtrp->tr_addafork, xtrp->tr_writeid, xtrp->tr_ainval);
+}
+		
 
 /*
  * Command to print xfs inodes: kp xnode <addr>
