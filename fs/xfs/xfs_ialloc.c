@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.59 $"
+#ident	"$Revision: 1.60 $"
 
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -482,7 +482,10 @@ xfs_dialloc(
 	}
 	/*
 	 * Here with an allocation group that has a free inode.
+	 * Reset agno since we may have chosen a new ag in the
+	 * loop above.
 	 */
+	agno = tagno;
 	*IO_agbp = NULL;
 	cur = xfs_btree_init_cursor(mp, tp, agbp, agi->agi_seqno, XFS_BTNUM_INO,
 		(xfs_inode_t *)0);
@@ -635,7 +638,7 @@ xfs_dialloc(
 	offset = XFS_IALLOC_FIND_FREE(&rec.ir_free);
 	ASSERT(offset >= 0);
 	ASSERT(XFS_AGINO_TO_OFFSET(mp, rec.ir_startino) == 0);
-	ino = XFS_AGINO_TO_INO(mp, tagno, rec.ir_startino + offset);
+	ino = XFS_AGINO_TO_INO(mp, agno, rec.ir_startino + offset);
 	XFS_INOBT_CLR_FREE(&rec, offset);
 	rec.ir_freecount--;
 	xfs_inobt_update(cur, rec.ir_startino, rec.ir_freecount, rec.ir_free);
