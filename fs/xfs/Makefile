@@ -2,11 +2,13 @@
 # Top-level Makefile for slinx
 #
 
+WORKAREA ?= `pwd`
+
 KERN_SPECS = kernel-2.4.spec
 
 SGI_VERSION = `cat $(WORKAREA)/SPECS/_sgi_kvers_`
 
-default all: checkproc tarballs headers i686kernel i386cmd
+default all: checkproc tarballs i386kernel i686kernel i386cmd
 
 checkproc:
 	if [ ! -e /proc/stat ]; then \
@@ -30,15 +32,6 @@ i686kernel:
 	cd $(WORKAREA)/SPECS; \
 	rpm -ba --target i686 ${KERN_SPECS}; \
 	echo "=== Done Making $@ `date`"
-
-headers:i386kernel
-	if [ -f `ls $(WORKAREA)/RPMS/i386/kernel-headers*.rpm` ] ; then \
-		cd $(WORKAREA); \
-		for header in $(WORKAREA)/RPMS/i386/kernel-headers*.rpm; do \
-			echo "=== Installing $$header ==="; \
-			rpm -Uh --force --nodeps --root / $$header; \
-		done; \
-	fi
 
 i386cmd: xfs-cmds
 	[ ! -d $(WORKAREA)/SRPMS ] \
