@@ -123,7 +123,6 @@ xfs_iget(xfs_mount_t	*mp,
 	vnode_t		*vp;
 	ulong		version;
 	vmap_t		vmap;
-	int		s;
 	char		name[8];
 
 	SYSINFO.iget++;
@@ -239,14 +238,14 @@ again:
 	 * Link ip to its mount and thread it on the mount's inode list.
 	 */
 	ip->i_mount = mp;
-	s = XFS_MOUNT_ILOCK(mp);
+	XFS_MOUNT_ILOCK(mp);
 	if (iq = mp->m_inodes) {
 		iq->i_mprevp = &ip->i_mnext;
 	}
 	ip->i_mnext = iq;
 	ip->i_mprevp = &mp->m_inodes;
 	mp->m_inodes = ip;
-	XFS_MOUNT_IUNLOCK(mp, s);
+	XFS_MOUNT_IUNLOCK(mp);
 
 out:
 	return ip;
@@ -349,12 +348,25 @@ xfs_ireclaim(xfs_inode_t *ip)
 	 * Remove from mount's inode list.
 	 */
 	mp = ip->i_mount;
-	s = XFS_MOUNT_ILOCK(mp);
+	XFS_MOUNT_ILOCK(mp);
 	if (iq = ip->i_mnext) {
 		iq->i_mprevp = ip->i_mprevp;
 	}
 	*ip->i_mprevp = iq;
-	XFS_MOUNT_IUNLOCK(mp, s);
+	mp->m_ireclaims++;
+	XFS_MOUNT_IUNLOCK(mp);
+
+	/*
+	 * Here we do a spurious inode lock in order to coordinate with
+	 * xfs_sync().  This is because xfs_sync() references the inodes
+	 * in the mount list without taking references on the corresponding
+	 * vnodes.  We make that OK here by ensuring that we wait until
+	 * the inode is unlocked in xfs_sync() before we go ahead and
+	 * free it.  We get both the regular lock and the io lock because
+	 * the xfs_sync() code may need to drop the regular one but will
+	 * still hold the io lock.
+	 */
+	xfs_ilock(ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 
 	/*
 	 * Free all memory associated with the inode.
