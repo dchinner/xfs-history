@@ -336,7 +336,7 @@ xfs_trans_log_inode(xfs_trans_t	*tp,
 	lidp->lid_flags |= XFS_LID_DIRTY;
 
 	if (ip->i_item.ili_format.ilf_fields == 0) {
-		ASSERT(ip->i_item.ili_ref == 0);
+		ASSERT(ip->i_item.ili_logged == 0);
 		vn_hold(XFS_ITOV(ip));
 	}
 	ip->i_item.ili_format.ilf_fields |= flags;
