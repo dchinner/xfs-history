@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.105 $"
+#ident	"$Revision: 1.108 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -297,7 +297,7 @@ xfs_ialloc_ag_alloc(
 		 */
 		d = XFS_AGB_TO_DADDR(args.mp, agi->agi_seqno,
 				     args.agbno + (j * blks_per_cluster));
-		fbuf = xfs_trans_get_buf(tp, args.mp->m_dev, d,
+		fbuf = xfs_trans_get_buf(tp, args.mp->m_ddev_targp, d,
 					 args.mp->m_bsize * blks_per_cluster,
 					 0);
 		ASSERT(fbuf);

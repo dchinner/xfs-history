@@ -1,4 +1,4 @@
-#ident "$Revision: 1.52 $"
+#ident "$Revision: 1.53 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -70,7 +70,7 @@ xfs_trans_buf_item_match(
  */
 buf_t *
 xfs_trans_get_buf(xfs_trans_t	*tp,
-		  dev_t		dev,
+		  buftarg_t	*target_dev,
 		  daddr_t	blkno,
 		  int		len,
 		  uint		flags)
@@ -90,9 +90,11 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 		/*
 		 * There's no bdflush daemon in simulation.
 		 */
-		return (get_buf(dev, blkno, len, flags));
+		return (get_buf(target_dev->dev, blkno, len, flags));
 #else
-		return (get_buf(dev, blkno, len, flags | BUF_BUSY));
+		bp = get_buf(target_dev->dev, blkno, len, flags | BUF_BUSY);
+		bp->b_target = target_dev;
+		return(bp);
 #endif
 	}
 
@@ -103,11 +105,12 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	 * recursion count and return the buffer to the caller.
 	 */
 	if (tp->t_items.lic_next == NULL) {
-		bp = xfs_trans_buf_item_match(tp, dev, blkno, len);
+		bp = xfs_trans_buf_item_match(tp, target_dev->dev, blkno, len);
 	} else {
-		bp = incore_match(dev, blkno, len, BUF_FSPRIV2, tp);
+		bp = incore_match(target_dev->dev, blkno, len, BUF_FSPRIV2, tp);
 	}
 	if (bp != NULL) {
+		bp->b_target = target_dev;
 		if (XFS_FORCED_SHUTDOWN(tp->t_mountp)) {
 			bp->b_flags &= ~(B_DONE|B_DELWRI);
 			bp->b_flags |= B_STALE;
@@ -130,13 +133,14 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	 * us to run out of stack space.
 	 */
 #ifdef SIM
-	bp = get_buf(dev, blkno, len, flags);
+	bp = get_buf(target_dev->dev, blkno, len, flags);
 #else
-	bp = get_buf(dev, blkno, len, flags | BUF_BUSY);
+	bp = get_buf(target_dev->dev, blkno, len, flags | BUF_BUSY);
 #endif
 	if (bp == NULL) {
 		return NULL;
 	}
+	bp->b_target = target_dev;
 
 	ASSERT(!geterror(bp));
 
@@ -312,7 +316,10 @@ xfs_trans_read_buf(
 		 */
 		bp = read_buf(dev, blkno, len, flags);
 #else
-		bp = read_buf(dev, blkno, len, flags | BUF_BUSY);
+		bp = read_buf_targ(mp->m_ddev_targp, blkno, len,
+			      flags | BUF_BUSY);
+		ASSERT(bp->b_target);
+		ASSERT(bp->b_edev == dev);
 #endif
 		if ((bp != NULL) && (geterror(bp) != 0)) {
 			xfs_ioerror_alert("xfs_trans_read_buf", mp, dev, blkno);
@@ -354,6 +361,7 @@ xfs_trans_read_buf(
 		ASSERT(bp->b_fsprivate2 == tp);
 		ASSERT(bp->b_fsprivate != NULL);
 		ASSERT((bp->b_flags & B_ERROR) == 0);
+		bp->b_target = mp->m_ddev_targp;
 		if (!(bp->b_flags & B_DONE)) {
 			ASSERT(0);
 #ifndef SIM
@@ -420,7 +428,7 @@ xfs_trans_read_buf(
 #ifdef SIM
 	bp = read_buf(dev, blkno, len, flags);
 #else
-	bp = read_buf(dev, blkno, len, flags | BUF_BUSY);
+	bp = read_buf_targ(mp->m_ddev_targp, blkno, len, flags | BUF_BUSY);
 #endif
 	if (bp == NULL) {
 		*bpp = NULL;

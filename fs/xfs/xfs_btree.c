@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.55 $"
+#ident	"$Revision: 1.57 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -484,7 +484,7 @@ xfs_btree_get_bufl(
 
 	ASSERT(fsbno != NULLFSBLOCK);
 	d = XFS_FSB_TO_DADDR(mp, fsbno);
-	bp = xfs_trans_get_buf(tp, mp->m_dev, d, mp->m_bsize, lock);
+	bp = xfs_trans_get_buf(tp, mp->m_ddev_targp, d, mp->m_bsize, lock);
 	ASSERT(bp);
 	ASSERT(!geterror(bp));
 	return bp;
@@ -508,7 +508,7 @@ xfs_btree_get_bufs(
 	ASSERT(agno != NULLAGNUMBER);
 	ASSERT(agbno != NULLAGBLOCK);
 	d = XFS_AGB_TO_DADDR(mp, agno, agbno);
-	bp = xfs_trans_get_buf(tp, mp->m_dev, d, mp->m_bsize, lock);
+	bp = xfs_trans_get_buf(tp, mp->m_ddev_targp, d, mp->m_bsize, lock);
 	ASSERT(bp);
 	ASSERT(!geterror(bp));
 	return bp;
@@ -763,7 +763,7 @@ xfs_btree_reada_bufl(
 	ASSERT(fsbno != NULLFSBLOCK);
 #ifndef SIM
 	d = XFS_FSB_TO_DADDR(mp, fsbno);
-	baread(mp->m_dev, d, mp->m_bsize * count);
+	baread(mp->m_ddev_targp, d, mp->m_bsize * count);
 #endif
 }
 
@@ -787,7 +787,7 @@ xfs_btree_reada_bufs(
 	ASSERT(agbno != NULLAGBLOCK);
 #ifndef SIM
 	d = XFS_AGB_TO_DADDR(mp, agno, agbno);
-	baread(mp->m_dev, d, mp->m_bsize * count);
+	baread(mp->m_ddev_targp, d, mp->m_bsize * count);
 #endif
 }
 

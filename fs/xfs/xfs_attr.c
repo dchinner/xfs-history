@@ -1,4 +1,4 @@
-#ident "$Revision: 1.50 $"
+#ident "$Revision: 1.51 $"
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/buf.h>
@@ -1767,8 +1767,8 @@ xfs_attr_rmtval_get(xfs_da_args_t *args)
 			       (map[i].br_startblock != HOLESTARTBLOCK));
 			dblkno = XFS_FSB_TO_DADDR(mp, map[i].br_startblock);
 			blkcnt = XFS_FSB_TO_BB(mp, map[i].br_blockcount);
-			error = xfs_read_buf(mp, mp->m_dev, dblkno, blkcnt,
-					     0, &bp);
+			error = xfs_read_buf(mp, mp->m_ddev_targp, dblkno,
+					     blkcnt, 0, &bp);
 			if (error)
 				return(error);
 
@@ -1897,6 +1897,7 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 		bp = get_buf(mp->m_dev, dblkno, blkcnt, 0);
 		ASSERT(bp);
 		ASSERT(!geterror(bp));
+		bp->b_target = mp->m_ddev_targp;
 
 		tmp = (valuelen < bp->b_bufsize) ? valuelen : bp->b_bufsize;
 		bcopy(src, bp->b_un.b_addr, tmp);

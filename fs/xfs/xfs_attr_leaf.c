@@ -2628,7 +2628,8 @@ xfs_attr_leaf_freextent(xfs_trans_t **trans, xfs_inode_t *dp,
 						  map.br_startblock);
 			dblkcnt = XFS_FSB_TO_BB(dp->i_mount,
 						map.br_blockcount);
-			bp = xfs_trans_get_buf(*trans, dp->i_mount->m_dev,
+			bp = xfs_trans_get_buf(*trans,
+					dp->i_mount->m_ddev_targp,
 					dblkno, dblkcnt, 0);
 			xfs_trans_binval(*trans, bp);
 			/*

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.24 $"
+#ident	"$Revision: 1.26 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -89,7 +89,7 @@ xfs_growfs_data(
 	if (nb < mp->m_sb.sb_dblocks || pct < 0 || pct > 100)
 		return XFS_ERROR(EINVAL);
 	dpct = pct - mp->m_sb.sb_imax_pct;
-	error = xfs_read_buf(mp, mp->m_dev, XFS_FSB_TO_BB(mp, nb) - 1, 1, 0, 
+	error = xfs_read_buf(mp, mp->m_ddev_targp, XFS_FSB_TO_BB(mp, nb) - 1, 1, 0, 
 			     &bp);
 	if (error)
 		return error;
@@ -129,6 +129,7 @@ xfs_growfs_data(
 		 */
 		bp = get_buf(mp->m_dev, XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR),
 			     sectbb, 0);
+		bp->b_target =  mp->m_ddev_targp;
 		agf = XFS_BUF_TO_AGF(bp);
 		bzero(agf, mp->m_sb.sb_sectsize);
 		agf->agf_magicnum = XFS_AGF_MAGIC;
@@ -156,6 +157,7 @@ xfs_growfs_data(
 		 * AG inode header block
 		 */
 		bp = get_buf(mp->m_dev, XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR), sectbb, 0);
+		bp->b_target =  mp->m_ddev_targp;
 		agi = XFS_BUF_TO_AGI(bp);
 		bzero(agi, mp->m_sb.sb_sectsize);
 		agi->agi_magicnum = XFS_AGI_MAGIC;
@@ -180,6 +182,7 @@ xfs_growfs_data(
 		bp = get_buf(mp->m_dev,
 			XFS_AGB_TO_DADDR(mp, agno, XFS_BNO_BLOCK(mp)),
 			BTOBB(bsize), 0);
+		bp->b_target =  mp->m_ddev_targp;
 		block = XFS_BUF_TO_SBLOCK(bp);
 		bzero(block, bsize);
 		block->bb_magic = XFS_ABTB_MAGIC;
@@ -200,6 +203,7 @@ xfs_growfs_data(
 		bp = get_buf(mp->m_dev,
 			XFS_AGB_TO_DADDR(mp, agno, XFS_CNT_BLOCK(mp)),
 			BTOBB(bsize), 0);
+		bp->b_target =  mp->m_ddev_targp;
 		block = XFS_BUF_TO_SBLOCK(bp);
 		bzero(block, bsize);
 		block->bb_magic = XFS_ABTC_MAGIC;
@@ -287,7 +291,7 @@ xfs_growfs_data(
 	else
 		mp->m_maxicount = 0;
 	for (agno = 1; agno < nagcount; agno++) {
-	        error = xfs_read_buf(mp, mp->m_dev,
+	        error = xfs_read_buf(mp, mp->m_ddev_targp,
 				  XFS_AGB_TO_DADDR(mp, agno, XFS_SB_BLOCK(mp)),
 				  BTOBB(bsize), 0, &bp);
 		if (error) {

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.28 $"
+#ident "$Revision: 1.29 $"
 
 
 #include <sys/param.h>
@@ -1720,7 +1720,7 @@ xfs_qm_dqiterate(
 				rablkcnt =  map[i+1].br_blockcount;
 				rablkno = map[i+1].br_startblock;
 				while (rablkcnt--) {
-					baread(mp->m_dev,
+					baread(mp->m_ddev_targp,
 					       XFS_FSB_TO_DADDR(mp, rablkno),
 					       (int)XFS_QI_DQCHUNKLEN(mp));
 					rablkno++;

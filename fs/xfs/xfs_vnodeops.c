@@ -1,4 +1,4 @@
-#ident "$Revision: 1.354 $"
+#ident "$Revision: 1.356 $"
 
 
 #ifdef SIM
@@ -1302,7 +1302,8 @@ xfs_readlink(
                 for (n = 0; n < nmaps; n++) {
                         d = XFS_FSB_TO_DADDR(mp, mval[n].br_startblock);
                         byte_cnt = XFS_FSB_TO_B(mp, mval[n].br_blockcount);
-                        bp = read_buf(mp->m_dev, d, BTOBB(byte_cnt), 0);
+                        bp = read_buf_targ(mp->m_ddev_targp, d,
+				      BTOBB(byte_cnt), 0);
 			error = geterror(bp);
 			if (error) {
 				brelse(bp);
@@ -1784,7 +1785,7 @@ xfs_inactive_symlink_rmt(
 		goto error0;
 		
 	for (i = 0; i < nmaps; i++) {
-		bp = xfs_trans_get_buf(tp, mp->m_dev,
+		bp = xfs_trans_get_buf(tp, mp->m_ddev_targp,
 				       XFS_FSB_TO_DADDR(mp,
 							mval[i].br_startblock),
 				       XFS_FSB_TO_BB(mp,
@@ -4693,7 +4694,7 @@ xfs_symlink(
 		for (n = 0; n < nmaps; n++) {
 			d = XFS_FSB_TO_DADDR(mp, mval[n].br_startblock);
 			byte_cnt = XFS_FSB_TO_B(mp, mval[n].br_blockcount);
-			bp = xfs_trans_get_buf(tp, mp->m_dev, d, 
+			bp = xfs_trans_get_buf(tp, mp->m_ddev_targp, d, 
 					       BTOBB(byte_cnt), 0);
 			ASSERT(bp && !geterror(bp));
 			if (pathlen < byte_cnt) {
@@ -5909,6 +5910,7 @@ xfs_zero_remaining_bytes(
 	bp = ngetrbuf(mp->m_sb.sb_blocksize);
 	ASSERT(!geterror(bp));
 	bp->b_edev = mp->m_dev;
+	bp->b_target = mp->m_ddev_targp;
 	for (offset = startoff; offset <= endoff; offset = lastoffset + 1) {
 		offset_fsb = XFS_B_TO_FSBT(mp, offset);
 		nimap = 1;

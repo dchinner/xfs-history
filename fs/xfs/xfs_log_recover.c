@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.125 $"
+#ident	"$Revision: 1.126 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -142,6 +142,7 @@ xlog_bread(xlog_t	*log,
 	bp->b_flags	= B_READ|B_BUSY;
 	bp->b_bcount	= BBTOB(nbblks);
 	bp->b_edev	= log->l_dev;
+	bp->b_target	= &log->l_mp->m_logdev_targ;
 
 #ifndef SIM
 	bp_dcache_wbinval(bp);
@@ -177,6 +178,7 @@ xlog_bwrite(
 	bp->b_flags	= B_BUSY | B_HOLD;
 	bp->b_bcount	= BBTOB(nbblks);
 	bp->b_edev	= log->l_dev;
+	bp->b_target	= &log->l_mp->m_logdev_targ;
 
 	if (error = xfs_bwrite(log->l_mp, bp)) 
 		xfs_ioerror_alert("xlog_bwrite", log->l_mp, 
@@ -1804,7 +1806,7 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	}
 
 	mp = log->l_mp;
-	bp = bread(mp->m_dev, blkno, len);
+	bp = read_buf_targ(mp->m_ddev_targp, blkno, len, 0);
 	if (bp->b_flags & B_ERROR) {
 		xfs_ioerror_alert("xlog_recover_do..(read)", log->l_mp, 
 				  mp->m_dev, blkno);
@@ -1899,7 +1901,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		imap.im_blkno = 0;
 		xfs_imap(log->l_mp, 0, ino, &imap, 0);
 	}
-	bp = bread(mp->m_dev, imap.im_blkno, imap.im_len);
+	bp = read_buf_targ(mp->m_ddev_targp, imap.im_blkno, imap.im_len, 0);
 	if (bp->b_flags & B_ERROR) {
 		xfs_ioerror_alert("xlog_recover_do..(read)", mp, 
 				  mp->m_dev, imap.im_blkno);
@@ -2180,7 +2182,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 	}
 	ASSERT(dq_f->qlf_len == 1);
 	
-	error = xfs_read_buf(mp, mp->m_dev, 
+	error = xfs_read_buf(mp, mp->m_ddev_targp,
 			     dq_f->qlf_blkno, 
 			     XFS_FSB_TO_BB(mp, dq_f->qlf_len),
 			     0, &bp);
@@ -2785,7 +2787,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 		 * Find the agi for this ag.
 		 */
 		agidaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
-		agibp = read_buf(mp->m_dev, agidaddr, 1, 0);
+		agibp = read_buf_targ(mp->m_ddev_targp, agidaddr, 1, 0);
 		agi = XFS_BUF_TO_AGI(agibp);
 		ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
 
@@ -2855,7 +2857,8 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 			 * the loop.
 			 */
 			agidaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
-			agibp = read_buf(mp->m_dev, agidaddr, 1, 0);
+			agibp = read_buf_targ(mp->m_ddev_targp,
+					 agidaddr, 1, 0);
 			agi = XFS_BUF_TO_AGI(agibp);
 			ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
 		}
@@ -3331,7 +3334,7 @@ xlog_recover_check_summary(xlog_t	*log)
 	ifree = 0LL;
 	for (agno = 0; agno < mp->m_sb.sb_agcount; agno++) {
 		agfdaddr = XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR);
-		agfbp = read_buf(mp->m_dev, agfdaddr, 1, 0);
+		agfbp = read_buf_targ(mp->m_ddev_targp, agfdaddr, 1, 0);
 		agfp = XFS_BUF_TO_AGF(agfbp);
 		ASSERT(agfp->agf_magicnum == XFS_AGF_MAGIC);
 		ASSERT(XFS_AGF_GOOD_VERSION(agfp->agf_versionnum));
@@ -3341,7 +3344,7 @@ xlog_recover_check_summary(xlog_t	*log)
 		brelse(agfbp);
 
 		agidaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
-		agibp = read_buf(mp->m_dev, agidaddr, 1, 0);
+		agibp = read_buf_targ(mp->m_ddev_targp, agidaddr, 1, 0);
 		agip = XFS_BUF_TO_AGI(agibp);
 		ASSERT(agip->agi_magicnum == XFS_AGI_MAGIC);
 		ASSERT(XFS_AGI_GOOD_VERSION(agip->agi_versionnum));

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.150 $"
+#ident	"$Revision: 1.151 $"
 
 /*
  * High level interface routines for log manager
@@ -898,14 +898,23 @@ STATIC int
 xlog_bdstrat_cb(struct buf *bp)
 {
 	xlog_in_core_t *iclog;
-	struct bdevsw	*my_bdevsw;
 
 	iclog = (xlog_in_core_t *)(bp->b_fsprivate);
 
 	if ((iclog->ic_state & XLOG_STATE_IOERROR) == 0) {
-		my_bdevsw = get_bdevsw(bp->b_edev);
+#ifdef CELL_IRIX
+		vnode_t *vp;
+
+		vp = bp->b_target->specvp;
+		ASSERT(vp);
+		VOP_STRATEGY(vp, bp);
+#else
+		struct bdevsw	*my_bdevsw;
+
+		my_bdevsw = bp->b_target->bdevsw;
 		ASSERT(my_bdevsw != NULL);
 		bdstrat(my_bdevsw, bp);
+#endif
 		return 0;
 	} 
 
@@ -1073,6 +1082,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	xlog_get_iclog_buffer_size(mp, log);
 	bp = log->l_xbuf   = getrbuf(0);	/* get my locked buffer */
 	bp->b_edev	   = log_dev;
+	bp->b_target	   = &mp->m_logdev_targ;
 	bp->b_bufsize	   = log->l_iclog_size;
 	bp->b_iodone	   = xlog_iodone;
 	bp->b_bdstrat	   = xlog_bdstrat_cb;
@@ -1116,6 +1126,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 
 		bp = iclog->ic_bp = getrbuf(0);		/* my locked buffer */
 		bp->b_edev = log_dev;
+		bp->b_target = &mp->m_logdev_targ;
 		bp->b_bufsize = log->l_iclog_size;
 		bp->b_iodone = xlog_iodone;
 		bp->b_bdstrat = xlog_bdstrat_cb;

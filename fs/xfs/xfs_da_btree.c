@@ -1754,7 +1754,7 @@ xfs_da_get_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,
 	ASSERT(map.br_startblock == fsb);
 	if (fsb == NULLFSBLOCK)
 		return XFS_ERROR(EFSCORRUPTED);
-	bp = xfs_trans_get_buf(trans, dp->i_mount->m_dev,
+	bp = xfs_trans_get_buf(trans, dp->i_mount->m_ddev_targp,
 				      XFS_FSB_TO_DADDR(dp->i_mount, fsb),
 				      dp->i_mount->m_bsize, 0);
 	ASSERT(bp);
@@ -1865,7 +1865,7 @@ xfs_da_reada_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,
 	mp = dp->i_mount;
 	ASSERT(mp != NULL);
 	rval = XFS_FSB_TO_DADDR(mp, fsb);
-	baread(mp->m_dev, rval, mp->m_bsize);
+	baread(mp->m_ddev_targp, rval, mp->m_bsize);
 	return rval;
 }
 #endif	/* !SIM */

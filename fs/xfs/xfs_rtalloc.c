@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.41 $"
+#ident	"$Revision: 1.42 $"
 
 /*
  * Free realtime space allocation for XFS.
@@ -451,7 +451,7 @@ xfs_growfs_rt_alloc(
 			 * Get a buffer for the block.
 			 */
 			d = XFS_FSB_TO_DADDR(mp, fsbno);
-			bp = xfs_trans_get_buf(tp, mp->m_dev, d,
+			bp = xfs_trans_get_buf(tp, mp->m_ddev_targp, d,
 				mp->m_bsize, 0);
 			if (bp == NULL) {
 				error = XFS_ERROR(EIO);
@@ -2217,7 +2217,7 @@ xfs_growfs_rt(
 	/*
 	 * Read in the last block of the device, make sure it exists.
 	 */
-	error = xfs_read_buf(mp, mp->m_rtdev,
+	error = xfs_read_buf(mp, &mp->m_rtdev_targ,
 		XFS_FSB_TO_BB(mp, in->newblocks) - 1, 1, 0, &bp);
 	if (error)
 		return error;
@@ -2569,7 +2569,7 @@ xfs_rtmount_init(
 	d = (daddr_t)XFS_FSB_TO_BB(mp, mp->m_sb.sb_rblocks);
 	if (XFS_BB_TO_FSB(mp, d) != mp->m_sb.sb_rblocks)
 		return XFS_ERROR(E2BIG);
-	error = xfs_read_buf(mp, mp->m_rtdev, d - 1, 1, 0, &bp);
+	error = xfs_read_buf(mp, &mp->m_rtdev_targ, d - 1, 1, 0, &bp);
 	if (error == ENOSPC)
 		return XFS_ERROR(E2BIG);
 	else if (error)
