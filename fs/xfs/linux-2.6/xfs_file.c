@@ -2,12 +2,14 @@
  *  fs/xfs/xfs_linux_ops_file.c
  *
  */
-#include <sys/types.h>
+#define FSID_T
 #include <sys/cred.h>
 #include <linux/errno.h>
 
 #include "xfs_coda_oops.h"
 
+#undef NODEV
+/* shut up warning about redefining */
 #include <linux/fs.h>
 #include <linux/dcache.h>
 #include <linux/sched.h>	/* To get current */

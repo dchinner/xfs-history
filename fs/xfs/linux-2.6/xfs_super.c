@@ -4,14 +4,15 @@
  */
 
 /* Don't want anything from linux/capability.h. We need the stuff from IRIX */
-
-#include <sys/types.h>
+#define FSID_T /* wrapper hack... border files have type problems */
+#include <sys/types.h> 
 
 #include <linux/module.h>
 #include <linux/errno.h>
 
 #include "xfs_coda_oops.h"
 
+#undef  NODEV
 #include <linux/fs.h>
 #include <linux/sched.h>
 #include <linux/locks.h>
@@ -31,7 +32,8 @@
 #undef MS_REMOUNT
 #include <sys/mount.h>
 
-#include "xfs_inode.h"
+
+#include <linux/xfs_inode.h>
 
 #include <xfs_clnt.h>
 #include <xfs_inum.h>
@@ -49,6 +51,7 @@ cred_t	sys_cred_val, *sys_cred = &sys_cred_val;
 static void
 cred_init(void)
 {
+  ENTER("cred_init");
         memset(sys_cred, 0, sizeof(cred_t));
         sys_cred->cr_ref = 1;
 
@@ -56,6 +59,7 @@ cred_init(void)
         sys_cred->cr_cap.cap_inheritable = CAP_ALL_ON;
         sys_cred->cr_cap.cap_permitted = CAP_ALL_ON;
         /*_MAC_INIT_CRED();*/
+		EXIT("cred_init");
 }
 
 
@@ -67,7 +71,7 @@ linvfs_inode_attr_in(
 	vattr_t		attr;
 	int		error;
 
-
+	ENTER("linvfs_inode_attr_in");
 	memset(&attr, 0, sizeof(vattr_t));
 	attr.va_mask = AT_STAT;
 
@@ -118,6 +122,7 @@ linvfs_inode_attr_in(
 	inode->i_blksize = attr.va_blksize;
 	inode->i_blocks = attr.va_nblocks;
 	inode->i_version = ++event;
+	EXIT("linvfs_inode_attr_in");
 }
 
 
@@ -144,6 +149,7 @@ linvfs_read_super(
 
 	MOD_INC_USE_COUNT;
 	ENTER("linvfs_read_super");
+	printk ("sb 0x%x sb->s_dev 0x%x\n",sb,(u_int)sb->s_dev);
 
 	lock_super(sb);
 
@@ -184,30 +190,37 @@ linvfs_read_super(
 
 	/*  Setup the uap structure  */
 
-	memset(&uap, 0, sizeof(struct mounta));
+	memset(uap, 0, sizeof(struct mounta));
 
 	switch (MAJOR(sb->s_dev)) {
 	case 8: {  /*  SCSI  */
-		int disk, partition;
+	  u_int disk, partition;
 
 		disk = MINOR(sb->s_dev) / 16;
 		partition = MINOR(sb->s_dev) % 16;
 
-		sprintf(spec, "/dev/sd%c%d", 'a' + disk, partition);
+		if (partition){
+		  sprintf(spec, "/dev/sd%c%d", 'a' + disk, partition);
+		} else {		  
+		  sprintf(spec, "/dev/sd%c", 'a' + disk);
 		}
+		printk("sb->s_dev %u disk %u partion %u\n",sb->s_dev,disk,partition);
+		printk ("Using device %s\n",spec);
+	}
     
-		break;
+	break;
 	case 3:{ /* hd */
 	  int disk, partition;
 	  
 	  disk = MINOR(sb->s_dev) / 16;
 	  partition = MINOR(sb->s_dev) % 16;
 	  
-	  sprintf(spec, "/dev/sd%c%d", 'a' + disk, partition);
-	  printf ("Using device %s\n",spec);
+	  sprintf(spec, "/dev/hd%c%d", 'a' + disk, partition);
+	  printk("sb->s_dev %u disk %u partion %u\n",sb->s_dev,disk,partition);
+	  printk ("Using device %s\n",spec);
 	}
 	break;
-	default:
+
 		panic("FixMe!!!  (uap->spec)\n");
 	};
 	uap->spec = spec;
@@ -263,6 +276,7 @@ linvfs_read_super(
 
 	unlock_super(sb);
 
+	EXIT("linvfs_read_super <OK>");
 	return(NULL);
 
 
@@ -282,7 +296,7 @@ linvfs_read_super(
 		unlock_super(sb);
 		MOD_DEC_USE_COUNT;
 
-		ENTER("linvfs_read_super <OK>");
+		EXIT("linvfs_read_super <ERROR>");
 		return(NULL);
 }
 
@@ -295,10 +309,11 @@ linvfs_read_inode(
 	vnode_t		*vp;
 	int		error;
 
-
+	ENTER("linvfs_read_inode");
 	VFS_GET_VNODE(vfsp, &vp, inode->i_ino, error);
 	if (error) {
 		make_bad_inode(inode);
+		EXIT("linvfs_read_inode <ERROR>");
 		return;
 	}
 
@@ -321,7 +336,8 @@ linvfs_read_inode(
 	else if (S_ISFIFO(inode->i_mode))
 		init_fifo(inode);
 	else
-		panic("XFS:  unknown file type:  %d\n", inode->i_mode);
+	  panic("XFS:  unknown file type:  %d\n", inode->i_mode);
+	EXIT("linvfs_read_inode");
 }
 
 
@@ -329,10 +345,12 @@ void
 linvfs_put_inode(
 	struct inode	*inode)
 {
+  ENTER("linvfs_put_inode");
 /*
    Does XFS do read-ahead stuff that needs to be thrown away every time the
    file is closed?  If so, this function needs to do that.
 */
+  EXIT("linvfs_put_indoe");
 }
 
 
@@ -348,11 +366,13 @@ linvfs_notify_change(
 	int		error;
 	struct inode	*inode;
 
-
+	ENTER("linvfs_notify_change");
 	inode = dentry->d_inode;
 	error = inode_change_ok(inode, attr);
-	if (error)
-		return(error);
+	if (error){
+	  EXIT("linvfs_notify_change <ERROR>");
+	  return(error);
+	}
 
 	memset(&vattr, 0, sizeof(vattr_t));
 
@@ -395,7 +415,8 @@ linvfs_notify_change(
 	VOP_SETATTR(vp, &vattr, 0, sys_cred, error);
 
 	linvfs_inode_attr_in(inode);
-	
+
+	EXIT("linvfs_notify_change");
 	return(-error);
 }
 
@@ -408,6 +429,7 @@ linvfs_put_super(
 	vnode_t		*rootvp;
 	int		error;
 
+	ENTER("linvfs_put_super");
 	VFS_DOUNMOUNT(vfsp, 0, NULL, sys_cred, error); 
 
 	vfs_deallocate(vfsp);
@@ -417,6 +439,7 @@ linvfs_put_super(
 	/*  Do something to get rid of the VNODE/VFS layer here  */
 
 	MOD_DEC_USE_COUNT; 
+	EXIT("linvfs_put_super");
 }
 
 
@@ -427,12 +450,13 @@ linvfs_write_super(
 	vfs_t		*vfsp = LINVFS_GET_VFS(sb);
 	int		error;
 
-
+	ENTER("linvfs_write_super");
 	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_ATTR|SYNC_DELWRI|SYNC_NOWAIT,
 		sys_cred, error);
 
 
 	sb->s_dirt = 1;  /*  Keep the syncs coming.  */
+	EXIT("linvfs_write_super");
 }
 
 
@@ -448,18 +472,22 @@ linvfs_statfs(
 
 	struct statfs	sfs;
 	int		error;
-
+	ENTER("linvfs_statfs");
 	
 	VFS_ROOT(vfsp, &rootvp, error);
-	if (error)
-		return(-error);
+	if (error){
+	  EXIT("linvfs_statfs <ERROR>");
+	  return(-error);
+	}
 
 	VFS_STATVFS(vfsp, &stat, rootvp, error);
 
 	VN_RELE(rootvp);
 
-	if (error)
-		return(-error);
+	if (error){
+	  EXIT("linvfs_statfs <ERROR>");
+	  return(-error);
+	}
 
 
 	memset(&sfs, 0, sizeof(struct statfs));
@@ -477,6 +505,7 @@ linvfs_statfs(
 	error = copy_to_user(statfsbuf, &sfs,
 		(size < sizeof(struct statfs)) ? size : sizeof(struct statfs));
 
+	EXIT("linvfs_statfs <OK>");
 	return(error);
 }
 
@@ -497,9 +526,10 @@ linvfs_clear_inode(
 	struct inode	*inode)
 {
 	vnode_t		*vp = LINVFS_GET_VP(inode);
-
+	ENTER("linvfs_clear_inode");
 	if (vp) 
 		VN_RELE(vp);
+	EXIT("linvfs_clear_inode");
 }
 
 
@@ -518,7 +548,7 @@ static struct super_operations linvfs_sops = {
 	NULL			/*  unmount_begin  */
 };
 
-
+#if 0
 static struct file_system_type linvfs_fs_type = {
 	"xfs", 
 	FS_REQUIRES_DEV,
@@ -535,6 +565,25 @@ __initfunc(int init_linvfs_fs(void))
   EXIT("init_linvfs_fs"); 
   return register_filesystem(&linvfs_fs_type);
 }
+#endif
+
+static struct file_system_type xfs_fs_type = {
+	"xfs", 
+	FS_REQUIRES_DEV,
+	linvfs_read_super, 
+	NULL
+};
+
+
+__initfunc(int init_xfs_fs(void))
+{
+  ENTER("init_xfs_fs"); 
+
+  cred_init();
+  
+  EXIT("init_xfs_fs"); 
+  return register_filesystem(&xfs_fs_type);
+}
 
 #ifdef MODULE
 EXPORT_NO_SYMBOLS;
@@ -546,10 +595,7 @@ int init_module(void)
 
 void cleanup_module(void)
 {
-        unregister_filesystem(&linvfs_fs_type);
+        unregister_filesystem(&xfs_fs_type);
 }
 
 #endif
-
-
-

@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.216 $"
+#ident  "$Revision: 1.217 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -1031,6 +1031,10 @@ xfs_mountargs(
 	ap->slcount = -1;
         ap->stimeout = -1;
 	ap->ctimeout = -1;
+
+#ifdef __linux__
+#define copyin(from, to, len) (memcpy(to, from, len), /*return*/0)
+#endif
 	if (uap->datalen && uap->dataptr) { 
 
 		/* Copy in the xfs_args version number */
@@ -1065,6 +1069,10 @@ xfs_mountargs(
 			return XFS_ERROR(EINVAL);
 	}
 	return (0);
+
+#ifdef __linux__
+#undef copyin
+#endif
 }
 
 /*
