@@ -51,17 +51,6 @@ typedef struct vfs {
 	fsid_t		*vfs_altfsid;	/* An ID fixed for life of FS */
 	bhv_head_t	vfs_bh;		/* head of vfs behavior chain */
 	struct super_block *vfs_super;	/* pointer to super block structure */
-#if CELL_CAPABLE
-	__uint64_t	vfs_opsflags;		/* vfsops/vnodeops flags */
-	struct vfs	*vfs_next;		/* next VFS in VFS list */
-	struct vfs	**vfs_prevp;		/* ptr to previous vfs_next */
-	struct vnode	*vfs_vnodecovered;	/* vnode mounted on */
-	cell_t		vfs_cell;	/* device cell for this FS */
-	char		*vfs_expinfo;	/* data exported by home instance
-					   of file system. */
-	size_t		vfs_eisize;	/* amount of data exported by
-					   home instance of file system */
-#endif
 } vfs_t;
 
 #define vfs_fbhv	vfs_bh.bh_first		/* 1st on vfs behavior chain */

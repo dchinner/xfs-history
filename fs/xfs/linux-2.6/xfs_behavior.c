@@ -59,76 +59,6 @@ bhv_global_init(void)
 }
 
 /*
- * Insert a new behavior descriptor into a behavior chain.  The act of
- * modifying the chain is done atomically w.r.t. ops-in-progress
- * (see comment at top of behavior.h for more info on synchronization).
- *
- * If BHV_SYNCH is defined, then must be called with the behavior chain
- * write locked.  This both synchronizes with ops-in-progress as well
- * as multiple concurrent threads inserting.
- *
- * If BHV_SYNCH is not defined, then it's the callers' responsibility
- * to synchronize appropriately.  Imon, for instance, relies on the
- * atomic nature of insertion to synchronize with ops-in-progress, and
- * implements its own lock to synchronize multiple concurrent threads
- * inserting.
- *
- * The behavior chain is ordered based on the 'position' number which
- * lives in the first field of the ops vector (higher numbers first).
- *
- * Attemps to insert duplicate ops result in an EINVAL return code.
- * Otherwise, return 0 to indicate success.
- */
-int
-bhv_insert(bhv_head_t *bhp, bhv_desc_t *bdp)
-{
-	bhv_desc_t	*curdesc, *prev;
-	int		position;
-
-	ASSERT(bdp->bd_next == NULL);
-	ASSERT(BHV_IS_WRITE_LOCKED(bhp));
-
-	/*
-	 * Validate the position value of the new behavior.
-	 */
-	position = BHV_POSITION(bdp);
-	ASSERT(position >= BHV_POSITION_BASE && position <= BHV_POSITION_TOP);
-
-	/*
-	 * Find location to insert behavior.  Check for duplicates.
-	 */
-	prev = NULL;
-	for (curdesc = bhp->bh_first;
-	     curdesc != NULL;
-	     curdesc = curdesc->bd_next) {
-
-		/* Check for duplication. */
-		if (curdesc->bd_ops == bdp->bd_ops)
-			return EINVAL;
-
-		/* Find correct position */
-		if (position >= BHV_POSITION(curdesc)) {
-			ASSERT(position != BHV_POSITION(curdesc));
-			break;		/* found it */
-		}
-
-		prev = curdesc;
-	}
-
-	if (prev == NULL) {
-		/* insert at front of chain */
-		bdp->bd_next = bhp->bh_first;
-		bhp->bh_first = bdp;		/* atomic wrt oip's */
-	} else {
-		/* insert after prev */
-		bdp->bd_next = prev->bd_next;
-		prev->bd_next = bdp;		/* atomic wrt oip's */
-	}
-
-	return 0;
-}
-
-/*
  * Remove a behavior descriptor from a position in a behavior chain;
  * the postition is guaranteed not to be the first position.
  * Should only be called by the bhv_remove() macro.
@@ -225,7 +155,7 @@ bhv_base_unlocked(bhv_head_t *bhp)
 	return NULL;
 }
 
-#define BHVMAGIC 0xf00d
+#define BHVMAGIC (void *)0xf00d
 
 /* ARGSUSED */
 void
@@ -234,9 +164,7 @@ bhv_head_init(
 	char *name)
 {
 	bhp->bh_first = NULL;
-#if defined(CELL_ENABLED)
 	bhp->bh_lockp = BHVMAGIC;
-#endif
 }
 
 
@@ -246,9 +174,7 @@ bhv_head_reinit(
 	bhv_head_t *bhp)
 {
 	ASSERT(bhp->bh_first == NULL);
-#if defined(CELL_ENABLED)
 	ASSERT(bhp->bh_lockp == BHVMAGIC);
-#endif
 }
 
 
@@ -258,9 +184,7 @@ bhv_insert_initial(
 	bhv_desc_t *bdp)
 {
 	ASSERT(bhp->bh_first == NULL);
-#if defined(CELL_ENABLED)
 	ASSERT(bhp->bh_lockp == BHVMAGIC);
-#endif
 	(bhp)->bh_first = bdp;
 }
 
@@ -269,9 +193,7 @@ bhv_head_destroy(
 	bhv_head_t *bhp)
 {
 	ASSERT(bhp->bh_first == NULL);
-#if defined(CELL_CAPABLE)
 	ASSERT(bhp->bh_lockp == BHVMAGIC);
 	bhp->bh_lockp = NULL;
-#endif
 }
 

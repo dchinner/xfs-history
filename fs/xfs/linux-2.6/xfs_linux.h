@@ -124,11 +124,6 @@ typedef struct xfs_dirent {		/* data from readdir() */
 #define btoc(x)		(((__psunsigned_t)(x)+(NBPC-1))>>BPCSHIFT)
 
 #ifndef CELL_CAPABLE
-#define CELL_ONLY(x)
-#define CELL_NOT(x)	(x)
-#define CELL_IF(a, b)	(b)
-#define CELL_MUST(a)	ASSERT(0)
-#define CELL_ASSERT(x)
 #define FSC_NOTIFY_NAME_CHANGED(vp)
 #endif
 
