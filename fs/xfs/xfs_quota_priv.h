@@ -43,9 +43,10 @@ struct xfs_dquotblk;
 #define QI_PQIP		m_quotainfo->qi_pquotaip
 #define QI_DQCHUNKLEN	m_quotainfo->qi_dqchunklen
 #define QI_BTIMELIMIT	m_quotainfo->qi_btimelimit
+#define QI_RTBTIMELIMIT	m_quotainfo->qi_rtbtimelimit
 #define QI_ITIMELIMIT	m_quotainfo->qi_itimelimit
-#define QI_BWARNS	m_quotainfo->qi_bwarns
-#define QI_IWARNS	m_quotainfo->qi_iwarns
+#define QI_BWARNLIMIT	m_quotainfo->qi_bwarnlimit
+#define QI_IWARNLIMIT	m_quotainfo->qi_iwarnlimit
 #define QI_QOFFLOCK	m_quotainfo->qi_quotaofflock
 #define QI_MPLRECLAIMS	m_quotainfo->qi_dqreclaims
 
