@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.92 $"
+#ident	"$Revision: 1.93 $"
 
 /*
  * High level interface routines for log manager
@@ -59,7 +59,6 @@
 	  (off) += (bytes);}
 
 /* Local miscellaneous function prototypes */
-STATIC xfs_lsn_t xlog_assign_tail_lsn(xfs_mount_t *mp, xlog_in_core_t *iclog);
 STATIC xfs_lsn_t xlog_commit_record(xfs_mount_t *mp, xlog_ticket_t *ticket);
 STATIC int	 xlog_find_zeroed(xlog_t *log, daddr_t *blk_no);
 STATIC xlog_t *  xlog_alloc_log(xfs_mount_t	*mp,
@@ -603,7 +602,7 @@ xfs_log_move_tail(xfs_mount_t	*mp,
  *
  * We may be holding the log iclog lock upon entering this routine.
  */
-STATIC xfs_lsn_t
+xfs_lsn_t
 xlog_assign_tail_lsn(xfs_mount_t *mp, xlog_in_core_t *iclog)
 {
 	xfs_lsn_t tail_lsn;
