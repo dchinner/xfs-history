@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.40 $"
+#ident	"$Revision: 1.41 $"
 
 struct cred;
 struct xfs_ihash;
@@ -73,8 +73,8 @@ typedef struct xfs_mount {
 /*
  * Default minimum read and write sizes.
  */
-#define	XFS_READIO_LOG	15
-#define	XFS_WRITEIO_LOG	15
+#define	XFS_READIO_LOG	16
+#define	XFS_WRITEIO_LOG	16
 
 /*
  * Macros for getting from mount to vfs and back.
