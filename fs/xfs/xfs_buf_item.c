@@ -1,4 +1,4 @@
-#ident "$Revision: 1.62 $"
+#ident "$Revision: 1.63 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -493,7 +493,6 @@ xfs_lsn_t
 xfs_buf_item_committed(
 	xfs_buf_log_item_t	*bip,
 	xfs_lsn_t		lsn)
-/* ARGSUSED */
 {
 	xfs_buf_item_trace("COMMITTED", bip);
 	if ((bip->bli_flags & XFS_BLI_INODE_ALLOC_BUF) &&
@@ -513,15 +512,11 @@ void
 xfs_buf_item_abort(
 	xfs_buf_log_item_t	*bip)
 {
-/* XXXsup - we should be doing this I believe, or we'll end up brelse'ing
-   B_STALE|B_DELWRI bufs. */
-#if 0
 	buf_t 	*bp;
 
 	bp = bip->bli_buf;
 	bp->b_flags &= ~(B_DELWRI|B_DONE);
 	bp->b_flags |= B_STALE;
-#endif	
 	xfs_buf_item_unlock(bip);
 	return;
 }
