@@ -31,16 +31,7 @@
  */
 
 #include <xfs.h>
-#include <linux/mm.h>
-#include <linux/pagemap.h>
-#include <linux/mpage.h>
-#include <linux/iobuf.h>
-#include <linux/xfs_iops.h>
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,9)
-#define page_buffers(page)	((page)->buffers)
-#define page_has_buffers(page)	((page)->buffers)
-#endif
+#include <linux/xattr.h>
 
 
 /*
@@ -134,7 +125,6 @@ linvfs_mknod(
 		/* linvfs_revalidate_core returns (-) errors */
 		error = -linvfs_revalidate_core(ip, ATTR_COMM);
 		validate_fields(dir);
-		mark_inode_dirty(ip);
 		d_instantiate(dentry, ip);
 		mark_inode_dirty_sync(ip);
 		mark_inode_dirty_sync(dir);
@@ -379,13 +369,10 @@ linvfs_readlink(
 }
 
 /*
- * careful here - this function can get called recusively up
- * to 32 times, hence we need to be very careful about how much
- * stack we use. uio is kmalloced for this reason...
- *
- * TODO - nathans: this may no longer be true nowadays (limit is
- * 5 currently, see if we can revert the unnecessary kmalloc now)
-*/
+ * careful here - this function can get called recusively, so
+ * we need to be very careful about how much stack we use.
+ * uio is kmalloced for this reason...
+ */
 STATIC int
 linvfs_follow_link(
 	struct dentry		*dentry,
@@ -467,11 +454,11 @@ linvfs_revalidate_core(
 
 STATIC int
 linvfs_getattr(
-	struct vfsmount *mnt,
+	struct vfsmount	*mnt,
 	struct dentry	*dentry,
 	struct kstat	*stat)
 {
-	struct inode *inode = dentry->d_inode;
+	struct inode	*inode = dentry->d_inode;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	int		error = 0;
 
@@ -547,423 +534,300 @@ linvfs_setattr(
 	return error;
 }
 
-STATIC int
-linvfs_get_block_core(
-	struct inode		*inode,
-	sector_t		iblock,
-	int			blocks,
-	struct buffer_head	*bh_result,
-	int			create,
-	int			direct,
-	page_buf_flags_t	flags)
-{
-	vnode_t			*vp = LINVFS_GET_VP(inode);
-	page_buf_bmap_t		pbmap;
-	int			retpbbm = 1;
-	int			error;
-	ssize_t			size;
-	loff_t			offset = (loff_t)iblock << inode->i_blkbits;
-
-	if (blocks) {
-		size = blocks << inode->i_blkbits;
-	} else {
-		/* If we are doing writes at the end of the file,
-		 * allocate in chunks
-		 */
-		if (create && (offset >= inode->i_size) && !(flags & PBF_SYNC))
-			size = 1 << XFS_WRITE_IO_LOG;
-		else
-			size = 1 << inode->i_blkbits;
-	}
-
-	VOP_BMAP(vp, offset, size,
-		create ? flags : PBF_READ, NULL,
-		(struct page_buf_bmap_s *)&pbmap, &retpbbm, error);
-	if (error)
-		return -error;
-
-	if (retpbbm == 0)
-		return 0;
-
-	if (pbmap.pbm_bn != PAGE_BUF_DADDR_NULL) {
-		page_buf_daddr_t	bn;
-		loff_t			delta;
-
-		delta = offset - pbmap.pbm_offset;
-		delta >>= inode->i_blkbits;
-
-		bn = pbmap.pbm_bn >> (inode->i_blkbits - 9);
-		bn += delta;
-
-		bh_result->b_blocknr = bn;
-		bh_result->b_bdev = pbmap.pbm_target->pbr_bdev;
-		set_buffer_mapped(bh_result);
-	}
-
-	/* If we previously allocated a block out beyond eof and
-	 * we are now coming back to use it then we will need to
-	 * flag it as new even if it has a disk address.
-	 */
-	if (create &&
-	    ((!buffer_mapped(bh_result) && !buffer_uptodate(bh_result)) ||
-	     (offset >= inode->i_size))) {
-		set_buffer_new(bh_result);
-	}
-
-	if (pbmap.pbm_flags & PBMF_DELAY) {
-		if (unlikely(direct))
-			BUG();
-		if (create) {
-			set_buffer_mapped(bh_result);
-			set_buffer_uptodate(bh_result);
-		}
-		bh_result->b_bdev = pbmap.pbm_target->pbr_bdev;
-		set_buffer_delay(bh_result);
-	}
-
-	if (blocks) {
-		size = (pbmap.pbm_bsize - pbmap.pbm_delta); 
-		bh_result->b_size = min(size, blocks << inode->i_blkbits);
-	}
-
-	return 0;
-}
-
-int
-linvfs_get_block(
-	struct inode		*inode,
-	sector_t		iblock,
-	struct buffer_head	*bh_result,
-	int			create)
-{
-	return linvfs_get_block_core(inode, iblock, 0, bh_result,
-					create, 0, PBF_WRITE);
-}
-
-int
-linvfs_get_block_sync(
-	struct inode		*inode,
-	sector_t		iblock,
-	struct buffer_head	*bh_result,
-	int			create)
-{
-	return linvfs_get_block_core(inode, iblock, 0, bh_result,
-					create, 0, PBF_SYNC|PBF_WRITE);
-}
-
-
-
-int
-linvfs_get_blocks_direct(
-	struct inode		*inode,
-	sector_t		iblock,
-	unsigned long		max_blocks,
-	struct buffer_head	*bh_result,
-	int			create)
-{
-	return linvfs_get_block_core(inode, iblock, max_blocks, bh_result,
-					create, 1, PBF_WRITE|PBF_DIRECT);
-}
-
-static int
-linvfs_direct_IO(int rw, struct inode *inode, char *buf,
-                        loff_t offset, size_t count)
-{
-        return generic_direct_IO(rw, inode, buf, offset, count, 
-					linvfs_get_blocks_direct);
-}
-
-int
-linvfs_pb_bmap(
-	struct inode	*inode,
-	loff_t		offset,
-	ssize_t		count,
-	page_buf_bmap_t *pbmapp,
-	int		flags)
-{
-	vnode_t		*vp = LINVFS_GET_VP(inode);
-	int		error, nmaps = 1;
-
-retry:
-	if (flags & PBF_FILE_ALLOCATE) {
-		VOP_STRATEGY(vp, offset, count, flags, NULL,
-				pbmapp, &nmaps, error);
-	} else {
-		VOP_BMAP(vp, offset, count, flags, NULL,
-				pbmapp, &nmaps, error);
-	}
-	if (flags & PBF_WRITE) {
-		if (unlikely((flags & PBF_DIRECT) && nmaps &&
-		    (pbmapp->pbm_flags & PBMF_DELAY))) {
-			flags = PBF_WRITE | PBF_FILE_ALLOCATE;
-			goto retry;
-		}
-		VMODIFY(vp);
-	}
-	return -error;
-}
-
-STATIC int
-linvfs_bmap(
-	struct address_space	*mapping,
-	long			block)
-{
-	struct inode		*inode = (struct inode *)mapping->host;
-	vnode_t			*vp = LINVFS_GET_VP(inode);
-	int			error;
-
-	/* block	     - Linux disk blocks    512b */
-	/* bmap input offset - bytes		      1b */
-	/* bmap output bn    - XFS BBs		    512b */
-	/* bmap output delta - bytes		      1b */
-
-	vn_trace_entry(vp, "linvfs_bmap", (inst_t *)__return_address);
-
-	VOP_RWLOCK(vp, VRWLOCK_READ);
-	VOP_FLUSH_PAGES(vp, (xfs_off_t)0, -1, 0, FI_REMAPF, error);
-	VOP_RWUNLOCK(vp, VRWLOCK_READ);
-	return generic_block_bmap(mapping, block, linvfs_get_block);
-}
-
-STATIC int
-linvfs_read_full_page(
-	struct file	*unused,
-	struct page	*page)
-{
-	return block_read_full_page(page, linvfs_get_block);
-}
-
-STATIC int
-linvfs_readpages(
-	struct address_space	*mapping,
-	struct list_head	*pages,
-	unsigned		nr_pages)
-{
-	return mpage_readpages(mapping, pages, nr_pages, linvfs_get_block);
-}
-
-
-STATIC int
-count_page_state(
-	struct page	*page,
-	int		*nr_delalloc,
-	int		*nr_unmapped)
-{
-	*nr_delalloc = *nr_unmapped = 0;
-
-	if (page_has_buffers(page)) {
-		struct buffer_head	*bh, *head;
-
-		bh = head = page_buffers(page);
-		do {
-			if (buffer_uptodate(bh) && !buffer_mapped(bh)) {
-				(*nr_unmapped)++;
-				continue;
-			}
-			if (!buffer_delay(bh))
-				continue;
-			(*nr_delalloc)++;
-		} while ((bh = bh->b_this_page) != head);
-		return 1;
-	}
-
-	return 0;
-}
-
-STATIC int
-linvfs_write_full_page(
-	struct page	*page)
-{
-	int		error;
-	int		need_trans;
-	int		nr_delalloc, nr_unmapped;
-
-	if (count_page_state(page, &nr_delalloc, &nr_unmapped)) {
-		need_trans = nr_delalloc + nr_unmapped;
-	} else {
-		need_trans = 1;
-	}
-
-	if ((current->flags & (PF_FSTRANS)) && need_trans)
-		goto out_fail;
-
-	error = pagebuf_write_full_page(page, nr_delalloc);
-
-	return error;
-
-out_fail:
-	set_page_dirty(page);
-	unlock_page(page);
-	return 0;
-}
-
-STATIC int
-linvfs_prepare_write(
-	struct file	*file,
-	struct page	*page,
-	unsigned int	from,
-	unsigned int	to)
-{
-	if (file && (file->f_flags & O_SYNC)) {
-		return block_prepare_write(page, from, to,
-						linvfs_get_block_sync);
-	} else {
-		return block_prepare_write(page, from, to,
-						linvfs_get_block);
-	}
-}
-
 STATIC void
 linvfs_truncate(
-	struct inode	*inode)
+	struct inode		*inode)
 {
-	block_truncate_page(inode->i_mapping, inode->i_size,
-						linvfs_get_block);
+	block_truncate_page(inode->i_mapping, inode->i_size, linvfs_get_block);
 }
 
-#if 0
-/* Keeping this for now as an example of a better way of
- * doing O_DIRECT for XFS - the generic path has more
- * overhead than we want.
- */
 
-/* Initiate I/O on a kiobuf of user memory */
-STATIC int
-linvfs_direct_IO(
-	int		rw,
-	struct inode	*inode,
-	struct kiobuf	*iobuf,
-	unsigned long	blocknr,
-	int		blocksize)
-{
-	struct page	**maplist;
-	size_t		page_offset;
-	page_buf_t	*pb;
-	page_buf_bmap_t map;
-	int		error = 0;
-	int		pb_flags, map_flags, pg_index = 0;
-	size_t		length, total;
-	loff_t		offset;
-	size_t		map_size, size;
-
-	total = length = iobuf->length;
-	offset = blocknr;
-	offset <<= inode->i_blkbits;
-
-	maplist = iobuf->maplist;
-	page_offset = iobuf->offset;
-
-	map_flags = (rw ? PBF_WRITE : PBF_READ) | PBF_DIRECT;
-	pb_flags = (rw ? PBF_WRITE : PBF_READ) | PBF_FORCEIO | _PBF_LOCKABLE;
-	while (length) {
-		error = linvfs_pb_bmap(inode, offset, length, &map, map_flags);
-		if (error)
-			break;
-
-		map_size = map.pbm_bsize - map.pbm_delta;
-		size = min(map_size, length);
-		if (map.pbm_flags & PBMF_HOLE) {
-			size_t	zero_len = size;
-
-			if (rw == WRITE)
-				break;
-
-			/* Need to zero it all */
-			while (zero_len) {
-				struct page *page;
-				size_t	pg_len;
-
-				pg_len = min((size_t)(PAGE_CACHE_SIZE - page_offset),
-								zero_len);
-
-				page = maplist[pg_index];
-
-				memset(kmap(page) + page_offset, 0, pg_len);
-				flush_dcache_page(page);
-				kunmap(page);
-
-				zero_len -= pg_len;
-				if ((pg_len + page_offset) == PAGE_CACHE_SIZE) {
-					pg_index++;
-					page_offset = 0;
-				} else {
-					page_offset = (page_offset + pg_len) &
-							~PAGE_CACHE_MASK;
-				}
-			}
-		} else {
-			int	pg_count;
-
-			pg_count = (size + page_offset + PAGE_CACHE_SIZE - 1)
-					>> PAGE_CACHE_SHIFT;
-			pb = pagebuf_lookup(map.pbm_target, inode, offset,
-							size, pb_flags);
-			/* Need to hook up pagebuf to kiobuf pages */
-			pb->pb_pages = &maplist[pg_index];
-			pb->pb_offset = page_offset;
-			pb->pb_page_count = pg_count;
-
-			pb->pb_bn = map.pbm_bn + (map.pbm_delta >> 9);
-			pagebuf_iostart(pb, pb_flags);
-			pb->pb_flags &= ~_PBF_LOCKABLE;
-			pagebuf_rele(pb);
-
-			page_offset = (page_offset + size) & ~PAGE_CACHE_MASK;
-			if (page_offset)
-				pg_count--;
-			pg_index += pg_count;
-		}
-
-		offset += size;
-		length -= size;
-	}
-
-	return error ? error : total - length;
-}
-#endif
 
 /*
- * This gets a page into cleanable state - page locked on entry
- * kept locked on exit. If the page is marked dirty we should
- * not come this way.
+ * Extended attributes interfaces
+ */
+
+#define SYSTEM_NAME	"system."	/* VFS shared names/values */
+#define ROOT_NAME	"xfsroot."	/* XFS ondisk names/values */
+#define USER_NAME	"user."		/* user's own names/values */
+STATIC xattr_namespace_t xfs_namespace_array[] = {
+	{ .name= SYSTEM_NAME,	.namelen= sizeof(SYSTEM_NAME)-1,.exists= NULL },
+	{ .name= ROOT_NAME,	.namelen= sizeof(ROOT_NAME)-1,	.exists= NULL },
+	{ .name= USER_NAME,	.namelen= sizeof(USER_NAME)-1,	.exists= NULL },
+	{ .name= NULL }
+};
+xattr_namespace_t *xfs_namespaces = &xfs_namespace_array[0];
+
+#define POSIXACL_ACCESS		"posix_acl_access"
+#define POSIXACL_ACCESS_SIZE	(sizeof(POSIXACL_ACCESS)-1)
+#define POSIXACL_DEFAULT	"posix_acl_default"
+#define POSIXACL_DEFAULT_SIZE	(sizeof(POSIXACL_DEFAULT)-1)
+#define POSIXCAP		"posix_capabilities"
+#define POSIXCAP_SIZE		(sizeof(POSIXCAP)-1)
+#define POSIXMAC		"posix_mac"
+#define POSIXMAC_SIZE		(sizeof(POSIXMAC)-1)
+STATIC xattr_namespace_t sys_namespace_array[] = {
+	{ .name= POSIXACL_ACCESS,
+		.namelen= POSIXACL_ACCESS_SIZE,	 .exists= _ACL_ACCESS_EXISTS },
+	{ .name= POSIXACL_DEFAULT,
+		.namelen= POSIXACL_DEFAULT_SIZE, .exists= _ACL_DEFAULT_EXISTS },
+	{ .name= POSIXCAP,
+		.namelen= POSIXCAP_SIZE,	 .exists= _CAP_EXISTS },
+	{ .name= POSIXMAC,
+		.namelen= POSIXMAC_SIZE,	 .exists= _MAC_EXISTS },
+	{ .name= NULL }
+};
+
+/*
+ * Some checks to prevent people abusing EAs to get over quota:
+ * - Don't allow modifying user EAs on devices/symlinks;
+ * - Don't allow modifying user EAs if sticky bit set;
  */
 STATIC int
-linvfs_release_page(
-	struct page	*page,
-	int		gfp_mask)
+capable_user_xattr(
+	struct inode	*inode)
 {
-	int		need_trans;
-	int		nr_delalloc, nr_unmapped;
+	if (!S_ISREG(inode->i_mode) && !S_ISDIR(inode->i_mode) &&
+	    !capable(CAP_SYS_ADMIN))
+		return 0;
+	if (S_ISDIR(inode->i_mode) && (inode->i_mode & S_ISVTX) &&
+	    (current->fsuid != inode->i_uid) && !capable(CAP_FOWNER))
+		return 0;
+	return 1;
+}
 
-	if (count_page_state(page, &nr_delalloc, &nr_unmapped)) {
-		need_trans = nr_delalloc;
-	} else {
-		need_trans = 0;
+STATIC int
+linvfs_setxattr(
+	struct dentry	*dentry,
+	const char	*name,
+	void		*data,
+	size_t		size,
+	int		flags)
+{
+	int		error;
+	int		xflags = 0;
+	char		*p = (char *)name;
+	struct inode	*inode = dentry->d_inode;
+	vnode_t		*vp = LINVFS_GET_VP(inode);
+
+	if (strncmp(name, xfs_namespaces[SYSTEM_NAMES].name,
+			xfs_namespaces[SYSTEM_NAMES].namelen) == 0) {
+		error = -EINVAL;
+		if (flags & XATTR_CREATE)
+			 return error;
+		error = -ENOATTR;
+		p += xfs_namespaces[SYSTEM_NAMES].namelen;
+		if (strcmp(p, POSIXACL_ACCESS) == 0) {
+			if (vp->v_flag & VMODIFIED) {
+				error = linvfs_revalidate_core(inode, 0);
+				if (error)
+					return error;
+			}
+			error = xfs_acl_vset(vp, data, size, _ACL_TYPE_ACCESS);
+			if (!error) {
+				VMODIFY(vp);
+				error = linvfs_revalidate_core(inode, 0);
+			}
+		}
+		else if (strcmp(p, POSIXACL_DEFAULT) == 0) {
+			error = linvfs_revalidate_core(inode, 0);
+			if (error)
+				return error;
+			error = xfs_acl_vset(vp, data, size, _ACL_TYPE_DEFAULT);
+			if (!error) {
+				VMODIFY(vp);
+				error = linvfs_revalidate_core(inode, 0);
+			}
+		}
+		else if (strcmp(p, POSIXCAP) == 0) {
+			error = xfs_cap_vset(vp, data, size);
+		}
+		return error;
 	}
 
-	if (need_trans == 0) {
-		return try_to_free_buffers(page);
+	/* Convert Linux syscall to XFS internal ATTR flags */
+	if (flags & XATTR_CREATE)
+		xflags |= ATTR_CREATE;
+	if (flags & XATTR_REPLACE)
+		xflags |= ATTR_REPLACE;
+
+	if (strncmp(name, xfs_namespaces[ROOT_NAMES].name,
+			xfs_namespaces[ROOT_NAMES].namelen) == 0) {
+		if (!capable(CAP_SYS_ADMIN))
+			return -EPERM;
+		xflags |= ATTR_ROOT;
+		p += xfs_namespaces[ROOT_NAMES].namelen;
+		VOP_ATTR_SET(vp, p, data, size, xflags, NULL, error);
+		return -error;
+	}
+	if (strncmp(name, xfs_namespaces[USER_NAMES].name,
+			xfs_namespaces[USER_NAMES].namelen) == 0) {
+		if (!capable_user_xattr(inode))
+			return -EPERM;
+		p += xfs_namespaces[USER_NAMES].namelen;
+		VOP_ATTR_SET(vp, p, data, size, xflags, NULL, error);
+		return -error;
+	}
+	return -ENOATTR;
+}
+
+STATIC ssize_t
+linvfs_getxattr(
+	struct dentry	*dentry,
+	const char	*name,
+	void		*data,
+	size_t		size)
+{
+	ssize_t		error;
+	int		xflags = 0;
+	char		*p = (char *)name;
+	struct inode	*inode = dentry->d_inode;
+	vnode_t		*vp = LINVFS_GET_VP(inode);
+
+	if (strncmp(name, xfs_namespaces[SYSTEM_NAMES].name,
+			xfs_namespaces[SYSTEM_NAMES].namelen) == 0) {
+		error = -ENOATTR;
+		p += xfs_namespaces[SYSTEM_NAMES].namelen;
+		if (strcmp(p, POSIXACL_ACCESS) == 0) {
+			if (vp->v_flag & VMODIFIED) {
+				error = linvfs_revalidate_core(inode, 0);
+				if (error)
+					return error;
+			}
+			error = xfs_acl_vget(vp, data, size, _ACL_TYPE_ACCESS);
+		}
+		else if (strcmp(p, POSIXACL_DEFAULT) == 0) {
+			if (vp->v_flag & VMODIFIED) {
+				error = linvfs_revalidate_core(inode, 0);
+				if (error)
+					return error;
+			}
+			error = xfs_acl_vget(vp, data, size, _ACL_TYPE_DEFAULT);
+		}
+		else if (strcmp(p, POSIXCAP) == 0) {
+			error = xfs_cap_vget(vp, data, size);
+		}
+		return error;
 	}
 
-	if (gfp_mask & __GFP_FS) {
-		if (pagebuf_release_page(page) == 0)
-			return try_to_free_buffers(page);
+	/* Convert Linux syscall to XFS internal ATTR flags */
+	if (!size)
+		xflags |= ATTR_KERNOVAL;
+
+	if (strncmp(name, xfs_namespaces[ROOT_NAMES].name,
+			xfs_namespaces[ROOT_NAMES].namelen) == 0) {
+		if (!capable(CAP_SYS_ADMIN))
+			return -EPERM;
+		xflags |= ATTR_ROOT;
+		p += xfs_namespaces[ROOT_NAMES].namelen;
+		VOP_ATTR_GET(vp, p, data, (int *)&size, xflags, NULL, error);
+		if (!error)
+			error = -size;
+		return -error;
 	}
-	return 0;
+	if (strncmp(name, xfs_namespaces[USER_NAMES].name,
+			xfs_namespaces[USER_NAMES].namelen) == 0) {
+		p += xfs_namespaces[USER_NAMES].namelen;
+		if (!capable_user_xattr(inode))
+			return -EPERM;
+		VOP_ATTR_GET(vp, p, data, (int *)&size, xflags, NULL, error);
+		if (!error)
+			error = -size;
+		return -error;
+	}
+	return -ENOATTR;
 }
 
 
-struct address_space_operations linvfs_aops = {
-	.readpage		= linvfs_read_full_page,
-	.readpages		= linvfs_readpages,
-	.writepage		= linvfs_write_full_page,
-	.sync_page		= block_sync_page,
-	.releasepage		= linvfs_release_page,
-	.prepare_write		= linvfs_prepare_write,
-	.commit_write		= generic_commit_write,
-	.bmap			= linvfs_bmap,
-	.direct_IO		= linvfs_direct_IO,
-};
+STATIC ssize_t
+linvfs_listxattr(
+	struct dentry		*dentry,
+	char			*data,
+	size_t			size)
+{
+	ssize_t			error;
+	int			result = 0;
+	int			xflags = ATTR_KERNAMELS;
+	char			*k = data;
+	attrlist_cursor_kern_t	cursor;
+	xattr_namespace_t	*sys;
+	vnode_t			*vp;
+
+	vp = LINVFS_GET_VP(dentry->d_inode);
+
+	if (!size)
+		xflags |= ATTR_KERNOVAL;
+	if (capable(CAP_SYS_ADMIN))
+		xflags |= ATTR_KERNFULLS;
+
+	memset(&cursor, 0, sizeof(cursor));
+	VOP_ATTR_LIST(vp, data, size, xflags, &cursor, NULL, error);
+	if (error > 0)
+		return -error;
+	result += -error;
+
+	k += result;		/* advance start of our buffer */
+	for (sys = &sys_namespace_array[0]; sys->name != NULL; sys++) {
+		if (sys->exists == NULL || !sys->exists(vp))
+			continue;
+		result += xfs_namespaces[SYSTEM_NAMES].namelen;
+		result += sys->namelen + 1;
+		if (size) {
+			if (result > size)
+				return -ERANGE;
+			strcpy(k, xfs_namespaces[SYSTEM_NAMES].name);
+			k += xfs_namespaces[SYSTEM_NAMES].namelen;
+			strcpy(k, sys->name);
+			k += sys->namelen + 1;
+		}
+	}
+	return result;
+}
+
+STATIC int
+linvfs_removexattr(
+	struct dentry	*dentry,
+	const char	*name)
+{
+	int		error;
+	int		xflags = 0;
+	char		*p = (char *)name;
+	struct inode	*inode = dentry->d_inode;
+	vnode_t		*vp = LINVFS_GET_VP(inode);
+
+	if (strncmp(name, xfs_namespaces[SYSTEM_NAMES].name,
+			xfs_namespaces[SYSTEM_NAMES].namelen) == 0) {
+		error = -ENOATTR;
+		p += xfs_namespaces[SYSTEM_NAMES].namelen;
+		if (strcmp(p, POSIXACL_ACCESS) == 0)
+			error = xfs_acl_vremove(vp, _ACL_TYPE_ACCESS);
+		else if (strcmp(p, POSIXACL_DEFAULT) == 0)
+			error = xfs_acl_vremove(vp, _ACL_TYPE_DEFAULT);
+		else if (strcmp(p, POSIXCAP) == 0)
+			error = xfs_cap_vremove(vp);
+		return error;
+	}
+
+	if (strncmp(name, xfs_namespaces[ROOT_NAMES].name,
+			xfs_namespaces[ROOT_NAMES].namelen) == 0) {
+		if (!capable(CAP_SYS_ADMIN))
+			return -EPERM;
+		xflags |= ATTR_ROOT;
+		p += xfs_namespaces[ROOT_NAMES].namelen;
+		VOP_ATTR_REMOVE(vp, p, xflags, NULL, error);
+		return -error;
+	}
+	if (strncmp(name, xfs_namespaces[USER_NAMES].name,
+			xfs_namespaces[USER_NAMES].namelen) == 0) {
+		p += xfs_namespaces[USER_NAMES].namelen;
+		if (!capable_user_xattr(inode))
+			return -EPERM;
+		VOP_ATTR_REMOVE(vp, p, xflags, NULL, error);
+		return -error;
+	}
+	return -ENOATTR;
+}
+
 
 struct inode_operations linvfs_file_inode_operations =
 {

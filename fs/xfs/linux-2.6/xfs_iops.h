@@ -32,6 +32,30 @@
 #ifndef __XFS_IOPS_H__
 #define __XFS_IOPS_H__
 
+/*
+ * Extended system attributes.
+ * So far only POSIX ACLs are supported, but this will need to
+ * grow in time (capabilities, mandatory access control, etc).
+ */
+#define XFS_SYSTEM_NAMESPACE	SYSTEM_POSIXACL
+
+/*
+ * Define a table of the namespaces XFS supports
+ */
+typedef int (*xattr_exists_t)(vnode_t *);
+
+typedef struct xattr_namespace {
+	char		*name;
+	unsigned int	namelen;
+	xattr_exists_t	exists;
+} xattr_namespace_t;
+
+#define SYSTEM_NAMES	0
+#define ROOT_NAMES	1
+#define USER_NAMES	2
+extern struct xattr_namespace *xfs_namespaces;
+
+
 extern struct inode_operations linvfs_file_inode_operations;
 extern struct inode_operations linvfs_dir_inode_operations;
 extern struct inode_operations linvfs_symlink_inode_operations;
@@ -42,5 +66,6 @@ extern struct file_operations linvfs_dir_operations;
 extern struct address_space_operations linvfs_aops;
 
 extern int linvfs_revalidate_core(struct inode *, int);
+extern int linvfs_get_block(struct inode *, sector_t, struct buffer_head *, int);
 
 #endif /* __XFS_IOPS_H__ */

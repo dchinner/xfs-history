@@ -33,7 +33,6 @@
 #include <xfs.h>
 #include <xfs_fsops.h>
 #include <xfs_dfrag.h>
-#include <linux/xfs_iops.h>
 #include <linux/dcache.h>
 #include <linux/namei.h>
 #include <linux/iobuf.h>

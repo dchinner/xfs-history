@@ -37,7 +37,6 @@
 #include <xfs.h>
 #include <linux/pagemap.h>
 #include <linux/capability.h>
-#include <linux/xfs_iops.h>
 
 
 #define XFS_WRITEIO_ALIGN(mp,off)	(((off) >> mp->m_writeio_log) \

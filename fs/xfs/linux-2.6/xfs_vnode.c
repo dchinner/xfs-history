@@ -31,7 +31,6 @@
  */
 
 #include <xfs.h>
-#include <linux/xfs_iops.h>
 #include <linux/pagemap.h>
 
 

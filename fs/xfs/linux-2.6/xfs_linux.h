@@ -56,10 +56,10 @@
 #include <linux/xfs_vnode.h>
 #include <linux/xfs_stats.h>
 #include <linux/xfs_sysctl.h>
+#include <linux/xfs_iops.h>
 #include <linux/xfs_super.h>
 #include <linux/xfs_globals.h>
 #include <linux/xfs_fs_subr.h>
-#include <linux/xfs_xattr.h>
 
 #include <pagebuf/page_buf.h>
 
@@ -68,10 +68,10 @@
 #endif
 
 typedef struct xfs_dirent {		/* data from readdir() */
-	xfs_ino_t d_ino;	/* inode number of entry */
-	xfs_off_t d_off;	/* offset of disk directory entry */
-	unsigned short d_reclen;/* length of this record */
-	char d_name[1];		/* name of file */
+	xfs_ino_t	d_ino;		/* inode number of entry */
+	xfs_off_t	d_off;		/* offset of disk directory entry */
+	unsigned short	d_reclen;	/* length of this record */
+	char		d_name[1];	/* name of file */
 } xfs_dirent_t;
 
 #define DIRENTBASESIZE		(((xfs_dirent_t *)0)->d_name - (char *)0)
