@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.168 $"
+#ident	"$Revision: 1.169 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -460,7 +460,7 @@ xfs_bmap_add_attrfork_extents(
 	xfs_btree_cur_t		*cur;
 	int			error;
 
-	if (ip->i_df.if_bytes <= XFS_IFORK_DSIZE(ip))
+	if (ip->i_d.di_nextents * sizeof(xfs_bmbt_rec_t) <= XFS_IFORK_DSIZE(ip))
 		return 0;
 	error = xfs_bmap_extents_to_btree(tp, ip, firstblock, flist, &cur, 0, 0,
 		flags, XFS_DATA_FORK);
@@ -2336,6 +2336,8 @@ xfs_bmap_extents_to_btree(
 
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	ASSERT(XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_EXTENTS);
+	ASSERT(ifp->if_ext_max ==
+	       XFS_IFORK_SIZE(ip, whichfork) / sizeof(xfs_bmbt_rec_t));
 	/*
 	 * Make space in the inode incore.
 	 */
@@ -2868,6 +2870,8 @@ xfs_bmap_add_attrfork(
 	int			s;
 	xfs_trans_t		*tp;
 
+	ASSERT(ip->i_df.if_ext_max ==
+	       XFS_IFORK_DSIZE(ip) / sizeof(xfs_bmbt_rec_t));
 	if (XFS_IFORK_Q(ip))
 		return 0;
 	mp = ip->i_mount;
@@ -2947,6 +2951,8 @@ xfs_bmap_add_attrfork(
 	if (error)
 		goto error2;
 	error = xfs_trans_commit(tp, XFS_TRANS_PERM_LOG_RES);
+	ASSERT(ip->i_df.if_ext_max ==
+	       XFS_IFORK_DSIZE(ip) / sizeof(xfs_bmbt_rec_t));
 	return error;
 
 error2:
@@ -2955,6 +2961,8 @@ error1:
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 error0:
 	xfs_trans_cancel(tp, XFS_TRANS_ABORT);
+	ASSERT(ip->i_df.if_ext_max ==
+	       XFS_IFORK_DSIZE(ip) / sizeof(xfs_bmbt_rec_t));
 	return error;
 }
 
@@ -3543,6 +3551,8 @@ xfs_bmapi(
 		XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_LOCAL)
 			return XFS_ERROR(EIO);
 	ifp = XFS_IFORK_PTR(ip, whichfork);
+	ASSERT(ifp->if_ext_max ==
+	       XFS_IFORK_SIZE(ip, whichfork) / sizeof(xfs_bmbt_rec_t));
 	if (wr = (flags & XFS_BMAPI_WRITE) != 0)
 		XFSSTATS.xs_blk_mapw++;
 	else
@@ -3861,6 +3871,10 @@ xfs_bmapi(
 		}
 		logflags |= tmp_logflags;
 	}
+	ASSERT(ifp->if_ext_max ==
+	       XFS_IFORK_SIZE(ip, whichfork) / sizeof(xfs_bmbt_rec_t));
+	ASSERT(XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE ||
+	       XFS_IFORK_NEXTENTS(ip, whichfork) > ifp->if_ext_max);
 	/*
 	 * Log everything.  Do this after conversion, there's no point in
 	 * logging the extent list if we've converted to btree format.
@@ -3984,10 +3998,12 @@ xfs_bunmapi(
 		XFS_ATTR_FORK : XFS_DATA_FORK;
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS &&
-		XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE)
+	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE)
 		return XFS_ERROR(EIO);
 	ASSERT(len > 0);
 	ASSERT(nexts > 0);
+	ASSERT(ifp->if_ext_max ==
+	       XFS_IFORK_SIZE(ip, whichfork) / sizeof(xfs_bmbt_rec_t));
 	if (!(ifp->if_flags & XFS_IFEXTENTS)) {
 		error = xfs_iread_extents(tp, ip, whichfork);
 		if (error) {
@@ -4112,6 +4128,8 @@ xfs_bunmapi(
 	}
 	ifp->if_lastex = lastx;
 	*done = bno == (xfs_fileoff_t)-1 || bno < start || lastx < 0;
+	ASSERT(ifp->if_ext_max ==
+	       XFS_IFORK_SIZE(ip, whichfork) / sizeof(xfs_bmbt_rec_t));
 	/*
 	 * Convert to a btree if necessary.
 	 */
@@ -4147,6 +4165,8 @@ xfs_bunmapi(
 		logflags |= tmp_logflags;
 	}
 	/* transform from extents to local */
+	ASSERT(ifp->if_ext_max ==
+	       XFS_IFORK_SIZE(ip, whichfork) / sizeof(xfs_bmbt_rec_t));
 	/*
 	 * Log everything.  Do this after conversion, there's no point in
 	 * logging the extent list if we've converted to btree format.
