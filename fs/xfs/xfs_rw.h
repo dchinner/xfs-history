@@ -158,6 +158,19 @@ xfs_zero_eof(struct xfs_inode	*ip,
 	     xfs_fsize_t	isize,
 	     struct cred	*credp);
 
+void
+xfs_refcache_insert(
+	struct xfs_inode	*ip);
 
+void
+xfs_refcache_purge_ip(
+	struct xfs_inode	*ip);
+
+void
+xfs_refcache_purge_mp(
+	struct xfs_mount	*mp);
+
+void
+xfs_refcache_purge_some(void);
 
 #endif /* _XFS_RW_H */
