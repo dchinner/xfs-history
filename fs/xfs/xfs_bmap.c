@@ -5671,7 +5671,7 @@ xfs_getbmap(
 
 	if (bmv->bmv_length == -1) {
 		fixlen = XFS_FSB_TO_BB(mp, XFS_B_TO_FSB(mp, fixlen));
-		bmv->bmv_length = MAX(fixlen - bmv->bmv_offset, 0LL);
+		bmv->bmv_length = MAX(fixlen - bmv->bmv_offset, (__int64_t)0);
 	} else if (bmv->bmv_length < 0)
 		return XFS_ERROR(EINVAL);
 	if (bmv->bmv_length == 0) {

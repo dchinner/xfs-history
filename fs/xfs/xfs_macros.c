@@ -2005,7 +2005,7 @@ xfs_min_freelist_pag(xfs_perag_t *pag, xfs_mount_t *mp)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_MIN_FREELIST_RAW)
 int
-xfs_min_freelist_raw(int bl, int cl, xfs_mount_t *mp)
+xfs_min_freelist_raw(uint bl, uint cl, xfs_mount_t *mp)
 {
 	return XFS_MIN_FREELIST_RAW(bl, cl, mp);
 }
