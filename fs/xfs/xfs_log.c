@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.76 $"
+#ident	"$Revision: 1.77 $"
 
 /*
  * High level interface routines for log manager
@@ -557,6 +557,11 @@ xlog_space_left(xlog_t *log)
 void
 xlog_iodone(buf_t *bp)
 {
+#ifdef DEBUG
+	if (bp->b_fsprivate2 != (void *)2)
+		xlog_panic("xlog_iodone: bad buffer");
+	bp->b_fsprivate2 = (void *)1;
+#endif
 	xlog_state_done_syncing((xlog_in_core_t *)(bp->b_fsprivate));
 	if ( !(bp->b_flags & B_ASYNC) ) {
 		/* Corresponding psema() will be done in bwrite().  If we don't
@@ -619,6 +624,7 @@ xlog_alloc(xlog_t *log)
 	bp = log->l_xbuf   = getrbuf(0);	/* get my locked buffer */
 	bp->b_edev	   = log_dev;
 	bp->b_iodone	   = xlog_iodone;
+	bp->b_fsprivate2   = (void *)1;
 	ASSERT(log->l_xbuf->b_flags & B_BUSY);
 	ASSERT(valusema(&log->l_xbuf->b_lock) <= 0);
 	initnlock(&log->l_icloglock, "iclog");
@@ -649,6 +655,7 @@ xlog_alloc(xlog_t *log)
 		bp = iclog->ic_bp = getrbuf(0);		/* my locked buffer */
 		bp->b_edev = log_dev;
 		bp->b_iodone = xlog_iodone;
+		bp->b_fsprivate2 = (void *)1;
 		ASSERT(iclog->ic_bp->b_flags & B_BUSY);
 		ASSERT(valusema(&iclog->ic_bp->b_lock) <= 0);
 		initnsema(&iclog->ic_forcesema, 0, "iclog-force");
@@ -769,6 +776,11 @@ xlog_sync(xlog_t		*log,
 	iclog->ic_header.h_len = iclog->ic_offset;	/* real byte length */
 
 	bp	    = iclog->ic_bp;
+#if DEBUG
+	if (bp->b_fsprivate2 != (void *)1)
+		xlog_panic("xlog_sync: bad buffer");
+	bp->b_fsprivate2 = (void *)2;
+#endif
 	bp->b_blkno = BLOCK_LSN(iclog->ic_header.h_lsn);
 
 	/* Round byte count up to a XLOG_BBSIZE chunk */
@@ -802,6 +814,11 @@ xlog_sync(xlog_t		*log,
 
 	if (split) {
 		bp		= iclog->ic_log->l_xbuf;
+#ifdef DEBUG
+		if (bp->b_fsprivate2 != (void *)1)
+			xlog_panic("xlog_sync(split): bad buffer");
+		bp->b_fsprivate2 = (void *)2;
+#endif
 		bp->b_blkno	= 0;		     /* logical 0 */
 		bp->b_bcount	= bp->b_bufsize = split;
 		bp->b_dmaaddr	= (caddr_t)((psint)iclog+(psint)count);
