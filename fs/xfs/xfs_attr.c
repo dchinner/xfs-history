@@ -1,4 +1,4 @@
-#ident "$Revision: 1.41 $"
+#ident "$Revision: 1.42 $"
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/buf.h>
@@ -641,7 +641,7 @@ xfs_attr_inactive(xfs_inode_t *dp)
 	 * async inactive transactions are safe.
 	 */
 	error = xfs_itruncate_finish(&trans, dp, 0LL, XFS_ATTR_FORK,
-				((dp->i_mount->m_flags & XFS_MOUNT_WSYNC == 0)
+				(((dp->i_mount->m_flags & XFS_MOUNT_WSYNC) == 0)
 				 ? 1 : 0));
 
 	/*
