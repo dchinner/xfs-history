@@ -40,6 +40,10 @@
 
 #define	ROUNDUPNBWORD(x)	(((x) + (NBWORD - 1)) & ~NBWORD)
 
+/*
+ * This lock guards the buf log item bli_refcount fields.
+ */
+lock_t	xfs_bli_reflock;
 
 STATIC void	xfs_buf_item_set_bit(uint *, uint, uint);
 
@@ -58,6 +62,8 @@ STATIC void	xfs_buf_item_log_check(xfs_buf_log_item_t *);
  * It calculates this as 1 iovec for the buf log format structure
  * and 1 or each stretch of non-contiguous chunks to be logged.
  * Contiguous chunks are logged in a single iovec.
+ *
+ * If the XFS_BLI_STALE flag has been set, then log nothing.
  */
 uint
 xfs_buf_item_size(xfs_buf_log_item_t *bip)
@@ -65,6 +71,14 @@ xfs_buf_item_size(xfs_buf_log_item_t *bip)
 	uint	nvecs;
 	int	next_bit;
 	int	last_bit;
+
+	if (bip->bli_flags & XFS_BLI_STALE) {
+		/*
+		 * The buffer is stale, so don't bother
+		 * logging anything.
+		 */
+		return 0;
+	}
 
 	nvecs = 1;
 	last_bit = xfs_buf_item_next_bit(bip->bli_format.blf_data_map,
@@ -118,6 +132,14 @@ xfs_buf_item_format(xfs_buf_log_item_t	*bip,
 	int		next_bit;
 	uint		nbits;
 	uint		buffer_offset;
+
+	if (bip->bli_flags & XFS_BLI_STALE) {
+		/*
+		 * The buffer is stale, so don't bother
+		 * logging anything.
+		 */
+		return;
+	}
 
 	bp = bip->bli_buf;
 	ASSERT(BP_ISMAPPED(bp));
@@ -212,18 +234,39 @@ xfs_buf_item_pin(xfs_buf_log_item_t *bip)
  * This is called to unpin the buffer associated with the buf log
  * item which was previously pinned with a call to xfs_buf_item_pin().
  * Just call bunpin() on the buffer to do this.
+ *
+ * Also drop the reference to the buf item for the current transaction.
+ * If the XFS_BLI_STALE flag is set and we are the last reference,
+ * then free up the buf log item.
  */
 void
 xfs_buf_item_unpin(xfs_buf_log_item_t *bip)
 {
-	buf_t	*bp;
+	xfs_mount_t	*mp;
+	buf_t		*bp;
+	int		s;
+	int		refcount;
 
 	bp = bip->bli_buf;
 	ASSERT(bp != NULL);
 	ASSERT((xfs_buf_log_item_t*)(bp->b_fsprivate) == bip);
+	ASSERT(bip->bli_refcount > 0);
+
+	s = splockspl(xfs_bli_reflock, splhi);
+	refcount = --(bip->bli_refcount);
+	spunlockspl(xfs_bli_reflock, s);
+
+	if ((refcount == 0) && (bip->bli_flags & XFS_BLI_STALE)) {
+		ASSERT(!(bp->b_flags & B_DELWRI));
+		mp = bip->bli_item.li_mountp;
+		s = AIL_LOCK(mp);
+		xfs_trans_delete_ail(mp, (xfs_log_item_t *)bip);
+		AIL_UNLOCK(mp, s);
+		xfs_buf_item_relse(bp);
+		ASSERT(bp->b_fsprivate == NULL);
+	}
 	bunpin(bp);
 }
-
 /*
  * This is called to attempt to lock the buffer associated with this
  * buf log item.  Don't sleep on the buffer lock.  If we can't get
