@@ -113,6 +113,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	 */
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
+	ASSERT(!(bip->bli_format.blf_flags & XFS_BLI_CANCEL));
  	ASSERT(!(bip->bli_flags & XFS_BLI_LOGGED));
 	bip->bli_recur = 0;
 
@@ -196,6 +197,7 @@ xfs_trans_getsb(xfs_trans_t	*tp,
 	 */
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
+	ASSERT(!(bip->bli_format.blf_flags & XFS_BLI_CANCEL));
  	ASSERT(!(bip->bli_flags & XFS_BLI_LOGGED));
 	bip->bli_recur = 0;
 
@@ -322,6 +324,7 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 	 */
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
+	ASSERT(!(bip->bli_format.blf_flags & XFS_BLI_CANCEL));
  	ASSERT(!(bip->bli_flags & XFS_BLI_LOGGED));
 	bip->bli_recur = 0;
 
@@ -399,6 +402,7 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;	
 	ASSERT(bip->bli_item.li_type == XFS_LI_BUF);
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
+	ASSERT(!(bip->bli_format.blf_flags & XFS_BLI_CANCEL));
 	ASSERT(bip->bli_refcount > 0);
 
 	/*
@@ -515,6 +519,7 @@ xfs_trans_bjoin(xfs_trans_t	*tp,
 	xfs_buf_item_init(bp, tp->t_mountp);
 	bip = bp->b_fsprivate;
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
+	ASSERT(!(bip->bli_format.blf_flags & XFS_BLI_CANCEL));
 	ASSERT(!(bip->bli_flags & XFS_BLI_LOGGED));
 
 	/*
@@ -555,6 +560,7 @@ xfs_trans_bhold(xfs_trans_t	*tp,
 
 	bip = (xfs_buf_log_item_t*)(bp->b_fsprivate);
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
+	ASSERT(!(bip->bli_format.blf_flags & XFS_BLI_CANCEL));
 	ASSERT(bip->bli_refcount > 0);
 	bip->bli_flags |= XFS_BLI_HOLD;
 	xfs_buf_item_trace("BHOLD", bip);
@@ -583,6 +589,7 @@ xfs_trans_bhold_until_committed(xfs_trans_t	*tp,
 
 	bip = (xfs_buf_log_item_t *)(bp->b_fsprivate);
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
+	ASSERT(!(bip->bli_format.blf_flags & XFS_BLI_CANCEL));
 	ASSERT(bip->bli_refcount > 0);
 	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)bip);
 	ASSERT(lidp != NULL);
@@ -643,6 +650,7 @@ xfs_trans_log_buf(xfs_trans_t	*tp,
 	if (bip->bli_flags & XFS_BLI_STALE) {
 		xfs_buf_item_trace("BLOG UNSTALE", bip);
 		bip->bli_flags &= ~XFS_BLI_STALE;
+		bip->bli_format.blf_flags &= ~XFS_BLI_CANCEL;
 	}
 
 	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)bip);
@@ -700,6 +708,7 @@ xfs_trans_binval(
 		ASSERT(!(bp->b_flags & B_DELWRI));
 		ASSERT(!(bip->bli_flags & (XFS_BLI_LOGGED | XFS_BLI_DIRTY)));
 		ASSERT(!(bip->bli_format.blf_flags & XFS_BLI_INODE_BUF));
+		ASSERT(bip->bli_format.blf_flags & XFS_BLI_CANCEL);
 		ASSERT(lidp->lid_flags & XFS_LID_DIRTY);
 		ASSERT(tp->t_flags & XFS_TRANS_DIRTY);
 		xfs_buf_item_trace("BINVAL RECUR", bip);
@@ -711,6 +720,10 @@ xfs_trans_binval(
 	 * in the buf log item.  The STALE flag will be used in
 	 * xfs_buf_item_unpin() to determine if it should clean up
 	 * when the last reference to the buf item is given up.
+	 * We set the XFS_BLI_CANCEL flag in the buf log format structure
+	 * and log the buf item.  This will be used at recovery time
+	 * to determine that copies of the buffer in the log before
+	 * this should not be replayed.
 	 * We mark the item descriptor and the transaction dirty so
 	 * that we'll hold the buffer until after the commit.
 	 *
@@ -723,6 +736,7 @@ xfs_trans_binval(
 	bip->bli_flags |= XFS_BLI_STALE;
 	bip->bli_flags &= ~(XFS_BLI_LOGGED | XFS_BLI_DIRTY);
 	bip->bli_format.blf_flags &= ~XFS_BLI_INODE_BUF;
+	bip->bli_format.blf_flags |= XFS_BLI_CANCEL;
 	bzero((char *)(bip->bli_format.blf_data_map),
 	      (bip->bli_format.blf_map_size * sizeof(uint)));
 	lidp->lid_flags |= XFS_LID_DIRTY;
