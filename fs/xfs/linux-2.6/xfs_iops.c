@@ -668,7 +668,7 @@ xfs_read_full_page(
 	xfs_mount_t	*mp = xip->i_mount;
 
 	return pagebuf_read_full_page(
-			(xip->i_d.di_flags & XFS_IOCORE_RT)?
+			(xip->i_d.di_flags & XFS_DIFLAG_REALTIME)?
 			mp->m_rtdev_targ.pb_targ : mp->m_ddev_targ.pb_targ,
 			page, linvfs_pb_bmap);
 }
@@ -682,7 +682,7 @@ xfs_write_full_page(
 	xfs_mount_t	*mp = xip->i_mount;
 
 	return pagebuf_write_full_page(
-			(xip->i_d.di_flags & XFS_IOCORE_RT)?
+			(xip->i_d.di_flags & XFS_DIFLAG_REALTIME)?
 			mp->m_rtdev_targ.pb_targ : mp->m_ddev_targ.pb_targ,
 			page, linvfs_pb_bmap);
 }
@@ -698,7 +698,7 @@ xfs_prepare_write(
 	xfs_mount_t	*mp = xip->i_mount;
 
 	return pagebuf_prepare_write(
-			(xip->i_d.di_flags & XFS_IOCORE_RT)?
+			(xip->i_d.di_flags & XFS_DIFLAG_REALTIME)?
 			mp->m_rtdev_targ.pb_targ : mp->m_ddev_targ.pb_targ,
 			page, from, to, linvfs_pb_bmap);
 }
@@ -714,7 +714,7 @@ xfs_commit_write(
 	xfs_mount_t	*mp = xip->i_mount;
 
 	return pagebuf_commit_write(
-			(xip->i_d.di_flags & XFS_IOCORE_RT)?
+			(xip->i_d.di_flags & XFS_DIFLAG_REALTIME)?
 			mp->m_rtdev_targ.pb_targ : mp->m_ddev_targ.pb_targ,
 			page, from, to);
 }
@@ -728,7 +728,7 @@ xfs_release_page(
 	xfs_mount_t	*mp = xip->i_mount;
 
 	pagebuf_release_page(
-			(xip->i_d.di_flags & XFS_IOCORE_RT)?
+			(xip->i_d.di_flags & XFS_DIFLAG_REALTIME)?
 			mp->m_rtdev_targ.pb_targ : mp->m_ddev_targ.pb_targ,
 			page, linvfs_pb_bmap);
 	return 1;
