@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.175 $"
+#ident	"$Revision: 1.176 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -3508,6 +3508,7 @@ xfs_bmap_validate_ret(
 	ASSERT(ret_nmap <= nmap);
 
 	for (i = 0; i < ret_nmap; i++) {
+		ASSERT(mval[i].br_blockcount > 0);
 		if (!(flags & XFS_BMAPI_ENTIRE)) {
 			ASSERT(mval[i].br_startoff >= bno);
 			ASSERT(mval[i].br_blockcount <= len);
