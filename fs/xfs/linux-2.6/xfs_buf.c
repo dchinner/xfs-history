@@ -505,21 +505,6 @@ _pagebuf_lookup_pages(
 			nbytes = size;
 		size -= nbytes;
 
-		/* Test for the page being valid. There is a special case
-		 * in here for the case where we are reading a pagebuf
-		 * smaller than a page. We want to populate the whole page
-		 * here rather than just the part the caller wanted. That
-		 * way we do not need to deal with partially valid pages.
-		 * We keep the page locked, and in the read path fake out
-		 * the lower layers to issue an I/O for the whole page.
-		 *
-		 * This doesn't work for filesystem blocksizes which are
-		 * smaller than the pagesize.  We can have metadata blocks
-		 * on these block device inode pages overlapping with file
-		 * data...  so it would be possible to have multiple pages
-		 * thinking they all have uptodate (different) data. :(
-		 * We'll have to use a different approach for that case.
-		 */
 		if (!PageUptodate(page)) {
 			if ((blocksize == PAGE_CACHE_SIZE) &&
 			    (flags & PBF_READ)) {
@@ -543,8 +528,6 @@ _pagebuf_lookup_pages(
 				good_pages--;
 			}
 		}
-		if (!pb->pb_locked)
-			unlock_page(page);
 		offset = 0;
 	}
 	if (cached_page)
@@ -578,6 +561,11 @@ mapit:
 		pb->pb_flags &= ~(PBF_NONE);
 		if (good_pages != page_count) {
 			pb->pb_flags |= PBF_PARTIAL;
+		}
+	}
+	if (!pb->pb_locked) {
+		for (pi = 0; pi < page_count; pi++) {
+			unlock_page(pb->pb_pages[pi]);
 		}
 	}
 
