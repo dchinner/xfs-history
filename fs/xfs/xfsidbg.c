@@ -1897,7 +1897,7 @@ kdbm_pbmap(int argc, const char **argv, const char **envp,
 }
 
 #ifdef	PAGEBUF_TRACE
-#include <linux/page_buf_trace.h>
+#include <pagebuf/page_buf_trace.h>
 
 #define EV_SIZE	(sizeof(event_names)/sizeof(char *))
 

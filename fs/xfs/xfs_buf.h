@@ -235,7 +235,7 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
 
 #ifdef PAGEBUF_TRACE
 #define PB_DEFINE_TRACES
-#include <linux/page_buf_trace.h>
+#include <pagebuf/page_buf_trace.h>
 
 #define xfs_buftrace(id, bp)	PB_TRACE(bp, (void *)id)
 #else
