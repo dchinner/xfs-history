@@ -1,4 +1,4 @@
-#ident "$Revision: 1.332 $"
+#ident "$Revision: 1.333 $"
 
 
 #ifdef SIM
@@ -5904,7 +5904,7 @@ vnodeops_t xfs_vnodeops = {
 	(vop_realvp_t)fs_nosys,
 	(vop_bmap_t)fs_nosys,
 	(vop_strategy_t)fs_nosys,
-	(vop_map_t)fs_nosys,
+	(vop_map_t)fs_nodev,
 	(vop_addmap_t)fs_nosys,
 	(vop_delmap_t)fs_nosys,
 	(vop_poll_t)fs_nosys,
