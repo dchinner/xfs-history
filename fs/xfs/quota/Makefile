@@ -52,6 +52,7 @@ obj-y				+= xfs_dquot.o \
 				   xfs_qm_bhv.o \
 				   xfs_qm.o
 
-export-objs			+= xfs_qm.o
+obj-$(CONFIG_MODULES)		+= xfs_qm_ksyms.o
+export-objs			+= xfs_qm_ksyms.o
 
 include $(TOPDIR)/Rules.make

@@ -83,6 +83,11 @@ xfs-$(CONFIG_XFS_QUOTA)		+= $(addprefix quota/, \
 				   xfs_qm_syscalls.o \
 				   xfs_qm_bhv.o \
 				   xfs_qm.o)
+
+ifeq ($(CONFIG_MODULES),y)
+xfs-$(CONFIG_XFS_QUOTA)		+= quota/xfs_qm_ksyms.o
+endif
+
 ifeq ($(CONFIG_XFS_QUOTA),y)
 xfs-$(CONFIG_PROC_FS)		+= quota/xfs_qm_stats.o
 else
@@ -161,6 +166,8 @@ xfs-y				+= $(addprefix $(XFS_LINUX)/, \
 				   xfs_vfs.o \
 				   xfs_vnode.o \
 				   xfs_buf.o)
+
+xfs-$(CONFIG_MODULES)		+= $(XFS_LINUX)/xfs_ksyms.o
 
 # Objects in support/
 xfs-y				+= $(addprefix support/, \
