@@ -52,10 +52,13 @@
  * XLOG_CONTINUE_TRANS until the last one, which gets marked with XLOG_END_TRANS.
  *
  */
-#define XLOG_START_TRANS		0x1	/* Start a new transaction */
-#define XLOG_COMMIT_TRANS	0x2	/* Commit this transaction */
-#define XLOG_CONTINUE_TRANS	0x4	/* Cont this trans into new region */
-#define XLOG_END_TRANS		0x8	/* End a continued transaction */
+#define XLOG_START_TRANS	0x01	/* Start a new transaction */
+#define XLOG_COMMIT_TRANS	0x02	/* Commit this transaction */
+#define XLOG_CONTINUE_TRANS	0x04	/* Cont this trans into new region */
+#define XLOG_WAS_CONT_TRANS	0x08	/* Cont this trans into new region */
+#define XLOG_END_TRANS		0x10	/* End a continued transaction */
+#define XLOG_SKIP_TRANS		(XLOG_COMMIT_TRANS | XLOG_CONTINUE_TRANS | \
+				 XLOG_WAS_CONT_TRANS | XLOG_END_TRANS)
 
 /*
  * Flags to log ticket
@@ -89,10 +92,10 @@ typedef struct xlog_rec_header {
 	uint	  h_cycle;	/* write cycle of log			:  4 */
 	int	  h_version;	/* LR version				:  4 */
 	xfs_lsn_t h_lsn;	/* lsn of this LR			:  8 */
-	xfs_lsn_t h_sync_lsn;	/* lsn of 1st LR w/ buffers not committed: 8 */
+	xfs_lsn_t h_tail_lsn;	/* lsn of 1st LR w/ buffers not committed: 8 */
 	int	  h_len;	/* len in bytes; should be 64-bit aligned: 4 */
 	uint	  h_chksum;	/* may not be used; non-zero if used	:  4 */
-	int	  h_prev_offset;/* block offset to previous LR		:  4 */
+	int	  h_prev_block; /* block number to previous LR		:  4 */
 	int	  h_num_logops;	/* number of log operations in this LR	:  4 */
 	uint	  h_cycle_data[XLOG_RECORD_BSIZE / BBSIZE];
 } xlog_rec_header_t;
@@ -125,6 +128,7 @@ typedef struct xlog_in_core {
 	buf_t	  		*ic_bp;
 	struct log		*ic_log;
 	xfs_log_callback_t	*ic_callback;
+	xfs_log_callback_t	**ic_callback_tail;
 	int	  		ic_size;
 	int	  		ic_offset;
 	int	  		ic_refcnt;
@@ -144,7 +148,7 @@ typedef struct log {
 	xlog_in_core_t	*l_iclog;     /* head log queue			  :  4*/
 	sema_t		l_flushsema;  /* iclog flushing semaphore	  : 20*/
 	lock_t		l_icloglock;  /* grab to change iclog state	  :  4*/
-	xfs_lsn_t	l_sync_lsn;   /* lsn of 1st LR w/ unflushed buffers: 8*/
+	xfs_lsn_t	l_tail_lsn;   /* lsn of 1st LR w/ unflushed buffers: 8*/
 	xfs_mount_t	*l_mp;	      /* mount point			   : 4*/
 	buf_t		*l_xbuf;      /* extra buffer for log wrapping	   : 4*/
 	dev_t		l_dev;	      /* dev_t of log			   : 4*/
