@@ -66,7 +66,7 @@
 #endif
 
 #ifdef XFSDADEBUG
-int xfsda_debug = 1;		/* interval for fsck at split/join ops */
+int xfsda_debug = 200;		/* interval for fsck at split/join ops */
 int xfsda_debug_cnt = 1;	/* counter for fsck at split/join ops */
 int xfsda_check(xfs_inode_t *dp, int whichfork);
 int xfsda_loaddir(xfs_inode_t *dp);
@@ -189,19 +189,79 @@ xfs_da_split(xfs_da_state_t *state)
 		switch (oldblk->magic) {
 		case XFS_ATTR_LEAF_MAGIC:
 #ifdef SIM
-			error = ENOTTY;
+			return(ENOTTY);
 #else
 			error = xfs_attr_leaf_split(state, oldblk, newblk);
-#endif
-			if (error)
+			if ((error != 0) && (error != ENOSPC)) {
 				return(error);	/* GROT: dir is inconsistent */
-			addblk = newblk;
+			}
+			if (!error) {
+				addblk = newblk;
+				break;
+			}
+#ifdef XFSDADEBUG
+if (xfsda_debug) {
+	printf("\nATTR: Doing a double-split operation\n");
+}
+xfsda_debug_cnt = 0;	/* force an FSCK */
+#endif /* XFSDADEBUG */
+
+			/*
+			 * Entry wouldn't fit, split the leaf again.
+			 */
+			state->extravalid = 1;
+			if (state->inleaf) {
+				state->extraafter = 0;	/* before newblk */
+				error = xfs_attr_leaf_split(state, oldblk,
+							    &state->extrablk);
+				if (error)
+					return(error);	/* GROT: dir incon. */
+				addblk = newblk;
+			} else {
+				state->extraafter = 1;	/* after newblk */
+				error = xfs_attr_leaf_split(state, newblk,
+							    &state->extrablk);
+				if (error)
+					return(error);	/* GROT: dir incon. */
+				addblk = newblk;
+			}
 			break;
+#endif
 		case XFS_DIR_LEAF_MAGIC:
 			error = xfs_dir_leaf_split(state, oldblk, newblk);
-			if (error)
+			if ((error != 0) && (error != ENOSPC)) {
 				return(error);	/* GROT: dir is inconsistent */
-			addblk = newblk;
+			}
+			if (!error) {
+				addblk = newblk;
+				break;
+			}
+#ifdef XFSDADEBUG
+if (xfsda_debug) {
+	printf("\nDIR: Doing a double-split operation\n");
+}
+xfsda_debug_cnt = 0;	/* force an FSCK */
+#endif /* XFSDADEBUG */
+
+			/*
+			 * Entry wouldn't fit, split the leaf again.
+			 */
+			state->extravalid = 1;
+			if (state->inleaf) {
+				state->extraafter = 0;	/* before newblk */
+				error = xfs_dir_leaf_split(state, oldblk,
+							   &state->extrablk);
+				if (error)
+					return(error);	/* GROT: dir incon. */
+				addblk = newblk;
+			} else {
+				state->extraafter = 1;	/* after newblk */
+				error = xfs_dir_leaf_split(state, newblk,
+							   &state->extrablk);
+				if (error)
+					return(error);	/* GROT: dir incon. */
+				addblk = newblk;
+			}
 			break;
 		case XFS_DA_NODE_MAGIC:
 			error = xfs_da_node_split(state, oldblk, newblk, addblk,
@@ -323,7 +383,7 @@ xfs_da_node_split(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 {
 	xfs_da_intnode_t *node;
 	xfs_dablk_t blkno;
-	int error;
+	int newcount, error;
 
 	node = (xfs_da_intnode_t *)oldblk->bp->b_un.b_addr;
 	ASSERT(node->hdr.info.magic == XFS_DA_NODE_MAGIC);
@@ -331,7 +391,8 @@ xfs_da_node_split(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 	/*
 	 * Do we have to split the node?
 	 */
-	if (node->hdr.count >= XFS_DA_NODE_ENTRIES(state->mp)) {
+	newcount = 1 + (state->extravalid ? 1 : 0);
+	if ((node->hdr.count + newcount) > XFS_DA_NODE_ENTRIES(state->mp)) {
 		/*
 		 * Allocate a new node, add to the doubly linked chain of
 		 * nodes, then move some of our excess entries into it.
@@ -356,7 +417,7 @@ xfs_da_node_split(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 	}
 
 	/*
-	 * Insert the new entry into the correct block
+	 * Insert the new entry(s) into the correct block
 	 * (updating last hashval in the process).
 	 *
 	 * xfs_da_node_add() inserts BEFORE the given index,
@@ -364,14 +425,28 @@ xfs_da_node_split(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 	 * point to a valid entry (not after one), but a split
 	 * operation always results in a new block whose hashvals
 	 * FOLLOW the current block.
+	 *
+	 * If we had double-split op below us, then add the extra block too.
 	 */
 	node = (xfs_da_intnode_t *)oldblk->bp->b_un.b_addr;
 	if (oldblk->index <= node->hdr.count) {
 		oldblk->index++;
 		xfs_da_node_add(state, oldblk, addblk);
+		if (state->extravalid) {
+			if (state->extraafter)
+				oldblk->index++;
+			xfs_da_node_add(state, oldblk, &state->extrablk);
+			state->extravalid = 0;
+		}
 	} else {
 		newblk->index++;
 		xfs_da_node_add(state, newblk, addblk);
+		if (state->extravalid) {
+			if (state->extraafter)
+				newblk->index++;
+			xfs_da_node_add(state, newblk, &state->extrablk);
+			state->extravalid = 0;
+		}
 	}
 
 	return(0);
@@ -1228,9 +1303,10 @@ xfs_da_node_lasthash(buf_t *bp, int *count)
 
 	node = (xfs_da_intnode_t *)bp->b_un.b_addr;
 	ASSERT(node->hdr.info.magic == XFS_DA_NODE_MAGIC);
-	if (count) {
+	if (count)
 		*count = node->hdr.count;
-	}
+	if (node->hdr.count == 0)
+		return(0);
 	return(node->btree[ node->hdr.count-1 ].hashval);
 }
 
@@ -1785,6 +1861,18 @@ xfsda_load_node(xfs_inode_t *dp, xfs_dablk_t blkno, int whichfork)
 					     bp, VAL1, VAL2, VAL3)
 
 /*
+ * Block usage information.
+ */
+#define XFSDA_BLK_INUSE		0x01	/* block in is use */
+#define XFSDA_BLK_LEAF		0x02	/* block is a leaf */
+#define XFSDA_BLK_NODE		0x04	/* block is a node */
+#define XFSDA_BLK_VALUE		0x08	/* block is an attr remote value */
+#define XFSDA_BLK_MULTI		0x10	/* block is multiply used */
+#define XFSDA_BLK_FORWARD	0x20	/* block is someone's "forward" */
+#define XFSDA_BLK_BACKWARD	0x40	/* block is someone's "backward" */
+#define XFSDA_BLK_ENDCHAIN	0x80	/* block is beginning/end of chain */
+
+/*
  * Directory/attribute structure checking data, context for each process.
  */
 typedef struct xfsda_context {
@@ -1806,22 +1894,25 @@ typedef struct xfsda_context {
 	int		nodes;		/* node blocks seen */
 	int		leaves;		/* leaf blocks seen */
 	int		values;		/* "remote" value blocks seen */
+	int		multichk;	/* show uses of mutiply used blocks */
 } xfsda_context_t;
 
 
 int xfsda_leaf_check(xfsda_context_t *con, xfs_dablk_t blkno, int firstlast);
 int xfsda_attr_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno,
 					  int firstlast);
+int xfsda_attr_leaf_recheck(xfsda_context_t *con, xfs_dablk_t blkno);
 int xfsda_dir_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno,
 					 int firstlast);
 int xfsda_node_check(xfsda_context_t *con, xfs_dablk_t blkno, int depth,
 				     int firstlast);
+int xfsda_attr_node_recheck(xfsda_context_t *con, xfs_dablk_t blkno);
 int xfsda_check_blockuse(xfsda_context_t *con);
 int xfsda_checkchain(xfsda_context_t *con, buf_t *bp, xfs_dablk_t parentblk,
 				     xfs_dablk_t blkno, int forward);
 int xfsda_endchain(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno);
-int xfsda_checkblock(xfsda_context_t *con, buf_t *bp,
-				     xfs_dablk_t blkno, int level);
+int xfsda_checkblock(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno,
+				     int blktype);
 int xfsda_checkname(buf_t *bp, char *name, int namelen, int index,
 			  xfs_dahash_t hashval);
 void xfsda_printbytes(int bytes);
@@ -1876,9 +1967,14 @@ xfsda_check(xfs_inode_t *dp, int whichfork)
 			retval = 0; /* xfsda_shortform_check(con); */
 		} else if (xfs_bmap_one_block(dp, XFS_ATTR_FORK)) {
 			retval = xfsda_leaf_check(con, 0, -2);
+			if (con->multichk) {
+				retval = xfsda_attr_leaf_recheck(con, 0);
+			}
 		} else {
 			retval = xfsda_node_check(con, (xfs_dablk_t)0, -1, -2);
-			retval += xfsda_check_blockuse(con);
+			if (con->multichk) {
+				retval = xfsda_attr_node_recheck(con, 0);
+			}
 		}
 	} else {
 		if (dp->i_d.di_size <= XFS_LITINO(dp->i_mount)) {
@@ -1887,9 +1983,10 @@ xfsda_check(xfs_inode_t *dp, int whichfork)
 			retval = xfsda_leaf_check(con, 0, -2);
 		} else {
 			retval = xfsda_node_check(con, (xfs_dablk_t)0, -1, -2);
-			retval += xfsda_check_blockuse(con);
 		}
 	}
+	retval += xfsda_check_blockuse(con);
+
 	printf("%d entries, blocks(n/l/v): %d/%d/%d, bytes(u/f/w): ",
 		   con->entries, con->nodes, con->leaves, con->values);
 	xfsda_printbytes(con->usedbytes);
@@ -2098,7 +2195,8 @@ xfsda_attr_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno,
 				con->wastedbytes += XFS_FSB_TO_B(con->dp->i_mount, n)
 							- remotep->valuelen;
 				for (j = 0; j < n; k++, j++) {
-					tmp = xfsda_checkblock(con, NULL, k, -1);
+					tmp = xfsda_checkblock(con, NULL, k,
+							    XFSDA_BLK_VALUE);
 					if (tmp) {
 						retval += tmp;
 						BADNEWS1(" in: leaf 0x%x\n",
@@ -2172,6 +2270,44 @@ xfsda_attr_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno,
 			BADNEWS3("firstused (0x%x) not right (0x%x), no holes: leaf 0x%x\n",
 					    (int)leaf->hdr.firstused,
 					    lowest, blkno);
+	}
+
+	if (retval == 0)
+		xfs_trans_brelse(con->dp->i_transp, bp);
+	return(retval);
+}
+
+/*ARGSUSED*/
+int
+xfsda_attr_leaf_recheck(xfsda_context_t *con, xfs_dablk_t blkno)
+{
+	xfs_attr_leafblock_t *leaf;
+	xfs_attr_leaf_entry_t *entry;
+	xfs_attr_leaf_name_remote_t *remotep;
+	int i, j, base, len, retval;
+	buf_t *bp;
+
+	(void) xfs_da_read_buf(con->dp->i_transp, con->dp, blkno, -1, &bp,
+						  con->whichfork);
+	leaf = (xfs_attr_leafblock_t *)bp->b_un.b_addr;
+
+	/*
+	 * Check the entries
+	 */
+	retval = 0;
+	entry = &leaf->entries[0];
+	for (i = 0; i < leaf->hdr.count; entry++, i++) {
+		if (entry->flags & XFS_ATTR_LOCAL)
+			continue;
+		remotep = XFS_ATTR_LEAF_NAME_REMOTE(leaf, i);
+		base = remotep->valueblk;
+		len = XFS_B_TO_FSB(con->dp->i_mount, remotep->valuelen);
+		for (j = 0; j < len; base++, j++) {
+			if (con->blockmap[base] & XFSDA_BLK_MULTI) {
+				BADNEWS3("Block 0x%x used in leaf 0x%x, bp 0x%x\n",
+						base, blkno, bp);
+			}
+		}
 	}
 
 	if (retval == 0)
@@ -2417,8 +2553,14 @@ xfsda_node_check(xfsda_context_t *con, xfs_dablk_t blkno,
 					  blkno, i);
 		}
 
-		if (tmp = xfsda_checkblock(con, bp, btree->before,
-						 node->hdr.level-1)) {
+		if ((node->hdr.level-1) > 0) {
+			tmp = xfsda_checkblock(con, bp, btree->before,
+						    XFSDA_BLK_NODE);
+		} else {
+			tmp = xfsda_checkblock(con, bp, btree->before,
+						    XFSDA_BLK_LEAF);
+		}
+		if (tmp) {
 			retval += tmp;
 			BADNEWS1(" in: node 0x%x\n", blkno);
 			retval--;
@@ -2454,6 +2596,62 @@ xfsda_node_check(xfsda_context_t *con, xfs_dablk_t blkno,
 	return(retval);
 }
 
+int
+xfsda_attr_node_recheck(xfsda_context_t *con, xfs_dablk_t blkno)
+{
+	xfs_da_intnode_t *node;
+	xfs_da_blkinfo_t *info;
+	xfs_da_node_entry_t *btree;
+	int retval, count, i;
+	buf_t *bp;
+
+	/*
+	 * Read the next node down in the tree.
+	 */
+	(void) xfs_da_read_buf(con->dp->i_transp, con->dp, blkno, -1, &bp,
+						  con->whichfork);
+	info = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
+	node = (xfs_da_intnode_t *)bp->b_un.b_addr;
+
+	/*
+	 * Check the header fields.
+	 */
+	retval = 0;
+	if (info->magic == XFS_ATTR_LEAF_MAGIC) {
+		/*
+		 * check leaf, may have "remote" value (why we ended up here)
+		 */
+		if (blkno != 0) {
+			BADNEWS1("leaf block not block 0: bp 0x%x\n", bp);
+		} else {
+			retval = xfsda_attr_leaf_recheck(con, 0);
+		}
+		return(retval);
+	}
+	count = node->hdr.count;
+
+	/*
+	 * Do a linear pass through the entries.
+	 */
+	btree = &node->btree[0];
+	for (i = 0; i < count; btree++, i++) {
+		if (con->blockmap[btree->before] & XFSDA_BLK_MULTI) {
+			BADNEWS3("Block 0x%x used in node 0x%x, bp 0x%x\n",
+					btree->before, blkno, bp);
+		}
+
+		if (node->hdr.level == 1) {
+			retval += xfsda_attr_leaf_recheck(con, btree->before);
+		} else {
+			retval += xfsda_attr_node_recheck(con, btree->before);
+		}
+	}
+
+	if (retval == 0)
+		xfs_trans_brelse(con->dp->i_transp, bp);
+	return(retval);
+}
+
 /*========================================================================
  * Utility routines.
  *========================================================================*/
@@ -2472,25 +2670,20 @@ xfsda_checkname(buf_t *bp, char *name, int namelen, int index,
 }
 
 int
-xfsda_checkblock(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno, int level)
+xfsda_checkblock(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno,
+				 int blktype)
 {
 	int retval;
 
 	retval = 0;
 	if ((blkno == 0) || (blkno >= con->maxblockmap)) {
 		BADNEWS1("block number out of range: blkno 0x%x,", blkno);
-	} else if (con->blockmap[blkno] & 0x01) {
+	} else if (con->blockmap[blkno] & XFSDA_BLK_INUSE) {
 		BADNEWS1("block multiply used: blkno 0x%x, ", blkno);
-	} else {
-		con->blockmap[blkno] |= 0x01;
-		if (level > 0) {
-			con->blockmap[blkno] |= 0x04;
-		} else if (level == 0) {
-			con->blockmap[blkno] |= 0x02;
-		} else if (level < 0) {
-			con->blockmap[blkno] |= 0x08;
-		}
+		con->blockmap[blkno] |= XFSDA_BLK_MULTI;
+		con->multichk++;
 	}
+	con->blockmap[blkno] |= (XFSDA_BLK_INUSE | blktype);
 
 	return(retval);
 }
@@ -2501,9 +2694,9 @@ xfsda_endchain(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno)
 	int retval;
 
 	retval = 0;
-	if (con->blockmap[blkno] & 0x20)
+	if (con->blockmap[blkno] & XFSDA_BLK_ENDCHAIN)
 		BADNEWS1("blkno 0x%x is already a start/end blk\n", blkno);
-	con->blockmap[blkno] |= 0x20;
+	con->blockmap[blkno] |= XFSDA_BLK_ENDCHAIN;
 	return(retval);
 }
 
@@ -2528,10 +2721,10 @@ xfsda_checkchain(xfsda_context_t *con, buf_t *bp,
 
 	if (forward) {
 		links = con->forw_links;
-		tmp = 0x80;
+		tmp = XFSDA_BLK_FORWARD;
 	} else {
 		links = con->back_links;
-		tmp = 0x40;
+		tmp = XFSDA_BLK_BACKWARD;
 	}
 
 	if (con->blockmap[blkno] & tmp) {
@@ -2562,46 +2755,43 @@ xfsda_check_blockuse(xfsda_context_t *con)
 	leaves = nodes = values = retval = 0;
 	bmp = con->blockmap;
 	for (i = 0; i < con->maxblockmap; bmp++, i++) {
-		if (*bmp & 0x08) {
+		if (*bmp & XFSDA_BLK_VALUE) {
 			values++;
-			if ((*bmp & 0x02) != 0) {
+			if ((*bmp & XFSDA_BLK_LEAF) != 0) {
 				BADNEWS1("block 0x%x is a remote value and also a leaf\n", i);
 			}
-			if (((*bmp & 0x04) != 0) || (i == 0)) {
+			if (((*bmp & XFSDA_BLK_NODE) != 0) || (i == 0)) {
 				BADNEWS1("block 0x%x a remote value and is also a node\n", i);
 			}
-			if ((*bmp & 0x06) != 0) {
-				BADNEWS1("block 0x%x is both a remote value and something else\n", i);
-			}
 		}
-		if ((*bmp & 0x02) && (*bmp & 0x04)) {
+		if ((*bmp & XFSDA_BLK_LEAF) && (*bmp & XFSDA_BLK_NODE)) {
 			BADNEWS1("block 0x%x is both a leaf and a node\n", i);
-		} else if ((*bmp & 0x02) != 0) {
+		} else if ((*bmp & XFSDA_BLK_LEAF) != 0) {
 			leaves++;
-		} else if (((*bmp & 0x04) != 0) || (i == 0)) {
+		} else if (((*bmp & XFSDA_BLK_NODE) != 0) || (i == 0)) {
 			nodes++;
 		}
 
-		if (*bmp & 0x08) {
+		if (*bmp & XFSDA_BLK_VALUE) {
 			;
-		} else if ((*bmp & 0x01) == 0) {
+		} else if ((*bmp & XFSDA_BLK_INUSE) == 0) {
 #ifdef XXX
 			if (i != 0)
 				printf("block 0x%x not referenced\n", i);
 #endif
-			if ((*bmp & 0x80) == 1)
+			if (*bmp & XFSDA_BLK_FORWARD)
 				BADNEWS1("block 0x%x is someone's \"forward\"\n", i);
-			if ((*bmp & 0x40) == 1)
+			if (*bmp & XFSDA_BLK_BACKWARD)
 				BADNEWS1("block 0x%x is someone's \"backward\"\n", i);
-		} else if ((*bmp & 0x20) == 0) {
-			if ((*bmp & 0x80) == 0)
+		} else if ((*bmp & XFSDA_BLK_ENDCHAIN) == 0) {
+			if ((*bmp & XFSDA_BLK_FORWARD) == 0)
 				BADNEWS1("block 0x%x not someone's \"forward\"\n", i);
-			else if ((*bmp & 0x40) == 0)
+			else if ((*bmp & XFSDA_BLK_BACKWARD) == 0)
 				BADNEWS1("block 0x%x not someone's \"backward\"\n", i);
 		} else {
-			if ((*bmp & 0x80) == 1)
+			if ((*bmp & XFSDA_BLK_FORWARD) == 1)
 				BADNEWS1("block 0x%x a start/end blk but also someone's \"forward\"\n", i);
-			else if ((*bmp & 0x40) == 1)
+			else if ((*bmp & XFSDA_BLK_BACKWARD) == 1)
 				BADNEWS1("block 0x%x a start/end blk but also someone's \"backward\"\n", i);
 		}
 	}
