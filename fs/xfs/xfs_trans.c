@@ -28,6 +28,18 @@
 #include "xfs_mount.h"
 #include "xfs_error.h"
 #include "xfs_trans_priv.h"
+#include "xfs_alloc_btree.h"
+#include "xfs_bmap_btree.h"
+#include "xfs_ialloc_btree.h"
+#include "xfs_btree.h"
+#include "xfs_ialloc.h"
+#include "xfs_alloc.h"
+#include "xfs_bmap.h"
+#include "xfs_dinode.h"
+#include "xfs_inode_item.h"
+#include "xfs_inode.h"
+#include "xfs_dir.h"
+
 
 #ifdef SIM
 #include "sim.h"
@@ -56,18 +68,29 @@ xfs_trans_id_alloc(
 }
 
 
-
-/*ARGSUSED*/
-int
-xfs_trans_lsn_danger(
-	xfs_mount_t	*mp,
-	xfs_lsn_t	lsn)
+/*
+ * Initialize the precomputed transaction reservation values
+ * in the mount structure.
+ */
+void
+xfs_trans_init(
+	xfs_mount_t	*mp)
 {
-	/*
-	 * XXXajs
-	 * Do this.
-	 */
-	return (0);
+	xfs_trans_reservations_t	*resp;
+
+	resp = &(mp->m_reservations);
+	resp->tr_write = XFS_CALC_WRITE_LOG_RES(mp);
+	resp->tr_itruncate = XFS_CALC_ITRUNCATE_LOG_RES(mp);
+	resp->tr_rename = XFS_CALC_RENAME_LOG_RES(mp);
+	resp->tr_link = XFS_CALC_LINK_LOG_RES(mp);
+	resp->tr_remove = XFS_CALC_REMOVE_LOG_RES(mp);
+	resp->tr_symlink = XFS_CALC_SYMLINK_LOG_RES(mp);
+	resp->tr_create = XFS_CALC_CREATE_LOG_RES(mp);
+	resp->tr_mkdir = XFS_CALC_MKDIR_LOG_RES(mp);
+	resp->tr_ifree = XFS_CALC_IFREE_LOG_RES(mp);
+	resp->tr_ichange = XFS_CALC_ICHANGE_LOG_RES(mp);
+	resp->tr_growdata = XFS_CALC_GROWDATA_LOG_RES(mp);
+	resp->tr_swrite = XFS_CALC_SWRITE_LOG_RES(mp);
 }
 
 /*
@@ -96,7 +119,6 @@ xfs_trans_alloc(
 	tp->t_type = type;
 	tp->t_mountp = mp;
 	tp->t_flags = 0;
-	initnsema(&(tp->t_sema), 0, "xfs_trans");
 	tp->t_items_free = XFS_LIC_NUM_SLOTS;
 	XFS_LIC_INIT(&(tp->t_items));
 
@@ -126,7 +148,6 @@ xfs_trans_dup(
 	ntp->t_tid = xfs_trans_id_alloc(tp->t_mountp);
 	ntp->t_type = tp->t_type;
 	ntp->t_mountp = tp->t_mountp;
-	initnsema(&(ntp->t_sema), 0, "xfs_trans");
 	ntp->t_items_free = XFS_LIC_NUM_SLOTS;
 	XFS_LIC_INIT(&(ntp->t_items));
 
@@ -544,6 +565,8 @@ xfs_trans_commit(
 	int			error;
 	int			log_flags;
 	int			sync;
+#define	XFS_TRANS_LOGVEC_COUNT	16
+	xfs_log_iovec_t		log_vector_fast[XFS_TRANS_LOGVEC_COUNT];
 	static xfs_lsn_t	trans_lsn = 1;
 
 	/*
@@ -586,12 +609,18 @@ xfs_trans_commit(
 	/*
 	 * Ask each log item how many log_vector entries it will
 	 * need so we can figure out how many to allocate.
+	 * Try to avoid the kmem_alloc() call in the common case
+	 * by using a vector from the stack when it fits.
 	 */
 	nvec = xfs_trans_count_vecs(tp);
 
-	log_vector = (xfs_log_iovec_t *)kmem_alloc(nvec *
+	if (nvec <= XFS_TRANS_LOGVEC_COUNT) {
+		log_vector = log_vector_fast;
+	} else {
+		log_vector = (xfs_log_iovec_t *)kmem_alloc(nvec *
 						   sizeof(xfs_log_iovec_t),
 						   KM_SLEEP);
+	}
 
 	/*
 	 * Fill in the log_vector and pin the logged items, and
@@ -607,7 +636,9 @@ xfs_trans_commit(
 		tp->t_lsn = trans_lsn++;
 	}
 
-	kmem_free(log_vector, nvec * sizeof(xfs_log_iovec_t));
+	if (nvec > XFS_TRANS_LOGVEC_COUNT) {
+		kmem_free(log_vector, nvec * sizeof(xfs_log_iovec_t));
+	}
 
 	/*
 	 * Once all the items of the transaction have been copied
@@ -789,7 +820,6 @@ STATIC void
 xfs_trans_free(
 	xfs_trans_t	*tp)
 {
-	freesema(&(tp->t_sema));
 	kmem_zone_free(xfs_trans_zone, tp);
 }
 
@@ -921,10 +951,13 @@ xfs_trans_chunk_committed(
 			 * This will set the item's lsn to item_lsn
 			 * and update the position of the item in
 			 * the AIL.
+			 *
+			 * xfs_trans_update_ail() drops the AIL lock.
 			 */
-			xfs_trans_update_ail(mp, lip, item_lsn);
+			xfs_trans_update_ail(mp, lip, item_lsn, s);
+		} else {
+			AIL_UNLOCK(mp, s);
 		}
-		AIL_UNLOCK(mp, s);
 
 		/*
 		 * Now that we've repositioned the item in the AIL,
