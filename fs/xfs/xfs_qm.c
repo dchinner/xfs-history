@@ -1628,7 +1628,7 @@ xfs_qm_dqiterate(
 	xfs_inode_t	*qip,
 	uint		flags)
 {
-        xfs_bmbt_irec_t         map[XFS_DQITER_MAP_SIZE];          
+	xfs_bmbt_irec_t		*map;
         int                     i, nmaps;    	/* number of map entries */
 	int                     error;          /* return value */
 	xfs_fileoff_t		lblkno;
@@ -1645,6 +1645,8 @@ xfs_qm_dqiterate(
 	 */
 	if (qip->i_d.di_nblocks == 0)
 		return (0);
+
+	map = kmem_alloc(XFS_DQITER_MAP_SIZE * sizeof(*map), KM_SLEEP);
 
 	lblkno = 0;
 	maxlblkcnt = XFS_B_TO_FSB(mp, (xfs_ufsize_t)XFS_MAX_FILE_OFFSET);
@@ -1708,6 +1710,8 @@ xfs_qm_dqiterate(
 		if (error) 
 			break;
 	} while (nmaps > 0); 
+
+	kmem_free(map, XFS_DQITER_MAP_SIZE * sizeof(*map));
 
         return (error);
 }
