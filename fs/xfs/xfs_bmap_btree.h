@@ -89,7 +89,7 @@ typedef	struct xfs_btree_lblock xfs_bmbt_block_t;
 #define	XFS_BMAP_BLOCK_IMAXRECS(lev,cur) \
 	((lev) == (cur)->bc_nlevels - 1 ? \
 		XFS_BTREE_BLOCK_MAXRECS(XFS_BMAP_RBLOCK_ISIZE(lev,cur), \
-			xfs_bmbt, lev == 0) : \
+			xfs_bmbt, (lev) == 0) : \
 		((cur)->bc_mp->m_bmap_dmxr[(lev) != 0]))
 
 #define	XFS_BMAP_BLOCK_DMINRECS(lev,cur) \
@@ -98,7 +98,7 @@ typedef	struct xfs_btree_lblock xfs_bmbt_block_t;
 #define	XFS_BMAP_BLOCK_IMINRECS(lev,cur) \
 	((lev) == (cur)->bc_nlevels - 1 ? \
 		XFS_BTREE_BLOCK_MINRECS(XFS_BMAP_RBLOCK_ISIZE(lev,cur), \
-			xfs_bmbt, lev == 0) : \
+			xfs_bmbt, (lev) == 0) : \
 		((cur)->bc_mp->m_bmap_dmnr[(lev) != 0]))
 
 #define	XFS_BMAP_REC_DADDR(bb,i,cur) \
