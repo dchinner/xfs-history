@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.138 $"
+#ident	"$Revision: 1.139 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -754,18 +754,23 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	/* REFERENCED */
 	int		unused;
 	struct bdevsw	*my_bdevsw;
+	int		ndquots;
 
 	xfs_iflush_all(mp, XFS_FLUSH_ALL);
 	
 #ifndef SIM
 	/*
-	 * Flush and purge the dquot cache.
+	 * Purge the dquot cache. 
+	 * None of the dquots should really be busy at this point.
 	 */
 	if (mp->m_quotainfo) {
-		xfs_qm_dqflush_all(mp, XFS_QMOPT_SYNC);
-		xfs_qm_dqpurge_all(mp, 
-				   XFS_QMOPT_UQUOTA|XFS_QMOPT_PQUOTA|
-				   XFS_QMOPT_UMOUNTING);
+		while (ndquots = xfs_qm_dqpurge_all(mp, 
+						  XFS_QMOPT_UQUOTA|
+						  XFS_QMOPT_PQUOTA|
+						  XFS_QMOPT_UMOUNTING)) {
+			ASSERT(0);
+			delay(ndquots * 10);
+		}
 	}
 #endif
 	/*
