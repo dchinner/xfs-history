@@ -312,7 +312,10 @@ ifeq ($(CONFIG_KALLSYMS),y)
 	@$(LD_VMLINUX) $(TMPPREFIX).tmp_kallsyms2.o -o $(TMPPREFIX).tmp_vmlinux3
 	@$(KALLSYMS) $(TMPPREFIX).tmp_vmlinux3 > $(TMPPREFIX).tmp_kallsyms3.o
 endif
-	$(LD_VMLINUX) $(LD_VMLINUX_KALLSYMS) -o vmlinux
+	$(LD_VMLINUX) $(LD_VMLINUX_KALLSYMS) -o $(TMPPREFIX)vmlinux
+ifneq ($(TMPPREFIX),)
+	mv $(TMPPREFIX)vmlinux vmlinux
+endif
 	$(NM) vmlinux | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
 	@rm -f $(TMPPREFIX).tmp_vmlinux* $(TMPPREFIX).tmp_kallsyms*
 
