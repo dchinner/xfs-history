@@ -530,6 +530,7 @@ xfs_log_mount(xfs_mount_t	*mp,
 	if (!(mp->m_flags & XFS_MOUNT_NORECOVERY)) {
 		if ((error = xlog_recover(log,
 				XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY)) != 0) {
+                        cmn_err(CE_WARN, "XFS: log mount/recovery failed\n");
 			xlog_unalloc_log(log);
 		}
 	} else

@@ -407,8 +407,10 @@ xlog_find_head(xlog_t  *log,
     if ((error = xlog_find_zeroed(log, &first_blk)) == -1) {
 	*return_head_blk = first_blk;
 	return 0;
-    } else if (error)
+    } else if (error) {
+        xlog_warn("XFS: empty log check failed\n");
 	return error;
+    }
 
     first_blk = 0;				/* get cycle # of 1st block */
     bp = xlog_get_bp(1,log->l_mp);
@@ -634,6 +636,10 @@ big_bp_err:
 	xlog_put_bp(big_bp);
 bp_err:
 	xlog_put_bp(bp);
+
+        if (error)
+            xlog_warn("XFS: failed to find log head\n");
+            
 	return error;
 }	/* xlog_find_head */
 
@@ -667,8 +673,10 @@ xlog_test_footer(xlog_t *log)
                 
 		/* Read in the last physical block of the log and check its
 		 * magic goo. */
-		if (error = xlog_bread(log, log->l_logBBsize - 1, 1, bp))
+		if (error = xlog_bread(log, log->l_logBBsize - 1, 1, bp)) {
+  		        xlog_warn("XFS: failed to read external log footer\n");
 			goto exit;
+                }
 		rfoot = (xlog_volume_footer_t *)XFS_BUF_PTR(bp);
 
 		if (uuid_compare(&(rfoot->f_magic), magic, &status) == 0) {
@@ -679,6 +687,7 @@ xlog_test_footer(xlog_t *log)
 
 			if (uuid_compare(&(super->sb_uuid), &(rfoot->f_uuid),
 					 &status) != 0) {
+  		                xlog_warn("XFS: mismatched external log\n");
 				xlog_warn("XFS: This is not the log you're looking for.  Are you sure that this is the\n right device?\n");
 				error = XFS_ERROR(EINVAL);
 				goto exit;
@@ -690,7 +699,8 @@ xlog_test_footer(xlog_t *log)
 			log->l_iclog_size -= BBSIZE;
 			log->l_logBBsize -= 1;
 		} else {
-			xlog_warn("XFS: invalid log magic number.  Did you use mkfs to create this log?");
+  		        xlog_warn("XFS: invalid external log footer\n");
+			xlog_warn("XFS: Did you use mkfs to create this log?");
 			error = XFS_ERROR(EINVAL);
 			goto exit;
 		}
@@ -875,6 +885,9 @@ xlog_find_tail(xlog_t  *log,
 bread_err:
 exit:
 	xlog_put_bp(bp);
+
+        if (error) 
+                xlog_warn("XFS: failed to locate log tail\n");
 
 	return error;
 }	/* xlog_find_tail */

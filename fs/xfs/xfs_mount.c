@@ -246,13 +246,21 @@ xfs_mount_validate_sb(
 	 * we have a zero sb_logstart in this case, we may be trying to mount
 	 * a volume filesystem in a non-volume manner.
 	 */
-	if (sbp->sb_magicnum != XFS_SB_MAGIC || !XFS_SB_GOOD_VERSION(sbp))
+	if (sbp->sb_magicnum != XFS_SB_MAGIC) {
+		cmn_err(CE_WARN, "XFS: bad magic number\n");
+                return XFS_ERROR(EWRONGFS);
+        }
+
+        if (!XFS_SB_GOOD_VERSION(sbp)) {
+		cmn_err(CE_WARN, "XFS: bad version\n");
 		return XFS_ERROR(EWRONGFS);
+        }
         
 	if (sbp->sb_logstart == 0 && mp->m_logdev == mp->m_dev) {
 		cmn_err(CE_WARN, "XFS: filesystem is marked as having an external log; specify logdev on the\nmount command line.\n");
 		return XFS_ERROR(EFSCORRUPTED);
 	}
+        
 	if (sbp->sb_logstart != 0 && mp->m_logdev && mp->m_logdev != mp->m_dev) {
 		cmn_err(CE_WARN, "XFS: filesystem is marked as having an internal log; don't specify logdev on\nthe mount command line.\n");
 		return XFS_ERROR(EFSCORRUPTED);
@@ -271,8 +279,10 @@ xfs_mount_validate_sb(
 	    sbp->sb_inodesize > XFS_DINODE_MAX_SIZE 			||
 	    (sbp->sb_rextsize * sbp->sb_blocksize > XFS_MAX_RTEXTSIZE) 	||
 	    (sbp->sb_rextsize * sbp->sb_blocksize < XFS_MIN_RTEXTSIZE) 	||
-	    sbp->sb_imax_pct > 100)
+	    sbp->sb_imax_pct > 100) {
+		cmn_err(CE_WARN, "XFS: SB sanity check 1 failed\n");
 		return XFS_ERROR(EFSCORRUPTED);
+        }
 
 	/* 
 	 * sanity check ag count, size fields against data size field 
@@ -281,8 +291,10 @@ xfs_mount_validate_sb(
 	    sbp->sb_dblocks >
 	     (xfs_drfsbno_t)sbp->sb_agcount * sbp->sb_agblocks ||
 	    sbp->sb_dblocks < (xfs_drfsbno_t)(sbp->sb_agcount - 1) * 
-			      sbp->sb_agblocks + XFS_MIN_AG_BLOCKS)
+			      sbp->sb_agblocks + XFS_MIN_AG_BLOCKS) {
+		cmn_err(CE_WARN, "XFS: SB sanity check 2 failed\n");
 		return XFS_ERROR(EFSCORRUPTED);
+        }
 
 #if !XFS_BIG_FILESYSTEMS
 	if (sbp->sb_dblocks > INT_MAX || sbp->sb_rblocks > INT_MAX)  {
@@ -309,8 +321,10 @@ xfs_mount_validate_sb(
 	/*
 	 * Except for from mkfs, don't let partly-mkfs'ed filesystems mount.
 	 */
-	if (sbp->sb_inprogress) 
+	if (sbp->sb_inprogress) {
+		cmn_err(CE_WARN, "XFS: file system busy\n");
 		return XFS_ERROR(EFSCORRUPTED);
+        }
 #endif	
 	return (0);
 }
@@ -431,6 +445,7 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	XFS_BUF_SET_TARGET(bp, mp->m_ddev_targp);
 	xfsbdstrat(mp, bp);
 	if (error = xfs_iowait(bp)) {
+		cmn_err(CE_WARN, "XFS: SB read failed\n");
 		goto err;
 	}
 
@@ -442,6 +457,7 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
         mp->m_arch=sbp->sb_arch; /* set architecture first */
         xfs_xlatesb(bp, &(mp->m_sb), 1, ARCH_GET(mp->m_arch), XFS_SB_ALL_BITS);
 	if (error = xfs_mount_validate_sb(mp, &(mp->m_sb))) {
+		cmn_err(CE_WARN, "XFS: SB validate failed\n");
 		goto err;
 	}
 
@@ -548,6 +564,7 @@ xfs_mountfs_int(
 		if ((BBTOB(mp->m_dalign) & mp->m_blockmask) ||
 		    (BBTOB(mp->m_swidth) & mp->m_blockmask)) {
 			if (mp->m_flags & XFS_MOUNT_RETERR) {
+		                cmn_err(CE_WARN, "XFS: alignment check 1 failed\n");
 				error = XFS_ERROR(EINVAL);
 				goto error1;
 			}
@@ -559,6 +576,7 @@ xfs_mountfs_int(
 			mp->m_dalign = XFS_BB_TO_FSBT(mp, mp->m_dalign);
 			if (mp->m_dalign && (sbp->sb_agblocks % mp->m_dalign)) {
 				if (mp->m_flags & XFS_MOUNT_RETERR) {
+  		                        cmn_err(CE_WARN, "XFS: alignment check 2 failed\n");
 					error = XFS_ERROR(EINVAL);
 					goto error1;
 				}
@@ -568,6 +586,7 @@ xfs_mountfs_int(
 				mp->m_swidth = XFS_BB_TO_FSBT(mp, mp->m_swidth);
 			} else {
 				if (mp->m_flags & XFS_MOUNT_RETERR) {
+  		                        cmn_err(CE_WARN, "XFS: alignment check 3 failed\n");
 					error = XFS_ERROR(EINVAL);
 					goto error1;
 				}
@@ -762,6 +781,7 @@ xfs_mountfs_int(
 	 */
 	d = (daddr_t)XFS_FSB_TO_BB(mp, mp->m_sb.sb_dblocks);
 	if (XFS_BB_TO_FSB(mp, d) != mp->m_sb.sb_dblocks) {
+  		cmn_err(CE_WARN, "XFS: size check 1 failed\n");
 		error = XFS_ERROR(E2BIG);
 		goto error1;
 	}
@@ -770,6 +790,7 @@ xfs_mountfs_int(
 		if (!error) {
 			xfs_buf_relse(bp);
 		} else {
+  		        cmn_err(CE_WARN, "XFS: size check 2 failed\n");
 			if (error == ENOSPC) {
 				error = XFS_ERROR(E2BIG);
 			}
@@ -781,6 +802,7 @@ xfs_mountfs_int(
 	    mp->m_logdev && mp->m_logdev != mp->m_dev) {
 		d = (daddr_t)XFS_FSB_TO_BB(mp, mp->m_sb.sb_logblocks);
 		if (XFS_BB_TO_FSB(mp, d) != mp->m_sb.sb_logblocks) {
+  		        cmn_err(CE_WARN, "XFS: size check 3 failed\n");
 			error = XFS_ERROR(E2BIG);
 			goto error1;
 		}
@@ -788,6 +810,7 @@ xfs_mountfs_int(
 		if (!error) {
 			xfs_buf_relse(bp);
 		} else {
+  		        cmn_err(CE_WARN, "XFS: size check 3 failed\n");
 			if (error == ENOSPC) {
 				error = XFS_ERROR(E2BIG);
 			}
@@ -798,8 +821,10 @@ xfs_mountfs_int(
 	/*
 	 * Initialize realtime fields in the mount structure
 	 */
-	if (error = xfs_rtmount_init(mp))
+	if (error = xfs_rtmount_init(mp)) {
+  		cmn_err(CE_WARN, "XFS: RT mount failed\n");
 		goto error1;
+        }
 
 	/*
 	 * For client case we are done now
@@ -879,9 +904,11 @@ xfs_mountfs_int(
 				      XFS_FSB_TO_DADDR(mp, sbp->sb_logstart),
 				      XFS_FSB_TO_BB(mp, sbp->sb_logblocks));
 		if (error) {
+  		        cmn_err(CE_WARN, "XFS: log mount failed\n");
 			goto error2;
 		}
 	} else {	/* No log has been defined */
+  		cmn_err(CE_WARN, "XFS: no log defined\n");
 		error = XFS_ERROR(EFSCORRUPTED);
 		goto error2;
 	}
@@ -897,11 +924,13 @@ xfs_mountfs_int(
 		error = xfs_iget(mp, NULL, sbp->sb_rootino, XFS_ILOCK_EXCL,
 				 &rip, 0);
 		if (error) {
+  		        cmn_err(CE_WARN, "XFS: failed to read root inode\n");
 			goto error2;
 		}
 		ASSERT(rip != NULL);
 		rvp = XFS_ITOV(rip);
 		if ((rip->i_d.di_mode & IFMT) != IFDIR) {
+  		        cmn_err(CE_WARN, "XFS: corrupted root inode\n");
 			VMAP(rvp, vmap);
 			prdev("Root inode %d is not a directory",
 			      (int)rip->i_dev, rip->i_ino);
@@ -924,6 +953,7 @@ xfs_mountfs_int(
 		/*
 		 * Free up the root inode.
 		 */
+  		cmn_err(CE_WARN, "XFS: failed ro read RT inodes\n");
 		VMAP(rvp, vmap);
 		VN_RELE(rvp);
 		vn_purge(rvp, &vmap);
@@ -993,6 +1023,7 @@ xfs_mountfs_int(
 	error = xfs_log_mount_finish(mp, mfsi_flags);
 #endif
 	if (error) {
+  		cmn_err(CE_WARN, "XFS: log mount finish failed\n");
 		goto error2;
 	}
 
