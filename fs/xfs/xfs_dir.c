@@ -842,6 +842,7 @@ xfs_dir_node_lookup(xfs_trans_t *trans, struct xfs_dir_name *args)
 {
 	struct xfs_dir_state state;
 	int retval;
+	int i;
 
 	bzero((char *)&state, sizeof(struct xfs_dir_state));
 	state.args = args;
@@ -854,6 +855,13 @@ xfs_dir_node_lookup(xfs_trans_t *trans, struct xfs_dir_name *args)
 	 * and get back a pointer to it.
 	 */
 	retval = xfs_dir_node_lookup_int(&state);
+
+	/* 
+	 * If not in a transaction, we have to release all the buffers.
+	 */
+	for (i = 0; i < state.path.active; i++)
+		xfs_trans_brelse(trans, state.path.blk[i].bp);
+
 	return(retval);
 }
 
