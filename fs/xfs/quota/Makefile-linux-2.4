@@ -50,8 +50,9 @@ obj-y				+= xfs_dquot.o \
 				   xfs_trans_dquot.o \
 				   xfs_qm_syscalls.o \
 				   xfs_qm_bhv.o \
+				   xfs_qm_ksyms.o \
 				   xfs_qm.o
 
-export-objs			+= xfs_qm.o
+export-objs			+= xfs_qm_ksyms.o
 
 include $(TOPDIR)/Rules.make
