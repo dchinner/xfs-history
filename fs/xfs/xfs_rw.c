@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.119 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -83,8 +83,8 @@ lock_t	xfs_strat_lock;
 static int	xfsd_count;
 static buf_t	*xfsd_list;
 static int	xfsd_bufcount;
-lock_t		xfsd_lock;
-sema_t		xfsd_wait;
+mutex_t		xfsd_lock;
+sv_t		xfsd_wait;
 
 /*
  * Zone allocator for arrays of xfs_bmbt_irec_t used
@@ -3704,7 +3704,7 @@ xfs_strategy(
 	 */
 	if ((bp->b_flags & (B_ASYNC | B_BDFLUSH)) == (B_ASYNC | B_BDFLUSH) &&
 	    (xfsd_count > 0)) {
-		s = splock(xfsd_lock);
+		s = mp_mutex_spinlock(&xfsd_lock);
 		/*
 		 * Queue the buffer at the end of the list.
 		 * Bump the inode count of the number of queued buffers.
@@ -3722,8 +3722,8 @@ xfs_strategy(
 		xfsd_bufcount++;
 		ASSERT(XFS_VTOI(vp)->i_queued_bufs >= 0);
 		atomicAddInt(&(XFS_VTOI(vp)->i_queued_bufs), 1);
-		spunlock(xfsd_lock, s);
-		cvsema(&xfsd_wait);
+		(void)sv_signal(&xfsd_wait);
+		mp_mutex_spinunlock(&xfsd_lock, s);
 	} else {
 		/*
 		 * We're not going to queue it for the xfsds, but bump the
@@ -3800,14 +3800,13 @@ xfsd(void)
 	 */
 	setinfoRunq(u.u_procp, RQRTPRI, NDPHIMIN);
 
-	s = splock(xfsd_lock);
+	s = mp_mutex_spinlock(&xfsd_lock);
 	xfsd_count++;
 
 	while (1) {
 		while (xfsd_list == NULL) {
-			(void) spunlock_psema(xfsd_lock, s, &xfsd_wait,
-					      PRIBIO);
-			s = splock(xfsd_lock);
+			mp_sv_wait(&xfsd_wait, PRIBIO, &xfsd_lock, s);
+			s = mp_mutex_spinlock(&xfsd_lock);
 		}
 
 		/*
@@ -3826,7 +3825,7 @@ xfsd(void)
 		xfsd_bufcount--;;
 		ASSERT(xfsd_bufcount >= 0);
 
-		spunlock(xfsd_lock, s);
+		mp_mutex_spinunlock(&xfsd_lock, s);
 		bp->av_forw = bp;
 		bp->av_back = bp;
 
@@ -3835,7 +3834,7 @@ xfsd(void)
 		XFSSTATS.xs_xfsd_bufs++;
 		xfs_strat_write(bp->b_vp, bp);
 
-		s = splock(xfsd_lock);
+		s = mp_mutex_spinlock(&xfsd_lock);
 	}
 }
 #endif	/* !SIM */
