@@ -1,6 +1,6 @@
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision$"
+#ident	"$Revision: 1.61 $"
 
 #if defined(XFS_ALL_TRACE)
 #define	XFS_LOG_TRACE
@@ -21,7 +21,11 @@ struct xfs_mount;
  */
 
 #define XLOG_NUM_ICLOGS		2
+#ifdef __linux__
+#define XLOG_MAX_ICLOGS		4
+#else
 #define XLOG_MAX_ICLOGS		8
+#endif
 #define XLOG_CALLBACK_SIZE	10
 #define XLOG_HEADER_MAGIC_NUM	0xFEEDbabe	/* Illegal cycle number */
 #define XLOG_RECORD_BSIZE	(16*1024)	/* eventually 32k */
