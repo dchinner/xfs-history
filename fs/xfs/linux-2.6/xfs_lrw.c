@@ -854,10 +854,10 @@ _xfs_imap_to_bmap(
 
 		start_block = imap->br_startblock;
 		if (start_block == HOLESTARTBLOCK) {
-			pbmapp->pbm_bn = -1;
+			pbmapp->pbm_bn = PAGE_BUF_DADDR_NULL;
 			pbmapp->pbm_flags = PBMF_HOLE;
 		} else if (start_block == DELAYSTARTBLOCK) {
-			pbmapp->pbm_bn = -1;
+			pbmapp->pbm_bn = PAGE_BUF_DADDR_NULL;
 			pbmapp->pbm_flags = PBMF_DELAY;
 		} else {
 			pbmapp->pbm_bn = XFS_FSB_TO_DB_IO(io, start_block);
@@ -1151,7 +1151,7 @@ xfs_write_bmap(
 			pbmapp->pbm_flags = PBMF_UNWRITTEN;
 		}
 	} else {
-		pbmapp->pbm_bn = -1;
+		pbmapp->pbm_bn = PAGE_BUF_DADDR_NULL;
 		pbmapp->pbm_flags = PBMF_DELAY;
 	}
 	length = iosize;
