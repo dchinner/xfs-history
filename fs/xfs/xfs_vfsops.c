@@ -548,12 +548,9 @@ xfs_mount(
 	dev_t		rtdev;
 	int		error;
 
-	vfs_lock(vfsp);
 	error = spectodevs(vfsp->vfs_super, args, &ddev, &logdev, &rtdev);
 	if (!error)
 		error = xfs_cmountfs(vfsp, ddev, logdev, rtdev, args, credp);
-	vfs_unlock(vfsp);
-
 	return (error);
 }
 

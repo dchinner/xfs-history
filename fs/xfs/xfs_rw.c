@@ -464,7 +464,7 @@ xfs_refcache_insert(
 	 * If an unmount is busy clearing out the cache, don't add new
 	 * entries to it.
 	 */
-	if ((xfs_refcache_busy) || (vp->v_vfsp->vfs_flag & VFS_OFFLINE)) {
+	if (xfs_refcache_busy) {
 		spin_unlock(&xfs_refcache_lock);
 		VN_RELE(vp);
 		/*
