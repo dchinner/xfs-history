@@ -1,4 +1,4 @@
-#ident "$Revision: 1.281 $"
+#ident "$Revision: 1.283 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -462,6 +462,7 @@ debug_print_vnmaps(vnmap_t *vnmap, int numvnmaps, int vnmap_flags)
  *
  * Everything here is in terms of file system blocks, not BBs.
  */
+#if 1
 void
 xfs_next_bmap(
 	xfs_mount_t	*mp,
@@ -604,6 +605,7 @@ xfs_next_bmap(
 
 	bmapp->bsize = XFS_FSB_TO_B(mp, bmapp->length);
 }
+#endif /* !defined(__linux__) */
 
 /*
  * xfs_retrieved() is a utility function used to calculate the
@@ -616,6 +618,7 @@ xfs_next_bmap(
  *  which have been setup for the user in this call so far.
  * Isize is the current size of the file being read.
  */
+#if 1 
 STATIC int
 xfs_retrieved(
 	uint		available,
@@ -653,7 +656,7 @@ xfs_retrieved(
 	*total_retrieved += retrieved;
 	return retrieved;
 }
-
+#endif /* !defined(__linux__) */
 /*
  * xfs_iomap_extra()
  *
@@ -664,6 +667,7 @@ xfs_retrieved(
  * This behavior is tied to the code in the VM/chunk cache (do_pdflush())
  * that will call here.
  */
+#if 1 /* !defined(__linux__) */
 STATIC int					/* error */
 xfs_iomap_extra(
 	xfs_iocore_t	*io,
@@ -761,7 +765,7 @@ xfs_iomap_extra(
 	}
 	return 0;
 }
-
+#endif /* !defined(__linux__) */
 /*
  * xfs_iomap_read()
  *
@@ -777,6 +781,7 @@ xfs_iomap_extra(
  * the inode lock can be held in SHARED mode. The only time we need it 
  * in EXCL mode is when it is being read in the first time.  
  */
+#if 1/*  !defined(__linux__) */
 int					/* error */
 xfs_iomap_read(
 	xfs_iocore_t	*io,
@@ -1141,8 +1146,10 @@ xfs_iomap_read(
 	}
 	return 0;
 }				
+#endif /* !defined(__linux__) */
 
 /* ARGSUSED */
+#if !defined(__linux__)
 int
 xfs_vop_readbuf(bhv_desc_t 	*bdp,
 		off_t		offset,
@@ -1229,14 +1236,15 @@ xfs_vop_readbuf(bhv_desc_t 	*bdp,
 
 	bp = chunkread(vp, bmaps, nmaps, creds);
 
-	if (bp->b_flags & B_ERROR) {
-		error = geterror(bp);
+	if (XFS_BUF_ISERROR(bp)) {
+		error = XFS_BUF_GETERROR(bp);
 		ASSERT(error != EINVAL);
 		/*
 		 * b_relse functions like chunkhold
 		 * expect B_DONE to be there.
 		 */
-		bp->b_flags |= B_DONE|B_STALE;
+		XFS_BUF_DONE(bp);
+		XFS_BUF_STALE(bp);
 		xfs_buf_relse(bp);
 		goto out;
 	}
@@ -1254,7 +1262,7 @@ out:
 		xfs_rwunlockf(bdp, VRWLOCK_READ, 0);
 	return XFS_ERROR(error);
 }
-
+#endif /* !defined(__linux__) */
 /*
  * set of routines (xfs_lockdown_iopages, xfs_unlock_iopages,
  * xfs_mapped_biomove) to deal with i/o to or from mmapped files where
@@ -1406,6 +1414,7 @@ xfs_is_nested_locking_enabled(void)
  * using xfs_unlock_iopages().
  */
 /* ARGSUSED */
+#if 1 /* !defined(__linux__) */
 int
 xfs_lockdown_iopages(
 	struct bmapval	*bmapp,
@@ -1627,11 +1636,12 @@ xfs_lockdown_iopages(
 
 	return error;
 }
-
+#endif /* !defined(__linux__) */
 /*
  * xfs_unlock_iopages() - unlock the set of pages specified in the
  *	xfs_uaccmap_t's set up by xfs_lockdown_iopages().
  */
+#if 1 /* !defined(__linux__) */
 void
 xfs_unlock_iopages(
 	xfs_uaccmap_t	*uaccmap,	/* useracc maps */
@@ -1649,7 +1659,7 @@ xfs_unlock_iopages(
 
 	return;
 }
-
+#endif /* !defined(__linux__) */
 /*
  * handles biomoves of data where some of the user addresses are mapped to
  * the file being read/written.  each vnmap_t represents a range of addresses
@@ -1672,6 +1682,7 @@ xfs_unlock_iopages(
  * vnmapp and nvnmapp are set to the first map that hasn't completely been
  * moved and the count of remaining valid maps respectively.
  */
+#if !defined(__linux__)
 int
 xfs_mapped_biomove(
 	struct xfs_buf	*bp,
@@ -1776,8 +1787,9 @@ xfs_mapped_biomove(
 
 	return error;
 }
-
+#endif /* !defined(__linux__) */
 /* ARGSUSED */		
+#if !defined(__linux__)
 int
 xfs_read_file(
 	xfs_iocore_t	*io,
@@ -1910,19 +1922,21 @@ xfs_read_file(
 
 			bp = chunkread(vp, bmapp, read_bmaps, credp);
 
-			if (bp->b_flags & B_ERROR) {
-				error = geterror(bp);
+			if (XFS_BUF_ISERROR(bp)) {
+				error = XFS_BUF_GETERROR(bp);
 				ASSERT(error != EINVAL);
 				/*
 				 * b_relse functions like chunkhold
 				 * expect B_DONE to be there.
 				 */
-				bp->b_flags |= B_DONE|B_STALE;
+				XFS_BUF_DONE(bp);
+				XFS_BUF_STALE(bp);
 				xfs_buf_relse(bp);
 				break;
 			} else if (bp->b_resid != 0) {
 				buffer_bytes_ok = 0;
-				bp->b_flags |= B_DONE|B_STALE;
+				XFS_BUF_DONE(bp);
+				XFS_BUF_STALE(bp);
 				xfs_buf_relse(bp);
 				break;
 			} else {
@@ -1949,7 +1963,8 @@ xfs_read_file(
 							&num_biovnmaps);
 				}
 				if (error) {
-					bp->b_flags |= B_DONE|B_STALE;
+					XFS_BUF_DONE(bp);
+					XFS_BUF_STALE(bp);
 					xfs_buf_relse(bp);
 					break;
 				}
@@ -1976,13 +1991,14 @@ xfs_read_file(
 
 	return error;
 }
-
+#endif /* !defined(__linux__) */
 
 /*	Core component of xfs read vop - this function is used by both
  *	xfs and cxfs to do the top part of a VOP_READ after filesystem
  *	specific locking and token management has been done.
  */
 
+#if !defined(__linux__)
 int
 xfs_read_core(
 	bhv_desc_t	*bdp,
@@ -2215,7 +2231,9 @@ xfs_read_core(
 out:
 	return error;
 }
+#endif /* !defined(__linux__) */
 
+#if 1
 int
 xfs_check_mapped_io(
 	vnode_t		*vp,
@@ -2278,13 +2296,14 @@ xfs_check_mapped_io(
 
 	return 0;
 }
-
+#endif /* !defined(__linux__) */
 /*
  * xfs_read
  *
  * This is the XFS VOP_READ entry point.  It does some minimal
  * error checking and then switches out based on the file type.
  */
+#if !defined(__linux__)
 int
 xfs_read(
 	bhv_desc_t	*bdp,
@@ -2417,7 +2436,7 @@ xfs_read(
 
 	return error;
 }
-
+#endif /* !defined(__linux__) */
 
 /*
  * Map the given I/O size and I/O alignment over the given extent.
@@ -2427,6 +2446,7 @@ xfs_read(
  * are confined to the given extent.
  */
 /*ARGSUSED*/
+#if 1
 STATIC void
 xfs_write_bmap(
 	xfs_mount_t	*mp,
@@ -2487,7 +2507,7 @@ xfs_write_bmap(
 
 	bmapp->bsize = XFS_FSB_TO_B(mp, bmapp->length);
 }
-
+#endif /* !defined(__linux__) */
 /*
  * This routine is called to handle zeroing any space in the last
  * block of the file that is beyond the EOF.  We do this since the
@@ -2495,6 +2515,7 @@ xfs_write_bmap(
  * and we don't want anyone to read the garbage on the disk.
  */
 /* ARGSUSED */
+#if 1
 STATIC int				/* error */
 xfs_zero_last_block(
 	vnode_t		*vp,
@@ -2646,9 +2667,10 @@ xfs_zero_last_block(
 		bmap.eof |= BMAP_DELAY;
 	}
 	bp = chunkread(vp, &bmap, 1, credp);
-	if (bp->b_flags & B_ERROR) {
-		error = geterror(bp);
-		bp->b_flags |= B_DONE|B_STALE;
+	if (XFS_BUF_ISERROR(bp)) {
+		error = XFS_BUF_GETERROR(bp);
+		XFS_BUF_DONE(bp);
+		XFS_BUF_STALE(bp);
 		xfs_buf_relse(bp);
 		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
 		return error;
@@ -2679,7 +2701,7 @@ xfs_zero_last_block(
 	XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
 	return error;
 }
-
+#endif /* !defined(__linux__) */
 /*
  * Zero any on disk space between the current EOF and the new,
  * larger EOF.  This handles the normal case of zeroing the remainder
@@ -2690,6 +2712,7 @@ xfs_zero_last_block(
  * then any holes in the range are filled and zeroed.  If not, the holes
  * are left alone as holes.
  */
+#if 1
 int					/* error */
 xfs_zero_eof(
 	vnode_t		*vp,
@@ -2880,7 +2903,9 @@ xfs_zero_eof(
 
 	return 0;
 }
+#endif /* !defined(__linux__) */
 
+#if 1
 STATIC int
 xfs_iomap_write(
 	xfs_iocore_t	*io,
@@ -3254,7 +3279,9 @@ xfs_iomap_write(
 
 	return 0;
 }
+#endif /* !defined(__linux__) */
 
+#if !defined(__linux__)
 int
 xfs_write_file(
 	bhv_desc_t	*bdp,
@@ -3521,11 +3548,12 @@ xfs_write_file(
 			 * will remain unreadable, so we just toss the buffer
 			 * and its associated pages.
 			 */
-			if (bp->b_flags & B_ERROR) {
-				error = geterror(bp);
+			if (XFS_BUF_ISERROR(bp)) {
+			    error = XFS_BUF_GETERROR(bp);
 				ASSERT(error != EINVAL);
-				bp->b_flags |= B_DONE|B_STALE;
-				bp->b_flags &= ~(B_DELWRI);
+				XFS_BUF_DONE(bp);
+				XFS_BUF_STALE(bp);
+				XFS_BUF_UNDELAYWRITE(bp);
 				xfs_buf_relse(bp);
 				bmapp++;
 				nbmaps--;
@@ -3547,7 +3575,7 @@ xfs_write_file(
 			 * is synced out.
 			 */
 			if (error != 0) {
-				bp->b_flags |= B_STALE;
+				XFS_BUF_STALE(bp);
 				(void) bwrite(bp);
 				bmapp++;
 				nbmaps--;
@@ -3700,11 +3728,11 @@ xfs_write_file(
 				 * after it is synced out.
 				 */
 
-				if (!(bp->b_flags & B_DONE)) {
+			  if (!XFS_BUF_ISDONE(bp)) {
 					chunkreread(bp);
 				}
 
-				bp->b_flags |= B_STALE;
+				XFS_BUF_STALE(bp);
 				(void) bwrite(bp);
 			} else {
 
@@ -3725,12 +3753,12 @@ xfs_write_file(
 
 					if (ioflag & IO_DSYNC) {
 						bp->b_fsprivate3 = commit_lsn_p;
-						bp->b_flags |= B_HOLD;
+						XFS_BUF_HOLD(bp);
 					}
 					error = bwrite(bp);
 					if (ioflag & IO_DSYNC) {
 						bp->b_fsprivate3 = NULL;
-						bp->b_flags &= ~B_HOLD;
+						XFS_BUF_UNHOLD(bp);
 						xfs_buf_relse(bp);
 					}
 				} else {
@@ -3795,11 +3823,12 @@ error0:
 
 	return error;
 }
-
+#endif /* !defined(__linux__) */
 /*
  * This is a subroutine for xfs_write() and other writers
  * (xfs_fcntl) which clears the setuid and setgid bits when a file is written.
  */
+#if 1
 int
 xfs_write_clear_setuid(
 	xfs_inode_t	*ip)
@@ -3837,13 +3866,14 @@ xfs_write_clear_setuid(
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	return 0;
 }
-
+#endif /* !defined(__linux__) */
 /*
  * xfs_write
  *
  * This is the XFS VOP_WRITE entry point.  It does some minimal error
  * checking and then switches out based on the file type.
  */
+#if !defined(__linux__) 
 int
 xfs_write(
 	bhv_desc_t	*bdp,
@@ -4305,7 +4335,7 @@ out:
 
 	return error;
 }
-
+#endif /* !defined(__linux__) */
 
 /*
  * This is the XFS entry point for VOP_BMAP().
@@ -4322,6 +4352,7 @@ out:
  * before doing the requested action and released afterwards.
  */
 /* ARGSUSED */
+#if 1 
 int
 xfs_bmap(
 	bhv_desc_t	*bdp,
@@ -4380,11 +4411,12 @@ xfs_bmap(
 	}
 	return error;
 }
-
+#endif /* !defined(__linux__) */
 /*
  * Set up rbp so that it points to the memory attached to bp
  * from rbp_offset from the start of bp for rbp_len bytes.
  */
+#if !defined(__linux__)
 STATIC void
 xfs_overlap_bp(
 	xfs_buf_t	*bp,
@@ -4432,7 +4464,7 @@ xfs_overlap_bp(
 		pgbboff = dpoff(rbp->b_offset);
 		rbp->b_bufsize = ctob(dtop(pgbboff + BTOBB(rbp_len)));
 
-		rbp->b_flags |= B_PAGEIO;
+		XFS_BUF_PAGEIO(rbp);
 
 		if (pgbboff != 0) {
 			bp_mapin(rbp);
@@ -4442,14 +4474,17 @@ xfs_overlap_bp(
 	rbp->b_remain = 0;
 	rbp->b_vp = bp->b_vp;
 	rbp->b_edev = bp->b_edev;
-	rbp->b_flags |= (bp->b_flags & (B_UNCACHED | B_ASYNC));
+	/* note XFS_BFLAGS must be member access for this to work */
+	/* Think about changing this */
+	XFS_BUF_BFLAGS(rbp) |= (XFS_BUF_ISUNCACHED(rbp) | XFS_BUF_ASYNC(rbp)); 
 }
-
+#endif /* !defined(__linux__) */
 
 /*
  * Zero the given bp from data_offset from the start of it for data_len
  * bytes.
  */
+#if 1 /* !defined(__linux__) */
 STATIC void
 xfs_zero_bp(
 	xfs_buf_t	*bp,
@@ -4476,7 +4511,7 @@ xfs_zero_bp(
 	}
 	ASSERT(data_offset >= 0);
 	while (data_len > 0) {
-		page_addr = page_mapin(pfdp, (bp->b_flags & B_UNCACHED ?
+		page_addr = page_mapin(pfdp, (XFS_BUF_ISUNCACHED(bp) ?
 					      VM_UNCACHED : 0), 0);
 		len = MIN(data_len, NBPP - data_offset);
 		bzero(page_addr + data_offset, len);
@@ -4486,6 +4521,7 @@ xfs_zero_bp(
 		pfdp = getnextpg(bp, pfdp);
 	}
 }
+#endif /* !defined(__linux__) */
 
 /*
  * Verify that the gap list is properly sorted and that no entries
@@ -4619,6 +4655,7 @@ xfs_build_gap_list(
  * use of this in xfs_write_file() where we start at the front and
  * move sequentially forward.
  */
+#if !defined(__linux__)
 STATIC void
 xfs_delete_gap_list(
 	xfs_iocore_t	*io,
@@ -4693,6 +4730,8 @@ xfs_delete_gap_list(
  * Free up all of the entries in the inode's gap list.  This requires
  * the inode lock to be held exclusively.
  */
+#endif /* !defined(__linux__) */
+#if !defined(__linux__)
 STATIC void
 xfs_free_gap_list(
 	xfs_iocore_t	*io)
@@ -4711,12 +4750,13 @@ xfs_free_gap_list(
 	}
 	io->io_gap_list = NULL;
 }
-
+#endif /* !defined(__linux__) */
 /*
  * Zero the parts of the buffer which overlap gaps in the inode's gap list.
  * Deal with everything in BBs since the buffer is not guaranteed to be block
  * aligned.
  */
+#if !defined(__linux__)
 STATIC void
 xfs_cmp_gap_list_and_zero(
 	xfs_iocore_t	*io,
@@ -4811,6 +4851,7 @@ xfs_cmp_gap_list_and_zero(
 		curr_gap = curr_gap->xg_next;
 	}
 }
+#endif /* !defined(__linux__) */
 
 
 /*
@@ -4831,6 +4872,7 @@ xfs_cmp_gap_list_and_zero(
  * xfs_ilock_map_shared() here, because the extents had to be
  * read in in order to create the buffer we're trying to write out.
  */
+#if !defined(__linux__)
 int
 xfs_strat_read(
 	xfs_iocore_t	*io,
@@ -4861,7 +4903,7 @@ xfs_strat_read(
 #define	XFS_STRAT_READ_IMAPS	XFS_BMAP_MAX_NMAP
 	xfs_bmbt_irec_t	imap[XFS_STRAT_READ_IMAPS];
 	
-	ASSERT((bp->b_blkno == -1) || (bp->b_flags & B_UNINITIAL));
+	ASSERT((bp->b_blkno == -1) || (XFS_BUF_ISUNINITIAL(bp)));
 	mp = io->io_mount;
 	offset_fsb = XFS_BB_TO_FSBT(mp, bp->b_offset);
 	/*
@@ -5049,16 +5091,15 @@ xfs_strat_read(
 				rbp->b_offset = XFS_FSB_TO_BB(mp,
 							      imap_offset) +
 						block_off;
-				rbp->b_flags |= B_READ;
-				rbp->b_flags &= ~B_ASYNC;
+				XFS_BUF_READ(rbp);
+				XFS_BUF_UNASYNC(rbp);
 				rbp->b_target = bp->b_target;
 
 				xfs_check_rbp(io, bp, rbp, 1);
 				(void) xfsbdstrat(mp, rbp);
 				error = iowait(rbp);
 				if (error) {
-					bp->b_flags |= B_ERROR;
-					bp->b_error = error;
+					XFS_BUF_ERROR(bp,error);
 					ASSERT(bp->b_error != EINVAL);
 				}
 
@@ -5083,7 +5124,7 @@ xfs_strat_read(
 	iodone(bp);
 	return error;
 }
-
+#endif /* !defined(__linux__) */
 
 #if defined(XFS_STRAT_TRACE)
 
@@ -5110,8 +5151,8 @@ xfs_strat_write_bp_trace(
 		     (void*)((__psunsigned_t)(bp->b_bcount)),
 		     (void*)((__psunsigned_t)(bp->b_bufsize)),
 		     (void*)(bp->b_blkno),
-		     (void*)(__psunsigned_t)((bp->b_flags >> 32) & 0xffffffff),
-		     (void*)(bp->b_flags & 0xffffffff),
+		     (void*)(__psunsigned_t)((XFS_BUF_BFLAGS(bp) >> 32) & 0xffffffff),
+		     (void*)(XFS_BUF_BFLAGS(bp) & 0xffffffff),
 		     (void*)(bp->b_pages),
 		     (void*)(bp->b_pages->pf_pageno),
 		     (void*)0,
@@ -5130,8 +5171,8 @@ xfs_strat_write_bp_trace(
 		     (void*)((__psunsigned_t)(bp->b_bcount)),
 		     (void*)((__psunsigned_t)(bp->b_bufsize)),
 		     (void*)(bp->b_blkno),
-		     (void*)(__psunsigned_t)((bp->b_flags >> 32) & 0xffffffff),
-		     (void*)(bp->b_flags & 0xffffffff),
+		     (void*)(__psunsigned_t)((XFS_BUF_BFLAGS(bp) >> 32) & 0xffffffff),
+		     (void*)(XFS_BUF_BFLAGS(bp) & 0xffffffff),
 		     (void*)(bp->b_pages),
 		     (void*)(bp->b_pages->pf_pageno),
 		     (void*)0,
@@ -5168,7 +5209,7 @@ xfs_strat_write_subbp_trace(
 		     (void*)(rbp->b_offset & 0xffffffff),
 		     (void*)((unsigned long)(rbp->b_bcount)),
 		     (void*)(rbp->b_blkno),
-		     (void*)((__psunsigned_t)(rbp->b_flags)), /* lower 32 flags only */
+		     (void*)((__psunsigned_t)(XFS_BUF_BFLAGS(rbp)), /* lower 32 flags only */
 		     (void*)(XFS_BUF_PTR(rbp)),
 		     (void*)(bp->b_pages),
 		     (void*)(last_off),
@@ -5188,7 +5229,7 @@ xfs_strat_write_subbp_trace(
 		     (void*)(rbp->b_offset & 0xffffffff),
 		     (void*)((unsigned long)(rbp->b_bcount)),
 		     (void*)(rbp->b_blkno),
-		     (void*)((__psunsigned_t)(rbp->b_flags)), /* lower 32 flags only */
+		     (void*)((__psunsigned_t)(XFS_BUF_BFLAGS(rbp)), /* lower 32 flags only */
 		     (void*)(XFS_BUF_PTR(rbp)),
 		     (void*)(bp->b_pages),
 		     (void*)(last_off),
@@ -5258,22 +5299,23 @@ xfs_strat_write_check(
  *	Since this occurs in an interrupt thread, massage some bp info
  *	and queue to the xfs_strat daemon.
  */
+#if !defined(__linux__)
 void
 xfs_strat_write_iodone(
 	xfs_buf_t	*bp)
 {
 	int		s;
 
-	ASSERT(bp->b_flags & B_UNINITIAL);
+	ASSERT(XFS_BUF_ISUNITIAL(bp));
 	ASSERT(bp->b_vp);
 	ASSERT(xfsc_count > 0);
 	/*
 	 * Delay I/O done work until the transaction is completed.
 	 */
 	bp->b_iodone = NULL;
-	ASSERT(bp->b_flags & B_BUSY);
+	ASSERT(XFS_BUF_ISBUSY(bp));
 	ASSERT(valusema(&bp->b_lock) <= 0);
-	ASSERT(!(bp->b_flags & B_DONE));
+	ASSERT(!(XFS_BUF_ISDONE(bp));
 
 	/*
 	 * Queue to the xfsc_list.
@@ -5299,12 +5341,13 @@ xfs_strat_write_iodone(
 	mp_mutex_spinunlock(&xfsc_lock, s);
 	return;
 }
+#endif /* !defined(__linux__) */
 
 
 /* Issue transactions to convert a buffer range from unwritten
  * to written extents.
  */
-
+#if !defined(__linux__)
 void	xfs_strat_complete_buf(
 	bhv_desc_t	*bdp,
 	xfs_buf_t		*bp)
@@ -5323,7 +5366,9 @@ void	xfs_strat_complete_buf(
 	xfs_fsblock_t	firstfsb;
 	xfs_bmap_free_t	free_list;
 
-	ASSERT((bp->b_flags & B_UNINITIAL) == B_UNINITIAL);
+	/*	ASSERT((bp->b_flags & B_UNINITIAL) == B_UNINITIAL); */
+	ASSERT(XFS_BUF_ISUNITIAL(bp)); /* this isn't quite the same as the obove line 
+									* but it should be equivalent */		   
 	ASSERT(bp->b_vp);
 	buftrace("STRAT_WRITE_CMPL", bp);
 	ip = XFS_BHVTOI(bdp);
@@ -5390,7 +5435,7 @@ void	xfs_strat_complete_buf(
 		count_fsb -= numblks_fsb;
 	} while (count_fsb > 0);
 
-	bp->b_flags &= ~(B_UNINITIAL);
+	XFS_BUF_UNUNINITIAL(bp);
 	xfs_strat_write_bp_trace(XFS_STRAT_UNINT_CMPL, ip, bp);
 	buftrace("STRAT_WRITE_CMPL", bp);
 	/* fall through on normal completion */
@@ -5402,12 +5447,12 @@ error_on_bmapi_transaction:
 	xfs_trans_cancel(tp, (XFS_TRANS_RELEASE_LOG_RES | XFS_TRANS_ABORT));
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 error0:
-	bp->b_flags |= B_ERROR;
-	bp->b_error = error;
+	XFS_BUF_ERROR(bp,error);
 	biodone(bp);
 }
+#endif /* !defined(__linux__) */
 
-
+#if !defined(__linux__)
 STATIC void
 xfs_strat_comp(void)
 {
@@ -5451,7 +5496,8 @@ xfs_strat_comp(void)
 		mp_mutex_spinunlock(&xfsc_lock, s);
 		bp->av_forw = bp;
 		bp->av_back = bp;
-		ASSERT((bp->b_flags & B_UNINITIAL) == B_UNINITIAL);
+		/*		ASSERT((bp->b_flags & B_UNINITIAL) == B_UNINITIAL); */
+		ASSERT(XFS_BUF_ISUNINITIAL(bp));
 		ASSERT(bp->b_vp);
 
 		bdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(bp->b_vp),
@@ -5469,7 +5515,7 @@ xfs_strat_comp(void)
 		s = mp_mutex_spinlock(&xfsc_lock);
 	}
 }
-
+#endif /* !defined(__linux__) */
 /*
  * This is the completion routine for the heap-allocated buffers
  * used to write out a buffer which becomes fragmented during
@@ -5477,6 +5523,7 @@ xfs_strat_comp(void)
  * to properly mark the lead buffer as done when necessary and
  * to free the subordinate buffer.
  */
+#if !defined(__linux__)
 STATIC void
 xfs_strat_write_relse(
 	xfs_buf_t	*rbp)
@@ -5488,7 +5535,7 @@ xfs_strat_write_relse(
 	
 
 	s = mutex_spinlock(&xfs_strat_lock);
-	ASSERT(rbp->b_flags & B_DONE);
+	ASSERT(XFS_BUF_ISDONE(rbp));
 
 	forw = (xfs_buf_t*)rbp->b_fsprivate2;
 	back = (xfs_buf_t*)rbp->b_fsprivate;
@@ -5553,6 +5600,7 @@ xfs_strat_write_relse(
 
 	freerbuf(rbp);
 }
+#endif /* !defined(__linux__) */
 
 #ifdef DEBUG
 /*ARGSUSED*/
@@ -5703,7 +5751,7 @@ xfs_check_bp(
  *	calls xfs_bmapi() with a write flag, and issues the 
  *	required transaction.
  */
-
+#if !defined(__linux__)
 int
 xfs_strat_write_unwritten(
 	xfs_iocore_t	*io,
@@ -5816,13 +5864,14 @@ xfs_strat_write_unwritten(
 	biodone(bp);
 	return error;
 }
-
+#endif /* !defined(__linux__) */
 
 /*
  * This is called to convert all delayed allocation blocks in the given
  * range back to 'holes' in the file.  It is used when a buffer will not
  * be able to be written out due to disk errors in the allocation calls.
  */
+#if !defined(__linux__)
 STATIC void
 xfs_delalloc_cleanup(
 	xfs_inode_t	*ip,
@@ -5875,13 +5924,14 @@ xfs_delalloc_cleanup(
 	}
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 }
-
+#endif /* !defined(__linux__) */
 /*
  *	xfs_strat_write is called for buffered writes which
  *	require a transaction. These cases are:
  *	- Delayed allocation (since allocation now takes place).
  *	- Writing a previously unwritten extent.
  */
+#if !defined(__linux__)
 
 int
 xfs_strat_write(
@@ -5902,7 +5952,8 @@ xfs_strat_write(
 
 	return xfs_strat_write_core(io, bp, 1);
 }
-
+#endif /* !defined(__linux__) */
+#if !defined(__linux__)
 int
 xfs_strat_write_core(
 	xfs_iocore_t	*io,
@@ -6312,13 +6363,14 @@ xfs_strat_write_core(
 	}
 	return error;
 }
-
+#endif /* !defined(__linux__) */
 /*
  * Force a shutdown of the filesystem instantly while keeping
  * the filesystem consistent. We don't do an unmount here; just shutdown
  * the shop, make sure that absolutely nothing persistent happens to
  * this filesystem after this point. 
  */
+#if 1
 void
 xfs_force_shutdown(
 	xfs_mount_t	*mp,
@@ -6401,6 +6453,7 @@ xfs_force_shutdown(
 	}
 #endif /* CELL_CAPABLE */
 }
+#endif /* !defined(__linux__) */
 
 
 /*
@@ -6408,6 +6461,7 @@ xfs_force_shutdown(
  * We attach the EIO error, muck with its flags, and call biodone
  * so that the proper iodone callbacks get called.
  */
+#if 1 /* !defined(__linux__) */
 int
 xfs_bioerror(
 	xfs_buf_t *bp)
@@ -6437,6 +6491,7 @@ xfs_bioerror(
 	
 	return (EIO);
 }
+#endif /* !defined(__linux__) */
 
 /*
  * Same as xfs_bioerror, except that we are releasing the buffer
@@ -6444,6 +6499,7 @@ xfs_bioerror(
  * This is meant for userdata errors; metadata bufs come with
  * iodone functions attached, so that we can track down errors.
  */
+#if 1 /* !defined(__linux__) */
 int
 xfs_bioerror_relse(
 	xfs_buf_t *bp)
@@ -6481,7 +6537,7 @@ xfs_bioerror_relse(
 	}
 	return (EIO);
 }
-
+#endif /* !defined(__linux__) */
 /*
  * Prints out an ALERT message about I/O error. 
  */
@@ -6509,6 +6565,7 @@ xfs_ioerror_alert(
  * the error checking stuff and the brelse if appropriate for
  * the caller, so the code can be a little leaner.
  */
+#if 1
 int
 xfs_read_buf(
 	struct xfs_mount *mp,
@@ -6540,11 +6597,13 @@ xfs_read_buf(
 	}
 	return (error);
 }
+#endif /* !defined(__linux__) */
 	
 /*
  * Wrapper around bwrite() so that we can trap 
  * write errors, and act accordingly.
  */
+#if 1
 int
 xfs_bwrite(
 	struct xfs_mount *mp,
@@ -6572,13 +6631,14 @@ xfs_bwrite(
 	}
 	return (error);
 }
-
+#endif /* !defined(__linux__) */
 /*
  * All xfs metadata buffers except log state machine buffers
  * get this attached as their b_bdstrat callback function. 
  * This is so that we can catch a buffer
  * after prematurely unpinning it to forcibly shutdown the filesystem.
  */
+#if 1
 int
 xfs_bdstrat_cb(struct xfs_buf *bp)
 {
@@ -6609,13 +6669,14 @@ xfs_bdstrat_cb(struct xfs_buf *bp)
 			return (xfs_bioerror(bp));
 	}
 }
-
+#endif /* !defined(__linux__) */
 /*
  * Wrapper around bdstrat so that we can stop data
  * from going to disk in case we are shutting down the filesystem.
  * Typically user data goes thru this path; one of the exceptions
  * is the superblock.
  */
+#if 1
 int
 xfsbdstrat(
 	struct xfs_mount 	*mp,
@@ -6647,7 +6708,7 @@ xfsbdstrat(
 	buftrace("XFSBDSTRAT IOERROR", bp);
 	return (xfs_bioerror_relse(bp));
 }
-
+#endif /* !defined(__linux__) */
 
 /*
  * xfs_strategy
@@ -6662,6 +6723,7 @@ xfsbdstrat(
  * initialized. If b_blkno specifies a real block, then all
  * we need to do is pass the buffer on to the underlying driver.
  */
+#if !defined(__linux__)
 void
 xfs_strategy(
 	bhv_desc_t	*bdp,
@@ -6673,7 +6735,9 @@ xfs_strategy(
 
 	xfs_strat_core(&ip->i_iocore, bp);
 }
+#endif /* !defined(__linux__) */
 
+#if !defined(__linux__)
 void
 xfs_strat_core(
 	xfs_iocore_t	*io,
@@ -6762,13 +6826,14 @@ xfs_strat_core(
 		XFS_STRAT_WRITE(mp, io, bp);
 	}
 }
-
+#endif /* !defined(__linux__) */
 /*
  * This is called from xfs_init() to start the xfs daemons.
  * We'll start with a minimum of 4 of them, and add 1
  * for each 128 MB of memory up to 1 GB.  That should
  * be enough.
  */
+#if !defined(__linux__)
 void
 xfs_start_daemons(void)
 {
@@ -6816,6 +6881,7 @@ xfs_start_daemons(void)
 #undef XFSD_SSIZE
 	return;
 }
+#endif /* !defined(__linux__) */
 
 
 #define MAX_BUF_EXAMINED 10
@@ -6826,6 +6892,7 @@ xfs_start_daemons(void)
  * remove its buffers from the xfsd_list so it doesn't have to wait
  * for them to be pushed out to disk
  */
+#if 1
 void xfs_xfsd_list_evict(bhv_desc_t * bdp)
 {
 	vnode_t		*vp;
@@ -7138,7 +7205,7 @@ void xfs_xfsd_list_evict(bhv_desc_t * bdp)
 		bp = next_bp;
 	}
 }
-
+#endif /* !defined(__linux__) */
 /*
  * This is the main loop for the xfs daemons.
  * From here they wait in a loop for buffers which will
@@ -7146,6 +7213,7 @@ void xfs_xfsd_list_evict(bhv_desc_t * bdp)
  * This way we never force bdflush() to wait on one of our transactions,
  * thereby keeping the system happier and preventing buffer deadlocks.
  */
+#if !defined(__linux__)
 STATIC int
 xfsd(void)
 {
@@ -7210,6 +7278,7 @@ xfsd(void)
 		s = mp_mutex_spinlock(&xfsd_lock);
 	}
 }
+#endif /* !defined(__linux__) */
 /*
  * xfs_inval_cached_pages()
  * This routine is responsible for keeping direct I/O and buffered I/O
@@ -7218,6 +7287,7 @@ xfsd(void)
  * the page cache to flush and invalidate any cached pages.  If there
  * are no cached pages this routine will be very quick.
  */
+#if 1
 void
 xfs_inval_cached_pages(
 	vnode_t		*vp,
@@ -7286,13 +7356,14 @@ xfs_inval_cached_pages(
 		XFS_ILOCK(mp, io, XFS_IOLOCK_SHARED);
 	}
 }
-
+#endif /* !defined(__linux__) */
 /*
  * A user has written some portion of a realtime extent.  We need to zero
  * what remains, so the caller can mark the entire realtime extent as
  * written.  This is only used for filesystems that don't support unwritten
  * extents.
  */
+#if 1 /* !defined(__linux__) */
 STATIC int
 xfs_dio_write_zero_rtarea(
 	xfs_inode_t	*ip,
@@ -7391,6 +7462,7 @@ xfs_dio_write_zero_rtarea(
 
 	return error;
 }
+#endif /* !defined(__linux__) */
 
 /*
  * xfs_dio_read()
@@ -7401,6 +7473,7 @@ xfs_dio_write_zero_rtarea(
  * RETURNS:
  *	error 
  */
+#if 1 
 int
 xfs_dio_read(
 	xfs_dio_t *diop)
@@ -7667,6 +7740,7 @@ retry:
 
 	return (error);
 }
+#endif /* !defined(__linux__) */
 
 
 /*
@@ -7678,6 +7752,7 @@ retry:
  * RETURNS:
  *	error
  */
+#if 1 
 int
 xfs_dio_write(
 	xfs_dio_t *diop)
@@ -8126,7 +8201,7 @@ retry:
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	goto error0;
 }
-
+#endif /* !defined(__linux__) */
 
 /*
  * xfs_diostrat()
@@ -8141,6 +8216,7 @@ retry:
  * RETURNS:
  *	none
  */
+#if !defined(__linux__)
 int
 xfs_diostrat(
 	xfs_buf_t	*bp)
@@ -8201,6 +8277,7 @@ xfs_diostrat(
 
 	return (0);
 }
+#endif /* !defined(__linux__) */
 
 /*
  * xfs_diordwr()
@@ -8215,6 +8292,7 @@ xfs_diostrat(
  * 	 0 on success
  * 	errno on error
  */
+#if !defined(__linux__)
 int
 xfs_diordwr(
 	bhv_desc_t	*bdp,
@@ -8390,7 +8468,7 @@ xfs_diordwr(
 	}
 
 	ASSERT((bp->b_flags & B_MAPPED) == 0);
-	bp->b_flags = 0;
+	XFS_BUF_ZEROFLAGS(bp);
 	XFS_BUF_PTR(bp) = 0;
 	putphysbuf(bp);
 
@@ -8402,7 +8480,7 @@ xfs_diordwr(
 
 	return (error);
 }
-
+#endif /* !defined(__linux__) */
 
 
 
@@ -8416,6 +8494,7 @@ int		xfs_refcache_count;
 /*
  * Insert the given inode into the reference cache.
  */
+#if 1
 void
 xfs_refcache_insert(
 	xfs_inode_t	*ip)
@@ -8524,12 +8603,13 @@ xfs_refcache_insert(
 	}
 	return;
 }
-
+#endif /* !defined(__linux__) */
 
 /*
  * If the given inode is in the reference cache, purge its entry and
  * release the reference on the vnode.
  */
+#if 1 
 void
 xfs_refcache_purge_ip(
 	xfs_inode_t	*ip)
@@ -8568,13 +8648,14 @@ xfs_refcache_purge_ip(
 
 	return;
 }
-
+#endif /* !defined(__linux__) */
 
 /*
  * This is called from the XFS unmount code to purge all entries for the
  * given mount from the cache.  It uses the refcache busy counter to
  * make sure that new entries are not added to the cache as we purge them.
  */
+#if 1 
 void
 xfs_refcache_purge_mp(
 	xfs_mount_t	*mp)
@@ -8623,13 +8704,14 @@ xfs_refcache_purge_mp(
 	ASSERT(xfs_refcache_busy >= 0);
 	mp_mutex_spinunlock(&xfs_refcache_lock, s);
 }
-
+#endif /* !defined(__linux__) */
 
 /*
  * This is called from the XFS sync code to ensure that the refcache
  * is emptied out over time.  We purge a small number of entries with
  * each call.
  */
+#if 1
 void
 xfs_refcache_purge_some(void)
 {
@@ -8680,3 +8762,4 @@ xfs_refcache_purge_some(void)
 		VN_RELE(XFS_ITOV(iplist[i]));
 	}
 }
+#endif /* !defined(__linux__) */

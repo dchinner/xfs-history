@@ -1,4 +1,4 @@
-#ident "$Revision: 1.80 $"
+#ident "$Revision: 1.81 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -769,7 +769,7 @@ xfs_inode_item_pushbuf(
 		    iip->ili_format.ilf_len, INCORE_TRYLOCK);
 
 	if (bp != NULL) {
-		if (bp->b_flags & B_DELWRI) {
+		if (XFS_BUF_ISDELAYWRITE(bp)) {
 			/*
 			 * We were racing with iflush because we don't hold
 			 * the AIL_LOCK or the flush lock. However, at this point,

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.104 $"
+#ident	"$Revision: 1.105 $"
 
 struct cred;
 struct mounta;
@@ -96,7 +96,7 @@ typedef struct xfs_ioops {
 #ifndef SIM
 	xfs_dio_write_t		xfs_dio_write_func;
 	xfs_dio_read_t		xfs_dio_read_func;
-	xfs_strat_write_t	xfs_strat_write_func;
+    xfs_strat_write_t	xfs_strat_write_func;
 #endif
 	xfs_bmapi_t		xfs_bmapi_func;
 	xfs_bmap_eof_t		xfs_bmap_eof_func;

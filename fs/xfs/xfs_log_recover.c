@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.142 $"
+#ident	"$Revision: 1.144 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -185,7 +185,9 @@ xlog_bwrite(
 	ASSERT(BBTOB(nbblks) <= bp->b_bufsize);
 
 	XFS_BUF_SET_ADDR(bp, log->l_logBBstart + blk_no);
-	bp->b_flags	= B_BUSY | B_HOLD;
+	XFS_BUF_ZEROFLAGS(bp);
+	XFS_BUF_BUSY(bp);
+    XFS_BUF_HOLD(bp);
 	XFS_BUF_SET_COUNT(bp, BBTOB(nbblks));
 	bp->b_edev	= log->l_dev;
 	bp->b_target	= &log->l_mp->m_logdev_targ;
@@ -1821,10 +1823,10 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 
 	mp = log->l_mp;
 	bp = read_buf_targ(mp->m_ddev_targp, blkno, len, 0);
-	if (bp->b_flags & B_ERROR) {
+	if (XFS_BUF_ISERROR(bp)) {
 		xfs_ioerror_alert("xlog_recover_do..(read)", log->l_mp, 
 				  mp->m_dev, blkno);
-		error = bp->b_error;
+		error = XFS_BUF_GETERROR(bp);
 		xfs_buf_relse(bp);
 		return error;
 	}

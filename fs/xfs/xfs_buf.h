@@ -14,7 +14,8 @@ typedef struct buf xfs_buf_t;
 #define xfs_buf buf
 
 
-#define XFS_BFLAGS(x)            ((x)->b_flags)  /* debugging routines might need this */
+#define XFS_BUF_BFLAGS(x)            ((x)->b_flags)  /* debugging routines might need this */
+#define XFS_BUF_ZEROFLAGS(x)            ((x)->b_flags = 0) 
 #define XFS_BUF_STALE(x)	     ((x)->b_flags |= B_STALE)
 #define XFS_BUF_UNSTALE(x)	     ((x)->b_flags &= ~B_STALE)
 #define XFS_BUF_ISSTALE(x)	     ((x)->b_flags & B_STALE)
@@ -55,11 +56,19 @@ typedef struct buf xfs_buf_t;
 #define XFS_BUF_UNREAD(x)       ((x)->b_flags &= ~B_READ)
 #define XFS_BUF_ISREAD(x)       ((x)->b_flags & B_READ)
 
-#define XFS_BUF_WRITE(x)         ((x)->b_flags |= B_WRITE)
-#define XFS_BUF_UNWRITE(x)       ((x)->b_flags &= ~B_WRITE)
-#define XFS_BUF_ISWRITE(x)       ((x)->b_flags & B_WRITE)
+#define XFS_BUF_WRITE(x)        ((x)->b_flags |= B_WRITE)
+#define XFS_BUF_UNWRITE(x)      ((x)->b_flags &= ~B_WRITE)
+#define XFS_BUF_ISWRITE(x)      ((x)->b_flags & B_WRITE)
 
-#define XFS_BUF_ISUNINITIAL(x)  ((x)->b_flags & B_UNINITIAL)
+#define XFS_BUF_UNCACHED(x)      ((x)->b_flags |= B_UNCACHED)
+#define XFS_BUF_UNUNCACHED(x)    ((x)->b_flags &= ~B_UNCACHED)
+#define XFS_BUF_ISUNCACHED(x)    ((x)->b_flags & B_UNCACHED)
+
+#define XFS_BUF_ISUNINITIAL(x)   ((x)->b_flags & B_UNINITIAL)
+#define XFS_BUF_UNUNINITIAL(x)   ((x)->b_flags &= ~B_UNINITIAL)
+
+/* hmm what does the mean on linux? may go away */
+#define XFS_BUF_PAGEIO(x)       ((x)->b_flags & B_PAGEIO)
 
 #define XFS_BUF_IODONE_FUNC(buf)	(buf)->b_iodone
 #define XFS_BUF_SET_IODONE_FUNC(buf, func)	\

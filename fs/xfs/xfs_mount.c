@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.187 $"
+#ident	"$Revision: 1.189 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -240,7 +240,7 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	 */
 	bp = ngetrbuf(BBTOB(BTOBB(sizeof(xfs_sb_t))));
 	ASSERT(bp != NULL);
-	ASSERT((bp->b_flags & B_BUSY) && valusema(&bp->b_lock) <= 0);
+	ASSERT(XFS_BUF_ISBUSY(bp) && valusema(&bp->b_lock) <= 0);
 
 	/*
 	 * Initialize and read in the superblock buffer.
@@ -248,7 +248,7 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	bp->b_edev = dev;
 	bp->b_relse = xfs_sb_relse;
 	XFS_BUF_SET_ADDR(bp, XFS_SB_DADDR);
-	bp->b_flags |= B_READ;
+	XFS_BUF_READ(bp);
 	bp->b_target = mp->m_ddev_targp;
 	xfsbdstrat(mp, bp);
 	if (error = iowait(bp)) {
@@ -1070,8 +1070,9 @@ xfs_unmountfs_writesb(xfs_mount_t *mp)
 			xfs_fs_cmn_err(CE_NOTE, mp,
 				"Unmounting, marking shared read-only");
 		}
-		sbp->b_flags &= ~(B_DONE | B_READ);
-		sbp->b_flags |= B_WRITE;
+		XFS_BUF_UNDONE(sbp);
+		XFS_BUF_UNREAD(sbp);
+		XFS_BUF_WRITE(sbp);
 		bwait_unpin(sbp);
 		ASSERT(sbp->b_edev == mp->m_dev);
 		xfsbdstrat(mp, sbp);
@@ -1459,7 +1460,7 @@ xfs_getsb(xfs_mount_t	*mp,
 	} else {
 		psema(&bp->b_lock, PRIBIO);
 	}
-	ASSERT(bp->b_flags & B_DONE);
+	ASSERT(XFS_BUF_ISDONE(bp));
 	return (bp);
 }
 
@@ -1489,9 +1490,10 @@ xfs_freesb(
 STATIC void
 xfs_sb_relse(xfs_buf_t *bp)
 {
-	ASSERT(bp->b_flags & B_BUSY);
+	ASSERT(XFS_BUF_ISBUSY(bp));
 	ASSERT(valusema(&bp->b_lock) <= 0);
-	bp->b_flags &= ~(B_ASYNC | B_READ);
+	XFS_BUF_UNASYNC(bp);
+	XFS_BUF_UNREAD(bp);
 	bp->av_forw = NULL;
 	bp->av_back = NULL;
 	vsema(&bp->b_lock);

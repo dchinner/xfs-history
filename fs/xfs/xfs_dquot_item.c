@@ -1,4 +1,4 @@
-#ident "$Revision: 1.12 $"
+#ident "$Revision: 1.13 $"
 
 #include <sys/param.h>
 #include "xfs_buf.h"
@@ -293,7 +293,7 @@ xfs_qm_dquot_logitem_pushbuf(
 		    XFS_QI_DQCHUNKLEN(mp),
 		    INCORE_TRYLOCK);
 	if (bp != NULL) {
-		if (bp->b_flags & B_DELWRI) {
+		if (XFS_BUF_ISDELAYWRITE(bp)) {
 			dopush = ((qip->qli_item.li_flags & XFS_LI_IN_AIL) && 
 				  (valusema(&(dqp->q_flock)) <= 0));
 			qip->qli_pushbuf_flag = 0;

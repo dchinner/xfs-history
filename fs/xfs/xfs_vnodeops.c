@@ -1,4 +1,4 @@
-#ident "$Revision: 1.419 $"
+#ident "$Revision: 1.421 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -7029,13 +7029,13 @@ vnodeops_t xfs_vnodeops = {
 	BHV_IDENTITY_INIT(VN_BHV_XFS,VNODE_POSITION_BASE),
 	xfs_open,
 	xfs_close,
-	xfs_read,
-	xfs_write,
-	xfs_ioctl,
+	(vop_read_t)fs_nosys, /*xfs_read, */
+	(vop_write_t)fs_nosys,/* xfs_write, */
+	(vop_ioctl_t)fs_nosys,/* xfs_ioctl, */
 	(vop_setfl_t)fs_noerr,
 	xfs_getattr,
 	xfs_setattr,
-	xfs_access,
+	(vop_access_t)fs_nosys,/* xfs_access, */
 	xfs_lookup,
 	xfs_create,
 	xfs_remove,
@@ -7048,29 +7048,29 @@ vnodeops_t xfs_vnodeops = {
 	xfs_readlink,
 	xfs_fsync,
 	xfs_inactive,
-	xfs_fid,
-	xfs_fid2,
-	xfs_rwlock,
-	xfs_rwunlock,
+	(vop_fid_t)fs_nosys,/* xfs_fid, */
+	(vop_fid2_t)fs_nosys,/* xfs_fid2, */
+   	(vop_rwlock_t)fs_nosys,/* xfs_rwlock, */
+	(vop_rwunlock_t)fs_nosys,/* xfs_rwunlock, */
 	xfs_seek,
-	fs_cmp,
-	xfs_frlock,
+	(vop_cmp_t)fs_nosys,/* fs_cmp, */
+	(vop_frlock_t)fs_nosys,/* xfs_frlock, */
 	(vop_realvp_t)fs_nosys,
 	xfs_bmap,
-	xfs_strategy,
+	(vop_strategy_t)fs_nosys, /* xfs_strategy, */
 	(vop_map_t)fs_noerr,
 	(vop_addmap_t)fs_noerr,
 	(vop_delmap_t)fs_noerr,
 	fs_poll,
 	(vop_dump_t)fs_nosys,
-	xfs_pathconf,
-	xfs_allocstore,
-	xfs_fcntl,
+	(vop_pathconf_t)fs_nosys,/* xfs_pathconf, */
+	(vop_allocstore_t)fs_nosys,/* xfs_allocstore, */
+	(vop_fcntl_t)fs_nosys, /* xfs_fcntl, */
 	xfs_reclaim,
-	xfs_attr_get,
-	xfs_attr_set,
-	xfs_attr_remove,
-	xfs_attr_list,
+	(vop_attr_get_t)fs_nosys,/* xfs_attr_get, */
+	(vop_attr_set_t)fs_nosys,/* xfs_attr_set, */
+	(vop_attr_remove_t)fs_nosys,/* xfs_attr_remove, */
+	(vop_attr_list_t)fs_nosys,/* xfs_attr_list, */
 	fs_cover,
 	(vop_link_removed_t)fs_noval,
 	fs_vnode_change,
@@ -7080,7 +7080,7 @@ vnodeops_t xfs_vnodeops = {
 	fs_invalfree_pages,
 	fs_pages_sethole,
 	(vop_commit_t)fs_nosys,
-	(vop_readbuf_t)xfs_vop_readbuf,
+	(vop_readbuf_t)fs_nosys,/* (vop_readbuf_t)xfs_vop_readbuf, */
 	fs_strgetmsg,
 	fs_strputmsg,
 };
