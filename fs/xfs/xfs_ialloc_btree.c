@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#ident	"$Revision: 1.58 $"
+#ident	"$Revision: 1.59 $"
 
 /*
  * Inode allocation management for XFS.
@@ -371,7 +371,7 @@ xfs_inobt_delrec(
 					cur->bc_mp->m_ddev_targp, agfbno, 1, 0,
 					&agfbp))
 				return error;
-			ASSERT(!geterror(agfbp));
+			ASSERT(!XFS_BUF_GETERROR(agfbp));
 			xfs_trans_bhold_until_committed(cur->bc_tp, agfbp);
 		} else if (level > 0 &&
 			   (error = xfs_inobt_decrement(cur, level, &i)))
@@ -663,7 +663,7 @@ xfs_inobt_delrec(
 	if (error = xfs_trans_read_buf(cur->bc_mp, cur->bc_tp,
 			cur->bc_mp->m_ddev_targp, agfbno, 1, 0, &agfbp))
 		return error;
-	ASSERT(!geterror(agfbp));
+	ASSERT(!XFS_BUF_GETERROR(agfbp));
 	xfs_trans_bhold_until_committed(cur->bc_tp, agfbp);
 	/*
 	 * If we joined with the left neighbor, set the buffer in the
