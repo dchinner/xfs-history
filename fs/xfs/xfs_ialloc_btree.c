@@ -1306,13 +1306,15 @@ xfs_inobt_newroot(
 
 		nfsbno = XFS_AGB_TO_FSB(cur->bc_mp, cur->bc_private.i.agno,
 			agi->agi_root);
-		nfsbno = xfs_alloc_extent(cur->bc_tp, nfsbno, 1,
-			XFS_ALLOCTYPE_NEAR_BNO, 0, 0, 0);
+		nfsbno = xfs_alloc_vextent(cur->bc_tp, nfsbno, 1, 1,
+			(xfs_extlen_t *)&nptr, XFS_ALLOCTYPE_NEAR_BNO, 0, 0, 0,
+			0, 1);
 		/*
 		 * None available, we fail.
 		 */
 		if (nfsbno == NULLFSBLOCK)
 			return 0;
+		ASSERT(nptr == 1);
 		nbno = XFS_FSB_TO_AGBNO(cur->bc_mp, nfsbno);
 	}
 	nbp = xfs_btree_get_bufs(cur->bc_mp, cur->bc_tp,
@@ -1675,12 +1677,14 @@ xfs_inobt_split(
 
 		rfsbno = XFS_AGB_TO_FSB(cur->bc_mp, cur->bc_private.i.agno,
 			lbno);
-		rfsbno = xfs_alloc_extent(cur->bc_tp, rfsbno, 1,
-			XFS_ALLOCTYPE_NEAR_BNO, 0, 0, 0);
+		rfsbno = xfs_alloc_vextent(cur->bc_tp, rfsbno, 1, 1,
+			(xfs_extlen_t *)&i, XFS_ALLOCTYPE_NEAR_BNO, 0, 0, 0,
+			0, 1);
 		if (rfsbno == NULLFSBLOCK) {
 			kmem_check();
 			return 0;
 		}
+		ASSERT(i == 1);
 		rbno = XFS_FSB_TO_AGBNO(cur->bc_mp, rfsbno);
 	}
 	rbp = xfs_btree_get_bufs(cur->bc_mp, cur->bc_tp,

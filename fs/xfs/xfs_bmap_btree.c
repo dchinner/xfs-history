@@ -649,13 +649,16 @@ xfs_bmbt_insrec(
 				type = XFS_ALLOCTYPE_FIRST_AG;
 			else
 				type = XFS_ALLOCTYPE_NEAR_BNO;
-			cbno = xfs_alloc_extent(tp, askbno, 1, type, 0, 0,
-				cur->bc_private.b.flags & XFS_BTCUR_BPRV_WASDEL);
+			cbno = xfs_alloc_vextent(tp, askbno, 1, 1,
+				(xfs_extlen_t *)&i, type, 0, 0,
+				cur->bc_private.b.flags & XFS_BTCUR_BPRV_WASDEL,
+				0, 1);
 			if (cbno == NULLFSBLOCK) {
 				xfs_bmbt_trace_cursor("xfs_bmbt_insrec exit1",
 					cur);
 				return 0;
 			}
+			ASSERT(i == 1);
 			cur->bc_private.b.firstblock = cbno;
 			cur->bc_private.b.allocated++;
 			ip->i_d.di_nblocks++;
@@ -1432,12 +1435,13 @@ xfs_bmbt_split(
 		type = XFS_ALLOCTYPE_FIRST_AG;
 	else
 		type = XFS_ALLOCTYPE_NEAR_BNO;
-	rbno = xfs_alloc_extent(tp, bno, 1, type, 0, 0,
-		cur->bc_private.b.flags & XFS_BTCUR_BPRV_WASDEL);
+	rbno = xfs_alloc_vextent(tp, bno, 1, 1, (xfs_extlen_t *)&i, type, 0, 0,
+		cur->bc_private.b.flags & XFS_BTCUR_BPRV_WASDEL, 0, 1);
 	if (rbno == NULLFSBLOCK) {
 		xfs_bmbt_trace_cursor("xfs_bmbt_split exit0", cur);
 		return 0;
 	}
+	ASSERT(i == 1);
 	cur->bc_private.b.firstblock = rbno;
 	cur->bc_private.b.allocated++;
 	ip->i_d.di_nblocks++;

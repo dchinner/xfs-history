@@ -206,10 +206,11 @@ xfs_ialloc_ag_alloc(
 	/*
 	 * Allocate a fixed-size extent of inodes.
 	 */
-	newfsbno = xfs_alloc_extent(tp, newfsbno, newblocks,
-		XFS_ALLOCTYPE_NEAR_BNO, 0, 0, 0);
+	newfsbno = xfs_alloc_vextent(tp, newfsbno, newblocks, newblocks,
+		(xfs_extlen_t *)&i, XFS_ALLOCTYPE_NEAR_BNO, 0, 0, 0, 0, 1);
 	if (newfsbno == NULLFSBLOCK)
 		return 0;
+	ASSERT(i == newblocks);
 	/*
 	 * Convert the results.
 	 */

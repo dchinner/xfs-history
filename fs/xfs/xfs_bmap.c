@@ -1885,7 +1885,8 @@ xfs_bmap_extents_to_btree(
 		type = XFS_ALLOCTYPE_NEAR_BNO;
 		abno = *firstblock;
 	}
-	abno = xfs_alloc_extent(tp, abno, 1, type, 0, 0, wasdel);
+	abno = xfs_alloc_vextent(tp, abno, 1, 1, (xfs_extlen_t *)&i, type, 0, 0,
+		wasdel, 0, 1);
 	/*
 	 * Allocation can't fail, the space was reserved.
 	 */
@@ -1980,6 +1981,7 @@ xfs_bmap_local_to_extents(
 #if defined(DEBUG) && !defined(SIM)
 	static char	fname[] = "xfs_bmap_local_to_extents";
 #endif
+	xfs_extlen_t	len;
 	xfs_mount_t	*mp;
 	xfs_alloctype_t	type;
 
@@ -1998,11 +2000,13 @@ xfs_bmap_local_to_extents(
 			askbno = *firstblock;
 			type = XFS_ALLOCTYPE_NEAR_BNO;
 		}
-		bno = xfs_alloc_extent(tp, askbno, 1, type, total, 0, 0);
+		bno = xfs_alloc_vextent(tp, askbno, 1, 1, &len, type, total, 0,
+			0, 0, 1);
 		/* 
 		 * Can't fail, the space was reserved.
 		 */
 		ASSERT(bno != NULLFSBLOCK);
+		ASSERT(len == 1);
 		*firstblock = bno;
 		bp = xfs_btree_get_bufl(mp, tp, bno, 0);
 		cp = (char *)bp->b_un.b_addr;
