@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.16 $"
+#ident	"$Revision: 1.20 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -69,7 +69,7 @@ xfs_mount_init(void)
 }
 	
 xfs_mount_t *
-xfs_mount(dev_t dev, dev_t rtdev)
+xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 {
 	buf_t		*bp;
 	xfs_sb_t	*sbp;
@@ -147,6 +147,12 @@ xfs_mount(dev_t dev, dev_t rtdev)
 		xfs_iunlock(mp->m_rsumip, XFS_ILOCK_SHARED);
 	}
 
+	/*
+	 * Call the log's mount-time initialization.
+	 */
+	if (logdev)
+		xfs_log_mount(mp, logdev, 0);
+
 	return mp;
 }
 
@@ -190,6 +196,7 @@ xfs_mod_sb(xfs_trans_t *tp, int fields)
 		offsetof(xfs_sb_t, sb_magicnum),
 		offsetof(xfs_sb_t, sb_rblocks),
 		offsetof(xfs_sb_t, sb_rextents),
+		offsetof(xfs_sb_t, sb_logstart),
 		offsetof(xfs_sb_t, sb_rootino),
 		offsetof(xfs_sb_t, sb_rbmino),
 		offsetof(xfs_sb_t, sb_rsumino),
@@ -197,6 +204,7 @@ xfs_mod_sb(xfs_trans_t *tp, int fields)
 		offsetof(xfs_sb_t, sb_agblocks),
 		offsetof(xfs_sb_t, sb_agcount),
 		offsetof(xfs_sb_t, sb_rbmblocks),
+		offsetof(xfs_sb_t, sb_logblocks),
 		offsetof(xfs_sb_t, sb_versionnum),
 		offsetof(xfs_sb_t, sb_sectsize),
 		offsetof(xfs_sb_t, sb_inodesize),
