@@ -492,14 +492,13 @@ xfs_attr_leaf_to_node(xfs_trans_t *trans, xfs_da_args_t *args)
 
 	dp = args->dp;
 	error = xfs_da_grow_inode(trans, args, 1, &blkno);
-	ASSERT(blkno == 1);
 	if (error)
 		return(error);
 	error = xfs_da_read_buf(trans, dp, 0, &bp1, XFS_ATTR_FORK);
 	if (error)
 		return(error);
 	ASSERT(bp1 != NULL);
-	error = xfs_da_get_buf(trans, dp, 1, &bp2, XFS_ATTR_FORK);
+	error = xfs_da_get_buf(trans, dp, blkno, &bp2, XFS_ATTR_FORK);
 	if (error)
 		return(error);
 	ASSERT(bp2 != NULL);
