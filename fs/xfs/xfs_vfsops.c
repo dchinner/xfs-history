@@ -2078,6 +2078,13 @@ xfs_vget(
                 *vpp = NULL;
                 return XFS_ERROR(EIO);
         }
+
+	if (ip->i_d.di_mode == 0) {
+		xfs_iput(ip, XFS_ILOCK_EXCL);
+		*vpp = NULL;
+		return 0;
+	}
+
 	if (ip->i_d.di_gen != igen) {
                 xfs_iput(ip, XFS_ILOCK_EXCL);
                 *vpp = NULL;
