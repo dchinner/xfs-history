@@ -79,10 +79,10 @@ typedef struct xfs_bmbt_irec
 
 #define	XFS_BMAP_MAXLEVELS	5	/* ??? */
 
-#define	xfs_bmbt_get_block(cur, level)	\
+#define	xfs_bmbt_get_block(cur, level, bpp) \
 	((level) < (cur)->bc_nlevels - 1 ? \
-	 xfs_buf_to_block((cur)->bc_bufs[level]) : \
-	 (cur)->bc_private.b.ip->i_broot)
+	 ((*bpp = (cur)->bc_bufs[level]), xfs_buf_to_block(*bpp)) : \
+	 ((*bpp = 0), (cur)->bc_private.b.ip->i_broot))
 
 void xfs_bmapi(xfs_trans_t *, struct xfs_inode *, xfs_fsblock_t, xfs_extlen_t, int, xfs_bmbt_irec_t *, int *);
 
