@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.158 $"
+#ident	"$Revision: 1.159 $"
 
 /*
  * High level interface routines for log manager
@@ -2182,6 +2182,7 @@ redo:
 	 * the ticket/transaction gets cancelled.
 	 */
 	tic->t_curr_res = 0;
+	tic->t_cnt = 0; /* ungrant will give back unit_res * t_cnt. */
 	GRANT_UNLOCK(log, spl);
 	return XFS_ERROR(EIO);
 }	/* xlog_grant_log_space */
@@ -2307,6 +2308,13 @@ redo:
 	if (tic->t_flags & XLOG_TIC_IN_Q)
 		XLOG_DEL_TICKETQ(log->l_reserve_headq, tic);
 	xlog_trace_loggrant(log, tic, "xlog_regrant_write_log_space: err_ret");
+	/*
+	 * If we are failing, make sure the ticket doesn't have any
+	 * current reservations. We don't want to add this back when
+	 * the ticket/transaction gets cancelled.
+	 */
+	tic->t_curr_res = 0;
+	tic->t_cnt = 0; /* ungrant will give back unit_res * t_cnt. */
 	GRANT_UNLOCK(log, spl);
 	return XFS_ERROR(EIO);
 }	/* xlog_regrant_write_log_space */
