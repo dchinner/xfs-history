@@ -37,23 +37,6 @@
 #include <asm/uaccess.h>
 
 /*
- * map these directly... trying to use a #define causes
- * many strange side affects
- */
-int
-copyout( void* from, void* to, int size ) 
-{
-	return copy_to_user(to, from, size );
-}
-
-int
-copyin( void* from, void* to, int size ) 
-{
-	return copy_from_user (to, from, size );
-}
-
-
-/*
  * Move "n" bytes at byte address "cp"; "rw" indicates the direction
  * of the move, and the I/O parameters are provided in "uio", which is
  * update to reflect the data which was moved.  Returns 0 on success or
@@ -108,6 +91,4 @@ uiomove(void *cp, size_t n, enum uio_rw rw, struct uio *uio)
 	return 0;
 }
 
-EXPORT_SYMBOL(copyin);
-EXPORT_SYMBOL(copyout);
 EXPORT_SYMBOL(uiomove);

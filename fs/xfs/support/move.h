@@ -35,6 +35,7 @@
 
 #include <support/types.h>
 #include <linux/uio.h>
+#include <asm/uaccess.h>
 
 #define bzero(p,s)	memset((p), 0, (s))
 #define bcopy(s,d,n)	memcpy((d),(s),(n))
@@ -74,7 +75,20 @@ typedef enum uio_seg {
 
 extern int	uiomove (void *, size_t, uio_rw_t, uio_t *);
 
-extern int	copyout (void *,void *, int);
-extern int	copyin (void *, void *, int);
+/*
+ * map these directly... trying to use a #define causes
+ * many strange side affects
+ */
+static __inline__ int
+copyout( void* from, void* to, int size ) 
+{
+	return copy_to_user(to, from, size );
+}
+
+static __inline__ int
+copyin( void* from, void* to, int size ) 
+{
+	return copy_from_user (to, from, size );
+}
 
 #endif  /* __XFS_SUPPORT_MOVE_H__ */
