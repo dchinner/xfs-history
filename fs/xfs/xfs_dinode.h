@@ -45,6 +45,7 @@ typedef struct xfs_dinode_core
 	xfs_extlen_t	di_extsize;	/* basic/minimum extent size for file */
 	__uint32_t	di_flags;	/* random flags, XFS_DIFLAG_... */
 	xfs_agino_t	di_nexti;	/* next allocated inode in ag */
+	xfs_fsblock_t	di_nblocks;	/* # of direct & btree blocks used */
 } xfs_dinode_core_t;
 
 typedef struct xfs_dinode
@@ -80,8 +81,9 @@ typedef struct xfs_dinode
 #define	XFS_DI_EXTSIZE	0x04000
 #define	XFS_DI_FLAGS	0x08000
 #define	XFS_DI_NEXTI	0x10000
-#define	XFS_DI_U	0x20000
-#define	XFS_DI_NUM_BITS	18
+#define	XFS_DI_NBLOCKS	0x20000
+#define	XFS_DI_U	0x40000
+#define	XFS_DI_NUM_BITS	19
 #define	XFS_DI_ALL_BITS	((1 << XFS_DI_NUM_BITS) - 1)
 
 /*

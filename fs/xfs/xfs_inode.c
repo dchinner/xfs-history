@@ -1358,11 +1358,12 @@ xfs_iprint(xfs_inode_t *ip)
 	printf("   di_nlink %x\n", dip->di_nlink);
 	printf("   di_uid %d\n", dip->di_uid); 
 	printf("   di_gid %d\n", dip->di_gid);
-	printf("   di_size %d\n", (int)dip->di_size);
-	printf("   di_nextents %d\n", (int)dip->di_nextents);
+	printf("   di_nextents %d\n", dip->di_nextents);
+	printf("   di_size %lld\n", dip->di_size);
 	printf("   di_gen %x\n", dip->di_gen);
 	printf("   di_extsize %d\n", dip->di_extsize);
 	printf("   di_flags %x\n", dip->di_flags);
+	printf("   di_nblocks %lld\n", dip->di_nblocks);
 }
 
 /*

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.2 $"
+#ident	"$Revision: 1.4 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -776,6 +776,7 @@ xfs_bmbt_insrec(
 			cbno = xfs_alloc_extent(tp, askbno, 1, XFS_ALLOCTYPE_START_BNO, 0, 0);
 			if (cbno == NULLFSBLOCK)
 				return 0;
+			ip->i_d.di_nblocks++;
 			buf = xfs_btree_get_bufl(mp, tp, cbno, 0);
 			cblock = xfs_buf_to_lblock(buf);
 			*cblock = *block;
@@ -799,7 +800,8 @@ xfs_bmbt_insrec(
 			xfs_bmbt_log_block(cur, buf, XFS_BB_ALL_BITS);
 			xfs_bmbt_log_keys(cur, buf, 1, cblock->bb_numrecs);
 			xfs_bmbt_log_ptrs(cur, buf, 1, cblock->bb_numrecs);
-			xfs_trans_log_inode(tp, ip, XFS_ILOG_BROOT);
+			xfs_trans_log_inode(tp, ip,
+				XFS_ILOG_CORE | XFS_ILOG_BROOT);
 			block = cblock;
 		} else {
 			if (xfs_bmbt_rshift(cur, level)) {
@@ -1443,6 +1445,7 @@ xfs_bmbt_split(
 	daddr_t			d;
 	int			first;
 	int			i;
+	xfs_inode_t		*ip;
 	xfs_bmbt_key_t		key;
 	int			last;
 	xfs_bmbt_ptr_t		lbno;
@@ -1467,6 +1470,7 @@ xfs_bmbt_split(
 	xfs_bmbt_rcheck(cur);
 	tp = cur->bc_tp;
 	mp = cur->bc_mp;
+	ip = cur->bc_private.b.ip;
 	sbp = &mp->m_sb;
 	lbuf = cur->bc_bufs[level];
 	lbno = xfs_daddr_to_fsb(sbp, lbuf->b_blkno);
@@ -1475,6 +1479,8 @@ xfs_bmbt_split(
 				XFS_ALLOCTYPE_START_BNO, 0, 0);
 	if (rbno == NULLFSBLOCK)
 		return 0;
+	ip->i_d.di_nblocks++;
+	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	rbuf = xfs_btree_get_bufl(mp, tp, rbno, 0);
 	right = xfs_buf_to_lblock(rbuf);
 	xfs_btree_check_lblock(cur, left, level);

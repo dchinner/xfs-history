@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.32 $"
+#ident	"$Revision: 1.33 $"
 
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -164,6 +164,7 @@ xfs_ialloc_log_di(
 		offsetof(xfs_dinode_core_t, di_extsize),
 		offsetof(xfs_dinode_core_t, di_flags),
 		offsetof(xfs_dinode_core_t, di_nexti),
+		offsetof(xfs_dinode_core_t, di_nblocks),
 		offsetof(xfs_dinode_t, di_u),
 		sizeof(xfs_dinode_t)
 	};
@@ -318,6 +319,7 @@ xfs_ialloc_ag_alloc(
 			free->di_core.di_extsize = 0;
 			free->di_core.di_flags = 0;
 			free->di_core.di_nexti = nextino;
+			free->di_core.di_nblocks = 0;
 			free->di_u.di_next = nextino;
 			xfs_ialloc_log_di(tp, fbuf, i, XFS_DI_ALL_BITS);
 			/*
