@@ -1,4 +1,4 @@
-#ident "$Revision: 1.228 $"
+#ident "$Revision: 1.229 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1686,12 +1686,15 @@ xfs_igrow_start(
  * The inode must have both the iolock and the ilock locked
  * for update and it must be a part of the current transaction.
  * The xfs_igrow_start() function must have been called previously.
+ * If the change_flag is not zero, the inode change timestamp will
+ * be updated.
  */
 void
 xfs_igrow_finish(
 	xfs_trans_t	*tp,
 	xfs_inode_t	*ip,
-	xfs_fsize_t	new_size)
+	xfs_fsize_t	new_size,
+	int		change_flag)
 {
 	ASSERT(ismrlocked(&(ip->i_lock), MR_UPDATE) != 0);
 	ASSERT(ismrlocked(&(ip->i_iolock), MR_UPDATE) != 0);
@@ -1699,9 +1702,11 @@ xfs_igrow_finish(
 	ASSERT(new_size > ip->i_d.di_size);
 
 	/*
-	 * Update the file size and inode change timestamp.
+         * Update the file size.  Update the inode change timestamp
+         * if change_flag set.
 	 */
 	ip->i_d.di_size = new_size;
+	if (change_flag)
 	xfs_ichgtime(ip, XFS_ICHGTIME_CHG);
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 

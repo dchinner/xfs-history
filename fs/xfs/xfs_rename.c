@@ -1,4 +1,4 @@
-#ident "$Revision: 1.3 $"
+#ident "$Revision: 1.4 $"
 
 #include <sys/types.h>
 #include <sys/uuid.h>
@@ -35,6 +35,7 @@
 #include "xfs_trans_space.h"
 #include "xfs_da_btree.h"
 #include "xfs_dir_leaf.h"
+#include "xfs_dmapi.h"
 
 #ifndef SIM
 mutex_t	xfs_ancestormon;		/* initialized in xfs_init */
@@ -669,16 +670,23 @@ xfs_rename(
 	if (target_dir_bdp == NULL) {
 		return XFS_ERROR(EXDEV);
 	}
-	if (DM_EVENT_ENABLED(src_dir_vp->v_vfsp, XFS_BHVTOI(src_dir_bdp),
-			     DM_RENAME) ||
+	src_dp = XFS_BHVTOI(src_dir_bdp);
+        target_dp = XFS_BHVTOI(target_dir_bdp);
+#ifndef SIM
+	if (DM_EVENT_ENABLED(src_dir_vp->v_vfsp, src_dp, DM_EVENT_RENAME) ||
 	    DM_EVENT_ENABLED(target_dir_vp->v_vfsp,
-			     XFS_BHVTOI(target_dir_bdp), DM_RENAME)) {
-		error = dm_namesp_event(DM_RENAME, src_dir_vp, target_dir_vp,
-					 src_name, target_name, 0, 0);
+			     	target_dp, DM_EVENT_RENAME)) {
+		error = dm_send_namesp_event(DM_EVENT_RENAME,
+					src_dir_bdp, DM_RIGHT_NULL,
+					target_dir_bdp, DM_RIGHT_NULL,
+					src_name, target_name,
+					0, 0, 0);
 		if (error) {
 			return error;
 		}
 	}
+#endif
+	/* Return through std_return after this point. */
 
  start_over:
 	/*
@@ -690,8 +698,6 @@ xfs_rename(
 	 * does not exist in the source directory.
 	 */
 	tp = NULL;
-	src_dp = XFS_BHVTOI(src_dir_bdp);
-        target_dp = XFS_BHVTOI(target_dir_bdp);
 	do {
 		error = xfs_lock_for_rename(src_dp, target_dp, src_name,
 				target_name, &src_ip, &target_ip, inodes,
@@ -703,7 +709,7 @@ xfs_rename(
 		 * We have nothing locked, no inode references, and
 		 * no transaction, so just get out.
 		 */
-		return error;
+		goto std_return;
 	}
 
 	ASSERT(src_ip != NULL);
@@ -1036,7 +1042,7 @@ xfs_rename(
 		if (target_ip != NULL) {
 			IRELE(target_ip);
 		}
-		return error;
+		goto std_return;
 	}
 	/*
 	 * Take refs. for vop_link_removed calls below.  No need to worry 
@@ -1072,19 +1078,21 @@ xfs_rename(
 		IRELE(src_ip);
 	}
 
-	if (error) {
-		return error;
-	}
-
-	if (DM_EVENT_ENABLED(src_dir_vp->v_vfsp, XFS_BHVTOI(src_dir_bdp),
-			     DM_POSTRENAME) ||
+	/* Fall through to std_return with error = 0 or errno from
+	 * xfs_trans_commit	 */
+std_return:
+#ifndef SIM
+	if (DM_EVENT_ENABLED(src_dir_vp->v_vfsp, src_dp, DM_EVENT_POSTRENAME) ||
 	    DM_EVENT_ENABLED(target_dir_vp->v_vfsp,
-			     XFS_BHVTOI(target_dir_bdp), DM_POSTRENAME)) {
-		(void) dm_namesp_event(DM_POSTRENAME, src_dir_vp,
-			target_dir_vp, src_name, target_name, 0, 0);
+			     	target_dp, DM_EVENT_POSTRENAME)) {
+		(void) dm_send_namesp_event(DM_EVENT_POSTRENAME,
+					src_dir_bdp, DM_RIGHT_NULL,
+					target_dir_bdp, DM_RIGHT_NULL,
+					src_name, target_name,
+					0, error, 0);
 	}
-
-	return 0;
+#endif
+	return error;
 
  abort_return:
 	cancel_flags |= XFS_TRANS_ABORT;
@@ -1092,7 +1100,7 @@ xfs_rename(
  error_return:
 	xfs_bmap_cancel(&free_list);
 	xfs_trans_cancel(tp, cancel_flags);
-	return error;
+	goto std_return;
 
  unlock_rele_return:
 	xfs_rename_unlock4(inodes);
@@ -1102,5 +1110,5 @@ xfs_rename(
 	if (target_ip != NULL) {
 		IRELE(target_ip);
 	}
-	return error;
+	goto std_return;
 }

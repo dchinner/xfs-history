@@ -16,8 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.186 $"
-
+#ident  "$Revision: 1.187 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -31,7 +30,6 @@
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/grio.h>
-#include <sys/dmi.h>
 #include <sys/dmi_kern.h>
 #include <sys/fs/spec_lsnode.h>
 #include <sys/kmem.h>
@@ -97,13 +95,14 @@
 #include "xfs_extfree_item.h"
 #include "xfs_dir.h"
 #include "xfs_quota.h"
+#include "xfs_dmapi.h"
+
 #if CELL || NOTYET
 #include "cxfs_clnt.h"
 #include "xfs_cxfs.h"
 #else /* CELL || NOTYET */
 #include "xfs_clnt.h"
 #endif /* CELL || NOTYET */
-
 
 #ifdef SIM
 #include "sim.h"
@@ -790,7 +789,6 @@ xfs_args_to_ver_3(
 #endif /* CELL || NOTYET */
 #endif 
 
-
 /*
  * xfs_mount
  *
@@ -812,6 +810,7 @@ xfs_mount(
 	dev_t		ddev;
 	dev_t		logdev;
 	dev_t		rtdev;
+	vnode_t		*rootvp;
 	int		error;
 
 	if (!_CAP_CRABLE(credp, CAP_MOUNT_MGT))
@@ -898,8 +897,18 @@ xfs_mount(
 	if (uap->flags & MS_DMI) {
 		vfsp->vfs_flag |= VFS_DMI;
 		/* Always send mount event (when mounted with dmi option) */
-		error = dm_namesp_event(DM_MOUNT, (vnode_t *) vfsp, mvp,
-					uap->dir, uap->spec, 0, 0);
+		VFS_ROOT(vfsp, &rootvp, error);
+		if (error == 0) {
+			bhv_desc_t	*mbdp, *rootbdp;
+
+			mbdp = bhv_lookup_unlocked(VN_BHV_HEAD(mvp), &xfs_vnodeops);
+			rootbdp = bhv_lookup_unlocked(VN_BHV_HEAD(rootvp), &xfs_vnodeops);
+			VN_RELE(rootvp);
+			error = dm_send_mount_event(vfsp, DM_RIGHT_NULL,
+						mbdp, DM_RIGHT_NULL,
+						rootbdp, DM_RIGHT_NULL,
+						uap->dir, uap->spec);
+		}
 		if (error) {
 			/* REFERENCED */
 			int	errcode;
@@ -1235,9 +1244,10 @@ xfs_unmount(
 	vnode_t		*rvp = 0;
 	vmap_t		vmap;
 	int		vfs_flags;
-	int		sendunmountevent = 0;
-	int		error;
 	struct vfs 	*vfsp = bhvtovfs(bdp);
+	int		unmount_event_wanted = 0;
+	int		unmount_event_flags = 0;
+	int		error;
 
 	if (!_CAP_CRABLE(credp, CAP_MOUNT_MGT))
 		return XFS_ERROR(EPERM);
@@ -1246,16 +1256,22 @@ xfs_unmount(
 	rip = mp->m_rootip;
 	rvp = XFS_ITOV(rip);
 
+#ifndef SIM
 	if (vfsp->vfs_flag & VFS_DMI) {
-		if (mp->m_dmevmask & DM_ETOM(DM_PREUNMOUNT)) {
-			error = dm_namesp_event(DM_PREUNMOUNT,
-						rvp, rvp, 0, 0, 0, 0);
+		bhv_desc_t	*rbdp = VNODE_TO_FIRST_BHV(rvp);
+
+		error = dm_send_namesp_event(DM_EVENT_PREUNMOUNT,
+				rbdp, DM_RIGHT_NULL, rbdp, DM_RIGHT_NULL,
+				NULL, NULL, 0, 0,
+				(mp->m_dmevmask & (1 << DM_EVENT_PREUNMOUNT)) != 0 ?
+					0:DM_FLAGS_UNWANTED);
 			if (error)
 				return XFS_ERROR(error);
-		}
-		if (mp->m_dmevmask & DM_ETOM(DM_UNMOUNT))
-			sendunmountevent = 1;
+		unmount_event_wanted = 1;
+		unmount_event_flags = (mp->m_dmevmask & (1 << DM_EVENT_UNMOUNT)) != 0 ?
+					0 : DM_FLAGS_UNWANTED;
 	}
+#endif
 
 	/*
 	 * First blow any referenced inode from this file system
@@ -1267,7 +1283,8 @@ xfs_unmount(
 	 * Make sure there are no active users.
 	 */
 	if (xfs_ibusy(mp)) {
-		return XFS_ERROR(EBUSY);
+		error = EBUSY;
+		goto out;
 	}
 	
 	bflush(mp->m_dev);
@@ -1344,10 +1361,12 @@ xfs_unmount(
 	}
 	xfs_unmountfs(mp, vfs_flags, credp);	
 out:
-	if (sendunmountevent) {
-		(void) dm_namesp_event(DM_UNMOUNT, (vnode_t *) vfsp,
-				       0, 0, 0, 0, error);
+#ifndef SIM
+	if (unmount_event_wanted) {
+		dm_send_unmount_event(vfsp, error == 0 ? rvp : NULL,
+			DM_RIGHT_NULL, 0, error, unmount_event_flags);
 	}
+#endif
 	return XFS_ERROR(error);
 
 fscorrupt_out:

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.228 $"
+#ident "$Revision: 1.229 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -15,6 +15,7 @@
 #include <sys/major.h>
 #include <sys/grio.h>
 #include <sys/pda.h>
+#include <sys/dmi_kern.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -69,6 +70,7 @@
 #include "xfs_rw.h"
 #include "xfs_quota.h"
 #include "xfs_trans_space.h"
+#include "xfs_dmapi.h"
 #include <limits.h>
 
 #ifdef SIM
@@ -1089,7 +1091,7 @@ xfs_vop_readbuf(bhv_desc_t 	*bdp,
 	if (MANDLOCK(vp, ip->i_d.di_mode))
 		goto out;
 
-	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_READ) && !(ioflags & IO_INVIS))
+	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) && !(ioflags & IO_INVIS))
 		goto out;
 #endif
 
@@ -1416,11 +1418,25 @@ xfs_read(
 		ASSERT((ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS) ||
 		       (ip->i_d.di_format == XFS_DINODE_FMT_BTREE));
 
-		if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_READ) &&
+#ifndef SIM
+		if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&
 		    !(ioflag & IO_INVIS)) {
-			if (error = dm_data_event(vp, DM_READ, offset, count))
+			vrwlock_t	*lptr;
+			vrwlock_t	locktype;
+
+			if (ioflag & IO_ISLOCKED) {
+				lptr = &locktype;
+				locktype = VRWLOCK_READ;
+			} else
+				lptr = NULL;
+
+			error = xfs_dm_send_data_event(DM_EVENT_READ, bdp,
+					offset, count,
+					UIO_DELAY_FLAG(uiop), lptr);
+			if (error)
 				goto out;
 		}
+#endif /* SIM */
 
 #ifndef SIM
 		/*
@@ -2923,23 +2939,37 @@ start:
 			resid = 0;
 		}
 
-		if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_WRITE) &&
-		    !(ioflag & IO_INVIS) &&
-		    !eventsent) {
-			error = dm_data_event(vp, DM_WRITE, offset, count);
+#ifndef SIM
+		if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_WRITE) &&
+		    !(ioflag & IO_INVIS) && !eventsent) {
+			vrwlock_t	*lptr;
+			vrwlock_t	locktype;
+
+			if (ioflag & IO_ISLOCKED) {
+				lptr = &locktype;
+				locktype = (ioflag & IO_DIRECT) ?
+					VRWLOCK_WRITE_DIRECT:VRWLOCK_WRITE;
+			} else
+				lptr = NULL;
+
+			error = xfs_dm_send_data_event(DM_EVENT_WRITE, bdp,
+					offset, count,
+					UIO_DELAY_FLAG(uiop), lptr);
 			if (error)
 				goto out;
 			eventsent = 1;
 		}
 		/*
-		 *  The iolock is dropped and reaquired in dm_data_event(),
-		 *  so we have to recheck the size when appending.  Will
-		 *  only "goto start;" once, since having sent the event 
-		 *  prevents another call to dm_data_event, which is what
+		 *  The iolock was dropped and reaquired in
+		 *  xfs_dm_send_data_event so we have to recheck the size
+		 *  when appending.  We will only "goto start;" once,
+		 *  since having sent the event prevents another call
+		 *  to xfs_dm_send_data_event, which is what
 		 *  allows the size to change in the first place.
 		 */
 		if ((ioflag & IO_APPEND) && savedsize != ip->i_d.di_size)
 			goto start;
+#endif
 
 		/*
 		 * If we're writing the file then make sure to clear the
@@ -3011,16 +3041,31 @@ retry:
 			error = xfs_write_file(bdp, uiop, ioflag, credp);
 		}
 
+#ifndef SIM
 		if (error == ENOSPC &&
-		    DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_NOSPACE) &&
+		    DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_NOSPACE) &&
 		    !(ioflag & IO_INVIS)) {
-			error = dm_data_event(vp, DM_NOSPACE, 0, 0);
-			if (error) {
+			vrwlock_t	*lptr;
+			vrwlock_t	locktype;
+
+			if (ioflag & IO_ISLOCKED) {
+				lptr = &locktype;
+				locktype = (ioflag & IO_DIRECT) ?
+					VRWLOCK_WRITE_DIRECT:VRWLOCK_WRITE;
+			} else
+				lptr = NULL;
+
+			error = xfs_dm_send_data_event(DM_EVENT_NOSPACE, bdp,
+					0, 0,
+					UIO_DELAY_FLAG(uiop), lptr);
+			if (error)
 				goto out;
-			}
+
 			offset = uiop->uio_offset;
 			goto retry;
-		} else if (error == ENOSPC) {
+		} else
+#endif
+		if (error == ENOSPC) {
 			mp = ip->i_mount;
 			if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)  {
 				xfs_error(mp, 2);

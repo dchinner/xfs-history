@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.114 $"
+#ident "$Revision: 1.115 $"
 
 struct bhv_desc;
 struct buf;
@@ -412,7 +412,7 @@ int		xfs_iunlink(struct xfs_trans *, xfs_inode_t *);
 #endif	/* !SIM */
 int		xfs_igrow_start(xfs_inode_t *, xfs_fsize_t, struct cred *);
 void		xfs_igrow_finish(struct xfs_trans *, xfs_inode_t *,
-				 xfs_fsize_t);
+				 xfs_fsize_t, int);
 
 void		xfs_idestroy_fork(xfs_inode_t *, int);
 void		xfs_idestroy(xfs_inode_t *);
