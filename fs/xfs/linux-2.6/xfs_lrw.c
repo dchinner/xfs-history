@@ -153,6 +153,8 @@ xfs_read(
 /* We don' want the IRIX poff */
 #define poff(x) ((x) & (PAGE_SIZE-1))
 
+int xfs_zlb_debug = 0;
+
 /* ARGSUSED */
 STATIC int				/* error */
 xfs_zero_last_block(
@@ -180,6 +182,9 @@ xfs_zero_last_block(
 	size_t		lsize;
 
 
+	dprintk(xfs_zlb_debug,
+	       ("zlb: ip 0x%p off 0x%Lx isize 0x%x\n",
+		ip, offset, isize));
 	ASSERT(ismrlocked(io->io_lock, MR_UPDATE) != 0);
 	ASSERT(offset > isize);
 
@@ -195,13 +200,22 @@ xfs_zero_last_block(
 	 * this out to disk, we're just initializing it to zeroes like
 	 * we would have done in xfs_strat_read() had the size been bigger.
 	 */
+	dprintk(xfs_zlb_debug,
+	     ("zlb: sb_blocksize 0x%x poff(isize) 0x%Lx\n",
+		    mp->m_sb.sb_blocksize, poff(isize)));
 	if ((mp->m_sb.sb_blocksize < NBPP) && ((i = poff(isize)) != 0)) {
 		struct page *page;
 		struct page ** hash;
 
-		hash = page_hash(&ip->i_data, isize & PAGE_CACHE_MASK);
-		page = __find_lock_page(&ip->i_data, isize & PAGE_CACHE_MASK, hash);
+		hash = page_hash(&ip->i_data, isize >> PAGE_CACHE_SHIFT);
+		page = __find_lock_page(&ip->i_data, isize >> PAGE_CACHE_SHIFT, hash);
 		if (page) {
+
+			dprintk(xfs_zlb_debug,
+			        ("zlb: memset page 0x%p paddr 0x%x from 0x%x sz 0x%x\n",
+				page, page_address(page),
+				page_address(page) + i, PAGE_SIZE -i));
+
 			memset((void *)page_address(page)+i, 0, PAGE_SIZE-i);
 
 			/*
@@ -258,7 +272,7 @@ xfs_zero_last_block(
 			}
 			clear_bit(PG_locked, &page->flags);
 			page_cache_release(page);
-		}
+		} 
 	}
 
 	isize_fsb_offset = XFS_B_FSB_OFFSET(mp, isize);
@@ -295,6 +309,11 @@ xfs_zero_last_block(
 	XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL| XFS_EXTSIZE_RD);
 	loff = XFS_FSB_TO_B(mp, last_fsb);
 	lsize = BBTOB(XFS_FSB_TO_BB(mp, 1));
+
+	dprintk(xfs_zlb_debug,
+	      ("zlb: pbget ip 0x%p loff 0x%Lx lsize 0x%x last_fsb 0x%x\n",
+		ip, loff, lsize, last_fsb));
+
 	/*
 	 * JIMJIM what about the real-time device
 	 */
@@ -324,6 +343,11 @@ xfs_zero_last_block(
 
 	zero_offset = isize_fsb_offset;
 	zero_len = mp->m_sb.sb_blocksize - isize_fsb_offset;
+
+	dprintk(xfs_zlb_debug,
+	      ("zlb: pb_iozero pb 0x%p zf 0x%x zl 0x%x\n",
+		pb, zero_offset, zero_len));
+
 	if (error = pagebuf_iozero(pb, zero_offset, zero_len)) {
 		pagebuf_rele(pb);
 		goto out_lock;
@@ -368,6 +392,8 @@ out_lock:
  * are left alone as holes.
  */
 
+int xfs_zeof_debug = 0;
+
 int					/* error */
 xfs_zero_eof(
 	struct inode	*ip,
@@ -399,6 +425,9 @@ xfs_zero_eof(
 
 	mp = io->io_mount;
 
+	dprintk(xfs_zeof_debug,
+		("zeof ip 0x%p offset 0x%Lx size 0x%x\n",
+		ip, offset, isize));
 	/*
 	 * First handle zeroing the block on which isize resides.
 	 * We only zero a part of that block so it is handled specially.
@@ -411,6 +440,12 @@ xfs_zero_eof(
 	}
 
 	/*
+	 * zero'ed last block already, shift up isize to next block
+	 */
+	isize += mp->m_sb.sb_blocksize;
+	isize &= ~(mp->m_sb.sb_blocksize - 1);
+
+	/*
 	 * Calculate the range between the new size and the old
 	 * where blocks needing to be zeroed may exist.  To get the
 	 * block where the last byte in the file currently resides,
@@ -418,11 +453,13 @@ xfs_zero_eof(
 	 * to a block boundary.  We subtract 1 in case the size is
 	 * exactly on a block boundary.
 	 */
-	last_fsb = isize ? XFS_B_TO_FSBT(mp, isize - 1) : (xfs_fileoff_t)-1;
+	last_fsb = isize ? XFS_B_TO_FSBT(mp, isize) : (xfs_fileoff_t)-1;
 	start_zero_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)isize);
 	end_zero_fsb = XFS_B_TO_FSBT(mp, offset - 1);
 
-	printk("zero: last block %Ld end %Ld\n", last_fsb, end_zero_fsb);
+	dprintk(xfs_zeof_debug,
+		("zero: last block %Ld end %Ld\n",
+		last_fsb, end_zero_fsb));
 
 	ASSERT((xfs_sfiloff_t)last_fsb < (xfs_sfiloff_t)start_zero_fsb);
 	if (last_fsb == end_zero_fsb) {
@@ -441,7 +478,9 @@ xfs_zero_eof(
 	 * loop while we split the mappings into pagebufs?
 	 */
 	while (start_zero_fsb <= end_zero_fsb) {
-		printk("zero: start block %Ld end %Ld\n", start_zero_fsb, end_zero_fsb);
+		dprintk(xfs_zeof_debug,
+			("zero: start block %Ld end %Ld\n",
+			start_zero_fsb, end_zero_fsb));
 		nimaps = 1;
 		zero_count_fsb = end_zero_fsb - start_zero_fsb + 1;
 		firstblock = NULLFSBLOCK;
@@ -495,7 +534,7 @@ xfs_zero_eof(
 		 */
 		XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
 
-		loff = XFS_FSB_TO_B(mp, last_fsb);
+		loff = XFS_FSB_TO_B(mp, start_zero_fsb);
 		lsize = XFS_FSB_TO_B(mp, buf_len_fsb);
 		/*
 		 * JIMJIM what about the real-time device
@@ -546,7 +585,7 @@ xfs_zero_eof(
 		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
 	}
 
-	printk("zero: all done\n");
+	dprintk(xfs_zeof_debug, ("zero: all done\n"));
 
 	return 0;
 
@@ -555,6 +594,8 @@ out_lock:
 	XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
 	return error;
 }
+
+int xfsw_debug = 0;
 
 ssize_t
 xfs_write(
@@ -577,6 +618,10 @@ xfs_write(
 	io = &(xip->i_iocore);
 	mp = io->io_mount;
 	isize = XFS_SIZE(mp, io); /* JIMJIM do we need to lock for this? */
+
+	dprintk(xfsw_debug,
+	     ("xfsw: ip 0x%p(is 0x%Lx) offset 0x%Lx size 0x%x\n",
+		ip, ip->i_size, *offsetp, size));
 
 	/*
 	 * If the offset is beyond the size of the file, we have a couple

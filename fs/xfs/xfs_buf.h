@@ -492,7 +492,7 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
 #define xfs_bp_mapin(bp)             \
 			pagebuf_mapin(bp)
 
-#define xfs_xfsd_list_evict(x)       printk("xfs_xfsd_list_evict not implemented\n")
+#define xfs_xfsd_list_evict(x)        {  /* printk("xfs_xfsd_list_evict not implemented\n"); */ }
 
 #ifdef PAGEBUF_TRACE
 #define PB_DEFINE_TRACES
