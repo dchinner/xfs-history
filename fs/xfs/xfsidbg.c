@@ -25,6 +25,7 @@
 #include <sys/vnode.h>
 #include <sys/kmem.h>
 #include <sys/attributes.h>
+#include <sys/uuid.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -2646,7 +2647,12 @@ idbg_xiclog(xlog_in_core_t *iclog)
 		iclog->ic_log, iclog->ic_callback, iclog->ic_callback_tail,
 		iclog->ic_roundoff);
 	qprintf("size: %d  (OFFSET: %d) trace: 0x%x  refcnt: %d  bwritecnt: %d",
-		iclog->ic_size, iclog->ic_offset, iclog->ic_trace,
+		iclog->ic_size, iclog->ic_offset,
+#ifdef DEBUG
+		iclog->ic_trace,
+#else
+		NULL,
+#endif
 		iclog->ic_refcnt, iclog->ic_bwritecnt);
 	qprintf("  state: ");
 	if (iclog->ic_state & XLOG_STATE_ALL)
@@ -2804,8 +2810,10 @@ idbg_xlog(xlog_t *log)
        qprintf("GResBlocks: %d  GResRemain: %d  GWrBlocks: %d  GWrRemain: %d\n",
 	       rbytes / BBSIZE, rbytes % BBSIZE,
 	       wbytes / BBSIZE, wbytes % BBSIZE);
+#ifdef DEBUG
 	qprintf("trace: 0x%x  grant_trace: use xlog value\n",
 		log->l_trace);
+#endif
 }	/* idbg_xlog */
 
 #ifdef DEBUG
