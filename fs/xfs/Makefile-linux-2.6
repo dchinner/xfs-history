@@ -44,9 +44,12 @@
 EXTRA_FIND_DIRECTORIES = linux pseudo-inc
 EXTRA_INCLUDE_DIRECTORIES = -I./linux -I./pseudo-inc -I.
 
-EXTRA_CFLAGS += -g3 -Wno-unused  -Wno-unknown-pragmas -Wno-parentheses \
+EXTRA_CFLAGS += -g3 -Wno-unused  -Wno-parentheses \
                 -Wno-uninitialized ${EXTRA_INCLUDE_DIRECTORIES} -D_KERNEL \
 		-funsigned-char 
+
+EXTRA_CFLAGS += $(shell if $(CC) -Wno-unknown-pragmas -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-Wno-unknown-pragmas"; fi)
+
 
 # EXTRA_CFLAGS += -DDEBUG -DXFSDEBUG
 
