@@ -455,7 +455,7 @@ xfs_dir2_sf_addname_hard(
 
 	sfp = (xfs_dir2_sf_t *)dp->i_df.if_u1.if_data;
 	old_isize = (int)dp->i_d.di_size;
-	buf = kmem_alloc(old_isize, GFP_KERNEL);
+	buf = kmem_alloc(old_isize, KM_SLEEP);
 	oldsfp = (xfs_dir2_sf_t *)buf;
 	bcopy(sfp, oldsfp, old_isize);
 	/*
