@@ -26,13 +26,42 @@
 #include "sim.h"
 #endif
 
-STATIC void	xfs_ail_insert(xfs_ail_entry_t *, xfs_log_item_t *);
-STATIC xfs_log_item_t	*xfs_ail_delete(xfs_ail_entry_t	*, xfs_log_item_t *);
-STATIC xfs_log_item_t	*xfs_ail_min(xfs_ail_entry_t *);
-STATIC xfs_log_item_t	*xfs_ail_next(xfs_ail_entry_t *, xfs_log_item_t	*);
+STATIC void
+xfs_ail_ticket_wait(
+	xfs_mount_t		*mp,
+	xfs_ail_ticket_t	*ticketp,
+	xfs_lsn_t		lsn,
+	int			spl);
+
+STATIC void
+xfs_ail_ticket_wakeup(
+	xfs_mount_t	*mp,
+	xfs_lsn_t	lsn,
+	int		wakeup_equal);		      
+
+STATIC void
+xfs_ail_insert(
+	xfs_ail_entry_t	*base,
+	xfs_log_item_t	*lip);
+
+STATIC xfs_log_item_t *
+xfs_ail_delete(
+	xfs_ail_entry_t	*base,
+	xfs_log_item_t	*lip);
+
+STATIC xfs_log_item_t *
+xfs_ail_min(
+	xfs_ail_entry_t	*base);
+
+STATIC xfs_log_item_t *
+xfs_ail_next(
+	xfs_ail_entry_t	*base,
+	xfs_log_item_t	*lip);
 
 #ifdef XFSDEBUG
-STATIC void	xfs_ail_check(xfs_ail_entry_t *);
+STATIC void
+xfs_ail_check(
+	xfs_ail_entry_t *base);
 #else
 #define	xfs_ail_check(a)
 #endif /* XFSDEBUG */
@@ -48,7 +77,8 @@ STATIC void	xfs_ail_check(xfs_ail_entry_t *);
  * lsn of the last item in the AIL.
  */
 xfs_lsn_t
-xfs_trans_tail_ail(xfs_mount_t *mp)
+xfs_trans_tail_ail(
+	xfs_mount_t	*mp)
 {
 	int		s;
 	xfs_lsn_t	lsn;
@@ -71,46 +101,77 @@ xfs_trans_tail_ail(xfs_mount_t *mp)
 /*
  * xfs_trans_push_ail
  *
- * This routine is called to try to move the tail of the AIL
+ * This routine is called to move the tail of the AIL
  * forward.  It does this by trying to flush items in the AIL
- * whose lsns are below the given threshold_lsn.  While this
- * routine makes an attempt to flush out the items in the AIL,
- * it makes no guarantees that the tail has moved forward upon
- * return from the call.  It is an asynchronous push, and the
- * caller must wait somehow independent of this routine.
+ * whose lsns are below the given threshold_lsn.  The minimum_lsn
+ * parameter specifies the lowest LSN allowed by the caller
+ * when this routine returns.  We are allowed to sleep here
+ * waiting for the tail of the AIL to move beyond the minimum_lsn.
+ * The caller provides an uninitialized ticket (which must come from
+ * the heap, not the stack) which we will use to sleep with if
+ * necessary.
  *
  * The routine returns the lsn of the tail of the log.
  */
 xfs_lsn_t
-xfs_trans_push_ail(struct xfs_mount	*mp,
-		   xfs_lsn_t		threshold_lsn)
+xfs_trans_push_ail(
+	xfs_mount_t		*mp,
+	xfs_ail_ticket_t	*ticketp,
+	xfs_lsn_t		threshold_lsn,
+	xfs_lsn_t		minimum_lsn)		   
 {
 	xfs_lsn_t		lsn;
 	xfs_log_item_t		*lip;
 	int			s;
 	int			gen;
 	int			restarts;
+	int			lock_result;
+	int			flush_log;
+	int			flushed_log;
+	int			ail_was_unlocked;
 #define	XFS_TRANS_PUSH_AIL_RESTARTS	10
 
+/*
+	ASSERT(ticketp != NULL);
+*/
+	ASSERT(XFS_LSN_CMP(minimum_lsn, threshold_lsn) <= 0);
+
+	if (ticketp != NULL) {
+		initnsema(&(ticketp->at_sema), 0, "ailtick");
+	}
+	flushed_log = 0;
+
+ startover:
+	ail_was_unlocked = 0;
 	s = AIL_LOCK(mp);
+ startover_locked:
 	lip = xfs_trans_first_ail(mp, &gen);
 	if (lip == NULL) {
 		/*
 		 * Just return if the AIL is empty.
 		 */
 		AIL_UNLOCK(mp, s);
+		if (ticketp != NULL) {
+			freesema(&(ticketp->at_sema));
+		}
 		return (xfs_lsn_t)0;
 	}
+
 
 	/*
 	 * While the item we are looking at is below the given threshold
 	 * try to flush it out.  Make sure to limit the number of times
 	 * we allow xfs_trans_next_ail() to restart scanning from the
-	 * beginning of the list.
+	 * beginning of the list.  We can't stop until we've at least
+	 * tried to push on everything in the AIL with an LSN less than
+	 * the given minimum.  That way we know that we at least tried
+	 * to push on everything necessary before going to sleep below.
 	 */
+	flush_log = 0;
 	restarts = 0;
-	while ((restarts < XFS_TRANS_PUSH_AIL_RESTARTS) &&
-	       (XFS_LSN_CMP(lip->li_lsn, threshold_lsn) < 0)) {
+	while ((XFS_LSN_CMP(lip->li_lsn, minimum_lsn) < 0) ||
+	       ((restarts < XFS_TRANS_PUSH_AIL_RESTARTS) &&
+		(XFS_LSN_CMP(lip->li_lsn, threshold_lsn) < 0))) {
 		/*
 		 * If we can lock the item without sleeping, unlock
 		 * the AIL lock and flush the item.  Then re-grab the
@@ -125,30 +186,252 @@ xfs_trans_push_ail(struct xfs_mount	*mp,
 		 * In any of these case it is being taken care of and we
 		 * can just skip to the next item in the list.
 		 */
-		if (IOP_TRYLOCK(lip)) {
+		lock_result = IOP_TRYLOCK(lip);
+		switch (lock_result) {
+		case XFS_ITEM_SUCCESS:
 			AIL_UNLOCK(mp, s);
 			IOP_PUSH(lip);
+			ail_was_unlocked = 1;
 			s = AIL_LOCK(mp);
+			break;
+		case XFS_ITEM_PINNED:
+			flush_log = 1;
+			break;
+		case XFS_ITEM_LOCKED:
+		case XFS_ITEM_FLUSHING:
+			break;
+		default:
+			ASSERT(0);
+			break;
 		}
+
 		lip = xfs_trans_next_ail(mp, lip, &gen, &restarts);
 		if (lip == NULL) {
 			break;
 		}
 	}
 
-	/*
-	 * Return the lsn of the current tail.
-	 */
+	if (flush_log && !flushed_log) {
+		/*
+		 * If something we need to push out was pinned, then
+		 * push out the log so it will become unpinned and
+		 * move forward in the AIL.  We indicate that we've
+		 * already flushed the log so that we don't loop
+		 * flushing the log waiting for an item to be unpinned.
+		 * There is a race here where things that were locked
+		 * in one pass become pinned in the next and we don't
+		 * flush the log, but as a last resort xfs_sync() will
+		 * always flush the log and bail us out.
+		 */
+		AIL_UNLOCK(mp, s);
+		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
+		flushed_log = 1;
+		goto startover;
+	}
+
+	if (ail_was_unlocked) {
+		/*
+		 * We need a pass through the AIL where we don't
+		 * unlock the AIL and we decide whether or not to
+		 * go to sleep below in order to prevent races with
+		 * the items we wait for being released before we
+		 * go to sleep.  Therefore, if we've unlocked the
+		 * AIL in the last pass, then start over.  Change
+		 * the threshold_lsn to be the same as the minimum_lsn
+		 * so we only do the work that is critical to us
+		 * in subsequent passes.
+		 */
+		ail_was_unlocked = 0;
+		goto startover_locked;
+	}
+
 	lip = xfs_ail_min(&(mp->m_ail));
+	if ((lip != NULL) && (XFS_LSN_CMP(lip->li_lsn, minimum_lsn) < 0)) {
+		/*
+		 * The tail is still too close.  Go to sleep until
+		 * it is moved forward enough.  We may also be awakened
+		 * just to see if anything has changed, so when we wake
+		 * up just start over again.  The AIL lock will not be
+		 * held when we return.  Before starting over, we also
+		 * reset flushed_log so we'll really be starting clean.
+		 */
+		if (ticketp != NULL) {
+			xfs_ail_ticket_wait(mp, ticketp, minimum_lsn, s);
+			flushed_log = 0;
+			goto startover;
+		}
+	}
+
 	if (lip == NULL) {
 		lsn = (xfs_lsn_t)0;
 	} else {
 		lsn = lip->li_lsn;
 	}
+	
+	/*
+	 * Now that we've pushed on the AIL, wake up anyone who was
+	 * waiting for the AIL to reach its current state.
+	 */
+	xfs_ail_ticket_wakeup(mp, lsn, 0);
+
 	AIL_UNLOCK(mp, s);
+	if (ticketp != NULL) {
+		freesema(&(ticketp->at_sema));
+	}
 	return lsn;
 }
 
+/*
+ * Insert the ticket into the list of tickets sorted by lsn
+ * and go to sleep.  The list is a doubly linked circular
+ * list whose first elmt is pointed to by mp->m_ail_wait.
+ * We scan from the tail of the list since things are
+ * generally added at the end.
+ *
+ * The AIL lock must be held when calling this routine.
+ */
+STATIC void
+xfs_ail_ticket_wait(
+	xfs_mount_t		*mp,
+	xfs_ail_ticket_t	*ticketp,
+	xfs_lsn_t		lsn,
+	int			spl)
+{
+	xfs_ail_ticket_t	*atp;
+	xfs_ail_ticket_t	*head;
+
+	ASSERT(valusema(&(ticketp->at_sema)) == 0);
+
+	ticketp->at_lsn = lsn;
+	if (mp->m_ail_wait == NULL) {
+		mp->m_ail_wait = ticketp;
+		ticketp->at_forw = ticketp;
+		ticketp->at_back = ticketp;
+		spunlockspl_psema(mp->m_ail_lock, spl,
+				  &(ticketp->at_sema), PINOD);
+		return;
+	}
+
+	/*
+	 * Make a quick check to see if we're re-inserting ourselves
+	 * at the front of the list.
+	 */
+	head = mp->m_ail_wait;
+	if (XFS_LSN_CMP(lsn, head->at_lsn) <= 0) {
+		/*
+		 * The LSN of the item is less than or equal
+		 * to that of the first elmt in the list.
+		 * Just put us at the head of the list.
+		 */
+		ticketp->at_forw = head;
+		ticketp->at_back = head->at_back;
+		head->at_back->at_forw = ticketp;
+		head->at_back = ticketp;
+		mp->m_ail_wait = ticketp;
+		spunlockspl_psema(mp->m_ail_lock, spl,
+				  &(ticketp->at_sema), PINOD);
+		return;
+	}
+
+	/*
+	 * Walk backwards throught the list until we find our
+	 * spot.
+	 */
+	atp = head->at_back;
+	while (XFS_LSN_CMP(lsn, atp->at_lsn) < 0) {
+		/*
+		 * The LSN of the new item is less than that of
+		 * the item we're looking at, so go on to the next
+		 * one.  Assert that we don't walk back past the head.
+		 */
+		ASSERT(atp != head);
+		atp = atp->at_back;
+	}
+	
+	/*
+	 * Now atp points at the ticket with an lsn less than ours.
+	 * Insert ourselves after it.
+	 */
+	ticketp->at_forw = atp->at_forw;
+	ticketp->at_back = atp;
+	atp->at_forw->at_back = ticketp;
+	atp->at_forw = ticketp;
+	spunlockspl_psema(mp->m_ail_lock, spl, &(ticketp->at_sema), PINOD);
+}
+
+/*
+ * Wake up any processes waiting on the AIL ticket waiting list
+ * that are waiting for an LSN less than the given LSN.  Pull the
+ * tickets from the list as we wake them up.  The wakeup_equal
+ * parameter tells us whether we should wake up sleepers waiting
+ * for an LSN equal to the given one or not.
+ */
+STATIC void
+xfs_ail_ticket_wakeup(
+	xfs_mount_t	*mp,
+	xfs_lsn_t	lsn,
+	int		wakeup_equal)		      
+{
+	xfs_ail_ticket_t	*head;
+	xfs_ail_ticket_t	*forw;
+	xfs_ail_ticket_t	*back;
+
+	head = mp->m_ail_wait;
+	while ((head != NULL) &&
+	       ((XFS_LSN_CMP(head->at_lsn, lsn) < 0) ||
+		(wakeup_equal &&
+		 (XFS_LSN_CMP(head->at_lsn, lsn) == 0)))) {
+		forw = head->at_forw;
+		if (forw == head) {
+			mp->m_ail_wait = NULL;
+			forw = NULL;
+		} else {
+			back = head->at_back;
+			forw->at_back = back;
+			back->at_forw = forw;
+			mp->m_ail_wait = forw;
+		}
+
+		ASSERT(valusema(&(head->at_sema)) == -1);
+		vsema(&(head->at_sema));
+
+		head = forw;
+	}
+}
+
+/*
+ * This is to be called when an item is unlocked that may have
+ * been in the AIL.  It will wake up the first member of the AIL
+ * wait list if this item's unlocking might allow it to progress.
+ * If the item is in the AIL, then we need to get the AIL lock
+ * while doing our checking so we don't race with someone going
+ * to sleep waiting for this event in xfs_trans_push_ail().
+ */
+void
+xfs_trans_unlocked_item(
+	xfs_mount_t	*mp,
+	xfs_log_item_t	*lip)
+{
+	int	s;
+
+	if (!(lip->li_flags & XFS_LI_IN_AIL)) {
+		return;
+	}
+
+	s = AIL_LOCK(mp);
+	if (mp->m_ail_wait == NULL) {
+		/*
+		 * Noone is asleep, so there is nothing to do.
+		 */
+		AIL_UNLOCK(mp, s);
+		return;
+	}
+
+	if (XFS_LSN_CMP(lip->li_lsn, mp->m_ail_wait->at_lsn) <= 0) {
+		xfs_ail_ticket_wakeup(mp, lip->li_lsn, 1);
+	}
+	AIL_UNLOCK(mp, s);
+}			
 
 /*
  * Update the position of the item in the AIL with the new
@@ -159,9 +442,10 @@ xfs_trans_push_ail(struct xfs_mount	*mp,
  * has changed.
  */
 void
-xfs_trans_update_ail(xfs_mount_t	*mp,
-		     xfs_log_item_t	*lip,
-		     xfs_lsn_t		lsn)
+xfs_trans_update_ail(
+	xfs_mount_t	*mp,
+	xfs_log_item_t	*lip,
+	xfs_lsn_t	lsn)
 {
 	xfs_ail_entry_t		*ailp;
 	xfs_log_item_t		*dlip;
@@ -215,8 +499,9 @@ xfs_trans_delete_ail(xfs_mount_t	*mp,
  * in calls to xfs_trans_next_ail().
  */
 xfs_log_item_t *
-xfs_trans_first_ail(xfs_mount_t	*mp,
-		    int		*gen)
+xfs_trans_first_ail(
+	xfs_mount_t	*mp,
+	int		*gen)
 {
 	xfs_log_item_t	*lip;
 
@@ -234,10 +519,11 @@ xfs_trans_first_ail(xfs_mount_t	*mp,
  * if one is given.
  */
 xfs_log_item_t *
-xfs_trans_next_ail(xfs_mount_t		*mp,
-		   xfs_log_item_t	*lip,
-		   int			*gen,
-		   int			*restarts)
+xfs_trans_next_ail(
+	xfs_mount_t	*mp,
+	xfs_log_item_t	*lip,
+	int		*gen,
+	int		*restarts)
 {
 	xfs_log_item_t	*nlip;
 
@@ -272,10 +558,12 @@ xfs_trans_next_ail(xfs_mount_t		*mp,
  * Initialize the doubly linked list to point only to itself.
  */
 void
-xfs_trans_ail_init(xfs_mount_t *mp)
+xfs_trans_ail_init(
+	xfs_mount_t	*mp)
 {
 	mp->m_ail.ail_forw = (xfs_log_item_t*)&(mp->m_ail);
 	mp->m_ail.ail_back = (xfs_log_item_t*)&(mp->m_ail);
+	mp->m_ail_wait = NULL;
 }
 
 /*
@@ -285,8 +573,9 @@ xfs_trans_ail_init(xfs_mount_t *mp)
  * new item belongs.
  */
 STATIC void
-xfs_ail_insert(xfs_ail_entry_t	*base,
-	       xfs_log_item_t	*lip)
+xfs_ail_insert(
+	xfs_ail_entry_t	*base,
+	xfs_log_item_t	*lip)
 /* ARGSUSED */
 {
 	xfs_log_item_t	*next_lip;
@@ -322,8 +611,9 @@ xfs_ail_insert(xfs_ail_entry_t	*base,
  * Delete the given item from the AIL.  Return a pointer to the item.
  */
 STATIC xfs_log_item_t *
-xfs_ail_delete(xfs_ail_entry_t	*base,
-	       xfs_log_item_t	*lip)
+xfs_ail_delete(
+	xfs_ail_entry_t	*base,
+	xfs_log_item_t	*lip)
 /* ARGSUSED */
 {
 	lip->li_ail.ail_forw->li_ail.ail_back = lip->li_ail.ail_back;
@@ -340,7 +630,8 @@ xfs_ail_delete(xfs_ail_entry_t	*base,
  * If the AIL is empty, then return NULL.
  */
 STATIC xfs_log_item_t *
-xfs_ail_min(xfs_ail_entry_t *base)
+xfs_ail_min(
+	xfs_ail_entry_t	*base)
 /* ARGSUSED */
 {
 	if (base->ail_forw == (xfs_log_item_t*)base) {
@@ -356,8 +647,9 @@ xfs_ail_min(xfs_ail_entry_t *base)
  * is the last item in the list, then return NULL.
  */
 STATIC xfs_log_item_t *
-xfs_ail_next(xfs_ail_entry_t	*base,
-	     xfs_log_item_t	*lip)
+xfs_ail_next(
+	xfs_ail_entry_t	*base,
+	xfs_log_item_t	*lip)
 /* ARGSUSED */
 {
 	if (lip->li_ail.ail_forw == (xfs_log_item_t*)base) {
@@ -372,7 +664,8 @@ xfs_ail_next(xfs_ail_entry_t	*base,
  * Check that the list is sorted as it should be.
  */
 STATIC void
-xfs_ail_check(xfs_ail_entry_t *base)
+xfs_ail_check(
+	xfs_ail_entry_t *base)
 {
 	xfs_log_item_t	*lip;
 	xfs_log_item_t	*prev_lip;
