@@ -299,7 +299,7 @@ _pagebuf_get_object(
 	 * io routines should use count_desired, which will the same in
 	 * most cases but may be reset (e.g. XFS recovery)
 	 */
-	pb->pb_flags = (flags & ~(PBF_ENTER_PAGES|PBF_MAPPED|PBF_DONT_BLOCK)) |
+	pb->pb_flags = (flags & ~(PBF_LOCK|PBF_ENTER_PAGES|PBF_MAPPED|PBF_DONT_BLOCK)) |
 			PBF_NONE;
 	pb->pb_bn = PAGE_BUF_DADDR_NULL;
 	atomic_set(&PBP(pb)->pb_pin_count, 0);
@@ -416,9 +416,12 @@ void _pagebuf_free_object(
 		 * PBF_FREED, so anyone doing a lookup should
 		 * skip this pagebuf.
 		 */
-		spin_unlock(&PBP(pb)->pb_lock);
-		if (pb->pb_flags & _PBF_LOCKABLE)
+		if (pb->pb_flags & _PBF_LOCKABLE) {
+			spin_unlock(&PBP(pb)->pb_lock);
 			_pagebuf_free_lockable_buffer(pb, flags);
+		} else {
+			spin_unlock_irqrestore(&PBP(pb)->pb_lock, flags);
+		}
 		pb_tracking_free(pb);
 		kmem_cache_free(pagebuf_cache, pb);
 	} else {
