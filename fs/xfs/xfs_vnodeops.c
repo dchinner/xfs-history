@@ -1,4 +1,4 @@
-#ident "$Revision: 1.370 $"
+#ident "$Revision: 1.371 $"
 
 
 #ifdef SIM
@@ -299,7 +299,7 @@ xfs_change_file_space(
 	flock_t		*bf,
 	off_t		offset,
 	cred_t		*credp,
-	int		nonblock_flag);
+	int		attr_flags);
 
 STATIC int
 xfs_ioctl(
@@ -5628,7 +5628,6 @@ xfs_fcntl(
 	vattr_t			va;
 	struct fsdmidata	d;
 	extern int		scache_linemask;
-	int			nonblock_flag;
 
 	vp = BHV_TO_VNODE(bdp);
 	vn_trace_entry(vp, "xfs_fcntl", (inst_t *)__return_address);
@@ -5711,7 +5710,9 @@ xfs_fcntl(
 			error = XFS_ERROR(EFAULT);
 		break;
 
-	case F_FSSETXATTR:
+	case F_FSSETXATTR: {
+		int	attr_flags;
+
 		if (copyin(arg, &fa, sizeof(fa))) {
 			error = XFS_ERROR(EFAULT);
 			break;
@@ -5719,9 +5720,10 @@ xfs_fcntl(
 		va.va_mask = AT_XFLAGS | AT_EXTSIZE;
 		va.va_xflags = fa.fsx_xflags;
 		va.va_extsize = fa.fsx_extsize;
-		nonblock_flag = ( flags&(FNDELAY|FNONBLOCK) ) ? ATTR_NONBLOCK : 0;
-		error = xfs_setattr(bdp, &va, nonblock_flag, credp);
+		attr_flags = ( flags&(FNDELAY|FNONBLOCK) ) ? ATTR_NONBLOCK : 0;
+		error = xfs_setattr(bdp, &va, attr_flags, credp);
 		break;
+	}
 
 	case F_GETBMAP:
 	case F_GETBMAPA: {
@@ -5797,7 +5799,9 @@ xfs_fcntl(
 	case F_FREESP64:
 
 	case F_RESVSP64:
-	case F_UNRESVSP64:
+	case F_UNRESVSP64: {
+		int	attr_flags;
+
 		/* cmd = cmd; XXX */
 		if ((flags & FWRITE) == 0) {
 			error = XFS_ERROR(EBADF);
@@ -5839,12 +5843,15 @@ xfs_fcntl(
 			bf.l_start = i5_bf.l_start;
 			bf.l_len = i5_bf.l_len;
 		}
-		nonblock_flag = ( flags&(FNDELAY|FNONBLOCK) ) ? ATTR_NONBLOCK : 0;
+		attr_flags = ( flags&(FNDELAY|FNONBLOCK) ) ? ATTR_NONBLOCK : 0;
+		if (flags&FINVIS)
+			attr_flags |= ATTR_DMI;
 		if (!error) {
 			error = xfs_change_file_space(bdp, cmd, &bf, offset,
-						      credp, nonblock_flag);
+						      credp, attr_flags);
 		}
 		break;
+	}
 
 #ifndef SIM
 	case F_DMAPI:
@@ -6124,7 +6131,8 @@ xfs_alloc_file_space(
 	xfs_inode_t		*ip,
 	off_t 			offset,
 	off_t			len,
-	int			alloc_type)
+	int			alloc_type,
+	int			attr_flags)
 {
 	xfs_filblks_t		allocated_fsb;
 	xfs_filblks_t		allocatesize_fsb;
@@ -6178,7 +6186,10 @@ xfs_alloc_file_space(
 	startoffset_fsb	= XFS_B_TO_FSBT(mp, offset);
 	allocatesize_fsb = XFS_B_TO_FSB(mp, count);
 
+/*	Generate a DMAPI event if needed.	*/
+
 	if (alloc_type != 0 && offset < ip->i_d.di_size &&
+			(attr_flags&ATTR_DMI) == 0  &&
 			DM_EVENT_ENABLED(XFS_MTOVFS(mp), ip, DM_EVENT_WRITE)) {
 		off_t           end_dmi_offset;
 
@@ -6195,6 +6206,7 @@ xfs_alloc_file_space(
 	/*
 	 * allocate file space until done or until there is an error	
  	 */
+retry:
 	while (allocatesize_fsb && !error) {
 		/*
 		 * determine if reserving space on
@@ -6282,6 +6294,19 @@ xfs_alloc_file_space(
 		startoffset_fsb += allocated_fsb;
 		allocatesize_fsb -= allocated_fsb;
 	}
+dmapi_enospc_check:
+#ifndef SIM
+	if (error == ENOSPC && (attr_flags&ATTR_DMI) == 0 &&
+	    DM_EVENT_ENABLED(XFS_MTOVFS(mp), ip, DM_EVENT_NOSPACE)) {
+
+		error = xfs_dm_send_data_event(DM_EVENT_NOSPACE,
+				XFS_ITOBHV(ip), 0, 0,
+				AT_DELAY_FLAG(attr_flags), NULL);
+		if (error == 0) 
+			goto retry;	/* Maybe DMAPI app. has made space */
+		/* else fall through with error = xfs_dm_send_data_event result. */
+	}
+#endif
 
 	return error;
 
@@ -6290,7 +6315,7 @@ xfs_alloc_file_space(
  error1:
 	xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES | XFS_TRANS_ABORT);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
-	return error;
+	goto dmapi_enospc_check;
 }
 
 /*
@@ -6542,7 +6567,7 @@ xfs_change_file_space(
 	flock_t 	*bf,
 	off_t 		offset,
 	cred_t  	*credp,
-	int		nonblock_flag)
+	int		attr_flags)
 {
 	int		clrprealloc;
 	int		error;
@@ -6590,7 +6615,7 @@ xfs_change_file_space(
 	switch (cmd) {
 	case F_RESVSP:
 	case F_RESVSP64:
-		error = xfs_alloc_file_space(ip, startoffset, bf->l_len, 1);
+		error = xfs_alloc_file_space(ip, startoffset, bf->l_len, 1, attr_flags);
 		if (error)
 			return error;
 		setprealloc = 1;
@@ -6606,13 +6631,13 @@ xfs_change_file_space(
 	case F_FREESP64:
 		if (startoffset > fsize) {
 			error = xfs_alloc_file_space(ip, fsize,
-					startoffset - fsize, 0);
+					startoffset - fsize, 0, attr_flags);
 			if (error)
 				break;
 		}
 		va.va_mask = AT_SIZE;
 		va.va_size = startoffset;
-		error = xfs_setattr(bdp, &va, nonblock_flag, credp);
+		error = xfs_setattr(bdp, &va, attr_flags, credp);
 		if (error)
 			return error;
 		clrprealloc = 1;
