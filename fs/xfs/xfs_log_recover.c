@@ -904,6 +904,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	bp = bread(mp->m_dev, imap.im_blkno, imap.im_len);
 	if (bp->b_flags & B_ERROR)
 		xlog_panic("xlog_recover_do_buffer_trans: bread error");
+	xfs_inobp_check(mp, bp);
 	ASSERT(in_f->ilf_fields & XFS_ILOG_CORE);
 	dip = (xfs_dinode_t *)(bp->b_un.b_addr+imap.im_boffset);
 	ASSERT((caddr_t)dip+item->ri_buf[1].i_len <= bp->b_dmaaddr+bp->b_bcount);
@@ -940,6 +941,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	}
 write_inode_buffer:
 	bp->b_flags = (B_BUSY | B_HOLD);
+	xfs_inobp_check(mp, bp);
 	bdwrite(bp);
 	if (bp->b_flags & B_ERROR)
 		xlog_panic("xlog_recover_do_inode_trans: bwrite error");
