@@ -305,7 +305,9 @@ linvfs_set_inode_ops(
 
 	inode->i_mode = VTTOIF(vp->v_type);
 
-	if (vp->v_type == VNON || S_ISREG(inode->i_mode)) {
+	if (vp->v_type == VNON) {
+		make_bad_inode(inode);
+	} else if (S_ISREG(inode->i_mode)) {
 		inode->i_op = &linvfs_file_inode_operations;
 		inode->i_fop = &linvfs_file_operations;
 		inode->i_mapping->a_ops = &linvfs_aops;
