@@ -3,23 +3,24 @@
  */
 
 #include <sys/types.h>
-
 #include <sys/param.h>
+
 #ifdef SIM
 #define _KERNEL
 #endif
+
 #include <sys/sysmacros.h>
 #include <sys/buf.h>
+
 #ifdef SIM
 #undef _KERNEL
 #include <bstring.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#else
-#include <sys/kmem.h>
 #endif
 
+#include <sys/kmem.h>
 #include <sys/debug.h>
 #include <sys/sema.h>
 #include <sys/uuid.h>
@@ -76,9 +77,8 @@ xfs_log_done(xfs_mount_t	*mp,
 
 /* Local function prototypes */
 STATIC void log_alloc(xfs_mount_t *mp, dev_t log_dev);
-STATIC void log_commit_record(xfs_mount_t *mp, log_ticket_t *ticket);
-STATIC void log_copy(log_in_core_t *, xfs_log_iovec_t region[], int i, int n,
-		     int offset, xfs_lsn_t *lsn);
+STATIC xfs_lsn_t log_commit_record(xfs_mount_t *mp, log_ticket_t *ticket);
+STATIC void log_push_buffers_to_disk(log_t *log);
 STATIC void log_sync(log_t *log, log_in_core_t *iclog, uint flags);
 STATIC void log_unalloc(void);
 STATIC int  log_write(xfs_mount_t *mp, xfs_log_iovec_t	region[], int nentries,
@@ -92,6 +92,7 @@ STATIC int  log_state_get_iclog_space(log_t *log, int len,
 STATIC int  log_state_lsn_is_synced(log_t *log, xfs_lsn_t lsn,
 				    xfs_log_callback_t *cb);
 STATIC void log_state_release_iclog(log_t *log,	log_in_core_t *iclog);
+STATIC int  log_state_sync(log_t *log, xfs_lsn_t lsn, uint flags);
 STATIC void log_state_want_sync(log_t *log, log_in_core_t *iclog);
 
 /* local ticket functions */
@@ -106,9 +107,65 @@ STATIC int	     log_recover(struct xfs_mount *mp, dev_t log_dev);
  * NOTES:
  *
  *	1. currblock field gets updated at startup and after in-core logs
- *		are written out to the disk.
+ *		marked as with WANT_SYNC.
+ */
+
+/*
  *
  */
+xfs_lsn_t
+xfs_log_done(xfs_mount_t	*mp,
+	     xfs_log_ticket_t	tic,
+	     uint		flags)
+{
+	log_t		*log    = mp->m_log;
+	log_ticket_t	*ticket = (xfs_log_ticket_t) tic;
+	xfs_lsn_t	lsn;
+	
+	/* If nothing was ever written, don't write out commit record */
+	if ((ticket->t_flags & LOG_TIC_INITED) == 0)
+		lsn = log_commit_record(mp, ticket);
+
+	/* Release ticket if not permanent reservation or a specifc
+	 * request has been made to release a permanent reservation.
+	 */
+	if ((ticket->t_flags & LOG_TIC_PERM_RESERV) == 0 ||
+	    (flags & XFS_LOG_REL_PERM_RESERV))
+		log_putticket(log, ticket);
+
+	/* If this ticket was a permanent reservation and we aren't
+	 * trying to release it, reset the inited flags; so next time
+	 * we write, a start record will be written out.
+	 */
+	if ((ticket->t_flags & LOG_TIC_PERM_RESERV) &&
+	    (flags & XFS_LOG_REL_PERM_RESERV) == 0)
+		ticket->t_flags |= LOG_TIC_INITED;
+
+	return lsn;
+}	/* xfs_log_done */
+
+
+/*
+ * Force the in-core log to disk.  If flags == XFS_LOG_SYNC,
+ *	the force is done synchronously.
+ */
+int
+xfs_log_force(xfs_mount_t *mp,
+	      xfs_lsn_t	  lsn,
+	      uint	  flags)
+{
+	log_t		*log = mp->m_log;
+	
+	if (flags & XFS_LOG_FORCE) {
+		return(log_state_sync(log, lsn, flags));
+	} else if (flags & XFS_LOG_URGE) {
+		log_panic("xfs_log_force: not yet implemented");
+		return -1;
+	} else
+		log_panic("xfs_log_force: illegal flags");
+	
+}	/* xfs_log_force */
+
 
 /*
  * purpose: This function will take a log sequence number and check to
@@ -128,63 +185,6 @@ xfs_log_notify(xfs_mount_t	  *mp,		/* mount of partition */
 	if (log_state_lsn_is_synced(log, lsn, cb))
 		cb->cb_func(cb->cb_arg);
 }	/* xfs_log_notify */
-
-
-/*
- *
- */
-void
-xfs_log_done(xfs_mount_t	*mp,
-	     xfs_log_ticket_t	tic,
-	     uint		flags)
-{
-	log_t		*log    = mp->m_log;
-	log_ticket_t	*ticket = (xfs_log_ticket_t) tic;
-	
-	/* If nothing was ever written, don't write out commit record */
-	if ((ticket->t_flags & LOG_TIC_INITED) == 0)
-		log_commit_record(mp, ticket);
-
-	/* Release ticket if not permanent reservation or a specifc
-	 * request has been made to release a permanent reservation.
-	 */
-	if ((ticket->t_flags & LOG_TIC_PERM_RESERV) == 0 ||
-	    (flags & XFS_LOG_REL_PERM_RESERV))
-		log_putticket(log, ticket);
-
-	/* If this ticket was a permanent reservation and we aren't
-	 * trying to release it, reset the inited flags; so next time
-	 * we write, a start record will be written out.
-	 */
-	if ((ticket->t_flags & LOG_TIC_PERM_RESERV) &&
-	    (flags & XFS_LOG_REL_PERM_RESERV) == 0)
-		ticket->t_flags |= LOG_TIC_INITED;
-}	/* xfs_log_done */
-
-
-/*
- * purpose: Force the in-core log to disk.  If flags == XFS_LOG_SYNC,
- *	the force is done synchronously.
- */
-int
-xfs_log_force(xfs_mount_t *mp,
-	      xfs_lsn_t	  lsn,
-	      uint	  flags)
-{
-	log_t		*log = mp->m_log;
-	
-	flags |= XFS_LOG_SYNC;
-	if (flags & XFS_LOG_FORCE) {
-		log_panic("xfs_log_force: not done");
-		log_state_want_sync(log, 0 );
-		log_sync(log, 0, flags);
-	} else if (flags & XFS_LOG_URGE) {
-		log_panic("xfs_log_force: not yet implemented");
-		return -1;
-	} else
-		log_panic("xfs_log_force: illegal flags");
-	
-}	/* xfs_log_force */
 
 
 /*
@@ -221,7 +221,18 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 	if (flags & XFS_LOG_SLEEP)
 		return XFS_ENOTSUP;
 	
-	len += LOG_HEADER_SIZE;
+	/*
+	 * Permanent reservations always have at least two active log
+	 * operations in the log.  Other reservations may need one log
+	 * record header for each part of an operation which falls in
+	 * a different log record.  This is a gross over estimate.
+	 */
+	if (flags & XFS_LOG_PERM_RESERV)
+		len += 2*LOG_HEADER_SIZE;
+	else {
+		len += LOG_HEADER_SIZE *
+			((len+LOG_RECORD_BSIZE-1) >> LOG_RECORD_BSHIFT);
+	}
 
 	/* Eventually force out buffers */
 	if (log->l_logreserved + len > log->l_logsize)
@@ -231,8 +242,9 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 	if (flags & XFS_LOG_PERM_RESERV)
 		((log_ticket_t *)ticket)->t_flags |= LOG_TIC_PERM_RESERV;
 
+	log_push_buffers_to_disk(log);
 	return 0;
-}	/* log_reserve */
+}	/* xfs_log_reserve */
 
 
 #ifdef SIM
@@ -270,7 +282,7 @@ xfs_log_mount(xfs_mount_t	*mp,
 	}
 	log_alloc(mp, log_dev);
 	return 0;
-}	/* log_mount */
+}	/* xfs_log_mount */
 
 
 int
@@ -319,8 +331,9 @@ log_alloc(xfs_mount_t	*mp,
 	log->l_dev = log_dev;
 	log->l_logreserved = 0;
 	log->l_currblock = 0;
+	log->l_cycle = 1;	      /* 0 is bad since this is initial value */
 	initnlock(&log->l_icloglock, "iclog");
-	initnsema(&log->l_flushsema, LOG_NUM_ICLOGS, "iclog");
+	initnsema(&log->l_flushsema, LOG_NUM_ICLOGS, "iclog-flush");
 
 	if ((log->l_logsize = log_findlogsize(log_dev)) == -1)
 		log_panic("log_findlogsize");
@@ -346,6 +359,7 @@ log_alloc(xfs_mount_t	*mp,
 /*		iclog->ic_refcnt = 0;	*/
 /*		iclog->ic_callback = 0;	*/
 		iclog->ic_bp = getrbuf(0);
+		initnsema(&iclog->ic_forcesema, 0, "iclog-force");
 		psema(&iclog->ic_bp->b_lock, PINOD);	/* it's mine */
 
 		iclogp = &iclog->ic_next;
@@ -354,7 +368,7 @@ log_alloc(xfs_mount_t	*mp,
 }	/* log_alloc */
 
 
-void
+xfs_lsn_t
 log_commit_record(xfs_mount_t  *mp,
 		  log_ticket_t *ticket)
 {
@@ -367,26 +381,9 @@ log_commit_record(xfs_mount_t  *mp,
 	error = log_write(mp, reg, 1, ticket, 1);
 	if (error)
 		log_panic("log_commit_record: Can't commit transaction");
+
+	return reg[0].i_lsn;
 }	/* log_commit_record */
-
-
-void
-log_copy(log_in_core_t	 *iclog,
-	 xfs_log_iovec_t reg[],
-	 int		 i,
-	 int		 n,
-	 int		 offset,
-	 xfs_lsn_t	 *lsn)
-{
-	char *ptr = &iclog->ic_data[offset];
-	
-	iclog->ic_header.h_num_logops++;
-	for ( ; i < n; i++) {
-		bcopy(reg[i].i_addr, ptr, reg[i].i_len);
-		reg[i].i_lsn = *lsn;
-		ptr += reg[i].i_len;
-	}
-}	/* log_copy */
 
 
 /*
@@ -405,6 +402,12 @@ log_iodone(buf_t *bp)
 		vsema(&bp->b_iodonesema);
 	}
 }	/* log_iodone */
+
+
+void
+log_push_buffers_to_disk(log_t *log)
+{
+}	/* log_push_buffers_to_disk */
 
 
 /*
@@ -498,6 +501,7 @@ log_write(xfs_mount_t *		mp,
 	for (len=0, index=0; index < nentries; index++) {
 		len += reg[index].i_len;
 		len += sizeof(log_op_header_t);
+		reg[index].i_lsn = 0;
 	}
 
 	if (ticket->t_flags & LOG_TIC_INITED)
@@ -513,6 +517,7 @@ log_write(xfs_mount_t *		mp,
 	    log_offset = log_state_get_iclog_space(log, len, &iclog, &lastwr);
 
 	    ptr = &iclog->ic_data[log_offset];
+	    reg[index].i_lsn = iclog->ic_header.h_lsn;
 	    for ( ;index < nentries; ) {
 		ASSERT(reg[index].i_len % sizeof(long) == 0);
 
@@ -585,7 +590,7 @@ log_write(xfs_mount_t *		mp,
 	    }
 	}
 
-	log_state_want_sync(log, iclog);
+	log_state_want_sync(log, iclog);   /* not needed for kernel XXXmiken */
 	log_state_release_iclog(log, iclog);
 }	/* log_write */
 
@@ -606,9 +611,9 @@ log_state_done_syncing(log_in_core_t	*iclog)
 	int		   spl;
 	log_t		   *log = iclog->ic_log;
 	log_in_core_t	   *iclogp;
-	xfs_log_callback_t *cb;
+	xfs_log_callback_t *cb, *cb_next;
 
-	spl = splockspl(log->l_icloglock, 0);
+	spl = splockspl(log->l_icloglock, splhi);
 
 	ASSERT(iclog->ic_state == LOG_STATE_SYNCING);
 
@@ -616,14 +621,17 @@ log_state_done_syncing(log_in_core_t	*iclog)
 	spunlockspl(log->l_icloglock, spl);
 
 	/* perform callbacks XXXmiken */
-	for (cb = iclog->ic_callback; cb != 0; cb = cb->cb_next)
+	for (cb = iclog->ic_callback; cb != 0; cb = cb_next) {
+		cb_next = cb->cb_next;
 		cb->cb_func(cb->cb_arg);
+	}
 
-	spl = splockspl(log->l_icloglock, 0);
+	spl = splockspl(log->l_icloglock, splhi);
 
 	ASSERT(iclog->ic_state == LOG_STATE_CALLBACK);
 
 	iclog->ic_state		= LOG_STATE_DIRTY;
+	while (cvsema(&iclog->ic_forcesema));	/* wake up xfs_log_force() */
 	for (iclogp = log->l_iclog;
 	     iclogp != iclog;
 	     iclogp = iclogp->ic_next) {
@@ -654,7 +662,7 @@ log_state_finish_copy(log_t		*log,
 {
 	int spl;
 
-	spl = splockspl(log->l_icloglock, 0);
+	spl = splockspl(log->l_icloglock, splhi);
 
 	iclog->ic_header.h_num_logops++;
 	iclog->ic_offset += copy_bytes;
@@ -696,7 +704,7 @@ log_state_get_iclog_space(log_t		*log,
 	log_in_core_t	*iclog;
 
 restart:
-	spl = splockspl(log->l_icloglock, 0);
+	spl = splockspl(log->l_icloglock, splhi);
 
 	iclog = log->l_iclog;
 	if (! (iclog->ic_state == LOG_STATE_ACTIVE ||
@@ -716,7 +724,7 @@ restart:
 	     iclog->ic_state == LOG_STATE_ACTIVE;
 	     iclog = iclog->ic_next) {
 		if (iclog->ic_state == LOG_STATE_ACTIVE)
-			goto dont_cycle;
+			goto dont_clean;
                 iclog->ic_state			= LOG_STATE_ACTIVE;
                 iclog->ic_offset		= 0;
 		iclog->ic_callback		= 0;   /* don't need to free */
@@ -724,7 +732,7 @@ restart:
                 bzero(iclog->ic_header.h_cycle_data,
 		      sizeof(iclog->ic_header.h_cycle_data));
 		vsema(&log->l_flushsema);
-dont_cycle:
+dont_clean:
 		if (iclog->ic_next == log->l_iclog)	/* don't cycle */
 			break;
 	}
@@ -791,7 +799,7 @@ log_state_lsn_is_synced(log_t		   *log,
 	int	      spl;
 	int	      lsn_is_synced = 1;
 
-	spl = splockspl(log->l_icloglock, 0);
+	spl = splockspl(log->l_icloglock, splhi);
 
 	iclog = log->l_iclog;
 	do {
@@ -816,6 +824,9 @@ log_state_lsn_is_synced(log_t		   *log,
 
 /*
  * So why can't the below psema() sleep?
+ *
+ * When this function is entered, the iclog is not necessarily in the
+ * WANT_SYNC state.  It may be sitting around waiting to get filled.
  */
 void
 log_state_release_iclog(log_t		*log,
@@ -824,12 +835,12 @@ log_state_release_iclog(log_t		*log,
 	int spl;
 	int sync = 0;
 
-	spl = splockspl(log->l_icloglock, 0);
+	spl = splockspl(log->l_icloglock, splhi);
 
 	ASSERT(iclog->ic_refcnt > 0);
-	ASSERT(iclog->ic_state == LOG_STATE_WANT_SYNC);
 
-	if (--iclog->ic_refcnt == 0) {
+	if (--iclog->ic_refcnt == 0 &&
+	    iclog->ic_state == LOG_STATE_WANT_SYNC) {
 		ASSERT(valusema(&log->l_flushsema) > 0);
 		sync++;
 		iclog->ic_state = LOG_STATE_SYNCING;
@@ -844,12 +855,48 @@ log_state_release_iclog(log_t		*log,
 }	/* log_state_release_iclog */
 
 
+int
+log_state_sync(log_t *log, xfs_lsn_t lsn, uint flags)
+{
+	log_in_core_t *iclog;
+	int spl;
+
+	spl = splockspl(log->l_icloglock, splhi);
+
+	iclog = log->l_iclog;
+	do {
+	    if (iclog->ic_header.h_lsn != lsn) {
+		iclog = iclog->ic_next;
+		continue;
+	    } else {
+		if (iclog->ic_state == LOG_STATE_ACTIVE) {
+		    iclog->ic_state = LOG_STATE_WANT_SYNC;
+		    log->l_currblock +=
+			((iclog->ic_offset + (BBSIZE-1)) >> BBSHIFT) + 1;
+	        } else if (iclog->ic_state == LOG_STATE_DIRTY) {
+		    spunlockspl(log->l_icloglock, spl);
+		    return 0;
+		}
+		if (flags & XFS_LOG_SYNC)
+		    spunlockspl(log->l_icloglock, spl);
+	        else
+		    spunlockspl_psema(log->l_icloglock, spl,
+				      &iclog->ic_forcesema, 0);
+		return 0;
+	    }
+	} while (iclog != log->l_iclog);
+
+	spunlockspl(log->l_icloglock, spl);
+	return XFS_ENOTFOUND;
+}	/* log_state_sync */
+
+
 void
 log_state_want_sync(log_t *log, log_in_core_t *iclog)
 {
 	int spl;
 
-	spl = splockspl(log->l_icloglock, 0);
+	spl = splockspl(log->l_icloglock, splhi);
 
 	if (iclog->ic_state == LOG_STATE_ACTIVE) {
 		iclog->ic_state = LOG_STATE_WANT_SYNC;

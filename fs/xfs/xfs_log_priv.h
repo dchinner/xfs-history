@@ -9,8 +9,8 @@
 #define LOG_NUM_ICLOGS		2
 #define LOG_CALLBACK_SIZE	10
 #define LOG_HEADER_MAGIC_NUM	0xBADbabe
-#define LOG_RECORD_ISIZE	1024
-#define LOG_RECORD_BSIZE	(4*(LOG_RECORD_ISIZE))	/* eventually 32k */
+#define LOG_RECORD_BSIZE	(4*1024)	/* eventually 32k */
+#define LOG_RECORD_BSHIFT	12		/* 4096 == 1 << 12 */
 #define LOG_HEADER_SIZE		512
 #define LOG_BBSHIFT		12
 #define LOG_BBSIZE		(1<<LOG_BBSHIFT)	/* 4096 */
@@ -96,6 +96,7 @@ typedef struct log_in_core {
 		char		 hic_sector[LOG_HEADER_SIZE];
 	} ic_h;
 	char			ic_data[LOG_RECORD_BSIZE-LOG_HEADER_SIZE];
+	sema_t			ic_forcesema;	/* used for xfs_log_force() */
 	struct log_in_core	*ic_next;
 	buf_t	  		*ic_bp;
 	struct log		*ic_log;	/* back ptr to log */
@@ -121,12 +122,13 @@ typedef struct log {
 	log_in_core_t	*l_iclog;	/* head log queue:		4b */
 	sema_t		l_flushsema;	/* iclog flushing semaphore	20b */
 	lock_t		l_icloglock;	/* grab to change iclog state:	 b */
+	xfs_lsn_t	l_sync_lsn;	/* lsn of last LR w/ buffers committed*/
+	xfs_lsn_t	l_tail_lsn;	/* lsn of 1st LR w/ unflushed buffers */
 	dev_t		l_dev;		/* dev_t of log */
 	int		l_logsize;	/* size in bytes of log */
 	int		l_cycle;	/* Cycle number of log writes */
 	int		l_currblock;	/* current logical block of log */
 	int		l_logreserved;	/* log space reserved */
-	xfs_lsn_t	l_sync_lsn;	/* lsn of last LR w/ buffers committed*/
 } log_t;
 
 

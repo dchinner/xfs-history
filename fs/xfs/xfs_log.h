@@ -37,8 +37,7 @@
 /*
  * Flags to xfs_log_force()
  *
- *	XFS_LOG_SYNC:	Synchronous force in-core log to disk.
- *	default:	Force out asynchronously
+ *	XFS_LOG_SYNC:	Synchronous force in-core log to disk. (default)
  *	XFS_LOG_FORCE:	Start in-core log write now.
  *	XFS_LOG_URGE:	Start write within some window of time.
  */
@@ -73,16 +72,16 @@ typedef struct xfs_log_callback {
 
 /* Log manager interfaces */
 struct xfs_mount;
-void xfs_log_done(struct xfs_mount *mp, xfs_log_ticket_t ticket, uint flags);
-int  xfs_log_force(struct xfs_mount *mp, xfs_lsn_t lsn, uint flags);
-int  xfs_log_init();
-int  xfs_log_mount(struct xfs_mount *mp, dev_t log_dev, uint flags);
-void xfs_log_notify(struct xfs_mount *mp, xfs_lsn_t lsn,
-		    xfs_log_callback_t *callback_entry);
-int  xfs_log_reserve(struct xfs_mount *mp, uint length,
-		     xfs_log_ticket_t *ticket, char clientid, uint flags);
-int  xfs_log_write(struct xfs_mount *mp, xfs_log_iovec_t region[], int nentries,
-		   xfs_log_ticket_t ticket);
+xfs_lsn_t xfs_log_done(struct xfs_mount *mp, xfs_log_ticket_t ticket, uint flags);
+int	  xfs_log_force(struct xfs_mount *mp, xfs_lsn_t lsn, uint flags);
+int	  xfs_log_init();
+int	  xfs_log_mount(struct xfs_mount *mp, dev_t log_dev, uint flags);
+void	  xfs_log_notify(struct xfs_mount *mp, xfs_lsn_t lsn,
+			 xfs_log_callback_t *callback_entry);
+int	  xfs_log_reserve(struct xfs_mount *mp, uint length,
+			  xfs_log_ticket_t *ticket, char clientid, uint flags);
+int	  xfs_log_write(struct xfs_mount *mp, xfs_log_iovec_t region[],
+			int nentries, xfs_log_ticket_t ticket);
 
 /* Log manager utility interfaces */
 void xfs_log_print(struct xfs_mount *mp, dev_t log_dev);
@@ -92,5 +91,6 @@ void xfs_log_print(struct xfs_mount *mp, dev_t log_dev);
 #define XFS_ENOLOGSPACE	3	/* Reservation too large */
 #define XFS_ENOTSUP	1
 #define XFS_ENOLSN	5	/* Can't find the lsn you asked for */
+#define XFS_ENOTFOUND	6
 
 #endif	/* _XFS_LOG_H */
