@@ -1,8 +1,8 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.54 $"
-#ident	"$Revision: 1.54 $"
+#ident	"$Revision: 1.55 $"
+#ident	"$Revision: 1.55 $"
 
 struct buf;
 struct cred;
@@ -147,6 +147,7 @@ typedef struct xfs_mod_sb {
 
 #ifdef SIM
 xfs_mount_t	*xfs_mount(dev_t, dev_t, dev_t);
+xfs_mount_t	*xfs_mount_partial(dev_t, dev_t, dev_t);
 void		xfs_umount(xfs_mount_t *);
 #endif
 

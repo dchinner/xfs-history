@@ -115,7 +115,7 @@ xfs_mount_free(xfs_mount_t *mp)
 
 
 /*
- * xfs_mountfs
+ * do_xfs_mountfs
  *
  * This function does the following on an initial mount of a file system:
  *	- reads the superblock from disk and init the mount struct
@@ -123,9 +123,20 @@ xfs_mount_free(xfs_mount_t *mp)
  *	- allocate inode hash table for fs
  *	- init directory manager
  *	- perform recovery and init the log manager
+ *
+ *	- if read_rootinos is set to 1 (typical case), the
+ *		root inodes will be read in.  The flag is set
+ *		to 0 only in special cases when the filesystem
+ *		is thought to be corrupt but we want a mount
+ *		structure set up so we can use the XFS_* macros.
+ *		If read_rootinos is 0, the superblock *must* be good.
+ *		and the filesystem should be unmounted and remounted
+ *		before any real xfs filesystem code can be run against
+ *		the filesystem.  This flag is used only by simulation
+ *		code for fixing up the filesystem btrees.
  */
-int
-xfs_mountfs(vfs_t *vfsp, dev_t dev)
+STATIC int
+do_xfs_mountfs(vfs_t *vfsp, dev_t dev, int read_rootinos)
 {
 	buf_t		*bp;
 	xfs_sb_t	*sbp;
@@ -406,7 +417,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	/*
 	 * Mkfs calls mount before the root inode is allocated.
 	 */
-	if (sbp->sb_rootino != NULLFSINO)
+	if (read_rootinos == 1 && sbp->sb_rootino != NULLFSINO)
 #endif /* SIM */
 	{
 		/*
@@ -438,7 +449,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	/*
 	 * Initialize realtime inode pointers in the mount structure
 	 */
-	if (sbp->sb_rbmino != NULLFSINO) {
+	if (sbp->sb_rbmino != NULLFSINO && read_rootinos == 1) {
 		error = xfs_iget(mp, NULL, sbp->sb_rbmino, NULL,
 				 &mp->m_rbmip, 0);
 		if (error) {
@@ -507,15 +518,20 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
  error0:
 	nfreerbuf(bp);
 	return error;
-}	/* xfs_mountfs */
+}	/* do_xfs_mountfs */
+
+/*
+ * wrapper routine for the kernel
+ */
+int
+xfs_mountfs(vfs_t *vfsp, dev_t dev)
+{
+	return(do_xfs_mountfs(vfsp, dev, 1));
+}
 
 #ifdef SIM
-/*
- * xfs_mount is the function used by the simulation environment
- * to start the file system.
- */
-xfs_mount_t *
-xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
+STATIC xfs_mount_t *
+do_xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev, int read_rootinos)
 {
 	int		error;
 	xfs_mount_t	*mp;
@@ -533,7 +549,7 @@ xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 	vfsp->vfs_dev = dev;
 
 
-        error = xfs_mountfs(vfsp, dev);
+        error = do_xfs_mountfs(vfsp, dev, read_rootinos);
 	if (error) {
 		kmem_free(mp, sizeof(*mp));
 		return 0;
@@ -553,6 +569,27 @@ xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 	}
 
 	return mp;
+}
+
+/*
+ * xfs_mount is the function used by the simulation environment
+ * to start the file system.
+ */
+xfs_mount_t *
+xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
+{
+	return(do_xfs_mount(dev, logdev, rtdev, 1));
+}
+
+/*
+ * xfs_mount_setup is used by the simulation environment to
+ * mount a filesystem where everything but the superblock
+ * might be trashed.  Beware:  the root inodes are NOT read in.
+ */
+xfs_mount_t *
+xfs_mount_partial(dev_t dev, dev_t logdev, dev_t rtdev)
+{
+	return(do_xfs_mount(dev, logdev, rtdev, 1));
 }
 #endif /* SIM */
 
