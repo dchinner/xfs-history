@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.3 $"
+#ident	"$Revision: 1.5 $"
 
 struct xfs_ihash;
 
@@ -23,6 +23,7 @@ typedef struct xfs_mount {
 	ulong			m_ihashmask;	/* fs inode hash size - 1 */
 	struct xfs_inode	*m_inodes;	/* active inode list */
 	lock_t			m_ilock;	/* inode list mutex */
+	void			*m_log;		/* log specific stuff */
 } xfs_mount_t;
 
 #define	XFS_MOUNT_ILOCK(mp)	splockspl((mp)->m_ilock, splhi)
