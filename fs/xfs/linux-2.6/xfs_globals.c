@@ -48,6 +48,11 @@ unsigned long	xfs_physmem;
 int		restricted_chown = 1;
 
 /*
+ * Used to serialize atomicIncWithWrap.
+ */
+spinlock_t Atomic_spin = SPIN_LOCK_UNLOCKED;
+
+/*
  * The global quota manager. There is only one of these for the entire
  * system, _not_ one per file system. XQM keeps track of the overall
  * quota functionality, including maintaining the freelist and hash
