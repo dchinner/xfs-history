@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.94 $"
+#ident	"$Revision: 1.95 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -314,9 +314,9 @@ xfs_ialloc_ag_alloc(
 	}
 	agi->agi_count += newlen;
 	agi->agi_freecount += newlen;
-	mrlock(&args.mp->m_peraglock, MR_ACCESS, PINOD);
+	mraccess(&args.mp->m_peraglock);
 	args.mp->m_perag[agi->agi_seqno].pagi_freecount += newlen;
-	mrunlock(&args.mp->m_peraglock);
+	mraccunlock(&args.mp->m_peraglock);
 	agi->agi_newino = newino;
 	/*
 	 * Insert records describing the new inode chunk into the btree.
@@ -399,13 +399,13 @@ xfs_ialloc_ag_select(
 	agno = pagno;
 	flags = XFS_ALLOC_FLAG_TRYLOCK;
 	for (;;) {
-		mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
+		mraccess(&mp->m_peraglock);
 		pag = &mp->m_perag[agno];
 		if (!pag->pagi_init) {
 			error = xfs_ialloc_read_agi(mp, tp, agno, &agbp);
 			if (error) {
 				agbp = NULL;
-				mrunlock(&mp->m_peraglock);
+				mraccunlock(&mp->m_peraglock);
 				goto nextag;
 			}
 		} else {
@@ -417,7 +417,7 @@ xfs_ialloc_ag_select(
 							    &agbp);
 				if (error) {
 					agbp = NULL;
-					mrunlock(&mp->m_peraglock);
+					mraccunlock(&mp->m_peraglock);
 					goto nextag;
 				}
 			}
@@ -438,11 +438,11 @@ xfs_ialloc_ag_select(
 							    agno, &agbp);
 					if (error) {
 						agbp = NULL;
-						mrunlock(&mp->m_peraglock);
+						mraccunlock(&mp->m_peraglock);
 						goto nextag;
 					}
 				}
-				mrunlock(&mp->m_peraglock);
+				mraccunlock(&mp->m_peraglock);
 				if (S_ISDIR(mode))
 					mp->m_agirotor =
 						(agno + 1 == agcount) ?
@@ -450,7 +450,7 @@ xfs_ialloc_ag_select(
 				return agbp;
 			}
 		}
-		mrunlock(&mp->m_peraglock);
+		mraccunlock(&mp->m_peraglock);
 		if (agbp)
 			xfs_trans_brelse(tp, agbp);
 nextag:		
@@ -602,9 +602,9 @@ nextag:
 			*inop = NULLFSINO;
 			return 0;
 		}
-		mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
+		mraccess(&mp->m_peraglock);
 		error = xfs_ialloc_read_agi(mp, tp, tagno, &agbp);
-		mrunlock(&mp->m_peraglock);
+		mraccunlock(&mp->m_peraglock);
 		if (error) {
 			goto nextag;
 		}
@@ -861,9 +861,9 @@ nextag:
 	rec.ir_freecount--;
 	xfs_inobt_update(cur, rec.ir_startino, rec.ir_freecount, rec.ir_free);
 	agi->agi_freecount--;
-	mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
+	mraccess(&mp->m_peraglock);
 	mp->m_perag[tagno].pagi_freecount--;
-	mrunlock(&mp->m_peraglock);
+	mraccunlock(&mp->m_peraglock);
 #ifdef DEBUG
 	if (cur->bc_nlevels == 1) {
 		int freecount = 0;
@@ -928,9 +928,9 @@ xfs_difree(
 	/*
 	 * Get the allocation group header.
 	 */
-	mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
+	mraccess(&mp->m_peraglock);
 	error = xfs_ialloc_read_agi(mp, tp, agno, &agbp);
-	mrunlock(&mp->m_peraglock);
+	mraccunlock(&mp->m_peraglock);
 	if (error) {
 		return error;
 	}
@@ -989,9 +989,9 @@ xfs_difree(
 	 * Change the inode free counts and log the ag/sb changes.
 	 */
 	agi->agi_freecount++;
-	mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
+	mraccess(&mp->m_peraglock);
 	mp->m_perag[agno].pagi_freecount++;
-	mrunlock(&mp->m_peraglock);
+	mraccunlock(&mp->m_peraglock);
 #ifdef DEBUG
 	if (cur->bc_nlevels == 1) {
 		int freecount = 0;
@@ -1083,9 +1083,9 @@ xfs_dilocate(
 		chunk_agbno = agbno - offset_agbno;
 	} else {
 		agino = XFS_INO_TO_AGINO(mp, ino);
-		mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
+		mraccess(&mp->m_peraglock);
 		error = xfs_ialloc_read_agi(mp, tp, agno, &agbp);
-		mrunlock(&mp->m_peraglock);
+		mraccunlock(&mp->m_peraglock);
 		if (error)
 			return error;
 		cur = xfs_btree_init_cursor(mp, tp, agbp, agno, XFS_BTNUM_INO,
