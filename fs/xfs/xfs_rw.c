@@ -100,6 +100,11 @@ zone_t		*xfs_bmap_zone;
 zone_t		*xfs_strat_write_zone;
 
 /*
+ * Zone allocator for xfs_gap_t structures.
+ */
+zone_t		*xfs_gap_zone;
+
+/*
  * Global trace buffer for xfs_strat_write() tracing.
  */
 ktrace_t	*xfs_strat_trace_buf;
@@ -244,11 +249,11 @@ xfs_rw_enter_trace(
 		     (void*)ip, 
 		     (void*)((ip->i_d.di_size >> 32) & 0xffffffff),
 		     (void*)(ip->i_d.di_size & 0xffffffff),
-		     (void*)(((__uint64_t)uiop->uio_offset > 32) & 0xffffffff),
+		     (void*)(((__uint64_t)uiop->uio_offset >> 32) & 0xffffffff),
 		     (void*)(uiop->uio_offset & 0xffffffff),
 		     (void*)uiop->uio_resid,
 		     (void*)ioflags,
-		     (void*)((ip->i_next_offset > 32) & 0xffffffff),
+		     (void*)((ip->i_next_offset >> 32) & 0xffffffff),
 		     (void*)(ip->i_next_offset & 0xffffffff),
 		     (void*)((ip->i_io_offset > 32) & 0xffffffff),
 		     (void*)(ip->i_io_offset & 0xffffffff),
@@ -450,18 +455,21 @@ xfs_next_bmap(
 
 	/*
 	 * If the iosize from our offset extends beyond the end
-	 * of the file, then trim down the length to match the
-	 * size of the file.  The extent may go beyond the end,
-	 * but all data beyond the EOF must be inaccessible.
+	 * of the file and the current extent is simply a hole,
+	 * then trim down the length to match the
+	 * size of the file.  This keeps us from going out too
+	 * far into hole at the EOF that extends to infinity.
 	 */
-	last_file_fsb = XFS_B_TO_FSB(mp, isize);
-	extra_blocks = (off_t)(bmapp->offset + bmapp->length) -
-		       (__uint64_t)last_file_fsb;
-	if (extra_blocks > 0) {
-		bmapp->length -= extra_blocks;
-		ASSERT(bmapp->length > 0);
+	if (start_block == HOLESTARTBLOCK) {
+		last_file_fsb = XFS_B_TO_FSB(mp, isize);
+		extra_blocks = (off_t)(bmapp->offset + bmapp->length) -
+			(__uint64_t)last_file_fsb;
+		if (extra_blocks > 0) {
+			bmapp->length -= extra_blocks;
+			ASSERT(bmapp->length > 0);
+		}
+		ASSERT((bmapp->offset + bmapp->length) <= last_file_fsb);
 	}
-	ASSERT((bmapp->offset + bmapp->length) <= last_file_fsb);
 
 	bmapp->bsize = XFS_FSB_TO_B(mp, bmapp->length);
 }
@@ -533,31 +541,80 @@ xfs_iomap_extra(
 	int		*nbmaps)
 {
 	xfs_fileoff_t	offset_fsb;
+	xfs_fileoff_t	end_fsb;
+	off_t		offset_bb;
+	xfs_extlen_t	block_off_bb;
 	xfs_fsize_t	nisize;
 	xfs_mount_t	*mp;
+	int		nimaps;
+	xfs_bmbt_irec_t	imap;
 
 	nisize = ip->i_new_size;
 	if (nisize < ip->i_d.di_size) {
 		nisize = ip->i_d.di_size;
 	}
-	ASSERT((offset == BBTOOFF(OFFTOBB(nisize))) && (count < NBPP));
-	ASSERT(ip->i_mount->m_sb.sb_blocksize < NBPP);
-
 	mp = ip->i_mount;
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 
-	*nbmaps = 1;
-	bmapp->eof = BMAP_EOF;
-	bmapp->bn = -1;
-	bmapp->offset = XFS_FSB_TO_BB(mp, offset_fsb);
-	bmapp->length = 0;
-	bmapp->bsize = 0;
-	bmapp->pboff = 0;
-	bmapp->pbsize = 0;
-	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
-		bmapp->pbdev = mp->m_rtdev;
+	if ((offset == BBTOOFF(OFFTOBB(nisize))) && (count < NBPP)) {
+		ASSERT((offset == BBTOOFF(OFFTOBB(nisize))) &&
+		       (count < NBPP));
+		ASSERT(ip->i_mount->m_sb.sb_blocksize < NBPP);
+
+		*nbmaps = 1;
+		bmapp->eof = BMAP_EOF;
+		bmapp->bn = -1;
+		bmapp->offset = XFS_FSB_TO_BB(mp, offset_fsb);
+		bmapp->length = 0;
+		bmapp->bsize = 0;
+		bmapp->pboff = 0;
+		bmapp->pbsize = 0;
+		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
+			bmapp->pbdev = mp->m_rtdev;
+		} else {
+			bmapp->pbdev = mp->m_dev;
+		}
 	} else {
-		bmapp->pbdev = mp->m_dev;
+		ASSERT(count <= NBPP);
+		end_fsb = XFS_B_TO_FSB(mp, (offset + count));
+		nimaps = 1;
+		(void) xfs_bmapi(NULL, ip, offset_fsb,
+				 (xfs_extlen_t)(end_fsb - offset_fsb),
+				 0, NULLFSBLOCK, 0, &imap,
+				 &nimaps, NULL);
+		ASSERT(nimaps == 1);
+		*nbmaps = 1;
+		bmapp->eof = BMAP_EOF;
+		offset_bb = OFFTOBBT(offset);
+		block_off_bb = XFS_BB_FSB_OFFSET(mp, offset_bb);
+		if (imap.br_startblock == HOLESTARTBLOCK) {
+			bmapp->eof |= BMAP_HOLE;
+			bmapp->bn = -1;
+		} else if (imap.br_startblock == DELAYSTARTBLOCK) {
+			bmapp->eof |= BMAP_DELAY;
+			bmapp->bn = -1;
+		} else {
+			bmapp->bn =
+				XFS_FSB_TO_DB(mp, ip, imap.br_startblock) +
+				block_off_bb;
+		}
+		bmapp->offset = XFS_FSB_TO_BB(mp, offset_fsb) + block_off_bb;
+		bmapp->length =	XFS_FSB_TO_BB(mp, imap.br_blockcount) -
+				block_off_bb;
+		ASSERT(bmapp->length > 0);
+		bmapp->bsize = BBTOB(bmapp->length);
+		bmapp->pboff = offset - BBTOOFF(bmapp->offset);
+		ASSERT(bmapp->pboff >= 0);
+		bmapp->pbsize = bmapp->bsize - bmapp->pboff;
+		ASSERT(bmapp->pbsize > 0);
+		if (bmapp->pbsize > count) {
+			bmapp->pbsize = count;
+		}
+		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
+			bmapp->pbdev = mp->m_rtdev;
+		} else {
+			bmapp->pbdev = mp->m_dev;
+		}
 	}
 }
 
@@ -587,6 +644,7 @@ xfs_iomap_read(
 	xfs_fileoff_t	last_required_offset;
 	xfs_fileoff_t	next_offset;
 	xfs_fileoff_t	last_fsb;
+	xfs_fileoff_t	max_fsb;
 	xfs_fsize_t	nisize;
 	off_t		offset_page;
 	off_t		aligned_offset;
@@ -606,8 +664,8 @@ xfs_iomap_read(
 	struct bmapval	*next_read_ahead_bmapp;
 	xfs_bmbt_irec_t	*curr_imapp;
 	xfs_bmbt_irec_t	*last_imapp;
-	xfs_bmbt_irec_t	*imap;
 #define	XFS_READ_IMAPS	XFS_BMAP_MAX_NMAP
+	xfs_bmbt_irec_t	imap[XFS_READ_IMAPS];
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE) != 0);
 	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE | MR_ACCESS) != 0);
@@ -635,9 +693,17 @@ xfs_iomap_read(
 		xfs_iomap_extra(ip, offset, count, bmapp, nbmaps);
 		return;
 	}
-	imap = (xfs_bmbt_irec_t *)kmem_zone_alloc(xfs_irec_zone, KM_SLEEP);
+	/*
+	 * Map out to the maximum possible file size.  This will return
+	 * an extra hole we don't really care about at the end, but we
+	 * won't do any read-ahead beyond the EOF anyway.  We do this
+	 * so that the buffers we create here line up well with those
+	 * created in xfs_iomap_write() which extend beyond the end of
+	 * the file.
+	 */
+	max_fsb = XFS_B_TO_FSBT(mp, XFS_MAX_FILE_OFFSET);
 	(void)xfs_bmapi(NULL, ip, offset_fsb,
-			(xfs_extlen_t)(last_fsb - offset_fsb),
+			(xfs_extlen_t)(max_fsb - offset_fsb),
 			XFS_BMAPI_ENTIRE, NULLFSBLOCK, 0, imap,
 			&nimaps, NULL);
 
@@ -735,7 +801,6 @@ xfs_iomap_read(
 	 * the whole request in the first bmap.
 	 */
 	last_fsb = XFS_B_TO_FSB(mp, nisize);
-	ASSERT((bmapp->offset + bmapp->length) <= last_fsb);
 	filled_bmaps = 1;
 	last_required_offset = bmapp[0].offset;
 	first_read_ahead_bmapp = NULL;
@@ -905,6 +970,7 @@ xfs_iomap_read(
 		} else {
 			curr_bmapp->pbdev = mp->m_dev;
 		}
+		ASSERT(curr_bmapp->offset <= XFS_B_TO_FSB(mp, nisize));
 		curr_bmapp->offset = XFS_FSB_TO_BB(mp, curr_bmapp->offset);
 		curr_bmapp->length = XFS_FSB_TO_BB(mp, curr_bmapp->length);
 		ASSERT(curr_bmapp->length > 0);
@@ -916,7 +982,6 @@ xfs_iomap_read(
 						       curr_bmapp->bn);
 		}
 	}
-	kmem_zone_free(xfs_irec_zone, imap);
 	return;
 }				
 			
@@ -929,7 +994,7 @@ xfs_read_file(
 	cred_t	*credp)
 {
 #define	XFS_READ_BMAPS	XFS_ZONE_NBMAPS
-	struct bmapval	*bmaps;
+	struct bmapval	bmaps[XFS_ZONE_NBMAPS];
 	struct bmapval	*bmapp;
 	int		nbmaps;
 	buf_t		*bp;
@@ -941,7 +1006,6 @@ xfs_read_file(
 	ip = XFS_VTOI(vp);
 	error = 0;
 	buffer_bytes_ok = 0;
-	bmaps = (struct bmapval *)kmem_zone_alloc(xfs_bmap_zone, KM_SLEEP);
 	XFSSTATS.xs_read_calls++;
 	XFSSTATS.xs_read_bytes += uiop->uio_resid;
 
@@ -993,7 +1057,6 @@ xfs_read_file(
 		 * first call to it.
 		 */
 		while ((uiop->uio_resid != 0) && (nbmaps > 0)) {
-
 			bp = chunkread(vp, bmapp, read_bmaps, credp);
 
 			if (bp->b_flags & B_ERROR) {
@@ -1028,7 +1091,6 @@ xfs_read_file(
 
 	} while (!error && (uiop->uio_resid != 0) && buffer_bytes_ok);
 
-	kmem_zone_free(xfs_bmap_zone, bmaps);
 	return error;
 }
 
@@ -1203,22 +1265,6 @@ xfs_write_bmap(
 		ASSERT(bmapp->length > 0);
 	}
 
-	/*
-	 * If the iosize from our offset extends beyond the last block
-	 * covered by isize, then trim down the length to match the
-	 * file size.  This counts on the given size being new_size
-	 * rather than the old size.
-	 */
-	last_file_fsb = XFS_B_TO_FSB(mp, isize);
-	extra_blocks = (off_t)(bmapp->offset + bmapp->length) -
-		       (__uint64_t)last_file_fsb;
-
-	if (extra_blocks > 0) {
-		bmapp->length -= extra_blocks;
-		ASSERT(bmapp->length > 0);
-	}
-	ASSERT((bmapp->offset + bmapp->length) <= last_file_fsb);
-
 	bmapp->bsize = XFS_FSB_TO_B(mp, bmapp->length);
 }
 
@@ -1363,6 +1409,7 @@ xfs_zero_eof(
 	buf_t		*bp;
 	int		nimaps;
 	xfs_bmbt_irec_t	imap;
+	struct bmapval	bmap;
 
 	ASSERT(ismrlocked(&(ip->i_lock), MR_UPDATE));
 	ASSERT(ismrlocked(&(ip->i_iolock), MR_UPDATE));
@@ -1402,7 +1449,6 @@ xfs_zero_eof(
 		(void) xfs_bmapi(NULL, ip, start_zero_fsb, zero_count_fsb,
 				 0, NULLFSBLOCK, 0, &imap, &nimaps, NULL);
 		ASSERT(nimaps > 0);
-		ASSERT(imap.br_startblock != DELAYSTARTBLOCK);
 
 		if (imap.br_startblock == HOLESTARTBLOCK) {
 			start_zero_fsb = imap.br_startoff +
@@ -1418,7 +1464,7 @@ xfs_zero_eof(
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
 		/*
-		 * There are real blocks in the range requested.
+		 * There are blocks in the range requested.
 		 * Zero them a single write at a time.  We actually
 		 * don't zero the entire range returned if it is
 		 * too big and simply loop around to get the rest.
@@ -1427,17 +1473,31 @@ xfs_zero_eof(
 		 */
 		buf_len_fsb = XFS_EXTLEN_MIN(imap.br_blockcount,
 					      mp->m_writeio_blocks);
-		bp = ngetrbuf(XFS_FSB_TO_B(mp, buf_len_fsb));
-		bzero(bp->b_un.b_addr, bp->b_bcount);
-		bp->b_blkno = XFS_FSB_TO_DB(mp, ip, imap.br_startblock);
-		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
-			bp->b_edev = mp->m_rtdev;
+		bmap.offset = XFS_FSB_TO_BB(mp, imap.br_startoff);
+		bmap.length = XFS_FSB_TO_BB(mp, buf_len_fsb);
+		bmap.bsize = BBTOB(bmap.length);
+		bmap.eof = BMAP_EOF;
+		if (imap.br_startblock == DELAYSTARTBLOCK) {
+			bmap.eof |= BMAP_DELAY;
+			bmap.bn = -1;
 		} else {
-			bp->b_edev = mp->m_dev;
+			bmap.bn = XFS_FSB_TO_DB(mp, ip, imap.br_startblock);
 		}
-		bp->b_flags |= B_HOLD;
-		bwrite(bp);
-		nfreerbuf(bp);
+		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
+			bmap.pbdev = mp->m_rtdev;
+		} else {
+			bmap.pbdev = mp->m_dev;
+		}
+		bp = getchunk(XFS_ITOV(ip), &bmap, credp);
+
+		bp_mapin(bp);
+		bzero(bp->b_un.b_addr, bp->b_bcount);
+
+		if (imap.br_startblock == DELAYSTARTBLOCK) {
+			bdwrite(bp);
+		} else {
+			bwrite(bp);
+		}
 
 		start_zero_fsb = imap.br_startoff + buf_len_fsb;
 		ASSERT(start_zero_fsb <= (end_zero_fsb + 1));
@@ -1475,8 +1535,8 @@ xfs_iomap_write(
 	struct bmapval	*last_bmapp;
 	xfs_bmbt_irec_t	*curr_imapp;
 	xfs_bmbt_irec_t	*last_imapp;
-	xfs_bmbt_irec_t	*imap;
 #define	XFS_WRITE_IMAPS	XFS_BMAP_MAX_NMAP
+	xfs_bmbt_irec_t	imap[XFS_WRITE_IMAPS];
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE) != 0);
 	xfs_iomap_enter_trace(XFS_IOMAP_WRITE_ENTER, ip, offset, count);
@@ -1487,10 +1547,38 @@ xfs_iomap_write(
 	} else {
 		isize = ip->i_d.di_size;
 	}
+
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
-	nimaps = XFS_WRITE_IMAPS;
-	imap = (xfs_bmbt_irec_t *)kmem_zone_alloc(xfs_irec_zone, KM_SLEEP);
 	last_fsb = XFS_B_TO_FSB(mp, offset + count);
+	/*
+	 * If the caller is doing a write at the end of the file,
+	 * then extend the allocation (and the buffer used for the write)
+	 * out to the file system's write iosize.  We clean up any extra
+	 * space left over when the file is closed in xfs_inactive().
+	 * We can only do this if the block underlying the last byte to
+	 * be written is not yet allocated.  This is because the caller
+	 * will not be writing the extra block allocated yet, so if the
+	 * bytes that are written are on a different extent then the extra
+	 * blocks we allocate there will be no buffer created over the
+	 * extra delayed allocation blocks.  That's not allowed.
+	 */
+	if ((offset + count) > ip->i_d.di_size) {
+		nimaps = 1;
+		(void) xfs_bmapi(NULL, ip,
+				 XFS_B_TO_FSBT(mp, (offset + count - 1)),
+				 (xfs_extlen_t)1, 0, NULLFSBLOCK, 0, imap,
+				 &nimaps, NULL);
+		ASSERT(nimaps == 1);
+		if ((imap->br_startblock == HOLESTARTBLOCK) ||
+		    (imap->br_startblock == DELAYSTARTBLOCK)) {
+			iosize = mp->m_writeio_blocks;
+			aligned_offset =
+				XFS_WRITEIO_ALIGN(mp, (offset + count - 1));
+			ioalign = XFS_B_TO_FSBT(mp, aligned_offset);
+			last_fsb = ioalign + iosize;
+		}
+	}
+	nimaps = XFS_WRITE_IMAPS;
 	(void) xfs_bmapi(NULL, ip, offset_fsb,
 			 (xfs_extlen_t)(last_fsb - offset_fsb),
 			 XFS_BMAPI_DELAY | XFS_BMAPI_WRITE |
@@ -1502,10 +1590,9 @@ xfs_iomap_write(
 	if (nimaps == 0) {
 		xfs_iomap_enter_trace(XFS_IOMAP_WRITE_NOSPACE,
 				      ip, offset, count);
-		kmem_zone_free(xfs_irec_zone, (void *)imap);
 		return ENOSPC;
 	}
-	
+
 	iosize = mp->m_writeio_blocks;
 	aligned_offset= XFS_WRITEIO_ALIGN(mp, offset);
 	ioalign = XFS_B_TO_FSBT(mp, aligned_offset);
@@ -1543,12 +1630,9 @@ xfs_iomap_write(
 	/*
 	 * Map more buffers if the first does not map the entire
 	 * request.  We do this until we run out of bmaps, imaps,
-	 * or bytes to write.  We also stop if the mappings go beyond
-	 * the end of the file.  There may be more blocks beyond the
-	 * EOF for which we have imaps, but they are inaccessible.
+	 * or bytes to write.
 	 */
 	last_file_fsb = XFS_B_TO_FSB(mp, isize);
-	ASSERT((bmapp->offset + bmapp->length) <= last_file_fsb);
 	filled_bmaps = 1;
 	if ((*nbmaps > 1) &&
 	    ((nimaps > 1) || (bmapp->offset + bmapp->length <
@@ -1569,16 +1653,13 @@ xfs_iomap_write(
 		while (next_bmapp <= last_bmapp) {
 			next_offset_fsb = curr_bmapp->offset +
 					  curr_bmapp->length;
-			ASSERT(next_offset_fsb <= last_file_fsb);
-			if (next_offset_fsb == last_file_fsb) {
+			if (next_offset_fsb >= last_file_fsb) {
 				/*
-				 * Anything left is beyond the EOF
-				 * and therefore inaccessible, so
-				 * get out now.
+				 * We've gone beyond the region asked for
+				 * by the caller, so we're done.
 				 */
 				break;
 			}
-
 			if (next_offset_fsb <
 			    (curr_imapp->br_startoff +
 			     curr_imapp->br_blockcount)) {
@@ -1691,7 +1772,6 @@ xfs_iomap_write(
 	 * have made it invalid.
 	 */
 	XFS_INODE_CLEAR_READ_AHEAD(ip);
-	kmem_zone_free(xfs_irec_zone, imap);
 	return 0;
 }
 
@@ -1704,7 +1784,7 @@ xfs_write_file(
 	cred_t	*credp)
 {
 #define	XFS_WRITE_BMAPS	XFS_ZONE_NBMAPS
-	struct bmapval	*bmaps;
+	struct bmapval	bmaps[XFS_WRITE_BMAPS];
 	struct bmapval	*bmapp;
 	int		nbmaps;
 	buf_t		*bp;
@@ -1734,7 +1814,6 @@ xfs_write_file(
 	buffer_bytes_ok = 0;
 	eof_zeroed = 0;
 	gaps_mapped = 0;
-	bmaps = (struct bmapval *)kmem_zone_alloc(xfs_bmap_zone, KM_SLEEP);
 	XFSSTATS.xs_write_calls++;
 	XFSSTATS.xs_write_bytes += uiop->uio_resid;
 
@@ -1986,7 +2065,6 @@ xfs_write_file(
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	ip->i_write_offset = 0;
 
-	kmem_zone_free(xfs_bmap_zone, bmaps);
 	return error;
 }
 
@@ -2423,7 +2501,7 @@ xfs_build_gap_list(
 			 * each entry to the end of the list so that it is
 			 * sorted by file offset.
 			 */
-			new_gap = kmem_alloc(sizeof(xfs_gap_t), KM_SLEEP);
+			new_gap = kmem_zone_alloc(xfs_gap_zone, KM_SLEEP);
 			new_gap->xg_offset_fsb = imapp->br_startoff;
 			new_gap->xg_count_fsb = imapp->br_blockcount;
 			new_gap->xg_next = NULL;
@@ -2513,7 +2591,7 @@ xfs_delete_gap_list(
 			ASSERT(last_gap->xg_next == curr_gap);
 			last_gap->xg_next = next_gap;
 		}
-		kmem_free(curr_gap, sizeof(xfs_gap_t));
+		kmem_zone_free(xfs_gap_zone, curr_gap);
 		curr_gap = next_gap;
 	}
 }		    
@@ -2534,7 +2612,7 @@ xfs_free_gap_list(
 	curr_gap = ip->i_gap_list;
 	while (curr_gap != NULL) {
 		next_gap = curr_gap->xg_next;
-		kmem_free(curr_gap, sizeof(xfs_gap_t));
+		kmem_zone_free(xfs_gap_zone, curr_gap);
 		curr_gap = next_gap;
 	}
 	ip->i_gap_list = NULL;
@@ -2682,8 +2760,8 @@ xfs_strat_read(
 	int		data_offset;
 	int		data_len;
 	int		nimaps;
-	xfs_bmbt_irec_t	*imap;
 #define	XFS_STRAT_READ_IMAPS	XFS_BMAP_MAX_NMAP
+	xfs_bmbt_irec_t	imap[XFS_STRAT_READ_IMAPS];
 	
 	ASSERT(bp->b_blkno == -1);
 	ip = XFS_VTOI(vp);
@@ -2737,7 +2815,6 @@ xfs_strat_read(
 	count_fsb = XFS_B_TO_FSB(mp, (offset + count)) -
 		    XFS_B_TO_FSBT(mp, offset);
 	map_start_fsb = offset_fsb;
-	imap = (xfs_bmbt_irec_t *)kmem_zone_alloc(xfs_irec_zone, KM_SLEEP);
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 	while (count_fsb != 0) {
 		nimaps = XFS_STRAT_READ_IMAPS;
@@ -2899,7 +2976,6 @@ xfs_strat_read(
 	}
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 	iodone(bp);
-	kmem_zone_free(xfs_irec_zone, imap);
 }
 
 
@@ -3906,12 +3982,12 @@ xfs_diostrat( buf_t *bp)
 			offset_this_req = XFS_FSB_TO_B(mp,
 				imapp->br_startoff) + BBTOB(blk_algn); 
 
-	     		/*
- 	      		 * Reduce request size, if it 
+			/*
+			 * Reduce request size, if it
 			 * is longer than user buffer.
-	      		 */
-	     		if ( bytes_this_req > count ) {
-	 			 bytes_this_req = count;
+			 */
+			if ( bytes_this_req > count ) {
+				 bytes_this_req = count;
 			}
 
 			/*
