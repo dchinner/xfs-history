@@ -2095,7 +2095,7 @@ xfs_strategy(vnode_t	*vp,
 	 * If this is just a buffer whose underlying disk space
 	 * is already allocated, then just do the requested I/O.
 	 */
-	if (bp->b_blkno > 0) {
+	if (bp->b_blkno >= 0) {
 		bdstrat(bmajor(bp->b_edev), bp);
 		return;
 	}
