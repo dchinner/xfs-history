@@ -44,6 +44,24 @@ STATIC void	xfs_acl_set_attr(vnode_t *, xfs_acl_t *, int, int *);
 STATIC int	xfs_acl_allow_set(vnode_t *, int);
 
 /*
+ * Test for existence of the extended attributes which implement
+ * the system.posix_acl_access and system.posix_acl_default attrs
+ */
+int
+posix_acl_access_exists(vnode_t *vp)
+{
+	xfs_acl_t xacl;
+	return _ACL_GET_ACCESS(vp, &xacl);
+}
+
+int
+posix_acl_default_exists(vnode_t *vp)
+{
+	xfs_acl_t xacl;
+	return _ACL_GET_DEFAULT(vp, &xacl);
+}
+
+/*
  * Convert from extended attribute representation to in-memory for XFS.
  */
 STATIC int
