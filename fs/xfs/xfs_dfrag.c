@@ -247,7 +247,7 @@ xfs_swapext(
 	 */
 
 	last_byte = xfs_file_last_byte(ip);
-	VOP_TOSS_PAGES(vp, 0, last_byte, FI_REMAPF);
+	VOP_TOSS_PAGES(vp, 0, last_byte - 1, FI_REMAPF);
 	VN_FLAGCLR(vp, VREMAPPING);
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_SWAPEXT);

@@ -2149,7 +2149,7 @@ xfs_read(
 	if (ioflag & IO_RSYNC) {
 		/* First we sync the data */
 		if ((ioflag & IO_SYNC) || (ioflag & IO_DSYNC)) {
-			chunkpush(vp, offset, offset + count , 0);
+			chunkpush(vp, offset, offset + count - 1, 0);
 		}
 		/* Now we sync the timestamps */
 		if (ioflag & IO_SYNC) {
@@ -3317,7 +3317,7 @@ xfs_write_file(
 			switch (fsynced) {
 			case 0:
 				VOP_FLUSH_PAGES(vp, 0,
-					(off_t)xfs_file_last_byte(ip), 0,
+					(off_t)xfs_file_last_byte(ip) - 1, 0,
 					FI_NONE, error);
 				error = 0;
 				fsynced = 1;

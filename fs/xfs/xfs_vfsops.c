@@ -2082,9 +2082,9 @@ xfs_sync(
 			last_byte = xfs_file_last_byte(ip);
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
 			if (XFS_FORCED_SHUTDOWN(mp)) {
-				VOP_TOSS_PAGES(vp, 0, last_byte, FI_REMAPF);
+				VOP_TOSS_PAGES(vp, 0, last_byte - 1, FI_REMAPF);
 			} else {
-				VOP_FLUSHINVAL_PAGES(vp, 0, last_byte, FI_REMAPF);
+				VOP_FLUSHINVAL_PAGES(vp, 0, last_byte - 1, FI_REMAPF);
 			}
 			xfs_ilock(ip, XFS_ILOCK_SHARED);
 		} else if (flags & SYNC_DELWRI) {
@@ -2103,7 +2103,7 @@ xfs_sync(
 				 */
 				last_byte = xfs_file_last_byte(ip);
 				xfs_iunlock(ip, XFS_ILOCK_SHARED);
-				VOP_FLUSH_PAGES(vp, (off_t)0, last_byte,
+				VOP_FLUSH_PAGES(vp, (off_t)0, last_byte - 1,
 						 fflag, FI_NONE, error);
 				xfs_ilock(ip, XFS_ILOCK_SHARED);
 			}

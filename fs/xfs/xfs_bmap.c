@@ -5422,7 +5422,7 @@ xfs_getbmap(
 	xfs_ilock(ip, XFS_IOLOCK_SHARED);
 	if (whichfork == XFS_DATA_FORK && ip->i_delayed_blks) {
 		last_byte = xfs_file_last_byte(ip);
-		VOP_FLUSH_PAGES(vp, (off_t)0, (off_t)last_byte, 0, 
+		VOP_FLUSH_PAGES(vp, (off_t)0, (off_t)last_byte - 1, 0, 
 			FI_REMAPF, error);
 	}
 	ASSERT(whichfork == XFS_ATTR_FORK || ip->i_delayed_blks == 0);

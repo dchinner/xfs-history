@@ -6134,7 +6134,7 @@ xfs_reclaim(
 			 * hates that.
 			 */
 			if (!XFS_FORCED_SHUTDOWN(ip->i_mount)) {
-				VOP_FLUSHINVAL_PAGES(vp, 0, last_byte, FI_NONE);	
+				VOP_FLUSHINVAL_PAGES(vp, 0, last_byte - 1, FI_NONE);
 			} else {
 				VOP_TOSS_PAGES(vp, 0, XFS_MAX_FILE_OFFSET, FI_NONE);
 			}
