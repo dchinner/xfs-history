@@ -61,9 +61,11 @@
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
 #include "xfs_dir2_sf.h"
+#include "xfs_dir2_trace.h"
 #include "xfs_dinode.h"
-#include "xfs_inode.h"
+#include "xfs_rw.h"
 #include "xfs_bmap.h"
+#include "xfs_inode.h"
 #include "xfs_da_btree.h"
 #include "xfs_attr.h"
 #include "xfs_attr_leaf.h"
@@ -72,10 +74,8 @@
 #include "xfs_dir2_leaf.h"
 #include "xfs_dir2_block.h"
 #include "xfs_dir2_node.h"
-#include "xfs_dir2_trace.h"
 #include "xfs_log_priv.h"
 #include "xfs_log_recover.h"
-#include "xfs_rw.h"
 #include "xfs_bit.h"
 #include "xfs_quota.h"
 #include "quota/xfs_qm.h"
@@ -85,6 +85,55 @@ MODULE_DESCRIPTION("Additional kdb commands for debugging XFS");
 MODULE_LICENSE("GPL");
 EXPORT_NO_SYMBOLS;
 
+#define qprintf	kdb_printf
+
+/*
+ * Command table functions. (tracing)
+ */
+#ifdef XFS_ALLOC_TRACE
+static void	xfsidbg_xalatrace(int);
+static void	xfsidbg_xalbtrace(xfs_agblock_t);
+static void	xfsidbg_xalgtrace(xfs_agnumber_t);
+static void	xfsidbg_xalmtrace(xfs_mount_t *);
+static void	xfsidbg_xalttrace(int);
+#endif
+#ifdef XFS_ATTR_TRACE
+static void	xfsidbg_xattrtrace(int);
+#endif
+#ifdef XFS_BLI_TRACE
+static void	xfsidbg_xblitrace(xfs_buf_log_item_t *);
+#endif
+#ifdef XFS_BMAP_TRACE
+static void	xfsidbg_xbmatrace(int);
+static void	xfsidbg_xbmitrace(xfs_inode_t *);
+static void	xfsidbg_xbmstrace(xfs_inode_t *);
+static void	xfsidbg_xbxatrace(int);
+static void	xfsidbg_xbxitrace(xfs_inode_t *);
+static void	xfsidbg_xbxstrace(xfs_inode_t *);
+#endif
+#ifdef XFS_ILOCK_TRACE
+static void	xfsidbg_xilock_trace(xfs_inode_t *);
+static void	xfsidbg_xailock_trace(int);
+#endif
+#ifdef XFS_DIR_TRACE
+static void	xfsidbg_xdirtrace(int);
+#endif
+#ifdef XFS_DIR2_TRACE
+static void	xfsidbg_xdir2atrace(int);
+static void	xfsidbg_xdir2itrace(xfs_inode_t *);
+#endif
+#ifdef XFS_LOG_TRACE
+static void	xfsidbg_xiclogtrace(xlog_in_core_t *);
+static void	xfsidbg_xlog_granttrace(xlog_t *);
+#endif
+#ifdef XFS_DQUOT_TRACE
+static void	xfsidbg_xqm_dqtrace(xfs_dquot_t *);
+#endif
+#ifdef XFS_RW_TRACE
+static void	xfsidbg_xrwtrace(xfs_inode_t *);
+#endif
+
+
 /*
  * Command table functions.
  */
@@ -92,9 +141,6 @@ static void	xfsidbg_xagf(xfs_agf_t *);
 static void	xfsidbg_xagi(xfs_agi_t *);
 static void	xfsidbg_xaildump(xfs_mount_t *);
 static void	xfsidbg_xalloc(xfs_alloc_arg_t *);
-#ifdef DEBUG
-static void	xfsidbg_xalmtrace(xfs_mount_t *);
-#endif
 static void	xfsidbg_xattrcontext(xfs_attr_list_context_t *);
 static void	xfsidbg_xattrleaf(xfs_attr_leafblock_t *);
 static void	xfsidbg_xattrsf(xfs_attr_shortform_t *);
@@ -106,6 +152,8 @@ static void	xfsidbg_xbroota(xfs_inode_t *);
 static void	xfsidbg_xbtcur(xfs_btree_cur_t *);
 static void	xfsidbg_xbuf(xfs_buf_t *);
 static void	xfsidbg_xbuf_real(xfs_buf_t *, int);
+static void	xfsidbg_xarg(int);
+static void	xfsidbg_xchksum(uint *);
 static void	xfsidbg_xchash(xfs_mount_t *mp);
 static void	xfsidbg_xchashlist(xfs_chashlist_t *chl);
 static void	xfsidbg_xdaargs(xfs_da_args_t *);
@@ -145,11 +193,16 @@ static void	xfsidbg_xqm_tpdqinfo(xfs_trans_t *tp);
 static void	xfsidbg_xsb(xfs_sb_t *, int convert);
 static void	xfsidbg_xtp(xfs_trans_t *);
 static void	xfsidbg_xtrans_res(xfs_mount_t *);
-#ifdef	CONFIG_XFS_QUOTA
+#ifdef CONFIG_XFS_QUOTA
 static void	xfsidbg_xqm(void);
 static void	xfsidbg_xqm_htab(void);
 static void	xfsidbg_xqm_freelist_print(xfs_frlist_t *qlist, char *title);
 static void	xfsidbg_xqm_freelist(void);
+#endif
+
+#ifdef XFS_BMAP_TRACE
+static void	xfs_convert_extent(xfs_bmbt_rec_32_t *, xfs_dfiloff_t *,
+				xfs_dfsbno_t *, xfs_dfilblks_t *, int *);
 #endif
 
 /* kdb wrappers */
@@ -217,6 +270,468 @@ static int	kdbm_xfs_xaildump(
 	return 0;
 }
 
+#ifdef XFS_ALLOC_TRACE
+static int	kdbm_xfs_xalatrace(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+	
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xalatrace((int) addr);
+	return 0;
+}
+
+static int	kdbm_xfs_xalbtrace(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xalbtrace((xfs_agblock_t) addr);
+	return 0;
+}
+
+static int	kdbm_xfs_xalgtrace(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xalgtrace((xfs_agnumber_t) addr);
+	return 0;
+}
+#endif
+
+#ifdef XFS_ATTR_TRACE
+static int	kdbm_xfs_xattrtrace(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xattrtrace((int) addr);
+	return 0;
+}
+#endif
+
+#ifdef XFS_BLI_TRACE
+static int	kdbm_xfs_xblitrace(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xblitrace((xfs_buf_log_item_t *) addr);
+	return 0;
+}
+#endif
+
+#ifdef XFS_BMAP_TRACE
+static int	kdbm_xfs_xbmatrace(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xbmatrace((int) addr);
+	return 0;
+}
+
+static int	kdbm_xfs_xbmitrace(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xbmitrace((xfs_inode_t *) addr);
+	return 0;
+}
+
+static int	kdbm_xfs_xbmstrace(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xbmstrace((xfs_inode_t *) addr);
+	return 0;
+}
+
+static int	kdbm_xfs_xbxatrace(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xbxatrace((int) addr);
+	return 0;
+}
+
+static int	kdbm_xfs_xbxitrace(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xbxitrace((xfs_inode_t *) addr);
+	return 0;
+}
+
+static int	kdbm_xfs_xbxstrace(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xbxstrace((xfs_inode_t *) addr);
+	return 0;
+}
+#endif
+
+#ifdef XFS_DIR2_TRACE
+static int	kdbm_xfs_xdir2atrace(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xdir2atrace((int) addr);
+	return 0;
+}
+
+static int	kdbm_xfs_xdir2itrace(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xdir2itrace((xfs_inode_t *) addr);
+	return 0;
+}
+#endif
+
+#ifdef XFS_DIR_TRACE
+static int	kdbm_xfs_xdirtrace(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xdirtrace((int) addr);
+	return 0;
+}
+#endif
+
+#ifdef XFS_LOG_TRACE
+static int	kdbm_xfs_xiclogtrace(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xiclogtrace((xlog_in_core_t *) addr);
+	return 0;
+}
+#endif
+
+#ifdef XFS_ILOCK_TRACE
+static int	kdbm_xfs_xilock_trace(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xilock_trace((xfs_inode_t *) addr);
+	return 0;
+}
+
+static int	kdbm_xfs_xailock_trace(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xailock_trace((int) addr);
+	return 0;
+}
+#endif
+
+#ifdef XFS_LOG_TRACE
+static int	kdbm_xfs_xlog_granttrace(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xlog_granttrace((xlog_t *) addr);
+	return 0;
+}
+#endif
+
+#ifdef XFS_DQUOT_TRACE
+static int	kdbm_xfs_xqm_dqtrace(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xqm_dqtrace((xfs_dquot_t *) addr);
+	return 0;
+}
+#endif
+
+#ifdef XFS_RW_TRACE
+static int	kdbm_xfs_xrwtrace(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xrwtrace((xfs_inode_t *) addr);
+	return 0;
+}
+#endif
+
 static int	kdbm_xfs_xalloc(
 	int	argc,
 	const char **argv,
@@ -238,7 +753,7 @@ static int	kdbm_xfs_xalloc(
 	return 0;
 }
 
-#ifdef DEBUG
+#ifdef XFS_ALLOC_TRACE
 static int	kdbm_xfs_xalmtrace(
 	int	argc,
 	const char **argv,
@@ -259,7 +774,28 @@ static int	kdbm_xfs_xalmtrace(
 	xfsidbg_xalmtrace((xfs_mount_t *) addr);
 	return 0;
 }
-#endif /* DEBUG */
+
+static int	kdbm_xfs_xalttrace(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xalttrace((int) addr);
+	return 0;
+}
+#endif /* XFS_ALLOC_TRACE */
 
 static int	kdbm_xfs_xattrcontext(
 	int	argc,
@@ -468,6 +1004,49 @@ static int	kdbm_xfs_xbuf(
 		return diag;
 
 	xfsidbg_xbuf((xfs_buf_t *) addr);
+	return 0;
+}
+
+
+static int	kdbm_xfs_xarg(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xarg((int) addr);
+	return 0;
+}
+
+static int	kdbm_xfs_xchksum(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_xchksum((uint *) addr);
 	return 0;
 }
 
@@ -1443,9 +2022,9 @@ static void	printvnode(vnode_t *vp, unsigned long addr)
 	printflags((__psunsigned_t)vp->v_flag, tab_vflags, "flag =");
 	kdb_printf("\n");
 
-#ifdef	CONFIG_XFS_VNODE_TRACING
+#ifdef	XFS_VNODE_TRACE
 	kdb_printf("   v_trace 0x%p\n", vp->v_trace);
-#endif	/* CONFIG_XFS_VNODE_TRACING */
+#endif	/* XFS_VNODE_TRACE */
 
 	kdb_printf("   v_vfsp 0x%p v_number %Lx\n",
 		vp->v_vfsp, vp->v_number);
@@ -1546,7 +2125,7 @@ static int	kdbm_vfs(
 }
 
 
-#ifdef	CONFIG_XFS_VNODE_TRACING
+#ifdef	XFS_VNODE_TRACE
 /*
  * Print a vnode trace entry.
  */
@@ -1742,7 +2321,7 @@ static int	kdbm_vntraceaddr(
 
 	return 0;
 }
-#endif	/* CONFIG_XFS_VNODE_TRACING */
+#endif	/* XFS_VNODE_TRACE */
 
 
 static void	printinode(struct inode *ip)
@@ -1789,22 +2368,19 @@ static int	kdbm_vn(
 {
 	int		diag;
 	int		nextarg = 1;
-/*	char		*symname; */
 	long		offset = 0;
 	unsigned long	addr;
 	struct inode	*ip;
-/*	bhv_desc_t	*bh; */
-#ifdef	CONFIG_XFS_VNODE_TRACING
+	vnode_t		vp;
+#ifdef	XFS_VNODE_TRACE
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
 #endif
-	vnode_t		vp;
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
 	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
-
 	if (diag)
 		return diag;
 
@@ -1812,30 +2388,24 @@ static int	kdbm_vn(
 		return diag;
 
 	ip = LINVFS_GET_IP((vnode_t *)addr);
-
 	kdb_printf("--> Inode @ 0x%p\n", ip);
 	printinode(ip);
 
 	kdb_printf("--> Vnode @ 0x%lx\n", addr);
 	printvnode(&vp, addr);
 
-#ifdef	CONFIG_XFS_VNODE_TRACING
-
-	kdb_printf("--> Vntrace @ 0x%x/0x%p\n", addr, vp.v_trace);
-
+#ifdef	XFS_VNODE_TRACE
+	kdb_printf("--> Vntrace @ 0x%lx/0x%p\n", addr, vp.v_trace);
 	if (vp.v_trace == NULL)
 		return 0;
-
 	ktep = ktrace_first(vp.v_trace, &kts);
-
 	while (ktep != NULL) {
 		if (vn_trace_pr_entry(ktep))
 			kdb_printf("\n");
 
 		ktep = ktrace_next(vp.v_trace, &kts);
 	}
-#endif	/* CONFIG_XFS_VNODE_TRACING */
-
+#endif	/* XFS_VNODE_TRACE */
 	return 0;
 }
 
@@ -1868,7 +2438,7 @@ static char	*map_flags(unsigned long flags, char *mapping[])
 	for (index = 0; flags && mapping[index]; flags >>= 1, index++) {
 		if (flags & 1) {
 			if ((offset + strlen(mapping[index]) + 1) >= 80) {
-				strcat(buffer, "\n            ");
+				strcat(buffer, "\n	    ");
 				offset = 12;
 			} else if (offset > 12) {
 				strcat(buffer, " ");
@@ -2054,7 +2624,7 @@ kdbm_pbmap(int argc, const char **argv, const char **envp,
 # endif
 #include "pagebuf/page_buf_trace.h"
 
-#define EV_SIZE	(sizeof(event_names)/sizeof(char *))
+#define EV_SIZE (sizeof(event_names)/sizeof(char *))
 
 void
 pb_trace_core(
@@ -2064,7 +2634,7 @@ pb_trace_core(
 	long long mask)
 {
 	extern struct pagebuf_trace_buf pb_trace;
-	int i, total, end;
+	int	i, total, end;
 	pagebuf_trace_t	*trace;
 	char	*event;
 	char	value[10];
@@ -2131,7 +2701,6 @@ pb_trace_core(
 	}
 }
 
-
 static int
 kdbm_pbtrace_offset(int argc, const char **argv, const char **envp,
 	struct pt_regs *regs)
@@ -2191,55 +2760,77 @@ kdbm_pbtrace(int argc, const char **argv, const char **envp,
 	pb_trace_core(addr, event_match, 0LL, 0LL);
 	return 0;
 }
+#endif
 
-#else	/* PAGEBUF_TRACE */
-static int
-kdbm_pbtrace(int argc, const char **argv, const char **envp,
-	struct pt_regs *regs)
-{
-	kdb_printf("pagebuf tracing not compiled in\n");
-
-	return 0;
-}
-#endif	/* PAGEBUF_TRACE */
-
-static struct xif {
+struct xif {
 	char	*name;
 	int	(*func)(int, const char **, const char **, struct pt_regs *);
 	char	*args;
 	char	*help;
-} xfsidbg_funcs[] = {
+};
+
+static struct xif xfsidbg_funcs[] = {
   {  "bhv",	kdbm_bhv,	"<bhv>", "Dump bhv chain"},
   {  "vn",	kdbm_vn,	"<vnode>", "Dump inode/vnode/trace"},
   {  "vnode",	kdbm_vnode,	"<vnode>", "Dump vnode"},
   {  "vfs",	kdbm_vfs,	"<vfs>", "Dump vfs"},
-#ifdef	CONFIG_XFS_VNODE_TRACING
+#ifdef XFS_VNODE_TRACE
   {  "vntrace",	kdbm_vntrace,	"<vntrace>", "Dump vnode Trace"},
-  {  "vntraceaddr",	kdbm_vntraceaddr, "<vntrace>", "Dump vnode Trace by Address"},
-#endif	/* CONFIG_XFS_VNODE_TRACING */
+  {  "vntraceaddr",	kdbm_vntraceaddr, "<vntrace>",
+				"Dump vnode Trace by Address"},
+#endif
   {  "xagf",	kdbm_xfs_xagf,	"<agf>",
 				"Dump XFS allocation group freespace" },
   {  "xagi",	kdbm_xfs_xagi,	"<agi>",
 				"Dump XFS allocation group inode" },
   {  "xail",	kdbm_xfs_xaildump,	"<xfs_mount_t>",
 				"Dump XFS AIL for a mountpoint" },
+#ifdef XFS_ALLOC_TRACE
+  {  "xalatrc",	kdbm_xfs_xalatrace,	"<count>",
+				"Dump XFS alloc count trace" },
+  {  "xalbtrc",	kdbm_xfs_xalbtrace,	"<xfs_agblock_t>",
+				"Dump XFS alloc block trace" },
+  {  "xalgtrc",	kdbm_xfs_xalgtrace,	"<xfs_agnumber_t>",
+				"Dump XFS alloc alloc-group trace" },
+#endif
+
   {  "xalloc",	kdbm_xfs_xalloc,	"<xfs_alloc_arg_t>",
 				"Dump XFS allocation args structure" },
-#ifdef DEBUG
+#ifdef XFS_ALLOC_TRACE
   {  "xalmtrc",	kdbm_xfs_xalmtrace,	"<xfs_mount_t>",
 				"Dump XFS alloc mount-point trace" },
+  {  "xalttrc",	kdbm_xfs_xalttrace,	"<tag>",
+				"Dump XFS alloc trace by tag number" },
 #endif
+  {  "xarg",	kdbm_xfs_xarg,		"<value>",
+				"Input XFS argument for next function" },
   {  "xattrcx",	kdbm_xfs_xattrcontext,	"<xfs_attr_list_context_t>",
 				"Dump XFS attr_list context struct"},
   {  "xattrlf",	kdbm_xfs_xattrleaf,	"<xfs_attr_leafblock_t>",
 				"Dump XFS attribute leaf block"},
   {  "xattrsf",	kdbm_xfs_xattrsf,	"<xfs_attr_shortform_t>",
 				"Dump XFS attribute shortform"},
+#ifdef XFS_ATTR_TRACE
+  {  "xattrtr",	kdbm_xfs_xattrtrace,	"<count>",
+				"Dump XFS attribute attr_list() trace" },
+#endif
   {  "xbirec",	kdbm_xfs_xbirec,	"<xfs_bmbt_irec_t",
 				"Dump XFS bmap incore record"},
+#ifdef XFS_BLI_TRACE
+  {  "xblitrc",	kdbm_xfs_xblitrace,	"<xfs_buf_log_item_t>",
+				"Dump XFS buf log item trace" },
+#endif
   {  "xbmalla",	kdbm_xfs_xbmalla,	"<xfs_bmalloca_t>",
 				"Dump XFS bmalloc args structure"},
-  {  "xbrec",	kdbm_xfs_xbrec,		"<xfs_bmbt_rec_64_t",
+#ifdef XFS_BMAP_TRACE
+  {  "xbmatrc",	kdbm_xfs_xbmatrace,	"<count>",
+				"Dump XFS bmap btree count trace" },
+  {  "xbmitrc",	kdbm_xfs_xbmitrace,	"<xfs_inode_t>",
+				"Dump XFS bmap btree per-inode trace" },
+  {  "xbmstrc",	kdbm_xfs_xbmstrace,	"<xfs_inode_t>",
+				"Dump XFS bmap btree inode trace" },
+#endif
+  {  "xbrec",	kdbm_xfs_xbrec,		"<xfs_bmbt_rec_64_t>",
 				"Dump XFS bmap record"},
   {  "xbroot",	kdbm_xfs_xbroot,	"<xfs_inode_t>",
 				"Dump XFS bmap btree root (data)"},
@@ -2249,12 +2840,29 @@ static struct xif {
 				"Dump XFS btree cursor"},
   {  "xbuf",	kdbm_xfs_xbuf,		"<xfs_buf_t>",
 				"Dump XFS data from a buffer"},
+#ifdef XFS_BMAP_TRACE
+  {  "xbxatrc",	kdbm_xfs_xbxatrace,	"<count>",
+				"Dump XFS bmap extent count trace" },
+  {  "xbxitrc",	kdbm_xfs_xbxitrace,	"<xfs_inode_t>",
+				"Dump XFS bmap extent per-inode trace" },
+  {  "xbxstrc",	kdbm_xfs_xbxstrace,	"<xfs_inode_t>",
+				"Dump XFS bmap extent inode trace" },
+#endif
   {  "xchash",	kdbm_xfs_xchash,	"<xfs_mount_t>",
 				"Dump XFS cluster hash"},
   {  "xchlist",	kdbm_xfs_xchashlist,	"<xfs_chashlist_t>",
 				"Dump XFS cluster hash list"},
+  {  "xchksum",	kdbm_xfs_xchksum,	"<addr>", "Dump chksum" },
+#ifdef XFS_DIR2_TRACE
+  {  "xd2atrc",	kdbm_xfs_xdir2atrace,	"<count>",
+				"Dump XFS directory v2 count trace" },
+#endif
   {  "xd2free",	kdbm_xfs_xdir2free,	"<xfs_dir2_free_t>",
 				"Dump XFS directory v2 freemap"},
+#ifdef XFS_DIR2_TRACE
+  {  "xd2itrc",	kdbm_xfs_xdir2itrace,	"<xfs_inode_t>",
+				"Dump XFS directory v2 per-inode trace" },
+#endif
   {  "xdaargs",	kdbm_xfs_xdaargs,	"<xfs_da_args_t>",
 				"Dump XFS dir/attr args structure"},
   {  "xdabuf",	kdbm_xfs_xdabuf,	"<xfs_dabuf_t>",
@@ -2271,12 +2879,20 @@ static struct xif {
 				"Dump XFS directory shortform"},
   {  "xdir2sf",	kdbm_xfs_xdir2sf,	"<xfs_dir2_sf_t>",
 				"Dump XFS directory v2 shortform"},
+#ifdef XFS_DIR_TRACE
+  {  "xdirtrc",	kdbm_xfs_xdirtrace,	"<count>",
+				"Dump XFS directory getdents() trace" },
+#endif
   {  "xdiskdq",	kdbm_xfs_xqm_diskdq,	"<xfs_disk_dquot_t>",
 				"Dump XFS ondisk dquot (quota) struct"},
   {  "xdqatt",	kdbm_xfs_xqm_dqattached_inos,	"<xfs_mount_t>",
 				 "All incore inodes with dquots"},
   {  "xdqinfo",	kdbm_xfs_xqm_tpdqinfo,	"<xfs_trans_t>",
 				"Dump dqinfo structure of a trans"},
+#ifdef XFS_DQUOT_TRACE
+  {  "xdqtrace",kdbm_xfs_xqm_dqtrace,	"<xfs_dquot_t>",
+				"Dump trace of a given dquot" },
+#endif
   {  "xdquot",	kdbm_xfs_xqm_dquot,	"<xfs_dquot_t>",
 				"Dump XFS dquot (quota) structure"},
   {  "xexlist",	kdbm_xfs_xexlist,	"<xfs_inode_t>",
@@ -2289,12 +2905,26 @@ static struct xif {
 				"Dump All XFS in-core logs"},
   {  "xiclog",	kdbm_xfs_xiclog,	"<xlog_in_core_t>",
 				"Dump XFS in-core log"},
+#ifdef XFS_LOG_TRACE
+  {  "xictrc",	kdbm_xfs_xiclogtrace,	"<xlog_in_core_t>",
+				"Dump XFS in-core log trace" },
+#endif
   {  "xihash",	kdbm_xfs_xihash,	"<xfs_mount_t>",
 				"Dump XFS inode hash statistics"},
+#ifdef XFS_ILOCK_TRACE
+  {  "xilocktrc",kdbm_xfs_xilock_trace,	"<xfs_inode_t>",
+				"Dump XFS ilock trace" },
+  {  "xailcktrc",kdbm_xfs_xailock_trace,"<count>",
+				"Dump XFS global ilock trace" },
+#endif
   {  "xinodes",	kdbm_xfs_xinodes,	"<xfs_mount_t>",
 				"Dump XFS inodes per mount"},
   {  "xquiesce",kdbm_xfs_xinodes_quiesce, "<xfs_mount_t>",
 				"Dump non-quiesced XFS inodes per mount"},
+#ifdef XFS_LOG_TRACE
+  {  "xl_grtr",	kdbm_xfs_xlog_granttrace,	"<xlog_t>",
+				"Dump XFS log grant trace" },
+#endif
   {  "xl_rcit",	kdbm_xfs_xlog_ritem,	"<xlog_recover_item_t>",
 				"Dump XFS recovery item"},
   {  "xl_rctr",	kdbm_xfs_xlog_rtrans,	"<xlog_recover_t>",
@@ -2329,12 +2959,28 @@ static struct xif {
 #endif	/* CONFIG_XFS_QUOTA */
   {  "xqmplist",kdbm_xfs_xqm_mplist,	"<xfs_mount_t>",
 				"Dump XFS all dquots of a f/s"},
+#ifdef XFS_RW_TRACE
+  {  "xrwtrc",	kdbm_xfs_xrwtrace,	"<xfs_inode_t>",
+				"Dump XFS inode read/write trace" },
+#endif
   {  "xsb",	kdbm_xfs_xsb,		"<xfs_sb_t> <cnv>",
 				"Dump XFS superblock"},
   {  "xtp",	kdbm_xfs_xtp,		"<xfs_trans_t>",
 				"Dump XFS transaction structure"},
   {  "xtrres",	kdbm_xfs_xtrans_res,	"<xfs_mount_t>",
 				"Dump XFS reservation values"},
+  {  0,		0,	0 }
+};
+
+static struct xif pb_funcs[] = {
+  {  "pb",	kdbm_pb,	"<vaddr>",	"Display page_buf_t" },
+  {  "pbflags",	kdbm_pb_flags,	"<flags>",	"Display page_buf flags" },
+  {  "pbmap",	kdbm_pbmap,	"<page_buf_bmap_t *>",	"Display Bmap" },
+  {  "pbdelay",	kdbm_pbdelay,	"0|1",		"Display delwri pagebufs" },
+#ifdef PAGEBUF_TRACE
+  {  "pbtrace",	kdbm_pbtrace,	"<vaddr>|<count>",	"page_buf_t trace" },
+  {  "pboffset",kdbm_pbtrace_offset,	"<addr> [<mask>]", "page_buf_t trace" },
+#endif
   {  0,		0,	0 }
 };
 
@@ -2345,20 +2991,8 @@ __init xfsidbg_init(void)
 
 	for (p = xfsidbg_funcs; p->name; p++)
 		kdb_register(p->name, p->func, p->args, p->help, 0);
-
-	kdb_register("pb", kdbm_pb, "<vaddr>", "Display page_buf_t", 0);
-	kdb_register("pbflags", kdbm_pb_flags, "<flags>",
-					"Display page buf flags", 0);
-	kdb_register("pbmap", kdbm_pbmap, "<page_buf_bmap_t *>",
-					"Display Bmap", 0);
-	kdb_register("pbdelay", kdbm_pbdelay, "0|1",
-					"Display delwri pagebufs", 0);
-	kdb_register("pbtrace", kdbm_pbtrace, "<vaddr>|<count>",
-					"page_buf_t trace", 0);
-#ifdef PAGEBUF_TRACE
-	kdb_register("pboffset", kdbm_pbtrace_offset, "<addr> [<mask>]",
-					"page_buf_t trace", 0);
-#endif
+	for (p = pb_funcs; p->name; p++)
+		kdb_register(p->name, p->func, p->args, p->help, 0);
 	return 0;
 }
 
@@ -2369,16 +3003,8 @@ __exit xfsidbg_exit(void)
 
 	for (p = xfsidbg_funcs; p->name; p++)
 		kdb_unregister(p->name);
-
-	kdb_unregister("pb");
-	kdb_unregister("pbflags");
-	kdb_unregister("pbmap");
-	kdb_unregister("pbdelay");
-	kdb_unregister("pbtrace");
-#ifdef PAGEBUF_TRACE
-	kdb_unregister("pboffset");
-#endif
-
+	for (p = pb_funcs; p->name; p++)
+		kdb_unregister(p->name);
 }
 
 /*
@@ -2389,12 +3015,22 @@ static char *xfs_alloctype[] = {
 	"start_bno", "near_bno", "this_bno"
 };
 
+static int xargument = 0;
 
 /*
  * Prototypes for static functions.
  */
-#ifdef DEBUG
+#ifdef XFS_ALLOC_TRACE
 static int xfs_alloc_trace_entry(ktrace_entry_t *ktep);
+#endif
+#ifdef XFS_ATTR_TRACE
+static int xfs_attr_trace_entry(ktrace_entry_t *ktep);
+#endif
+#ifdef XFS_BMAP_TRACE
+static int xfs_bmap_trace_entry(ktrace_entry_t *ktep);
+#endif
+#ifdef XFS_BMAP_TRACE
+static int xfs_bmbt_trace_entry(ktrace_entry_t *ktep);
 #endif
 static void xfs_broot(xfs_inode_t *ip, xfs_ifork_t *f);
 static void xfs_btalloc(xfs_alloc_block_t *bt, int bsz);
@@ -2402,6 +3038,12 @@ static void xfs_btbmap(xfs_bmbt_block_t *bt, int bsz);
 static void xfs_btino(xfs_inobt_block_t *bt, int bsz);
 static void xfs_buf_item_print(xfs_buf_log_item_t *blip, int summary);
 static void xfs_dastate_path(xfs_da_state_path_t *p);
+#ifdef XFS_DIR_TRACE
+static int xfs_dir_trace_entry(ktrace_entry_t *ktep);
+#endif
+#ifdef XFS_DIR2_TRACE
+static int xfs_dir2_trace_entry(ktrace_entry_t *ktep);
+#endif
 static void xfs_dir2data(void *addr, int size);
 static void xfs_dir2leaf(xfs_dir2_leaf_t *leaf, int size);
 static void xfs_dquot_item_print(xfs_dq_logitem_t *lip, int summary);
@@ -2419,6 +3061,10 @@ static void xfs_inodebuf(xfs_buf_t *bp);
 static void xfs_prdinode(xfs_dinode_t *di, int coreonly, int convert);
 static void xfs_prdinode_core(xfs_dinode_core_t *dip, int convert);
 static void xfs_qoff_item_print(xfs_qoff_logitem_t *lip, int summary);
+#ifdef XFS_RW_TRACE
+static void xfs_rw_enter_trace_entry(ktrace_entry_t *ktep);
+static int xfs_rw_trace_entry(ktrace_entry_t *ktep);
+#endif
 static void xfs_xexlist_fork(xfs_inode_t *ip, int whichfork);
 static void xfs_xnode_fork(char *name, xfs_ifork_t *f);
 
@@ -2426,7 +3072,7 @@ static void xfs_xnode_fork(char *name, xfs_ifork_t *f);
  * Static functions.
  */
 
-#ifdef DEBUG
+#ifdef XFS_ALLOC_TRACE
 /*
  * Print xfs alloc trace buffer entry.
  */
@@ -2556,7 +3202,238 @@ xfs_alloc_trace_entry(ktrace_entry_t *ktep)
 	}
 	return 1;
 }
-#endif /* DEBUG */
+#endif /* XFS_ALLOC_TRACE */
+
+#ifdef XFS_ATTR_TRACE
+/*
+ * Print an attribute trace buffer entry.
+ */
+static int
+xfs_attr_trace_entry(ktrace_entry_t *ktep)
+{
+	static char *attr_arg_flags[] = {
+		"DONTFOLLOW",	/* 0x0001 */
+		"ROOT",		/* 0x0002 */
+		"?",		/* 0x0004 */
+		"REPLACE",	/* 0x0008 */
+		"CREATE",	/* 0x0010 */
+		"?",		/* 0x0020 */
+		"?",		/* 0x0040 */
+		"?",		/* 0x0080 */
+		"?",		/* 0x0100 */
+		"?",		/* 0x0200 */
+		"?",		/* 0x0400 */
+		"?",		/* 0x0800 */
+		"KERNOTIME",	/* 0x1000 */
+		"KERNOVAL",	/* 0x2000 */
+		"KERNAMELS",	/* 0x4000 */
+		"KERNFULLS",	/* 0x8000 */
+		NULL
+	};
+
+	if (!ktep->val[0])
+		return 0;
+
+	qprintf("-- %s: cursor h/b/o 0x%x/0x%x/%d, dupcnt %d, dp 0x%x\n",
+		 (char *)ktep->val[1],
+		 (__psunsigned_t)ktep->val[3],
+		 (__psunsigned_t)ktep->val[4],
+		 (__psunsigned_t)ktep->val[5],
+		 (__psunsigned_t)ktep->val[11],
+		 (__psunsigned_t)ktep->val[2]);
+	qprintf("   alist 0x%x, size %d, count %d, firstu %d, Llen %d",
+		 (__psunsigned_t)ktep->val[6],
+		 (__psunsigned_t)ktep->val[7],
+		 (__psunsigned_t)ktep->val[8],
+		 (__psunsigned_t)ktep->val[9],
+		 (__psunsigned_t)ktep->val[10]);
+	printflags((__psunsigned_t)(ktep->val[12]), attr_arg_flags, ", flags");
+	qprintf("\n");
+
+	switch ((__psint_t)ktep->val[0]) {
+	case XFS_ATTR_KTRACE_L_C:
+		break;
+	case XFS_ATTR_KTRACE_L_CN:
+		qprintf("   node: count %d, 1st hash 0x%x, last hash 0x%x\n",
+			 (__psunsigned_t)ktep->val[13],
+			 (__psunsigned_t)ktep->val[14],
+			 (__psunsigned_t)ktep->val[15]);
+		break;
+	case XFS_ATTR_KTRACE_L_CB:
+		qprintf("   btree: hash 0x%x, blkno 0x%x\n",
+			 (__psunsigned_t)ktep->val[13],
+			 (__psunsigned_t)ktep->val[14]);
+		break;
+	case XFS_ATTR_KTRACE_L_CL:
+		qprintf("   leaf: count %d, 1st hash 0x%x, last hash 0x%x\n",
+			 (__psunsigned_t)ktep->val[13],
+			 (__psunsigned_t)ktep->val[14],
+			 (__psunsigned_t)ktep->val[15]);
+		break;
+	default:
+		qprintf("   unknown attr trace record format\n");
+		break;
+	}
+	return 1;
+}
+#endif /* XFS_ATTR_TRACE */
+
+#ifdef XFS_BMAP_TRACE
+/*
+ * Print xfs bmap extent trace buffer entry.
+ */
+static int
+xfs_bmap_trace_entry(ktrace_entry_t *ktep)
+{
+	xfs_dfsbno_t	    b;
+	xfs_dfilblks_t	  c;
+	xfs_inode_t	     *ip;
+	xfs_ino_t	       ino;
+	xfs_dfiloff_t	   o;
+	int		     flag;
+	int		     opcode;
+	static char	     *ops[] = { "del", "ins", "pre", "post" };
+	xfs_bmbt_rec_32_t       r;
+	int		     whichfork;
+
+	opcode = ((__psint_t)ktep->val[0]) & 0xffff;
+	if (opcode == 0)
+		return 0;
+	whichfork = ((__psint_t)ktep->val[0]) >> 16;
+	ip = (xfs_inode_t *)ktep->val[3];
+	ino = ((xfs_ino_t)(unsigned long)ktep->val[6] << 32) |
+		((xfs_ino_t)(unsigned long)ktep->val[7]);
+	qprintf("%s %s:%s ip %p ino %s %cf\n",
+		ops[opcode - 1], (char *)ktep->val[1],
+		(char *)ktep->val[2], ip, xfs_fmtino(ino, ip->i_mount),
+		"da"[whichfork]);
+	r.l0 = (xfs_bmbt_rec_base_t)(unsigned long)ktep->val[8];
+	r.l1 = (xfs_bmbt_rec_base_t)(unsigned long)ktep->val[9];
+	r.l2 = (xfs_bmbt_rec_base_t)(unsigned long)ktep->val[10];
+	r.l3 = (xfs_bmbt_rec_base_t)(unsigned long)ktep->val[11];
+	xfs_convert_extent(&r, &o, &b, &c, &flag);
+	qprintf(" idx %d offset %lld block %s",
+		(__psint_t)ktep->val[4], o,
+		xfs_fmtfsblock((xfs_fsblock_t)b, ip->i_mount));
+	qprintf(" count %lld flag %d\n", c, flag);
+	if ((__psint_t)ktep->val[5] != 2)
+		return 1;
+	r.l0 = (xfs_bmbt_rec_base_t)(unsigned long)ktep->val[12];
+	r.l1 = (xfs_bmbt_rec_base_t)(unsigned long)ktep->val[13];
+	r.l2 = (xfs_bmbt_rec_base_t)(unsigned long)ktep->val[14];
+	r.l3 = (xfs_bmbt_rec_base_t)(unsigned long)ktep->val[15];
+	xfs_convert_extent(&r, &o, &b, &c, &flag);
+	qprintf(" offset %lld block %s", o,
+		xfs_fmtfsblock((xfs_fsblock_t)b, ip->i_mount));
+	qprintf(" count %lld flag %d\n", c, flag);
+	return 1;
+}
+
+/*
+ * Print xfs bmap btree trace buffer entry.
+ */
+static int
+xfs_bmbt_trace_entry(
+	ktrace_entry_t	  *ktep)
+{
+	int			line;
+	xfs_bmbt_rec_32_t	r;
+	xfs_bmbt_irec_t		s;
+	int			type;
+	int			whichfork;
+
+	type = (__psint_t)ktep->val[0] & 0xff;
+	if (type == 0)
+		return 0;
+	whichfork = ((__psint_t)ktep->val[0] >> 8) & 0xff;
+	line = ((__psint_t)ktep->val[0] >> 16) & 0xffff;
+	qprintf("%s[%s@%d] ip 0x%p %cf cur 0x%p\n",
+		(char *)ktep->val[1],
+		(char *)ktep->val[2],
+		line,
+		(xfs_inode_t *)ktep->val[3],
+		"da"[whichfork],
+		(xfs_btree_cur_t *)ktep->val[4]);
+	switch (type) {
+	case XFS_BMBT_KTRACE_ARGBI:
+		qprintf(" buf 0x%p i %d\n",
+			(xfs_buf_t *)ktep->val[5],
+			(__psint_t)ktep->val[6]);
+		break;
+	case XFS_BMBT_KTRACE_ARGBII:
+		qprintf(" buf 0x%p i0 %d i1 %d\n",
+			(xfs_buf_t *)ktep->val[5],
+			(__psint_t)ktep->val[6],
+			(__psint_t)ktep->val[7]);
+		break;
+	case XFS_BMBT_KTRACE_ARGFFFI:
+		qprintf(" o 0x%x%08x b 0x%x%08x i 0x%x%08x j %d\n",
+			(__psint_t)ktep->val[5],
+			(__psint_t)ktep->val[6],
+			(__psint_t)ktep->val[7],
+			(__psint_t)ktep->val[8],
+			(__psint_t)ktep->val[9],
+			(__psint_t)ktep->val[10],
+			(__psint_t)ktep->val[11]);
+		break;
+	case XFS_BMBT_KTRACE_ARGI:
+		qprintf(" i 0x%x\n",
+			(__psint_t)ktep->val[5]);
+		break;
+	case XFS_BMBT_KTRACE_ARGIFK:
+		qprintf(" i 0x%x f 0x%x%08x o 0x%x%08x\n",
+			(__psint_t)ktep->val[5],
+			(__psint_t)ktep->val[6], (__psint_t)ktep->val[7],
+			(__psint_t)ktep->val[8], (__psint_t)ktep->val[9]);
+		break;
+	case XFS_BMBT_KTRACE_ARGIFR:
+		qprintf(" i 0x%x f 0x%x%08x ",
+			(__psint_t)ktep->val[5],
+			(__psint_t)ktep->val[6], (__psint_t)ktep->val[7]);
+		s.br_startoff = (xfs_fileoff_t)
+			(((xfs_dfiloff_t)(unsigned long)ktep->val[8] << 32) |
+				(xfs_dfiloff_t)(unsigned long)ktep->val[9]);
+		s.br_startblock = (xfs_fsblock_t)
+			(((xfs_dfsbno_t)(unsigned long)ktep->val[10] << 32) |
+				(xfs_dfsbno_t)(unsigned long)ktep->val[11]);
+		s.br_blockcount = (xfs_filblks_t)
+			(((xfs_dfilblks_t)(unsigned long)ktep->val[12] << 32) |
+				(xfs_dfilblks_t)(unsigned long)ktep->val[13]);
+		xfsidbg_xbirec(&s);
+		break;
+	case XFS_BMBT_KTRACE_ARGIK:
+		qprintf(" i 0x%x o 0x%x%08x\n",
+			(__psint_t)ktep->val[5],
+			(__psint_t)ktep->val[6], (__psint_t)ktep->val[7]);
+		break;
+	case XFS_BMBT_KTRACE_CUR:
+		qprintf(" nlevels %d flags %d allocated %d ",
+			((__psint_t)ktep->val[5] >> 24) & 0xff,
+			((__psint_t)ktep->val[5] >> 16) & 0xff,
+			(__psint_t)ktep->val[5] & 0xffff);
+		r.l0 = (xfs_bmbt_rec_base_t)(unsigned long)ktep->val[6];
+		r.l1 = (xfs_bmbt_rec_base_t)(unsigned long)ktep->val[7];
+		r.l2 = (xfs_bmbt_rec_base_t)(unsigned long)ktep->val[8];
+		r.l3 = (xfs_bmbt_rec_base_t)(unsigned long)ktep->val[9];
+		xfsidbg_xbrec((xfs_bmbt_rec_64_t *)&r);
+		qprintf(" bufs 0x%p 0x%p 0x%p 0x%p ",
+			(xfs_buf_t *)ktep->val[10],
+			(xfs_buf_t *)ktep->val[11],
+			(xfs_buf_t *)ktep->val[12],
+			(xfs_buf_t *)ktep->val[13]);
+		qprintf("ptrs %d %d %d %d\n",
+			(__psint_t)ktep->val[14] >> 16,
+			(__psint_t)ktep->val[14] & 0xffff,
+			(__psint_t)ktep->val[15] >> 16,
+			(__psint_t)ktep->val[15] & 0xffff);
+		break;
+	default:
+		qprintf("unknown bmbt trace record\n");
+		break;
+	}
+	return 1;
+}
+#endif
 
 /*
  * Print an xfs in-inode bmap btree root.
@@ -2677,8 +3554,11 @@ xfs_btino(xfs_inobt_block_t *bt, int bsz)
 	int i;
 
 	kdb_printf("magic 0x%x level %d numrecs %d leftsib 0x%x rightsib 0x%x\n",
-		INT_GET(bt->bb_magic, ARCH_CONVERT), INT_GET(bt->bb_level, ARCH_CONVERT), INT_GET(bt->bb_numrecs, ARCH_CONVERT),
-		INT_GET(bt->bb_leftsib, ARCH_CONVERT), INT_GET(bt->bb_rightsib, ARCH_CONVERT));
+		INT_GET(bt->bb_magic, ARCH_CONVERT),
+		INT_GET(bt->bb_level, ARCH_CONVERT),
+		INT_GET(bt->bb_numrecs, ARCH_CONVERT),
+		INT_GET(bt->bb_leftsib, ARCH_CONVERT),
+		INT_GET(bt->bb_rightsib, ARCH_CONVERT));
 	if (INT_ISZERO(bt->bb_level, ARCH_CONVERT)) {
 
 		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_CONVERT); i++) {
@@ -2686,7 +3566,8 @@ xfs_btino(xfs_inobt_block_t *bt, int bsz)
 
 			r = XFS_BTREE_REC_ADDR(bsz, xfs_inobt, bt, i, 0);
 			kdb_printf("rec %d startino 0x%x freecount %d, free %Lx\n",
-				i, INT_GET(r->ir_startino, ARCH_CONVERT), INT_GET(r->ir_freecount, ARCH_CONVERT),
+				i, INT_GET(r->ir_startino, ARCH_CONVERT),
+				INT_GET(r->ir_freecount, ARCH_CONVERT),
 				INT_GET(r->ir_free, ARCH_CONVERT));
 		}
 	} else {
@@ -2700,7 +3581,8 @@ xfs_btino(xfs_inobt_block_t *bt, int bsz)
 			k = XFS_BTREE_KEY_ADDR(bsz, xfs_inobt, bt, i, mxr);
 			p = XFS_BTREE_PTR_ADDR(bsz, xfs_inobt, bt, i, mxr);
 			kdb_printf("key %d startino 0x%x ptr 0x%x\n",
-				i, INT_GET(k->ir_startino, ARCH_CONVERT), INT_GET(*p, ARCH_CONVERT));
+				i, INT_GET(k->ir_startino, ARCH_CONVERT),
+				INT_GET(*p, ARCH_CONVERT));
 		}
 	}
 }
@@ -2752,6 +3634,45 @@ xfs_buf_item_print(xfs_buf_log_item_t *blip, int summary)
 	kdb_printf("\n");
 }
 
+#ifdef XFS_BMAP_TRACE
+/*
+ * Convert an external extent descriptor to internal form.
+ */
+static void
+xfs_convert_extent(xfs_bmbt_rec_32_t *rp, xfs_dfiloff_t *op, xfs_dfsbno_t *sp,
+		   xfs_dfilblks_t *cp, int *fp)
+{
+	xfs_dfiloff_t o;
+	xfs_dfsbno_t s;
+	xfs_dfilblks_t c;
+	int flag;
+
+	flag = (((xfs_dfiloff_t)rp->l0) >> 31) & 1;
+	o = ((((xfs_dfiloff_t)rp->l0) & 0x7fffffff) << 23) |
+	    (((xfs_dfiloff_t)rp->l1) >> 9);
+	s = (((xfs_dfsbno_t)(rp->l1 & 0x000001ff)) << 43) |
+	    (((xfs_dfsbno_t)rp->l2) << 11) |
+	    (((xfs_dfsbno_t)rp->l3) >> 21);
+	c = (xfs_dfilblks_t)(rp->l3 & 0x001fffff);
+	*op = o;
+	*sp = s;
+	*cp = c;
+	*fp = flag;
+}
+#endif
+
+#ifdef XFS_RW_TRACE
+/*
+ * Print itrunc entry trace.
+ */
+static void
+xfs_ctrunc_trace_entry(ktrace_entry_t	*ktep)
+{
+	qprintf("ip 0x%p cpu %d\n",
+		(xfs_inode_t *)(unsigned long)ktep->val[1], (int)ktep->val[2]);
+}
+#endif
+
 /*
  * Print an xfs_da_state_path structure.
  */
@@ -2771,11 +3692,141 @@ xfs_dastate_path(xfs_da_state_path_t *p)
 		case XFS_DIR_LEAF_MAGIC:	kdb_printf("DIR\n");	break;
 		case XFS_ATTR_LEAF_MAGIC:	kdb_printf("ATTR\n");	break;
 		case XFS_DIR2_LEAFN_MAGIC:	kdb_printf("DIR2\n");	break;
-		default:			kdb_printf("type ??\n");	break;
+		default:			kdb_printf("type ?\n");	break;
 		}
 	}
 }
 
+#ifdef XFS_DIR_TRACE
+/*
+ * Print a xfs directory trace buffer entry.
+ */
+static int
+xfs_dir_trace_entry(ktrace_entry_t *ktep)
+{
+	xfs_mount_t *mp;
+	__uint32_t hash;
+	xfs_off_t cookie;
+
+	if (!ktep->val[0] || !ktep->val[1])
+		return 0;
+
+	mp = (xfs_mount_t *)ktep->val[3];
+	cookie = (__psunsigned_t)ktep->val[4];
+	cookie <<= 32;
+	cookie |= (__psunsigned_t)ktep->val[5];
+	qprintf("%s -- dp=0x%p b/e/h=%d/%d/0x%08x resid=0x%x ",
+		    (char *)ktep->val[1],
+		    (xfs_inode_t *)(unsigned long)ktep->val[2],
+		    (__psint_t)XFS_DA_COOKIE_BNO(mp, cookie),
+		    (__psint_t)XFS_DA_COOKIE_ENTRY(mp, cookie),
+		    (__psunsigned_t)XFS_DA_COOKIE_HASH(mp, cookie),
+		    (__psint_t)ktep->val[6]);
+
+	switch ((__psint_t)ktep->val[0]) {
+	case XFS_DIR_KTRACE_G_DU:
+		break;
+	case XFS_DIR_KTRACE_G_DUB:
+		qprintf("bno=%d", (__psint_t)ktep->val[7]);
+		break;
+	case XFS_DIR_KTRACE_G_DUN:
+		qprintf("forw=%d, cnt=%d, 0x%08x - 0x%08x",
+			      (__psint_t)ktep->val[7],
+			      (__psint_t)ktep->val[8],
+			      (__psunsigned_t)ktep->val[9],
+			      (__psunsigned_t)ktep->val[10]);
+		break;
+	case XFS_DIR_KTRACE_G_DUL:
+		qprintf("forw=%d, cnt=%d, 0x%08x - 0x%08x",
+			      (__psint_t)ktep->val[7],
+			      (__psint_t)ktep->val[8],
+			      (__psunsigned_t)ktep->val[9],
+			      (__psunsigned_t)ktep->val[10]);
+		break;
+	case XFS_DIR_KTRACE_G_DUE:
+		qprintf("entry hashval 0x%08x", (__psunsigned_t)ktep->val[7]);
+		break;
+	case XFS_DIR_KTRACE_G_DUC:
+		cookie = (__psunsigned_t)ktep->val[7];
+		cookie <<= 32;
+		cookie |= (__psunsigned_t)ktep->val[8];
+		hash = XFS_DA_COOKIE_HASH(mp, cookie);
+		qprintf("b/e/h=%d/%d/0x%08x",
+		    (__psint_t)XFS_DA_COOKIE_BNO(mp, cookie),
+		    (__psint_t)XFS_DA_COOKIE_ENTRY(mp, cookie),
+		    hash);
+		break;
+	default:
+		qprintf("unknown dir trace record format");
+		break;
+	}
+	return 1;
+}
+#endif
+
+#ifdef XFS_DIR2_TRACE
+/*
+ * Print a xfs v2 directory trace buffer entry.
+ */
+static int
+xfs_dir2_trace_entry(ktrace_entry_t *ktep)
+{
+	char	    *cp;
+	int	     i;
+	int	     len;
+
+	if (!ktep->val[0])
+		return 0;
+	cp = (char *)&ktep->val[10];
+	qprintf("%s: '", (char *)ktep->val[1]);
+	len = min((__psint_t)ktep->val[9], (__psint_t)sizeof(ktep->val[10])*6);
+	for (i = 0; i < len; i++)
+		qprintf("%c", cp[i]);
+	qprintf("'(%d)", (__psint_t)ktep->val[9]);
+	if ((__psunsigned_t)ktep->val[0] != XFS_DIR2_KTRACE_ARGS_BIBII)
+		qprintf(" hashval 0x%llx inumber %lld dp 0x%p tp 0x%p check %d",
+			(__uint64_t)(unsigned long)ktep->val[2],
+			(__int64_t)(unsigned long)ktep->val[3],
+			ktep->val[4], ktep->val[5],
+			(int)(__psint_t)ktep->val[6]);
+	switch ((__psunsigned_t)ktep->val[0]) {
+	case XFS_DIR2_KTRACE_ARGS:
+		break;
+	case XFS_DIR2_KTRACE_ARGS_B:
+		qprintf(" bp 0x%p", ktep->val[7]);
+		break;
+	case XFS_DIR2_KTRACE_ARGS_BB:
+		qprintf(" lbp 0x%p dbp 0x%p", ktep->val[7], ktep->val[8]);
+		break;
+	case XFS_DIR2_KTRACE_ARGS_BIBII:
+		qprintf(" dp 0x%p tp 0x%p srcbp 0x%p srci %d dstbp 0x%p dsti %d count %d",
+			ktep->val[2], ktep->val[3], ktep->val[4],
+			(int)(__psint_t)ktep->val[5], ktep->val[6],
+			(int)(__psint_t)ktep->val[7],
+			(int)(__psint_t)ktep->val[8]);
+		break;
+	case XFS_DIR2_KTRACE_ARGS_DB:
+		qprintf(" db 0x%x bp 0x%p",
+			(xfs_dir2_db_t)(unsigned long)ktep->val[7],
+			ktep->val[8]);
+		break;
+	case XFS_DIR2_KTRACE_ARGS_I:
+		qprintf(" i 0x%llx", (xfs_ino_t)(unsigned long)ktep->val[7]);
+		break;
+	case XFS_DIR2_KTRACE_ARGS_S:
+		qprintf(" s 0x%x", (int)(__psint_t)ktep->val[7]);
+		break;
+	case XFS_DIR2_KTRACE_ARGS_SB:
+		qprintf(" s 0x%x bp 0x%p", (int)(__psint_t)ktep->val[7],
+			ktep->val[8]);
+		break;
+	default:
+		qprintf("unknown dirv2 trace record format");
+		break;
+	}
+	return 1;
+}
+#endif
 
 /*
  * Print an efd log item.
@@ -2957,9 +4008,9 @@ static char *
 xfs_fmtuuid(uuid_t *uu)
 {
 	static char rval[40];
-	char        *o          = rval;
-	char        *i          = (unsigned char*)uu;
-	int         b;
+	char	*o	  = rval;
+	char	*i	  = (unsigned char*)uu;
+	int	 b;
 
 	for (b=0;b<16;b++) {
 	    o+=sprintf(o, "%02x", *i++);
@@ -3074,6 +4125,106 @@ xfs_inodebuf(xfs_buf_t *bp)
 	}
 }
 
+#ifdef XFS_RW_TRACE
+/*
+ * Print iomap entry trace.
+ */
+static void
+xfs_iomap_enter_trace_entry(ktrace_entry_t *ktep)
+{
+	qprintf("ip 0x%p size 0x%x%x offset 0x%x%x count 0x%x\n",
+		ktep->val[1],
+		(unsigned int)ktep->val[2], (unsigned int)ktep->val[3],
+		(unsigned int)ktep->val[4], (unsigned int)ktep->val[5],
+		(unsigned int)ktep->val[6]);
+	qprintf("next offset 0x%x%x io offset 0x%x%x\n",
+		(unsigned int)ktep->val[7], (unsigned int)ktep->val[8],
+		(unsigned int)ktep->val[9], (unsigned int)ktep->val[10]);
+	qprintf("io size 0x%x last req sz 0x%x new size 0x%x%x\n",
+		(unsigned int)ktep->val[11], (unsigned int)ktep->val[12],
+		(unsigned int)ktep->val[13], (unsigned int)ktep->val[14]);
+}
+
+/*
+ * Print iomap map trace.
+ */
+static void
+xfs_iomap_map_trace_entry(ktrace_entry_t *ktep)
+{
+	qprintf("ip 0x%p size 0x%x%x offset 0x%x%x count 0x%x\n",
+		ktep->val[1],
+		(unsigned int)ktep->val[2], (unsigned int)ktep->val[3],
+		(unsigned int)ktep->val[4], (unsigned int)ktep->val[5],
+		(unsigned int)ktep->val[6]);
+	qprintf("bmap off 0x%x%x len 0x%x pboff 0x%x pbsize 0x%x bno 0x%x\n",
+		(unsigned int)ktep->val[7], (unsigned int)ktep->val[8],
+		(unsigned int)ktep->val[9], (unsigned int)ktep->val[10],
+		(unsigned int)ktep->val[11], (unsigned int)ktep->val[12]);
+	qprintf("imap off 0x%x count 0x%x block 0x%x\n",
+		(unsigned int)ktep->val[13], (unsigned int)ktep->val[14],
+		(unsigned int)ktep->val[15]);
+}
+
+/*
+ * Print itrunc entry trace.
+ */
+static void
+xfs_itrunc_trace_entry(ktrace_entry_t   *ktep)
+{
+	qprintf("ip 0x%p size 0x%x%x flag %d new size 0x%x%x\n",
+		ktep->val[1],
+		(unsigned int)ktep->val[2], (unsigned int)ktep->val[3],
+		(int)ktep->val[4],
+		(unsigned int)ktep->val[5], (unsigned int)ktep->val[6]);
+	qprintf("toss start 0x%x%x toss finish 0x%x%x cpu id %d\n",
+		(unsigned int)ktep->val[7], (unsigned int)ktep->val[8],
+		(unsigned int)ktep->val[9], (unsigned int)ktep->val[10],
+		(int)ktep->val[11]);
+}
+
+/*
+ * Print bunmap entry trace.
+ */
+static void
+xfs_bunmap_trace_entry(ktrace_entry_t   *ktep)
+{
+	static char *bunmapi_flags[] = {
+		"write",	/* 0x01 */
+		"delay",	/* 0x02 */
+		"entire",       /* 0x04 */
+		"metadata",     /* 0x08 */
+		"exact",	/* 0x10 */
+		"attrfork",     /* 0x20 */
+		"async",	/* 0x40 */
+		"rsvblocks",    /* 0x80 */
+		0
+	};
+
+	qprintf("ip 0x%p size 0x%x%x bno 0x%x%x len 0x%x cpu id %d\n",
+		ktep->val[1],
+		(unsigned int)ktep->val[2], (unsigned int)ktep->val[3],
+		(unsigned int)ktep->val[4], (unsigned int)ktep->val[5],
+		(unsigned int)ktep->val[6], (int)ktep->val[8]);
+	qprintf("ra 0x%p ", ktep->val[9]);
+	printflags((__psint_t)ktep->val[7], bunmapi_flags, "flags");
+	qprintf("\n");
+}
+
+/*
+ * Print inval_cached_pages entry trace.
+ */
+static void
+xfs_inval_cached_trace_entry(ktrace_entry_t     *ktep)
+{
+	qprintf("ip 0x%p offset 0x%x%x len 0x%x%x first 0x%x%x last 0x%x%x\n",
+		ktep->val[1],
+		(unsigned int)ktep->val[2], (unsigned int)ktep->val[3],
+		(unsigned int)ktep->val[4], (unsigned int)ktep->val[5],
+		(unsigned int)ktep->val[6], (unsigned int)ktep->val[7],
+		(unsigned int)ktep->val[8], (unsigned int)ktep->val[9]);
+}
+#endif
+
 
 /*
  * Print disk inode.
@@ -3143,6 +4294,123 @@ xfs_prdinode_core(xfs_dinode_core_t *dip, int convert)
 	printflags(INT_GET(dip->di_flags, convert), diflags, "flags");
 	kdb_printf("gen 0x%x\n", INT_GET(dip->di_gen, convert));
 }
+
+#ifdef XFS_RW_TRACE
+/*
+ * Print read/write entry trace.
+ */
+static void
+xfs_rw_enter_trace_entry(ktrace_entry_t *ktep)
+{
+	qprintf("ip 0x%p size 0x%x%x uio offset 0x%x%x uio count 0x%x\n",
+		ktep->val[1],
+		(unsigned int)ktep->val[2], (unsigned int)ktep->val[3],
+		(unsigned int)ktep->val[4], (unsigned int)ktep->val[5],
+		(unsigned int)ktep->val[6]);
+	qprintf("ioflags 0x%x next offset 0x%x%x io offset 0x%x%x\n",
+		(unsigned int)ktep->val[7],
+		(unsigned int)ktep->val[8], (unsigned int)ktep->val[9],
+		(unsigned int)ktep->val[10], (unsigned int)ktep->val[11]);
+	qprintf("io size 0x%x last req sz 0x%x new size 0x%x%x\n",
+		(unsigned int)ktep->val[12], (unsigned int)ktep->val[13],
+		(unsigned int)ktep->val[14], (unsigned int)ktep->val[15]);
+}
+
+/*
+ * Print read/write trace entry.
+ */
+static int
+xfs_rw_trace_entry(ktrace_entry_t *ktep)
+{
+	switch ( (long)ktep->val[0] ) {
+	case XFS_READ_ENTER:
+		qprintf("READ ENTER:\n");
+		xfs_rw_enter_trace_entry(ktep);
+		break;
+	case XFS_WRITE_ENTER:
+		qprintf("WRITE ENTER:\n");
+		xfs_rw_enter_trace_entry(ktep);
+		break;
+	case XFS_IOMAP_READ_ENTER:
+		qprintf("IOMAP READ ENTER:\n");
+		xfs_iomap_enter_trace_entry(ktep);
+		break;
+	case XFS_IOMAP_WRITE_ENTER:
+		qprintf("IOMAP WRITE ENTER:\n");
+		xfs_iomap_enter_trace_entry(ktep);
+		break;
+	case XFS_IOMAP_WRITE_NOSPACE:
+		qprintf("IOMAP WRITE NOSPACE:\n");
+		xfs_iomap_enter_trace_entry(ktep);
+		break;
+	case XFS_IOMAP_READ_MAP:
+		qprintf("IOMAP READ MAP:\n");
+		xfs_iomap_map_trace_entry(ktep);
+		break;
+	case XFS_IOMAP_WRITE_MAP:
+		qprintf("IOMAP WRITE MAP:\n");
+		xfs_iomap_map_trace_entry(ktep);
+		break;
+	case XFS_ITRUNC_START:
+		qprintf("ITRUNC START:\n");
+		xfs_itrunc_trace_entry(ktep);
+		break;
+	case XFS_ITRUNC_FINISH1:
+		qprintf("ITRUNC FINISH1:\n");
+		xfs_itrunc_trace_entry(ktep);
+		break;
+	case XFS_ITRUNC_FINISH2:
+		qprintf("ITRUNC FINISH2:\n");
+		xfs_itrunc_trace_entry(ktep);
+		break;
+	case XFS_CTRUNC1:
+		qprintf("CTRUNC1:\n");
+		xfs_ctrunc_trace_entry(ktep);
+		break;
+	case XFS_CTRUNC2:
+		qprintf("CTRUNC2:\n");
+		xfs_ctrunc_trace_entry(ktep);
+		break;
+	case XFS_CTRUNC3:
+		qprintf("CTRUNC3:\n");
+		xfs_ctrunc_trace_entry(ktep);
+		break;
+	case XFS_CTRUNC4:
+		qprintf("CTRUNC4:\n");
+		xfs_ctrunc_trace_entry(ktep);
+		break;
+	case XFS_CTRUNC5:
+		qprintf("CTRUNC5:\n");
+		xfs_ctrunc_trace_entry(ktep);
+		break;
+	case XFS_CTRUNC6:
+		qprintf("CTRUNC6:\n");
+		xfs_ctrunc_trace_entry(ktep);
+		break;
+	case XFS_BUNMAPI:
+		qprintf("BUNMAPI:\n");
+		xfs_bunmap_trace_entry(ktep);
+		break;
+	case XFS_INVAL_CACHED:
+		qprintf("INVAL CACHED:\n");
+		xfs_inval_cached_trace_entry(ktep);
+		break;
+	case XFS_DIORD_ENTER:
+		qprintf("DIORD ENTER:\n");
+		xfs_rw_enter_trace_entry(ktep);
+		break;
+	case XFS_DIOWR_ENTER:
+		qprintf("DIOWR ENTER:\n");
+		xfs_rw_enter_trace_entry(ktep);
+		break;
+
+	default:
+		return 0;
+	}
+
+	return 1;
+}
+#endif
 
 /*
  * Print xfs extent list for a fork.
@@ -3267,6 +4535,109 @@ xfsidbg_xagi(xfs_agi_t *agi)
 	}
 }
 
+#ifdef XFS_ALLOC_TRACE
+/*
+ * Print out the last "count" entries in the allocation trace buffer.
+ */
+static void
+xfsidbg_xalatrace(int count)
+{
+	ktrace_entry_t  *ktep;
+	ktrace_snap_t   kts;
+	int	     nentries;
+	int	     skip_entries;
+
+	if (xfs_alloc_trace_buf == NULL) {
+		qprintf("The xfs alloc trace buffer is not initialized\n");
+		return;
+	}
+	nentries = ktrace_nentries(xfs_alloc_trace_buf);
+	if (count == -1) {
+		count = nentries;
+	}
+	if ((count <= 0) || (count > nentries)) {
+		qprintf("Invalid count.  There are %d entries.\n", nentries);
+		return;
+	}
+
+	ktep = ktrace_first(xfs_alloc_trace_buf, &kts);
+	if (count != nentries) {
+		/*
+		 * Skip the total minus the number to look at minus one
+		 * for the entry returned by ktrace_first().
+		 */
+		skip_entries = nentries - count - 1;
+		ktep = ktrace_skip(xfs_alloc_trace_buf, skip_entries, &kts);
+		if (ktep == NULL) {
+			qprintf("Skipped them all\n");
+			return;
+		}
+	}
+	while (ktep != NULL) {
+		if (xfs_alloc_trace_entry(ktep))
+			qprintf("\n");
+		ktep = ktrace_next(xfs_alloc_trace_buf, &kts);
+	}
+}
+
+/*
+ * Print out all the entries in the alloc trace buf corresponding
+ * to the given block number.
+ */
+static void
+xfsidbg_xalbtrace(xfs_agblock_t bno)
+{
+	ktrace_entry_t  *ktep;
+	ktrace_snap_t   kts;
+
+	if (xfs_alloc_trace_buf == NULL) {
+		qprintf("The xfs alloc trace buffer is not initialized\n");
+		return;
+	}
+
+	ktep = ktrace_first(xfs_alloc_trace_buf, &kts);
+	while (ktep != NULL) {
+		switch ((__psint_t)ktep->val[0]) {
+		case XFS_ALLOC_KTRACE_ALLOC:
+		case XFS_ALLOC_KTRACE_FREE:
+			if (bno >= (xfs_agblock_t)((__psint_t)ktep->val[5]) &&
+			    bno < (xfs_agblock_t)((__psint_t)ktep->val[5]) +
+				  (xfs_extlen_t)((__psint_t)ktep->val[13])) {
+				(void)xfs_alloc_trace_entry(ktep);
+				qprintf("\n");
+			}
+			break;
+		}
+		ktep = ktrace_next(xfs_alloc_trace_buf, &kts);
+	}
+}
+
+/*
+ * Print out all the entries in the alloc trace buf corresponding
+ * to the given allocation group.
+ */
+static void
+xfsidbg_xalgtrace(xfs_agnumber_t agno)
+{
+	ktrace_entry_t  *ktep;
+	ktrace_snap_t   kts;
+
+	if (xfs_alloc_trace_buf == NULL) {
+		qprintf("The xfs alloc trace buffer is not initialized\n");
+		return;
+	}
+
+	ktep = ktrace_first(xfs_alloc_trace_buf, &kts);
+	while (ktep != NULL) {
+		if (  (__psint_t)ktep->val[0] &&
+		      ((xfs_agnumber_t)((__psint_t)ktep->val[4])) == agno ) {
+			(void)xfs_alloc_trace_entry(ktep);
+			qprintf("\n");
+		}
+		ktep = ktrace_next(xfs_alloc_trace_buf, &kts);
+	}
+}
+#endif
 
 /*
  * Print an allocation argument structure for XFS.
@@ -3288,7 +4659,7 @@ xfsidbg_xalloc(xfs_alloc_arg_t *args)
 		args->wasfromfl, args->isfl, args->userdata);
 }
 
-#ifdef DEBUG
+#ifdef XFS_ALLOC_TRACE
 /*
  * Print out all the entries in the alloc trace buf corresponding
  * to the given mount point.
@@ -3298,7 +4669,6 @@ xfsidbg_xalmtrace(xfs_mount_t *mp)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
-	extern ktrace_t	*xfs_alloc_trace_buf;
 
 	if (xfs_alloc_trace_buf == NULL) {
 		kdb_printf("The xfs alloc trace buffer is not initialized\n");
@@ -3307,14 +4677,53 @@ xfsidbg_xalmtrace(xfs_mount_t *mp)
 
 	ktep = ktrace_first(xfs_alloc_trace_buf, &kts);
 	while (ktep != NULL) {
-		if ((__psint_t)ktep->val[0] && (xfs_mount_t *)ktep->val[3] == mp) {
+		if ((__psint_t)ktep->val[0] &&
+		    (xfs_mount_t *)ktep->val[3] == mp) {
 			(void)xfs_alloc_trace_entry(ktep);
 			kdb_printf("\n");
 		}
 		ktep = ktrace_next(xfs_alloc_trace_buf, &kts);
 	}
 }
-#endif /* DEBUG */
+
+/*
+ * Print out all the entries in the alloc trace buf corresponding
+ * to the given entry type.
+ */
+static void
+xfsidbg_xalttrace(int tag)
+{
+	ktrace_entry_t  *ktep;
+	ktrace_snap_t   kts;
+
+	if (xfs_alloc_trace_buf == NULL) {
+		qprintf("The xfs alloc trace buffer is not initialized\n");
+		return;
+	}
+
+	ktep = ktrace_first(xfs_alloc_trace_buf, &kts);
+	while (ktep != NULL) {
+		if ((__psint_t)ktep->val[0] &&
+		    ((long)ktep->val[0] & 0xffffL) == (long)tag) {
+			(void)xfs_alloc_trace_entry(ktep);
+			qprintf("\n");
+		}
+		ktep = ktrace_next(xfs_alloc_trace_buf, &kts);
+	}
+}
+#endif
+
+/*
+ * Set xtra argument, used by xchksum.
+ */
+static void
+xfsidbg_xarg(int xarg)
+{
+	if (xarg == -1)
+		qprintf("xargument: %d\n", xargument);
+	else
+		xargument = xarg;
+}       /* xfsidbg_xarg */
 
 /*
  * Print an attr_list() context structure.
@@ -3441,6 +4850,50 @@ xfsidbg_xattrsf(xfs_attr_shortform_t *s)
 	}
 }
 
+#ifdef XFS_ATTR_TRACE
+/*
+ * Print out the last "count" entries in the attribute trace buffer.
+ */
+static void
+xfsidbg_xattrtrace(int count)
+{
+	ktrace_entry_t  *ktep;
+	ktrace_snap_t   kts;
+	int	     nentries;
+	int	     skip_entries;
+
+	if (xfs_attr_trace_buf == NULL) {
+		qprintf("The xfs attribute trace buffer is not initialized\n");
+		return;
+	}
+	nentries = ktrace_nentries(xfs_attr_trace_buf);
+	if (count == -1) {
+		count = nentries;
+	}
+	if ((count <= 0) || (count > nentries)) {
+		qprintf("Invalid count.  There are %d entries.\n", nentries);
+		return;
+	}
+
+	ktep = ktrace_first(xfs_attr_trace_buf, &kts);
+	if (count != nentries) {
+		/*
+		 * Skip the total minus the number to look at minus one
+		 * for the entry returned by ktrace_first().
+		 */
+		skip_entries = nentries - count - 1;
+		ktep = ktrace_skip(xfs_attr_trace_buf, skip_entries, &kts);
+		if (ktep == NULL) {
+			qprintf("Skipped them all\n");
+			return;
+		}
+	}
+	while (ktep != NULL) {
+		xfs_attr_trace_entry(ktep);
+		ktep = ktrace_next(xfs_attr_trace_buf, &kts);
+	}
+}
+#endif
 
 /*
  * Print xfs bmap internal record
@@ -3456,6 +4909,61 @@ xfsidbg_xbirec(xfs_bmbt_irec_t *r)
 		(__uint64_t)r->br_state);
 }
 
+#ifdef XFS_BLI_TRACE
+/*
+ * Print out the buf log item trace for the given buf log item.
+ */
+static void
+xfsidbg_xblitrace(xfs_buf_log_item_t *bip)
+{
+	ktrace_entry_t  *ktep;
+	ktrace_snap_t   kts;
+	uint64_t	flags;
+	static char *xbli_flags[] = {
+		"hold",		/* 0x01 */
+		"dirty",	/* 0x02 */
+		"stale",	/* 0x04 */
+		"logged",	/* 0x08 */
+		0
+		};
+	static char *xli_flags[] = {
+		"in ail",       /* 0x1 */
+		0
+		};
+
+	if (bip->bli_trace == NULL) {
+		qprintf("The bli trace buffer is not initialized\n");
+		return;
+	}
+
+	ktep = ktrace_first(bip->bli_trace, &kts);
+	while (ktep != NULL) {
+		qprintf("%s bp 0x%p flags ",
+			(char *)ktep->val[0], ktep->val[1]);
+		printflags((__psint_t)(ktep->val[2]), xbli_flags, "xbli");
+		qprintf("\n");
+		qprintf("recur %d refcount %d blkno 0x%x bcount 0x%x\n",
+			(int)ktep->val[3], (int)ktep->val[4],
+			(unsigned int)ktep->val[5], (unsigned int)ktep->val[6]);
+		flags = (((uint64_t)(unsigned long)ktep->val[7] << 32) &
+					0xFFFFFFFF00000000ULL) |
+			(((uint64_t)(unsigned long)ktep->val[8]) &
+					0x00000000FFFFFFFFULL);
+		qprintf("bp flags ");
+		printflags(flags, pb_flag_vals, 0);
+		qprintf("\n");
+		qprintf("fspriv 0x%x fspriv2 0x%x pincount %d iodone 0x%x\n",
+			(unsigned int)ktep->val[9], (unsigned int)ktep->val[10],
+			(int)ktep->val[11], (unsigned int)ktep->val[12]);
+		qprintf("lockval %d lid 0x%x log item flags ",
+			(int)ktep->val[13], (unsigned int)ktep->val[14]);
+		printflags((__psint_t)(ktep->val[15]), xli_flags, "xli");
+		qprintf("\n");
+
+		ktep = ktrace_next(bip->bli_trace, &kts);
+	}
+}
+#endif
 
 /*
  * Print a bmap alloc argument structure for XFS.
@@ -3476,6 +4984,97 @@ xfsidbg_xbmalla(xfs_bmalloca_t *a)
 		a->aeof);
 }
 
+#ifdef XFS_BMAP_TRACE
+/*
+ * Print out the last "count" entries in the bmap btree trace buffer.
+ * The "a" is for "all" inodes.
+ */
+static void
+xfsidbg_xbmatrace(int count)
+{
+	ktrace_entry_t  *ktep;
+	ktrace_snap_t   kts;
+	int	     nentries;
+	int	     skip_entries;
+
+	if (xfs_bmbt_trace_buf == NULL) {
+		qprintf("The xfs bmap btree trace buffer is not initialized\n");		return;
+	}
+	nentries = ktrace_nentries(xfs_bmbt_trace_buf);
+	if (count == -1) {
+		count = nentries;
+	}
+	if ((count <= 0) || (count > nentries)) {
+		qprintf("Invalid count.  There are %d entries.\n", nentries);
+		return;
+	}
+
+	ktep = ktrace_first(xfs_bmbt_trace_buf, &kts);
+	if (count != nentries) {
+		/*
+		 * Skip the total minus the number to look at minus one
+		 * for the entry returned by ktrace_first().
+		 */
+		skip_entries = nentries - count - 1;
+		ktep = ktrace_skip(xfs_bmbt_trace_buf, skip_entries, &kts);
+		if (ktep == NULL) {
+			qprintf("Skipped them all\n");
+			return;
+		}
+	}
+	while (ktep != NULL) {
+		if (xfs_bmbt_trace_entry(ktep))
+			qprintf("\n");
+		ktep = ktrace_next(xfs_bmbt_trace_buf, &kts);
+	}
+}
+
+/*
+ * Print out the bmap btree trace buffer attached to the given inode.
+ */
+static void
+xfsidbg_xbmitrace(xfs_inode_t *ip)
+{
+	ktrace_entry_t  *ktep;
+	ktrace_snap_t   kts;
+
+	if (ip->i_btrace == NULL) {
+		qprintf("The inode trace buffer is not initialized\n");
+		return;
+	}
+
+	ktep = ktrace_first(ip->i_btrace, &kts);
+	while (ktep != NULL) {
+		if (xfs_bmbt_trace_entry(ktep))
+			qprintf("\n");
+		ktep = ktrace_next(ip->i_btrace, &kts);
+	}
+}
+
+/*
+ * Print out all the entries in the bmap btree trace buf corresponding
+ * to the given inode.  The "s" is for "single" inode.
+ */
+static void
+xfsidbg_xbmstrace(xfs_inode_t *ip)
+{
+	ktrace_entry_t  *ktep;
+	ktrace_snap_t   kts;
+
+	if (xfs_bmbt_trace_buf == NULL) {
+		qprintf("The xfs bmap btree trace buffer is not initialized\n");		return;
+	}
+
+	ktep = ktrace_first(xfs_bmbt_trace_buf, &kts);
+	while (ktep != NULL) {
+		if ((xfs_inode_t *)(ktep->val[2]) == ip) {
+			if (xfs_bmbt_trace_entry(ktep))
+				qprintf("\n");
+		}
+		ktep = ktrace_next(xfs_bmbt_trace_buf, &kts);
+	}
+}
+#endif
 
 /*
  * Print xfs bmap record
@@ -3740,6 +5339,286 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 	}
 }
 
+#ifdef XFS_BMAP_TRACE
+/*
+ * Print out the last "count" entries in the bmap extent trace buffer.
+ * The "a" is for "all" inodes.
+ */
+static void
+xfsidbg_xbxatrace(int count)
+{
+	ktrace_entry_t  *ktep;
+	ktrace_snap_t   kts;
+	int	     nentries;
+	int	     skip_entries;
+
+	if (xfs_bmap_trace_buf == NULL) {
+		qprintf("The xfs bmap extent trace buffer is not initialized\n");
+		return;
+	}
+	nentries = ktrace_nentries(xfs_bmap_trace_buf);
+	if (count == -1) {
+		count = nentries;
+	}
+	if ((count <= 0) || (count > nentries)) {
+		qprintf("Invalid count.  There are %d entries.\n", nentries);
+		return;
+	}
+
+	ktep = ktrace_first(xfs_bmap_trace_buf, &kts);
+	if (count != nentries) {
+		/*
+		 * Skip the total minus the number to look at minus one
+		 * for the entry returned by ktrace_first().
+		 */
+		skip_entries = nentries - count - 1;
+		ktep = ktrace_skip(xfs_bmap_trace_buf, skip_entries, &kts);
+		if (ktep == NULL) {
+			qprintf("Skipped them all\n");
+			return;
+		}
+	}
+	while (ktep != NULL) {
+		if (xfs_bmap_trace_entry(ktep))
+			qprintf("\n");
+		ktep = ktrace_next(xfs_bmap_trace_buf, &kts);
+	}
+}
+
+/*
+ * Print out the bmap extent trace buffer attached to the given inode.
+ */
+static void
+xfsidbg_xbxitrace(xfs_inode_t *ip)
+{
+	ktrace_entry_t  *ktep;
+	ktrace_snap_t   kts;
+	if (ip->i_xtrace == NULL) {
+		qprintf("The inode trace buffer is not initialized\n");
+		return;
+	}
+
+	ktep = ktrace_first(ip->i_xtrace, &kts);
+	while (ktep != NULL) {
+		if (xfs_bmap_trace_entry(ktep))
+			qprintf("\n");
+		ktep = ktrace_next(ip->i_xtrace, &kts);
+	}
+}
+
+/*
+ * Print out all the entries in the bmap extent trace buf corresponding
+ * to the given inode.  The "s" is for "single" inode.
+ */
+static void
+xfsidbg_xbxstrace(xfs_inode_t *ip)
+{
+	ktrace_entry_t  *ktep;
+	ktrace_snap_t   kts;
+
+	if (xfs_bmap_trace_buf == NULL) {
+		qprintf("The xfs bmap extent trace buffer is not initialized\n");
+		return;
+	}
+
+	ktep = ktrace_first(xfs_bmap_trace_buf, &kts);
+	while (ktep != NULL) {
+		if ((xfs_inode_t *)(ktep->val[3]) == ip) {
+			if (xfs_bmap_trace_entry(ktep))
+				qprintf("\n");
+		}
+		ktep = ktrace_next(xfs_bmap_trace_buf, &kts);
+	}
+}
+#endif
+
+#ifdef XFS_ILOCK_TRACE
+/*
+ * Print out the ilock trace buffer attached to the given inode.
+ */
+static void
+xfsidbg_xilock_trace_entry(ktrace_entry_t *ktep)
+{
+	static char	*xiflags[] = {
+		"IOLOCK_EXCL",
+		"IOLOCK_SHAR",
+		"ILOCK_EXCL",
+		"ILOCK_SHAR",
+		"IUNLK_NONOT",
+		0
+	};
+
+	if ((__psint_t)ktep->val[0] &&
+	     (__psint_t)ktep->val[7] == 0) {
+		 printflags((__psint_t)ktep->val[2], xiflags,"Flags ");
+		if ((__psint_t)ktep->val[1] == 1)
+			 qprintf("LOCK\n");
+		else if ((__psint_t)ktep->val[1] == 2)
+			 qprintf("LOCK SHARED\n");
+		else if ((__psint_t)ktep->val[1] == 3)
+			 qprintf("UNLOCK\n");
+		qprintf("ip 0x%p %llx %d\n",
+			ktep->val[0],
+			(xfs_ino_t)((xfs_inode_t *)ktep->val[0])->i_ino,
+			(__psint_t)ktep->val[6]);
+		qprintf("raddr 0x%p\n", ktep->val[3]);
+		qprintf("  Pid %d, cpu %d\n",
+			 (__psint_t)ktep->val[5],
+			 (__psint_t)ktep->val[4]);
+		qprintf("-----------------------\n");
+
+	} else if ((__psint_t)ktep->val[7] == 1) {
+		if ((__psint_t)ktep->val[1] == 1)
+			qprintf("FlushLOCK ");
+		else if ((__psint_t)ktep->val[1] == 2)
+			qprintf("FlushTRYLOCK %d ",
+				(__psint_t)ktep->val[2]);
+		else if ((__psint_t)ktep->val[1] == 3)
+			qprintf("FlushUNLOCK ");
+		else if ((__psint_t)ktep->val[1] == 4)
+			qprintf("FlushInode 0x%x",
+				(__psint_t)ktep->val[2]);
+		else if ((__psint_t)ktep->val[1] == 5)
+			qprintf("FlushInodeInt ");
+		else     qprintf("FlushUNKNOWN ");
+		qprintf("ip 0x%x ino %llx @ %d\n",
+			(__psint_t)ktep->val[0],
+			(xfs_ino_t)((xfs_inode_t *)ktep->val[0])->i_ino,
+			(__psint_t)ktep->val[6]);
+		qprintf("raddr 0x%p\n", ktep->val[3]);
+		qprintf("  Pid %d, cpu %d\n",
+			(__psint_t)ktep->val[5],
+			(__psint_t)ktep->val[4]);
+		qprintf("-----------------------\n");
+	}
+}
+
+static void
+xfsidbg_xilock_trace(xfs_inode_t *ip)
+{
+	static char *xiflags[] = {
+		"IOLOCK_EXCL",
+		"IOLOCK_SHAR",
+		"ILOCK_EXCL",
+		"ILOCK_SHAR",
+		"IUNLK_NONOT",
+		0
+	};
+
+	ktrace_entry_t  *ktep;
+	ktrace_snap_t   kts;
+	if (ip->i_lock_trace == NULL) {
+		qprintf("The inode ilock trace buffer is not initialized\n");
+		return;
+	}
+
+	ktep = ktrace_first(ip->i_lock_trace, &kts);
+	while (ktep != NULL) {
+		 if ((__psint_t)ktep->val[0] &&
+		     (__psint_t)ktep->val[7] == 0) {
+			 printflags((__psint_t)ktep->val[2], xiflags,"Flags ");
+			 if ((__psint_t)ktep->val[1] == 1)
+				 qprintf("LOCK\n");
+			 else if ((__psint_t)ktep->val[1] == 2)
+				 qprintf("LOCK SHARED\n");
+			 else if ((__psint_t)ktep->val[1] == 3)
+				 qprintf("UNLOCK\n");
+			qprintf("ip 0x%p %lld %d\n",
+				ktep->val[0], (unsigned long long)
+				((xfs_inode_t*)ktep->val[0])->i_ino,
+				(__psint_t)ktep->val[6]);
+			 qprintf("raddr 0x%p\n", ktep->val[3]);
+			 qprintf("  Pid %d, cpu %d\n",
+				 (__psint_t)ktep->val[5],
+				 (__psint_t)ktep->val[4]);
+			 qprintf("-----------------------\n");
+		 } else if ((__psint_t)ktep->val[7] == 1) {
+			if ((__psint_t)ktep->val[1] == 1)
+				qprintf("LOCK ");
+			else if ((__psint_t)ktep->val[1] == 2)
+				qprintf("TRYLOCK %d ",
+					(__psint_t)ktep->val[2]);
+			else if ((__psint_t)ktep->val[1] == 3)
+				qprintf("UNLOCK ");
+			else     qprintf("UNKNOWN ");
+			qprintf("ip 0x%p %lld %d\n",
+				ktep->val[0], (unsigned long long)
+				((xfs_inode_t*)ktep->val[0])->i_ino,
+				(__psint_t)ktep->val[6]);
+			qprintf("raddr 0x%p\n", ktep->val[3]);
+			qprintf("  Pid %d, cpu %d\n",
+				(__psint_t)ktep->val[5],
+				(__psint_t)ktep->val[4]);
+			qprintf("-----------------------\n");
+		 }
+
+		 ktep = ktrace_next(ip->i_lock_trace, &kts);
+	}
+}
+
+/*
+ * Print out the last "count" entries in the inode lock trace buffer.
+ * The "a" is for "all" entries.
+ */
+static void
+xfsidbg_xailock_trace(int count)
+{
+	ktrace_entry_t  *ktep;
+	ktrace_snap_t   kts;
+	int	     nentries;
+	int	     skip_entries;
+
+	if (xfs_ilock_trace_buf == NULL) {
+		qprintf("The xfs inode lock trace buffer is not initialized\n");		return;
+	}
+	nentries = ktrace_nentries(xfs_ilock_trace_buf);
+	if (count == -1) {
+		count = nentries;
+	}
+	if ((count <= 0) || (count > nentries)) {
+		qprintf("Invalid count.  There are %d entries.\n", nentries);
+		return;
+	}
+
+	ktep = ktrace_first(xfs_ilock_trace_buf, &kts);
+	if (count != nentries) {
+		/*
+		 * Skip the total minus the number to look at minus one
+		 * for the entry returned by ktrace_first().
+		 */
+		skip_entries = nentries - count - 1;
+		ktep = ktrace_skip(xfs_ilock_trace_buf, skip_entries, &kts);
+		if (ktep == NULL) {
+			qprintf("Skipped them all\n");
+			return;
+		}
+	}
+	while (ktep != NULL) {
+		xfsidbg_xilock_trace_entry(ktep);
+		ktep = ktrace_next(xfs_ilock_trace_buf, &kts);
+	}
+}
+#endif
+
+/*
+ * Compute & print buffer's checksum.
+ */
+static void
+xfsidbg_xchksum(uint *addr)
+{
+	uint i, chksum = 0;
+
+	if (((__psint_t)addr) == ((__psint_t)-1)) {
+		qprintf("USAGE xchksum <address>\n");
+		qprintf("       length is set with xarg\n");
+	} else {
+		for (i=0; i<xargument; i++) {
+			chksum ^= *addr;
+			addr++;
+		}
+		qprintf("chksum (0x%x)  length (%d)\n", chksum, xargument);
+	}
+}       /* xfsidbg_xchksum */
 
 /*
  * Print an xfs_da_args structure.
@@ -4084,6 +5963,119 @@ xfsidbg_xdir2free(xfs_dir2_free_t *f)
 	}
 }
 
+#ifdef XFS_DIR_TRACE
+/*
+ * Print out the last "count" entries in the directory trace buffer.
+ */
+static void
+xfsidbg_xdirtrace(int count)
+{
+	ktrace_entry_t  *ktep;
+	ktrace_snap_t   kts;
+	int	     nentries;
+	int	     skip_entries;
+
+	if (xfs_dir_trace_buf == NULL) {
+		qprintf("The xfs directory trace buffer is not initialized\n");
+		return;
+	}
+	nentries = ktrace_nentries(xfs_dir_trace_buf);
+	if (count == -1) {
+		count = nentries;
+	}
+	if ((count <= 0) || (count > nentries)) {
+		qprintf("Invalid count.  There are %d entries.\n", nentries);
+		return;
+	}
+
+	ktep = ktrace_first(xfs_dir_trace_buf, &kts);
+	if (count != nentries) {
+		/*
+		 * Skip the total minus the number to look at minus one
+		 * for the entry returned by ktrace_first().
+		 */
+		skip_entries = nentries - count - 1;
+		ktep = ktrace_skip(xfs_dir_trace_buf, skip_entries, &kts);
+		if (ktep == NULL) {
+			qprintf("Skipped them all\n");
+			return;
+		}
+	}
+	while (ktep != NULL) {
+		if (xfs_dir_trace_entry(ktep))
+			qprintf("\n");
+		ktep = ktrace_next(xfs_dir_trace_buf, &kts);
+	}
+}
+#endif
+
+#ifdef XFS_DIR2_TRACE
+/*
+ * Print out the last "count" entries in the directory v2 trace buffer.
+ */
+static void
+xfsidbg_xdir2atrace(int count)
+{
+	ktrace_entry_t  *ktep;
+	ktrace_snap_t   kts;
+	int	     nentries;
+	int	     skip_entries;
+
+	if (xfs_dir2_trace_buf == NULL) {
+		qprintf("The xfs dirv2 trace buffer is not initialized\n");
+		return;
+	}
+	nentries = ktrace_nentries(xfs_dir2_trace_buf);
+	if (count == -1) {
+		count = nentries;
+	}
+	if ((count <= 0) || (count > nentries)) {
+		qprintf("Invalid count.  There are %d entries.\n", nentries);
+		return;
+	}
+
+	ktep = ktrace_first(xfs_dir2_trace_buf, &kts);
+	if (count != nentries) {
+		/*
+		 * Skip the total minus the number to look at minus one
+		 * for the entry returned by ktrace_first().
+		 */
+		skip_entries = nentries - count - 1;
+		ktep = ktrace_skip(xfs_dir2_trace_buf, skip_entries, &kts);
+		if (ktep == NULL) {
+			qprintf("Skipped them all\n");
+			return;
+		}
+	}
+	while (ktep != NULL) {
+		if (xfs_dir2_trace_entry(ktep))
+			qprintf("\n");
+		ktep = ktrace_next(xfs_dir2_trace_buf, &kts);
+	}
+}
+
+/*
+ * Print out the directory v2 trace buffer attached to the given inode.
+ */
+static void
+xfsidbg_xdir2itrace(xfs_inode_t *ip)
+{
+	ktrace_entry_t  *ktep;
+	ktrace_snap_t   kts;
+
+	if (ip->i_dir_trace == NULL) {
+		qprintf("The inode trace buffer is not initialized\n");
+		return;
+	}
+
+	ktep = ktrace_first(ip->i_dir_trace, &kts);
+	while (ktep != NULL) {
+		if (xfs_dir2_trace_entry(ktep))
+			qprintf("\n");
+		ktep = ktrace_next(ip->i_dir_trace, &kts);
+	}
+}
+#endif
 
 /*
  * Print xfs extent list.
@@ -4167,13 +6159,18 @@ xfsidbg_xiclog(xlog_in_core_t *iclog)
 	kdb_printf("log: 0x%p  callb: 0x%p  callb_tail: 0x%p  roundoff: %d\n",
 		iclog->ic_log, iclog->ic_callback, iclog->ic_callback_tail,
 		iclog->ic_roundoff);
-	kdb_printf("size: %d (OFFSET: %d) refcnt: %d  bwritecnt: %d",
+	kdb_printf("size: %d (OFFSET: %d) trace: 0x%p refcnt: %d bwritecnt: %d",
 		iclog->ic_size, iclog->ic_offset,
+#ifdef XFS_LOG_TRACE
+		iclog->ic_trace,
+#else
+		NULL,
+#endif
 		iclog->ic_refcnt, iclog->ic_bwritecnt);
 	if (iclog->ic_state & XLOG_STATE_ALL)
-		printflags(iclog->ic_state, ic_flags, "state:");
+		printflags(iclog->ic_state, ic_flags, " state:");
 	else
-		kdb_printf("state: INVALID 0x%x", iclog->ic_state);
+		kdb_printf(" state: INVALID 0x%x", iclog->ic_state);
 	kdb_printf("\n");
 }	/* xfsidbg_xiclog */
 
@@ -4222,6 +6219,44 @@ xfsidbg_xiclogcb(xlog_in_core_t *iclog)
 	}
 }
 
+#ifdef XFS_LOG_TRACE
+/*
+ * Print trace from incore log.
+ */
+static void
+xfsidbg_xiclogtrace(xlog_in_core_t *iclog)
+{
+	ktrace_entry_t  *ktep;
+	ktrace_snap_t   kts;
+	ktrace_t	*kt = iclog->ic_trace;
+
+	qprintf("iclog->ic_trace 0x%p\n", kt);
+	ktep = ktrace_first(kt, &kts);
+	while (ktep != NULL) {
+		switch ((__psint_t)ktep->val[0]) {
+		    case XLOG_TRACE_GRAB_FLUSH: {
+			    qprintf("grabbing semaphore\n");
+			    break;
+		    }
+		    case XLOG_TRACE_REL_FLUSH: {
+			    qprintf("releasing semaphore\n");
+			    break;
+		    }
+		    case XLOG_TRACE_SLEEP_FLUSH: {
+			    qprintf("sleeping on semaphore\n");
+			    break;
+		    }
+		    case XLOG_TRACE_WAKE_FLUSH: {
+			    qprintf("waking up on semaphore\n");
+			    break;
+		    }
+		    default: {
+		    }
+		}
+		ktep = ktrace_next(kt, &kts);
+	}
+}       /* xfsidbg_xiclogtrace */
+#endif
 
 /*
  * Print all of the inodes attached to the given mount structure.
@@ -4362,11 +6397,50 @@ xfsidbg_xlog(xlog_t *log)
 		log->l_grant_write_cycle, log->l_grant_write_bytes);
 	rbytes = log->l_grant_reserve_bytes + log->l_roundoff;
 	wbytes = log->l_grant_write_bytes + log->l_roundoff;
-       kdb_printf("GResBlocks: %d  GResRemain: %d  GWrBlocks: %d  GWrRemain: %d\n",
+	qprintf("GResBlocks: %d GResRemain: %d  GWrBlocks: %d GWrRemain: %d\n",
 	       rbytes / BBSIZE, rbytes % BBSIZE,
 	       wbytes / BBSIZE, wbytes % BBSIZE);
+#ifdef XFS_LOG_TRACE
+	qprintf("trace: 0x%p  grant_trace: use xlog value\n", log->l_trace);
+#endif
 }	/* xfsidbg_xlog */
 
+#ifdef XFS_LOG_TRACE
+/*
+ * Print grant trace for a log.
+ */
+static void
+xfsidbg_xlog_granttrace(xlog_t *log)
+{
+	ktrace_entry_t  *ktep;
+	ktrace_snap_t   kts;
+	ktrace_t	*kt;
+
+	if (((__psint_t)log) == ((__psint_t)-1)) {
+		qprintf("Usage: xl_grtr <log>\n");
+		return;
+	}
+	if ((kt = log->l_grant_trace))
+		qprintf("log->l_grant_trace 0x%p\n", kt);
+	else {
+		qprintf("log->l_grant_trace is empty!\n");
+		return;
+	}
+	ktep = ktrace_first(kt, &kts);
+	while (ktep != NULL) {
+		qprintf("%s\n", (char *)ktep->val[11]);
+		qprintf("  tic:0x%p resQ:0x%p wrQ:0x%p ",
+			ktep->val[0], ktep->val[1], ktep->val[2]);
+		qprintf("  GrResC:%d GrResB:%d GrWrC:%d GrWrB:%d \n",
+			(int)ktep->val[3], (int)ktep->val[4],
+			(int)ktep->val[5], (int)ktep->val[6]);
+		qprintf("  HeadC:%d HeadB:%d TailC:%d TailB:%d\n",
+			(int)ktep->val[7], (int)ktep->val[8],
+			(int)ktep->val[9], (int)ktep->val[10]);
+		ktep = ktrace_next(kt, &kts);
+	}
+}       /* xfsidbg_xlog_granttrace */
+#endif
 
 /*
  * Print out an XFS recovery transaction
@@ -4619,7 +6693,7 @@ xfsidbg_xaildump(xfs_mount_t *mp)
 		"6-1-buf",	/* 7 */
 		"inode",	/* 8 */
 		"buf",		/* 9 */
-		"dquot",        /* 10 */
+		"dquot",	/* 10 */
 		0
 		};
 	static char *li_flags[] = {
@@ -4681,7 +6755,7 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	static char *xmount_flags[] = {
 		"WSYNC",	/* 0x0001 */
 		"INO64",	/* 0x0002 */
-		"RQCHK",        /* 0x0004 */
+		"RQCHK",	/* 0x0004 */
 		"FSCLEAN",	/* 0x0008 */
 		"FSSHUTDN",	/* 0x0010 */
 		"NOATIME",	/* 0x0020 */
@@ -4920,6 +6994,21 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	kdb_printf("gen 0x%x delayed blks %d",
 		ip->i_gen,
 		ip->i_delayed_blks);
+#ifdef XFS_BMAP_TRACE
+	qprintf(" bmap_trace 0x%p\n", ip->i_xtrace);
+#endif
+#ifdef XFS_BMBT_TRACE
+	qprintf(" bmbt trace 0x%p\n", ip->i_btrace);
+#endif  
+#ifdef XFS_RW_TRACE
+	qprintf(" rw trace 0x%p\n", ip->i_rwtrace);
+#endif  
+#ifdef XFS_ILOCK_TRACE
+	qprintf(" ilock trace 0x%p\n", ip->i_lock_trace);
+#endif
+#ifdef XFS_DIR2_TRACE
+	qprintf(" dir trace 0x%p\n", ip->i_dir_trace);
+#endif  
 	kdb_printf("\n");
 	kdb_printf("chash 0x%p cnext 0x%p cprev 0x%p\n",
 		ip->i_chash,
@@ -5101,6 +7190,9 @@ xfsidbg_xqm_dquot(xfs_dquot_t *dqp)
 		&dqp->q_flock,
 		(valusema(&dqp->q_flock) <= 0) ? "LCK" : "UNLKD",
 		dqp->q_pincount);
+#ifdef XFS_DQUOT_TRACE
+	qprintf("dqtrace 0x%p\n", dqp->q_trace);
+#endif
 	kdb_printf("disk-dquot 0x%p\n", &dqp->q_core);
 	xfsidbg_xqm_diskdq(&dqp->q_core);
 
@@ -5145,7 +7237,7 @@ xfsidbg_xqm_dqattached_inos(xfs_mount_t	*mp)
 	kdb_printf("\nNumber of inodes with dquots attached: %d\n", n);
 }
 
-#ifdef	CONFIG_XFS_QUOTA
+#ifdef CONFIG_XFS_QUOTA
 static void
 xfsidbg_xqm_freelist_print(xfs_frlist_t *qlist, char *title)
 {
@@ -5195,6 +7287,80 @@ xfsidbg_xqm_htab(void)
 			kdb_printf("GRP %d: ", i);
 			XQMIDBG_LIST_PRINT(h, HL_NEXT);
 		}
+	}
+}
+#endif
+
+#ifdef XFS_DQUOT_TRACE
+static int
+xfsidbg_xqm_pr_dqentry(ktrace_entry_t *ktep)
+{
+	static char *xdq_flags[] = {
+		"USR",	  /* 0x1 */
+		"PRJ",	  /* 0x2 */
+		"LCKD",	 /* 0x4 */
+		"GRP",	  /* 0x8 */
+		"FLOCKD",       /* 0x08 */
+		"DIRTY",	/* 0x10 */
+		"WANT",	 /* 0x20 */
+		"INACT",	/* 0x40 */
+		"MARKER",       /* 0x80 */
+		0
+	};
+
+	if ((__psint_t)ktep->val[0] == 0)
+		return 0;
+	switch ((__psint_t)ktep->val[0]) {
+	      case DQUOT_KTRACE_ENTRY:
+		qprintf("[%d] %s\t",
+			(__psint_t)ktep->val[12], /* pid */
+			(char *)ktep->val[1]);
+		printflags((__psint_t)ktep->val[3], xdq_flags,"flgs ");
+		qprintf("\nnrefs = %d, "
+			"flags = 0x%x, "
+			"id = %d, "
+			"res_bc = 0x%x\n"
+			"bcnt = 0x%x [0x%x | 0x%x], "
+			"icnt = 0x%x [0x%x | 0x%x]\n"
+			"@ %ld\n",
+			(__psint_t)ktep->val[2], /* nrefs */
+			(__psint_t)ktep->val[3], /* flags */
+			(__psint_t)ktep->val[11], /* ID */
+			(__psint_t)ktep->val[4], /* res_bc */
+			(__psint_t)ktep->val[5], /* bcnt */
+			(__psint_t)ktep->val[8], /* bsoft */
+			(__psint_t)ktep->val[7], /* bhard */
+			(__psint_t)ktep->val[6], /* icnt */
+			(__psint_t)ktep->val[10], /* isoft */
+			(__psint_t)ktep->val[9], /* ihard */
+			(long) ((__psint_t)ktep->val[13]) /* time */
+			);
+		break;
+
+	      default:
+		qprintf("unknown dqtrace record\n");
+		break;
+	}
+	return (1);
+}
+
+void
+xfsidbg_xqm_dqtrace(xfs_dquot_t *dqp)
+{
+	ktrace_entry_t	*ktep;
+	ktrace_snap_t	kts;
+
+	if (dqp->q_trace == NULL) {
+		qprintf("The xfs dquot trace buffer is not initialized\n");
+		return;
+	}
+	qprintf("xdqtrace dquot 0x%p\n", dqp);
+
+	ktep = ktrace_first(dqp->q_trace, &kts);
+	while (ktep != NULL) {
+		if (xfsidbg_xqm_pr_dqentry(ktep))
+			qprintf("---------------------------------\n");
+		ktep = ktrace_next(dqp->q_trace, &kts);
 	}
 }
 #endif
@@ -5275,7 +7441,54 @@ xfsidbg_xqm_tpdqinfo(xfs_trans_t *tp)
 
 }
 
+#ifdef XFS_RW_TRACE
+/*
+ * Print out the read/write trace buffer attached to the given inode.
+ */
+static void
+xfsidbg_xrwtrace(xfs_inode_t *ip)
+{
+	ktrace_entry_t	*ktep;
+	ktrace_snap_t	kts;
+	int		nentries;
+	int		skip_entries;
+	int		count = xargument;
 
+	if (ip->i_rwtrace == NULL) {
+		qprintf("The inode trace buffer is not initialized\n");
+		return;
+	}
+	qprintf("i_rwtrace = 0x%p\n", ip->i_rwtrace);
+
+	nentries = ktrace_nentries(ip->i_rwtrace);
+	if (count == -1) {
+		count = nentries;
+	}
+	if ((count <= 0) || (count > nentries)) {
+		qprintf("Invalid count.  There are %d entries.\n", nentries);
+		return;
+	}
+
+	ktep = ktrace_first(ip->i_rwtrace, &kts);
+	if (count != nentries) {
+		/*
+		 * Skip the total minus the number to look at minus one
+		 * for the entry returned by ktrace_first().
+		 */
+		skip_entries = count - nentries - 1;
+		ktep = ktrace_skip(ip->i_rwtrace, skip_entries, &kts);
+		if (ktep == NULL) {
+			qprintf("Skipped them all\n");
+			return;
+		}
+	}
+	while (ktep != NULL) {
+		if (xfs_rw_trace_entry(ktep))
+			qprintf("\n");
+		ktep = ktrace_next(ip->i_rwtrace, &kts);
+	}
+}
+#endif
 
 /*
  * Print xfs superblock.
@@ -5353,7 +7566,7 @@ xfsidbg_xtp(xfs_trans_t *tp)
 		"dirty",	/* 0x1 */
 		"sb_dirty",	/* 0x2 */
 		"perm_log_res",	/* 0x4 */
-		"sync",         /* 0x08 */
+		"sync",		 /* 0x08 */
 		"dq_dirty",     /* 0x10 */
 		0
 		};
@@ -5367,7 +7580,7 @@ xfsidbg_xtp(xfs_trans_t *tp)
 
 	kdb_printf("tp 0x%p type ", tp);
 	switch (tp->t_type) {
-	case XFS_TRANS_SETATTR_NOT_SIZE: kdb_printf("SETATTR_NOT_SIZE");	break;
+	case XFS_TRANS_SETATTR_NOT_SIZE: kdb_printf("SETATTR_NOT_SIZE");break;
 	case XFS_TRANS_SETATTR_SIZE:	kdb_printf("SETATTR_SIZE");	break;
 	case XFS_TRANS_INACTIVE:	kdb_printf("INACTIVE");		break;
 	case XFS_TRANS_CREATE:		kdb_printf("CREATE");		break;
@@ -5379,32 +7592,31 @@ xfsidbg_xtp(xfs_trans_t *tp)
 	case XFS_TRANS_MKDIR:		kdb_printf("MKDIR");		break;
 	case XFS_TRANS_RMDIR:		kdb_printf("RMDIR");		break;
 	case XFS_TRANS_SYMLINK:		kdb_printf("SYMLINK");		break;
-	case XFS_TRANS_SET_DMATTRS:	kdb_printf("SET_DMATTRS");		break;
+	case XFS_TRANS_SET_DMATTRS:	kdb_printf("SET_DMATTRS");	break;
 	case XFS_TRANS_GROWFS:		kdb_printf("GROWFS");		break;
-	case XFS_TRANS_STRAT_WRITE:	kdb_printf("STRAT_WRITE");		break;
+	case XFS_TRANS_STRAT_WRITE:	kdb_printf("STRAT_WRITE");	break;
 	case XFS_TRANS_DIOSTRAT:	kdb_printf("DIOSTRAT");		break;
-	case XFS_TRANS_WRITE_SYNC:	kdb_printf("WRITE_SYNC");		break;
+	case XFS_TRANS_WRITE_SYNC:	kdb_printf("WRITE_SYNC");	break;
 	case XFS_TRANS_WRITEID:		kdb_printf("WRITEID");		break;
 	case XFS_TRANS_ADDAFORK:	kdb_printf("ADDAFORK");		break;
-	case XFS_TRANS_ATTRINVAL:	kdb_printf("ATTRINVAL");		break;
-	case XFS_TRANS_ATRUNCATE:	kdb_printf("ATRUNCATE");		break;
+	case XFS_TRANS_ATTRINVAL:	kdb_printf("ATTRINVAL");	break;
+	case XFS_TRANS_ATRUNCATE:	kdb_printf("ATRUNCATE");	break;
 	case XFS_TRANS_ATTR_SET:	kdb_printf("ATTR_SET");		break;
 	case XFS_TRANS_ATTR_RM:		kdb_printf("ATTR_RM");		break;
-	case XFS_TRANS_ATTR_FLAG:	kdb_printf("ATTR_FLAG");		break;
-	case XFS_TRANS_CLEAR_AGI_BUCKET:  kdb_printf("CLEAR_AGI_BUCKET");	break;
+	case XFS_TRANS_ATTR_FLAG:	kdb_printf("ATTR_FLAG");	break;
+	case XFS_TRANS_CLEAR_AGI_BUCKET:kdb_printf("CLEAR_AGI_BUCKET");	break;
 	case XFS_TRANS_QM_SBCHANGE:	kdb_printf("QM_SBCHANGE");	break;
 	case XFS_TRANS_QM_QUOTAOFF:	kdb_printf("QM_QUOTAOFF");	break;
-	case XFS_TRANS_QM_DQALLOC:	kdb_printf("QM_DQALLOC");		break;
-	case XFS_TRANS_QM_SETQLIM:	kdb_printf("QM_SETQLIM");		break;
+	case XFS_TRANS_QM_DQALLOC:	kdb_printf("QM_DQALLOC");	break;
+	case XFS_TRANS_QM_SETQLIM:	kdb_printf("QM_SETQLIM");	break;
 	case XFS_TRANS_QM_DQCLUSTER:	kdb_printf("QM_DQCLUSTER");	break;
 	case XFS_TRANS_QM_QINOCREATE:	kdb_printf("QM_QINOCREATE");	break;
-	case XFS_TRANS_QM_QUOTAOFF_END:	kdb_printf("QM_QOFF_END");		break;
+	case XFS_TRANS_QM_QUOTAOFF_END:	kdb_printf("QM_QOFF_END");	break;
 	case XFS_TRANS_SB_UNIT:		kdb_printf("SB_UNIT");		break;
 	case XFS_TRANS_FSYNC_TS:	kdb_printf("FSYNC_TS");		break;
 	case XFS_TRANS_GROWFSRT_ALLOC:	kdb_printf("GROWFSRT_ALLOC");	break;
 	case XFS_TRANS_GROWFSRT_ZERO:	kdb_printf("GROWFSRT_ZERO");	break;
 	case XFS_TRANS_GROWFSRT_FREE:	kdb_printf("GROWFSRT_FREE");	break;
-
 	default:			kdb_printf("0x%x", tp->t_type);	break;
 	}
 	kdb_printf(" mount 0x%p\n", tp->t_mountp);
