@@ -1781,7 +1781,7 @@ xfs_dir_put_dirent(xfs_mount_t *mp, dirent_t *dbp, xfs_ino_t ino,
 			 * (probably NFS) or has locked the user
 			 * buffer down, so work directly in its buffer.
 			 */
-			iovp->iov_base += reclen;
+			iovp->iov_base = (char *)iovp->iov_base + reclen;
 			iovp->iov_len -= reclen;
 			uio->uio_resid -= reclen;
 			*done = 1;
@@ -1819,7 +1819,7 @@ xfs_dir_put_dirent(xfs_mount_t *mp, dirent_t *dbp, xfs_ino_t ino,
 			 * (probably NFS) or has locked the user
 			 * buffer down, so work directly in its buffer.
 			 */
-			iovp->iov_base += reclen;
+			iovp->iov_base = (char *)iovp->iov_base + reclen;
 			iovp->iov_len -= reclen;
 			uio->uio_resid -= reclen;
 			*done = 1;
@@ -1852,7 +1852,7 @@ xfs_dir_put_dirent(xfs_mount_t *mp, dirent_t *dbp, xfs_ino_t ino,
 		idbp->d_name[namelen] = '\0';
 		idbp->d_off = doff;
 		if (dbp == NULL) {
-			iovp->iov_base += reclen;
+			iovp->iov_base = (char *)iovp->iov_base + reclen;
 			iovp->iov_len -= reclen;
 			uio->uio_resid -= reclen;
 			*done = 1;
