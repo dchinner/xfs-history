@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.132 $"
+#ident	"$Revision: 1.133 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -499,14 +499,6 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 		error = XFS_ERROR(EINVAL);
 		goto error2;
 	}
-	/*
-	 * Clear the quota flags, but remember them. This is so that quota code
-	 * doesn't get invoked before we're ready. This can happen when an 
-	 * inode goes inactive and wants to free blocks, 
-	 * or via xfs_log_mount_finish.
-	 */
-	quotaflags = mp->m_flags & XFS_MOUNT_QUOTA_MASK;
-	mp->m_flags &= ~(XFS_MOUNT_QUOTA_MASK);
 
 #ifdef SIM
 	/*
@@ -577,6 +569,39 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 		ASSERT(mp->m_rsumip != NULL);
 	}
 
+	
+#ifndef SIM 
+	quotaflags = 0;
+	if ((XFS_IS_QUOTA_ON(mp)) ||
+	    (XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
+	     mp->m_sb.sb_qflags & (XFS_MOUNT_UDQ_ACCT|XFS_MOUNT_PDQ_ACCT))) {
+		/*
+		 * Call mount_quotas at this point only if we won't have to do
+		 * a quotacheck.
+		 */
+		if (XFS_IS_QUOTA_ON(mp) && 
+		    XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
+		    (! XFS_QM_NEED_QUOTACHECK(mp))) {
+			(void) xfs_qm_mount_quotas(mp);
+			/*
+			 * If error occured, qm_mount_quotas code
+			 * has already disabled quotas. So, just finish
+			 * mounting, and get on with the boring life 
+			 * without disk quotas.
+			 */
+		} else {
+			/*
+			 * Clear the quota flags, but remember them. This 
+			 * is so that the quota code doesn't get invoked
+			 * before we're ready. This can happen when an 
+			 * inode goes inactive and wants to free blocks, 
+			 * or via xfs_log_mount_finish.
+			 */
+			quotaflags = mp->m_flags & XFS_MOUNT_QUOTA_MASK;
+			mp->m_flags &= ~(XFS_MOUNT_QUOTA_MASK);
+		}
+	}
+#endif		
 	/*
 	 * Finish recovering the file system.  This part needed to be
 	 * delayed until after the root and real-time bitmap inodes
@@ -589,37 +614,20 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 		goto error2;
 	}
 
-	/*
-	 * If quotas are on, mark it on now. We can't do a quotacheck
-	 * when there are disk blocks changing.
-	 */
-	mp->m_flags |= quotaflags;
 
 #ifndef SIM 
-	if ((XFS_IS_QUOTA_ON(mp)) ||
-	    (XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
-	     mp->m_sb.sb_qflags & (XFS_MOUNT_UDQ_ACCT|XFS_MOUNT_PDQ_ACCT))) {
-#ifdef DEBUG
-		cmn_err(CE_NOTE, "Attempting to turn on disk quotas.");
-#endif
-		if (error = xfs_qm_mount_quotas(mp)) {
-			/*
-			 * If error occured, qm_mount_quotas code
-			 * has already disabled quotas. So, just finish
-			 * mounting, and get on with the boring life without
-			 * disk quotas.
-			 */
-			cmn_err(CE_WARN, "Failed to initialize disk quotas.");
-		}
+	if (quotaflags) {
+		mp->m_flags |= quotaflags; 
+		(void) xfs_qm_mount_quotas(mp);
 	}
+
 #ifdef DEBUG
 	if (! (XFS_IS_QUOTA_ON(mp))) {
-		cmn_err(CE_NOTE, "Disk quotas not turned on.");
+		cmn_err(CE_NOTE, "Disk quotas not turned on: %s", mp->m_fsname);
 	} else {
-		cmn_err(CE_NOTE, "Disk quotas turned on.");
+		cmn_err(CE_NOTE, "Disk quotas turned on: %s", mp->m_fsname);
 	}
 #endif
-
 #endif /* !SIM */
 
 	/*
