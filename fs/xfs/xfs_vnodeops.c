@@ -1940,6 +1940,44 @@ xfs_inactive_attrs(
 	return (0);
 }
 
+/*ARGSUSED*/
+STATIC int
+xfs_release(
+	bhv_desc_t	*bdp)
+{
+	xfs_inode_t	*ip;
+	vnode_t		*vp;
+	xfs_mount_t	*mp;
+	int		error;
+
+	vp = BHV_TO_VNODE(bdp);
+	ip = XFS_BHVTOI(bdp);
+
+	if ((vp->v_type != VREG) || (ip->i_d.di_mode == 0)) {
+		return 0;
+	}
+
+	mp = ip->i_mount;
+
+	if (ip->i_d.di_nlink != 0) {
+		if ((((ip->i_d.di_mode & IFMT) == IFREG) &&
+		     ((ip->i_d.di_size > 0) || (vp->v_pgcnt > 0)) &&
+		     (ip->i_df.if_flags & XFS_IFEXTENTS))  &&
+		    (!(ip->i_d.di_flags & XFS_DIFLAG_PREALLOC))) {
+			if (error = xfs_inactive_free_eofblocks(mp, ip))
+				return (error);
+		}
+	}
+
+        if (vp->v_type == VREG) {
+                XFS_INODE_CLEAR_READ_AHEAD(&ip->i_iocore);
+                xfs_ilock(ip, XFS_ILOCK_EXCL);
+                xfs_iocore_reset(&ip->i_iocore);
+                xfs_iunlock(ip, XFS_ILOCK_EXCL);
+        }
+
+	return 0;
+}
 
 #endif	/* !SIM */
 
@@ -4814,6 +4852,13 @@ xfs_symlink(
 		xfs_trans_set_sync(tp);
 	}
 
+	/*
+	 * xfs_trans_commit normally decrements the vnode ref count
+	 * when it unlocks the inode. Since we want to return the
+	 * vnode to the caller, we bump the vnode ref count now.
+	 */
+	IHOLD(ip);
+
 	error = xfs_bmap_finish(&tp, &free_list, first_block, &committed);
 	if (error) {
 		goto error2;
@@ -4856,6 +4901,7 @@ std_return:
 	return error;
 
  error2:
+	IRELE(ip);
 	dnlc_remove(dir_vp, link_name);
  error1:
 	xfs_bmap_cancel(&free_list);
@@ -6301,6 +6347,7 @@ vnodeops_t xfs_vnodeops = {
 	(vop_readlink_t)fs_nosys,
 	(vop_fsync_t)fs_nosys,
 	xfs_inactive,
+	(vop_release_t)fs_nosys,
 	(vop_rwlock_t)fs_nosys,
 	(vop_rwunlock_t)fs_nosys,
 	(vop_seek_t)fs_nosys,
@@ -6341,6 +6388,7 @@ vnodeops_t xfs_vnodeops = {
 	xfs_readlink,
 	xfs_fsync,
 	xfs_inactive,
+	xfs_release,
 	xfs_rwlock,/* fs_nosys, */
 	xfs_rwunlock,/* fs_nosys, */
 	xfs_seek,

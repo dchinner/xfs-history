@@ -140,10 +140,7 @@ static int linvfs_open(
 
 	VOP_OPEN(vp, &newvp, 0, get_current_cred(), error);
 
-	if (error)
-		return -error;
-
-	return 0;
+	return -error;
 }
 
 
@@ -151,7 +148,14 @@ static int linvfs_release(
 	struct inode *inode,
 	struct file *filp)
 {
-  return(-ENOSYS);
+	vnode_t *vp = LINVFS_GET_VP(inode);
+	int	error = 0;
+
+	if (vp) {
+		VOP_RELEASE(vp, error);
+	}
+
+	return -error;
 }
 
 
@@ -245,7 +249,6 @@ struct file_operations linvfs_dir_operations = {
 	read:		linvfs_dir_read,
 	readdir:	linvfs_readdir,
 	ioctl:		linvfs_ioctl,
-	release:	linvfs_release,
 	fsync:		linvfs_fsync,
 };
 

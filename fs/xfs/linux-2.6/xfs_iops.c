@@ -427,6 +427,7 @@ struct dentry * linvfs_follow_link(struct dentry *dentry,
 	VOP_READLINK(vp, &uio, &cred, error);
 	if (error) {
 		kfree_s(link, MAXNAMELEN);
+		dput(base);
 		return NULL;
 	}
 

@@ -1306,6 +1306,42 @@ static int	kdbm_xfs_xtrans_res(
 	return 0;
 }
 
+static char *vnode_type[] = {
+	"VNON", "VREG", "VDIR", "VBLK", "VLNK", "VFIFO", "VBAD", "VSOCK"
+};
+
+static int	kdbm_vnode(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+	vnode_t		*vp;
+	bhv_desc_t	*bh;
+	char		*symname;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	vp = (vnode_t *)addr;
+	printk("vnode: 0x%p v_count %d type %s\n", vp, vp->v_count,
+		vnode_type[vp->v_type]);
+	bh = vp->v_bh.bh_first;
+	symname = kdbnearsym((unsigned int)bh->bd_ops);
+	printk("   v_inode 0x%p v_bh->bh_first 0x%p pobj 0x%p ops %s\n",
+		vp->v_inode, bh, bh->bd_pdata, symname ? symname : "???");
+	return 0;
+}
+
+
+
 
 
 static struct xif {
@@ -1424,6 +1460,7 @@ static struct xif {
 				"Dump XFS transaction structure"},
   {  "xtrres",	kdbm_xfs_xtrans_res,	"<xfs_mount_t>",
 				"Dump XFS reservation values"},
+  {  "vnode",	kdbm_vnode,	"<vnode>", "Dump vnode"},
   {  0,		0,	0 }
 };
 
