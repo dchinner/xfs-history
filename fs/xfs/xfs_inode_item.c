@@ -721,7 +721,7 @@ xfs_inode_item_pushbuf(
 {
 	xfs_inode_t	*ip;
 	xfs_mount_t 	*mp;
-	xfs_buf_t		*bp;
+	xfs_buf_t	*bp;
 	uint		dopush;
 
 	ip = iip->ili_inode;
@@ -784,11 +784,11 @@ xfs_inode_item_pushbuf(
 	}
 	/*
 	 * We have to be careful about resetting pushbuf flag too early (above).
-	 * Eventhough in theory we can do it as soon as we have the buflock,
+	 * Even though in theory we can do it as soon as we have the buflock,
 	 * we don't want others to be doing work needlessly. They'll come to
-	 * this function thinking that pushing the buffer is there responsibility
-	 * only to find that the buffer is still locked by another doing the
-	 * same thing.XXX
+	 * this function thinking that pushing the buffer is their
+	 * responsibility only to find that the buffer is still locked by
+	 * another doing the same thing
 	 */
 	iip->ili_pushbuf_flag = 0;
 	xfs_iunlock(ip, XFS_ILOCK_SHARED); 

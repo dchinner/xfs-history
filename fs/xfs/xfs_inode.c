@@ -2987,7 +2987,7 @@ xfs_iflush(
 		if (xfs_ilock_nowait(iq, XFS_ILOCK_SHARED)) {
 			/* get inode flush lock */
 			if (xfs_iflock_nowait(iq)) {
-				/* check if ipined */
+				/* check if pinned */
 				if (xfs_ipincount(iq) == 0) {
 					/* arriving here means that
 					 * this inode can be flushed.
