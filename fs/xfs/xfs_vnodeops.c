@@ -1,4 +1,4 @@
-#ident "$Revision: 1.228 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -4303,6 +4303,13 @@ xfs_mkdir(
 	 * use the slightly slower plain dnlc_enter().
 	 */
 	dnlc_enter(dir_vp, dir_name, XFS_ITOV(cdp), NOCRED);
+
+	/*
+	 * Bump the in memory version number of the parent directory
+	 * so that other processes accessing it will recognize that
+	 * the directory has changed.
+	 */
+	dp->i_gen++;
 	
 	error = xfs_dir_init(tp, cdp, dp);
 	if (error) {
@@ -4507,6 +4514,12 @@ xfs_rmdir(
 	xfs_ichgtime(dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
 	dnlc_remove(dir_vp, name);
+
+	/*
+	 * Bump the in memory generation count on the parent
+	 * directory so that other can know that it has changed.
+	 */
+	dp->i_gen++;
 
 	/*
 	 * Drop the link from cdp's "..".
@@ -4835,6 +4848,13 @@ xfs_symlink(
 	xfs_ichgtime(dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
         dnlc_enter(dir_vp, link_name, XFS_ITOV(ip), NOCRED);
+
+	/*
+	 * Bump the in memory version number of the parent directory
+	 * so that other processes accessing it will recognize that
+	 * the directory has changed.
+	 */
+	dp->i_gen++;
 
 	/*
 	 * If this is a synchronous mount, make sure that the
