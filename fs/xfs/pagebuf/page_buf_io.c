@@ -111,7 +111,7 @@ pagebuf_commit_write_core(
 	unsigned	from,
 	unsigned	to)
 {
-	int		partial = (from - to) != PAGE_CACHE_SIZE;
+	int		partial = (to - from) != PAGE_CACHE_SIZE;
 
 	__pb_block_commit_write_async(target, inode, page, partial);
 	kunmap(page);
@@ -1145,8 +1145,11 @@ __pagebuf_do_delwri(
 		err = __pb_block_prepare_write_async(target, inode, page,
 			offset, offset + bytes,
 			at_eof, NULL, mp, nmaps, PBF_WRITE);
-		if (err)
+		if (err) {
+			ClearPageUptodate(page);
+			kunmap(page);
 			goto unlock;
+		}
 		kaddr = page_address(page);
 
 		err = __copy_from_user(kaddr + offset, buf, bytes);
@@ -1386,8 +1389,11 @@ pagebuf_generic_file_write(
 			offset, offset + bytes, at_eof, bmap,
 			NULL, 0, pb_flags);
 			
-		if (status)
+		if (status) {
+			ClearPageUptodate(page);
+			kunmap(page);
 			goto unlock;
+		}
 
 		kaddr = page_address(page);
 		status = __copy_from_user(kaddr+offset, buf, bytes);
