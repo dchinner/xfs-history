@@ -4201,10 +4201,15 @@ xfs_diordwr(vnode_t	*vp,
 	 *
 	 * This enforces the alignment restrictions indicated by 
  	 * the F_DIOINFO fcntl call.
+	 *
+	 * We make an exception for swap I/O.  This will always be
+	 * page aligned and all the blocks will already be allocated,
+	 * so we don't need to worry about read/modify/write stuff.
  	 */
-	if ((((int)(uiop->uio_iov->iov_base)) & BBMASK) ||
+	if (!(vp->v_flag & VISSWAP) &&
+	    ((((int)(uiop->uio_iov->iov_base)) & BBMASK) ||
 	     (uiop->uio_offset & mp->m_blockmask) ||
-	     (uiop->uio_resid & mp->m_blockmask)) {
+	     (uiop->uio_resid & mp->m_blockmask))) {
 #ifndef SIM
 		return XFS_ERROR(EINVAL);
 #endif
