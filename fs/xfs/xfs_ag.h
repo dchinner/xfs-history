@@ -18,29 +18,29 @@ typedef enum
 
 typedef struct xfs_aghdr
 {
-	__uint32_t	xfsag_magic;	/* magic number == XFS_AGH_MAGIC */
-	__uint16_t	xfsag_version;	/* header version == XFS_AGH_VERSION */
-	__uint16_t	xfsag_seqno;	/* sequence # starting from 0 */
-	xfs_agblock_t	xfsag_length;	/* size in blocks of a.g. */
+	__uint32_t	ag_magic;	/* magic number == XFS_AGH_MAGIC */
+	__uint16_t	ag_version;	/* header version == XFS_AGH_VERSION */
+	__uint16_t	ag_seqno;	/* sequence # starting from 0 */
+	xfs_agblock_t	ag_length;	/* size in blocks of a.g. */
 	/*
 	 * Freespace information
 	 */
-	xfs_agblock_t	xfsag_roots[XFS_BTNUM_MAX - 2];
-	xfs_agblock_t	xfsag_freelist;	/* free blocks */
-	__uint16_t	xfsag_levels[XFS_BTNUM_MAX - 2];
-	xfs_extlen_t	xfsag_flist_count;	/* #blocks */
-	xfs_extlen_t	xfsag_freeblks;	/* total free blocks */
-	xfs_extlen_t	xfsag_longest;	/* longest free space */
+	xfs_agblock_t	ag_roots[XFS_BTNUM_MAX - 2];
+	xfs_agblock_t	ag_freelist;	/* free blocks */
+	__uint16_t	ag_levels[XFS_BTNUM_MAX - 2];
+	xfs_extlen_t	ag_flist_count;	/* #blocks */
+	xfs_extlen_t	ag_freeblks;	/* total free blocks */
+	xfs_extlen_t	ag_longest;	/* longest free space */
 	/*
 	 * We may really want to put the inode btree root here instead
 	 * of pointing at it, but for now it simplifies things to not
 	 * have to special case the root block of the Btree.
 	 */
-	xfs_agblock_t	xfsag_iroot;	/* root block of B-tree for inode map */
-	xfs_agino_t	xfsag_icount;	/* count of allocated inodes */
-	__uint16_t	xfsag_ilevels;	/* # levels in the B-tree */
-	xfs_agino_t	xfsag_iflist;	/* first free inode */
-	xfs_agino_t	xfsag_ifcount;	/* number of free inodes */
+	xfs_agblock_t	ag_iroot;	/* root block of B-tree for inode map */
+	xfs_agino_t	ag_icount;	/* count of allocated inodes */
+	__uint16_t	ag_ilevels;	/* # levels in the B-tree */
+	xfs_agino_t	ag_iflist;	/* first free inode */
+	xfs_agino_t	ag_ifcount;	/* number of free inodes */
 } xfs_aghdr_t;
 
 /* block number in the AG; SB is block 0 */
@@ -49,14 +49,14 @@ typedef struct xfs_aghdr
 #define	XFS_AG_MIN_SIZE	(1<<24)	/* bytes */
 #define	XFS_AG_MAX_SIZE	(1<<30)	/* bytes */
 
-#define	XFS_MIN_FREELIST(a)	(2 * (((a)->xfsag_levels[XFS_BTNUM_BNO]) + ((a)->xfsag_levels[XFS_BTNUM_CNT]) + 1))
+#define	XFS_MIN_FREELIST(a)	(2 * (((a)->ag_levels[XFS_BTNUM_BNO]) + ((a)->ag_levels[XFS_BTNUM_CNT]) + 1))
 
 #define	xfs_agb_to_fsb(s,agno,agbno) \
-	((xfs_fsblock_t)((agno) * (s)->xfsb_agblocks + (agbno)))
+	((xfs_fsblock_t)((agno) * (s)->sb_agblocks + (agbno)))
 #define	xfs_fsb_to_agno(s,fsbno) \
-	((xfs_agnumber_t)((fsbno) / (s)->xfsb_agblocks))
+	((xfs_agnumber_t)((fsbno) / (s)->sb_agblocks))
 #define	xfs_fsb_to_agbno(s,fsbno) \
-	((xfs_agblock_t)((fsbno) % (s)->xfsb_agblocks))
+	((xfs_agblock_t)((fsbno) % (s)->sb_agblocks))
 
 #define	xfs_daddr_to_agno(s,d) \
 	xfs_fsb_to_agno(s,xfs_daddr_to_fsb(s,d))
