@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_H
 #define	_FS_XFS_DIR_H
 
-#ident	"$Revision: 1.15 $"
+#ident	"$Revision: 1.16 $"
 
 /*
  * xfs_dir.h
