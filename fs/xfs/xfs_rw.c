@@ -75,31 +75,35 @@ lock_t		xfsd_lock;
 sema_t		xfsd_wait;
 
 STATIC void
-xfs_zero_bp(buf_t	*bp,
-	    int		data_offset,
-	    int		data_len);
+xfs_zero_bp(
+	buf_t	*bp,
+	int	data_offset,
+	int	data_len);
 
 STATIC int
-xfs_retrieved(int	available,
-	      off_t	offset,
-	      int	count,
-	      uint	*total_retrieved,
-	      __int64_t	isize);
+xfs_retrieved(
+	int		available,
+	off_t		offset,
+	int		count,
+	uint		*total_retrieved,
+	xfs_fsize_t	isize);
 
 int
-xfs_diordwr(vnode_t	*vp,
-	 uio_t		*uiop,
-	 int		ioflag,
-	 cred_t		*credp,
-	 int		rw);
+xfs_diordwr(
+	vnode_t	*vp,
+	uio_t		*uiop,
+	int		ioflag,
+	cred_t		*credp,
+	int		rw);
 
 extern int
-xfs_grio_req(xfs_inode_t *,
-	     struct reservation_id *, 
-	     uio_t *,
-	     int,
-	     cred_t *,
-	     int);
+xfs_grio_req(
+	xfs_inode_t *,
+	struct reservation_id *, 
+	uio_t *,
+	int,
+	cred_t *,
+	int);
 
 /*
  * Round the given file offset down to the nearest read/write
@@ -117,14 +121,15 @@ xfs_grio_req(xfs_inode_t *,
  * Everything here is in terms of file system blocks, not BBs.
  */
 void
-xfs_next_bmap(xfs_mount_t	*mp,
-	      xfs_bmbt_irec_t	*imapp,
-	      struct bmapval	*bmapp,
-	      int		iosize,
-	      int		last_iosize,
-	      xfs_fileoff_t	ioalign,
-	      xfs_fileoff_t	last_offset,
-	      xfs_fileoff_t	req_offset)
+xfs_next_bmap(
+	xfs_mount_t	*mp,
+	xfs_bmbt_irec_t	*imapp,
+	struct bmapval	*bmapp,
+	int		iosize,
+	int		last_iosize,
+	xfs_fileoff_t	ioalign,
+	xfs_fileoff_t	last_offset,
+	xfs_fileoff_t	req_offset)
 {
 	int		extra_blocks;
 	xfs_fileoff_t	size_diff;
@@ -247,14 +252,15 @@ xfs_next_bmap(xfs_mount_t	*mp,
  * Isize is the current size of the file being read.
  */
 STATIC int
-xfs_retrieved(int	available,
-	      off_t	offset,
-	      int	count,
-	      uint	*total_retrieved,
-	      __int64_t	isize)
+xfs_retrieved(
+	int		available,
+	off_t		offset,
+	int		count,
+	uint		*total_retrieved,
+	xfs_fsize_t	isize)
 {
 	int		retrieved;
-	__int64_t	file_bytes_left;
+	xfs_fsize_t	file_bytes_left;
 	
 
 	if ((available + *total_retrieved) > count) {
@@ -297,11 +303,12 @@ xfs_retrieved(int	available,
  * rest of the page is passed off to here.
  */
 STATIC void
-xfs_iomap_extra(xfs_inode_t	*ip,
-		off_t		offset,
-		size_t		count,
-		struct bmapval	*bmapp,
-		int		*nbmaps)
+xfs_iomap_extra(
+	xfs_inode_t	*ip,
+	off_t		offset,
+	size_t		count,
+	struct bmapval	*bmapp,
+	int		*nbmaps)
 {
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t	count_fsb;
@@ -336,11 +343,12 @@ xfs_iomap_extra(xfs_inode_t	*ip,
 }
 
 void
-xfs_iomap_read(xfs_inode_t	*ip,
-	       off_t		offset,
-	       size_t		count,
-	       struct bmapval	*bmapp,
-	       int		*nbmaps)
+xfs_iomap_read(
+	xfs_inode_t	*ip,
+	off_t		offset,
+	size_t		count,
+	struct bmapval	*bmapp,
+	int		*nbmaps)
 {
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t	ioalign;
@@ -348,7 +356,7 @@ xfs_iomap_read(xfs_inode_t	*ip,
 	xfs_fileoff_t	last_required_offset;
 	xfs_fileoff_t	last_fsb;
 	xfs_fileoff_t	next_offset;
-	__int64_t	nisize;
+	xfs_fsize_t	nisize;
 	off_t		offset_page;
 	int		nimaps;
 	unsigned int	iosize;
@@ -644,10 +652,11 @@ xfs_iomap_read(xfs_inode_t	*ip,
 			
 		
 int
-xfs_read_file(vnode_t	*vp,
-	      uio_t	*uiop,
-	      int	ioflag,
-	      cred_t	*credp)
+xfs_read_file(
+	vnode_t	*vp,
+	uio_t	*uiop,
+	int	ioflag,
+	cred_t	*credp)
 {
 #define	XFS_READ_BMAPS	4
 	struct bmapval	bmaps[XFS_READ_BMAPS];
@@ -750,10 +759,11 @@ xfs_read_file(vnode_t	*vp,
  * This is a stub.
  */
 int
-xfs_read(vnode_t	*vp,
-	 uio_t		*uiop,
-	 int		ioflag,
-	 cred_t		*credp)
+xfs_read(
+	vnode_t	*vp,
+	uio_t		*uiop,
+	int		ioflag,
+	cred_t		*credp)
 {
 	struct reservation_id id;
 	xfs_inode_t	*ip;
@@ -832,12 +842,13 @@ xfs_read(vnode_t	*vp,
  * are confined to the given extent.
  */
 STATIC void
-xfs_write_bmap(xfs_mount_t	*mp,
-	       xfs_bmbt_irec_t	*imapp,
-	       struct bmapval	*bmapp,
-	       int		iosize,
-	       xfs_fileoff_t	ioalign,
-	       __int64_t	isize)
+xfs_write_bmap(
+	xfs_mount_t	*mp,
+	xfs_bmbt_irec_t	*imapp,
+	struct bmapval	*bmapp,
+	int		iosize,
+	xfs_fileoff_t	ioalign,
+	xfs_fsize_t	isize)
 {
 	int		extra_blocks;
 	xfs_fileoff_t	size_diff;
@@ -907,13 +918,14 @@ xfs_write_bmap(xfs_mount_t	*mp,
  * we don't re-read garbage from it later.
  */
 void
-xfs_zero_eof(xfs_inode_t	*ip,
-	     off_t		offset,
-	     __int64_t		isize,
-	     cred_t		*credp)
+xfs_zero_eof(
+	xfs_inode_t	*ip,
+	off_t		offset,
+	xfs_fsize_t	isize,
+	cred_t		*credp)
 {
 	xfs_fileoff_t	last_fsb;
-	__int64_t	last_byte;
+	xfs_fsize_t	last_byte;
 	off_t		page_start;
 	off_t		ioalign;
 	xfs_mount_t	*mp;
@@ -1020,11 +1032,12 @@ xfs_zero_eof(xfs_inode_t	*ip,
 }
 
 STATIC void
-xfs_iomap_write(xfs_inode_t	*ip,
-		off_t		offset,
-		size_t		count,
-		struct bmapval	*bmapp,
-		int		*nbmaps)
+xfs_iomap_write(
+	xfs_inode_t	*ip,
+	off_t		offset,
+	size_t		count,
+	struct bmapval	*bmapp,
+	int		*nbmaps)
 {
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t	ioalign;
@@ -1032,7 +1045,7 @@ xfs_iomap_write(xfs_inode_t	*ip,
 	xfs_fileoff_t	last_fsb;
 	xfs_fileoff_t	bmap_end_fsb;
 	off_t		next_offset;
-	__int64_t	isize;
+	xfs_fsize_t	isize;
 	int		nimaps;
 	unsigned int	iosize;
 	unsigned int	writing_bytes;
@@ -1234,10 +1247,11 @@ xfs_iomap_write(xfs_inode_t	*ip,
 
 
 int
-xfs_write_file(vnode_t	*vp,
-	       uio_t	*uiop,
-	       int	ioflag,
-	       cred_t	*credp)
+xfs_write_file(
+	vnode_t	*vp,
+	uio_t	*uiop,
+	int	ioflag,
+	cred_t	*credp)
 {
 #define	XFS_WRITE_BMAPS	4
 	struct bmapval	bmaps[XFS_WRITE_BMAPS];
@@ -1248,7 +1262,7 @@ xfs_write_file(vnode_t	*vp,
 	xfs_inode_t	*ip;
 	int		error;
 	int		eof_zeroed;
-	__int64_t	isize;
+	xfs_fsize_t	isize;
 
 	ip = XFS_VTOI(vp);
 	error = 0;
@@ -1390,13 +1404,13 @@ xfs_write_file(vnode_t	*vp,
 /*
  * xfs_write
  *
- * This is a stub.
  */
 int
-xfs_write(vnode_t	*vp,
-	  uio_t		*uiop,
-	  int		ioflag,
-	  cred_t	*credp)
+xfs_write(
+	vnode_t	*vp,
+	uio_t	*uiop,
+	int	ioflag,
+	cred_t	*credp)
 {
 	struct reservation_id id;
 	xfs_inode_t	*ip;
@@ -1518,13 +1532,14 @@ xfs_write(vnode_t	*vp,
  * iolock in at least shared mode.
  */
 int
-xfs_bmap(vnode_t	*vp,
-	 off_t		offset,
-	 ssize_t	count,
-	 int		flags,
-	 cred_t		*credp,
-	 struct bmapval	*bmapp,
-	 int		*nbmaps)
+xfs_bmap(
+	vnode_t		*vp,
+	off_t		offset,
+	ssize_t		count,
+	int		flags,
+	cred_t		*credp,
+	struct bmapval	*bmapp,
+	int		*nbmaps)
 {
 	xfs_inode_t	*ip;
 
@@ -1552,10 +1567,11 @@ xfs_bmap(vnode_t	*vp,
  * from rbp_offset from the start of bp for rbp_len bytes.
  */
 STATIC void
-xfs_overlap_bp(buf_t	*bp,
-	       buf_t	*rbp,
-	       uint	rbp_offset,
-	       uint	rbp_len)
+xfs_overlap_bp(
+	buf_t	*bp,
+	buf_t	*rbp,
+	uint	rbp_offset,
+	uint	rbp_len)
 {
 	int	pgbboff;
 	int	bytes_off;
@@ -1617,9 +1633,10 @@ xfs_overlap_bp(buf_t	*bp,
  * bytes.
  */
 STATIC void
-xfs_zero_bp(buf_t	*bp,
-	    int		data_offset,
-	    int		data_len)
+xfs_zero_bp(
+	buf_t	*bp,
+	int	data_offset,
+	int	data_len)
 {
 	pfd_t	*pfdp;
 	caddr_t	page_addr;
@@ -1658,15 +1675,16 @@ xfs_zero_bp(buf_t	*bp,
  * over real disk space we need to read in the stuff from disk.
  */
 STATIC void
-xfs_strat_read(vnode_t	*vp,
-	       buf_t	*bp)
+xfs_strat_read(
+	vnode_t	*vp,
+	buf_t	*bp)
 {
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t   map_start_fsb;
 	xfs_fileoff_t	imap_offset;
 	xfs_extlen_t	count_fsb;
 	xfs_extlen_t	imap_blocks;
-	__int64_t	isize;
+	xfs_fsize_t	isize;
 	off_t		offset;
 	off_t		end_offset;
 	int		x;
@@ -1781,11 +1799,12 @@ xfs_strat_read(vnode_t	*vp,
  * pdflush() turns one of our extra pages into a buffer.
  */
 STATIC xfs_extlen_t
-xfs_strat_write_count(xfs_inode_t	*ip,
-		      xfs_fileoff_t	offset_fsb,
-		      xfs_extlen_t	buf_fsb,
-		      xfs_bmbt_irec_t	*imap,
-		      int		imap_count)
+xfs_strat_write_count(
+	xfs_inode_t	*ip,
+	xfs_fileoff_t	offset_fsb,
+	xfs_extlen_t	buf_fsb,
+	xfs_bmbt_irec_t	*imap,
+	int		imap_count)
 {
 	xfs_fileoff_t	off_fsb;
 	xfs_extlen_t	count_fsb;
@@ -1836,7 +1855,8 @@ xfs_strat_write_count(xfs_inode_t	*ip,
  * to free the subordinate buffer.
  */
 STATIC void
-xfs_strat_write_relse(buf_t	*rbp)
+xfs_strat_write_relse(
+	buf_t	*rbp)
 {
 	int	s;
 	buf_t	*leader;
@@ -1910,8 +1930,9 @@ xfs_strat_write_relse(buf_t	*rbp)
 }
 
 STATIC void
-xfs_strat_write(vnode_t	*vp,
-		buf_t	*bp)
+xfs_strat_write(
+	vnode_t	*vp,
+	buf_t	*bp)
 {
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t   map_start_fsb;
@@ -2111,8 +2132,9 @@ xfs_strat_write(vnode_t	*vp,
  * is pass the buffer on to the underlying driver.
  */
 void
-xfs_strategy(vnode_t	*vp,
-	     buf_t	*bp)
+xfs_strategy(
+	vnode_t	*vp,
+	buf_t	*bp)
 {
 	xfs_mount_t	*mp;
 	int		s;
