@@ -305,11 +305,13 @@ xlog_find_verify_cycle( xlog_t 		*log,
         
 
 	for (i = start_blk; i < start_blk + nbblks; i += bufblks)  {
-                if ((error = xlog_bread(log, i, bufblks, bp)))
+		int bcount = min(bufblks, (start_blk + nbblks - i));
+
+                if ((error = xlog_bread(log, i, bcount, bp)))
 		        goto out;
 
 		buf = XFS_BUF_PTR(bp);
-		for (j = 0; j < bufblks; j++) {
+		for (j = 0; j < bcount; j++) {
 			cycle = GET_CYCLE(buf, ARCH_CONVERT);
 			if (cycle == stop_on_cycle_no) {
 				error = i;
