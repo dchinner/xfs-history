@@ -1,4 +1,4 @@
-#ident "$Revision: 1.204 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -102,7 +102,7 @@ STATIC int	xfs_truncate_file(xfs_mount_t	*mp,
 STATIC int	xfs_droplink(xfs_trans_t *tp,
 			     xfs_inode_t *ip);
 
-STATIC void	xfs_bumplink(xfs_trans_t *tp,
+STATIC int	xfs_bumplink(xfs_trans_t *tp,
 			     xfs_inode_t *ip);
 
 STATIC int	xfs_open(vnode_t	**vpp,
@@ -352,7 +352,7 @@ xfs_close(
 
 	extern 	int	grio_remove_reservation( pid_t, dev_t, gr_ino_t);
 	int		isshd, nofiles, vpcount, i;
-	proc_t		*p = u.u_procp;
+	proc_t		*p = curprocp;
 	shaddr_t	*sa = p->p_shaddr;
         xfs_inode_t	*ip;
 	struct file	*fp;
@@ -402,7 +402,7 @@ xfs_close(
 
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
-	cleanlocks(vp, u.u_procp->p_epid, u.u_procp->p_sysid);
+	cleanlocks(vp, curprocp->p_epid, curprocp->p_sysid);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
 	return 0;
@@ -434,9 +434,12 @@ xfs_getattr(
 	}
         vap->va_fsid = ip->i_dev;
 
-	/* trunc to 32 bits in 32-bit kernels */
-
-        vap->va_nodeid = ip->i_ino;
+	mp = XFS_VFSTOM(vp->v_vfsp);
+	vap->va_nodeid = ip->i_ino;
+#if XFS_BIG_FILESYSTEMS
+	if (mp->m_flags & XFS_MOUNT_INO64)
+		vap->va_nodeid += XFS_INO64_OFFSET;
+#endif
 
         if (vap->va_mask == (AT_FSID|AT_NODEID)) {
 		xfs_iunlock (ip, XFS_ILOCK_SHARED);
@@ -471,8 +474,6 @@ xfs_getattr(
         vap->va_mtime.tv_nsec = ip->i_d.di_mtime.t_nsec;
         vap->va_ctime.tv_sec = ip->i_d.di_ctime.t_sec;
         vap->va_ctime.tv_nsec = ip->i_d.di_ctime.t_nsec;
-
-	mp = XFS_VFSTOM(vp->v_vfsp);
 
         switch (ip->i_d.di_mode & IFMT) {
           case IFBLK:
@@ -1276,10 +1277,7 @@ xfs_inactive(
 		(void) dm_namesp_event(DM_DESTROY, vp, NULL, NULL, NULL, 0, 0);
 	}
 
-#ifdef SIM
-	ASSERT(ip->i_d.di_nlink >= 0);
-#else
-	ASSERT(ip->i_d.di_nlink >= 0);
+#ifndef SIM
 	mp = ip->i_mount;
 	if (ip->i_d.di_nlink == 0) {
 		tp = xfs_trans_alloc(mp, XFS_TRANS_INACTIVE);
@@ -1832,7 +1830,7 @@ xfs_dir_ialloc(
 	xfs_inode_t	*dp,		/* directory within whose allocate
 					   the inode. */
 	mode_t		mode,
-	ushort		nlink,
+	nlink_t		nlink,
 	dev_t		rdev,
 	cred_t		*credp,
 	xfs_inode_t	**ipp,		/* pointer to inode; it will be
@@ -1993,15 +1991,18 @@ xfs_droplink(
 /*
  * Increment the link count on an inode & log the change.
  */
-STATIC void
+STATIC int
 xfs_bumplink(
 	xfs_trans_t *tp,
 	xfs_inode_t *ip)
 {
+	if (ip->i_d.di_nlink >= XFS_MAXLINK)
+		return XFS_ERROR(EMLINK);
 	xfs_ichgtime(ip, XFS_ICHGTIME_CHG);
 
         ip->i_d.di_nlink++;
         xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+	return 0;
 }
 
 
@@ -3072,6 +3073,14 @@ xfs_link(
         xfs_trans_ijoin(tp, tdp, XFS_ILOCK_EXCL);
 
 	/*
+	 * If the source has too many links, we can't make any more to it.
+	 */
+	if (sip->i_d.di_nlink >= XFS_MAXLINK) {
+		error = XFS_ERROR(EMLINK);
+		goto error_return;
+	}
+
+	/*
 	 * If the target directory has been removed, we can't link
 	 * any more files in it.
 	 */
@@ -3104,8 +3113,10 @@ xfs_link(
 	tdp->i_gen++;
 	xfs_trans_log_inode(tp, tdp, XFS_ILOG_CORE);
 
-
-	xfs_bumplink(tp, sip);
+	error = xfs_bumplink(tp, sip);
+	if (error) {
+		goto abort_return;
+	}
 
 	/*
 	 * If this is a synchronous mount, make sure that the
@@ -3313,7 +3324,7 @@ xfs_ancestor_check(
 		}
 		ASSERT(ip != NULL);
 		if (((ip->i_d.di_mode & IFMT) != IFDIR) ||
-		    (ip->i_d.di_nlink <= 0)) {
+		    (ip->i_d.di_nlink == 0)) {
                         prdev("Ancestor inode %d is not a directory",
 			      ip->i_dev, ip->i_ino);
                         error = XFS_ERROR(ENOTDIR);
@@ -3534,18 +3545,28 @@ xfs_rename(
 		ASSERT(src_ip->i_d.di_nlink >= 2);
 
 		/*
+		 * Check for link count overflow on target_dp
+		 */
+		if (target_ip == NULL && new_parent &&
+		    target_dp->i_d.di_nlink >= XFS_MAXLINK) {
+			error = XFS_ERROR(EMLINK);
+			rename_which_error_return = 11;
+			goto error_return;
+		}
+		    
+		/*
 		 * Cannot rename ".."
 		 */
 		if ((src_name[0] == '.') && (src_name[1] == '.') &&
 		    (src_name[2] == '\0')) {
 			error = XFS_ERROR(EINVAL);
-			rename_which_error_return = 11;
+			rename_which_error_return = 12;
 			goto error_return;
 		}
                 if ((target_name[0] == '.') && (target_name[1] == '.') &&
                     (target_name[2] == '\0')) {
                         error = XFS_ERROR(EINVAL);
-			rename_which_error_return = 12;
+			rename_which_error_return = 13;
                         goto error_return;
                 }
 
@@ -3569,7 +3590,7 @@ xfs_rename(
 						   target_dp, target_ip,
 						   &state_has_changed);
 			if (error) {
-				rename_which_error_return = 13;
+				rename_which_error_return = 14;
 				goto error_return;
 			}
 
@@ -3602,13 +3623,17 @@ xfs_rename(
 					   src_ip->i_ino, &first_block,
 					   &free_list, MAX_EXT_NEEDED);
 		if (error) {
-			rename_which_error_return = 14;
+			rename_which_error_return = 15;
 			goto abort_return;
 		}
 		xfs_ichgtime(target_dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
 		if (new_parent && src_is_directory) {
-			xfs_bumplink(tp, target_dp);
+			error = xfs_bumplink(tp, target_dp);
+			if (error) {
+				rename_which_error_return = 16;
+				goto abort_return;
+			}
 		}
 	} else { /* target_ip != NULL */
 
@@ -3625,7 +3650,7 @@ xfs_rename(
 			 */
 			if (!src_is_directory) {
 				error = XFS_ERROR(EISDIR);
-				rename_which_error_return = 15;
+				rename_which_error_return = 17;
 				goto error_return;
 			}
 
@@ -3635,21 +3660,21 @@ xfs_rename(
 			if (!(xfs_dir_isempty(target_ip)) || 
 			    (target_ip->i_d.di_nlink > 2)) {
 				error = XFS_ERROR(EEXIST);
-				rename_which_error_return = 16;
+				rename_which_error_return = 18;
                                 goto error_return;
                         }
 
-			if (ABI_IS_SVR4(u.u_procp->p_abi) &&
+			if (ABI_IS_SVR4(curprocp->p_abi) &&
                             XFS_ITOV(target_ip)->v_vfsmountedhere) {
                                 error = XFS_ERROR(EBUSY);
-				rename_which_error_return = 17;
+				rename_which_error_return = 19;
                                 goto error_return;
                         }
 
 		} else {
 			if (src_is_directory) {
 				error = XFS_ERROR(ENOTDIR);
-				rename_which_error_return = 18;
+				rename_which_error_return = 20;
 				goto error_return;
 			}
 		}
@@ -3672,7 +3697,7 @@ xfs_rename(
 			((target_pnp != NULL) ? target_pnp->pn_complen :
 			 strlen(target_name)), src_ip->i_ino);
 		if (error) {
-			rename_which_error_return = 19;
+			rename_which_error_return = 21;
 			goto abort_return;
 		}
 		xfs_ichgtime(target_dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
@@ -3686,7 +3711,7 @@ xfs_rename(
 		 */
 		error = xfs_droplink(tp, target_ip);
 		if (error) {
-			rename_which_error_return = 20;
+			rename_which_error_return = 22;
 			goto abort_return;;
 		}
 
@@ -3696,7 +3721,7 @@ xfs_rename(
 			 */
 			error = xfs_droplink(tp, target_ip);
 			if (error) {
-				rename_which_error_return = 21;
+				rename_which_error_return = 23;
 				goto abort_return;
 			}
 		} 
@@ -3717,7 +3742,7 @@ xfs_rename(
 		error = xfs_dir_replace(tp, src_ip, "..", 2,
 					target_dp->i_ino);
 		if (error) {
-			rename_which_error_return = 22;
+			rename_which_error_return = 24;
 			goto abort_return;
 		}
 		xfs_ichgtime(src_ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
@@ -3730,7 +3755,7 @@ xfs_rename(
 		 */
 		error = xfs_droplink(tp, src_dp);
 		if (error) {
-			rename_which_error_return = 23;
+			rename_which_error_return = 25;
 			goto abort_return;
 		}
 	}
@@ -3739,7 +3764,7 @@ xfs_rename(
 	error = xfs_dir_removename(tp, src_dp, src_name, &first_block,
 				   &free_list, MAX_EXT_NEEDED);
 	if (error) {
-		rename_which_error_return = 24;
+		rename_which_error_return = 26;
 		goto abort_return;
 	}
 	xfs_ichgtime(src_dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
@@ -3876,9 +3901,17 @@ xfs_mkdir(
 	 * Since dp was not locked between VOP_LOOKUP and VOP_MKDIR,
 	 * the directory could have been removed.
 	 */
-        if (dp->i_d.di_nlink <= 0) {
+        if (dp->i_d.di_nlink == 0) {
 		error = XFS_ERROR(ENOENT);
                 goto error_return;
+	}
+
+	/* 
+	 * Check for directory link count overflow.
+	 */
+	if (dp->i_d.di_nlink >= XFS_MAXLINK) {
+		error = XFS_ERROR(EMLINK);
+		goto error_return;
 	}
 
         error = xfs_dir_lookup_int(NULL, dir_vp, 0, dir_name, NULL,
@@ -3938,7 +3971,10 @@ xfs_mkdir(
 	}
 
 	cdp->i_gen = 1;
-	xfs_bumplink(tp, dp);
+	error = xfs_bumplink(tp, dp);
+	if (error) {
+		goto error2;
+	}
 
 	dnlc_remove(XFS_ITOV(cdp), "..");
 
@@ -4204,7 +4240,7 @@ xfs_readdir(
 
 
 	/* If the directory has been removed after it was opened. */
-        if (dp->i_d.di_nlink <= 0) {
+        if (dp->i_d.di_nlink == 0) {
                 xfs_iunlock_map_shared(dp, lock_mode);
                 return 0;
         }
@@ -4608,6 +4644,8 @@ xfs_seek(
 	off_t		old_offset,
 	off_t		*new_offsetp)
 {
+	if (vp->v_type == VDIR)
+		return(0);
 	if ((*new_offsetp > XFS_MAX_FILE_OFFSET) ||
 	    (*new_offsetp < 0)) {
 		return XFS_ERROR(EINVAL);
@@ -5041,7 +5079,7 @@ xfs_fcntl(
 		} else if (vp->v_type != VREG) {
 			error = XFS_ERROR(EINVAL);
 #ifdef _K64U64
-		} else if (ABI_IS_IRIX5_64(u.u_procp->p_abi)) {
+		} else if (ABI_IS_IRIX5_64(curprocp->p_abi)) {
 			if (copyin((caddr_t)arg, &bf, sizeof bf)) {
 				error = XFS_ERROR(EFAULT);
 				break;
@@ -5049,7 +5087,7 @@ xfs_fcntl(
 #endif
 		} else if (cmd == F_ALLOCSP64 || cmd == F_FREESP64   ||
 			   cmd == F_RESVSP64  || cmd == F_UNRESVSP64 || 
-			   ABI_IS_IRIX5_N32(u.u_procp->p_abi)) {
+			   ABI_IS_IRIX5_N32(curprocp->p_abi)) {
 			/* 
 			 * The n32 flock structure is the same size as the
 			 * o32 flock64 structure. So the copyin_xlate
@@ -5057,7 +5095,7 @@ xfs_fcntl(
 			 */
 			if (COPYIN_XLATE((caddr_t)arg, &bf, sizeof bf,
 					 irix5_n32_to_flock,
-					 u.u_procp->p_abi, 1)) {
+					 curprocp->p_abi, 1)) {
 				error = XFS_ERROR(EFAULT);
 				break;
 			}
@@ -5077,7 +5115,7 @@ xfs_fcntl(
 
 		if (!error) {
 			error = xfs_change_file_space(vp, cmd, &bf, offset,
-						      u.u_cred );
+						      curprocp->p_cred );
 		}
 		break;
 
@@ -5404,6 +5442,7 @@ xfs_alloc_file_space(
 			datablocks = 0;
 		} else {
 			datablocks = allocatesize_fsb;
+			numrtextents = 0;
 		}
 
 		/*
