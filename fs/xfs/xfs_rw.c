@@ -2420,6 +2420,7 @@ xfs_diordwr(vnode_t	*vp,
 {
 	xfs_inode_t	*ip;
 	struct dio_s	dp;
+	xfs_mount_t	*mp;
 	buf_t		*bp;
 	int		error;
 
@@ -2460,7 +2461,12 @@ xfs_diordwr(vnode_t	*vp,
 	 */
 	bp = getphysbuf();
 	bp->b_private = &dp;
-	bp->b_edev = ip->i_dev;
+	mp = XFS_VFSTOM(vp->v_vfsp);
+	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
+		bp->b_edev = mp->m_rtdev;
+	} else {
+		bp->b_edev = mp->m_dev;
+	}
 
 	/*
  	 * Perform I/O operation.
