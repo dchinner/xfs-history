@@ -198,8 +198,11 @@ void		xfs_ipin(xfs_inode_t *);
 void		xfs_iunpin(xfs_inode_t *);
 void		xfs_iflush(xfs_inode_t *, uint);
 int		xfs_iflush_all(xfs_mount_t *, int);
+#ifdef SIM
 void		xfs_iprint(xfs_inode_t *);
+#endif
 int		xfs_iaccess(xfs_inode_t *, mode_t, struct cred *);
+uint		xfs_iroundup(uint);
 
 extern struct zone	*xfs_inode_zone;
 
