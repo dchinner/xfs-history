@@ -774,7 +774,6 @@ xfs_dir2_put_dirent32_uio(
 {
 	irix5_dirent_t		*idbp;		/* dirent pointer */
 	int			namelen;	/* entry name length */
-	int			reclen;		/* entry total length */
 	int			rval;		/* return value */
 	uio_t			*uio;		/* I/O control */
 	linux_off_t		offset = (linux_off_t )pa->cook;
@@ -791,7 +790,6 @@ xfs_dir2_put_dirent32_uio(
 	}
 #endif
 	namelen = pa->namelen;
-	reclen = IRIX5_DIRENTSIZE(namelen);
 	uio = pa->uio;
 	rval = uio->uio_copy((void *)uio->uio_iov->iov_base,
 			pa->name, namelen, offset, ino, pa->type);
@@ -850,14 +848,12 @@ xfs_dir2_put_dirent64_uio(
 {
 	dirent_t		*idbp;		/* dirent pointer */
 	int			namelen;	/* entry name length */
-	int			reclen;		/* entry total length */
 	int			rval;		/* return value */
 	uio_t			*uio;		/* I/O control */
 	linux_off_t		offset = (linux_off_t )pa->cook;
 	linux_ino_t		ino = (linux_ino_t) pa->ino;
 
 	namelen = pa->namelen;
-	reclen = DIRENTSIZE(namelen);
 	uio = pa->uio;
 
 	rval = uio->uio_copy((void *)uio->uio_iov->iov_base,
