@@ -1,4 +1,4 @@
-#ident "$Revision: 1.191 $"
+#ident "$Revision: 1.192 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1434,12 +1434,10 @@ xfs_inactive(
 
 		/*
 		 * If there are attributes associated with the file
-		 * then blow them away now.  The code here is just
-		 * like that above for truncating the file but it gets
-		 * the other fork and uses xfs_atruncate_start() rather
-		 * than xfs_itruncate_start().  We need to just commit
-		 * the current transaction because we can't use it
-		 * for xfs_atruncate_start().
+		 * then blow them away now.  The code calls a routine
+		 * that recursively deconstructs the attribute fork.
+		 * We need to just commit the current transaction
+		 * because we can't use it for xfs_attr_inactive().
 		 */
  free_attrs:
 		if (ip->i_d.di_anextents > 0) {
@@ -1450,25 +1448,21 @@ xfs_inactive(
 					    XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 				goto out;
 			}
-			xfs_iunlock(ip, XFS_ILOCK_EXCL);
-			error = xfs_atruncate_start(ip);
-			/*
-			 * If we can't clean up the attribute fork properly,
-			 * then just blow it away and free the inode.
-			 */
-			if (error) {
-				xfs_ilock(ip, XFS_ILOCK_EXCL);
-				tp = NULL;
-				xfs_itruncate_cleanup(&tp, ip, 0,
-						      XFS_ATTR_FORK);
-				goto free_inode;
-			}
 
-			tp = xfs_trans_alloc(mp, XFS_ATRUNCATE);
+			/*
+			 * The return value is ignored cause we don't know
+			 * what to do about it.
+			 */
+			(void)xfs_attr_inactive(ip);	
+
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
+
+			tp = xfs_trans_alloc(mp, XFS_TRANS_INACTIVE);
 			error = xfs_trans_reserve(tp, 0,
-					XFS_ITRUNCATE_LOG_RES(mp),
-					0, XFS_TRANS_PERM_LOG_RES,
-					XFS_ITRUNCATE_LOG_COUNT);
+						  XFS_IFREE_LOG_RES(mp),
+						  0, 0,
+						  XFS_DEFAULT_LOG_COUNT);
+			commit_flags = 0;
 			ASSERT(error == 0);
 
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
@@ -1476,24 +1470,8 @@ xfs_inactive(
 					XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 			xfs_trans_ihold(tp, ip);
 
-			error = xfs_itruncate_finish(&tp, ip, 0,
-						     XFS_ATTR_FORK, 0);
-			commit_flags = XFS_TRANS_RELEASE_LOG_RES;
+			xfs_idestroy_fork(ip, XFS_ATTR_FORK);
 
-			if (error) {
-				/*
-				 * If we get an error while trying to
-				 * truncate the file, abort the truncation
-				 * transaction and just try to continue
-				 * by freeing the inode.
-				 */
-				commit_flags |= XFS_TRANS_ABORT;
-				xfs_itruncate_cleanup(&tp, ip, commit_flags,
-						      XFS_ATTR_FORK);
-				commit_flags = 0;
-			} else {
-				xfs_idestroy_fork(ip, XFS_ATTR_FORK);
-			}
 			ASSERT(error || (ip->i_d.di_anextents == 0));
 		} else if (ip->i_afp)
 			xfs_idestroy_fork(ip, XFS_ATTR_FORK);
