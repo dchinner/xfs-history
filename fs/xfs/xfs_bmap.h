@@ -55,7 +55,7 @@ typedef struct xfs_bmbt_irec
 	xfs_extlen_t	br_blockcount;	/* number of block */
 } xfs_bmbt_irec_t;
 
-#define	XFS_BMAP_RBLOCK_DSIZE(lev,cur) ((cur)->bc_private.b.inodesize - (int)offsetof(xfs_dinode_t, di_u))
+#define	XFS_BMAP_RBLOCK_DSIZE(lev,cur) ((cur)->bc_private.b.inodesize - (int)sizeof(xfs_dinode_core_t))
 #define	XFS_BMAP_RBLOCK_ISIZE(lev,cur) ((int)(cur)->bc_private.b.ip->i_broot_bytes)
 #define	XFS_BMAP_IBLOCK_SIZE(lev,cur) (1 << (cur)->bc_blocklog)
 #define	XFS_BMAP_BLOCK_DSIZE(lev,cur) ((lev) == (cur)->bc_nlevels - 1 ? XFS_BMAP_RBLOCK_DSIZE(lev,cur) : XFS_BMAP_IBLOCK_SIZE(lev,cur))
@@ -76,7 +76,7 @@ typedef struct xfs_bmbt_irec
  * These are to be used when we know the size of the block and
  * we don't have a cursor.
  */
-#define	XFS_BMAP_BROOT_SIZE(isz) ((isz) - offsetof(xfs_dinode_t, di_u)) 
+#define	XFS_BMAP_BROOT_SIZE(isz) ((isz) - sizeof(xfs_dinode_core_t)) 
 #define	XFS_BMAP_BROOT_REC_ADDR(bb,i,isz) XFS_BTREE_REC_ADDR(isz,xfs_bmbt_rec_t,bb,i)
 #define XFS_BMAP_BROOT_PTR_ADDR(bb,i,isz) XFS_BTREE_ROOT_PTR_ADDR(isz,xfs_bmbt_rec_t,bb,i)
 
@@ -85,7 +85,14 @@ typedef struct xfs_bmbt_irec
 #define	XFS_BMAP_BROOT_SPACE(bb) ((int)(sizeof(xfs_btree_block_t) + ((bb)->bb_numrecs * (sizeof(xfs_bmbt_rec_t) + sizeof(xfs_agblock_t)))))
 #define	XFS_BMAP_BROOT_SPACE_CALC(nrecs) ((int)(sizeof(xfs_btree_block_t) + ((nrecs) * (sizeof(xfs_bmbt_rec_t) + sizeof(xfs_agblock_t)))))
 
+/*
+ * Number of extent records that fit in the inode.
+ */
+#define	XFS_BMAP_EXT_MAXRECS(isz)	\
+	(XFS_BMAP_BROOT_SIZE(isz) / sizeof(xfs_bmbt_rec_t))
+
 #define	XFS_BMAP_MAXLEVELS	5	/* ??? */
+#define	XFS_BMAP_MAX_NMAP	4
 
 #define	xfs_bmbt_get_block(cur, level, bpp) \
 	((level) < (cur)->bc_nlevels - 1 ? \
@@ -93,5 +100,6 @@ typedef struct xfs_bmbt_irec
 	 ((*bpp = 0), (cur)->bc_private.b.ip->i_broot))
 
 void xfs_bmapi(xfs_mount_t *, xfs_trans_t *, struct xfs_inode *, xfs_fsblock_t, xfs_extlen_t, int, xfs_bmbt_irec_t *, int *);
+void xfs_bmap_read_extents(xfs_mount_t *, xfs_trans_t *, struct xfs_inode *);
 
 #endif	/* _FS_XFS_BMAP_H */
