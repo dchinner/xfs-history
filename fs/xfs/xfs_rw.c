@@ -206,6 +206,10 @@ xfs_grio_req(
 	off_t,
 	int);
 
+extern void xfs_error(
+	xfs_mount_t *,
+	int);
+
 
 /*
  * Round the given file offset down to the nearest read/write
@@ -2002,6 +2006,7 @@ xfs_write(
 {
 	struct reservation_id id;
 	xfs_inode_t	*ip;
+	xfs_mount_t	*mp;
 	int		type;
 	off_t		offset;
 	size_t		count;
@@ -2099,7 +2104,16 @@ retry:
 				return error;
 			offset = uiop->uio_offset;
 			goto retry;
+		} else if ( error == ENOSPC ) {
+			mp = ip->i_mount;
+			if ( ip->i_d.di_flags & XFS_DIFLAG_REALTIME )  {
+				xfs_error( mp, 2);
+			} else {
+				xfs_error( mp, 1);
+			}
 		}
+
+
 		/*
 		 * Add back whatever we refused to do because of
 		 * uio_limit.
