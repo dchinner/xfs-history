@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.6 $"
+#ident	"$Revision: 1.8 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -45,6 +45,8 @@ xfs_bulkstat_one(
 {
 	xfs_inode_t	*ip;
 
+	if (ino == mp->m_sb.sb_rbmino || ino == mp->m_sb.sb_rsumino)
+		return 0;
 	ip = xfs_iget(mp, tp, ino, XFS_ILOCK_SHARED);
 	if (ip->i_d.di_mode == 0) {
 		xfs_iput(ip, XFS_ILOCK_SHARED);
