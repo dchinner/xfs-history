@@ -184,11 +184,12 @@ typedef struct xfs_inode {
 /*
  * XFS file identifier.
  */
+typedef __uint32_t	xfs_fid_ino_t;
 typedef struct xfs_fid {
 	u_short		fid_len;       /* length of remainder */
         u_short		fid_pad;       /* padding, must be zero */
 	u_long		fid_gen;       /* generation number */
-        xfs_ino_t	fid_ino;       /* inode number */
+        xfs_fid_ino_t	fid_ino;       /* inode number */
 } xfs_fid_t;
 
 /*
