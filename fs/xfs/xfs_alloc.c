@@ -317,10 +317,14 @@ xfs_alloc_delrec(xfs_btree_cur_t *cur, int level)
 			xfs_btree_check_ptr(cur, rpp[i], level);
 			lpp[i] = rpp[i];
 		}
+		xfs_alloc_log_ptrs(cur, lbuf, left->bb_numrecs + 1,
+				   left->bb_numrecs + right->bb_numrecs);
 	} else {
 		for (i = 0; i < right->bb_numrecs; i++)
 			lrp[i] = rrp[i];
 	}
+	xfs_alloc_log_recs(cur, lbuf, left->bb_numrecs + 1,
+			   left->bb_numrecs + right->bb_numrecs);
 	if (buf != lbuf) {
 		xfs_btree_setbuf(cur, level, lbuf);
 		cur->bc_ptrs[level] += left->bb_numrecs;
@@ -328,6 +332,7 @@ xfs_alloc_delrec(xfs_btree_cur_t *cur, int level)
 		xfs_alloc_increment(cur, level + 1);
 	left->bb_numrecs += right->bb_numrecs;
 	left->bb_rightsib = right->bb_rightsib;
+	xfs_btree_log_block(tp, lbuf, XFS_BB_NUMRECS | XFS_BB_RIGHTSIB);
 	if (left->bb_rightsib != NULLAGBLOCK) {
 		rrbuf = xfs_btree_bread(mp, tp, cur->bc_agno, left->bb_rightsib);
 		rrblock = xfs_buf_to_block(rrbuf);
