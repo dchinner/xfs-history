@@ -195,6 +195,16 @@ xfs_ialloc_ag_alloc(
 	    args.mp->m_sb.sb_icount + newlen > args.mp->m_maxicount)
 		return XFS_ERROR(ENOSPC);
 	args.minlen = args.maxlen = XFS_IALLOC_BLOCKS(args.mp);
+	/*
+	 * Set the alignment for the allocation.
+	 * If the cluster size is smaller than a filesystem block 
+	 * then we're doing I/O for inodes in filesystem block size pieces,
+	 * so don't need alignment anyway.
+	 */
+	if (XFS_SB_VERSION_HASALIGN(&args.mp->m_sb) &&
+	    args.mp->m_sb.sb_inoalignmt >= 
+	    XFS_B_TO_FSBT(args.mp, XFS_INODE_CLUSTER_SIZE(args.mp)))
+		args.alignment = args.mp->m_sb.sb_inoalignmt;
 	agi = XFS_BUF_TO_AGI(agbp);
 	/*
 	 * Need to figure out where to allocate the inode blocks.
@@ -249,11 +259,10 @@ xfs_ialloc_ag_alloc(
 	 * use the old version so that old kernels will continue to be
 	 * able to use the file system.
 	 */
-	if (args.mp->m_sb.sb_versionnum < XFS_SB_VERSION_HASNLINK) {
-		version = XFS_DINODE_VERSION_1;
-	} else {
+	if (XFS_SB_VERSION_HASNLINK(&args.mp->m_sb))
 		version = XFS_DINODE_VERSION_2;
-	}
+	else
+		version = XFS_DINODE_VERSION_1;
 	for (j = 0; j < nbufs; j++) {
 		/*
 		 * Get the block.
@@ -1046,12 +1055,8 @@ xfs_dilocate(
 	 */
 	agno = XFS_INO_TO_AGNO(mp, ino);
 	agbno = XFS_INO_TO_AGBNO(mp, ino);
-	if ((agno >= mp->m_sb.sb_agcount) ||
-	    (agbno >= mp->m_sb.sb_agblocks)) {
+	if ((agno >= mp->m_sb.sb_agcount) || (agbno >= mp->m_sb.sb_agblocks))
 		return XFS_ERROR(EINVAL);
-	}
-
-	error = 0;
 	if ((mp->m_sb.sb_blocksize >= XFS_INODE_CLUSTER_SIZE(mp)) ||
 	    !(flags & XFS_IMAP_LOOKUP)) {
 		offset = XFS_INO_TO_OFFSET(mp, ino);
@@ -1059,53 +1064,54 @@ xfs_dilocate(
 		*bno = XFS_AGB_TO_FSB(mp, agno, agbno);
 		*off = offset;
 		*len = 1;
-	} else if (*bno != NULLFSBLOCK) {
+		return 0;
+	}
+	blks_per_cluster = XFS_INODE_CLUSTER_SIZE(mp) >> mp->m_sb.sb_blocklog;
+	if (*bno != NULLFSBLOCK) {
 		offset = XFS_INO_TO_OFFSET(mp, ino);
 		ASSERT(offset < mp->m_sb.sb_inopblock);
 		cluster_agbno = XFS_FSB_TO_AGBNO(mp, *bno);
 		*off = ((agbno - cluster_agbno) * mp->m_sb.sb_inopblock) +
 			offset;
-		*len = XFS_INODE_CLUSTER_SIZE(mp) >> mp->m_sb.sb_blocklog;
+		*len = blks_per_cluster;
+		return 0;
+	}
+	if (mp->m_inoalign) {
+		offset_agbno = agbno % mp->m_inoalign;
+		chunk_agbno = agbno - offset_agbno;
 	} else {
 		agino = XFS_INO_TO_AGINO(mp, ino);
 		mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
 		error = xfs_ialloc_read_agi(mp, tp, agno, &agbp);
 		mrunlock(&mp->m_peraglock);
-		if (error) {
+		if (error)
 			return error;
-		}
-		cur = xfs_btree_init_cursor(mp, tp, agbp, agno,
-			XFS_BTNUM_INO, (xfs_inode_t *)0, 0);
-		error = xfs_inobt_lookup_le(cur, agino, 0, 0, &i);
-		if (error) {
+		cur = xfs_btree_init_cursor(mp, tp, agbp, agno, XFS_BTNUM_INO,
+			(xfs_inode_t *)0, 0);
+		if (error = xfs_inobt_lookup_le(cur, agino, 0, 0, &i)) {
 			xfs_trans_brelse(tp, agbp);
 			xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 			return error;
 		}
 		if (!xfs_inobt_get_rec(cur, &chunk_agino, &chunk_cnt,
-				       &chunk_free)) {
+				&chunk_free))
 			error = XFS_ERROR(EINVAL);
-		} else {
-			chunk_agbno = XFS_AGINO_TO_AGBNO(mp, chunk_agino);
-			ASSERT(agbno >= chunk_agbno);
-			offset_agbno = agbno - chunk_agbno;
-			blks_per_cluster = XFS_INODE_CLUSTER_SIZE(mp) >>
-				           mp->m_sb.sb_blocklog;
-			cluster_agbno = chunk_agbno +
-				        ((offset_agbno / blks_per_cluster) *
-					 blks_per_cluster);
-			offset = ((agbno - cluster_agbno) *
-				  mp->m_sb.sb_inopblock) +
-				 XFS_INO_TO_OFFSET(mp, ino);
-			*bno = XFS_AGB_TO_FSB(mp, agno, cluster_agbno);
-			*off = offset;
-			*len = blks_per_cluster;
-		}
 		xfs_trans_brelse(tp, agbp);
 		xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);		
+		if (error)
+			return error;
+		chunk_agbno = XFS_AGINO_TO_AGBNO(mp, chunk_agino);
+		offset_agbno = agbno - chunk_agbno;
 	}
-
-	return error;
+	ASSERT(agbno >= chunk_agbno);
+	cluster_agbno = chunk_agbno +
+		((offset_agbno / blks_per_cluster) * blks_per_cluster);
+	offset = ((agbno - cluster_agbno) * mp->m_sb.sb_inopblock) +
+		XFS_INO_TO_OFFSET(mp, ino);
+	*bno = XFS_AGB_TO_FSB(mp, agno, cluster_agbno);
+	*off = offset;
+	*len = blks_per_cluster;
+	return 0;
 }
 
 /*
