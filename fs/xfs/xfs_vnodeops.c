@@ -19,6 +19,7 @@
 #include <sys/pfdat.h>
 #include <sys/sysinfo.h>
 #include <sys/ksa.h>
+#include <sys/xlate.h>
 #include <io/dmi/dmi_kern.h>
 #ifdef SIM
 #undef _KERNEL
@@ -226,12 +227,15 @@ STATIC int	xfs_fcntl(vnode_t	*vp,
 			  void		*arg,
 			  int		flags,
 			  off_t		offset,
-			  cred_t	*credp,
+			  cred_t	*credp, 
 			  rval_t	*rvalp);
 
 STATIC int	xfs_set_dmattrs (vnode_t	*vp,
 				 u_int		evmask,
 				 u_int		state);
+
+STATIC int fsxattr_to_irix5( void *, int, register xlate_info_t *);
+STATIC int irix5_to_fsxattr( enum xlate_mode, void *, int, xlate_info_t *);
 
 #endif	/* !SIM */
 
@@ -4195,8 +4199,11 @@ xfs_fcntl(vnode_t	*vp,
 		fa.fsx_extsize = va.va_extsize;
 		fa.fsx_nextents = va.va_nextents;
 		fa.fsx_uuid = va.va_uuid;
-		if (copyout(&fa, arg, sizeof(fa)))
+
+		if  ( xlate_copyout(&fa, arg, sizeof(fa),
+			fsxattr_to_irix5, u.u_procp->p_abi, 1) ) {
 			error = XFS_ERROR(EFAULT);
+		}
 		break;
 	    }
 
@@ -4204,7 +4211,8 @@ xfs_fcntl(vnode_t	*vp,
 		struct fsxattr fa;
 		vattr_t va;
 
-		if (copyin(arg, &fa, sizeof(fa))) {
+		if ( copyin_xlate(arg, &fa, sizeof(fa),
+			irix5_to_fsxattr, u.u_procp->p_abi, 1) ) {
 			error = XFS_ERROR(EFAULT);
 			break;
 		}
@@ -4537,3 +4545,82 @@ struct vnodeops xfs_vnodeops = {
 
 #endif	/* SIM */
 
+
+#ifdef _K64U64
+
+
+STATIC int irix5_to_fsxattr(
+enum xlate_mode mode,
+void *to,
+int count,
+xlate_info_t *info)
+{
+	register struct fsxattr *fsxp;
+	register struct irix5_fsxattr *i5_fsxp;
+
+	ASSERT(info->smallbuf != NULL);
+	ASSERT(mode == SETUP_BUFFER || mode == DO_XLATE);
+
+	if (mode == SETUP_BUFFER) {
+		ASSERT(info->copybuf == NULL);
+		ASSERT(info->copysize == 0);
+		if (sizeof(struct irix5_fsxattr) <= info->inbufsize)
+			info->copybuf = info->smallbuf;
+		else
+			info->copybuf = 
+				kern_malloc(sizeof(struct irix5_fsxattr));
+		info->copysize = sizeof(struct irix5_fsxattr);
+		return 0;
+	}
+
+	ASSERT(info->copysize == sizeof(struct irix5_fsxattr));
+	ASSERT(info->copybuf != NULL);
+
+        fsxp = to;
+        i5_fsxp = info->copybuf;
+
+        fsxp->fsx_xflags	= (ulong)i5_fsxp->fsx_xflags;
+        fsxp->fsx_extsize	= (ulong)i5_fsxp->fsx_extsize;
+        fsxp->fsx_nextents	= (ulong)i5_fsxp->fsx_nextents;
+
+	bcopy(  (char *)&(i5_fsxp->fsx_uuid),
+		(char *)&(fsxp->fsx_uuid),
+		sizeof(uuid_t) );
+
+	return( 0 );
+}
+
+
+STATIC int
+fsxattr_to_irix5(
+void *from,
+int count,
+register xlate_info_t *info)
+{
+        register struct irix5_fsxattr *i5_fsxp;
+        register struct fsxattr *fsxp = from;
+
+        ASSERT(count == 1);
+        ASSERT(info->smallbuf != NULL);
+
+        if (sizeof(struct irix5_fsxattr) <= info->inbufsize)
+                info->copybuf = info->smallbuf;
+        else
+                info->copybuf = kern_malloc(sizeof(struct irix5_fsxattr));
+        info->copysize = sizeof(struct irix5_fsxattr);
+
+        i5_fsxp = info->copybuf;
+
+        i5_fsxp->fsx_xflags	= (__uint32_t)fsxp->fsx_xflags;
+        i5_fsxp->fsx_extsize	= (__uint32_t)fsxp->fsx_extsize;
+        i5_fsxp->fsx_nextents	= (__uint32_t)fsxp->fsx_nextents;
+
+	bcopy(	(char *)&(fsxp->fsx_uuid),
+		(char *)&(i5_fsxp->fsx_uuid),
+		sizeof(uuid_t) );
+
+	return( 0 );
+}
+
+
+#endif
