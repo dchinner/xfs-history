@@ -461,7 +461,7 @@ xfs_trans_add_busy(xfs_trans_t *tp, xfs_agnumber_t ag, xfs_extlen_t idx)
 {
 	xfs_log_busy_chunk_t	*lbcp;
 	xfs_log_busy_slot_t	*lbsp;
-	int			i;
+	int			i=0;
 
 	/*
 	 * If there are no free descriptors, allocate a new chunk
@@ -512,7 +512,7 @@ xfs_trans_add_busy(xfs_trans_t *tp, xfs_agnumber_t ag, xfs_extlen_t idx)
 				break;
 			} else {
 				/* out-of-order vacancy */
-				printk("OOO vacancy lbcp 0x%x\n", lbcp);
+				printk("OOO vacancy lbcp 0x%p\n", lbcp);
 				ASSERT(0);
 			}
 		}
