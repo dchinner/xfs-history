@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.142 $"
+#ident  "$Revision: 1.143 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -866,11 +866,15 @@ xfs_mountroot(
 				  SYNC_ATTR | SYNC_FSDATA),
 				 cr);
 			xfs_iflush_all(mp, XFS_FLUSH_ALL);
-
-			xfs_qm_dqflush_all(mp, XFS_QMOPT_SYNC);
-			xfs_qm_dqpurge_all(mp, 
-					   XFS_QMOPT_UQUOTA|XFS_QMOPT_PQUOTA|
-					   XFS_QMOPT_UMOUNTING);
+			if (mp->m_quotainfo) {
+				xfs_qm_dqrele_all_inodes(mp, 
+							 XFS_UQUOTA_ACCT |
+							 XFS_PQUOTA_ACCT);
+				xfs_qm_dqpurge_all(mp, 
+						   XFS_QMOPT_UQUOTA|
+						   XFS_QMOPT_PQUOTA|
+						   XFS_QMOPT_UMOUNTING);
+			}
 			/*
 			 * Force the log to unpin as many buffers as
 			 * possible and then sync them out.
@@ -945,7 +949,7 @@ xfs_mountroot(
 	vfs_unlock(vfsp);
 	return(0);
 bad:
-	cmn_err(CE_WARN, "%s of root device 0x%x failed with errno %d\n",
+	cmn_err(CE_WARN, "%s of root device %V failed with errno %d\n",
 		whymount[why], rootdev, error);
 	return error;
 
