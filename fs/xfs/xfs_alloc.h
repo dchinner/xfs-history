@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ALLOC_H
 #define	_FS_XFS_ALLOC_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.20 $"
 
 /*
  * Freespace allocation types.  Argument to xfs_alloc_[v]extent.
@@ -43,6 +43,13 @@ xfs_alloc_ag_freeblks(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_agnumber_t	agno,		/* allocation group number */
 	int		flags);		/* XFS_ALLOC_FLAG_... */
+
+/*
+ * Compute and fill in value of m_ag_maxlevels.
+ */
+void
+xfs_alloc_compute_maxlevels(
+	xfs_mount_t	*mp);		/* file system mount structure */
 
 /*
  * Allocate an extent (fixed-size).

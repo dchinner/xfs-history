@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.67 $"
+#ident	"$Revision: 1.68 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1930,11 +1930,11 @@ xfs_bmap_worst_indlen(
 	mp = ip->i_mount;
 	sbp = &mp->m_sb;
 	maxrecs = XFS_BTREE_BLOCK_MAXRECS(sbp->sb_blocksize, xfs_bmbt, 1);
-	for (level = 0, rval = 0; level < XFS_BTREE_MAXLEVELS; level++) {
+	for (level = 0, rval = 0; level < XFS_BM_MAXLEVELS(mp); level++) {
 		len = (len + maxrecs - 1) / maxrecs;
 		rval += len;
 		if (len == 1)
-			return rval + (XFS_BTREE_MAXLEVELS - level - 1);
+			return rval + (XFS_BM_MAXLEVELS(mp) - level - 1);
 		if (level == 0)
 			maxrecs = XFS_BTREE_BLOCK_MAXRECS(sbp->sb_blocksize,
 				xfs_bmbt, 0);
@@ -1985,6 +1985,40 @@ xfs_bmap_add_free(
 	new->xbfi_next = cur;
 	flist->xbf_count++;
 	kmem_check();
+}
+
+/* 
+ * Compute and fill in the value of the maximum depth of a bmap btree
+ * in this filesystem.  Done once, during mount.
+ */
+void
+xfs_bmap_compute_maxlevels(
+	xfs_mount_t	*mp)		/* file system mount structure */
+{
+	int		level;
+	uint		maxblocks;
+	uint		maxleafents;
+	int		maxrootrecs;
+	int		minleafrecs;
+	int		minnoderecs;
+
+	/*
+	 * The maximum number of extents in a file, hence the maximum
+	 * number of leaf entries, is controlled by the type of di_nextents
+	 * (a signed 32-bit number, xfs_extnum_t).
+	 */
+	maxleafents = MAXEXTNUM;
+	minleafrecs = mp->m_bmap_dmnr[0];
+	minnoderecs = mp->m_bmap_dmnr[1];
+	maxrootrecs = mp->m_bmap_dmxr[3];
+	maxblocks = (maxleafents + minleafrecs - 1) / minleafrecs;
+	for (level = 1; maxblocks > 1; level++) {
+		if (maxblocks <= maxrootrecs)
+			maxblocks = 1;
+		else
+			maxblocks = (maxblocks + minnoderecs - 1) / minnoderecs;
+	}
+	mp->m_bm_maxlevels = level;
 }
 
 /*

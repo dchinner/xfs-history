@@ -52,6 +52,14 @@ xfs_bmap_add_free(
 	xfs_bmap_free_t		*flist,		/* list of extents */
 	xfs_mount_t		*mp);		/* mount point structure */
 
+/* 
+ * Compute and fill in the value of the maximum depth of a bmap btree
+ * in this filesystem.  Done once, during mount.
+ */
+void
+xfs_bmap_compute_maxlevels(
+	xfs_mount_t	*mp);		/* file system mount structure */
+
 /*
  * Routine to be called at transaction's end by xfs_bmapi, xfs_bunmapi 
  * caller.  Frees all the extents that need freeing, which must be done

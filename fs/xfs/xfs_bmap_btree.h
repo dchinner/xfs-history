@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_BTREE_H
 #define	_FS_XFS_BMAP_BTREE_H
 
-#ident "$Revision: 1.6 $"
+#ident "$Revision: 1.8 $"
 
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 
@@ -142,6 +142,10 @@ typedef	struct xfs_btree_lblock xfs_bmbt_block_t;
  * Number of extent records that fit in the inode.
  */
 #define	XFS_BMAP_EXT_MAXRECS(mp)	((mp)->m_bmap_ext_mxr)
+/*
+ * Maximum number of bmap btree levels.
+ */
+#define	XFS_BM_MAXLEVELS(mp)		((mp)->m_bm_maxlevels)
 
 /*
  * Prototypes for xfs_bmap.c to call.

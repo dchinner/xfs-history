@@ -971,9 +971,9 @@ xfs_alloc_newroot(
 	xfs_trans_t		*tp;
 
 	xfs_alloc_rcheck(cur);
-	ASSERT(cur->bc_nlevels < XFS_BTREE_MAXLEVELS);
 	tp = cur->bc_tp;
 	mp = cur->bc_mp;
+	ASSERT(cur->bc_nlevels < XFS_AG_MAXLEVELS(mp));
 	agbuf = cur->bc_private.a.agbuf;
 	agf = xfs_buf_to_agf(agbuf);
 	nbno = xfs_alloc_get_freelist(tp, agbuf, &nbuf);
