@@ -76,7 +76,6 @@ lock_t 		vfslock;	/* spinlock protecting rootvfs and vfs_flag */
 zone_t          *pn_zone;       /* pathname zone */
 sema_t 		synclock;	/* sync in progress; initialized in sinit() */
                                 
-extern int xfs_statdevvp(struct statvfs *, struct vnode *);
 extern void	vn_init(void);
 
 /*

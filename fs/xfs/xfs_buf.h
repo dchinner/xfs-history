@@ -10,6 +10,9 @@
 
 #ifdef _USING_BUF_T
 #include <sys/buf.h>
+#include <sys/sema.h>
+#include <sys/kmem.h>
+#include <linux/page_buf.h>
 
 typedef struct buf xfs_buf_t;
 #define xfs_buf buf

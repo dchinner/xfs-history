@@ -36,6 +36,7 @@
 #include <sys/statvfs.h>
 #include <asm/uaccess.h>
 #include <linux/init.h>
+#include <linux/page_buf.h>
 
 #if 0
 #undef MS_RDONLY
@@ -157,6 +158,46 @@ int spectodevs(
 	return 0;
 }
 
+static struct inode_operations xfs_meta_ops = {
+	NULL,			/* default file-ops */
+        NULL,                   /* create */
+        NULL,                   /* lookup */
+        NULL,                   /* link */
+        NULL,                   /* unlink */
+        NULL,                   /* symlink */
+        NULL,                   /* mkdir */
+        NULL,                   /* rmdir */
+        NULL,                   /* mknod */
+        NULL,                   /* rename */
+        NULL,                   /* readlink */
+        NULL,                   /* follow_link */
+        NULL,                   /* readpage */
+        NULL,                   /* writepage */
+        NULL,                   /* bmap */
+        NULL,                   /* truncate */
+        NULL,                   /* permission */
+        NULL,                   /* smap */
+        NULL,                   /* updatepage */
+        NULL,                   /* revalidate */
+	NULL,			/* pagebuf_bmap */
+	NULL			/* pagebuf_ioinitiate */
+};
+
+struct inode *
+linvfs_make_inode(kdev_t kdev, struct super_block *sb)
+{
+	struct inode *inode = (struct inode *)kern_malloc(sizeof(struct inode));
+
+	inode->i_dev = kdev;
+	inode->i_op = &xfs_meta_ops;
+	inode->i_pages = NULL;
+	inode->i_nrpages = 0;
+	inode->i_sb = sb;
+
+	pagebuf_lock_enable(inode);
+
+	return inode;
+}
 
 struct super_block *
 linvfs_read_super(
@@ -272,11 +313,13 @@ linvfs_read_super(
   
 	uap->dataptr = (char *)args;
 	uap->datalen = sizeof(*args);
+	sb->s_blocksize = 512;
+	sb->s_blocksize_bits = ffs(sb->s_blocksize) - 1;
+	set_blocksize(sb->s_dev, 512);
 
 	VFSOPS_MOUNT(vfsops, vfsp, cvp, uap, NULL, sys_cred, error);
 	if (error)
 		goto fail_vfsop;
-
 
 	VFS_STATVFS(vfsp, &statvfs, NULL, error);
 	if (error)

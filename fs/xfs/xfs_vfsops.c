@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.237 $"
+#ident  "$Revision: 1.238 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -485,16 +485,26 @@ spectodevs(
  *
  * Put the "appropriate" things in a buftarg_t structure.
  */
+#ifdef __linux__
+STATIC
+void
+xfs_fill_buftarg(buftarg_t *btp, dev_t dev, struct super_block *sb)
+{
+	extern struct inode *linvfs_make_inode(kdev_t, struct super_block *);
+
+	btp->inode = linvfs_make_inode(MKDEV(emajor(dev), eminor(dev)), sb);
+	btp->dev    = dev;
+}
+#else
 STATIC
 void
 xfs_fill_buftarg(buftarg_t *btp, dev_t dev, vnode_t *vp)
 {
-	btp->dev    = dev;
-#ifndef __linux__
 	btp->specvp = vp;
 	btp->bdevsw = get_bdevsw(dev);
-#endif
+	btp->dev    = dev;
 }
+#endif
 
 #ifdef __linux__
 struct vnode *make_specvp(dev_t dev, enum vtype type)
@@ -569,7 +579,7 @@ xfs_cmountfs(
 	 */
 	vfs_flags = (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE;
 #ifdef __linux__
-	xfs_fill_buftarg(&mp->m_ddev_targ, ddev, NULL);
+	xfs_fill_buftarg(&mp->m_ddev_targ, ddev, vfsp->vfs_super);
 	mp->m_ddev_targp = &mp->m_ddev_targ;
 	mp->m_rtdev = NODEV;
 
@@ -1797,6 +1807,7 @@ xfs_root(
 	return 0;
 }
 
+#ifndef __linux__
 /*
  * Get a buffer containing the superblock from an XFS filesystem given its
  * device vnode pointer.
@@ -1971,6 +1982,7 @@ xfs_statdevvp(
 	VOP_CLOSE(devvp, FREAD, L_TRUE, get_current_cred(), unused);
 	return error;
 }
+#endif
 
 /*
  * xfs_statvfs
