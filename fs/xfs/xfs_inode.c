@@ -1,4 +1,4 @@
-#ident "$Revision: 1.217 $"
+#ident "$Revision: 1.218 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -167,7 +167,7 @@ xfs_inobp_check(
 }
 #endif /* DEBUG && !XFS_REPAIR_SIM */
 
-#ifndef NO_XFS_PARANOIA
+#ifndef SIM
 /*
  * called from bwrite on xfs inode buffers
  */
@@ -177,20 +177,12 @@ xfs_inobp_bwcheck(buf_t *bp)
 	xfs_mount_t	*mp;
 	int		i;
 	int		j;
-	int		clear;
 	xfs_dinode_t	*dip;
 
 	ASSERT(bp->b_flags2 & B_XFS_INO);
-	ASSERT(bp->b_fsprivate2 != NULL);
+	ASSERT(bp->b_fsprivate3 != NULL);
 
-	if (((xfs_trans_t *) bp->b_fsprivate2)->t_magic ==
-					XFS_TRANS_HEADER_MAGIC)  {
-		mp = ((xfs_trans_t *) bp->b_fsprivate2)->t_mountp;
-		clear = 0;
-	} else  {
-		mp = bp->b_fsprivate2;
-		clear = 1;
-	}
+	mp = bp->b_fsprivate3;
 
 	j = mp->m_inode_cluster_size >> mp->m_sb.sb_inodelog;
 	dip = (xfs_dinode_t *) bp->b_un.b_addr;
@@ -221,14 +213,9 @@ xfs_inobp_bwcheck(buf_t *bp)
 		dip = (xfs_dinode_t *)((__psint_t) dip + mp->m_sb.sb_inodesize);
 	}
 
-	if (clear)
-		bp->b_fsprivate2 = NULL;
-
-	bp->b_flags2 &= ~B_XFS_INO;
-
 	return;
 }
-#endif /* NO_XFS_PARANOIA */
+#endif /* !SIM */
 
 /*
  * This routine is called to map an inode number within a file
@@ -420,6 +407,11 @@ xfs_itobp(
 	}
 
 	xfs_inobp_check(mp, bp);
+
+	/*
+	 * Mark the buffer as an inode buffer now that it looks good
+	 */
+	bp->b_flags2 |= B_XFS_INO;
 
 	/*
 	 * Set *dipp to point to the on-disk inode in the buffer.
@@ -3223,23 +3215,6 @@ xfs_iflush(
 #ifdef SIM
 	error = xfs_bwrite(mp, bp);
 #else
-#ifndef NO_XFS_PARANOIA
-	/*
-	 * NO_XFS_PARANOIA - XXX rcc - make buffer cache consistency
-	 * check buffer before writing delayed or async buffers
-	 */
-	if (!(bp->b_flags2 & B_XFS_INO))  {
-		if (bp->b_fsprivate2 == NULL)
-			bp->b_fsprivate2 = mp;
-		else if (((xfs_trans_t *) bp->b_fsprivate2)->t_magic ==
-				XFS_TRANS_HEADER_MAGIC)  {
-			cmn_err(CE_PANIC,
-			"Bad fsprivate2 ptr, bp = 0x%x\n", bp);
-		}
-		bp->b_flags2 |= B_XFS_INO;
-	}
-#endif /* !NO_XFS_PARANOIA */
-
 	if (flags & B_DELWRI) {
 		xfs_bdwrite(mp, bp);
 	} else if (flags & B_ASYNC) {
