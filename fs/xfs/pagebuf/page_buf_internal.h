@@ -130,7 +130,7 @@ struct pbstats {
 
 extern struct pbstats pbstats;
 
-#define PB_STATS_INC(count)	( count ++ )
+#define PB_STATS_INC(count)	( pbstats.count++ )
 
 #ifndef STATIC
 # define STATIC	static
