@@ -1,4 +1,4 @@
-#ident "$Revision: 1.221 $"
+#ident "$Revision: 1.222 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -880,6 +880,7 @@ xfs_ialloc(
 	dev_t		rdev,
 	cred_t		*cr,
 	xfs_prid_t	prid,   
+	int		okalloc,
 	buf_t		**ialloc_context,
 	boolean_t	*call_again,
 	xfs_inode_t	**ipp)	   
@@ -899,8 +900,8 @@ xfs_ialloc(
 #ifndef SIM
 	ASSERT(pip != NULL);
 #endif
-	error = xfs_dialloc(tp, pip ? pip->i_ino : 0, mode, ialloc_context,
-			    call_again, &ino);
+	error = xfs_dialloc(tp, pip ? pip->i_ino : 0, mode, okalloc,
+			    ialloc_context, call_again, &ino);
 	if (error != 0) {
 		return error;
 	}
