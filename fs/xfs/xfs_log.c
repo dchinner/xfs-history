@@ -65,7 +65,7 @@ STATIC int	 xlog_bdstrat_cb(struct xfs_buf *);
 STATIC int	 xlog_commit_record(xfs_mount_t *mp, xlog_ticket_t *ticket,
 				    xlog_in_core_t **, xfs_lsn_t *);
 STATIC xlog_t *  xlog_alloc_log(xfs_mount_t	*mp,
-				dev_t		log_dev,
+				xfs_dev_t	log_dev,
 				xfs_daddr_t	blk_offset,
 				int		num_bblks);
 STATIC int	 xlog_space_left(xlog_t *log, int cycle, int bytes);
@@ -155,7 +155,7 @@ int xlog_error_mod = 33;
  */
 #if defined(XLOG_NOLOG) || defined(DEBUG)
 int   xlog_debug = 1;
-dev_t xlog_devt  = 0;
+xfs_dev_t xlog_devt  = 0;
 #endif
 
 #if defined(XFS_LOG_TRACE)
@@ -1175,7 +1175,7 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
  */
 STATIC xlog_t *
 xlog_alloc_log(xfs_mount_t	*mp,
-	       dev_t		log_dev,
+	       xfs_dev_t	log_dev,
 	       xfs_daddr_t	blk_offset,
 	       int		num_bblks)
 {

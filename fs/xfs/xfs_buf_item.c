@@ -1007,7 +1007,7 @@ xfs_buf_iodone_callbacks(
 {
 	xfs_log_item_t	*lip;
 	static ulong	lasttime;
-	static dev_t	lastdev;
+	static xfs_dev_t	lastdev;
 	xfs_mount_t	*mp;
 
 	ASSERT(XFS_BUF_FSPRIVATE(bp, void *) != NULL);
