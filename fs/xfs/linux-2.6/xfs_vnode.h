@@ -185,12 +185,8 @@ typedef int	(*vop_release_t)(bhv_desc_t *);
 typedef int	(*vop_rwlock_t)(bhv_desc_t *, vrwlock_t);
 typedef void	(*vop_rwunlock_t)(bhv_desc_t *, vrwlock_t);
 typedef int	(*vop_seek_t)(bhv_desc_t *, xfs_off_t, xfs_off_t*);
-typedef int	(*vop_realvp_t)(bhv_desc_t *, vnode_t **);
 typedef int	(*vop_bmap_t)(bhv_desc_t *, xfs_off_t, ssize_t, int, struct cred *, struct page_buf_bmap_s *, int *);
 typedef int	(*vop_strategy_t)(bhv_desc_t *, xfs_off_t, ssize_t, int, struct cred *, struct page_buf_bmap_s *, int *);
-#ifdef CELL_CAPABLE
-typedef int	(*vop_allocstore_t)(bhv_desc_t *, xfs_off_t, size_t, struct cred *);
-#endif
 typedef int	(*vop_reclaim_t)(bhv_desc_t *, int);
 typedef int	(*vop_attr_get_t)(bhv_desc_t *, char *, char *, int *, int,
 				struct cred *);
@@ -208,9 +204,7 @@ typedef int	(*vop_iflush_t)(bhv_desc_t *);
 
 
 typedef struct vnodeops {
-#ifdef CELL_CAPABLE
 	bhv_position_t	vn_position;	/* position within behavior chain */
-#endif
 	vop_open_t		vop_open;
 	vop_read_t		vop_read;
 	vop_write_t		vop_write;
@@ -234,12 +228,8 @@ typedef struct vnodeops {
 	vop_rwlock_t		vop_rwlock;
 	vop_rwunlock_t		vop_rwunlock;
 	vop_seek_t		vop_seek;
-	vop_realvp_t		vop_realvp;
 	vop_bmap_t		vop_bmap;
 	vop_strategy_t		vop_strategy;
-#ifdef CELL_CAPABLE
-	vop_allocstore_t	vop_allocstore;
-#endif
 	vop_reclaim_t		vop_reclaim;
 	vop_attr_get_t		vop_attr_get;
 	vop_attr_set_t		vop_attr_set;
@@ -414,12 +404,6 @@ typedef struct vnodeops {
 	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_seek, vp)((vp)->v_fbhv, ooff, noffp);		\
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
-}
-#define VOP_REALVP(vp1, vp2, rv)					\
-{									\
-	VN_BHV_READ_LOCK(&(vp1)->v_bh);					\
-	rv = _VOP_(vop_realvp, vp1)((vp1)->v_fbhv, vp2);		\
-	VN_BHV_READ_UNLOCK(&(vp1)->v_bh);				\
 }
 #define VOP_RECLAIM(vp, flag, rv)					\
 {	/* vnode not reference-able, so no need to lock chain */	\

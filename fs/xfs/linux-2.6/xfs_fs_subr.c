@@ -109,23 +109,6 @@ fs_noval()
 }
 
 /*
- * Change state of vnode itself.
- *
- * This routine may or may not require that the caller(s) prohibit
- * simultaneous changes to a given piece of state.  This depends
- * on the particular 'cmd' - and individual commands should assert
- * appropriately if they so desire.
- */
-void
-fs_vnode_change(
-	bhv_desc_t	*bdp,
-	vchange_t	cmd,
-	__psint_t	val)
-{
-//	printk("XFS: fs_vnode_change() NOT IMPLEMENTED\n");
-}
-
-/*
  * vnode pcache layer for vnode_tosspages.
  * 'last' parameter unused but left in for IRIX compatibility
  */
