@@ -1,4 +1,4 @@
-#ident "$Revision: 1.3 $"
+#ident "$Revision: 1.4 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -336,10 +336,9 @@ xfs_qm_scall_quotaon(
 		mp->m_sb.sb_uquotino = NULLFSINO;
 		mp->m_sb.sb_pquotino = NULLFSINO;
 		mp->m_sb.sb_qflags = 0;
-		bzero(mp->m_sb.sb_padding, sizeof(mp->m_sb.sb_padding));
 		XFS_SB_UNLOCK(mp, s);
-		sbflags |= (XFS_SB_VERSIONNUM | XFS_SB_USRQINO | XFS_SB_PRJQINO |
-			    XFS_SB_QFLAGS | XFS_SB_PADDING);
+		sbflags |= (XFS_SB_VERSIONNUM | XFS_SB_UQUOTINO |
+			    XFS_SB_PQUOTINO | XFS_SB_QFLAGS);
 	}
 
 	/*

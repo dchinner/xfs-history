@@ -1,4 +1,4 @@
-#ident "$Revision: 1.2 $"
+#ident "$Revision: 1.3 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1970,10 +1970,9 @@ xfs_qm_init_quotainos(
 		mp->m_sb.sb_uquotino = NULLFSINO;
 		mp->m_sb.sb_pquotino = NULLFSINO;
 		mp->m_sb.sb_qflags = 0;
-		bzero(mp->m_sb.sb_padding, sizeof(mp->m_sb.sb_padding));
 		XFS_SB_UNLOCK(mp, s);
-		sbflags |= (XFS_SB_VERSIONNUM | XFS_SB_USRQINO | XFS_SB_PRJQINO |
-			    XFS_SB_QFLAGS | XFS_SB_PADDING);
+		sbflags |= (XFS_SB_VERSIONNUM | XFS_SB_UQUOTINO |
+			    XFS_SB_PQUOTINO | XFS_SB_QFLAGS);
 		
 	}
 	
@@ -1984,13 +1983,13 @@ xfs_qm_init_quotainos(
 	 */
 	if (XFS_IS_UQUOTA_ON(mp) && uip == NULL) {
 		if (error = xfs_qm_qino_alloc(mp, &uip, &mp->m_sb.sb_uquotino,
-					      sbflags | XFS_SB_USRQINO))
+					      sbflags | XFS_SB_UQUOTINO))
 			return XFS_ERROR(error);
 		sbflags = 0;
 	}
 	if (XFS_IS_PQUOTA_ON(mp) && pip == NULL) {
 		if (error = xfs_qm_qino_alloc(mp, &pip, &mp->m_sb.sb_pquotino,
-					       sbflags | XFS_SB_PRJQINO)) {
+					       sbflags | XFS_SB_PQUOTINO)) {
 			if (uip)
 				VN_RELE(XFS_ITOV(uip));
 			

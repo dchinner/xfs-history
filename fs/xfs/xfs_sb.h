@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_SB_H
 #define	_FS_XFS_SB_H
 
-#ident	"$Revision: 6.0 $"
+#ident	"$Revision: 1.27 $"
 
 /*
  * Super block
@@ -80,7 +80,6 @@ typedef struct xfs_sb
 	xfs_ino_t	sb_uquotino;	/* user quota inode */
 	xfs_ino_t	sb_pquotino;	/* project quota inode */
 	__uint16_t	sb_qflags;	/* quota flags */
-	__uint8_t	sb_padding[37]; /* padding for posterity */
 } xfs_sb_t;
 
 /*
@@ -96,7 +95,7 @@ typedef enum {
 	XFS_SBS_SECTLOG, XFS_SBS_INODELOG, XFS_SBS_INOPBLOG, XFS_SBS_AGBLKLOG,
 	XFS_SBS_REXTSLOG, XFS_SBS_INPROGRESS, XFS_SBS_IMAX_PCT, XFS_SBS_ICOUNT,
 	XFS_SBS_IFREE, XFS_SBS_FDBLOCKS, XFS_SBS_FREXTENTS, 
-	XFS_SBS_USRQINO, XFS_SBS_PRJQINO, XFS_SBS_QFLAGS, XFS_SBS_PADDING,
+	XFS_SBS_UQUOTINO, XFS_SBS_PQUOTINO, XFS_SBS_QFLAGS,
 	XFS_SBS_FIELDCOUNT
 } xfs_sb_field_t;
 
@@ -109,10 +108,9 @@ typedef enum {
 #define	XFS_SB_RBMINO		XFS_SB_MVAL(RBMINO)
 #define	XFS_SB_RSUMINO		XFS_SB_MVAL(RSUMINO)
 #define	XFS_SB_VERSIONNUM	XFS_SB_MVAL(VERSIONNUM)
-#define XFS_SB_USRQINO		XFS_SB_MVAL(USRQINO)
-#define XFS_SB_PRJQINO		XFS_SB_MVAL(PRJQINO)
+#define XFS_SB_UQUOTINO		XFS_SB_MVAL(UQUOTINO)
+#define XFS_SB_PQUOTINO		XFS_SB_MVAL(PQUOTINO)
 #define XFS_SB_QFLAGS		XFS_SB_MVAL(QFLAGS)
-#define XFS_SB_PADDING		XFS_SB_MVAL(PADDING)
 #define	XFS_SB_NUM_BITS		((int)XFS_SBS_FIELDCOUNT)
 #define	XFS_SB_ALL_BITS		((1LL << XFS_SB_NUM_BITS) - 1)
 
