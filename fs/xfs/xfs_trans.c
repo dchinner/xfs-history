@@ -405,170 +405,7 @@ xfs_trans_commit_async(xfs_mount_t *mp)
 	}
 }
 
-/*
- * This is called to commit a transaction to the in core log.
- * All resources which are logged are pinned, and all resources
- * are unlocked.  
- *
- * If there is nothing to log, then all log items will be unlocked
- * and the transaction will freed.
- */
-#if 0
-STATIC void
-xfs_trans_do_commit(xfs_trans_t	*tp,
-		    uint	flags)
-{
-	char			*trans_headerp;
-	char			*trans_commitp;
-	char			*log_ptr;
-	xfs_log_item_desc_t	*start_desc;
-	xfs_log_item_desc_t	*desc;
-	uint			space;
-	xfs_lsn_t		commit_lsn;
-
-	/*
-	 * If there is nothing to be logged by the transaction,
-	 * then unlock all of the items associated with the
-	 * transaction and free the transaction structure.
-	 */
-	if (!(tp->t_flags & XFS_TRANS_DIRTY)) {
-		xfs_trans_free_items(tp);
-		xfs_trans_free(tp);
-		return;
-	}
-
-	/*
-	 * Write a transaction header into the in core log.
-	 */
-	trans_headerp = xfs_log_alloc(sizeof(xfs_trans_header_t), 0,
-				      &tp->t_lsn);
-	xfs_trans_write_header(tp, trans_headerp);
-	xfs_log_free(trans_headerp, sizeof(xfs_trans_header_t));
-
-	/*
-	 * Write the log items into the in core log in chunks
-	 * of size XFS_TRANS_LOG_CHUNK or smaller.
-	 */
-	start_desc = xfs_trans_first_item(tp);
-	ASSERT(start_desc != NULL);
-	while (start_desc != NULL) {
-		/*
-		 * Find the first group of items that will fit in a chunk
-		 * of XFS_TRANS_LOG_CHUNK bytes in the in core log.  Keep
-		 * all sizes rounded to 32 byte boundaries.  When the total
-		 * size would be bigger than XFS_TRANS_LOG_CHUNK, then break
-		 * out of the loop.  This includes the case where a single
-		 * item is too big.
-		 */
-		space = 0;
-		desc = start_desc;
-		while (desc != NULL) {
-			/*
-			 * Skip items which aren't dirty in this transaction.
-			 */
-			if (!(desc->lid_flags & XFS_LID_DIRTY)) {
-				desc = xfs_trans_next_item(tp, desc);
-				continue;
-			}
-			/*
-			 * Only ask the item for its size the first time here.
-			 * If the item is large or just missed fitting in to
-			 * the last group we don't want to ask it again.  If
-			 * it was large then we're tracking how much is left
-			 * in lid_size and don't want to overwrite it.
-			 */
-			if (desc->lid_size == 0) {
-				desc->lid_size = IOP_SIZE(desc->lid_item);
-				desc->lid_size = ROUNDUP32(desc->lid_size);
-			}
-			if ((space + desc->lid_size) > XFS_TRANS_LOG_CHUNK) {
-				break;
-			}
-			space += desc->lid_size;
-			desc = xfs_trans_next_item(tp, desc);
-		}
-
-		/*
-		 * Desc will only be NULL if we reached the last item.
-		 * If we did this and found nothing new to log, we're
-		 * done.
-		 */
-		if ((desc == NULL) && (space == 0)) {
-			break;
-		}
-
-		/*
-		 * If we have a single item which is too large, then size will
-		 * never have been incremented above 0 in the loop above.
-		 * We deal with the big item here.  We know there is only one,
-		 * because it would never fit under XFS_TRANS_LOG_CHUNK with
-		 * another item since it can't by itself. Call 
-		 * xfs_trans_large_item() to process the large
-		 * item in a loop doing multiple partial writes of the item.
-		 */
-		if (space == 0) {
-			xfs_trans_large_item(tp, desc);
-			start_desc = xfs_trans_next_item(tp, desc);
-			continue;
-		}
-
-		/*
-		 * Here we have a group of items to write into the log.
-		 * Call xfs_trans_log_items() to log the items starting
-		 * with start_desc which will fit into log space space.
-		 * This will return the log item which follows the last
-		 * one written, which will be used to start this loop
-		 * over again for the next group of items.
-		 */
-		start_desc = xfs_trans_log_items(tp, start_desc, space);
-	}
-
-	/*
-	 * Now write the commit record for the transaction into
-	 * the log.
-	 */
-	trans_commitp = xfs_log_alloc(sizeof(xfs_trans_commit_t), 0,
-				      &commit_lsn);
-	xfs_trans_write_commit(tp, trans_commitp);
-	xfs_log_free(trans_commitp, sizeof(xfs_trans_commit_t));
-
-	/*
-	 * Once all the items of the transaction have been copied
-	 * to the in core log we can release them.  Do that here.
-	 * This will free descriptors pointing to items which were
-	 * not logged since there is nothing more to do with them.
-	 * For items which were logged, we will keep pointers to them
-	 * so they can be unpinned after the transaction commits.
-	 */
-	xfs_trans_unlock_items(tp);
-
-	/*
- 	 * Tell the LM to call the transaction completion routine
-	 * when the log write with LSN commit_lsn completes.
-	 * After this call we cannot reference tp, because the call
-	 * can happen at any time and tp can be freed.
-	 */
-	xfs_log_notify((void(*)(void*))xfs_trans_committed, tp, commit_lsn);
-
-	/*
-	 * If the caller wants the log written immediately,
-	 * then ask the LM to do it.
-	 */
-	if (flags & XFS_TRANS_SYNC) {
-		xfs_log_sync(commit_lsn);
-	}
-
-	/*
-	 * If the caller wants to wait for the transaction to be
-	 * committed to disk, then ask the LM to put us to sleep
-	 * and wake us up when the transaction is committed to disk.
-	 */
-	if (flags & XFS_TRANS_WAIT) {
-		xfs_log_wait(commit_lsn);
-	}
-}	
-#endif
-#ifndef SIM
+#ifdef NOTYET
 STATIC void
 xfs_trans_do_commit(xfs_trans_t	*tp,
 		    uint	flags)
@@ -651,9 +488,19 @@ xfs_trans_do_commit(xfs_trans_t	*tp,
 	 * After this call we cannot reference tp, because the call
 	 * can happen at any time and tp can be freed.
 	 */
-	xfs_log_notify((void(*)(void*))xfs_trans_committed, tp, commit_lsn);
+	xfs_log_notify(mp, commit_lsn, (void(*)(void*))xfs_trans_committed, tp);
 }
+#endif
+#ifndef SIM
+STATIC void
+xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
+/* ARGSUSED */
+{
+	return;
+}
+
 #else
+
 STATIC void
 xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
 /* ARGSUSED */
@@ -733,13 +580,6 @@ xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
 	xfs_log_notify((void(*)(void*))xfs_trans_committed, tp, commit_lsn);
 	 */
 	xfs_trans_committed(tp);
-
-#if 0
-	/*
-	 * Free the transaction structure now that it has been committed.
-	 */
-	xfs_trans_free(tp);
-#endif
 }
 #endif
 
@@ -852,7 +692,9 @@ STATIC void
 xfs_trans_free(xfs_trans_t *tp)
 {
 #ifndef SIM
+/*
 	xfs_log_unreserve(tp->t_mountp, tp->t_log_res);
+*/
 
 	kmem_zone_free(xfs_trans_zone, tp);
 #else
