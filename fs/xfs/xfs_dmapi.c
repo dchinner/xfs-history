@@ -85,10 +85,12 @@ xfs_setattr(
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #define MAX_DIO_SIZE(mp)	(64 * PAGE_CACHE_SIZE)
-#define XFS_TO_LINUX_DEVT(dev)	(MKDEV(sysv_major(dev) & 0x1ff, sysv_minor(dev)))
+#define XFS_TO_LINUX_RDEVT(xip,ip)	(new_encode_dev((ip)->i_rdev))
+#define XFS_TO_LINUX_DEVT(xip,ip)	(new_encode_dev((ip)->i_sb->s_dev))
 #else
 #define MAX_DIO_SIZE(mp)	XFS_B_TO_FSBT((mp), KIO_MAX_ATOMIC_IO << 10)
-#define XFS_TO_LINUX_DEVT(dev)	(kdev_t_to_nr(XFS_DEV_TO_KDEVT(dev)))
+#define XFS_TO_LINUX_RDEVT(xip,ip)	(kdev_t_to_nr(XFS_DEV_TO_KDEVT((xip)->i_df.if_u2.if_rdev)))
+#define XFS_TO_LINUX_DEVT(xip,ip)	((xip)->i_mount->m_dev)
 #endif
 
 /* Structure used to hold the on-disk version of a dm_attrname_t.  All
@@ -341,9 +343,10 @@ xfs_ip_to_stat(
 	xfs_inode_t	*ip)
 {
 	vnode_t		*vp = XFS_ITOV(ip);
+	struct inode	*inode = LINVFS_GET_IP(vp);
 
 	buf->dt_size = ip->i_d.di_size;
-	buf->dt_dev = ip->i_mount->m_dev;
+	buf->dt_dev = XFS_TO_LINUX_DEVT(ip,inode);
 
 	buf->dt_ino = ip->i_ino;
 #if XFS_BIG_INUMS
@@ -352,7 +355,7 @@ xfs_ip_to_stat(
 	/*
 	 * Copy from in-core inode.
 	 */
-	buf->dt_mode = VTTOIF(vp->v_type) | (ip->i_d.di_mode & MODEMASK);
+	buf->dt_mode = inode->i_mode;
 	buf->dt_uid = ip->i_d.di_uid;
 	buf->dt_gid = ip->i_d.di_gid;
 	buf->dt_nlink = ip->i_d.di_nlink;
@@ -362,7 +365,7 @@ xfs_ip_to_stat(
 	if ((vp->v_type == VREG) || (vp->v_type == VDIR)) {
 		buf->dt_rdev = 0;
 	} else if ((vp->v_type == VCHR) || (vp->v_type == VBLK) ) {
-		buf->dt_rdev = XFS_TO_LINUX_DEVT(ip->i_df.if_u2.if_rdev);
+		buf->dt_rdev = XFS_TO_LINUX_RDEVT(ip,inode);
 	} else {
 		buf->dt_rdev = 0;	/* not a b/c spec. */
 	}
