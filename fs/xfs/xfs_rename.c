@@ -103,18 +103,13 @@ xfs_lock_for_rename(
 	 * to see if we still have the right inodes, directories, etc.
 	 */
 	lock_mode = xfs_ilock_map_shared(dp1);
-
-	lookup_flags = DLF_IGET;
-	if (lock_mode == XFS_ILOCK_SHARED) {
-		lookup_flags |= DLF_LOCK_SHARED;
-	}
-	error = xfs_dir_lookup_int(XFS_ITOBHV(dp1), lookup_flags,
-				   dentry1, &inum1, &ip1);
-
+	error = xfs_get_dir_entry(dentry1, &ip1);
 	if (error) {
 		xfs_iunlock_map_shared(dp1, lock_mode);
 		return error;
 	}
+
+	inum1 = ip1->i_ino;
 
 	ASSERT(ip1);
 	ITRACE(ip1);

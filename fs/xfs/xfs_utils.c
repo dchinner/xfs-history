@@ -37,6 +37,34 @@ struct xfsstats xfsstats;
 #endif
 
 /*
+ * xfs_get_dir_entry is used to get a reference to an inode given
+ * its parent directory inode and the name of the file.	 It does
+ * not lock the child inode, and it unlocks the directory before
+ * returning.  The directory's generation number is returned for
+ * use by a later call to xfs_lock_dir_and_entry.
+ */
+int
+xfs_get_dir_entry(
+	struct dentry		*dentry,
+	xfs_inode_t		**ipp)
+{
+	vnode_t			*vp;
+	bhv_desc_t		*bdp;
+
+	ASSERT(dentry->d_inode);
+
+	vp = LINVFS_GET_VP(dentry->d_inode);
+	bdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(vp), &xfs_vnodeops);
+	if (!bdp) {
+		*ipp = NULL;
+		return XFS_ERROR(ENOENT);
+	}
+	VN_HOLD(vp);
+	*ipp = XFS_BHVTOI(bdp);
+	return 0;
+}
+
+/*
  * Wrapper around xfs_dir_lookup.
  *
  * If DLF_IGET is set, then this routine will also return the inode.
@@ -63,35 +91,10 @@ xfs_dir_lookup_int(
 	dir_vp = BHV_TO_VNODE(dir_bdp);
 	vn_trace_entry(dir_vp, "xfs_dir_lookup_int",
 		       (inst_t *)__return_address);
+
 	do_iget = flags & DLF_IGET;
 	error = 0;
 
-	if (dentry->d_inode) {
-		vnode_t *vp = LINVFS_GET_VP(dentry->d_inode);
-		bdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(vp), &xfs_vnodeops);
-		if (!bdp) {
-			return ENOENT;
-		}
-		if (do_iget) {
-			VN_HOLD(vp);
-			*ipp = XFS_BHVTOI(bdp);
-		}
-		*inum = XFS_BHVTOI(bdp)->i_ino;
-
-		return 0;
-	}
-
-	/*
-	 * Handle degenerate pathname component.
-	 */
-	if (*name == '\0') {
-		*inum = XFS_BHVTOI(dir_bdp)->i_ino;
-		if (do_iget) {
-			VN_HOLD(dir_vp);
-			*ipp = XFS_BHVTOI(dir_bdp);
-		}
-		return 0;
-	}
 	if (flags & DLF_LOCK_SHARED) {
 		lock_mode = XFS_ILOCK_SHARED;
 	} else {
@@ -99,7 +102,6 @@ xfs_dir_lookup_int(
 	}
 
 	dp = XFS_BHVTOI(dir_bdp);
-
 	bdp = NULL;
 
 	/*
@@ -158,8 +160,6 @@ xfs_dir_lookup_int(
 	}
 	return error;
 }
-
-
 
 /*
  * Allocates a new inode from disk and return a pointer to the

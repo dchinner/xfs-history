@@ -38,8 +38,7 @@
 				(inst_t *)__return_address)
 
 #define DLF_IGET	0x01	/* get entry inode if name lookup succeeds */
-#define DLF_NODNLC	0x02	/* don't use the dnlc */
-#define DLF_LOCK_SHARED 0x04	/* directory locked shared */
+#define DLF_LOCK_SHARED 0x02	/* directory locked shared */
 
 struct bhv_desc;
 struct cred;
@@ -62,6 +61,11 @@ xfs_link(
 	struct vnode	*src_vp,
 	struct dentry	*target_dentry,
 	struct cred	*credp);
+
+extern int
+xfs_get_dir_entry(
+	struct dentry		*dentry,
+	xfs_inode_t		**ipp);
 
 extern int
 xfs_dir_lookup_int(

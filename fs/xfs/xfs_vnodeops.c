@@ -2488,32 +2488,6 @@ std_return:
 	goto std_return;
 }
 
-/*
- * xfs_get_dir_entry is used to get a reference to an inode given
- * its parent directory inode and the name of the file.	 It does
- * not lock the child inode, and it unlocks the directory before
- * returning.  The directory's generation number is returned for
- * use by a later call to xfs_lock_dir_and_entry.
- */
-STATIC int
-xfs_get_dir_entry(
-	struct dentry	*dentry,
-	xfs_inode_t	**ipp)	/* inode of entry 'name' */
-{
-	struct inode		*inode = dentry->d_inode;
-	vnode_t			*vp = LINVFS_GET_VP(inode);
-	bhv_desc_t		*bdp;
-
-	bdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(vp), &xfs_vnodeops);
-	if (!bdp) {
-		*ipp = NULL;
-		return XFS_ERROR(ENOENT);
-	}
-	VN_HOLD(vp);
-	*ipp = XFS_BHVTOI(bdp);
-	return 0;
-}
-
 #ifdef DEBUG
 
 /*
