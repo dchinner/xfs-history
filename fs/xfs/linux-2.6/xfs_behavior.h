@@ -127,11 +127,7 @@ typedef struct bhv_identity {
 
 typedef bhv_identity_t bhv_position_t;
 
-#ifdef CELL_CAPABLE
 #define BHV_IDENTITY_INIT(id,pos)	{id, pos}
-#else
-#define BHV_IDENTITY_INIT(id,pos)	{0, pos}
-#endif
 
 #define BHV_IDENTITY_INIT_POSITION(pos) BHV_IDENTITY_INIT(0, pos)
 
