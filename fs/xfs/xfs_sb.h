@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_SB_H
 #define	_FS_XFS_SB_H
 
-#ident	"$Revision: 1.31 $"
+#ident	"$Revision: 1.32 $"
 
 /*
  * Super block
@@ -41,9 +41,12 @@ struct xfs_mount;
 	(XFS_SB_VERSION_NUMBITS | \
 	 XFS_SB_VERSION_OKREALFBITS | \
 	 XFS_SB_VERSION_OKSASHFBITS)
-#define	XFS_SB_VERSION_MKFS(ia)	\
-	((ia) ? (XFS_SB_VERSION_4 | XFS_SB_VERSION_ALIGNBIT \
-			| XFS_SB_VERSION_DALIGNBIT) : XFS_SB_VERSION_1)
+#define	XFS_SB_VERSION_MKFS(ia,dia)	\
+	(((ia) || (dia)) ? \
+		(XFS_SB_VERSION_4 | \
+		 ((ia) ? XFS_SB_VERSION_ALIGNBIT : 0) | \
+		 ((dia) ? XFS_SB_VERSION_DALIGNBIT : 0)) : \
+		XFS_SB_VERSION_1)
 
 typedef struct xfs_sb
 {
