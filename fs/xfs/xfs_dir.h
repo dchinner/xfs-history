@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_H
 #define	_FS_XFS_DIR_H
 
-#ident	"$Revision: 1.2 $"
+#ident	"$Revision: 1.3 $"
 
 /*
  * xfs_dir.h
@@ -214,46 +214,24 @@ struct xfs_dir_freeblock {
 struct xfs_dir_name;
 
 /*
- * Internal routines when dirsize < XFS_LITINO(sbp).
- */
-int	xfs_dir_shortform_create(xfs_trans_t *trans, xfs_inode_t *dp,
-					xfs_ino_t parent_inumber);
-int	xfs_dir_shortform_addname(xfs_trans_t *trans, struct xfs_dir_name *add);
-int	xfs_dir_shortform_removename(xfs_trans_t *trans,
-					struct xfs_dir_name *remove);
-int	xfs_dir_shortform_lookup(xfs_trans_t *trans, struct xfs_dir_name *args);
-int	xfs_dir_shortform_to_leaf(xfs_trans_t *trans, xfs_inode_t *dp);
-
-/*
  * Internal routines when dirsize == XFS_LBSIZE(sbp).
  */
 buf_t	*xfs_dir_leaf_create(xfs_trans_t *trans, xfs_inode_t *dp,
 				xfs_fsblock_t which_block);
-int	xfs_dir_leaf_addname(xfs_trans_t *trans, struct xfs_dir_name *args);
-int	xfs_dir_leaf_removename(xfs_trans_t *trans, struct xfs_dir_name *args,
-				int *number_entries, int *total_namebytes);
-int	xfs_dir_leaf_lookup(xfs_trans_t *trans, struct xfs_dir_name *args);
-int	xfs_dir_leaf_to_shortform(xfs_trans_t *trans, xfs_inode_t *dp);
-int	xfs_dir_leaf_to_node(xfs_trans_t *trans, xfs_inode_t *dp);
 
 /*
  * Internal routines when dirsize > XFS_LBSIZE(sbp).
  */
 buf_t	*xfs_dir_node_create(xfs_trans_t *trans, xfs_inode_t *dp,
 				xfs_fsblock_t which_block, int leaf_block_next);
-int	xfs_dir_node_addname(xfs_trans_t *trans, struct xfs_dir_name *args);
-int	xfs_dir_node_removename(xfs_trans_t *trans, struct xfs_dir_name *args);
-int	xfs_dir_node_lookup(xfs_trans_t *trans, struct xfs_dir_name *args);
-int	xfs_dir_node_to_leaf(xfs_trans_t *trans, xfs_inode_t *dp);
 
 /*
  * Utility routines.
  */
-uint	xfs_dir_hashname(char *name_string, int name_length);
-int	xfs_dir_grow_inode(xfs_trans_t *trans, xfs_inode_t *dp,
+int	xfs_dir_grow_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
 				int delta_in_bytes,
 				xfs_fsblock_t *last_logblk_in_inode);
-int	xfs_dir_shrink_inode(xfs_trans_t *trans, xfs_inode_t *dp,
+int	xfs_dir_shrink_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
 				int delta_in_bytes,
 				xfs_fsblock_t *last_logblk_in_inode);
 buf_t	*xfs_dir_get_buf(xfs_trans_t *trans, xfs_inode_t *dp,
@@ -271,16 +249,19 @@ int	xfs_dir_init(xfs_trans_t *trans,
 		     xfs_inode_t *parent_dir);
 
 int	xfs_dir_createname(xfs_trans_t *trans,
-			   xfs_fsblock_t *first_block,
-			   xfs_extlen_t total,
-			   xfs_bmap_free_t *free_list,
 			   xfs_inode_t *dp,
 			   char *name_string,
-			   xfs_ino_t inode_number);
+			   xfs_ino_t inode_number,
+			   xfs_fsblock_t *firstblock,
+			   xfs_bmap_free_t *flist,
+			   xfs_extlen_t total);
 
 int	xfs_dir_removename(xfs_trans_t *trans,
 			   xfs_inode_t *dp,
-			   char *name_string);
+			   char *name_string,
+			   xfs_fsblock_t *firstblock,
+			   xfs_bmap_free_t *flist,
+			   xfs_extlen_t total);
 
 int	xfs_dir_lookup(xfs_trans_t *tp,
 		       xfs_inode_t *dp,
