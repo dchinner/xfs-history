@@ -28,9 +28,7 @@
 #include <ksys/as.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
-#include <sys/fcntl.h>
 #include <ksys/vfile.h>
-#include <sys/flock.h>
 #include <sys/fs_subr.h>
 #include <sys/kabi.h>
 #include <sys/param.h>
@@ -117,28 +115,6 @@ fs_nosys()
 void
 fs_noval()
 {
-}
-
-/*
- * fs_frlock2 is identical to fs_frlock, except it has an extra
- * argument for use by CXFS.  Also, it calls reclock2 instead of reclock.
- */
-/* ARGSUSED */
-int
-fs_frlock2(
-	register bhv_desc_t *bdp,
-	int cmd,
-	struct flock *bfp,
-	int flag,
-	off_t offset,
-	vrwlock_t vrwlock,
-	cred_t *cr,
-	int ioflag,
-	int want_vn_chg,
-	int *need_vn_chg)
-{
-	printk("XFS: fs_frlock2() NOT IMPLEMENTED\n");
-	return 0;
 }
 
 /*

@@ -53,11 +53,13 @@
 #include "xfs_trans_space.h"
 #include "xfs_rtalloc.h"
 
+#include <linux/xfs_fs.h>
+
 /*
  * File system operations
  */
 
-STATIC int
+int
 xfs_fs_geometry(
 	xfs_mount_t		*mp,
 	xfs_fsop_geom_t		*geo,

@@ -38,7 +38,6 @@
 #endif
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
-#include <sys/fcntl.h>
 #include <sys/var.h>
 #ifdef SIM
 #include <stdio.h>
@@ -49,9 +48,6 @@
 #include <sys/kmem.h>
 #include <linux/xfs_sema.h>
 #include <ksys/vfile.h>
-#ifndef SIM
-#include <sys/flock.h>
-#endif
 #include <sys/fs_subr.h>
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
@@ -149,89 +145,6 @@ xfs_setsize_fn(
 	return isize;
 }
 
-#ifndef SIM
-int
-xfs_frlock2(
-	bhv_desc_t	*bdp,
-	int		cmd,
-	flock_t		*flockp,
-	int		flag,
-	off_t		offset,
-	vrwlock_t	vrwlock,
-	cred_t		*credp,
-	int		ioflag)
-{
-	xfs_inode_t	*ip;
-	int		dolock, error;
-	/* REFERENCED */
-	int		need_vn_chg = 0;
-
-	ASSERT(BHV_IS_XFS(bdp));
-
-	vn_trace_entry(BHV_TO_VNODE(bdp), "xfs_frlock2",
-			(inst_t *)__return_address);
-	ip = XFS_BHVTOI(bdp);
-
-	dolock = (vrwlock == VRWLOCK_NONE);
-	if (dolock) {
-		xfs_ilock(ip, XFS_IOLOCK_EXCL);
-		vrwlock = VRWLOCK_WRITE;
-	}
-
-	ASSERT(vrwlock == VRWLOCK_READ ? ismrlocked(&ip->i_iolock, MR_ACCESS) :
-		ismrlocked(&ip->i_iolock, MR_UPDATE));
-
-	error = fs_frlock2(bdp, cmd, flockp, flag, offset, vrwlock,
-			credp, ioflag, 1, &need_vn_chg);
-	if (dolock)
-		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
-	return error;
-}
-
-/* ARGSUSED */
-static int
-xfs_checklock(
-	bhv_desc_t	*bdp,
-	vnode_t		*vp,
-	int		iomode,
-	off_t		offset,
-	off_t		len,
-	int		fmode,
-	cred_t		*cr,
-	flid_t		*fl,
-	vrwlock_t	vrwlock,
-	int		ioflag)
-{
-	struct flock	bf;
-	int		cmd, error;
-
-	if (!fl)
-		return 0;
-	bf.l_type = (iomode & FWRITE) ? F_WRLCK : F_RDLCK;
-	bf.l_whence = 0;
-	bf.l_start = offset;
-	bf.l_len = len;
-	bf.l_pid = fl->fl_pid;
-	/* Hack aleart hack alert */
-	/* the sysid stuct does not exist in linux flock */
-	/*	bf.l_sysid = fl->fl_sysid; */
-
-	if (fmode & (FNDELAY|FNONBLOCK))
-		cmd = F_CHKLK;
-	else
-		cmd = F_CHKLKW;
-
-	VN_BHV_READ_LOCK(&vp->v_bh);       
-	error = xfs_frlock2(bdp, cmd, &bf, 0, offset, vrwlock, 
-							cr, ioflag);
-	VN_BHV_READ_UNLOCK(&vp->v_bh);     
-
-	if (!error && bf.l_type != F_UNLCK)
-		error = EAGAIN;
-
-	return error;
-}
-#endif
 
 xfs_ioops_t	xfs_iocore_xfs = {
 #ifndef SIM
@@ -253,9 +166,6 @@ xfs_ioops_t	xfs_iocore_xfs = {
 	(xfs_size_t) xfs_size_fn,
 	(xfs_setsize_t) xfs_setsize_fn,
 	(xfs_lastbyte_t) xfs_file_last_byte,
-#ifndef SIM
-	(xfs_checklock_t) xfs_checklock
-#endif
 };
 
 void

@@ -42,7 +42,6 @@
 #include <sys/grio.h>
 #include <sys/ktrace.h>
 #include <sys/ksa.h>
-#include <sys/fcntl.h>
 #ifdef SIM
 #undef _KERNEL
 #include <stdio.h>

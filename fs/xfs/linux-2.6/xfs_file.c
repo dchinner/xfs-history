@@ -57,7 +57,7 @@ static long long linvfs_file_lseek(
 
 	if (error)
 		return -error;
-	
+
 	if (offset != file->f_pos) {
 		file->f_pos = offset;
 		file->f_version = ++event;
@@ -113,16 +113,6 @@ static ssize_t linvfs_write(
 	VOP_WRITE(vp, (void *)filp, buf, size, offset, rv);
 
 	return(rv);
-}
-
-
-static int linvfs_ioctl(
-	struct inode *inode,
-	struct file *filp,
-	unsigned int cmd,
-	unsigned long arg)
-{
-  return(-ENOSYS);
 }
 
 
@@ -215,6 +205,13 @@ static int linvfs_readdir(
 	filp->f_pos = uio.uio_offset;
 	return -error;
 }
+
+
+extern int linvfs_ioctl(
+	struct inode *inode,
+	struct file *filp,
+	unsigned int cmd,
+	unsigned long arg);
 
 
 struct file_operations linvfs_file_operations =

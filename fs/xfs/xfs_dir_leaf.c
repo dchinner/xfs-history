@@ -33,7 +33,6 @@
 #include "xfs_buf.h"
 #include <sys/debug.h>
 #include <sys/uuid.h>
-#include <sys/fcntl.h>
 #include <sys/cmn_err.h>
 #ifdef SIM
 #undef _KERNEL

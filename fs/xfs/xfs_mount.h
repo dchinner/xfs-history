@@ -87,9 +87,6 @@ typedef void		(*xfs_chgtime_t)(void *, int);
 typedef xfs_fsize_t	(*xfs_size_t)(void *);
 typedef xfs_fsize_t	(*xfs_setsize_t)(void *, off_t);
 typedef xfs_fsize_t	(*xfs_lastbyte_t)(void *);
-typedef int		(*xfs_checklock_t)(bhv_desc_t *, struct vnode *, 
-				int, off_t, off_t, int, struct cred *, 
-				struct flid *, vrwlock_t, int);
 
 
 typedef struct xfs_ioops {
@@ -112,9 +109,6 @@ typedef struct xfs_ioops {
 	xfs_size_t		xfs_size_func;
 	xfs_setsize_t		xfs_setsize_func;
 	xfs_lastbyte_t		xfs_lastbyte;
-#ifndef SIM
-	xfs_checklock_t		xfs_checklock;
-#endif
 } xfs_ioops_t;
 
 
@@ -168,9 +162,6 @@ typedef struct xfs_ioops {
 #define XFS_LASTBYTE(mp, io) \
 	(*(mp)->m_io_ops.xfs_lastbyte)((io)->io_obj)
 
-#define XFS_CHECKLOCK(mp, bdp, vp, mode, off, count, fmode, credp, fl, vrwl, ioflg) \
-	(*(mp)->m_io_ops.xfs_checklock)(bdp, vp, mode, off, count, \
-					fmode, credp, fl, vrwl, ioflg)
 
 typedef struct xfs_mount {
 	bhv_desc_t		m_bhv;		/* vfs xfs behavior */

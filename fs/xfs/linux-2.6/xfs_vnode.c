@@ -26,7 +26,6 @@
 #include <sys/types.h>
 #include <sys/debug.h>
 #include <sys/file.h>
-#include <sys/flock.h>
 #include <sys/fs_subr.h>
 #include <sys/param.h>
 #include <sys/kmem.h>

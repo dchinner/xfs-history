@@ -16,10 +16,10 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ifndef _FS_XFS_GROW_H
-#define	_FS_XFS_GROW_H
+#ifndef _FS_XFS_FSOPS_H
+#define	_FS_XFS_FSOPS_H
 
-#ident	"$Revision: 1.11 $"
+#ident	"$Revision$"
 
 /*
  * File system growth interfaces
@@ -49,42 +49,6 @@
  * Input and output structures
  */
 
-/*
- * Output for XFS_FS_GEOMETRY
- */
-typedef struct xfs_fsop_geom
-{
-	__uint32_t	blocksize;	/* filesystem (data) block size */
-	__uint32_t	rtextsize;	/* realtime extent size */
-	__uint32_t	agblocks;	/* fsblocks in an allocation group */
-	__uint32_t	agcount;	/* number of allocation groups */
-	__uint32_t	logblocks;	/* fsblocks in the log */
-	__uint32_t	sectsize;	/* (data) sector size, bytes */
-	__uint32_t	inodesize;	/* inode size in bytes */
-	__uint32_t	imaxpct;	/* max allowed space for inodes (%) */
-	__uint64_t	datablocks;	/* fsblocks in the data subvolume */
-	__uint64_t	rtblocks;	/* fsblocks in the realtime subvolume */
-	__uint64_t	rtextents;	/* rt extents in the realtime subvol */
-	__uint64_t	logstart;	/* starting fsblock of the log */
-	uuid_t		uuid;		/* unique id of the filesystem */
-	__uint32_t	sunit;		/* stripe unit, fsblocks */
-	__uint32_t	swidth;		/* stripe width, fsblocks */
-	__int32_t	version;	/* structure version */
-	__uint32_t	flags;		/* superblock version flags */
-	__uint32_t	logsectsize;	/* log sector size, bytes */
-	__uint32_t	rtsectsize;	/* realtime sector size, bytes */
-	__uint32_t	dirblocksize;	/* directory block size, bytes */
-} xfs_fsop_geom_t;
-#define	XFS_FSOP_GEOM_VERSION	0
-
-#define	XFS_FSOP_GEOM_FLAGS_ATTR	0x01	/* attributes in use */
-#define	XFS_FSOP_GEOM_FLAGS_NLINK	0x02	/* 32-bit nlink values */
-#define	XFS_FSOP_GEOM_FLAGS_QUOTA	0x04	/* quota accounting enabled */
-#define	XFS_FSOP_GEOM_FLAGS_IALIGN	0x08	/* inode alignment */
-#define	XFS_FSOP_GEOM_FLAGS_DALIGN	0x10	/* large data alignment */
-#define	XFS_FSOP_GEOM_FLAGS_SHARED	0x20	/* read-only shared */
-#define	XFS_FSOP_GEOM_FLAGS_EXTFLG	0x40	/* special extent flag */
-#define	XFS_FSOP_GEOM_FLAGS_DIRV2	0x80	/* directory version 2 */
 
 /*
  * This version has two new fields sunit and swidth. 
@@ -167,12 +131,21 @@ typedef struct xfs_growfs_rt
 } xfs_growfs_rt_t;
 
 #ifdef _KERNEL
+
+struct xfs_fsop_geom;
+
 int					/* error status */
 xfs_fsoperations(
 	int		fd,		/* file descriptor for fs */
 	int		opcode,		/* operation code */
 	void		*in,		/* input structure */
 	void		*out);		/* output structure */
+
+int
+xfs_fs_geometry(
+	xfs_mount_t		*mp,
+	struct xfs_fsop_geom	*geo,
+	int			new_version);
 #endif	/* _KERNEL */
 
-#endif	/* _FS_XFS_GROW_H */
+#endif	/* _FS_XFS_FSOPS_H */

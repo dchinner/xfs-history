@@ -34,7 +34,6 @@
 #include <sys/kmem.h>
 #include <sys/ktrace.h>
 #include <sys/cmn_err.h>
-#include <sys/fcntl.h>
 #ifdef SIM
 #include <stddef.h>
 #else
@@ -5649,11 +5648,11 @@ xfs_getbmap(
 	 *	the extents.  Usually this means restoring user file data to
 	 *	regions of the file that look like holes.
 	 *	
-	 *	The "old behavior" (from F_GETBMAP) is to not specify 
-	 *	BMV_IF_NO_DMAPI_READ so that read events are generated.  If this
-	 *	were not true, callers of fcntl( F_GETBMAP ) could misinterpret
-	 *	holes in a DMAPI file as true holes, when in fact they may
-	 *	represent offline user data.
+	 *	The "old behavior" (from XFS_IOC_GETBMAP) is to not specify 
+	 *	BMV_IF_NO_DMAPI_READ so that read events are generated.
+	 *	If this were not true, callers of ioctl( XFS_IOC_GETBMAP )
+	 *	could misinterpret holes in a DMAPI file as true holes,
+	 *	when in fact they may represent offline user data.
 	 */
 	if ( (interface&BMV_IF_NO_DMAPI_READ) == 0 &&
 		DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&

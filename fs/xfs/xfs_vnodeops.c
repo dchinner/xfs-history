@@ -18,8 +18,9 @@
 #ident "$Revision$"
 
 #include <xfs_os_defs.h>
-#include <asm/fcntl.h>
 #include <linux/xfs_cred.h>
+#include <asm/fcntl.h>
+#include <linux/xfs_fs.h>
 
 #ifdef SIM
 #define _KERNEL 1
@@ -46,8 +47,6 @@
 #ifdef SIM
 #undef _KERNEL
 #endif
-#include <sys/fcntl.h>
-#include <sys/flock.h>
 #include <sys/fs_subr.h>
 #include <sys/ktrace.h>
 #ifndef SIM
@@ -109,22 +108,10 @@
 #include <fs/fs_bhv_id.h>
 #include <fs/specfs/spec_lsnode.h>
 
+
 extern prid_t dfltprid;
-
-#ifdef DATAPIPE
-/* data pipe functions */
-extern	int fspe_get_ops(void *);
-int         xfs_fspe_dioinfo(struct vnode *, struct dioattr *);
-#endif
-
-#if _MIPS_SIM == _ABI64
-int irix5_to_flock(enum xlate_mode, void *, int, xlate_info_t *);
-int flock_to_irix5(void *, int, xlate_info_t *);
-int irix5_n32_to_flock(enum xlate_mode, void *, int, xlate_info_t *);
-int flock_to_irix5_n32(void *, int, xlate_info_t *);
-#endif
-
 extern void xfs_lock_inodes (xfs_inode_t **, int, int, uint);
+
 /*
  * The maximum pathlen is 1024 bytes. Since the minimum file system
  * blocksize is 512 bytes, we can get a max of 2 extents back from
@@ -148,7 +135,7 @@ xfs_close(
 	lastclose_t	lastclose,
 	cred_t		*credp);
 
-STATIC int
+int
 xfs_getattr(
 	bhv_desc_t	*bdp,
 	vattr_t		*vap,
@@ -244,21 +231,11 @@ xfs_seek(
 	off_t		old_offset,
 	off_t		*new_offsetp);
 
-STATIC int
-xfs_fcntl(
-	bhv_desc_t	*bdp,
-	int		cmd,
-	void		*arg,
-	int		flags,
-	off_t		offset,
-	cred_t		*credp,
-	rval_t		*rvalp);
-
 int
 xfs_change_file_space(
 	bhv_desc_t	*bdp,
 	int		cmd,
-	flock_t		*bf,
+	xfs_flock64_t	*bf,
 	off_t		offset,
 	cred_t		*credp,
 	int		attr_flags);
@@ -363,7 +340,7 @@ xfs_close(
  * xfs_getattr
  */
 /*ARGSUSED*/
-STATIC int
+int
 xfs_getattr(
 	bhv_desc_t	*bdp,
 	vattr_t		*vap,
@@ -5431,7 +5408,7 @@ xfs_fspe_dioinfo(
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
 
-	/* It's a copy of the code in xfs_fcntl - F_DIOINFO cmd */
+	/* It's a copy of the code in xfs_fcntl - XFS_IOC_DIOINFO cmd */
 	
 	ASSERT(scache_linemask != 0);
 #ifdef R10000_SPECULATION_WAR
@@ -5584,305 +5561,6 @@ xfs_set_uiosize(
 
 	return 0;
 }
-
-#ifndef SIM
-/*
- * xfs_fcntl
- */
-/*ARGSUSED*/
-STATIC int
-xfs_fcntl(
-	bhv_desc_t	*bdp,
-	int		cmd,
-	void		*arg,
-	int		flags,
-	off_t		offset,
-	cred_t		*credp,
-	rval_t		*rvalp)
-{
-	int			error = 0;
-	xfs_mount_t		*mp;
-	struct flock		bf;
-	vnode_t 		*vp;
-	xfs_inode_t		*ip;
-	struct biosize		bs;
-	struct dioattr		da;
-	struct fsxattr		fa;
-	vattr_t			va;
-	struct fsdmidata	d;
-	extern int		scache_linemask;
-
-	vp = BHV_TO_VNODE(bdp);
-	vn_trace_entry(vp, "xfs_fcntl", (inst_t *)__return_address);
-	ip = XFS_BHVTOI(bdp);
-	mp = ip->i_mount;
-
-	if (XFS_FORCED_SHUTDOWN(mp))
-		return XFS_ERROR(EIO);
-	
-	switch (cmd) {
-#ifdef DATAPIPE
-	case F_GETOPS:
-		fspe_get_ops(arg);
-		break;
-#endif
-
-	case F_DIOINFO:
-                /*
-		 * We align to the secondary cache line size so that we
-		 * don't have to worry about nasty writeback caches on
-		 * I/O incoherent machines.  Making this less than a page
-		 * requires setting the maximum I/O size to 1 page less
-		 * than maxdmasz.  This is for the case of a maximum
-		 * size I/O that is not page aligned.  It requires the
-		 * maximum size plus 1 pages.
-		 *
-		 * Note: there are three additional pieced of code that
-		 * replicate F_DIOINFO: xfs_fspe_dioinfo(),
-		 * xfs_dm_get_dioinfo(), efs_fspe_dioinfo. 
-		 * They are *not* identical
-                 */
-		ASSERT(scache_linemask != 0);
-		da.d_miniosz = mp->m_sb.sb_blocksize;
-
-#ifdef MH_R10000_SPECULATION_WAR
-		if (IS_R10000()) {
-			da.d_mem = _PAGESZ;
-			da.d_miniosz = ptob(btopr(mp->m_sb.sb_blocksize));
-		} else
-			da.d_mem = scache_linemask + 1;
-#elif R10000_SPECULATION_WAR	/* makes tlb invalidate during dma more
-	effective, by decreasing the likelihood of a valid reference in the
-	same page as dma user address space; leaving the tlb invalid avoids
-	the speculative reference. We return the more stringent
-	"requirements" on the fcntl(), but do *NOT* enforced them
-	in the read/write code, to be sure we don't break apps... */
-		da.d_mem = _PAGESZ;
-#else
-		da.d_mem = scache_linemask + 1;
-#endif
-
-		/*
-		 * this only really needs to be BBSIZE.
-		 * it is set to the file system block size to
-		 * avoid having to do block zeroing on short writes.
-		 */
-#ifndef __linux__
-		da.d_maxiosz = XFS_FSB_TO_B(mp,
-				    XFS_B_TO_FSBT(mp, ctob(v.v_maxdmasz - 1)));
-#else
-		printk("xfs_vnodeops.c Fix Me Fix Me\n");
-#endif
-
-		if (copyout(&da, arg, sizeof(da))) {
-			error = XFS_ERROR(EFAULT);
-		}
-		break;
-
-	case F_FSGETXATTR:
-		va.va_mask = AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS;
-		error = xfs_getattr(bdp, &va, 0, credp);
-		if (error)
-			break;
-		fa.fsx_xflags = va.va_xflags;
-		fa.fsx_extsize = va.va_extsize;
-		fa.fsx_nextents = va.va_nextents;
-		if (copyout(&fa, arg, sizeof(fa)))
-			error = XFS_ERROR(EFAULT);
-		break;
-
-	case F_FSGETXATTRA:
-		va.va_mask = AT_XFLAGS|AT_EXTSIZE|AT_ANEXTENTS;
-		error = xfs_getattr(bdp, &va, 0, credp);
-		if (error)
-			break;
-		fa.fsx_xflags = va.va_xflags;
-		fa.fsx_extsize = va.va_extsize;
-		fa.fsx_nextents = va.va_anextents;
-		if (copyout(&fa, arg, sizeof(fa)))
-			error = XFS_ERROR(EFAULT);
-		break;
-
-	case F_FSSETXATTR: {
-		int	attr_flags;
-
-		if (copyin(arg, &fa, sizeof(fa))) {
-			error = XFS_ERROR(EFAULT);
-			break;
-		}
-		va.va_mask = AT_XFLAGS | AT_EXTSIZE;
-		va.va_xflags = fa.fsx_xflags;
-		va.va_extsize = fa.fsx_extsize;
-		attr_flags = ( flags&(FNDELAY|FNONBLOCK) ) ? ATTR_NONBLOCK : 0;
-		error = xfs_setattr(bdp, &va, attr_flags, credp);
-		break;
-	}
-
-	case F_GETBMAP:
-	case F_GETBMAPA: {
-		struct	getbmap	bm;
-		int		iflags;
-
-		if (copyin(arg, &bm, sizeof(bm))) {
-			error = XFS_ERROR(EFAULT);
-			break;
-		}
-		if (bm.bmv_count < 2) {
-			error = XFS_ERROR(EINVAL);
-			break;
-		}
-
-		iflags = (cmd == F_GETBMAPA ? BMV_IF_ATTRFORK : 0);
-		if (flags&FINVIS)
-			iflags |= BMV_IF_NO_DMAPI_READ;
-		error = xfs_getbmap(bdp, &bm, (struct getbmap *)arg + 1, iflags);
-
-		if (!error && copyout(&bm, arg, sizeof(bm))) {
-			error = XFS_ERROR(EFAULT);
-		}
-		break;
-	}
-	case F_GETBMAPX: {
-		struct	getbmapx	bmx;
-		struct	getbmap		bm;
-		int			iflags;
-
-
-		if (copyin(arg, &bmx, sizeof(bmx))) {
-			error = XFS_ERROR(EFAULT);
-			break;
-		}
-		if (bmx.bmv_count < 2) {
-			error = XFS_ERROR(EINVAL);
-			break;
-		}
-		/* Map input getbmapx structure to a getbmap
-		 * structure for xfs_getbmap.
-		 */
-		GETBMAP_CONVERT(bmx,bm);
-
-		iflags = bmx.bmv_iflags;
-		if (iflags & (~BMV_IF_VALID)) {
-			error = XFS_ERROR(EINVAL);
-			break;
-		}
-		iflags |= BMV_IF_EXTENDED;
-		error = xfs_getbmap(bdp, &bm, (struct getbmapx *)arg + 1, iflags);
-		if (error)
-			break;
-		GETBMAP_CONVERT(bm,bmx);
-		if (copyout(&bmx, arg, sizeof(bmx))) {
-			error = XFS_ERROR(EFAULT);
-		}
-		break;
-	}
-	case F_FSSETDM:
-		if (copyin(arg, &d, sizeof d)) {
-			error = XFS_ERROR (EFAULT);
-			break;
-		}
-		error = xfs_set_dmattrs(bdp, d.fsd_dmevmask, d.fsd_dmstate,
-			credp);
-		break;
-
-	case F_ALLOCSP:
-	case F_FREESP:
-
-	case F_RESVSP:
-	case F_UNRESVSP:
-
-	case F_ALLOCSP64:
-	case F_FREESP64:
-
-	case F_RESVSP64:
-	case F_UNRESVSP64: {
-		int	attr_flags;
-
-		/* cmd = cmd; XXX */
-		if ((flags & FWRITE) == 0) {
-			error = XFS_ERROR(EBADF);
-		} else if (vp->v_type != VREG) {
-			error = XFS_ERROR(EINVAL);
-		} else if (vp->v_flag & VISSWAP) {
-			error = XFS_ERROR(EACCES);
-#if _MIPS_SIM == _ABI64
-		} else if (ABI_IS_IRIX5_64(get_current_abi())) {
-			if (copyin((caddr_t)arg, &bf, sizeof bf)) {
-				error = XFS_ERROR(EFAULT);
-				break;
-			}
-#endif
-		} else if (cmd == F_ALLOCSP64 || cmd == F_FREESP64   ||
-			   cmd == F_RESVSP64  || cmd == F_UNRESVSP64 || 
-			   ABI_IS_IRIX5_N32(get_current_abi())) {
-			/* 
-			 * The n32 flock structure is the same size as the
-			 * o32 flock64 structure. So the copyin_xlate
-			 * with irix5_n32_to_flock works here.
-			 */
-			if (COPYIN_XLATE((caddr_t)arg, &bf, sizeof bf,
-					 irix5_n32_to_flock,
-					 get_current_abi(), 1)) {
-				error = XFS_ERROR(EFAULT);
-				break;
-			}
-		} else {
-#if !defined(__linux__)
-			if (copyin((caddr_t)arg, &i5_bf, sizeof i5_bf)) {
-				error = XFS_ERROR(EFAULT);
-				break;
-			}
-			/* 
-			 * Now expand to 64 bit sizes. 
-			 */
-			bf.l_type = i5_bf.l_type;
-			bf.l_whence = i5_bf.l_whence;
-			bf.l_start = i5_bf.l_start;
-			bf.l_len = i5_bf.l_len;
-#else
-			error = XFS_ERROR(ENOSYS);
-#endif
-		}
-		attr_flags = ( flags&(FNDELAY|FNONBLOCK) ) ? ATTR_NONBLOCK : 0;
-		if (flags&FINVIS)
-			attr_flags |= ATTR_DMI;
-		if (!error) {
-			error = xfs_change_file_space(bdp, cmd, &bf, offset,
-						      credp, attr_flags);
-		}
-		break;
-	}
-
-#ifndef SIM
-	case F_DMAPI:
-		error = xfs_dm_fcntl(bdp, arg, flags, offset, credp, rvalp);
-		break;
-#endif
-
-	case F_SETBIOSIZE:
-		if (copyin(arg, &bs, sizeof(struct biosize))) {
-			error = XFS_ERROR(EFAULT);
-			break;
-		}
-		error = xfs_set_uiosize(mp, ip, bs.biosz_flags, bs.biosz_read,
-					bs.biosz_write, credp);
-		break;
-
-	case F_GETBIOSIZE:
-		error = xfs_get_uiosize(mp, ip, &bs, credp);
-		if (copyout(&bs, arg, sizeof(struct biosize))) {
-			error = XFS_ERROR(EFAULT);
-			break;
-		}
-		break;
-
-	default:
-		error = XFS_ERROR(EINVAL);
-		break;
-	}
-	return error;
-}
-#endif
 
 int
 xfs_set_dmattrs (
@@ -6623,7 +6301,7 @@ int
 xfs_change_file_space( 
 	bhv_desc_t	*bdp,
 	int		cmd,
-	flock_t 	*bf,
+	xfs_flock64_t 	*bf,
 	off_t 		offset,
 	cred_t  	*credp,
 	int		attr_flags)
@@ -6635,12 +6313,14 @@ xfs_change_file_space(
 	xfs_mount_t	*mp;
 	int		setprealloc;
 	off_t		startoffset;
+	off_t		llen;
 	xfs_trans_t	*tp;
 	vattr_t		va;
 	vnode_t		*vp;
 
 	vp = BHV_TO_VNODE(bdp);
-	vn_trace_entry(vp, "xfs_change_file_space", (inst_t *)__return_address);
+	vn_trace_entry(vp, "xfs_change_file_space",
+						(inst_t *)__return_address);
 	
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
@@ -6652,56 +6332,92 @@ xfs_change_file_space(
 		return XFS_ERROR(EINVAL);
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
+
 	if (error = xfs_iaccess(ip, IWRITE)) {
 		xfs_iunlock(ip, XFS_ILOCK_SHARED);
 		return error;
 	}
+
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
-	if (error = convoff(vp, bf, 0, offset, XFS_MAX_FILE_OFFSET, credp))
-		return error;
+
+	switch (bf->l_whence) {
+	case 0: /*SEEK_SET*/
+		break;
+	case 1: /*SEEK_CUR*/
+		bf->l_start += offset;
+		break;
+	case 2: /*SEEK_END*/
+		bf->l_start += ip->i_d.di_size;
+		break;
+	default:
+		return XFS_ERROR(EINVAL);
+	}
+
+	llen = bf->l_len > 0 ? bf->l_len - 1 : bf->l_len;
+
+	if (   (bf->l_start < 0)
+	    || (bf->l_start > XFS_MAX_FILE_OFFSET)
+	    || (bf->l_start + llen < 0)
+	    || (bf->l_start + llen > XFS_MAX_FILE_OFFSET))
+		return XFS_ERROR(EINVAL);
+
+	bf->l_whence = 0;
+
 	startoffset = bf->l_start;
 	fsize = ip->i_d.di_size;
+
 	/*
-	 * F_RESVSP and F_UNRESVSP will reserve or unreserve file space.
-	 * these calls do NOT zero the data space allocated
-	 * to the file, nor do they change the file size.
+	 * XFS_IOC_RESVSP and XFS_IOC_UNRESVSP will reserve or unreserve
+	 * file space.
+	 * These calls do NOT zero the data space allocated to the file,
+	 * nor do they change the file size.
  	 *
-	 * F_ALLOCSP and F_FREESP will allocate and free file space.
-	 * these calls cause the new file data to be zeroed and the file
+	 * XFS_IOC_ALLOCSP and XFS_IOC_FREESP will allocate and free file
+	 * space.
+	 * These calls cause the new file data to be zeroed and the file
 	 * size to be changed.
 	 */
 	setprealloc = clrprealloc = 0;
+
 	switch (cmd) {
-	case F_RESVSP:
-	case F_RESVSP64:
-		error = xfs_alloc_file_space(ip, startoffset, bf->l_len, 1, attr_flags);
+	case XFS_IOC_RESVSP:
+	case XFS_IOC_RESVSP64:
+		error = xfs_alloc_file_space(ip, startoffset, bf->l_len,
+								1, attr_flags);
 		if (error)
 			return error;
 		setprealloc = 1;
 		break;
-	case F_UNRESVSP:
-	case F_UNRESVSP64:
+
+	case XFS_IOC_UNRESVSP:
+	case XFS_IOC_UNRESVSP64:
 		if (error = xfs_free_file_space(ip, startoffset, bf->l_len,
-									attr_flags))
+								attr_flags))
 			return error;
 		break;
-	case F_ALLOCSP:
-	case F_ALLOCSP64:
-	case F_FREESP:
-	case F_FREESP64:
+
+	case XFS_IOC_ALLOCSP:
+	case XFS_IOC_ALLOCSP64:
+	case XFS_IOC_FREESP:
+	case XFS_IOC_FREESP64:
 		if (startoffset > fsize) {
 			error = xfs_alloc_file_space(ip, fsize,
 					startoffset - fsize, 0, attr_flags);
 			if (error)
 				break;
 		}
+
 		va.va_mask = AT_SIZE;
 		va.va_size = startoffset;
+
 		error = xfs_setattr(bdp, &va, attr_flags, credp);
+
 		if (error)
 			return error;
+
 		clrprealloc = 1;
 		break;
+
 	default:
 		ASSERT(0);
 		return XFS_ERROR(EINVAL);
@@ -6711,15 +6427,19 @@ xfs_change_file_space(
 	 * update the inode timestamp, mode, and prealloc flag bits
 	 */
 	tp = xfs_trans_alloc(mp, XFS_TRANS_WRITEID);
+
 	if (error = xfs_trans_reserve(tp, 0, XFS_WRITEID_LOG_RES(mp),
 				      0, 0, 0)) {
 		/* ASSERT(0); */
 		xfs_trans_cancel(tp, 0);
 		return error;
 	}
+
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
+
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 	xfs_trans_ihold(tp, ip);
+
 	ip->i_d.di_mode &= ~ISUID;
 
 	/*
@@ -6731,15 +6451,21 @@ xfs_change_file_space(
 	 */
 	if (ip->i_d.di_mode & (IEXEC >> 3))
 		ip->i_d.di_mode &= ~ISGID;
+
 	xfs_ichgtime(ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
+
 	if (setprealloc)
 		ip->i_d.di_flags |= XFS_DIFLAG_PREALLOC;
 	else if (clrprealloc)
 		ip->i_d.di_flags &= ~XFS_DIFLAG_PREALLOC;
+
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	xfs_trans_set_sync(tp);
+
 	error = xfs_trans_commit(tp, 0, NULL);
+
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+
 	return error;
 }
 
@@ -6840,7 +6566,7 @@ vnodeops_t xfs_vnodeops = {
 	xfs_seek,
 	(vop_realvp_t)fs_nosys,
 	(vop_bmap_t)xfs_bmap,
-	(vop_fcntl_t)fs_nosys, /* xfs_fcntl, */
+	(vop_fcntl_t)fs_nosys,
 	xfs_reclaim,
 	(vop_attr_get_t)fs_nosys,/* xfs_attr_get, */
 	(vop_attr_set_t)fs_nosys,/* xfs_attr_set, */

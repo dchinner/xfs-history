@@ -31,7 +31,6 @@
 #include <sys/dmi_kern.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
-#include <sys/fcntl.h>
 #include <sys/var.h>
 #include <sys/conf.h>
 #include <sys/systm.h>
@@ -40,7 +39,6 @@
 #include <sys/kmem.h>
 #include <linux/xfs_sema.h>
 #include <ksys/vfile.h>
-#include <sys/flock.h>
 #include <sys/fs_subr.h>
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
@@ -589,8 +587,8 @@ xfs_retrieved(
 }
 
 /*
- * This is a subroutine for xfs_write() and other writers
- * (xfs_fcntl) which clears the setuid and setgid bits when a file is written.
+ * This is a subroutine for xfs_write() and other writers (xfs_ioctl)
+ * which clears the setuid and setgid bits when a file is written.
  */
 int
 xfs_write_clear_setuid(

@@ -42,7 +42,6 @@
 #include <sys/dirent.h>
 #include <sys/uuid.h>
 #include <sys/ksa.h>
-#include <sys/fcntl.h>
 #ifdef SIM
 #undef _KERNEL
 #else
