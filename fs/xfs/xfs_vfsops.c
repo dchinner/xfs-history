@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.202 $"
+#ident  "$Revision: 1.203 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -931,7 +931,7 @@ xfs_mount(
 	vnode_t		*rootvp;
 	int		error;
 
-	if (!_CAP_CRABLE(credp, CAP_MOUNT_MGT))
+	if (!cap_able_cred(credp, CAP_MOUNT_MGT))
 		return XFS_ERROR(EPERM);
 	if (mvp->v_type != VDIR)
 		return XFS_ERROR(ENOTDIR);
@@ -1378,7 +1378,7 @@ xfs_unmount(
 	int		xfs_unmountfs_needed = 0;
 	int		error;
 
-	if (!_CAP_CRABLE(credp, CAP_MOUNT_MGT))
+	if (!cap_able_cred(credp, CAP_MOUNT_MGT))
 		return XFS_ERROR(EPERM);
 
 	mp = XFS_BHVTOM(bdp);

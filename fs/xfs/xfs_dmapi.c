@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.9 $"
+#ident "$Revision: 1.10 $"
 
 #include <sys/types.h>
 #include <sys/sysinfo.h>
@@ -2841,7 +2841,7 @@ xfs_dm_fcntl(
 {
 	dm_fcntl_t	*dmfcntlp;
 
-	if (!_CAP_CRABLE(credp, CAP_DEVICE_MGT))
+	if (!cap_able_cred(credp, CAP_DEVICE_MGT))
 		return(EPERM);
 
 	dmfcntlp = (dm_fcntl_t *)arg;

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.249 $"
+#ident "$Revision: 1.250 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -3120,8 +3120,8 @@ start:
 		if (((ip->i_d.di_mode & ISUID) ||
 		    ((ip->i_d.di_mode & (ISGID | (IEXEC >> 3))) ==
 			(ISGID | (IEXEC >> 3)))) &&
-		     (credp->cr_uid != 0) &&
-		    !(vp->v_flag & VISSWAP)) {
+		    !(vp->v_flag & VISSWAP) &&
+		    !cap_able_cred(credp, CAP_FSETID)) {
 			error = xfs_write_clear_setuid(ip);
 			if (error) {
 				goto out;
@@ -6376,7 +6376,8 @@ retry:
 	if (writeflag) {
 
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
-		if ((ip->i_d.di_mode & (ISUID|ISGID)) && dp->cr->cr_uid != 0){
+		if ((ip->i_d.di_mode & (ISUID|ISGID)) &&
+		    !cap_able_cred(dp->cr, CAP_FSETID)) {
 			ip->i_d.di_mode &= ~ISUID;
 			/*
 			 * Note that we don't have to worry about mandatory

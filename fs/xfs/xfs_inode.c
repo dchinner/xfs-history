@@ -1,4 +1,4 @@
-#ident "$Revision: 1.240 $"
+#ident "$Revision: 1.241 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -3366,9 +3366,9 @@ xfs_iaccess(
 	if ((ip->i_d.di_mode & mode) == mode)
 		return 0;
 
-	if (((orgmode & IWRITE) && !_CAP_CRABLE(cr, CAP_DAC_WRITE)) ||
-	    ((orgmode & IREAD) && !_CAP_CRABLE(cr, CAP_DAC_READ_SEARCH)) ||
-	    ((orgmode & IEXEC) && !_CAP_CRABLE(cr, CAP_DAC_EXECUTE))) {
+	if (((orgmode & IWRITE) && !cap_able_cred(cr, CAP_DAC_WRITE)) ||
+	    ((orgmode & IREAD) && !cap_able_cred(cr, CAP_DAC_READ_SEARCH)) ||
+	    ((orgmode & IEXEC) && !cap_able_cred(cr, CAP_DAC_EXECUTE))) {
 #ifdef	NOISE
 		cmn_err(CE_NOTE, "Ick: mode=%o, orgmode=%o", mode, orgmode);
 #endif	/* NOISE */

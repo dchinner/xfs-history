@@ -1,4 +1,4 @@
-#ident "$Revision: 1.380 $"
+#ident "$Revision: 1.381 $"
 
 
 #ifdef SIM
@@ -290,7 +290,8 @@ STATIC int
 xfs_set_dmattrs(
 	bhv_desc_t	*bdp,
 	u_int		evmask,
-	u_int16_t	state);
+	u_int16_t	state,
+	cred_t		*credp);
 
 STATIC int
 xfs_change_file_space(
@@ -5791,7 +5792,8 @@ xfs_fcntl(
 			error = XFS_ERROR (EFAULT);
 			break;
 		}
-		error = xfs_set_dmattrs(bdp, d.fsd_dmevmask, d.fsd_dmstate);
+		error = xfs_set_dmattrs(bdp, d.fsd_dmevmask, d.fsd_dmstate,
+			credp);
 		break;
 
 	case F_ALLOCSP:
@@ -5892,14 +5894,15 @@ int
 xfs_set_dmattrs (
 	bhv_desc_t	*bdp,
 	u_int		evmask,
-	u_int16_t	state)
+	u_int16_t	state,
+	cred_t		*credp)
 {
         xfs_inode_t     *ip;
 	xfs_trans_t	*tp;
 	xfs_mount_t	*mp;
 	int		error;
 
-	if (!cap_able(CAP_DEVICE_MGT))
+	if (!cap_able_cred(credp, CAP_DEVICE_MGT))
 		return XFS_ERROR(EPERM);
 
         ip = XFS_BHVTOI(bdp);
