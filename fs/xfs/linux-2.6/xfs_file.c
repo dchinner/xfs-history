@@ -236,33 +236,23 @@ static int linvfs_readdir(
 
 struct file_operations linvfs_file_operations =
 {
-	linvfs_file_lseek,
-	linvfs_read,  
-	linvfs_write,
-	NULL,  /*  readdir  */
-	NULL,  /*  poll  */
-	linvfs_ioctl,
-	generic_file_mmap,
-	linvfs_open,
-	NULL,	 		/*  flush - called from close */
-	linvfs_release,		/* called on last close */
-	linvfs_fsync,
-	NULL	 /*  fasync  */
+	llseek:		linvfs_file_lseek,
+	read:		linvfs_read,  
+	write:		linvfs_write,
+	ioctl:		linvfs_ioctl,
+	mmap:		generic_file_mmap,
+	open:		linvfs_open,
+	release:	linvfs_release,
+	fsync:		linvfs_fsync,
 };
 
 struct file_operations linvfs_dir_operations = {
-	linvfs_file_lseek,
-	linvfs_dir_read,
-	NULL,	 /*  write  */
-	linvfs_readdir,
-	NULL,	 /*  poll  */
-	linvfs_ioctl,
-	NULL,  /*  mmap  */
-	NULL,
-	NULL,	 /*  flush  */
-	linvfs_release,
-	linvfs_fsync,
-	NULL	 /*  fasync  */
+	llseek:		linvfs_file_lseek,
+	read:		linvfs_dir_read,
+	readdir:	linvfs_readdir,
+	ioctl:		linvfs_ioctl,
+	release:	linvfs_release,
+	fsync:		linvfs_fsync,
 };
 
 

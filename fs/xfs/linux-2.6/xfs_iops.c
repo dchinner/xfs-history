@@ -566,69 +566,32 @@ linvfs_pb_bmap(struct inode *inode,
 
 struct inode_operations linvfs_file_inode_operations =
 {
-  &linvfs_file_operations,
-  NULL,	 /*  create  */
-  NULL,	 /*  lookup  */
-  NULL,	 /*  link  */
-  NULL,	 /*  unlink  */
-  NULL,	 /*  symlink  */
-  NULL,	 /*  mkdir  */
-  NULL,	 /*  rmdir  */
-  NULL,	 /*  mknod  */
-  NULL,	 /*  rename  */
-  NULL,	 /*  readlink  */
-  NULL,	 /*  follow_link  */
-  linvfs_get_block,
-  pagebuf_read_full_page,
-  pagebuf_write_full_page,
-  NULL,	 /*  truncate  */
-  NULL,  /*  permission  */
-  linvfs_revalidate,
-  linvfs_pb_bmap
+  default_file_ops:	&linvfs_file_operations,
+  get_block:		linvfs_get_block,
+  readpage:		pagebuf_read_full_page,
+  writepage:		pagebuf_write_full_page,
+  revalidate:		linvfs_revalidate,
+  pagebuf_bmap:		linvfs_pb_bmap
 };
 
 struct inode_operations linvfs_dir_inode_operations =
 {
-  &linvfs_dir_operations,
-  linvfs_create,
-  linvfs_lookup,
-  linvfs_link,	
-  linvfs_unlink,	
-  linvfs_symlink,	
-  linvfs_mkdir,	
-  linvfs_rmdir,	
-  linvfs_mknod,	
-  linvfs_rename,	
-  NULL,	 /*  readlink  */
-  NULL,	 /*  follow_link  */
-  NULL,	 /*  readpage  */
-  NULL,	 /*  writepage  */
-  NULL,	 /*  bmap  */
-  NULL,	 /*  truncate  */
-  NULL,  /*  permission  */
-  NULL,  /*  updatepage  */
-  linvfs_revalidate
+  default_file_ops:	&linvfs_dir_operations,
+  create:		linvfs_create,
+  lookup:		linvfs_lookup,
+  link:			linvfs_link,	
+  unlink:		linvfs_unlink,	
+  symlink:		linvfs_symlink,	
+  mkdir:		linvfs_mkdir,	
+  rmdir:		linvfs_rmdir,	
+  mknod:		linvfs_mknod,	
+  rename:		linvfs_rename,	
+  revalidate:		linvfs_revalidate
 };
 
 struct inode_operations linvfs_symlink_inode_operations =
 {
-  NULL,  /*  struct file_operations  */
-  NULL,	 /*  create  */
-  NULL,	 /*  lookup  */
-  NULL,	 /*  link  */
-  NULL,	 /*  unlink  */
-  NULL,	 /*  symlink  */
-  NULL,	 /*  mkdir  */
-  NULL,	 /*  rmdir  */
-  NULL,	 /*  mknod  */
-  NULL,	 /*  rename  */
-  linvfs_readlink,
-  linvfs_follow_link,
-  NULL,	 /*  readpage  */
-  NULL,	 /*  writepage  */
-  NULL,	 /*  bmap  */
-  NULL,	 /*  truncate  */
-  NULL,	 /*  permission  */
-  NULL,  /*  updatepage  */
-  linvfs_revalidate
+  readlink:		linvfs_readlink,
+  follow_link:		linvfs_follow_link,
+  revalidate:		linvfs_revalidate
 };

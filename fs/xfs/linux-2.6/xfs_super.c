@@ -57,11 +57,6 @@
 #include <linux/init.h>
 #include <linux/page_buf.h>
 
-#if 0
-#undef MS_RDONLY
-#undef MS_REMOUNT
-#include <sys/mount.h>
-#endif
 #define	MS_DATA		0x04
 
 
@@ -215,6 +210,7 @@ linvfs_make_inode(kdev_t kdev, struct super_block *sb)
 	return inode;
 }
 
+void
 linvfs_release_inode(struct inode *inode)
 {
 	pagebuf_lock_disable(inode);
@@ -285,40 +281,7 @@ linvfs_read_super(
 
 	memset(uap, 0, sizeof(struct mounta));
 
-	switch (MAJOR(sb->s_dev)) {
-	case 8:  /*  SCSI  */
-
-		disk = MINOR(sb->s_dev) / 16;
-		partition = MINOR(sb->s_dev) % 16;
-
-		if (partition){
-			sprintf(spec, "/dev/sd%c%d", 'a' + disk, partition);
-		} else {		  
-			sprintf(spec, "/dev/sd%c", 'a' + disk);
-		}
-		break;
-	case 3: /* hd */
-	case 22:
-
-		disk = MINOR(sb->s_dev) / 64;
-		if (MAJOR(sb->s_dev) == 22)
-			disk += 2;
-		partition = MINOR(sb->s_dev) % 64;
-
-		if (partition)
-			sprintf(spec, "/dev/hd%c%d", 'a' + disk, partition);
-		else
-			sprintf(spec, "/dev/hd%c", 'a' + disk);
-		break;
-	case 2: /* floppy */
-
-		disk = MINOR(sb->s_dev);
-
-		sprintf(spec, "/dev/fd%c", '0' + disk);
-		break;
-	default:
-		strcpy(spec, "FixMe!!!  (uap->spec)");
-	}
+	sprintf(spec, bdevname(sb->s_dev));
 	uap->spec = spec;
 
 	/*  uap->dir not needed until DMI is in place  */
@@ -365,11 +328,7 @@ linvfs_read_super(
 	sb->s_op = &linvfs_sops;
 	unlock_super(sb);
 	locked = 0;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
-	sb->s_root = d_alloc_root(iget(sb, ino), NULL);
-#else
 	sb->s_root = d_alloc_root(iget(sb, ino));
-#endif
 	if (!sb->s_root)
 		goto fail_vnrele;
 
@@ -514,7 +473,6 @@ linvfs_put_super(
 	int		sector_size = 512;
 	kdev_t		dev = sb->s_dev;
 
-	ENTER("linvfs_put_super");
 	VFS_DOUNMOUNT(vfsp, 0, NULL, sys_cred, error); 
 	if (error)
 		printk("XFS unmount got error %d\n", error);
@@ -532,7 +490,6 @@ linvfs_put_super(
 	set_blocksize(dev, sector_size);
 
 	MOD_DEC_USE_COUNT; 
-	EXIT("linvfs_put_super");
 }
 
 
@@ -615,17 +572,13 @@ linvfs_remount(
 
 
 static struct super_operations linvfs_sops = {
-	linvfs_read_inode,
-	NULL,			/*  write_inode  */
-	linvfs_put_inode,
-	NULL,			/*  delete_inode  */
-	linvfs_notify_change,
-	linvfs_put_super,
-	linvfs_write_super,
-	linvfs_statfs,
-	linvfs_remount,
-	NULL,			/*  clear inode */
-	NULL			/*  unmount_begin  */
+	read_inode:		linvfs_read_inode,
+	put_inode:		linvfs_put_inode,
+	notify_change:		linvfs_notify_change,
+	put_super:		linvfs_put_super,
+	write_super:		linvfs_write_super,
+	statfs:			linvfs_statfs,
+	remount_fs:		linvfs_remount
 };
 
 static struct file_system_type xfs_fs_type = {
