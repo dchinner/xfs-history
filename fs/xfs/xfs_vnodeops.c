@@ -68,22 +68,11 @@
 #endif
 
 
-STATIC int	xfs_open(vnode_t	**vpp,
-			 mode_t		mode,
-			 cred_t		*credp);
-
 STATIC int	xfs_close(vnode_t	*vp,
 			  int		flag,
 			  lastclose_t	lastclose,
 			  off_t		offset,
 			  cred_t	*credp);
-
-STATIC int	xfs_ioctl(vnode_t	*vp,
-			  int		cmd,
-			  void		*argp,
-			  int		flag,
-			  cred_t	*credp,
-			  int		*rvalp);
 
 STATIC int	xfs_getattr(vnode_t	*vp,
 			    vattr_t	*vap,
@@ -251,24 +240,18 @@ extern struct igetstats XFS_IGETINFO;
 #define IHOLD(ip)	VN_HOLD(XFS_ITOV(ip))
 
 
+
 /*
- * xfs_open
- *
- * This is a stub.
+ * No open action is required for regular files.  Devices are handled
+ * through the specfs file system, pipes through fifofs.  Device and
+ * fifo vnodes are "wrapped" by specfs and fifofs vnodes, respectively,
+ * when a new vnode is first looked up or created.
  */
-STATIC int
-xfs_open(vnode_t	**vpp,
-	 mode_t		mode,
-	 cred_t		*credp)
-{
-	return 0;
-}
 
 
 /*
  * xfs_close
  *
- * This is a stub.
  */
 STATIC int
 xfs_close(vnode_t	*vp,
@@ -277,7 +260,13 @@ xfs_close(vnode_t	*vp,
 	  off_t		offset,
 	  cred_t	*credp)
 {
-	return 0;
+        xfs_inode_t	*ip;
+
+        ip = XFS_VTOI(vp);
+        xfs_ilock(ip, XFS_ILOCK_SHARED);
+        cleanlocks(vp, u.u_procp->p_epid, u.u_procp->p_sysid);
+        xfs_iunlock(ip, XFS_ILOCK_SHARED);
+        return 0;
 }
 
 
@@ -784,6 +773,7 @@ xfs_readlink(vnode_t	*vp,
 		xfs_bmap_free_t free_list;
 
 		mp = XFS_VFSTOM(vp->v_vfsp);
+		sbp = &mp->m_sb;
                 first_fsb = 0;
                 fs_blocks = xfs_b_to_fsb(sbp, pathlen);
                 nmaps = SYMLINK_MAPS;
@@ -825,6 +815,7 @@ xfs_fsync(vnode_t	*vp,
 	  int		flag,
 	  cred_t	*credp)
 {
+	ASSERT (0);
 	return 0;
 }
 
@@ -942,9 +933,8 @@ xfs_lookup(vnode_t	*dir_vp,
 	dp = XFS_VTOI(dir_vp);
 	xfs_ilock(dp, XFS_ILOCK_SHARED);
 
-	/*
-	 * XXX Check access.
-	 */
+	if (code = xfs_iaccess(dp, IEXEC, credp))
+		return code;
 
 	code = xfs_dir_lookup_int (NULL, dir_vp, DLF_IGET, name, pnp, 
 				   &e_inum, &ip);
@@ -1141,31 +1131,38 @@ xfs_create(vnode_t	*dir_vp,
         xfs_fsblock_t   	first_block;
 
 
+try_again:
+
+	mp = XFS_VFSTOM(dir_vp->v_vfsp);
+	tp = xfs_trans_alloc (mp, XFS_TRANS_WAIT);
+	if (error = xfs_trans_reserve (tp, XFS_IALLOC_MAX_EVER_BLOCKS,
+					10, 0, 0)) 
+		goto error_return;
+
         dp = XFS_VTOI(dir_vp);
 
+	IHOLD (dp);
 	xfs_ilock (dp, XFS_ILOCK_EXCL);
+	xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
 
-try_again:
+	if (error = xfs_iaccess(dp, IEXEC, credp))
+                return error;
 
 	error = xfs_dir_lookup_int (NULL, dir_vp, DLF_IGET, name, NULL, 
 		&e_inum, &ip);
-	if ((error != 0) && (error != ENOENT)) {
-		ip = NULL;
+	if ((error != 0) && (error != ENOENT)) 
 		goto error_return;
-	}
 
 	first_block = NULLFSBLOCK;
 	bzero (&free_list, sizeof(free_list));
 
 	if (error == ENOENT) {
 
-		/* check access */
+		ASSERT (ip == NULL);
 
-		mp = XFS_VFSTOM(dir_vp->v_vfsp);
-		tp = xfs_trans_alloc (mp, XFS_TRANS_WAIT);
-		if (error = xfs_trans_reserve (tp, XFS_IALLOC_MAX_EVER_BLOCKS,
-						10, 0, 0))
+		if (error = xfs_iaccess(dp, IWRITE, credp)) {
 			goto error_return;
+		}
 
 		rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : NODEV;
 
@@ -1177,12 +1174,10 @@ try_again:
 
 		/*
 		 * At this point, we've gotten a newly allocated inode.
-		 * It is locked.
+		 * It is locked (and joined to the transaction).
 		 */
 
 		ASSERT (ismrlocked (&ip->i_lock, MR_UPDATE));
-
-		xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
 
 		/*
 		 * XXX Need to sanity check namelen.
@@ -1190,16 +1185,20 @@ try_again:
 
 		if (error = xfs_dir_createname (tp, dp, name, ip->i_ino,
 						&first_block, &free_list,
-						MAX_EXT_NEEDED)) {
-			xfs_droplink (tp, ip);
-			goto error_return;
-		}
+						MAX_EXT_NEEDED)) 
+			ASSERT (0);	/* we've reserved the space. */
 
 		dnlc_enter(dir_vp, name, XFS_ITOV(ip), NOCRED);
 
 	}
 	else {
+
+		/* This path is not implemented yet. */
+
+		ASSERT (0);
+
 		ASSERT (ip != NULL);
+		xfs_trans_ijoin (tp, ip, XFS_ILOCK_EXCL);
 
 		vp = XFS_ITOV(ip);
 		if (excl == EXCL)
@@ -1237,11 +1236,11 @@ try_again:
 
 				/*
 				 * If things have changed while the dp was
-				 * unlocked, drop all except the lock on the
-				 * directory inode & try again.
+				 * unlocked, drop all the locks and try
+			 	 * again.
 				 */
 				if (dp->i_gen != dir_generation) {
-					xfs_iunlock (ip, XFS_ILOCK_EXCL);
+					xfs_trans_cancel (tp, 0);
 					goto try_again;
 				}
 			}
@@ -1252,22 +1251,15 @@ try_again:
 
 	/*
 	 * xfs_trans_commit normally decrements the vnode ref count
-	 * when it unlocks the inode. In this case, we want to just
-	 * unlock the inode but retain the vnode reference. So we
-	 * hold the inode and then explicitly unlock only the inode 
-	 * after the commit.
+	 * when it unlocks the inode. Since we want to return the 
+	 * vnode to the caller, we bump the vnode ref count now.
 	 */
-	xfs_trans_ihold (tp, dp);
-	xfs_trans_ihold (tp, ip);
+
+	IHOLD (ip);
+	vp = XFS_ITOV (ip);
 
 	xfs_bmap_finish (&tp, &free_list, first_block);
 	xfs_trans_commit (tp, 0);
-
-	xfs_iunlock (dp, XFS_ILOCK_EXCL);
-	xfs_iunlock (ip, XFS_ILOCK_EXCL);
-
-	
-	vp = XFS_ITOV (ip);
 
 #if 0
         /*
@@ -1289,28 +1281,11 @@ try_again:
 
         *vpp = vp;
 
-
 	return 0;
 
 error_return:
 
-	/*
-	 * Note: this code assumes that we don't join ip & dp
-	 * to the transaction until we are certain we can commit.
-	 *
-	 * Otherwise, will have to do iunlock only in the cases
-	 * where tp == NULL.
-	 */
-	if (tp) {
-		xfs_trans_cancel (tp, 0);
-		tp = NULL;
-	}
-	xfs_iunlock (dp, XFS_ILOCK_EXCL);
-	if (ip != NULL) {
-		IRELE (ip);
-		if (ip != dp) 
-			xfs_iunlock (ip, XFS_ILOCK_EXCL);
-	}
+	xfs_trans_cancel (tp, 0);
 	return error;
 
 }
@@ -1596,6 +1571,13 @@ xfs_remove(vnode_t	*dir_vp,
         dp = XFS_VTOI(dir_vp);
 	ip = NULL;
 
+	tp = xfs_trans_alloc (XFS_VFSTOM(dir_vp->v_vfsp), XFS_TRANS_WAIT);
+        if (error = xfs_trans_reserve (tp, 10, 10, 0, 0)) 
+                goto error_return;
+
+	if (error = xfs_iaccess (dp, IEXEC | IWRITE, credp))
+		goto error_return;
+
 	error = xfs_lock_dir_and_entry (dp, name, &ip);
 	if (error) {
 		return error;
@@ -1605,8 +1587,16 @@ xfs_remove(vnode_t	*dir_vp,
 	 * At this point, we've gotten both the directory and the entry
 	 * inodes locked.
 	 */
+	xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
+	if (dp != ip) {
+		/* Increment vnode ref count only in this case since
+		 * there's an extra vnode reference in the case where
+		 * dp == ip.
+		 */
+		IHOLD (dp);
+		xfs_trans_ijoin (tp, ip, XFS_ILOCK_EXCL);
+	}
 
-	/* Check MAC access */
 
 	if (XFS_ITOV(ip)->v_vfsmountedhere) {
                         error = EBUSY;
@@ -1631,15 +1621,6 @@ xfs_remove(vnode_t	*dir_vp,
 		}
 	} 
 
-	tp = xfs_trans_alloc (XFS_VFSTOM(dir_vp->v_vfsp), XFS_TRANS_WAIT);
-	if (error = xfs_trans_reserve (tp, 10, 10, 0, 0)) {
-		xfs_trans_cancel (tp, 0);
-		goto error_return;
-	}
-
-	xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
-	xfs_trans_ijoin (tp, ip, XFS_ILOCK_EXCL);
-
 	/*
 	 * Entry must exist since we did a lookup in xfs_lock_dir_and_entry.
 	 */
@@ -1654,31 +1635,16 @@ xfs_remove(vnode_t	*dir_vp,
 	xfs_trans_log_inode (tp, dp, XFS_ILOG_CORE);
 
 	xfs_droplink (tp, ip);
+	IRELE(ip);	/* decrement the vn count from the caller. */
 
-	xfs_trans_ihold (tp, dp);
 	xfs_bmap_finish (&tp, &free_list, first_block);
 	xfs_trans_commit (tp, 0);
-
-	xfs_iunlock (dp, XFS_ILOCK_EXCL);
-	IRELE (ip);
-
-	/*
-	 * We won't drop any locks here since xfs_trans_commit will
-	 * do so when the transaction commits.
-	 */
 
 	return 0;
 
 error_return:
-	if (ip)
-		IRELE (ip);
-
-	xfs_iunlock (dp, XFS_ILOCK_EXCL);               
-	if (dp != ip)
-		xfs_iunlock (ip, XFS_ILOCK_EXCL);               
-
+	xfs_trans_cancel (tp, 0);
 	return error;
-
 
 }
 
@@ -1710,10 +1676,21 @@ xfs_link(vnode_t	*target_dir_vp,
         if (src_vp->v_type == VDIR && !crsuser(credp))
                 return EPERM;
 
+        tp = xfs_trans_alloc (XFS_VFSTOM(target_dir_vp->v_vfsp),
+                              XFS_TRANS_WAIT);
+        if (error = xfs_trans_reserve (tp, 10, 10, 0, 0))
+                goto error_return;
+
+
 	sip = XFS_VTOI(src_vp);
 	tdp = XFS_VTOI(target_dir_vp);
 
 	xfs_lock_2_inodes (sip, tdp);
+
+	IHOLD(sip);
+	IHOLD(tdp);
+	xfs_trans_ijoin (tp, sip, XFS_ILOCK_EXCL);
+        xfs_trans_ijoin (tp, tdp, XFS_ILOCK_EXCL);
 
 	/* XXX perform access checks */
 
@@ -1725,23 +1702,14 @@ xfs_link(vnode_t	*target_dir_vp,
 		goto error_return;
 	}
 
-        tp = xfs_trans_alloc (XFS_VFSTOM(target_dir_vp->v_vfsp),
-			      XFS_TRANS_WAIT);
-        if (error = xfs_trans_reserve (tp, 10, 10, 0, 0))
-                goto error_return;
-
-	xfs_trans_ijoin (tp, sip, XFS_ILOCK_EXCL);
-        xfs_trans_ijoin (tp, tdp, XFS_ILOCK_EXCL);
 
 	first_block = NULLFSBLOCK;
 	bzero (&free_list, sizeof(free_list));
 
 	if (error = xfs_dir_createname (tp, tdp, target_name, sip->i_ino,
 					&first_block, &free_list,
-					MAX_EXT_NEEDED)) {
-		xfs_trans_cancel (tp, 0);
-		return error;
-	}
+					MAX_EXT_NEEDED)) 
+		goto error_return;
 
 	tdp->i_gen++;
 	xfs_trans_log_inode (tp, tdp, XFS_ILOG_CORE);
@@ -1749,22 +1717,16 @@ xfs_link(vnode_t	*target_dir_vp,
 
 	xfs_bumplink(tp, sip);
 
-	xfs_trans_ihold (tp, sip);
-	xfs_trans_ihold (tp, tdp);
-
 	xfs_bmap_finish (&tp, &free_list, first_block);
 	xfs_trans_commit (tp, 0);
 
 	dnlc_enter (target_dir_vp, target_name, XFS_ITOV(sip), credp);
 
-	xfs_iunlock (sip, XFS_ILOCK_EXCL);
-	xfs_iunlock (tdp, XFS_ILOCK_EXCL);
-
 	return 0;
 
 error_return:
-	xfs_iunlock (tdp, XFS_ILOCK_EXCL);
-	xfs_iunlock (sip, XFS_ILOCK_EXCL);
+	xfs_trans_cancel (tp, 0);
+
 	return error;
 }
 
@@ -2456,6 +2418,7 @@ xfs_symlink(vnode_t	*dir_vp,
 	if (pathlen <= XFS_LITINO(sbp)) {
 		xfs_idata_realloc (ip, pathlen);
 		bcopy(target_path, ip->i_u1.iu_data, pathlen);
+		ip->i_d.di_size = pathlen;
 
 		/*
 		 * The inode was initially created in extent format.
@@ -2468,7 +2431,6 @@ xfs_symlink(vnode_t	*dir_vp,
 		 */
 		ip->i_d.di_mode = (ip->i_d.di_mode & ~IFMT) | IFLNK;
 
-		xfs_trans_ijoin (tp, ip, XFS_ILOCK_EXCL);
 		xfs_trans_log_inode (tp, ip, XFS_ILOG_DATA | XFS_ILOG_CORE);
 	}
 	else {
@@ -2489,6 +2451,9 @@ xfs_symlink(vnode_t	*dir_vp,
                          XFS_BMAPI_WRITE, first_block, fs_blocks+dir_needs, 
 			 mval, &nmaps, &free_list);
 
+		ip->i_d.di_size = pathlen;
+		xfs_trans_log_inode (tp, ip, XFS_ILOG_CORE);
+
 		cur_chunk = target_path;
 		for (n = 0; n < nmaps; n++) {
 			d = xfs_fsb_to_daddr(sbp, mval[n].br_startblock);
@@ -2504,8 +2469,9 @@ xfs_symlink(vnode_t	*dir_vp,
 
 			xfs_trans_log_buf (tp, bp, 0, byte_cnt);
 		}
-
 	}
+
+	xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
 
 	/*
 	 * Create the directory entry for the symlink.
@@ -2516,12 +2482,10 @@ xfs_symlink(vnode_t	*dir_vp,
                 ASSERT (0);
         dnlc_enter (dir_vp, link_name, XFS_ITOV(ip), NOCRED);
 
-	xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
-	xfs_trans_ijoin (tp, ip, XFS_ILOCK_EXCL);
+	IHOLD (dp);
 
 	/* Defer this to after directory code. */
 	xfs_bmap_finish (&tp, &free_list, first_block);
-
 	xfs_trans_commit (tp, 0);
 
 	return 0;
@@ -2832,11 +2796,11 @@ xfs_fcntl(vnode_t	*vp,
 
 
 struct vnodeops xfs_vnodeops = {
-	xfs_open,
+	fs_noerr,
 	xfs_close,
 	xfs_read,
 	xfs_write,
-	xfs_ioctl,
+	fs_nosys,
 	xfs_setfl,
 	xfs_getattr,
 	xfs_setattr,
