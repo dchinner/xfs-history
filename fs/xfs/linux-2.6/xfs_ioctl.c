@@ -145,7 +145,6 @@ xfs_find_handle(
                 if (error)
                         return error;
 
-                /* XXX dxm - is locking here ok? */                
                 ASSERT(nd.dentry);
                 ASSERT(nd.dentry->d_inode);
                 inode = igrab(nd.dentry->d_inode);
@@ -161,7 +160,6 @@ xfs_find_handle(
                 if (!file)
                     return -EBADF;
                 
-                /* XXX dxm - is locking here ok? */
                 ASSERT(file->f_dentry);
                 ASSERT(file->f_dentry->d_inode);
                 inode = igrab(file->f_dentry->d_inode);
