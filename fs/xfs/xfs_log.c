@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.113 $"
+#ident	"$Revision: 1.114 $"
 
 /*
  * High level interface routines for log manager
@@ -1522,6 +1522,14 @@ xlog_state_done_syncing(xlog_in_core_t	*iclog)
 	}
 
 	iclog->ic_state = XLOG_STATE_DONE_SYNC;
+
+	/*
+	 * Someone could be sleeping on the next iclog even though it is
+	 * in the ACTIVE state.  We kick off one thread to force the
+	 * iclog buffer out.  See xlog_state_sync() for more details.
+	 */
+	if (iclog->ic_next->ic_state == XLOG_STATE_ACTIVE)
+		cvsema(&iclog->ic_next->ic_forcesema);
 	LOG_UNLOCK(log, spl);
 	xlog_state_do_callback(log);	/* also cleans log */
 }	/* xlog_state_done_syncing */
@@ -2141,42 +2149,56 @@ xlog_state_sync(xlog_t	  *log,
 		xfs_lsn_t lsn,
 		uint	  flags)
 {
-	xlog_in_core_t	*iclog;
-	int		spl;
+    xlog_in_core_t	*iclog;
+    int			spl;
+    int			already_slept = 0;
 
-	if (lsn == 0)
-		return xlog_state_sync_all(log, flags);
+    if (lsn == 0)
+	return xlog_state_sync_all(log, flags);
 
-	spl = LOG_LOCK(log);
-	iclog = log->l_iclog;
-	do {
-		if (iclog->ic_header.h_lsn != lsn) {
-			iclog = iclog->ic_next;
+try_again:
+    spl = LOG_LOCK(log);
+    iclog = log->l_iclog;
+    do {
+	if (iclog->ic_header.h_lsn != lsn) {
+	    iclog = iclog->ic_next;
+	} else {
+	    if (iclog->ic_state == XLOG_STATE_ACTIVE) {
+		/*
+		 * Need a big comment here.
+		 */
+		if (!already_slept &&
+		    (iclog->ic_prev->ic_state == XLOG_STATE_WANT_SYNC ||
+		    iclog->ic_prev->ic_state == XLOG_STATE_SYNCING)) {
+		    spunlockspl_psema(log->l_icloglock, spl,
+				      &iclog->ic_forcesema, 0);
+		    already_slept = 1;
+		    goto try_again;
 		} else {
-		    if (iclog->ic_state == XLOG_STATE_ACTIVE) {
-			    iclog->ic_refcnt++;
-			    xlog_state_switch_iclogs(log, iclog, 0);
-			    spunlockspl(log->l_icloglock, spl);
-			    xlog_state_release_iclog(log, iclog);
-			    spl = splockspl(log->l_icloglock, splhi);
-		    } else if (iclog->ic_state == XLOG_STATE_DIRTY) {
-			    LOG_UNLOCK(log, spl);
-			    return 0;
-		    }
-		    if ((flags & XFS_LOG_SYNC) &&		    /* sleep */
-			!(iclog->ic_state == XLOG_STATE_ACTIVE ||
-			  iclog->ic_state == XLOG_STATE_DIRTY)) {
-			    spunlockspl_psema(log->l_icloglock, spl,
-					      &iclog->ic_forcesema, 0);
-		    } else {				/* just return */
-			    LOG_UNLOCK(log, spl);
-		    }
-		    return 0;
+		    iclog->ic_refcnt++;
+		    xlog_state_switch_iclogs(log, iclog, 0);
+		    spunlockspl(log->l_icloglock, spl);
+		    xlog_state_release_iclog(log, iclog);
+		    spl = splockspl(log->l_icloglock, splhi);
 		}
-	} while (iclog != log->l_iclog);
+	    } else if (iclog->ic_state == XLOG_STATE_DIRTY) {
+		LOG_UNLOCK(log, spl);
+		return 0;
+	    }
+	    if ((flags & XFS_LOG_SYNC) && /* sleep */
+		!(iclog->ic_state == XLOG_STATE_ACTIVE ||
+		  iclog->ic_state == XLOG_STATE_DIRTY)) {
+		spunlockspl_psema(log->l_icloglock, spl,
+				  &iclog->ic_forcesema, 0);
+	    } else {		/* just return */
+		LOG_UNLOCK(log, spl);
+	    }
+	    return 0;
+	}
+    } while (iclog != log->l_iclog);
 
-	LOG_UNLOCK(log, spl);
-	return XFS_ENOTFOUND;
+    LOG_UNLOCK(log, spl);
+    return XFS_ENOTFOUND;
 }	/* xlog_state_sync */
 
 
