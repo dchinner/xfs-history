@@ -143,7 +143,7 @@ xfs-y				+= $(addprefix support/, \
 				   uuid.o)
 
 xfs-$(CONFIG_XFS_TRACE)		+= support/ktrace.o
-xfs-$(CONFIG_XFS_DMAPI)		+= dmapi/dmapi_xfs.o
+xfs-$(CONFIG_XFS_DMAPI)		+= xfs_dmapi.o
 
 # If both xfs and kdb modules are built in then xfsidbg is built in.  If xfs is
 # a module and kdb modules are being compiled then xfsidbg must be a module, to

@@ -137,7 +137,7 @@ subdir-$(CONFIG_XFS_FS)		+= linux-2.4 support
 subdir-$(CONFIG_XFS_QUOTA)	+= quota
 
 ifneq ($(CONFIG_XFS_DMAPI),)
-  obj-y				+= dmapi/dmapi_xfs.o
+  obj-y				+= xfs_dmapi.o
 endif
 
 ifeq ($(CONFIG_XFS_FS)$(CONFIG_XFS_QUOTA),yy)
