@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.123 $"
+#ident  "$Revision: 1.124 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -24,6 +24,7 @@
 #endif
 #include <sys/types.h>
 #include <sys/buf.h>
+#include <sys/cred.h>
 #include <sys/vfs.h>
 #include <sys/pfdat.h>
 #include <sys/vnode.h>
