@@ -771,7 +771,7 @@ xfs_bmap(bhv_desc_t	*bdp,
 	int		error;
 	int		unlocked;
 	int		lockmode;
-	int		fsynced;
+	int		fsynced = 0;
 	vnode_t		*vp;
 
 	ip = XFS_BHVTOI(bdp);
