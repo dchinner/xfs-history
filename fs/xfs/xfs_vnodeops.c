@@ -5154,17 +5154,13 @@ xfs_finish_reclaim(
 	int		from_umount)
 {
 	int	error;
-	xfs_ihash_t	*ih = ip->i_hash;
 	int	sync_mode;
 
-	mrupdate(&ih->ih_lock);
 	if (XFS_ITOV_NULL(ip)) {
-		mrunlock(&ih->ih_lock);
 		return(0);
 	}
 	if (locked) {
 		ip->i_flags |= XFS_IRECLAIM;
-		mrunlock(&ih->ih_lock);
 	}
 
 	sync_mode = from_umount ? XFS_IFLUSH_ASYNC :
@@ -5186,11 +5182,9 @@ xfs_finish_reclaim(
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
 			if (ip->i_flags & XFS_IRECLAIM) {
 				xfs_iunlock(ip, XFS_ILOCK_EXCL);
-				mrunlock(&ih->ih_lock);
 				return(1);
 			}
 			ip->i_flags |= XFS_IRECLAIM;
-			mrunlock(&ih->ih_lock);
 			xfs_iflock(ip);
 		}
 
@@ -5217,11 +5211,8 @@ xfs_finish_reclaim(
 		ASSERT(ip->i_itemp == NULL || 
 		       ip->i_itemp->ili_format.ilf_fields == 0);
 		ASSERT(ip->i_iocore.io_queued_bufs == 0);
-	} else {
-		if (!locked) 
-			mrunlock(&ih->ih_lock);
-		else
-			xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	} else if (locked) {
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	}
 
 	xfs_ireclaim(ip);
