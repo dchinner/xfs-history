@@ -1,12 +1,13 @@
-#ident "$Revision: 1.5 $"
+#ident "$Revision: 1.6 $"
 
 #include "sys/types.h"
-#include "sys/systm.h"
 #include "sys/pda.h"
 #include "sys/errno.h"
 #include "sys/debug.h"
 #ifdef SIM
 #include <stdlib.h>
+#else
+#include "sys/systm.h"
 #endif
 #include "xfs_error.h"
 
