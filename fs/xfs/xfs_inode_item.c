@@ -47,7 +47,7 @@ uint
 xfs_inode_item_size(xfs_inode_log_item_t *iip)
 {
 	uint	base_size;
-	uint	meta_size;
+	uint	core_size;
 	uint	other_size;
 
 	/*
@@ -59,9 +59,9 @@ xfs_inode_item_size(xfs_inode_log_item_t *iip)
 	 * If we're logging the xfs_dinode_core structure
 	 * count it here.
 	 */
-	meta_size = 0;
-	if (iip->ili_fields & XFS_ILOG_META) {
-		meta_size = sizeof(xfs_dinode_core_t);
+	core_size = 0;
+	if (iip->ili_fields & XFS_ILOG_CORE) {
+		core_size = sizeof(xfs_dinode_core_t);
 	}
 
 	/*
@@ -76,7 +76,7 @@ xfs_inode_item_size(xfs_inode_log_item_t *iip)
 		other_size = iip->ili_inode->i_broot_bytes;
 	}
 		
-	return (base_size + other_size);
+	return (base_size + core_size + other_size);
 }
 
 /*
@@ -232,10 +232,10 @@ xfs_inode_item_push(xfs_inode_log_item_t *iip)
 
 	/*
 	 * Write out the inode.  The completion routine will
-	 * pull it from the AIL, mark it clearn, and xfs_iput()
+	 * pull it from the AIL, mark it clean, and xfs_iput()
 	 * the inode.
 	 */
-	xfs_iflush(ip);
+	xfs_iflush(ip, B_ASYNC);
 }
 
 /*
@@ -271,39 +271,69 @@ xfs_inode_item_init(xfs_inode_t *ip, xfs_mount_t *mp)
 
 
 /*
- * This is the iodone() function for buffers which have been
- * logged.  It is called when they are eventually flushed out.
- * It should remove the buf item from the AIL, and free the buf item.
- * It should then clear the b_iodone field of the buffer and 
- * call iodone() with the buffer so that it will receive normal
- * iodone() processing.
- */ 
-#if 0
+ * This is the inode flushing I/O completion routine.  It is called
+ * from interrupt level when the buffer containing the inode is
+ * flushed to disk.  It is responsible for removing the inode item
+ * from the AIL if it has not been re-logged, unlocking the inode's
+ * flush lock, and releasing the vnode reference taken by the
+ * inode transaction code if there is one.
+ */
 void
-xfs_inode_irelse(buf_t *bp)
+xfs_iflush_done(buf_t *bp, xfs_inode_log_item_t *iip)
 {
-	xfs_buf_log_item_t	*bip;
-	struct xfs_mount	*mp;
-	int			s;
+	xfs_lsn_t	lsn;
+	xfs_inode_t	*ip;
+	int		s;
+	int		drop_ref;
 
-	ASSERT(bp->b_fsprivate != NULL);
+	ip = iip->ili_inode;
+
+	/*
+	 * We only want to pull the item from the AIL if its
+	 * location in the log has not changed since we started
+	 * the flush.  Thus, we only bother if the inode's lsn
+	 * has not changed.  First we check outside the lock since
+	 * it's cheaper, and then we recheck while holding the
+	 * lock before removing the inode from the AIL.
+	 */
+	if (iip->ili_item.li_lsn == iip->ili_flush_lsn) {
+		s = AIL_LOCK(ip->i_mount);
+		if (iip->ili_item.li_lsn == iip->ili_flush_lsn) {
+			xfs_trans_delete_ail(ip->i_mount, (xfs_log_item_t*)iip);
+		}
+		AIL_UNLOCK(ip->i_mount, s);
+	}
+
+	/*
+	 * Check to see if we should drop the reference taken by
+	 * xfs_trans_log_inode() by looking at ili_ref.  ili_ref
+	 * is guarded by the i_flock, so check and clear it before
+	 * unlocking the i_flock.
+	 */
+	if (iip->ili_ref != 0) {
+		drop_ref = 1;
+		iip->ili_ref = 0;
+	} else {
+		drop_ref = 0;
+	}
 	
-	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
-	ASSERT(bip->bli_buf == bp);
+	/*
+	 * Release the inode's flush lock since we're done with it.
+	 */
+	xfs_ifunlock(ip);
 
-	mp = bip->bli_mountp;
-	s = AIL_LOCK(mp);
-	xfs_trans_delete_ail(bip->bli_mountp, (xfs_log_item_t *)bip);
-	AIL_UNLOCK(mp, s);
-
-	kmem_free(bip, sizeof(xfs_buf_log_item_t) +
-		  ((bip->bli_map_size - 1) * sizeof(int)));
-	bp->b_fsprivate = NULL;
-
-	bp->b_iodone = NULL;
-	iodone(bp);
-}
+	/*
+	 * Here we release the inode reference made by the transaction
+	 * code if we have one.
+	 */
+	if (drop_ref) {
+#ifdef NOTYET
+		vn_rele(XFS_ITOV(ip));
 #endif
+	}
+		
+	return;
+}
 
 
 
