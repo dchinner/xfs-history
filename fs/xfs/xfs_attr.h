@@ -59,16 +59,19 @@ struct attr_multiop_kern_64 {
  *========================================================================*/
 
 
-struct xfs_da_name;
+struct attrlist_cursor_kern;
+struct cred;
 struct uio;
+struct vnode;
+struct xfs_da_name;
 struct xfs_bmap_free;
 
 /*
  * Overall external interface routines.
  */
-int xfs_attr_get(vnode_t *, char *, char *, int *, int, struct cred *);
-int xfs_attr_set(vnode_t *, char *, char *, int, int, struct cred *);
-int xfs_attr_remove(vnode_t *, char *, int, struct cred *);
-int xfs_attr_list(vnode_t *, char *, int, int, attrlist_cursor_kern_t *,
-			  struct cred *);
+int xfs_attr_get(struct vnode *, char *, char *, int *, int, struct cred *);
+int xfs_attr_set(struct vnode *, char *, char *, int, int, struct cred *);
+int xfs_attr_remove(struct vnode *, char *, int, struct cred *);
+int xfs_attr_list(struct vnode *, char *, int, int,
+			 struct attrlist_cursor_kern *, struct cred *);
 #endif	/* !_FS_XFS_ATTR_H */
