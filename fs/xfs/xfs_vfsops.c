@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.164 $"
+#ident  "$Revision: 1.165 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -445,7 +445,8 @@ xfs_cmountfs(
 		mp->m_ddevp = ddevvp;
 
                 /* Values are in BBs */
-                if ((ap != NULL) && (ap->version == 2)) {
+                if ((ap != NULL) && (ap->version == 2) && 
+		    (ap->flags & XFSMNT_NOALIGN) != XFSMNT_NOALIGN) {
                         /*
                          * At this point the superblock has not been read
                          * in, therefore we do not know the block size.
@@ -556,6 +557,11 @@ xfs_cmountfs(
 				 XFSMNT_QUOTAMAYBE)) 
 			xfs_qm_mount_quotainit(mp, ap->flags);
 		
+		if (ap->flags & XFSMNT_RETERR)
+			mp->m_flags |= XFS_MOUNT_RETERR;
+
+		if (ap->flags & XFSMNT_NOALIGN)
+			mp->m_flags |= XFS_MOUNT_NOALIGN;
 	}
 
 	if (error = xfs_mountfs(vfsp, mp, ddev)) {
