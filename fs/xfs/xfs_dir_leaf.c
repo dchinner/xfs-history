@@ -1,4 +1,4 @@
-#ident "$Revision: 1.50 $"
+#ident "$Revision: 1.51 $"
 
 /*
  * xfs_dir_leaf.c
@@ -69,7 +69,8 @@
  */
 STATIC void xfs_dir_leaf_add_work(buf_t *leaf_buffer, xfs_da_args_t *args,
 					int insertion_index, int freemap_index);
-STATIC void xfs_dir_leaf_compact(xfs_trans_t *trans, buf_t *leaf_buffer);
+STATIC void xfs_dir_leaf_compact(xfs_trans_t *trans, buf_t *leaf_buffer,
+					     int musthave);
 STATIC void xfs_dir_leaf_rebalance(xfs_da_state_t *state,
 						  xfs_da_state_blk_t *blk1,
 						  xfs_da_state_blk_t *blk2);
@@ -974,7 +975,9 @@ xfs_dir_leaf_add(buf_t *bp, xfs_da_args_t *args, int index)
 	/*
 	 * Compact the entries to coalesce free space.
 	 */
-	xfs_dir_leaf_compact(args->trans, bp);
+	xfs_dir_leaf_compact(args->trans, bp,
+			args->total == 0 ?
+				entsize + sizeof(xfs_dir_leaf_entry_t) : 0);
 
 	/*
 	 * After compaction, the block is guaranteed to have only one
@@ -1069,7 +1072,7 @@ xfs_dir_leaf_add_work(buf_t *bp, xfs_da_args_t *args, int index, int mapindex)
  * Garbage collect a leaf directory block by copying it to a new buffer.
  */
 STATIC void
-xfs_dir_leaf_compact(xfs_trans_t *trans, buf_t *bp)
+xfs_dir_leaf_compact(xfs_trans_t *trans, buf_t *bp, int musthave)
 {
 	xfs_dir_leafblock_t *leaf_s, *leaf_d;
 	xfs_dir_leaf_hdr_t *hdr_s, *hdr_d;
@@ -1105,7 +1108,10 @@ xfs_dir_leaf_compact(xfs_trans_t *trans, buf_t *bp)
 	 */
 	xfs_dir_leaf_moveents(leaf_s, 0, leaf_d, 0, (int)hdr_s->count, mp);
 
-	xfs_trans_log_buf(trans, bp, 0, XFS_LBSIZE(mp) - 1);
+	if (musthave && hdr_d->freemap[0].size < musthave)
+		bcopy(tmpbuffer, bp->b_un.b_addr, XFS_LBSIZE(mp));
+	else
+		xfs_trans_log_buf(trans, bp, 0, XFS_LBSIZE(mp) - 1);
 
 	kmem_free(tmpbuffer, XFS_LBSIZE(mp));
 }
@@ -1178,7 +1184,7 @@ xfs_dir_leaf_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		max  = hdr2->firstused - sizeof(xfs_dir_leaf_hdr_t);
 		max -= hdr2->count * sizeof(xfs_dir_leaf_entry_t);
 		if (space > max) {
-			xfs_dir_leaf_compact(state->args->trans, blk2->bp);
+			xfs_dir_leaf_compact(state->args->trans, blk2->bp, 0);
 		}
 
 		/*
@@ -1207,7 +1213,7 @@ xfs_dir_leaf_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		max  = hdr1->firstused - sizeof(xfs_dir_leaf_hdr_t);
 		max -= hdr1->count * sizeof(xfs_dir_leaf_entry_t);
 		if (space > max) {
-			xfs_dir_leaf_compact(state->args->trans, blk1->bp);
+			xfs_dir_leaf_compact(state->args->trans, blk1->bp, 0);
 		}
 
 		/*
