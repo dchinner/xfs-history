@@ -56,6 +56,7 @@
  */
 #define XFS_LOG_PRINT_EXIT	0x1
 #define XFS_LOG_PRINT_NO_DATA	0x2
+#define XFS_LOG_PRINT_NO_PRINT	0x4
 
 
 /* Log Clients */
