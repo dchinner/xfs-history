@@ -675,7 +675,6 @@ _pagebuf_get_prealloc_bh(void)
 		BUG();
 
 	pb_resv_bh = bh->b_next;
-	bh->b_state = 0;
 	pb_resv_bh_cnt--;
 
 	spin_unlock_irqrestore(&pb_resv_bh_lock, flags);
@@ -699,22 +698,26 @@ _pagebuf_free_bh(
 	struct buffer_head	*bh)
 {
 	unsigned long		flags;
+	int			free;
 
-	if (pb_resv_bh_cnt == NR_RESERVED_BH){
-		kmem_cache_free(bh_cachep, bh);
-	} else {
+	if (! (free = pb_resv_bh_cnt >= NR_RESERVED_BH)) {
 		spin_lock_irqsave(&pb_resv_bh_lock, flags);
 
-		bh->b_pprev = &pb_resv_bh;
-		bh->b_next = pb_resv_bh;
-		pb_resv_bh = bh;
-		pb_resv_bh_cnt++;
+		if (! (free = pb_resv_bh_cnt >= NR_RESERVED_BH)) {
+			bh->b_pprev = &pb_resv_bh;
+			bh->b_next = pb_resv_bh;
+			pb_resv_bh = bh;
+			pb_resv_bh_cnt++;
 
-		if (waitqueue_active(&pb_resv_bh_wait)) {
-			wake_up(&pb_resv_bh_wait);
+			if (waitqueue_active(&pb_resv_bh_wait)) {
+				wake_up(&pb_resv_bh_wait);
+			}
 		}
 
 		spin_unlock_irqrestore(&pb_resv_bh_lock, flags);
+	}
+	if (free) {
+		kmem_cache_free(bh_cachep, bh);
 	}
 }
 
