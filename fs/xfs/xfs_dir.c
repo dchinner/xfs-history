@@ -1,4 +1,4 @@
-#ident "$Revision: 1.63 $"
+#ident "$Revision: 1.66 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -366,7 +366,7 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	 */
 	abi = uio->uio_segflg == UIO_USERSPACE ?
 		u.u_procp->p_abi : ABI_IRIX5_64;
-	alignment = ((abi == ABI_IRIX5_64) ?
+	alignment = (((abi == ABI_IRIX5_64) || (abi == ABI_IRIX5_N32)) ?
 		sizeof(off_t) : sizeof(irix5_off_t)) - 1;
 	if (uio->uio_segflg == UIO_SYSSPACE) {
 		ASSERT(uio->uio_iovcnt == 1);
