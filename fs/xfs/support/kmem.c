@@ -171,20 +171,6 @@ kmem_realloc(void *ptr, size_t newsize, size_t oldsize, int flags)
 	return new;
 }
 
-#ifdef	XFSDEBUG
-void
-kmem_check(void)
-{
-	void *ptr;
-
-	ptr = kmem_alloc(sizeof(ptr), KM_SLEEP);
-
-	ASSERT(ptr);
-
-	kmem_free(ptr, sizeof(ptr));
-}
-#endif	/* XFSDEBUG */
-
 kmem_zone_t *
 kmem_zone_init(int size, char *zone_name)
 {
