@@ -2503,21 +2503,16 @@ print_pagebuf(
 	kdb_printf("  pb_page_count %u pb_offset 0x%x pb_pages 0x%p\n",
 		pb->pb_page_count, pb->pb_offset,
 		pb->pb_pages);
-#ifdef PAGEBUF_LOCK_TRACKING
-	kdb_printf("  pb_iodonesema (%d,%d) pb_sema (%d,%d) pincount (%d) last holder %d\n",
-		   pb->pb_iodonesema.count.counter,
-		   pb->pb_iodonesema.sleepers,
-		   pb->pb_sema.count.counter, pb->pb_sema.sleepers,
-		   pb->pb_pin_count.counter, pb->pb_last_holder);
-#else
 	kdb_printf("  pb_iodonesema (%d,%d) pb_sema (%d,%d) pincount (%d)\n",
 		   pb->pb_iodonesema.count.counter,
 		   pb->pb_iodonesema.sleepers,
 		   pb->pb_sema.count.counter, pb->pb_sema.sleepers,
 		   pb->pb_pin_count.counter);
+#ifdef PAGEBUF_LOCK_TRACKING
+	kdb_printf("  last holder %d\n", pb->pb_last_holder);
 #endif
 	if (pb->pb_fspriv || pb->pb_fspriv2) {
-		kdb_printf(  "pb_fspriv 0x%p pb_fspriv2 0x%p\n",
+		kdb_printf(  "  pb_fspriv 0x%p pb_fspriv2 0x%p\n",
 			   pb->pb_fspriv, pb->pb_fspriv2);
 	}
 }
