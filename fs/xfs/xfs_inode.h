@@ -76,7 +76,6 @@ typedef struct xfs_inode {
 	} i_u2;
 
 	/* File incore attribute extent information. */
-	unsigned short		i_num_aextents;	/* number of attr extents */
 	size_t			i_abytes;	/* bytes in i_u3 */
 	union {
 		xfs_bmbt_rec_t	*iu_aextents;	/* map of attr extents */
