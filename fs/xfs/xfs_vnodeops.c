@@ -1,4 +1,4 @@
-#ident "$Revision: 1.318 $"
+#ident "$Revision: 1.319 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -162,7 +162,9 @@ STATIC int
 xfs_fsync(
 	bhv_desc_t	*bdp,
 	int		flag,
-	cred_t		*credp);
+	cred_t		*credp,
+	off_t		start,
+	off_t		stop);
 
 STATIC int
 xfs_lookup(
@@ -973,9 +975,17 @@ xfs_setattr(
 			xfs_igrow_finish(tp, ip, vap->va_size);
 		} else if (vap->va_size < ip->i_d.di_size) {
 			xfs_trans_ihold(tp, ip);
+			/*
+			 * signal a sync transaction unless
+			 * we're truncating an already unlinked
+			 * file on a wsync filesystem
+			 */
 			code = xfs_itruncate_finish(&tp, ip,
 					    (xfs_fsize_t)vap->va_size,
-					    XFS_DATA_FORK, 0);
+					    XFS_DATA_FORK,
+					    ((ip->i_d.di_nlink != 0 ||
+					      !(mp->m_flags & XFS_MOUNT_WSYNC))
+					     ? 1 : 0));
 			ip_held = B_TRUE;
 			if (code) {
 				goto abort_return;
@@ -1127,10 +1137,15 @@ xfs_setattr(
 	/*
 	 * If this is a synchronous mount, make sure that the
 	 * transaction goes to disk before returning to the user.
+	 * This is slightly sub-optimal in that truncates require
+	 * two sync transactions instead of one for wsync filesytems.
+	 * One for the truncate and one for the timestamps since we
+	 * don't want to change the timestamps unless we're sure the
+	 * truncate worked.  Truncates are less than 1% of the laddis
+	 * mix so this probably isn't worth the trouble to optimize.
 	 */
-	if (mp->m_flags & XFS_MOUNT_WSYNC) {
+	if (mp->m_flags & XFS_MOUNT_WSYNC)
 		xfs_trans_set_sync(tp);
-	}
 
 	code = xfs_trans_commit(tp, commit_flags);
 
@@ -1335,10 +1350,11 @@ STATIC int
 xfs_fsync(
 	bhv_desc_t	*bdp,
 	int		flag,
-	cred_t		*credp)
+	cred_t		*credp,
+	off_t		start,
+	off_t		stop)
 {
 	xfs_inode_t	*ip;
-	xfs_fsize_t	last_byte;
 	int		error;
 	vnode_t 	*vp;
 	xfs_trans_t	*tp;
@@ -1352,7 +1368,13 @@ xfs_fsync(
 #endif
 
 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
-	last_byte = xfs_file_last_byte(ip);
+	if (stop == -1)  {
+		ASSERT(start >= 0);
+		if (start == 0)
+			error = -1;
+		stop = (off_t) xfs_file_last_byte(ip);
+	} else
+		error = 0;
 
 	/*
 	 * If we're invalidating, always flush since we want to
@@ -1367,21 +1389,24 @@ xfs_fsync(
 			 * race in between the remapf and the pflushinvalvp
 			 * calls.
 			 */
+
 			VN_FLAGSET(vp, VREMAPPING);
 			if (VN_MAPPED(vp)) {
-				remapf(vp, 0, 1);
+				remapf(vp, start, 1);
 			}
-			pflushinvalvp(vp, 0, last_byte);
+			pflushinvalvp(vp, start, stop);
 			VN_FLAGCLR(vp, VREMAPPING);
 		}
-		ASSERT((vp->v_pgcnt == 0) && (vp->v_buf == 0));
+
+
+		ASSERT(error == 0 || ((vp->v_pgcnt == 0) && (vp->v_buf == 0)));
 	} else if (VN_DIRTY(vp)) {
 		/*
-		 * In the non-invalidating case calls to fsync() do not
+		 * In the non-invalidating case, calls to fsync() do not
 		 * flush all the dirty mmap'd pages.  That requires a
 		 * call to msync().
 		 */
-		pflushvp(vp, last_byte, (flag & FSYNC_WAIT) ? 0 : B_ASYNC);
+		pflushvp(vp, start, stop, (flag & FSYNC_WAIT) ? 0 : B_ASYNC);
 	}
 
 	/*
@@ -1415,8 +1440,8 @@ xfs_fsync(
 		 * lock unnecessarily.
 		 */
 		ASSERT(!(flag & (FSYNC_INVAL | FSYNC_WAIT)) ||
-		       (!VN_DIRTY(vp) &&
-			(ip->i_queued_bufs == 0)));
+		       error == 0 ||
+		       (!VN_DIRTY(vp) && (ip->i_queued_bufs == 0)));
 
 		xfs_ilock(ip, XFS_ILOCK_SHARED);
 
@@ -2052,7 +2077,15 @@ xfs_inactive(
 		xfs_trans_ijoin(tp, ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 		xfs_trans_ihold(tp, ip);
 
-		error = xfs_itruncate_finish(&tp, ip, 0, XFS_DATA_FORK, 0);
+		/*
+		 * normally, we have to run xfs_itruncate_finish sync.
+		 * But if filesystem is wsync and we're in the inactive
+		 * path, then we know that nlink == 0, and that the
+		 * xaction that made nlink == 0 is permanently committed
+		 * since xfs_remove runs as a synchronous transaction.
+		 */
+		error = xfs_itruncate_finish(&tp, ip, 0, XFS_DATA_FORK,
+				(!(mp->m_flags & XFS_MOUNT_WSYNC) ? 1 : 0));
 		commit_flags = XFS_TRANS_RELEASE_LOG_RES;
 
 		if (error) {
@@ -2678,9 +2711,17 @@ xfs_create(
 			if ((ip->i_d.di_size > 0) || (ip->i_d.di_nextents)) {
 				xfs_ctrunc_trace(XFS_CTRUNC5, ip);
 				xfs_trans_ihold(tp, ip);
+				/*
+				 * always signal sync xaction.  We're
+				 * truncating an existing file so the
+				 * xaction must be sync regardless
+				 * of whether the filesystem is wsync
+				 * to make the truncate persistent
+				 * in the face of a crash.
+				 */
 				error = xfs_itruncate_finish(&tp, ip,
 							     (xfs_fsize_t)0,
-							     XFS_DATA_FORK, 0);
+							     XFS_DATA_FORK, 1);
 				if (error) {
 					ASSERT(ip->i_transp == tp);
 					xfs_trans_ihold_release(tp, ip);
