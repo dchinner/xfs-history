@@ -653,61 +653,53 @@ bp_err:
 int
 xlog_test_footer(xlog_t *log)
 {
-	int error = 0;
-	xfs_buf_t *bp;
-        xlog_volume_footer_t *rfoot;
-        unsigned char b_magic[]={
-            0x70, 0x68, 0x69, 0x6c,  /* declare as bytes to avoid */
-            0x26, 0x6d, 0x6b, 0x70,  /* endian confusion - uuids  */
-            0x77, 0x65, 0x72, 0x65,  /* are really a byte string! */
-            0x68, 0x65, 0x72, 0x65
-        };
-	uuid_t *magic=(uuid_t*)b_magic;
-        uint_t status;
+    int error = 0;
+    xfs_buf_t *bp;
+    xlog_volume_footer_t *rfoot;
+    uint_t status;
+
+    /* do we have an external log? */
+    if (log->l_mp->m_sb.sb_logstart != 0)
+        return 0;
+
+    bp = xlog_get_bp(1, log->l_mp);
+
+    /* Read in the last physical block of the log and check its
+     * magic goo. */
+    
+    error = XFS_ERROR(EINVAL);
+    
+    if (xlog_bread(log, log->l_logBBsize - 1, 1, bp)) {
+  	xlog_warn("XFS: failed to read external log footer");
+    } else {
+        rfoot = (xlog_volume_footer_t *)XFS_BUF_PTR(bp);
         
-        /* do we have an external log? */
-	if (log->l_mp->m_sb.sb_logstart != 0)
-            return 0;
+        /* working on the assumption that changes to the footer will
+         * be backwards compatible, we ignore the version number here
+         */
 
-	bp = xlog_get_bp(1, log->l_mp);
-
-        /* Read in the last physical block of the log and check its
-	 * magic goo. */
-        if (error = xlog_bread(log, log->l_logBBsize - 1, 1, bp)) {
-  	        xlog_warn("XFS: failed to read external log footer");
-                error = XFS_ERROR(EINVAL);
+        if (uuid_compare(&rfoot->f_magic, XFS_EXTERNAL_LOG_MAGIC, &status)) {
+            xlog_warn("XFS: bad external log (incorrect magic number)");
+        } else if (uuid_compare(&log->l_mp->m_origuuid, &rfoot->f_uuid, &status)) {
+            xlog_warn("XFS: mismatched external log (incorrect uuid)");
         } else {
-                rfoot = (xlog_volume_footer_t *)XFS_BUF_PTR(bp);
-
-                if (uuid_compare(&rfoot->f_magic, magic, &status) == 0) {
-	                /* This has the magic number--it is an external log.
-		         * Now make sure that it's associated with the
-		         * filesystem that we're trying to mount. */
-                        /* compare against _original_ uuid because the
-                         * footer should match that even if we've assigned
-                         * a new uuid to this FS
-                         */
-	                if (uuid_compare(&log->l_mp->m_origuuid, &rfoot->f_uuid, 
-                            &status)) {
-  		                xlog_warn("XFS: mismatched external log (incorrect uuid)");
-                                error = XFS_ERROR(EINVAL);
-	                } else {
-	                        /* Since the last block of the log is this magic data,
-		                 * decrease the effective size. */
-	                        /* FIXME: is this the right thing to do? */
-	                        log->l_logsize -= BBSIZE;
-	                        log->l_iclog_size -= BBSIZE;
-	                        log->l_logBBsize -= 1;
-                        }
-                } else {
-  	                xlog_warn("XFS: invalid external log footer (not external log)");
-	                error = XFS_ERROR(EINVAL);
-                }
+            /* footer checks out */
+            
+            error = 0;
+            
+            /* Since the last block of the log is this magic data,
+	     * decrease the effective size. */
+            
+            log->l_logsize -= BBSIZE;
+            log->l_iclog_size -= BBSIZE;
+            log->l_logBBsize -= 1;
+            
         }
-        
-	xlog_put_bp(bp);
+    }
 
-	return error;
+    xlog_put_bp(bp);
+
+    return error;
 }
 
 

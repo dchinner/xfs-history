@@ -31,7 +31,7 @@
  */
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision: 1.72 $"
+#ident	"$Revision: 1.73 $"
 
 #if defined(XFS_ALL_TRACE)
 #define	XFS_LOG_TRACE
@@ -372,6 +372,15 @@ typedef struct xlog_rec_header {
 	int	  h_num_logops;	/* number of log operations in this LR	:  4 */
 	uint	  h_cycle_data[XLOG_MAX_RECORD_BSIZE / BBSIZE];
 } xlog_rec_header_t;
+
+/* external log footer
+ *
+ * define a magic number and a version - we don't accept logs made
+ * with a different version, but don't expect the version to change
+ */
+
+#define XFS_EXTERNAL_LOG_VERSION    1
+#define XFS_EXTERNAL_LOG_MAGIC      (uuid_t*)(void*)"XFS-external-log"
 
 typedef struct xlog_volume_footer {
 	uuid_t	  f_magic;	/* magic field */
