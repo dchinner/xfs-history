@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.29 $"
+#ident	"$Revision: 1.30 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -28,6 +28,7 @@
 #include <sys/ktrace.h>
 #include <sys/sema.h>
 #include <sys/vfs.h>
+#include <stddef.h>
 
 #include "xfs_inum.h"
 #include "xfs_types.h"
@@ -878,6 +879,153 @@ xlog_recover_reorder_trans(xlog_t	  *log,
 }	/* xlog_recover_reorder_trans */
 
 
+/*
+ * Perform recovery for a buffer full of inodes.  In these buffers,
+ * the only data which should be recovered is that which corresponds
+ * to the di_next_unlinked pointers in the on disk inode structures.
+ * The rest of the data for the inodes is always logged through the
+ * inodes themselves rather than the inode buffer and is recovered
+ * in xlog_recover_do_inode_trans().
+ *
+ * The only time when buffers full of inodes are fully recovered is
+ * when the buffer is full of newly allocated inodes.  In this case
+ * the buffer will not be marked as an inode buffer and so will be
+ * sent to xlog_recover_do_reg_buffer() below during recovery.
+ */
+STATIC void
+xlog_recover_do_inode_buffer(xfs_mount_t		*mp,
+			     xlog_recover_item_t	*item,
+			     buf_t			*bp,
+			     xfs_buf_log_format_t	*buf_f)
+{
+	int		i;
+	int		item_index;
+	int		bit;
+	int		nbits;
+	int		reg_buf_offset;
+	int		reg_buf_bytes;
+	int		next_unlinked_offset;
+	int		inodes_per_buf;
+	xfs_agino_t	*logged_nextp;
+	xfs_agino_t	*buffer_nextp;
+
+	/*
+	 * Set the variables corresponding to the current region to
+	 * 0 so that we'll initialize them on the first pass through
+	 * the loop.
+	 */
+	reg_buf_offset = 0;
+	reg_buf_bytes = 0;
+	bit = 0;
+	nbits = 0;
+	item_index = 0;
+	inodes_per_buf = bp->b_bcount >> mp->m_sb.sb_inodelog;
+	for (i = 0; i < inodes_per_buf; i++) {
+		next_unlinked_offset = (i * mp->m_sb.sb_inodesize) +
+			offsetof(xfs_dinode_t, di_next_unlinked);
+
+		while (next_unlinked_offset >=
+		       (reg_buf_offset + reg_buf_bytes)) {
+			/*
+			 * The next di_next_unlinked field is beyond
+			 * the current logged region.  Find the next
+			 * logged region that contains or is beyond
+			 * the current di_next_unlinked field.
+			 */
+			bit += nbits;
+			bit = xfs_buf_item_next_bit(buf_f->blf_data_map,
+						    buf_f->blf_map_size,
+						    bit);
+
+			/*
+			 * If there are no more logged regions in the
+			 * buffer, then we're done.
+			 */
+			if (bit == -1) {
+				return;
+			}
+
+			nbits = xfs_buf_item_contig_bits(buf_f->blf_data_map,
+							 buf_f->blf_map_size,
+							 bit);
+			reg_buf_offset = bit << XFS_BLI_SHIFT;
+			reg_buf_bytes = nbits << XFS_BLI_SHIFT;
+			item_index++;
+		}
+
+		/*
+		 * If the current logged region starts after the current
+		 * di_next_unlinked field, then move on to the next
+		 * di_next_unlinked field.
+		 */
+		if (next_unlinked_offset < reg_buf_offset) {
+			continue;
+		}
+
+		ASSERT(item->ri_buf[item_index].i_addr != NULL);
+		ASSERT((item->ri_buf[item_index].i_len % XFS_BLI_CHUNK) == 0);
+		ASSERT((reg_buf_offset + reg_buf_bytes) <= bp->b_bcount);
+
+		/*
+		 * The current logged region contains a copy of the
+		 * current di_next_unlinked field.  Extract its value
+		 * and copy it to the buffer copy.
+		 */
+		logged_nextp = (xfs_agino_t *)
+			       ((char *)(item->ri_buf[item_index].i_addr) +
+				(next_unlinked_offset - reg_buf_offset));
+		buffer_nextp = (xfs_agino_t *)((char *)(bp->b_un.b_addr) +
+					      next_unlinked_offset);
+		*buffer_nextp = *logged_nextp;
+	}
+}	/* xlog_recover_do_inode_buffer */
+
+/*
+ * Perform a 'normal' buffer recovery.  Each logged region of the
+ * buffer should be copied over the corresponding region in the
+ * given buffer.  The bitmap in the buf log format structure indicates
+ * where to place the logged data.
+ */
+STATIC void
+xlog_recover_do_reg_buffer(xfs_mount_t		*mp,
+			   xlog_recover_item_t	*item,
+			   buf_t		*bp,
+			   xfs_buf_log_format_t	*buf_f)
+{
+	int	i;
+	int	bit;
+	int	nbits;
+
+	bit = 0;
+	i = 1;  /* 0 is the buf format structure */
+	while (1) {
+		bit = xfs_buf_item_next_bit(buf_f->blf_data_map,
+					    buf_f->blf_map_size,
+					    bit);
+		if (bit == -1)
+			break;
+		nbits = xfs_buf_item_contig_bits(buf_f->blf_data_map,
+						 buf_f->blf_map_size,
+						 bit);
+		ASSERT(item->ri_buf[i].i_addr != 0);
+		ASSERT(item->ri_buf[i].i_len % XFS_BLI_CHUNK == 0);
+		ASSERT(bp->b_bcount >=
+		       ((uint)bit << XFS_BLI_SHIFT)+(nbits<<XFS_BLI_SHIFT));
+		bcopy(item->ri_buf[i].i_addr,		           /* source */
+		      bp->b_un.b_addr+((uint)bit << XFS_BLI_SHIFT),  /* dest */
+		      nbits<<XFS_BLI_SHIFT);			   /* length */
+		i++;
+		bit += nbits;
+	}
+
+	/* Shouldn't be any more regions */
+	if (i < XLOG_MAX_REGIONS_IN_ITEM) {
+		ASSERT(item->ri_buf[i].i_addr == 0);
+		ASSERT(item->ri_buf[i].i_len == 0);
+	}
+}	/* xlog_recover_do_reg_buffer */
+
+
 STATIC int
 xlog_recover_do_buffer_trans(xlog_t		 *log,
 			     xlog_recover_item_t *item)
@@ -901,43 +1049,24 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 		return error;
 	}
 
-	while (1) {
-		bit = xfs_buf_item_next_bit(buf_f->blf_data_map,
-					    buf_f->blf_map_size,
-					    bit);
-		if (bit == -1)
-			break;
-		nbits = xfs_buf_item_contig_bits(buf_f->blf_data_map,
-						 buf_f->blf_map_size,
-						 bit);
-		ASSERT(item->ri_buf[i].i_addr != 0);
-		ASSERT(item->ri_buf[i].i_len % XFS_BLI_CHUNK == 0);
-		ASSERT(bp->b_bcount >= ((uint)bit << XFS_BLI_SHIFT)+(nbits<<XFS_BLI_SHIFT));
-		bcopy(item->ri_buf[i].i_addr,		           /* source */
-		      bp->b_un.b_addr+((uint)bit << XFS_BLI_SHIFT),  /* dest */
-		      nbits<<XFS_BLI_SHIFT);			   /* length */
-		i++;
-		bit += nbits;
+	if (buf_f->blf_flags & XFS_BLI_INODE_BUF) {
+		xlog_recover_do_inode_buffer(mp, item, bp, buf_f);
+	} else {
+		xlog_recover_do_reg_buffer(mp, item, bp, buf_f);
 	}
 
 	/*
 	 * Perform delayed write on the buffer.  Asynchronous writes will be
 	 * slower when taking into account all the buffers to be flushed.
 	 */
-	bp->b_flags = (B_BUSY | B_HOLD);	/* synchronous */
 	bdwrite(bp);
+
 	/*
 	 * Once bdwrite() is called, we lose track of the buffer.  Therefore,
 	 * if we want to keep track of buffer errors, we need to add a
 	 * release function which sets some variable which gets looked at
 	 * after calling bflush() on the device.  XXXmiken
 	 */
-
-	/* Shouldn't be any more regions */
-	if (i < XLOG_MAX_REGIONS_IN_ITEM) {
-		ASSERT(item->ri_buf[i].i_addr == 0);
-		ASSERT(item->ri_buf[i].i_len == 0);
-	}
 	return 0;
 }	/* xlog_recover_do_buffer_trans */
 
@@ -1010,7 +1139,6 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	}
 
 write_inode_buffer:
-	bp->b_flags = (B_BUSY | B_HOLD);
 	xfs_inobp_check(mp, bp);
 	bdwrite(bp);
 	/*

@@ -473,7 +473,8 @@ typedef struct xfs_trans {
  */
 #define	XFS_GROWDATA_LOG_RES(mp) \
 	((mp)->m_sb.sb_sectsize * 3 + \
-	 (2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp))))
+	 (2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp))) + \
+	 (128 * (3 + (2 * XFS_AG_MAXLEVELS(mp)))))
 
 
 /*
@@ -537,6 +538,7 @@ void		xfs_trans_bjoin(xfs_trans_t *, buf_t *);
 void		xfs_trans_bhold(xfs_trans_t *, buf_t *);
 void		xfs_trans_bhold_until_committed(xfs_trans_t *, buf_t *);
 void		xfs_trans_binval(xfs_trans_t *, buf_t *);
+void		xfs_trans_inode_buf(xfs_trans_t *, buf_t *);
 struct xfs_inode	*xfs_trans_iget(struct xfs_mount *, xfs_trans_t *,
 					xfs_ino_t , uint);
 void		xfs_trans_iput(xfs_trans_t *, struct xfs_inode *, uint);

@@ -562,7 +562,9 @@ xfs_trans_bhold(xfs_trans_t	*tp,
 
 /*
  * This function is used to indicate that the buffer should not be
- * unlocked until the transaction is committed to disk.
+ * unlocked until the transaction is committed to disk.  Since we
+ * are going to keep the lock held, make the transaction synchronous
+ * so that the lock is not held too long.
  *
  * It uses the log item descriptor flag XFS_LID_SYNC_UNLOCK to
  * delay the buf items's unlock call until the transaction is
@@ -587,6 +589,8 @@ xfs_trans_bhold_until_committed(xfs_trans_t	*tp,
 
 	lidp->lid_flags |= XFS_LID_SYNC_UNLOCK;
 	xfs_buf_item_trace("BHOLD UNTILC OMMIT", bip);
+
+	xfs_trans_set_sync(tp);
 }
 
 
@@ -631,7 +635,7 @@ xfs_trans_log_buf(xfs_trans_t	*tp,
 	bip->bli_item.li_cb = (void(*)(buf_t*,xfs_log_item_t*))xfs_buf_iodone;
 
 	/*
-	 * If we invalidate the buffer within this transaction, then
+	 * If we invalidated the buffer within this transaction, then
 	 * cancel the invalidation now that we're dirtying the buffer
 	 * again.  There are no races with the code in xfs_buf_item_unpin(),
 	 * because we have a reference to the buffer this entire time.
@@ -695,6 +699,7 @@ xfs_trans_binval(
 		 */
 		ASSERT(!(bp->b_flags & B_DELWRI));
 		ASSERT(!(bip->bli_flags & (XFS_BLI_LOGGED | XFS_BLI_DIRTY)));
+		ASSERT(!(bip->bli_format.blf_flags & XFS_BLI_INODE_BUF));
 		ASSERT(lidp->lid_flags & XFS_LID_DIRTY);
 		ASSERT(tp->t_flags & XFS_TRANS_DIRTY);
 		xfs_buf_item_trace("BINVAL RECUR", bip);
@@ -705,16 +710,19 @@ xfs_trans_binval(
 	 * Clear the dirty bit in the buffer and set the STALE flag
 	 * in the buf log item.  The STALE flag will be used in
 	 * xfs_buf_item_unpin() to determine if it should clean up
-	 * when the last reference to the buf ite is given up.
+	 * when the last reference to the buf item is given up.
 	 * We mark the item descriptor and the transaction dirty so
 	 * that we'll hold the buffer until after the commit.
 	 *
 	 * Since we're invalidating the buffer, we also clear the state
-	 * about which parts of the buffer have been logged.
+	 * about which parts of the buffer have been logged.  We also
+	 * clear the flag indicating that this is an inode buffer since
+	 * the data in the buffer will no longer be valid.
 	 */
 	bp->b_flags &= ~B_DELWRI;
 	bip->bli_flags |= XFS_BLI_STALE;
 	bip->bli_flags &= ~(XFS_BLI_LOGGED | XFS_BLI_DIRTY);
+	bip->bli_format.blf_flags &= ~XFS_BLI_INODE_BUF;
 	bzero((char *)(bip->bli_format.blf_data_map),
 	      (bip->bli_format.blf_map_size * sizeof(uint)));
 	lidp->lid_flags |= XFS_LID_DIRTY;
@@ -722,3 +730,29 @@ xfs_trans_binval(
 	xfs_buf_item_trace("BINVAL", bip);
 }
 
+/*
+ * This call is used to indicate that the buffer contains on-disk
+ * inodes which must be handled specially during recovery.  They
+ * require special handling because only the di_next_unlinked from
+ * the inodes in the buffer should be recovered.  The rest of the
+ * data in the buffer is logged via the inodes themselves.
+ *
+ * All we do is set the XFS_BLI_INODE_BUF flag in the buffer's log
+ * format structure so that we'll know what to do at recovery time.
+ */
+void
+xfs_trans_inode_buf(
+	xfs_trans_t	*tp,
+	buf_t		*bp)
+{
+	xfs_buf_log_item_t	*bip;
+
+	ASSERT(bp->b_flags & B_BUSY);
+	ASSERT((xfs_trans_t*)(bp->b_fsprivate2) == tp);
+	ASSERT(bp->b_fsprivate != NULL);
+
+	bip = (xfs_buf_log_item_t *)(bp->b_fsprivate);
+	ASSERT(bip->bli_refcount > 0);
+
+	bip->bli_format.blf_flags |= XFS_BLI_INODE_BUF;
+}
