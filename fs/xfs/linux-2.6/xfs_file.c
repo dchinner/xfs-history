@@ -361,6 +361,57 @@ done:
 }
 
 
+
+int linvfs_dmapi_map_event(struct file *filp, struct vm_area_struct *vma,
+			   unsigned int wantflag)
+{
+	vnode_t		*vp;
+	xfs_inode_t	*ip;
+	bhv_desc_t	*bdp;
+	int		ret = 0;
+	dm_fcntl_t	dmfcntl;
+	dm_eventtype_t	max_event = DM_EVENT_READ;
+
+	vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
+	ASSERT(vp);
+
+	if ((vp->v_type != VREG) || !(vp->v_vfsp->vfs_flag & VFS_DMI))
+		return 0;
+
+	/* If they specifically asked for 'read', then give it to them.
+	 * Otherwise, see if it's possible to give them 'write'.
+	 */
+	if( wantflag & VM_READ ){
+		max_event = DM_EVENT_READ;
+	}
+	else if( ! (vma->vm_flags & VM_DENYWRITE) ) {
+		if((wantflag & VM_WRITE) || (vma->vm_flags & VM_WRITE))
+			max_event = DM_EVENT_WRITE;
+	}
+
+	if( (wantflag & VM_WRITE) && (max_event != DM_EVENT_WRITE) ){
+		return -EACCES;
+	}
+
+	dmfcntl.dmfc_subfunc = DM_FCNTL_MAPEVENT;
+	dmfcntl.u_fcntl.maprq.max_event = max_event;
+
+	/* Figure out how much of the file is being requested by the user. */
+	dmfcntl.u_fcntl.maprq.length = 0; /* whole file, for now */
+
+	bdp = bhv_base_unlocked(VN_BHV_HEAD(vp));
+	ip = XFS_BHVTOI(bdp);
+
+	if(DM_EVENT_ENABLED(vp->v_vfsp, ip, max_event)){
+		xfs_dm_mapevent(bdp, 0, 0, &dmfcntl);
+		ret = dmfcntl.u_fcntl.maprq.error;
+	}
+
+	return -ret;
+}
+
+
+
 int linvfs_generic_file_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	vnode_t	*vp;
@@ -379,7 +430,13 @@ int linvfs_generic_file_mmap(struct file *filp, struct vm_area_struct *vma)
 		ASSERT(vp);
 
 		VOP_SETATTR(vp, vap, AT_UPDATIME, NULL, ret);
+		if(ret)
+			goto out;
+
+		if( filp->f_op->dmapi_map_event )
+			ret = -filp->f_op->dmapi_map_event( filp, vma, 0 );
 	}
+out:
 	return(-ret);
 }
 
@@ -418,6 +475,9 @@ struct file_operations linvfs_file_operations =
 	open:		linvfs_open,
 	release:	linvfs_release,
 	fsync:		linvfs_fsync,
+#ifdef CONFIG_XFS_DMAPI
+	dmapi_map_event:	linvfs_dmapi_map_event,
+#endif
 };
 
 struct file_operations linvfs_dir_operations = {
