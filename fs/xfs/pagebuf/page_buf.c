@@ -128,8 +128,15 @@ pb_trace_func(
  */
 
 STATIC kmem_cache_t *pagebuf_cache;
-STATIC struct list_head pagebuf_iodone_tq[NR_CPUS];
-STATIC wait_queue_head_t pagebuf_iodone_wait[NR_CPUS];
+
+#define MAX_IO_DAEMONS		4
+#define CPU_TO_DAEMON(cpu)	((cpu) & (MAX_IO_DAEMONS - 1))
+STATIC int pb_logio_daemons[MAX_IO_DAEMONS];
+STATIC struct list_head pagebuf_logiodone_tq[MAX_IO_DAEMONS];
+STATIC wait_queue_head_t pagebuf_logiodone_wait[MAX_IO_DAEMONS];
+STATIC int pb_dataio_daemons[MAX_IO_DAEMONS];
+STATIC struct list_head pagebuf_dataiodone_tq[MAX_IO_DAEMONS];
+STATIC wait_queue_head_t pagebuf_dataiodone_wait[MAX_IO_DAEMONS];
 
 /*
  *	For pre-allocated buffer head pool
@@ -1261,12 +1268,17 @@ pagebuf_iodone(
 
 	if ((pb->pb_iodone) || (pb->pb_flags & PBF_ASYNC)) {
 		if (schedule) {
+			int	daemon = CPU_TO_DAEMON(smp_processor_id());
+
 			INIT_TQUEUE(&pb->pb_iodone_sched,
 				pagebuf_iodone_sched, (void *)pb);
-
 			queue_task(&pb->pb_iodone_sched,
-					&pagebuf_iodone_tq[smp_processor_id()]);
-			wake_up(&pagebuf_iodone_wait[smp_processor_id()]);
+				(pb->pb_flags & PBF_FS_IODONED) ?
+				&pagebuf_dataiodone_tq[daemon] :
+				&pagebuf_logiodone_tq[daemon]);
+			wake_up((pb->pb_flags & PBF_FS_IODONED) ?
+				&pagebuf_dataiodone_wait[daemon] :
+				&pagebuf_logiodone_wait[daemon]);
 		} else {
 			pagebuf_iodone_sched(pb);
 		}
@@ -1879,18 +1891,22 @@ pagebuf_delwri_dequeue(
 
 
 /*
- * The pagebuf iodone daemon
+ * The pagebuf iodone daemons
  */
-
-STATIC int pb_daemons[NR_CPUS];
 
 STATIC int
 pagebuf_iodone_daemon(
-	void			*__bind_cpu)
+	void			*__bind_cpu,
+	const char		*name,
+	int			pagebuf_daemons[],
+	struct list_head	pagebuf_iodone_tq[],
+	wait_queue_head_t	pagebuf_iodone_wait[])
 {
-	int			bind_cpu = (int) (long) __bind_cpu;
-	int			cpu = cpu_logical_map(bind_cpu);
+	int			bind_cpu, cpu;
 	DECLARE_WAITQUEUE	(wait, current);
+
+	bind_cpu = (int) (long)__bind_cpu;
+	cpu = CPU_TO_DAEMON(cpu_logical_map(bind_cpu));
 
 	/*  Set up the thread  */
 	daemonize();
@@ -1912,33 +1928,48 @@ pagebuf_iodone_daemon(
 		schedule();
 #endif
 
-	sprintf(current->comm, "pagebuf/%d", bind_cpu);
+	sprintf(current->comm, "%s/%d", name, bind_cpu);
 	INIT_LIST_HEAD(&pagebuf_iodone_tq[cpu]);
 	init_waitqueue_head(&pagebuf_iodone_wait[cpu]);
 	__set_current_state(TASK_INTERRUPTIBLE);
 	mb();
 
-	pb_daemons[cpu] = 1;
+	pagebuf_daemons[cpu] = 1;
 
 	for (;;) {
-		add_wait_queue(&pagebuf_iodone_wait[cpu],
-				&wait);
+		add_wait_queue(&pagebuf_iodone_wait[cpu], &wait);
 
 		if (TQ_ACTIVE(pagebuf_iodone_tq[cpu]))
 			__set_task_state(current, TASK_RUNNING);
 		schedule();
-		remove_wait_queue(&pagebuf_iodone_wait[cpu],
-				&wait);
+		remove_wait_queue(&pagebuf_iodone_wait[cpu], &wait);
 		run_task_queue(&pagebuf_iodone_tq[cpu]);
-		if (pb_daemons[cpu] == 0)
+		if (pagebuf_daemons[cpu] == 0)
 			break;
 		__set_current_state(TASK_INTERRUPTIBLE);
 	}
 
-	pb_daemons[cpu] = -1;
+	pagebuf_daemons[cpu] = -1;
 	wake_up_interruptible(&pagebuf_iodone_wait[cpu]);
 	return 0;
 }
+
+STATIC int
+pagebuf_logiodone_daemon(
+	void			*__bind_cpu)
+{
+	return pagebuf_iodone_daemon(__bind_cpu, "xfslogd", pb_logio_daemons,
+			pagebuf_logiodone_tq, pagebuf_logiodone_wait);
+}
+
+STATIC int
+pagebuf_dataiodone_daemon(
+	void			*__bind_cpu)
+{
+	return pagebuf_iodone_daemon(__bind_cpu, "xfsdatad", pb_dataio_daemons,
+			pagebuf_dataiodone_tq, pagebuf_dataiodone_wait);
+}
+
 
 /* Defines for pagebuf daemon */
 DECLARE_WAIT_QUEUE_HEAD(pbd_waitq);
@@ -2123,21 +2154,34 @@ pagebuf_delwri_flush(
 STATIC int
 pagebuf_daemon_start(void)
 {
-	int		cpu;
+	int		cpu, pcpu;
 
-	kernel_thread(pagebuf_daemon, NULL,
-			CLONE_FS|CLONE_FILES|CLONE_VM);
-	for (cpu = 0; cpu < smp_num_cpus; cpu++) {
-		if (kernel_thread(pagebuf_iodone_daemon,
+	kernel_thread(pagebuf_daemon, NULL, CLONE_FS|CLONE_FILES|CLONE_VM);
+
+	for (cpu = 0; cpu < min(smp_num_cpus, MAX_IO_DAEMONS); cpu++) {
+		pcpu = CPU_TO_DAEMON(cpu_logical_map(cpu));
+
+		if (kernel_thread(pagebuf_logiodone_daemon,
 				(void *)(long) cpu,
 				CLONE_FS|CLONE_FILES|CLONE_VM) < 0) {
-			printk("pagebuf_daemon_start failed\n");
+			printk("pagebuf_logiodone daemon failed to start\n");
 		} else {
-			while (!pb_daemons[cpu_logical_map(cpu)])
+			while (!pb_logio_daemons[pcpu])
 				yield();
 		}
 	}
+	for (cpu = 0; cpu < min(smp_num_cpus, MAX_IO_DAEMONS); cpu++) {
+		pcpu = CPU_TO_DAEMON(cpu_logical_map(cpu));
 
+		if (kernel_thread(pagebuf_dataiodone_daemon,
+				(void *)(long) cpu,
+				CLONE_FS|CLONE_FILES|CLONE_VM) < 0) {
+			printk("pagebuf_dataiodone daemon failed to start\n");
+		} else {
+			while (!pb_dataio_daemons[pcpu])
+				yield();
+		}
+	}
 	return 0;
 }
 
@@ -2156,13 +2200,18 @@ pagebuf_daemon_stop(void)
 	wake_up_interruptible(&pbd_waitq);
 	wait_event_interruptible(pbd_waitq, pbd_active);
 
-	for (pcpu = 0; pcpu < smp_num_cpus; pcpu++) {
-		cpu = cpu_logical_map(pcpu);
+	for (pcpu = 0; pcpu < min(smp_num_cpus, MAX_IO_DAEMONS); pcpu++) {
+		cpu = CPU_TO_DAEMON(cpu_logical_map(pcpu));
 
-		pb_daemons[cpu] = 0;
-		wake_up(&pagebuf_iodone_wait[cpu]);
-		wait_event_interruptible(pagebuf_iodone_wait[cpu],
-				pb_daemons[cpu] == -1);
+		pb_logio_daemons[cpu] = 0;
+		wake_up(&pagebuf_logiodone_wait[cpu]);
+		wait_event_interruptible(pagebuf_logiodone_wait[cpu],
+				pb_logio_daemons[cpu] == -1);
+
+		pb_dataio_daemons[cpu] = 0;
+		wake_up(&pagebuf_dataiodone_wait[cpu]);
+		wait_event_interruptible(pagebuf_dataiodone_wait[cpu],
+				pb_dataio_daemons[cpu] == -1);
 	}
 }
 
