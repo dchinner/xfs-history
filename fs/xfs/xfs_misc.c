@@ -1,4 +1,4 @@
-#ident "$Revision: 1.5 $"
+#ident "$Revision: 1.6 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -69,6 +69,11 @@ xfs_get_mount_fsname(struct vfs *vfsp)
 	bhv_desc_t *bdp;
 
 	bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
+
+	if (bdp == NULL)
+		return("Unknown");
+
 	fsname = (char *)(XFS_BHVTOM(bdp))->m_fsname;
+
 	return fsname;
 }

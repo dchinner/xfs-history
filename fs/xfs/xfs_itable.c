@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.62 $"
+#ident	"$Revision$"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #include <sys/sysmacros.h>
@@ -16,7 +16,6 @@
 #include <sys/debug.h>
 #include <ksys/vfile.h>
 #include <ksys/fdt.h>
-#include <ksys/cell_config.h>
 #include <sys/vfs.h>
 #if defined(__sgi__)
 #include <sys/syssgi.h>
@@ -49,7 +48,10 @@
 #include "xfs_ialloc.h"
 #include "xfs_itable.h"
 #include "xfs_error.h"
+
+#ifdef CELL_CAPABLE
 #include "xfs_cxfs.h"
+#endif
 
 
 /*

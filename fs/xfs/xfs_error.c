@@ -1,4 +1,4 @@
-#ident "$Revision: 1.18 $"
+#ident "$Revision$"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -45,6 +45,7 @@
 #include "xfs_error.h"
 
 #ifdef DEBUG
+
 int	xfs_etrap[XFS_ERROR_NTRAP] = {
 #ifdef SIM
 	EFSCORRUPTED,
