@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.30 $"
+#ident	"$Revision: 1.31 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -88,7 +88,10 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	buf_t		*bp;
 	xfs_sb_t	*sbp;
 	int		error;
+	int		s;
 	xfs_mount_t	*mp;
+	xfs_inode_t	*rip;
+	vnode_t		*rvp = 0;
 
 	if (vfsp->vfs_flag & VFS_REMOUNT)
 		return 0;
@@ -161,14 +164,37 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		mp->m_rbmip = mp->m_rsumip = NULL;
 	}
 
-	vsema(&bp->b_lock);
-	ASSERT(valusema(&bp->b_lock) > 0);
-
 	/*
 	 * Allocate and initialize the inode hash table for this
 	 * file system.
 	 */
 	xfs_ihash_init(mp);
+
+	/*
+	 * Get and sanity-check the root inode.
+	 * Save the pointer to it in the mount structure.
+	 */
+	rip = xfs_iget(mp, NULL, sbp->sb_rootino, XFS_ILOCK_EXCL);
+	rvp = XFS_ITOV(rip);
+	ASSERT(IFDIR == (rip->i_d.di_mode & IFMT));
+	if ((rip->i_d.di_mode & IFMT) != IFDIR) {
+		vmap_t vmap;
+
+		VMAP(rvp, vmap);
+		VN_RELE(rvp);
+		vn_purge(rvp, &vmap);
+
+		prdev("Root inode %d is not a directory",
+		      rip->i_dev, rip->i_ino);
+
+		error = EINVAL;
+		goto bad;
+	}
+	s = VN_LOCK(rvp);
+	rvp->v_flag |= VROOT;
+	VN_UNLOCK(rvp, s);
+	mp->m_rootip = rip;				/* save it */
+	xfs_iunlock(rip, XFS_ILOCK_EXCL);
 
 	/*
 	 * Initialize realtime inode pointers in the mount structure
@@ -183,6 +209,9 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	 * Initialize directory manager's entries.
 	 */
 	xfs_dir_mount(mp);
+
+	vsema(&bp->b_lock);
+	ASSERT(valusema(&bp->b_lock) > 0);
 
 	return 0;
 bad:
@@ -234,15 +263,17 @@ xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 }
 #endif
 
-void
-xfs_umount(xfs_mount_t *mp)
+/*
+ * xfs_unmountfs
+ */
+int
+xfs_unmountfs(xfs_mount_t *mp)
 {
-	int	error;
 	buf_t	*bp;
+	int	error;
 
 	xfs_iflush_all(mp);
-	/* someone needs to free the inodes' memory */
-	/* also need to give up if vnodes are referenced */
+	/* XXX someone needs to free the inodes' memory */
 
 	bflush(mp->m_dev);
 	bp = xfs_getsb(mp);
@@ -259,6 +290,38 @@ xfs_umount(xfs_mount_t *mp)
 	freerbuf(bp);
 	kmem_free(mp, sizeof(*mp));
 }
+
+
+#ifdef SIM
+/*
+ * xfs_umount is the function used by the simulation environment
+ * to stop the file system.
+ */
+void
+xfs_umount(xfs_mount_t *mp)
+{
+	xfs_inode_t	*ip;
+	vnode_t		*vp;
+	int		s;
+	int		error = 0;
+
+	/* need to give up if vnodes are referenced */
+	s = XFS_MOUNT_ILOCK(mp);
+	for (ip = mp->m_inodes; ip && !error; ip = ip->i_mnext) {
+		vp = XFS_ITOV(ip);
+		if (vp->v_count != 0) {
+			if ((vp->v_count == 1) && (ip == mp->m_rootip))
+				continue;
+			error++;
+		}
+	}
+	XFS_MOUNT_IUNLOCK(mp, s);
+
+	if (error == 0)
+		error = xfs_unmountfs(mp);
+}
+#endif
+
 
 /*
  * xfs_mod_sb() can be used to copy arbitrary changes to the
