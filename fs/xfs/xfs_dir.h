@@ -297,4 +297,10 @@ int	xfs_dir_getdents(xfs_trans_t *tp,
 			 struct uio *uiop,
 			 int *eofp);
 
+int	xfs_dir_replace(xfs_trans_t *tp,
+			xfs_inode_t *dp,
+			char *name_string,
+			int name_length,
+			xfs_ino_t inode_number);
+
 #endif	/* !_FS_XFS_DIR_H */

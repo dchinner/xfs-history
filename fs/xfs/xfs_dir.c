@@ -72,6 +72,8 @@ STATIC int xfs_dir_shortform_to_leaf(xfs_trans_t *trans,
 STATIC void xfs_dir_shortform_print(xfs_trans_t *trans, xfs_inode_t *dp);
 STATIC int xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					uio_t *uio, int *eofp, dirent_t *buf);
+STATIC int xfs_dir_shortform_replace(xfs_trans_t *trans,
+					struct xfs_dir_name *args);
 
 /*
  * Internal routines when dirsize == XFS_LBSIZE(sbp).
@@ -88,6 +90,7 @@ STATIC int xfs_dir_leaf_to_node(xfs_trans_t *trans, struct xfs_dir_name *args);
 STATIC void xfs_dir_leaf_print(xfs_trans_t *trans, xfs_inode_t *dp);
 STATIC int xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					uio_t *uio, int *eofp, dirent_t *buf);
+STATIC int xfs_dir_leaf_replace(xfs_trans_t *trans, struct xfs_dir_name *args);
 
 /*
  * Internal routines when dirsize > XFS_LBSIZE(sbp).
@@ -102,6 +105,7 @@ STATIC int xfs_dir_node_to_leaf(xfs_trans_t *trans, struct xfs_dir_name *args);
 STATIC void xfs_dir_node_print(xfs_trans_t *trans, xfs_inode_t *dp);
 STATIC int xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					uio_t *uio, int *eofp, dirent_t *buf);
+STATIC int xfs_dir_node_replace(xfs_trans_t *trans, struct xfs_dir_name *args);
 
 /*
  * Utility routines.
@@ -360,6 +364,45 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 		retval = xfs_dir_node_getdents(trans, dp, uio, eofp, buf);
 	}
 	kmem_free(buf, sizeof(*buf) + MAXNAMELEN);
+	return(retval);
+}
+
+int
+xfs_dir_replace(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
+				    xfs_ino_t inum)
+{
+	struct xfs_dir_name args;
+	int retval;
+	xfs_sb_t *sbp;
+
+	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
+	if (namelen >= MAXNAMELEN)
+		return(EINVAL);
+
+	/*
+	 * Fill in the arg structure for this request.
+	 */
+	args.name = name;
+	args.namelen = namelen;
+	args.hashval = xfs_dir_hashname(name, namelen);
+	args.inumber = inum;
+	args.dp = dp;
+	args.firstblock = NULL;
+	args.flist = NULL;
+	args.total = 0;
+
+	sbp = &dp->i_mount->m_sb;
+	/*
+	 * Decide on what work routines to call based on the inode size.
+	 */
+	if (dp->i_d.di_size <= XFS_LITINO(sbp)) {
+		retval = xfs_dir_shortform_replace(trans, &args);
+	} else if (dp->i_d.di_size == XFS_LBSIZE(sbp)) {
+		retval = xfs_dir_leaf_replace(trans, &args);
+	} else {
+		retval = xfs_dir_node_replace(trans, &args);
+	}
+
 	return(retval);
 }
 
@@ -689,6 +732,43 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	return(0);
 }
 
+/*
+ * Look up a name in a shortform directory structure, replace the inode number.
+ */
+STATIC int
+xfs_dir_shortform_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
+{
+	struct xfs_dir_shortform *sf;
+	struct xfs_dir_sf_entry *sfe;
+	int i;
+	xfs_inode_t *dp;
+
+	dp = args->dp;
+	ASSERT(dp->i_flags & XFS_IINLINE);
+	sf = (struct xfs_dir_shortform *)dp->i_u1.iu_data;
+	if (args->namelen == 2 &&
+	    args->name[0] == '.' && args->name[1] == '.') {
+		bcopy((char *)&args->inumber, sf->hdr.parent, sizeof(xfs_ino_t));
+		xfs_trans_log_inode(trans, dp, XFS_ILOG_DATA);
+		return(0);
+	}
+	ASSERT(args->namelen != 1 || args->name[0] != '.');
+	sfe = &sf->list[0];
+	for (i = sf->hdr.count-1; i >= 0; i--) {
+		if (sfe->namelen == args->namelen) {
+			if (bcmp(args->name, sfe->name, args->namelen) == 0) {
+				bcopy((char *)&args->inumber, sfe->inumber,
+						    sizeof(xfs_ino_t));
+				xfs_trans_log_inode(trans, dp, XFS_ILOG_DATA);
+				return(0);
+			}
+		}
+		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
+	}
+	return(ENOENT);
+}
+
+
 /*========================================================================
  * External routines when dirsize == XFS_LBSIZE(sbp).
  *========================================================================*/
@@ -929,6 +1009,37 @@ xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	return(retval);
 }
 
+/*
+ * Look up a name in a leaf directory structure, replace the inode number.
+ * This is the external routine.
+ */
+STATIC int
+xfs_dir_leaf_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
+{
+	int index, retval;
+	buf_t *bp;
+	xfs_ino_t inum;
+	struct xfs_dir_leafblock *leaf;
+	struct xfs_dir_leaf_entry *entry;
+	struct xfs_dir_leaf_name *namest;
+
+	inum = args->inumber;
+	bp = xfs_dir_read_buf(trans, args->dp, 0);
+	retval = xfs_dir_leaf_lookup_int(bp, args, &index);
+	if (retval == 0) {
+		leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
+		entry = &leaf->leaves[index];
+		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
+		bcopy((char *)&inum, namest->inumber, sizeof(inum));
+		xfs_trans_log_buf(trans, bp,
+			(char *)namest->inumber - (char *)leaf,
+			(char *)namest->inumber - (char *)leaf +
+			sizeof(namest->inumber) - 1);
+	} else
+		xfs_trans_brelse(trans, bp);
+	return(retval);
+}
+
 
 /*========================================================================
  * External routines when dirsize > XFS_LBSIZE(sbp).
@@ -1159,6 +1270,58 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	}
 	*eofp = 1;
 	return(0);
+}
+
+/*
+ * Look up a filename in a int directory, replace the inode number.
+ * Use an internal routine to actually do the lookup.
+ */
+STATIC int
+xfs_dir_node_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
+{
+	struct xfs_dir_state state;
+	int retval;
+	int i;
+	struct xfs_dir_state_blk *blk;
+	buf_t *bp;
+	xfs_ino_t inum;
+	struct xfs_dir_leafblock *leaf;
+	struct xfs_dir_leaf_entry *entry;
+	struct xfs_dir_leaf_name *namest;
+
+	bzero((char *)&state, sizeof(struct xfs_dir_state));
+	state.args = args;
+	state.mp = args->dp->i_mount;
+	state.trans = trans;
+	state.blocksize = state.mp->m_sb.sb_blocksize;
+	inum = args->inumber;
+
+	/*
+	 * Search to see if name exists,
+	 * and get back a pointer to it.
+	 */
+	retval = xfs_dir_node_lookup_int(&state);
+
+	if (retval == 0) {
+		blk = &state.path.blk[state.path.active - 1];
+		ASSERT(blk->leafblk);
+		bp = blk->bp;
+		leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
+		entry = &leaf->leaves[blk->index];
+		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
+		bcopy((char *)&inum, namest->inumber, sizeof(inum));
+		xfs_trans_log_buf(trans, bp,
+			(char *)namest->inumber - (char *)leaf,
+			(char *)namest->inumber - (char *)leaf +
+			sizeof(namest->inumber) - 1);
+	} else {
+		i = state.path.active - 1;
+		xfs_trans_brelse(trans, state.path.blk[i].bp);
+	}
+	for (i = 0; i < state.path.active - 1; i++)
+		xfs_trans_brelse(trans, state.path.blk[i].bp);
+
+	return(retval);
 }
 
 
