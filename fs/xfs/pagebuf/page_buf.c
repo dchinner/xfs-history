@@ -57,7 +57,9 @@
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
 
+#include <support/debug.h>
 #include <support/kmem.h>
+
 #include "page_buf_internal.h"
 
 #define SECTOR_SHIFT	9
@@ -1569,7 +1571,7 @@ _pagebuf_page_io(
 
 			lock_buffer(bh);
 			get_bh(bh);
-			assert(!waitqueue_active(&bh->b_wait));
+			ASSERT(!waitqueue_active(&bh->b_wait));
 
 			bh->b_size = SECTOR_SIZE;
 			bh->b_blocknr = bn + (i - (pg_offset >> SECTOR_SHIFT));
@@ -1615,7 +1617,7 @@ _pagebuf_page_io(
 	/* The b_size field of struct buffer_head is an unsigned short
 	 * ... we may need to split this request up.  [64K is too big]
 	 */
-	assert(sizeof(bh->b_size) == 2);
+	ASSERT(sizeof(bh->b_size) == 2);
 	while (sector > 0xffff) {
 		sector >>= 1;
 		blk_length++;
@@ -1724,7 +1726,7 @@ _page_buf_page_apply(
 	loff_t			pb_offset;
 	size_t			ret_len = pg_length;
 
-	assert(page);
+	ASSERT(page);
 
 	if ((blocksize == PAGE_CACHE_SIZE) &&
 	    (pb->pb_buffer_length < PAGE_CACHE_SIZE) &&
@@ -1919,7 +1921,7 @@ pagebuf_iomove(
 
 	while (cboff < boff) {
 		pagebuf_segment(pb, &cboff, &page, &cpoff, &csize);
-		assert(((csize + cpoff) <= PAGE_CACHE_SIZE));
+		ASSERT(((csize + cpoff) <= PAGE_CACHE_SIZE));
 
 		switch (mode) {
 		case PBRW_ZERO:
