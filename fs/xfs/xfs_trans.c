@@ -1,4 +1,4 @@
-#ident "$Revision: 1.68 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -370,6 +370,9 @@ xfs_trans_mod_sb(
 		ASSERT(delta > 0);
 		tp->t_agcount_delta += delta;
 		break;
+	case XFS_TRANS_SB_IMAXPCT:
+		tp->t_imaxpct_delta += delta;
+		break;
 	default:
 		ASSERT(0);
 		return;
@@ -425,6 +428,10 @@ xfs_trans_apply_sb_deltas(
 	}
 	if (tp->t_agcount_delta != 0) {
 		sbp->sb_agcount += tp->t_agcount_delta;
+		whole = 1;
+	}
+	if (tp->t_imaxpct_delta != 0) {
+		sbp->sb_imax_pct += tp->t_imaxpct_delta;
 		whole = 1;
 	}
 
@@ -524,6 +531,12 @@ xfs_trans_unreserve_and_mod_sb(
 		if (tp->t_agcount_delta != 0) {
 			msbp->msb_field = XFS_SB_AGCOUNT;
 			msbp->msb_delta = tp->t_agcount_delta;
+			msbp++;
+			n++;
+		}
+		if (tp->t_imaxpct_delta != 0) {
+			msbp->msb_field = XFS_SB_IMAX_PCT;
+			msbp->msb_delta = tp->t_imaxpct_delta;
 			msbp++;
 			n++;
 		}

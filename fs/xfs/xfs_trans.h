@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision: 1.76 $"
+#ident "$Revision$"
 
 struct buf;
 struct xfs_efd_log_item;
@@ -299,6 +299,7 @@ typedef struct xfs_trans {
 	long			t_ag_btree_delta; /* debugging counter */
 	long			t_dblocks_delta;/* superblock dblocks change */
 	long			t_agcount_delta;/* superblock agcount change */
+	long			t_imaxpct_delta;/* superblock imaxpct change */
 	unsigned int		t_items_free;	/* log item descs free */
 	xfs_log_item_chunk_t	t_items;	/* first log item desc chunk */
 	xfs_trans_header_t	t_header;	/* header for in-log trans */
@@ -332,6 +333,7 @@ typedef struct xfs_trans {
 #define	XFS_TRANS_SB_RES_FREXTENTS	0x00000020
 #define	XFS_TRANS_SB_DBLOCKS		0x00000040
 #define	XFS_TRANS_SB_AGCOUNT		0x00000080
+#define	XFS_TRANS_SB_IMAXPCT		0x00000100
 
 /*
  * Various log reservation values.
