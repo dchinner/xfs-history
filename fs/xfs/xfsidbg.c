@@ -2165,7 +2165,7 @@ idbg_xdirleaf(xfs_dir_leafblock_t *leaf)
 	}
 	for (j = 0, e = leaf->entries; j < h->count; j++, e++) {
 		n = XFS_DIR_LEAF_NAMESTRUCT(leaf, e->nameidx);
-		bcopy(n->inumber, (char *)&ino, sizeof(ino));
+		*(xfs_dir_ino_t *)&ino = n->inumber;
 		qprintf("leaf %d hashval 0x%x nameidx %d inumber %lld ",
 			j, e->hashval, e->nameidx, ino);
 		qprintf("namelen %d name \"", e->namelen);
@@ -2187,11 +2187,11 @@ idbg_xdirsf(xfs_dir_shortform_t *s)
 	int i, j;
 
 	sfh = &s->hdr;
-	bcopy(sfh->parent, &ino, sizeof(ino));
+	*(xfs_dir_ino_t *)&ino = sfh->parent;
 	qprintf("hdr parent %lld", ino);
 	qprintf(" count %d\n", sfh->count);
 	for (i = 0, sfe = s->list; i < sfh->count; i++) {
-		bcopy(sfe->inumber, &ino, sizeof(ino));
+		*(xfs_dir_ino_t *)&ino = sfe->inumber;
 		qprintf("entry %d inumber %lld", i, ino);
 		qprintf(" namelen %d name \"", sfe->namelen);
 		for (j = 0; j < sfe->namelen; j++)
@@ -2827,10 +2827,15 @@ idbg_xmount(xfs_mount_t *mp)
 	qprintf("perag 0x%x &peraglock 0x%x &growlock 0x%x rbmrotor %d\n",
 		mp->m_perag, &mp->m_peraglock, &mp->m_growlock, mp->m_rbmrotor);
 	printflags(mp->m_flags, xmount_flags,"flags");
-	qprintf("attroffset %d da_node_ents %d\n",
-		mp->m_attroffset, mp->m_da_node_ents);
 	qprintf("ialloc_inos %d ialloc_blks %d litino %d\n",
 		mp->m_ialloc_inos, mp->m_ialloc_blks, mp->m_litino);
+	qprintf("attroffset %d da_node_ents %d",
+		mp->m_attroffset, mp->m_da_node_ents);
+#if XFS_BIG_FILESYSTEMS
+	qprintf(" inoadd %llx\n", mp->m_inoadd);
+#else
+	qprintf("\n");
+#endif
 }
 
 void
