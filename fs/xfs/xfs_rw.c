@@ -687,6 +687,7 @@ xfs_read_file(
 	int		buffer_bytes_ok;
 	xfs_inode_t	*ip;
 	int		error;
+	uint		lock_mode;
 
 	ip = XFS_VTOI(vp);
 	error = 0;
@@ -698,14 +699,14 @@ xfs_read_file(
 	 * plus read-ahead as it can.
 	 */
 	do {
-		xfs_ilock(ip, XFS_ILOCK_SHARED);
+		lock_mode = xfs_ilock_map_shared(ip);
 
 		/*
 		 * We've fallen off the end of the file, so
 		 * just return with what we've done so far.
 		 */
 		if (uiop->uio_offset >= ip->i_d.di_size) {
-			xfs_iunlock(ip, XFS_ILOCK_SHARED);
+			xfs_iunlock_map_shared(ip, lock_mode);
 			break;
 		}
  
@@ -713,7 +714,7 @@ xfs_read_file(
 		xfs_iomap_read(ip, uiop->uio_offset, uiop->uio_resid,
 			       bmaps, &nbmaps);
 
-		xfs_iunlock(ip, XFS_ILOCK_SHARED);
+		xfs_iunlock_map_shared(ip, lock_mode);
 
 		if (error || (bmaps[0].pbsize == 0)) {
 			break;
@@ -1527,6 +1528,7 @@ xfs_bmap(
 	int		*nbmaps)
 {
 	xfs_inode_t	*ip;
+	uint		lock_mode;
 
 	ip = XFS_VTOI(vp);
 	ASSERT((ip->i_d.di_mode & IFMT) == IFREG);
@@ -1534,9 +1536,9 @@ xfs_bmap(
 	ASSERT((flags == B_READ) || (flags == B_WRITE));
 
 	if (flags == B_READ) {
-		xfs_ilock(ip, XFS_ILOCK_SHARED);
+		lock_mode = xfs_ilock_map_shared(ip);
 		xfs_iomap_read(ip, offset, count, bmapp, nbmaps);
-		xfs_iunlock(ip, XFS_ILOCK_SHARED);
+		xfs_iunlock_map_shared(ip, lock_mode);
 	} else {
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 		ASSERT(ip->i_d.di_size >= (offset + count));
@@ -1658,6 +1660,10 @@ xfs_zero_bp(
  * If we're over a hole or delayed allocation space we simply
  * zero the corresponding portions of the buffer.  For parts
  * over real disk space we need to read in the stuff from disk.
+ *
+ * We know that we can just use xfs_ilock(SHARED) rather than
+ * xfs_ilock_map_shared() here, because the extents had to be
+ * read in in order to create the buffer we're trying to write out.
  */
 STATIC void
 xfs_strat_read(
@@ -2285,6 +2291,7 @@ xfs_diostrat( buf_t *bp)
 	int		i, j, error, writeflag, reccount;
 	int		end_of_file, bufsissued, totresid, exist;
 	int		ioflag, blk_algn, rt, numrtextents, rtextsize;
+	uint		lock_mode;
 
 	dp        = (struct dio_s *)bp->b_private;
 	vp        = dp->vp;
@@ -2420,7 +2427,7 @@ xfs_diostrat( buf_t *bp)
 			 */
 			reccount = XFS_BMAP_MAX_NMAP;
 			imapp = &imaps[0];
-			xfs_ilock( ip, XFS_ILOCK_SHARED);
+			lock_mode = xfs_ilock_map_shared( ip);
 		}
 
 		/*
@@ -2441,7 +2448,7 @@ xfs_diostrat( buf_t *bp)
 			}
 			xfs_iunlock( ip, XFS_ILOCK_EXCL);
 		} else {
-			xfs_iunlock( ip, XFS_ILOCK_SHARED);
+			xfs_iunlock_map_shared( ip, lock_mode);
 		}
 
                 /*

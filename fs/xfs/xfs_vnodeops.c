@@ -1197,23 +1197,24 @@ xfs_lookup(vnode_t	*dir_vp,
 	xfs_ino_t		e_inum;
 	struct xfs_mount	*mp;
 	int			code = 0;
+	uint			lock_mode;
 
 	dp = XFS_VTOI(dir_vp);
-	xfs_ilock(dp, XFS_ILOCK_EXCL);
+	lock_mode = xfs_ilock_map_shared(dp);
 
 	if (code = xfs_iaccess(dp, IEXEC, credp)) {
-		xfs_iunlock(dp, XFS_ILOCK_EXCL);
+		xfs_iunlock_map_shared(dp, lock_mode);
 		return code;
 	}
 
 	code = xfs_dir_lookup_int (NULL, dir_vp, DLF_IGET, name, pnp, 
 				   &e_inum, &ip);
 	if (code) {
-		xfs_iunlock(dp, XFS_ILOCK_EXCL);
+		xfs_iunlock_map_shared(dp, lock_mode);
 		return code;
 	}
 
-	xfs_iunlock(dp, XFS_ILOCK_EXCL);
+	xfs_iunlock_map_shared(dp, lock_mode);
 
 	vp = XFS_ITOV (ip);
 
@@ -1803,6 +1804,7 @@ xfs_lock_for_rename(
 	xfs_inode_t	*i_tab[4];
 	int		num_inodes;
 	int		i, j;
+	uint		lock_mode;
 
 	ip2 = NULL;
 
@@ -1812,7 +1814,7 @@ xfs_lock_for_rename(
 	 * sanity check stuff after all the locks have been acquired
 	 * to see if we still have the right inodes, directories, etc.
 	 */
-        xfs_ilock (dp1, XFS_ILOCK_SHARED);
+        lock_mode = xfs_ilock_map_shared (dp1);
         error = xfs_dir_lookup_int(NULL, XFS_ITOV(dp1), DLF_IGET,
 				   name1, NULL, &inum1, &ip1);
 
@@ -1823,16 +1825,16 @@ xfs_lock_for_rename(
 	 * the target entry does not need to exist yet. 
 	 */
 	dir_gen1 = dp1->i_gen;
-	xfs_iunlock (dp1, XFS_ILOCK_SHARED);
+	xfs_iunlock_map_shared (dp1, lock_mode);
         if (error)
                 return error;
 	ASSERT (ip1);
 
-        xfs_ilock (dp2, XFS_ILOCK_SHARED);
+        lock_mode = xfs_ilock_map_shared (dp2);
         error = xfs_dir_lookup_int(NULL, XFS_ITOV(dp2), DLF_IGET,
 				   name2, NULL, &inum2, &ip2);
 	dir_gen2 = dp2->i_gen;
-        xfs_iunlock (dp2, XFS_ILOCK_SHARED);
+        xfs_iunlock_map_shared (dp2, lock_mode);
 	if (error == ENOENT) {		/* target does not need to exist. */
 		inum2 = 0;
 	}
@@ -2269,9 +2271,13 @@ xfs_ancestor_check (xfs_inode_t *src_dp,
 	 * root of the filesystem.
 	 * If we discover an anomaly, e.g., ".." missing, return
 	 * ENOENT.
+	 *
+	 * In this loop we need to lock the inodes exclusively since
+	 * we can't really get at the xfs_ilock_map_shared() interface
+	 * through xfs_dir_lookup_int().
 	 */
 	ip = target_dp;
-	xfs_ilock (ip, XFS_ILOCK_SHARED);
+	xfs_ilock (ip, XFS_ILOCK_EXCL);
 
 	while (ip->i_ino != root_ino) {
 		xfs_ino_t	parent_ino;
@@ -2296,11 +2302,11 @@ xfs_ancestor_check (xfs_inode_t *src_dp,
 		 * ip == target_dp, then we do not want to release
 		 * the vnode reference.
 		 */
-		xfs_iunlock (ip, XFS_ILOCK_SHARED);
+		xfs_iunlock (ip, XFS_ILOCK_EXCL);
 		if (ip != target_dp)
 			IRELE (ip);
 
-		ip = xfs_iget(mp, NULL, parent_ino, XFS_ILOCK_SHARED);
+		ip = xfs_iget(mp, NULL, parent_ino, XFS_ILOCK_EXCL);
 		if (((ip->i_d.di_mode & IFMT) != IFDIR) ||
 		    (ip->i_d.di_nlink <= 0)) {
                         prdev("Ancestor inode %d is not a directory",
@@ -2314,7 +2320,7 @@ xfs_ancestor_check (xfs_inode_t *src_dp,
 	 * Release the lock on the inode, taking care to decrement the 
 	 * vnode reference count only if ip != target_dp.
 	 */
-	xfs_iunlock (ip, XFS_ILOCK_SHARED);
+	xfs_iunlock (ip, XFS_ILOCK_EXCL);
 	if (ip != target_dp)
 		IRELE (ip);
 
@@ -2997,30 +3003,31 @@ xfs_readdir(vnode_t	*dir_vp,
         xfs_inode_t             *dp;
         xfs_trans_t             *tp = NULL;
 	int			status;
+	uint			lock_mode;
 
         dp = XFS_VTOI(dir_vp);
-        xfs_ilock (dp, XFS_ILOCK_SHARED);
+        lock_mode = xfs_ilock_map_shared (dp);
 
         if ((dp->i_d.di_mode & IFMT) != IFDIR) {
-		xfs_iunlock(dp, XFS_ILOCK_SHARED);
+		xfs_iunlock_map_shared(dp, lock_mode);
                 return XFS_ERROR(ENOTDIR);
         }
 
 	if (status = xfs_iaccess (dp, IEXEC, credp)) {
-		xfs_iunlock(dp, XFS_ILOCK_SHARED);
+		xfs_iunlock_map_shared(dp, lock_mode);
                 return status;
 	}
 
 
 	/* If the directory has been removed after it was opened. */
         if (dp->i_d.di_nlink <= 0) {
-                xfs_iunlock(dp, XFS_ILOCK_SHARED);
+                xfs_iunlock_map_shared(dp, lock_mode);
                 return 0;
         }
 
 	status = xfs_dir_getdents (tp, dp, uiop, eofp);
 
-	xfs_iunlock(dp, XFS_ILOCK_SHARED);
+	xfs_iunlock_map_shared(dp, lock_mode);
 	
 	return status;
 }
