@@ -36,6 +36,88 @@
  */
 
 /*========================================================================
+ * Function prototypes for the kernel.
+ *========================================================================*/
+
+/*
+ * Routines used for growing the Btree.
+ */
+STATIC int xfs_dir_root_split(struct xfs_dir_state *state,
+				     struct xfs_dir_state_blk *existing_root,
+				     struct xfs_dir_state_blk *new_child);
+STATIC int xfs_dir_leaf_split(struct xfs_dir_state *state,
+				     struct xfs_dir_state_blk *oldblk,
+				     struct xfs_dir_state_blk *newblk);
+STATIC void xfs_dir_leaf_add_work(xfs_trans_t *trans, buf_t *leaf_buffer,
+					      struct xfs_dir_name *args,
+					      int insertion_index,
+					      int freemap_index);
+STATIC void xfs_dir_leaf_compact(xfs_trans_t *trans, buf_t *leaf_buffer);
+STATIC void xfs_dir_leaf_rebalance(struct xfs_dir_state *state,
+					  struct xfs_dir_state_blk *blk1,
+					  struct xfs_dir_state_blk *blk2);
+STATIC int xfs_dir_leaf_figure_balance(struct xfs_dir_state *state,
+					   struct xfs_dir_state_blk *leaf_blk_1,
+					   struct xfs_dir_state_blk *leaf_blk_2,
+					   int *number_entries_in_blk1,
+					   int *number_namebytes_in_blk1);
+STATIC int xfs_dir_node_split(struct xfs_dir_state *state,
+				     struct xfs_dir_state_blk *existing_blk,
+				     struct xfs_dir_state_blk *split_blk,
+				     struct xfs_dir_state_blk *blk_to_add,
+				     int treelevel);
+STATIC void xfs_dir_node_rebalance(struct xfs_dir_state *state,
+					  struct xfs_dir_state_blk *node_blk_1,
+					  struct xfs_dir_state_blk *node_blk_2,
+					  uint hashval_of_new_node);
+STATIC void xfs_dir_node_add(struct xfs_dir_state *state,
+				    struct xfs_dir_state_blk *old_node_blk,
+				    struct xfs_dir_state_blk *new_node_blk);
+
+/*
+ * Routines used for shrinking the Btree.
+ */
+STATIC int xfs_dir_root_join(struct xfs_dir_state *state,
+				    struct xfs_dir_state_blk *root_blk);
+STATIC int xfs_dir_blk_toosmall(struct xfs_dir_state *state, int level);
+STATIC void xfs_dir_leaf_unbalance(struct xfs_dir_state *state,
+					  struct xfs_dir_state_blk *drop_blk,
+					  struct xfs_dir_state_blk *save_blk);
+STATIC void xfs_dir_node_remove(struct xfs_dir_state *state,
+				       struct xfs_dir_state_blk *drop_blk);
+STATIC void xfs_dir_node_unbalance(struct xfs_dir_state *state,
+					struct xfs_dir_state_blk *src_node_blk,
+					struct xfs_dir_state_blk *dst_node_blk);
+
+/*
+ * Routines used for finding things in the Btree.
+ */
+STATIC void xfs_dir_findpath(struct xfs_dir_state *state,
+				    struct xfs_dir_state_path *path_to_fill_in,
+				    uint hashval_to_find,
+				    xfs_fsblock_t blkno_to_find);
+
+/*
+ * Utility routines.
+ */
+STATIC void xfs_dir_leaf_moveents(struct xfs_dir_leafblock *src_leaf,
+					 int src_start,
+					 struct xfs_dir_leafblock *dst_leaf,
+					 int dst_start, int move_count,
+					 xfs_sb_t *sbp);
+STATIC int xfs_dir_leaf_refind(struct xfs_dir_leafblock *leaf, int likely_index,
+				      uint hashval, xfs_sb_t *sbp);
+STATIC int xfs_dir_node_refind(struct xfs_dir_intnode *node,
+				      int likely_index, uint hashval);
+STATIC void xfs_dir_blk_unlink(struct xfs_dir_state *state,
+				      struct xfs_dir_state_blk *drop_blk,
+				      struct xfs_dir_state_blk *save_blk);
+STATIC void xfs_dir_blk_link(struct xfs_dir_state *state,
+				    struct xfs_dir_state_blk *old_blk,
+				    struct xfs_dir_state_blk *new_blk);
+
+
+/*========================================================================
  * Routines used for growing the Btree.
  *========================================================================*/
 
@@ -43,6 +125,7 @@
  * Split a leaf node, rebalance, then possibly split
  * intermediate nodes, rebalance, etc.
  */
+int
 xfs_dir_split(struct xfs_dir_state *state)
 {
 	struct xfs_dir_state_blk *oldblk, *newblk, *addblk;
@@ -119,7 +202,7 @@ xfs_dir_split(struct xfs_dir_state *state)
  * parts (the split old root) that we just created.  Copy block zero to
  * the EOF, extending the inode in process.
  */
-int
+STATIC int
 xfs_dir_root_split(struct xfs_dir_state *state,
 			  struct xfs_dir_state_blk *blk1,
 			  struct xfs_dir_state_blk *blk2)
@@ -129,8 +212,8 @@ xfs_dir_root_split(struct xfs_dir_state *state,
 	buf_t *bp;
 	int retval;
 
-	retval = xfs_dir_grow_inode(state->trans, state->args->dp,
-				    state->blocksize, &blkno);
+	retval = xfs_dir_grow_inode(state->trans, state->args, state->blocksize,
+				    &blkno);
 	if (retval)
 		return(retval);
 	bp = xfs_dir_get_buf(state->trans, state->args->dp, blkno);
@@ -165,6 +248,7 @@ xfs_dir_root_split(struct xfs_dir_state *state,
 /*
  * Split the leaf node, rebalance, then add the new entry.
  */
+STATIC int
 xfs_dir_leaf_split(struct xfs_dir_state *state,
 			  struct xfs_dir_state_blk *oldblk,
 			  struct xfs_dir_state_blk *newblk)
@@ -178,8 +262,8 @@ xfs_dir_leaf_split(struct xfs_dir_state *state,
 	 * GROT: use a block off the freelist if possible.
 	 */
 	ASSERT(oldblk->leafblk == 1);
-	retval = xfs_dir_grow_inode(state->trans, state->args->dp,
-						  state->blocksize, &blkno);
+	retval = xfs_dir_grow_inode(state->trans, state->args, state->blocksize,
+				    &blkno);
 	if (retval)
 		return(retval);
 	newblk->bp = xfs_dir_leaf_create(state->trans, state->args->dp, blkno);
@@ -295,7 +379,7 @@ xfs_dir_leaf_add(xfs_trans_t *trans, buf_t *bp, struct xfs_dir_name *args,
 /*
  * Add a name to a leaf directory structure.
  */
-void
+STATIC void
 xfs_dir_leaf_add_work(xfs_trans_t *trans, buf_t *bp,
 				  struct xfs_dir_name *args,
 				  int index, int mapindex)
@@ -369,7 +453,7 @@ xfs_dir_leaf_add_work(xfs_trans_t *trans, buf_t *bp,
 /*
  * Garbage collect a leaf directory block by copying it to a new buffer.
  */
-void
+STATIC void
 xfs_dir_leaf_compact(xfs_trans_t *trans, buf_t *bp)
 {
 	struct xfs_dir_leafblock *leaf_s, *leaf_d;
@@ -415,7 +499,7 @@ xfs_dir_leaf_compact(xfs_trans_t *trans, buf_t *bp)
  *
  * NOTE: if new block is empty, then it will get the upper half of old block.
  */
-void
+STATIC void
 xfs_dir_leaf_rebalance(struct xfs_dir_state *state,
 			      struct xfs_dir_state_blk *blk1,
 			      struct xfs_dir_state_blk *blk2)
@@ -547,7 +631,7 @@ outahere:
  * GROT: there will always be enough room in either block for a new entry.
  * GROT: Do a double-split for this case?
  */
-int
+STATIC int
 xfs_dir_leaf_figure_balance(struct xfs_dir_state *state,
 				   struct xfs_dir_state_blk *blk1,
 				   struct xfs_dir_state_blk *blk2,
@@ -633,7 +717,7 @@ xfs_dir_leaf_figure_balance(struct xfs_dir_state *state,
 /*
  * Split the node, rebalance, then add the new entry.
  */
-int
+STATIC int
 xfs_dir_node_split(struct xfs_dir_state *state,
 			  struct xfs_dir_state_blk *oldblk,
 			  struct xfs_dir_state_blk *newblk,
@@ -661,7 +745,7 @@ xfs_dir_node_split(struct xfs_dir_state *state,
 		 * nodes, then move some of our excess entries into it.
 		 * GROT: use a freelist block.
 		 */
-		retval = xfs_dir_grow_inode(state->trans, state->args->dp,
+		retval = xfs_dir_grow_inode(state->trans, state->args,
 							  state->blocksize,
 							  &blkno);
 		if (retval)
@@ -696,7 +780,7 @@ xfs_dir_node_split(struct xfs_dir_state *state,
  *
  * NOTE: if blk2 is empty, then it will get the upper half of blk1.
  */
-void
+STATIC void
 xfs_dir_node_rebalance(struct xfs_dir_state *state,
 			      struct xfs_dir_state_blk *blk1,
 			      struct xfs_dir_state_blk *blk2,
@@ -805,7 +889,7 @@ xfs_dir_node_rebalance(struct xfs_dir_state *state,
 /*
  * Add a new entry to an intermediate node.
  */
-void
+STATIC void
 xfs_dir_node_add(struct xfs_dir_state *state,
 			struct xfs_dir_state_blk *oldblk,
 			struct xfs_dir_state_blk *newblk)
@@ -914,7 +998,7 @@ out:
  * the old root to block 0 as the new root node, but copy the freelist
  * from the old root before overwriting it.
  */
-int
+STATIC int
 xfs_dir_root_join(struct xfs_dir_state *state,
 			 struct xfs_dir_state_blk *drop_blk)
 {
@@ -942,8 +1026,7 @@ xfs_dir_root_join(struct xfs_dir_state *state,
 		xfs_trans_log_buf(state->trans, drop_blk->bp, 0,
 						state->blocksize - 1);
 		sbp = &state->mp->m_sb;
-		retval = xfs_dir_shrink_inode(state->trans,
-					      state->args->dp,
+		retval = xfs_dir_shrink_inode(state->trans, state->args,
 					      sbp->sb_inodesize - state->blocksize,
 					      &blkno);
 	} else {
@@ -972,7 +1055,7 @@ xfs_dir_root_join(struct xfs_dir_state *state,
  * block number.  If the block is empty, don't check siblings, return 2.
  * If nothing can be done, return 0.
  */
-int
+STATIC int
 xfs_dir_blk_toosmall(struct xfs_dir_state *state, int level)
 {
 	struct xfs_dir_leafblock *leaf, *tmp_leaf;
@@ -1273,7 +1356,7 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *bp, int index)
 /*
  * Move all the directory entries from drop_leaf into save_leaf.
  */
-void
+STATIC void
 xfs_dir_leaf_unbalance(struct xfs_dir_state *state,
 			      struct xfs_dir_state_blk *drop_blk,
 			      struct xfs_dir_state_blk *save_blk)
@@ -1361,7 +1444,7 @@ xfs_dir_leaf_unbalance(struct xfs_dir_state *state,
 /*
  * Remove an entry from an intermediate node.
  */
-void
+STATIC void
 xfs_dir_node_remove(struct xfs_dir_state *state,
 			   struct xfs_dir_state_blk *drop_blk)
 {
@@ -1402,7 +1485,7 @@ xfs_dir_node_remove(struct xfs_dir_state *state,
  * Unbalance the btree elements between two intermediate nodes,
  * move all Btree elements from one node into another.
  */
-void
+STATIC void
 xfs_dir_node_unbalance(struct xfs_dir_state *state,
 			      struct xfs_dir_state_blk *drop_blk,
 			      struct xfs_dir_state_blk *save_blk)
@@ -1463,6 +1546,7 @@ xfs_dir_node_unbalance(struct xfs_dir_state *state,
  *
  * GROT: what about duplicate hashval's being split into two nodes?
  */
+int
 xfs_dir_leaf_lookup_int(buf_t *bp, struct xfs_dir_name *args, int *index)
 {
 	struct xfs_dir_leafblock *leaf;
@@ -1573,6 +1657,7 @@ xfs_dir_leaf_lookup_int(buf_t *bp, struct xfs_dir_name *args, int *index)
  * in each of the nodes where either the hashval is or should be.
  * GROT: what about multiple intermediate nodes with the same hashval?
  */
+int
 xfs_dir_node_lookup_int(struct xfs_dir_state *state)
 {
 	struct xfs_dir_state_blk *blk;
@@ -1601,7 +1686,7 @@ xfs_dir_node_lookup_int(struct xfs_dir_state *state)
  * Find a particular hashval or blkno in the tree.
  * GROT: assumes hashvals are unique. Find old-hashval/blkno pair, then update.
  */
-void
+STATIC void
 xfs_dir_findpath(struct xfs_dir_state *state,
 			struct xfs_dir_state_path *path,
 			uint hashval, xfs_fsblock_t find_blkno)
@@ -1684,10 +1769,10 @@ out:
  * Move the indicated entries from one leaf to another.
  * NOTE: this routine modifies both source and destination leaves.
  */
-void
+STATIC void
 xfs_dir_leaf_moveents(struct xfs_dir_leafblock *leaf_s, int start_s,
-		      struct xfs_dir_leafblock *leaf_d, int start_d,
-		      int count, xfs_sb_t *sbp)
+			     struct xfs_dir_leafblock *leaf_d, int start_d,
+			     int count, xfs_sb_t *sbp)
 {
 	struct xfs_dir_leaf_hdr *hdr_s, *hdr_d;
 	struct xfs_dir_leaf_entry *entry_s, *entry_d;
@@ -1787,7 +1872,7 @@ xfs_dir_leaf_moveents(struct xfs_dir_leafblock *leaf_s, int start_s,
  * (Re)find the correct insertion point in a leaf for a hashval.
  * GROT: allow multiple duplicate hashvals.
  */
-int
+STATIC int
 xfs_dir_leaf_refind(struct xfs_dir_leafblock *leaf, int start, uint hashval,
 			xfs_sb_t *sbp)
 {
@@ -1826,7 +1911,7 @@ xfs_dir_leaf_refind(struct xfs_dir_leafblock *leaf, int start, uint hashval,
  * (Re)find the correct insertion point in a node for a hashval.
  * GROT: allow for several duplicate hashvals.
  */
-int
+STATIC int
 xfs_dir_node_refind(struct xfs_dir_intnode *node, int start, uint hashval)
 {
 	struct xfs_dir_node_entry *entry;
@@ -1859,7 +1944,7 @@ xfs_dir_node_refind(struct xfs_dir_intnode *node, int start, uint hashval)
 /*
  * Link a new block into a doubly linked list of blocks.
  */
-void
+STATIC void
 xfs_dir_blk_link(struct xfs_dir_state *state,
 			struct xfs_dir_state_blk *old_blk,
 			struct xfs_dir_state_blk *new_blk)
@@ -1957,7 +2042,7 @@ xfs_dir_blk_link(struct xfs_dir_state *state,
 /*
  * Unlink a block from a doubly linked list of blocks.
  */
-void
+STATIC void
 xfs_dir_blk_unlink(struct xfs_dir_state *state,
 			  struct xfs_dir_state_blk *drop_blk,
 			  struct xfs_dir_state_blk *save_blk)
