@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.155 $"
+#ident	"$Revision: 1.156 $"
 
 /*
  * High level interface routines for log manager
@@ -1326,8 +1326,10 @@ xlog_sync(xlog_t		*log,
 	XFSSTATS.xs_log_writes++;
 	ASSERT(iclog->ic_refcnt == 0);
 
+#ifdef DEBUG
 	if (flags != 0 && (flags & XFS_LOG_SYNC) )
 		xlog_panic("xlog_sync: illegal flag");
+#endif
 	
 	xlog_pack_data(log, iclog);       /* put cycle number in every block */
 	iclog->ic_header.h_len = iclog->ic_offset;	/* real byte length */
@@ -2180,6 +2182,7 @@ xlog_regrant_write_log_space(xlog_t	   *log,
 {
 	int		spl;
 	int		free_bytes, need_bytes;
+	xlog_ticket_t	*ntic;
 #ifdef DEBUG
 	xfs_lsn_t	tail_lsn;
 #endif
@@ -2197,7 +2200,53 @@ xlog_regrant_write_log_space(xlog_t	   *log,
 	spl = GRANT_LOCK(log);
 	xlog_trace_loggrant(log, tic, "xlog_regrant_write_log_space: enter");
 
+	if (XLOG_FORCED_SHUTDOWN(log)) 
+		goto error_return;
+
+	/* If there are other waiters on the queue then give them a
+	 * chance at logspace before us. Wake up the first waiters,
+	 * if we do not wake up all the waiters then go to sleep waiting
+	 * for more free space, otherwise try to get some space for
+	 * this transaction.
+	 */
+
+	if (ntic = log->l_write_headq) {
+		free_bytes = xlog_space_left(log, log->l_grant_write_cycle,
+					     log->l_grant_write_bytes);
+		do {
+			ASSERT(ntic->t_flags & XLOG_TIC_PERM_RESERV);
+
+			if (free_bytes < ntic->t_unit_res)
+				break;
+			free_bytes -= ntic->t_unit_res;
+			sv_signal(&ntic->t_sema);
+			ntic = ntic->t_next;
+		} while (ntic != log->l_write_headq);
+
+		if (ntic != log->l_write_headq) {
+			if ((tic->t_flags & XLOG_TIC_IN_Q) == 0)
+				XLOG_INS_TICKETQ(log->l_write_headq, tic);
+
+			xlog_trace_loggrant(log, tic,
+				    "xlog_regrant_write_log_space: sleep 1");
+			sv_wait(&tic->t_sema, PINOD, &log->l_grant_lock, spl); 
+
+			/* If we're shutting down, this tic is already
+			 * off the queue */
+			if (XLOG_FORCED_SHUTDOWN(log)) {
+				spl = GRANT_LOCK(log);	
+				goto error_return;
+			}
+
+			xlog_trace_loggrant(log, tic,
+				    "xlog_regrant_write_log_space: wake 1");
+			xlog_grant_push_ail(log->l_mp, tic->t_unit_res);
+			spl = GRANT_LOCK(log);
+		}
+	}
+
 	need_bytes = tic->t_unit_res;
+
 redo:
 	if (XLOG_FORCED_SHUTDOWN(log)) 
 		goto error_return;
@@ -2216,7 +2265,7 @@ redo:
 		}
 
 		xlog_trace_loggrant(log, tic,
-				    "xlog_regrant_write_log_space: wake 1");
+				    "xlog_regrant_write_log_space: wake 2");
 		xlog_grant_push_ail(log->l_mp, need_bytes);
 		spl = GRANT_LOCK(log);
 		goto redo;
@@ -2734,11 +2783,12 @@ xlog_state_want_sync(xlog_t *log, xlog_in_core_t *iclog)
 
 	spl = LOG_LOCK(log);
 	
-	if (iclog->ic_state == XLOG_STATE_ACTIVE)
+	if (iclog->ic_state == XLOG_STATE_ACTIVE) {
 		xlog_state_switch_iclogs(log, iclog, 0);
-	else if (!(iclog->ic_state & 
-		   (XLOG_STATE_WANT_SYNC|XLOG_STATE_IOERROR)))
-		xlog_panic("xlog_state_want_sync: bad state");
+	} else {
+		ASSERT(iclog->ic_state &
+			(XLOG_STATE_WANT_SYNC|XLOG_STATE_IOERROR));
+	}
 	
 	LOG_UNLOCK(log, spl);
 }	/* xlog_state_want_sync */
