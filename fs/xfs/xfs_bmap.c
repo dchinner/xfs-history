@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.118 $"
+#ident	"$Revision: 1.120 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1661,7 +1661,7 @@ xfs_bmap_del_extent(
 
 			xfs_rtfree_extent(ip->i_transp, bno, len);
 			ip->i_d.di_nblocks -=
-				del->br_blockcount * mp->m_sb.sb_rextsize;
+				(len * mp->m_sb.sb_rextsize);
 		}
 		/*
 		 * Ordinary allocation.  Add it to list of extents to be
