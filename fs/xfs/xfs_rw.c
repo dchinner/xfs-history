@@ -1,4 +1,4 @@
-#ident "$Revision: 1.199 $"
+#ident "$Revision: 1.202 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -3395,7 +3395,7 @@ xfs_strat_read(
 				  &firstblock, 0, imap, &nimaps, NULL);
 		if (error) {
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
-			xfs_bioerror(bp);
+			xfs_bioerror_relse(bp);
 			return error;
 		}
 		ASSERT(nimaps >= 1);
@@ -4414,18 +4414,20 @@ int
 xfs_bioerror(
 	buf_t *bp)
 {
+
+#ifdef XFSERRORDEBUG
 	/* XXXsup bdflush seems to hit metadata bufs with iodone reset */
 	ASSERT((bp->b_flags & (B_BDFLUSH|B_READ)) || bp->b_iodone);
 
 	if (bp->b_iodone == NULL) {
-#ifdef XFSERRORDEBUG
+		debug("");
 		printf("bp->b_iodone == NULL 0x%x\n", bp);
-#endif
 		if ((bp->b_flags & B_READ) == 0) {
 			buftrace("XFS IOERR BIODONE NULL", bp);
 			return xfs_bioerror_relse(bp);
 		}
 	}
+#endif
 
 	/*
 	 * No need to wait until the buffer is unpinned.
@@ -4467,13 +4469,9 @@ xfs_bioerror_relse(
 	fl = bp->b_flags;
 	/*
 	 * No need to wait until the buffer is unpinned.
-	 * We aren't flushing it. XXXsup Should I do bioerror
-	 * only for non-async bufs where somebody's waiting for
-	 * the error value?
-	 */    
-	/* bioerror(bp, EIO); */
-	/*
-	 * chunkhold expects B_DONE to be there, whether
+	 * We aren't flushing it.
+	 *
+	 * chunkhold expects B_DONE to be set, whether
 	 * we actually finish the I/O or not. We don't want to
 	 * change that interface.
 	 */
@@ -4482,6 +4480,12 @@ xfs_bioerror_relse(
 	bp->b_iodone = NULL;
 	bp->b_bdstrat = NULL;
 	if (!(fl & B_ASYNC)) {
+		/*
+		 * Mark b_error and B_ERROR _both_.
+		 * Lot's of chunkcache code assumes that.
+		 * There's no reason to mark error for
+		 * ASYNC buffers.
+		 */
 		bioerror(bp, EIO);
 		vsema(&bp->b_iodonesema);
 	} else {
@@ -4538,6 +4542,9 @@ xfs_read_buf(
 			*bpp = NULL;
 			if (bp) {
 				bp->b_flags |= B_DONE|B_STALE;
+				/* 
+				 * brelse clears B_ERROR and b_error
+				 */
 				brelse(bp);
 			}
 		}
@@ -4567,21 +4574,15 @@ xfs_bwrite(
 {
 	int	error;
 
+	/*
+	 * XXXsup how does this work for quotas.
+	 */
 	if (bp->b_vp == NULL) {
-#ifdef later
-		if (!(bp->b_flags & (B_FOUND|B_BDFLUSH))) {
-			if (bp->b_flags & B_ASYNC)
-				ASSERT(bp->b_iodone);
-		}
-#endif
 		bp->b_bdstrat = xfs_bdstrat_cb;
 	}
 	bp->b_fsprivate3 = mp;
 
 	if (error = bwrite(bp)) {
-#ifdef DEBUG
-		printf("------- xfs_bwrite HIT ------- 0x%x\n", bp);
-#endif	
 		ASSERT(mp);
 		buftrace("XFSBWRITE IOERROR", bp);
 		xfs_force_shutdown(mp);
@@ -4602,17 +4603,7 @@ xfs_bdstrat_cb(struct buf *bp)
 	xfs_mount_t	*mp;
 
 	mp = bp->b_fsprivate3;
-	/*
-	 * b_iodone must be set unless its synchronous write.
-	 * XXXsup BDFLUSH thing is a hack. For some reason, bdflush
-	 * comes across metadata bufs w/o iodone attached.
-	 */
-#ifdef later
-	if (!(bp->b_flags & (B_FOUND|B_BDFLUSH))) {
-		if (bp->b_flags & B_ASYNC)
-			ASSERT(bp->b_iodone);
-	}
-#endif
+
 	if (!XFS_FORCED_SHUTDOWN(mp)) {
 		my_bdevsw = get_bdevsw(bp->b_edev);
 		ASSERT(my_bdevsw != NULL);
@@ -5118,7 +5109,8 @@ retry:
 
 				xfs_iunlock(ip, XFS_ILOCK_EXCL);
 				error = xfs_trans_reserve(tp, 
-					   XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) + datablocks, 
+					   XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) +
+							  datablocks, 
 					   XFS_WRITE_LOG_RES(mp),
 					   numrtextents,
 					   XFS_TRANS_PERM_LOG_RES,
