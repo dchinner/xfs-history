@@ -1406,33 +1406,40 @@ printflags(register uint64_t flags,
 }
 
 
-static void	printvnode(vnode_t *vp, unsigned long addr)
+static void printbhv(bhv_desc_t *bdp)
 {
-	bhv_desc_t	*bh;
 	kdb_symtab_t	 symtab;
 
+	if (bdp == NULL) {
+		kdb_printf("NULL bhv\n");
+		return;
+	}
 
+	kdb_printf("bhv at 0x%p\n", bdp);
+	while (bdp) {
+		if (kdbnearsym((unsigned long)bdp->bd_ops, &symtab))
+			kdb_printf("  ops %s", symtab.sym_name);
+		else
+			kdb_printf("  ops %s/0x%p", "???", (void *)bdp->bd_ops);
+
+		kdb_printf(" vobj 0x%p pdata 0x%p next 0x%p\n",
+			   bdp->bd_vobj, bdp->bd_pdata, bdp->bd_next);
+
+		bdp = bdp->bd_next;
+	}
+}
+
+
+static void	printvnode(vnode_t *vp, unsigned long addr)
+{
 	kdb_printf("vnode: 0x%lx type ", addr);
 	if ((size_t)vp->v_type >= sizeof(vnode_type)/sizeof(vnode_type[0]))
 		kdb_printf("out of range 0x%x", vp->v_type);
 	else
 		kdb_printf("%s", vnode_type[vp->v_type]);
-	kdb_printf(" v_bh %p\n", &vp->v_bh);
+	kdb_printf(" v_bh 0x%p\n", &vp->v_bh);
 
-	if ((bh = vp->v_bh.bh_first)) {
-		kdb_printf("   v_inode 0x%p v_bh->bh_first 0x%p pobj 0x%p\n",
-					LINVFS_GET_IP((struct vnode *) addr),
-					bh, bh->bd_pdata);
-
-		if (kdbnearsym((unsigned long)bh->bd_ops, &symtab))
-			kdb_printf("   ops %s ", symtab.sym_name);
-		else
-			kdb_printf("   ops %s/0x%p ",
-						"???", (void *)bh->bd_ops);
-	} else {
-		kdb_printf("   v_inode 0x%p v_bh->bh_first = NULLBHV ",
-					LINVFS_GET_IP((struct vnode *) addr));
-	}
+	printbhv(vp->v_fbhv);
 
 	printflags((__psunsigned_t)vp->v_flag, tab_vflags, "flag =");
 	kdb_printf("\n");
@@ -1477,7 +1484,38 @@ static void
 print_vfs(vfs_t	*vfs, unsigned long addr)
 {
 	kdb_printf("vfsp at 0x%lx", addr);
-	kdb_printf("  vfs_fbhv 0x%p sb 0x%p\n", vfs->vfs_fbhv, vfs->vfs_super);
+	kdb_printf(" vfs_flag 0x%u\n", vfs->vfs_flag);
+	kdb_printf(" vfs_super 0x%p", vfs->vfs_super);
+	kdb_printf(" vfs_bh 0x%p\n", &vfs->vfs_bh);
+
+	printbhv(vfs->vfs_fbhv);
+}
+
+static int	kdbm_bhv(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+	bhv_desc_t	*bh;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+
+	if (diag)
+		return diag;
+
+	bh = (bhv_desc_t *)addr;
+
+	printbhv(bh);
+
+	return 0;
 }
 
 static int	kdbm_vfs(
@@ -2172,6 +2210,7 @@ static struct xif {
 	char	*args;
 	char	*help;
 } xfsidbg_funcs[] = {
+  {  "bhv",	kdbm_bhv,	"<bhv>", "Dump bhv chain"},
   {  "vn",	kdbm_vn,	"<vnode>", "Dump inode/vnode/trace"},
   {  "vnode",	kdbm_vnode,	"<vnode>", "Dump vnode"},
   {  "vfs",	kdbm_vfs,	"<vfs>", "Dump vfs"},
