@@ -5,23 +5,17 @@
 
 /* Don't want anything from linux/capability.h. We need the stuff from IRIX */
 
-#include <linux/types.h>
-#include <linux/module.h>
+#include <sys/types.h>
 
+#include <linux/module.h>
 #include <linux/errno.h>
+
+#include "xfs_coda_oops.h"
+
 #include <linux/fs.h>
 #include <linux/sched.h>
 
-/* Use the IRIX capabilities for now */
-#undef CAP_FOWNER
-#undef CAP_DAC_READ_SEARCH
 
-typedef struct __timespec {
-        time_t  tv_sec;         /* seconds */
-	long    tv_nsec;
-} timespec_t;
-
-#include <sys/types.h>
 #include <sys/capability.h>
 #include <sys/cred.h>
 #include <sys/vfs.h>
@@ -33,12 +27,12 @@ typedef struct __timespec {
 #undef MS_REMOUNT
 #include <sys/mount.h>
 
-#include "xfs_linux_ops_inode.h"
+#include "xfs_inode.h"
 
-#include "xfs_clnt.h"
-#include "xfs_inum.h"
+#include <xfs_clnt.h>
+#include <xfs_inum.h>
 #include <sys/uuid.h>
-#include "xfs_sb.h"
+#include <xfs_sb.h>
 
 /*
  * Global system credential structure.

@@ -6,10 +6,12 @@
 # unless it's something special (ie not a .c file).
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
-EXTRA_CFLAGS += -I.
+EXTRA_CFLAGS += -I.. -I.
 O_TARGET := xfs.o
-LINO_OBJS   := xfs_linux_ops_file.o xfs_linux_ops_inode.o\
- vnode.o behavior.o fs_bio.c vfs.c vnode.c xfs_linux_ops_super.o sim.random.o  
+LINO_OBJS   := linux/xfs_file.o  linux/xfs_super.o \
+ linux/xfs_vnode.o linux/xfs_behavior.o linux/xfs_vfs.o  linux/xfs_random.o  
+# xfs_linux_ops_inode.o
+# fs_bio.o
 M_OBJS   := $(O_TARGET)
 XFS_OBJS  :=   xfs_alloc.o \
                 xfs_alloc_btree.o \
@@ -64,3 +66,5 @@ O_OBJS :=  $(XFS_OBJS) $(LINO_OBJS)
 
 include $(TOPDIR)/Rules.make
 
+libgcc.a:
+		ln -sf `find /usr/lib/gcc-lib -name libgcc.a -print | head -1`   

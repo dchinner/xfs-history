@@ -2,13 +2,17 @@
  *  fs/xfs/xfs_linux_ops_file.c
  *
  */
-
+#include <sys/types.h>
+#include <sys/cred.h>
 #include <linux/errno.h>
+
+#include "xfs_coda_oops.h"
+
 #include <linux/fs.h>
 #include <linux/dcache.h>
 #include <linux/sched.h>	/* To get current */
 
-#include "xfs_linux_ops_file.h"
+#include "xfs_file.h"
 #include <sys/vnode.h>
 #include <sys/mode.h>
 #include <xfs_linux.h>
@@ -75,7 +79,7 @@ int linvfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 				      /* filldir will return an error if we go
 				      	beyond the buffer. */
 	uio.uio_iov = &iov;
-	uio.uio_rtn = (void *)filldir;
+	uio.uio_copy = filldir;
 	uio.uio_fmode = filp->f_mode;
 	uio.uio_offset = filp->f_pos;
 	uio.uio_segflg = UIO_USERSPACE;
