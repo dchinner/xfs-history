@@ -11,11 +11,18 @@ typedef struct xfs_buf_log_format {
 	unsigned short	blf_type;	/* buf log item type indicator */
 	unsigned short	blf_size;	/* size of this item */
 	daddr_t		blf_blkno;	/* starting blkno of this buf */
-	uint		blf_len;	/* number of blocks in this buf */
+	ushort		blf_flags;	/* misc state */
+	ushort		blf_len;	/* number of blocks in this buf */
 	unsigned int	blf_map_size;	/* size of data bitmap in words */
 	unsigned int	blf_data_map[1];/* variable size bitmap of */
 					/*   regions of buffer in this item */
 } xfs_buf_log_format_t;
+
+/*
+ * This flag indicates that the buffer contains on disk inodes
+ * and requires special recovery handling.
+ */
+#define	XFS_BLI_INODE_BUF	0x1
 
 #define	XFS_BLI_CHUNK		128
 #define	XFS_BLI_SHIFT		7

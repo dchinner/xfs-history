@@ -900,8 +900,9 @@ xfs_iunlink(
 		dip->di_next_unlinked = agi->agi_unlinked[bucket_index];
 		offset = ((char *)dip - (char *)(ibp->b_un.b_addr)) +
 			offsetof(xfs_dinode_t, di_next_unlinked);
+		xfs_trans_inode_buf(tp, ibp);
 		xfs_trans_log_buf(tp, ibp, offset,
-				  (offset + sizeof(xfs_agino_t)));
+				  (offset + sizeof(xfs_agino_t) - 1));
 		xfs_inobp_check(mp, ibp);
 	}
 
@@ -912,7 +913,8 @@ xfs_iunlink(
 	agi->agi_unlinked[bucket_index] = agino;
 	offset = offsetof(xfs_agi_t, agi_unlinked) +
 		(sizeof(xfs_agino_t) * bucket_index);
-	xfs_trans_log_buf(tp, agibp, offset, (offset + sizeof(xfs_agino_t)));
+	xfs_trans_log_buf(tp, agibp, offset,
+			  (offset + sizeof(xfs_agino_t) - 1));
 }	    
 
 /*
@@ -979,8 +981,9 @@ xfs_iunlink_remove(
 			dip->di_next_unlinked = NULLAGINO;
 			offset = ((char *)dip - (char *)(ibp->b_un.b_addr)) +
 				offsetof(xfs_dinode_t, di_next_unlinked);
+			xfs_trans_inode_buf(tp, ibp);
 			xfs_trans_log_buf(tp, ibp, offset,
-					  (offset + sizeof(xfs_agino_t)));
+					  (offset + sizeof(xfs_agino_t) - 1));
 			xfs_inobp_check(mp, ibp);
 		} else {
 			xfs_trans_brelse(tp, ibp);
@@ -993,7 +996,7 @@ xfs_iunlink_remove(
 		offset = offsetof(xfs_agi_t, agi_unlinked) +
 			(sizeof(xfs_agino_t) * bucket_index);
 		xfs_trans_log_buf(tp, agibp, offset,
-				  (offset + sizeof(xfs_agino_t)));
+				  (offset + sizeof(xfs_agino_t) - 1));
 	} else {
 		/*
 		 * We need to search the list for the inode being freed.
@@ -1026,8 +1029,9 @@ xfs_iunlink_remove(
 			dip->di_next_unlinked = NULLAGINO;
 			offset = ((char *)dip - (char *)(ibp->b_un.b_addr)) +
 				offsetof(xfs_dinode_t, di_next_unlinked);
+			xfs_trans_inode_buf(tp, ibp);
 			xfs_trans_log_buf(tp, ibp, offset,
-					  (offset + sizeof(xfs_agino_t)));
+					  (offset + sizeof(xfs_agino_t) - 1));
 			xfs_inobp_check(mp, ibp);
 		} else {
 			xfs_trans_brelse(tp, ibp);
@@ -1040,8 +1044,9 @@ xfs_iunlink_remove(
 		offset = ((char *)last_dip -
 			  (char *)(last_ibp->b_un.b_addr)) +
 			 offsetof(xfs_dinode_t, di_next_unlinked);
+		xfs_trans_inode_buf(tp, last_ibp);
 		xfs_trans_log_buf(tp, last_ibp, offset,
-				  (offset + sizeof(xfs_agino_t)));
+				  (offset + sizeof(xfs_agino_t) - 1));
 		xfs_inobp_check(mp, ibp);
 	}
 }
