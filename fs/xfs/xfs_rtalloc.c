@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.40 $"
+#ident	"$Revision: 1.41 $"
 
 /*
  * Free realtime space allocation for XFS.
@@ -2263,7 +2263,7 @@ xfs_growfs_rt(
 	 * This also deals with the case where there were no rtextents before.
 	 */
 	for (bmbno = sbp->sb_rbmblocks -
-		     ((sbp->sb_rextents % (NBBY * sbp->sb_blocksize)) != 0);
+		     ((sbp->sb_rextents & ((1 << mp->m_blkbit_log) - 1)) != 0);
 	     bmbno < nrbmblocks;
 	     bmbno++) {
 		/*
