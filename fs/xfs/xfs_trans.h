@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision$"
+#ident "$Revision: 6.0 $"
 
 struct buf;
 struct xfs_efd_log_item;
@@ -13,6 +13,7 @@ struct xfs_log_item;
 struct xfs_log_item_desc;
 struct xfs_mount;
 struct xfs_trans;
+struct xfs_dquot_acct;
 
 typedef struct xfs_ail_entry {
 	struct xfs_log_item	*ail_forw;	/* AIL forw pointer */
@@ -61,6 +62,8 @@ typedef struct xfs_log_item {
 #define	XFS_LI_6_1_BUF		0x123a
 #define	XFS_LI_INODE		0x123b
 #define	XFS_LI_BUF		0x123c
+#define	XFS_LI_DQUOT		0x123d
+#define	XFS_LI_QUOTAOFF		0x123e
 
 /*
  * Transaction types.  Used to distinguish types of buffers.
@@ -90,7 +93,13 @@ typedef struct xfs_log_item {
 #define	XFS_TRANS_ATTR_RM		23
 #define	XFS_TRANS_ATTR_FLAG		24
 #define	XFS_TRANS_CLEAR_AGI_BUCKET	25
-
+#define XFS_TRANS_QM_SBCHANGE		26
+#define XFS_TRANS_QM_QUOTAOFF		29
+#define XFS_TRANS_QM_DQALLOC		30
+#define XFS_TRANS_QM_SETQLIM		31
+#define XFS_TRANS_QM_DQCLUSTER		32
+#define XFS_TRANS_QM_QINOCREATE		33
+#define XFS_TRANS_QM_QUOTAOFF_END	34
 
 typedef struct xfs_item_ops {
 	uint (*iop_size)(xfs_log_item_t *);
@@ -286,6 +295,7 @@ typedef struct xfs_trans {
 	sema_t			t_sema;		/* sema for commit completion */
 	xfs_lsn_t		t_lsn;		/* log seq num of trans commit*/
 	struct xfs_mount	*t_mountp;	/* ptr to fs mount struct */
+	struct xfs_dquot_acct   *t_dqinfo;	/* accting info for dquots */
 	xfs_trans_callback_t	t_callback;	/* transaction callback */
 	void			*t_callarg;	/* callback arg */
 	unsigned int		t_flags;	/* misc flags */
@@ -314,6 +324,7 @@ typedef struct xfs_trans {
 #define	XFS_TRANS_SB_DIRTY	0x02	/* superblock is modified */
 #define	XFS_TRANS_PERM_LOG_RES	0x04	/* xact took a permanent log res */
 #define	XFS_TRANS_SYNC		0x08	/* make commit synchronous */
+#define XFS_TRANS_DQ_DIRTY	0x10	/* at least one dquot in trx dirty */
 
 /*
  * Values for call flags parameter.
@@ -682,7 +693,8 @@ typedef struct xfs_trans {
 #define	XFS_GEN_SBTREE_REF	2
 #define	XFS_INO_BTREE_REF	2
 #define	XFS_INO_REF		1     
-     
+#define	XFS_DQUOT_REF		1     
+
 /*
  * XFS transaction mechanism exported interfaces that are
  * actually macros.
@@ -723,6 +735,7 @@ void		xfs_trans_bhold(xfs_trans_t *, struct buf *);
 void		xfs_trans_bhold_until_committed(xfs_trans_t *, struct buf *);
 void		xfs_trans_binval(xfs_trans_t *, struct buf *);
 void		xfs_trans_inode_buf(xfs_trans_t *, struct buf *);
+void		xfs_trans_dquot_buf(xfs_trans_t *, struct buf *, uint);
 void		xfs_trans_inode_alloc_buf(xfs_trans_t *, struct buf *);
 int		xfs_trans_iget(struct xfs_mount *, xfs_trans_t *,
 			       xfs_ino_t , uint, struct xfs_inode **);
