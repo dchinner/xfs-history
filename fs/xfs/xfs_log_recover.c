@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.102 $"
+#ident	"$Revision: 1.103 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -3660,7 +3660,6 @@ xlog_recover_finish(xlog_t *log)
 	 * rather than accepting new requests.
 	 */
 	if (log->l_flags & XLOG_RECOVERY_NEEDED) {
-		char devnm[MAXDEVNAME];
 #ifdef _KERNEL
 		xlog_recover_process_efis(log);
 		/*
@@ -3676,12 +3675,12 @@ xlog_recover_finish(xlog_t *log)
 #endif /* _KERNEL */
 #if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
 		cmn_err(CE_NOTE,
-			"Ending XFS recovery for filesystem: %s (%s)",
-			log->l_mp->m_fsname, dev_to_name(log->l_dev, devnm, MAXDEVNAME));
+			"Ending XFS recovery for filesystem: %s (%V)",
+			log->l_mp->m_fsname, log->l_dev);
 #else
 		cmn_err(CE_NOTE,
-			"!Ending XFS recovery for filesystem: %s (%s)",
-			log->l_mp->m_fsname, dev_to_name(log->l_dev, devnm, MAXDEVNAME));
+			"!Ending XFS recovery for filesystem: %s (%V)",
+			log->l_mp->m_fsname, log->l_dev);
 #endif
 		log->l_flags &= ~XLOG_RECOVERY_NEEDED;
 	} else {
