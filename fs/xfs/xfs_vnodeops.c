@@ -1,4 +1,4 @@
-#ident "$Revision: 1.271 $"
+#ident "$Revision: 1.273 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -255,16 +255,6 @@ STATIC int
 xfs_fid2(
 	bhv_desc_t	*bdp,
 	fid_t		*fidp);
-
-STATIC void
-xfs_rwlock(
-	bhv_desc_t	*bdp,
-	vrwlock_t	write_lock);
-
-STATIC void
-xfs_rwunlock(
-	bhv_desc_t	*bdp,
-	vrwlock_t	write_lock);
 
 STATIC int
 xfs_seek(
@@ -5765,7 +5755,7 @@ xfs_fid2(
  * xfs_rwlock
  *
  */
-STATIC void
+void
 xfs_rwlock(
 	bhv_desc_t	*bdp,
 	vrwlock_t	locktype)
@@ -5791,7 +5781,7 @@ xfs_rwlock(
  * xfs_rwunlock
  *
  */
-STATIC void
+void
 xfs_rwunlock(
 	bhv_desc_t	*bdp,
 	vrwlock_t	locktype)

@@ -1,7 +1,7 @@
 #ifndef	_XFS_RW_H
 #define	_XFS_RW_H
 
-#ident "$Revision: 1.26 $"
+#ident "$Revision: 1.27 $"
 
 struct bhv_desc;
 struct bmapval;
@@ -174,5 +174,19 @@ xfs_refcache_purge_mp(
 
 void
 xfs_refcache_purge_some(void);
+
+/*
+ * Needed by xfs_rw.c
+ */
+void
+xfs_rwlock(
+	bhv_desc_t	*bdp,
+	vrwlock_t	write_lock);
+
+void
+xfs_rwunlock(
+	bhv_desc_t	*bdp,
+	vrwlock_t	write_lock);
+
 
 #endif /* _XFS_RW_H */
