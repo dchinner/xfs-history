@@ -1414,7 +1414,6 @@ pagebuf_delalloc_convert(
 	loff_t rounded_offset;
 
 	rounded_offset = ((unsigned long long) page->index) << PAGE_CACHE_SHIFT;
-allocate:
 	error = bmap(inode, rounded_offset, PAGE_CACHE_SIZE,
 			&maps[0], PBF_MAX_MAPS, &maps_returned, flags);
 	if (error)
