@@ -720,7 +720,8 @@ xfs_page_state_convert(
 	xfs_iomap_t		*iomp, iomap;
 	unsigned long		p_offset = 0;
 	pgoff_t			end_index;
-	loff_t			offset, end_offset;
+	loff_t			offset;
+	unsigned long long	end_offset;
 	int			len, err, i, cnt = 0, uptodate = 1;
 	int			flags = startio ? 0 : BMAPI_TRYLOCK;
 	int			page_dirty = 1;
@@ -737,9 +738,8 @@ xfs_page_state_convert(
 	}
 
 	offset = (loff_t)page->index << PAGE_CACHE_SHIFT;
-	end_offset = offset + PAGE_CACHE_SIZE;
-	if (end_offset > i_size_read(inode))
-		end_offset = i_size_read(inode);
+	end_offset = min_t(unsigned long long,
+			offset + PAGE_CACHE_SIZE, i_size_read(inode));
 
 	bh = head = page_buffers(page);
 	iomp = NULL;
