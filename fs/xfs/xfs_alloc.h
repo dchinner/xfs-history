@@ -5,21 +5,28 @@
 
 /*
  * Freespace allocation types.  Argument to xfs_alloc_[v]extent.
+ * Nonsense with double declaration is for -wlint.
  */
 typedef enum xfs_alloctype
 {
-	XFS_ALLOCTYPE_ANY_AG,	/* allocate anywhere */
-	XFS_ALLOCTYPE_START_AG,	/* anywhere, start in this a.g. */
-	XFS_ALLOCTYPE_THIS_AG,	/* anywhere in this a.g. */
-	XFS_ALLOCTYPE_START_BNO,/* near this block (in a.g.) else anywhere */
-	XFS_ALLOCTYPE_NEAR_BNO,	/* in this a.g. and near this block */
-	XFS_ALLOCTYPE_THIS_BNO	/* at exactly this block */
+	XFS_ALLOCTYPE_ANY_AGi,		/* allocate anywhere */
+	XFS_ALLOCTYPE_START_AGi,	/* anywhere, start in this a.g. */
+	XFS_ALLOCTYPE_THIS_AGi,		/* anywhere in this a.g. */
+	XFS_ALLOCTYPE_START_BNOi,	/* near this block else anywhere */
+	XFS_ALLOCTYPE_NEAR_BNOi,	/* in this a.g. and near this block */
+	XFS_ALLOCTYPE_THIS_BNOi		/* at exactly this block */
 } xfs_alloctype_t;
+#define	XFS_ALLOCTYPE_ANY_AG	((xfs_alloctype_t)XFS_ALLOCTYPE_ANY_AGi)
+#define	XFS_ALLOCTYPE_START_AG	((xfs_alloctype_t)XFS_ALLOCTYPE_START_AGi)
+#define	XFS_ALLOCTYPE_THIS_AG	((xfs_alloctype_t)XFS_ALLOCTYPE_THIS_AGi)
+#define	XFS_ALLOCTYPE_START_BNO	((xfs_alloctype_t)XFS_ALLOCTYPE_START_BNOi)
+#define	XFS_ALLOCTYPE_NEAR_BNO	((xfs_alloctype_t)XFS_ALLOCTYPE_NEAR_BNOi)
+#define	XFS_ALLOCTYPE_THIS_BNO	((xfs_alloctype_t)XFS_ALLOCTYPE_THIS_BNOi)
 
 /*
  * Flags for xfs_alloc_ag_freeblks, xfs_alloc_fix_freelist
  */
-#define	XFS_ALLOC_FLAG_TRYLOCK	0x1	/* use trylock for buffer locking */
+#define	XFS_ALLOC_FLAG_TRYLOCK	0x00000001  /* use trylock for buffer locking */
 
 /*
  * Prototypes for visible xfs_alloc.c routines
@@ -28,24 +35,25 @@ typedef enum xfs_alloctype
 /*
  * Return the number of free blocks left in the allocation group.
  */
-xfs_extlen_t			/* number of remaining free blocks */
+xfs_extlen_t				/* number of remaining free blocks */
 xfs_alloc_ag_freeblks(
-	xfs_mount_t	*mp,	/* file system mount structure */
-	xfs_trans_t	*tp,	/* transaction pointer */
-	xfs_agnumber_t	agno,	/* allocation group number */
-	int		flags);	/* XFS_ALLOC_FLAG_... */
+	xfs_mount_t	*mp,		/* file system mount structure */
+	xfs_trans_t	*tp,		/* transaction pointer */
+	xfs_agnumber_t	agno,		/* allocation group number */
+	int		flags);		/* XFS_ALLOC_FLAG_... */
 
 /*
  * Allocate an extent (fixed-size).
+ * Return the extent's starting block, NULLFSBLOCK on failure.
  */
-xfs_fsblock_t			/* extent's starting block, or NULLFSBLOCK */
+xfs_fsblock_t				/* extent's starting block */
 xfs_alloc_extent(
-	xfs_trans_t	*tp,	/* transaction pointer */
-	xfs_fsblock_t	bno,	/* requested starting block */
-	xfs_extlen_t	len,	/* requested length */
-	xfs_alloctype_t	type,	/* allocation type, see above definition */
-	xfs_extlen_t	total,	/* total blocks needed in transaction */
-	int		wasdel);/* extent was previously delayed-allocated */
+	xfs_trans_t	*tp,		/* transaction pointer */
+	xfs_fsblock_t	bno,		/* requested starting block */
+	xfs_extlen_t	len,		/* requested length */
+	xfs_alloctype_t	type,		/* allocation type, see above defn */
+	xfs_extlen_t	total,		/* total blocks needed in transaction */
+	int		wasdel);	/* extent was previously del-alloced */
 
 /*
  * Decide whether to use this allocation group for this allocation.

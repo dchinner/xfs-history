@@ -73,7 +73,7 @@ typedef struct xfs_log_callback {
 struct xfs_mount;
 xfs_lsn_t xfs_log_done(struct xfs_mount *mp, xfs_log_ticket_t ticket, uint flags);
 int	  xfs_log_force(struct xfs_mount *mp, xfs_lsn_t lsn, uint flags);
-int	  xfs_log_init();
+int	  xfs_log_init(void);
 int	  xfs_log_mount(struct xfs_mount *mp, dev_t log_dev, uint flags);
 void	  xfs_log_notify(struct xfs_mount *mp, xfs_lsn_t lsn,
 			 xfs_log_callback_t *callback_entry);

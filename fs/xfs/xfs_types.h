@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_TYPES_H
 #define	_FS_XFS_TYPES_H
 
-#ident	"$Revision: 1.3 $"
+#ident	"$Revision: 1.8 $"
 
 /*
  * xFS types
@@ -28,11 +28,11 @@ typedef	__int32_t	xfs_tid_t;	/* transaction identifier */
 #define	NULLEXTNUM	((xfs_extnum_t)-1)
 
 typedef enum {
-	XFS_LOOKUP_EQ, XFS_LOOKUP_LE, XFS_LOOKUP_GE
+	XFS_LOOKUP_EQi, XFS_LOOKUP_LEi, XFS_LOOKUP_GEi
 } xfs_lookup_t;
 
 typedef enum {
-	XFS_BTNUM_BNO, XFS_BTNUM_CNT, XFS_BTNUM_BMAP, XFS_BTNUM_MAX
+	XFS_BTNUM_BNOi, XFS_BTNUM_CNTi, XFS_BTNUM_BMAPi, XFS_BTNUM_MAX
 } xfs_btnum_t;
 
 #endif	/* !_FS_XFS_TYPES_H */

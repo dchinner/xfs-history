@@ -80,7 +80,7 @@ xfs_alloc_ag_vextent(
 STATIC xfs_agblock_t
 xfs_alloc_ag_vextent_exact(
 	xfs_trans_t	*tp,
-	buf_t		*agbuf,
+	buf_t 		*agbuf,
 	xfs_agnumber_t	agno,
 	xfs_agblock_t	bno,
 	xfs_extlen_t	minlen,
@@ -123,13 +123,16 @@ xfs_free_ag_extent(
  * freelen >= wantlen already checked by caller.
  */
 STATIC xfs_agblock_t
-xfs_alloc_compute_diff(xfs_agblock_t wantbno, xfs_extlen_t wantlen,
-		       xfs_agblock_t freebno, xfs_extlen_t freelen,
-		       xfs_agblock_t *newbnop)
+xfs_alloc_compute_diff(
+	xfs_agblock_t	wantbno,
+	xfs_extlen_t	wantlen,
+	xfs_agblock_t	freebno,
+	xfs_extlen_t	freelen,
+	xfs_agblock_t	*newbnop)
 {
-	xfs_agblock_t freeend;
-	xfs_agblock_t newbno;
-	xfs_agblock_t wantend;
+	xfs_agblock_t	freeend;
+	xfs_agblock_t	newbno;
+	xfs_agblock_t	wantend;
 
 	freeend = freebno + freelen;
 	wantend = wantbno + wantlen;
@@ -147,7 +150,11 @@ xfs_alloc_compute_diff(xfs_agblock_t wantbno, xfs_extlen_t wantlen,
  * Read in the allocation group header (free/alloc section)
  */
 STATIC buf_t *
-xfs_alloc_read_agf(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno, int flags)
+xfs_alloc_read_agf(
+	xfs_mount_t	*mp,
+	xfs_trans_t	*tp,
+	xfs_agnumber_t	agno,
+	int		flags)
 {
 	daddr_t		d;		/* disk block address */
 	xfs_sb_t	*sbp;		/* superblock structure */
@@ -156,7 +163,7 @@ xfs_alloc_read_agf(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno, int fl
 	sbp = &mp->m_sb;
 	d = xfs_ag_daddr(sbp, agno, XFS_AGF_DADDR);
 	return xfs_trans_read_buf(tp, mp->m_dev, d, 1,
-			  (flags & XFS_ALLOC_FLAG_TRYLOCK) ? BUF_TRYLOCK : 0);
+		(flags & XFS_ALLOC_FLAG_TRYLOCK) ? BUF_TRYLOCK : 0U);
 }
 
 /*
@@ -164,18 +171,25 @@ xfs_alloc_read_agf(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno, int fl
  */
 
 STATIC xfs_agblock_t
-xfs_alloc_ag_vextent_exact(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xfs_agblock_t bno, xfs_extlen_t minlen, xfs_extlen_t maxlen, xfs_extlen_t *len)
+xfs_alloc_ag_vextent_exact(
+	xfs_trans_t	*tp,
+	buf_t		*agbuf,
+	xfs_agnumber_t	agno,
+	xfs_agblock_t	bno,
+	xfs_extlen_t	minlen,
+	xfs_extlen_t	maxlen,
+	xfs_extlen_t	*len)
 {
-	xfs_btree_cur_t *bno_cur;
-	xfs_btree_cur_t *cnt_cur;
-	xfs_agblock_t end;
-	xfs_agblock_t fbno;
-	xfs_agblock_t fend;
-	xfs_extlen_t flen;
-	int i;
-	xfs_agblock_t maxend;
-	xfs_agblock_t minend;
-	xfs_mount_t *mp;
+	xfs_btree_cur_t	*bno_cur;
+	xfs_btree_cur_t	*cnt_cur;
+	xfs_agblock_t	end;
+	xfs_agblock_t	fbno;
+	xfs_agblock_t	fend;
+	xfs_extlen_t	flen;
+	int		i;
+	xfs_agblock_t	maxend;
+	xfs_agblock_t	minend;
+	xfs_mount_t	*mp;
 
 	mp = tp->t_mountp;
 	bno_cur = xfs_btree_init_cursor(mp, tp, agbuf, agno, XFS_BTNUM_BNO, 0);
@@ -189,7 +203,8 @@ xfs_alloc_ag_vextent_exact(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, x
 				end = fend < maxend ? fend : maxend;
 			else
 				end = minend;
-			cnt_cur = xfs_btree_init_cursor(mp, tp, agbuf, agno, XFS_BTNUM_CNT, 0);
+			cnt_cur = xfs_btree_init_cursor(mp, tp, agbuf, agno,
+				XFS_BTNUM_CNT, 0);
 			i = xfs_alloc_lookup_eq(cnt_cur, fbno, flen);
 			ASSERT(i == 1);
 			xfs_alloc_delete(cnt_cur);
@@ -229,15 +244,21 @@ xfs_alloc_ag_vextent_exact(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, x
 }
 
 STATIC xfs_agblock_t
-xfs_alloc_ag_vextent_size(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xfs_extlen_t minlen, xfs_extlen_t maxlen, xfs_extlen_t *len)
+xfs_alloc_ag_vextent_size(
+	xfs_trans_t	*tp,
+	buf_t		*agbuf,
+	xfs_agnumber_t	agno,
+	xfs_extlen_t	minlen,
+	xfs_extlen_t	maxlen,
+	xfs_extlen_t	*len)
 {
-	xfs_btree_cur_t *bno_cur;
-	xfs_btree_cur_t *cnt_cur;
-	xfs_agblock_t fbno;
-	xfs_extlen_t flen = 0;
-	int i;
-	xfs_extlen_t rlen;
-	xfs_mount_t *mp;
+	xfs_btree_cur_t	*bno_cur;
+	xfs_btree_cur_t	*cnt_cur;
+	xfs_agblock_t	fbno;
+	xfs_extlen_t	flen = 0;
+	int		i;
+	xfs_mount_t	*mp;
+	xfs_extlen_t	rlen;
 
 	mp = tp->t_mountp;
 	cnt_cur = xfs_btree_init_cursor(mp, tp, agbuf, agno, XFS_BTNUM_CNT, 0);
@@ -274,29 +295,36 @@ xfs_alloc_ag_vextent_size(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xf
 }
 
 STATIC xfs_agblock_t
-xfs_alloc_ag_vextent_near(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xfs_agblock_t bno, xfs_extlen_t minlen, xfs_extlen_t maxlen, xfs_extlen_t *len)
+xfs_alloc_ag_vextent_near(
+	xfs_trans_t	*tp,
+	buf_t		*agbuf,
+	xfs_agnumber_t	agno,
+	xfs_agblock_t	bno,
+	xfs_extlen_t	minlen,
+	xfs_extlen_t	maxlen,
+	xfs_extlen_t	*len)
 {
-	xfs_extlen_t bdiff;
-	int besti;
-	xfs_agblock_t bnew;
-	xfs_btree_cur_t *bno_cur_gt;
-	xfs_btree_cur_t *bno_cur_lt;
-	xfs_btree_cur_t *cnt_cur;
-	xfs_agblock_t gtbno;
-	xfs_extlen_t gtdiff;
-	xfs_agblock_t gtend;
-	xfs_extlen_t gtlen;
-	xfs_agblock_t gtnew;
-	xfs_agblock_t gtnewend;
-	int i;
-	xfs_agblock_t ltbno;
-	xfs_extlen_t ltdiff;
-	xfs_agblock_t ltend;
-	xfs_extlen_t ltlen;
-	xfs_agblock_t ltnew;
-	xfs_agblock_t ltnewend;
-	xfs_mount_t *mp;
-	xfs_extlen_t rlen;
+	xfs_extlen_t	bdiff;
+	int		besti;
+	xfs_agblock_t	bnew;
+	xfs_btree_cur_t	*bno_cur_gt;
+	xfs_btree_cur_t	*bno_cur_lt;
+	xfs_btree_cur_t	*cnt_cur;
+	xfs_agblock_t	gtbno;
+	xfs_extlen_t	gtdiff;
+	xfs_agblock_t	gtend;
+	xfs_extlen_t	gtlen;
+	xfs_agblock_t	gtnew;
+	xfs_agblock_t	gtnewend;
+	int		i;
+	xfs_agblock_t	ltbno;
+	xfs_extlen_t	ltdiff;
+	xfs_agblock_t	ltend;
+	xfs_extlen_t	ltlen;
+	xfs_agblock_t	ltnew;
+	xfs_agblock_t	ltnewend;
+	xfs_mount_t	*mp;
+	xfs_extlen_t	rlen;
 
 	mp = tp->t_mountp;
 	cnt_cur = xfs_btree_init_cursor(mp, tp, agbuf, agno, XFS_BTNUM_CNT, 0);
@@ -312,6 +340,7 @@ xfs_alloc_ag_vextent_near(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xf
 	if (xfs_btree_islastblock(cnt_cur, 0)) {
 		i = cnt_cur->bc_ptrs[0];
 		besti = 0;
+		bdiff = ltdiff = (xfs_extlen_t)0;
 		do {
 			xfs_alloc_get_rec(cnt_cur, &ltbno, &ltlen);
 			rlen = ltlen < maxlen ? ltlen : maxlen;
@@ -331,7 +360,8 @@ xfs_alloc_ag_vextent_near(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xf
 		ltnew = bnew;
 		ltnewend = bnew + rlen;
 		*len = rlen;
-		bno_cur_lt = xfs_btree_init_cursor(mp, tp, agbuf, agno, XFS_BTNUM_BNO, 0);
+		bno_cur_lt = xfs_btree_init_cursor(mp, tp, agbuf, agno,
+			XFS_BTNUM_BNO, 0);
 		i = xfs_alloc_lookup_eq(bno_cur_lt, ltbno, ltlen);
 		ASSERT(i == 1);
 		/*
@@ -372,7 +402,8 @@ xfs_alloc_ag_vextent_near(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xf
 		xfs_btree_del_cursor(bno_cur_lt);
 		return ltnew;
 	}
-	bno_cur_lt = xfs_btree_init_cursor(mp, tp, agbuf, agno, XFS_BTNUM_BNO, 0);
+	bno_cur_lt = xfs_btree_init_cursor(mp, tp, agbuf, agno,
+		XFS_BTNUM_BNO, 0);
 	if (!xfs_alloc_lookup_le(bno_cur_lt, bno, maxlen)) {
 		bno_cur_gt = bno_cur_lt;
 		bno_cur_lt = 0;
@@ -565,10 +596,8 @@ xfs_alloc_ag_vextent(
 	xfs_alloctype_t	type,
 	int		wasdel) 
 {
-	xfs_agf_t *agf;
-	xfs_mount_t *mp;
-	xfs_agblock_t r;
-	xfs_sb_t *sbp;
+	xfs_agf_t	*agf;
+	xfs_agblock_t	r;
 
 	if (minlen == 0 || maxlen == 0 || minlen > maxlen)
 		return NULLAGBLOCK;
@@ -587,14 +616,16 @@ xfs_alloc_ag_vextent(
 		/* NOTREACHED */
 	}
 	if (r != NULLAGBLOCK) {
+		int 	slen = (int)*len;
+
 		ASSERT(*len >= minlen && *len <= maxlen);
 		agf = xfs_buf_to_agf(agbuf);
 		agf->agf_freeblks -= *len;
 		xfs_alloc_log_agf(tp, agbuf, XFS_AGF_FREEBLKS);
 		if (wasdel)
-			xfs_trans_mod_sb(tp, XFS_TRANS_SB_RES_FDBLOCKS, -(*len));
+			xfs_trans_mod_sb(tp, XFS_TRANS_SB_RES_FDBLOCKS, -slen);
 		else
-			xfs_trans_mod_sb(tp, XFS_TRANS_SB_FDBLOCKS, -(*len));
+			xfs_trans_mod_sb(tp, XFS_TRANS_SB_FDBLOCKS, -slen);
 	}
 	return r;
 }
@@ -603,21 +634,27 @@ xfs_alloc_ag_vextent(
  * Free an extent in an ag.
  */
 STATIC int
-xfs_free_ag_extent(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xfs_agblock_t bno, xfs_extlen_t len)
+xfs_free_ag_extent(
+	xfs_trans_t	*tp,
+	buf_t		*agbuf,
+	xfs_agnumber_t	agno,
+	xfs_agblock_t	bno,
+	xfs_extlen_t	len)
 {
-	xfs_agf_t *agf;
-	xfs_btree_cur_t *bno_cur;
-	xfs_btree_cur_t *cnt_cur;
-	xfs_extlen_t flen = len;
-	xfs_agblock_t gtbno;
-	xfs_extlen_t gtlen;
-	int haveleft;
-	int haveright;
-	int i;
-	xfs_agblock_t ltbno;
-	xfs_extlen_t ltlen;
-	xfs_mount_t *mp;
-	xfs_sb_t *sbp;
+	xfs_agf_t	*agf;
+	xfs_btree_cur_t	*bno_cur;
+	xfs_btree_cur_t	*cnt_cur;
+	xfs_extlen_t	flen = len;
+	xfs_agblock_t	gtbno;
+	xfs_extlen_t	gtlen;
+	int		haveleft;
+	int		haveright;
+	int		i;
+	xfs_agblock_t	ltbno;
+	xfs_extlen_t	ltlen;
+	xfs_mount_t	*mp;
+	xfs_agblock_t	nbno;
+	xfs_extlen_t	nlen;
 
 	mp = tp->t_mountp;
 	bno_cur = xfs_btree_init_cursor(mp, tp, agbuf, agno, XFS_BTNUM_BNO, 0);
@@ -649,28 +686,30 @@ xfs_free_ag_extent(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xfs_agblo
 		xfs_alloc_delete(cnt_cur);
 		xfs_alloc_delete(bno_cur);
 		xfs_alloc_decrement(bno_cur, 0);
+#ifdef XFSDEBUG
 		{ xfs_agblock_t xxbno; xfs_extlen_t xxlen;
 		  xfs_alloc_get_rec(bno_cur, &xxbno, &xxlen);
 		  ASSERT(xxbno == ltbno);
 		  ASSERT(xxlen == ltlen);
 		}
-		bno = ltbno;
-		len += ltlen + gtlen;
-		xfs_alloc_update(bno_cur, bno, len);
+#endif
+		nbno = ltbno;
+		nlen = len + ltlen + gtlen;
+		xfs_alloc_update(bno_cur, nbno, nlen);
 	} else if (haveleft) {
 		i = xfs_alloc_lookup_eq(cnt_cur, ltbno, ltlen);
 		ASSERT(i == 1);
 		xfs_alloc_delete(cnt_cur);
 		xfs_alloc_decrement(bno_cur, 0);
-		bno = ltbno;
-		len += ltlen;
-		xfs_alloc_update(bno_cur, bno, len);
+		nbno = ltbno;
+		nlen = len + ltlen;
+		xfs_alloc_update(bno_cur, nbno, nlen);
 	} else if (haveright) {
 		i = xfs_alloc_lookup_eq(cnt_cur, gtbno, gtlen);
 		ASSERT(i == 1);
 		xfs_alloc_delete(cnt_cur);
-		len += gtlen;
-		xfs_alloc_update(bno_cur, bno, len);
+		nlen = len + gtlen;
+		xfs_alloc_update(bno_cur, bno, nlen);
 	} else
 		xfs_alloc_insert(bno_cur);
 	xfs_alloc_rcheck(bno_cur);
@@ -684,7 +723,7 @@ xfs_free_ag_extent(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xfs_agblo
 	agf->agf_freeblks += flen;
 	xfs_alloc_log_agf(tp, agbuf, XFS_AGF_FREEBLKS);
 	xfs_btree_del_cursor(cnt_cur);
-	xfs_trans_mod_sb(tp, XFS_TRANS_SB_FDBLOCKS, flen);
+	xfs_trans_mod_sb(tp, XFS_TRANS_SB_FDBLOCKS, (int)flen);
 	return 1;
 }
 
@@ -703,9 +742,9 @@ xfs_alloc_ag_freeblks(
 	xfs_agnumber_t	agno,	/* allocation group number */
 	int		flags)	/* XFS_ALLOC_FLAG_... */
 {
-	buf_t *agbuf;
-	xfs_agf_t *agf;
-	xfs_extlen_t freeblks;
+	buf_t		*agbuf;
+	xfs_agf_t	*agf;
+	xfs_extlen_t	freeblks;
 
 	agbuf = xfs_alloc_read_agf(mp, tp, agno, flags);
 	agf = xfs_buf_to_agf(agbuf);
@@ -716,18 +755,19 @@ xfs_alloc_ag_freeblks(
 
 /*
  * Allocate an extent (fixed-size).
+ * Return the extent's starting block, NULLFSBLOCK on failure.
  */
-xfs_fsblock_t			/* extent's starting block, or NULLFSBLOCK */
+xfs_fsblock_t			/* extent's starting block */
 xfs_alloc_extent(
 	xfs_trans_t	*tp,	/* transaction pointer */
 	xfs_fsblock_t	bno,	/* requested starting block */
 	xfs_extlen_t	len,	/* requested length */
-	xfs_alloctype_t	type,	/* allocation type, see above definition */
+	xfs_alloctype_t	type,	/* allocation type, see above defn */
 	xfs_extlen_t	total,	/* total blocks needed in transaction */
-	int		wasdel)	/* extent was previously delayed-allocated */
+	int		wasdel)	/* extent was previously del-alloced */
 {
-	xfs_extlen_t rlen;
-	xfs_fsblock_t rval;
+	xfs_extlen_t	rlen;
+	xfs_fsblock_t	rval;
 
 	rval = xfs_alloc_vextent(tp, bno, len, len, &rlen, type, total, wasdel);
 	if (rval != NULLFSBLOCK)
@@ -774,7 +814,8 @@ xfs_alloc_fix_freelist(
 	}
 	while (agf->agf_freecount < need) {
 		i = need - agf->agf_freecount;
-		agbno = xfs_alloc_ag_vextent(tp, agbuf, agno, 0, 1, i, &i, XFS_ALLOCTYPE_THIS_AG, 0);
+		agbno = xfs_alloc_ag_vextent(tp, agbuf, agno, 0, 1, i, &i,
+			XFS_ALLOCTYPE_THIS_AG, 0);
 		if (agbno == NULLAGBLOCK)
 			break;
 		for (bno = agbno + i - 1; bno >= agbno; bno--) {
@@ -833,7 +874,7 @@ xfs_alloc_log_agf(xfs_trans_t *tp, buf_t *buf, int fields)
 	};
 
 	xfs_btree_offsets(fields, offsets, XFS_AGF_NUM_BITS, &first, &last);
-	xfs_trans_log_buf(tp, buf, first, last);
+	xfs_trans_log_buf(tp, buf, (uint)first, (uint)last);
 	kmem_check();
 }
 
@@ -901,7 +942,6 @@ xfs_alloc_vextent(
 {
 	xfs_agblock_t	agbno;
 	buf_t		*agbuf;
-	xfs_agf_t	*agf;
 	xfs_agnumber_t	agno;
 	xfs_agblock_t	agsize;
 	int		flags;
@@ -933,7 +973,6 @@ xfs_alloc_vextent(
 		agno = xfs_fsb_to_agno(sbp, bno);
 		agbuf = xfs_alloc_fix_freelist(tp, agno, minlen, total, 1);
 		if (agbuf) {
-			agf = xfs_buf_to_agf(agbuf);
 			agbno = xfs_fsb_to_agbno(sbp, bno);
 			agbno = xfs_alloc_ag_vextent(tp, agbuf, agno, agbno, minlen, maxlen, len, ntype, wasdel); 
 			ASSERT(agbno != NULLAGBLOCK);
@@ -942,7 +981,7 @@ xfs_alloc_vextent(
 	case XFS_ALLOCTYPE_START_BNO:
 		agbno = xfs_fsb_to_agbno(sbp, bno);
 		ntype = XFS_ALLOCTYPE_NEAR_BNO;
-		/* fall through */
+		/* FALLTHROUGH */
 	case XFS_ALLOCTYPE_ANY_AG:
 	case XFS_ALLOCTYPE_START_AG:
 		flags = XFS_ALLOC_FLAG_TRYLOCK;
@@ -953,7 +992,6 @@ xfs_alloc_vextent(
 		for (;;) {
 			agbuf = xfs_alloc_fix_freelist(tp, tagno, minlen, total, flags);
 			if (agbuf) {
-				agf = xfs_buf_to_agf(agbuf);
 				agbno = xfs_alloc_ag_vextent(tp, agbuf, tagno, agbno, minlen, maxlen, len, ntype, wasdel); 
 				ASSERT(agbno != NULLAGBLOCK);
 				break;

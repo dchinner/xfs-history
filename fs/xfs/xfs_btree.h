@@ -2,6 +2,17 @@
 #define	_FS_XFS_BTREE_H
 
 /*
+ * This nonsense is to make -wlint happy.
+ */
+#define	XFS_LOOKUP_EQ	((xfs_lookup_t)XFS_LOOKUP_EQi)
+#define	XFS_LOOKUP_LE	((xfs_lookup_t)XFS_LOOKUP_LEi)
+#define	XFS_LOOKUP_GE	((xfs_lookup_t)XFS_LOOKUP_GEi)
+
+#define	XFS_BTNUM_BNO	((xfs_btnum_t)XFS_BTNUM_BNOi)
+#define	XFS_BTNUM_CNT	((xfs_btnum_t)XFS_BTNUM_CNTi)
+#define	XFS_BTNUM_BMAP	((xfs_btnum_t)XFS_BTNUM_BMAPi)
+
+/*
  * Short form header: space allocation btrees.
  */
 typedef struct xfs_btree_sblock
@@ -53,10 +64,10 @@ typedef struct xfs_btree_block
 /*
  * For logging record fields.
  */
-#define	XFS_BB_MAGIC		0x1
-#define	XFS_BB_LEVEL		0x2
-#define	XFS_BB_NUMRECS		0x4
-#define	XFS_BB_LEFTSIB		0x8
+#define	XFS_BB_MAGIC		0x01
+#define	XFS_BB_LEVEL		0x02
+#define	XFS_BB_NUMRECS		0x04
+#define	XFS_BB_LEFTSIB		0x08
 #define	XFS_BB_RIGHTSIB		0x10
 #define	XFS_BB_NUM_BITS		5
 #define	XFS_BB_ALL_BITS		((1 << XFS_BB_NUM_BITS) - 1)
@@ -106,14 +117,52 @@ typedef struct xfs_btree_cur
 #define	xfs_buf_to_lblock(buf)	((xfs_btree_lblock_t *)((buf)->b_un.b_addr))
 
 #ifdef XFSDEBUG
-void xfs_btree_check_block(xfs_btree_cur_t *, xfs_btree_block_t *, int);
-void xfs_btree_check_key(xfs_btnum_t, void *, void *);
-void xfs_btree_check_lblock(xfs_btree_cur_t *, xfs_btree_lblock_t *, int);
-void xfs_btree_check_lptr(xfs_btree_cur_t *, xfs_fsblock_t, int);
-void xfs_btree_check_rec(xfs_btnum_t, void *, void *);
-void xfs_btree_check_sblock(xfs_btree_cur_t *, xfs_btree_sblock_t *, int);
-void xfs_btree_check_sptr(xfs_btree_cur_t *, xfs_agblock_t, int);
-int xfs_btree_maxrecs(xfs_btree_cur_t *, xfs_btree_block_t *);
+void
+xfs_btree_check_block(
+	xfs_btree_cur_t		*cur,
+	xfs_btree_block_t	*block,
+	int			level);
+
+void
+xfs_btree_check_key(
+	xfs_btnum_t	btnum,
+	void		*ak1,
+	void		*ak2);
+
+void
+xfs_btree_check_lblock(
+	xfs_btree_cur_t		*cur,
+	xfs_btree_lblock_t	*block,
+	int			level);
+
+void
+xfs_btree_check_lptr(
+	xfs_btree_cur_t	*cur,
+	xfs_fsblock_t	ptr,
+	int		level);
+
+void
+xfs_btree_check_rec(
+	xfs_btnum_t	btnum,
+	void		*ar1,
+	void		*ar2);
+
+void
+xfs_btree_check_sblock(
+	xfs_btree_cur_t		*cur,
+	xfs_btree_sblock_t	*block,
+	int			level);
+
+void
+xfs_btree_check_sptr(
+	xfs_btree_cur_t	*cur,
+	xfs_agblock_t	ptr,
+	int		level);
+
+int
+xfs_btree_maxrecs(
+	xfs_btree_cur_t		*cur,
+	xfs_btree_block_t	*block);
 #else
 #define	xfs_btree_check_block(a,b,c)
 #define	xfs_btree_check_key(a,b,c)
@@ -124,18 +173,81 @@ int xfs_btree_maxrecs(xfs_btree_cur_t *, xfs_btree_block_t *);
 #define	xfs_btree_check_sptr(a,b,c)
 #endif
 
-buf_t *xfs_btree_read_bufl(xfs_mount_t *, xfs_trans_t *, xfs_fsblock_t, uint);
-buf_t *xfs_btree_read_bufs(xfs_mount_t *, xfs_trans_t *, xfs_agnumber_t, xfs_agblock_t, uint);
-void xfs_btree_del_cursor(xfs_btree_cur_t *);
-xfs_btree_cur_t *xfs_btree_dup_cursor(xfs_btree_cur_t *);
-int xfs_btree_firstrec(xfs_btree_cur_t *, int);
-buf_t *xfs_btree_get_bufl(xfs_mount_t *, xfs_trans_t *, xfs_fsblock_t, uint);
-buf_t *xfs_btree_get_bufs(xfs_mount_t *, xfs_trans_t *, xfs_agnumber_t, xfs_agblock_t, uint);
-xfs_btree_cur_t *xfs_btree_init_cursor(xfs_mount_t *, xfs_trans_t *, buf_t *, xfs_agnumber_t, xfs_btnum_t, struct xfs_inode *);
-int xfs_btree_islastblock(xfs_btree_cur_t *, int);
-int xfs_btree_lastrec(xfs_btree_cur_t *, int);
-void xfs_btree_offsets(int, const int *, int, int *, int *);
-void xfs_btree_setbuf(xfs_btree_cur_t *, int, buf_t *);
+buf_t *
+xfs_btree_read_bufl(
+	xfs_mount_t	*mp,
+	xfs_trans_t	*tp,
+	xfs_fsblock_t	fsbno,
+	uint		lock_flag);
+
+buf_t *
+xfs_btree_read_bufs(
+	xfs_mount_t	*mp,
+	xfs_trans_t	*tp,
+	xfs_agnumber_t	agno,
+	xfs_agblock_t	agbno,
+	uint		lock_flag);
+
+void
+xfs_btree_del_cursor(
+	xfs_btree_cur_t	*cur);
+
+xfs_btree_cur_t *
+xfs_btree_dup_cursor(
+	xfs_btree_cur_t	*cur);
+
+int
+xfs_btree_firstrec(
+	xfs_btree_cur_t	*cur,
+	int		level);
+
+buf_t *
+xfs_btree_get_bufl(
+	xfs_mount_t	*mp,
+	xfs_trans_t	*tp,
+	xfs_fsblock_t	fsbno,
+	uint		lock_flag);
+
+buf_t *
+xfs_btree_get_bufs(
+	xfs_mount_t	*mp,
+	xfs_trans_t	*tp,
+	xfs_agnumber_t	agno,
+	xfs_agblock_t	agbno,
+	uint		lock_flag);
+
+xfs_btree_cur_t *
+xfs_btree_init_cursor(
+	xfs_mount_t		*mp,
+	xfs_trans_t		*tp,
+	buf_t			*agbuf,
+	xfs_agnumber_t		agno,
+	xfs_btnum_t		btnum,
+	struct xfs_inode	*ip);
+
+int
+xfs_btree_islastblock(
+	xfs_btree_cur_t	*cur,
+	int		level);
+
+int
+xfs_btree_lastrec(
+	xfs_btree_cur_t	*cur,
+	int		level);
+
+void
+xfs_btree_offsets(
+	int		fields,
+	const int	*offsets,
+	int		nbits,
+	int		*first,
+	int		*last);
+
+void
+xfs_btree_setbuf(
+	xfs_btree_cur_t	*cur,
+	int		lev,
+	buf_t		*buf);
 
 extern __uint32_t xfs_magics[];
 

@@ -91,8 +91,8 @@ typedef struct xfs_sb
 	xfs_agb_to_fsb(s, xfs_daddr_to_agno(s,d), xfs_daddr_to_agbno(s,d))
 #define	xfs_fsb_to_daddr(s,fsbno) \
 	xfs_agb_to_daddr(s, xfs_fsb_to_agno(s,fsbno), xfs_fsb_to_agbno(s,fsbno))
-#define	xfs_btod(s,l)	((daddr_t)((l) << ((s)->sb_blocklog - BBSHIFT)))
-#define	xfs_dtobt(s,l)	((l) >> ((s)->sb_blocklog - BBSHIFT))
+#define	xfs_btod(s,l)	((daddr_t)((l) << (xfs_fsblock_t)((s)->sb_blocklog - BBSHIFT)))
+#define	xfs_dtobt(s,l)	((xfs_fsblock_t)((l) >> (daddr_t)((s)->sb_blocklog - BBSHIFT)))
 
 #define	xfs_buf_to_sbp(buf)	((xfs_sb_t *)(buf)->b_un.b_addr)
 

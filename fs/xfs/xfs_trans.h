@@ -201,11 +201,11 @@ typedef struct xfs_trans {
 /*
  * Field values for xfs_trans_mod_sb.
  */
-#define	XFS_TRANS_SB_ICOUNT		0x1
-#define	XFS_TRANS_SB_IFREE		0x2
-#define	XFS_TRANS_SB_FDBLOCKS		0x4
-#define	XFS_TRANS_SB_RES_FDBLOCKS	0x8
-#define	XFS_TRANS_SB_FREXTENTS		0x10
+#define	XFS_TRANS_SB_ICOUNT		0x00000001
+#define	XFS_TRANS_SB_IFREE		0x00000002
+#define	XFS_TRANS_SB_FDBLOCKS		0x00000004
+#define	XFS_TRANS_SB_RES_FDBLOCKS	0x00000008
+#define	XFS_TRANS_SB_FREXTENTS		0x00000010
 
 
 
