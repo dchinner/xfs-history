@@ -45,10 +45,11 @@ export-objs			:= ktrace.o
 
 obj-y				:= debug.o \
 				   kmem.o \
-				   ktrace.o \
 				   move.o \
 				   mrlock.o \
 				   qsort.o \
 				   uuid.o
+
+obj-$(CONFIG_XFS_TRACE)		+= ktrace.o
 
 include $(TOPDIR)/Rules.make
