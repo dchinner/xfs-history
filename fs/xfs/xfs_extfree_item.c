@@ -298,18 +298,22 @@ xfs_efi_item_committing(xfs_efi_log_item_t *efip, xfs_lsn_t lsn)
  * This is the ops vector shared by all efi log items.
  */
 struct xfs_item_ops xfs_efi_item_ops = {
-	(uint(*)(xfs_log_item_t*))xfs_efi_item_size,
-	(void(*)(xfs_log_item_t*, xfs_log_iovec_t*))xfs_efi_item_format,
-	(void(*)(xfs_log_item_t*))xfs_efi_item_pin,
-	(void(*)(xfs_log_item_t*))xfs_efi_item_unpin,
-	(void(*)(xfs_log_item_t*, xfs_trans_t *))xfs_efi_item_unpin_remove,
-	(uint(*)(xfs_log_item_t*))xfs_efi_item_trylock,
-	(void(*)(xfs_log_item_t*))xfs_efi_item_unlock,
-	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_efi_item_committed,
-	(void(*)(xfs_log_item_t*))xfs_efi_item_push,
-	(void(*)(xfs_log_item_t*))xfs_efi_item_abort,
-	NULL,
-	(void(*)(xfs_log_item_t*, xfs_lsn_t))xfs_efi_item_committing
+	iop_size:	(uint(*)(xfs_log_item_t*))xfs_efi_item_size,
+	iop_format:	(void(*)(xfs_log_item_t*, xfs_log_iovec_t*))
+					xfs_efi_item_format,
+	iop_pin:	(void(*)(xfs_log_item_t*))xfs_efi_item_pin,
+	iop_unpin:	(void(*)(xfs_log_item_t*))xfs_efi_item_unpin,
+	iop_unpin_remove: (void(*)(xfs_log_item_t*, xfs_trans_t *))
+					xfs_efi_item_unpin_remove,
+	iop_trylock:	(uint(*)(xfs_log_item_t*))xfs_efi_item_trylock,
+	iop_unlock:	(void(*)(xfs_log_item_t*))xfs_efi_item_unlock,
+	iop_committed:	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))
+					xfs_efi_item_committed,
+	iop_push:	(void(*)(xfs_log_item_t*))xfs_efi_item_push,
+	iop_abort:	(void(*)(xfs_log_item_t*))xfs_efi_item_abort,
+	iop_pushbuf:	NULL,
+	iop_committing:	(void(*)(xfs_log_item_t*, xfs_lsn_t))
+					xfs_efi_item_committing
 };
 
 
@@ -621,18 +625,22 @@ xfs_efd_item_committing(xfs_efd_log_item_t *efip, xfs_lsn_t lsn)
  * This is the ops vector shared by all efd log items.
  */
 struct xfs_item_ops xfs_efd_item_ops = {
-	(uint(*)(xfs_log_item_t*))xfs_efd_item_size,
-	(void(*)(xfs_log_item_t*, xfs_log_iovec_t*))xfs_efd_item_format,
-	(void(*)(xfs_log_item_t*))xfs_efd_item_pin,
-	(void(*)(xfs_log_item_t*))xfs_efd_item_unpin,
-	(void(*)(xfs_log_item_t*, xfs_trans_t*))xfs_efd_item_unpin_remove,
-	(uint(*)(xfs_log_item_t*))xfs_efd_item_trylock,
-	(void(*)(xfs_log_item_t*))xfs_efd_item_unlock,
-	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_efd_item_committed,
-	(void(*)(xfs_log_item_t*))xfs_efd_item_push,
-	(void(*)(xfs_log_item_t*))xfs_efd_item_abort,
-	NULL,
-	(void(*)(xfs_log_item_t*, xfs_lsn_t))xfs_efd_item_committing
+	iop_size:	(uint(*)(xfs_log_item_t*))xfs_efd_item_size,
+	iop_format:	(void(*)(xfs_log_item_t*, xfs_log_iovec_t*))
+					xfs_efd_item_format,
+	iop_pin:	(void(*)(xfs_log_item_t*))xfs_efd_item_pin,
+	iop_unpin:	(void(*)(xfs_log_item_t*))xfs_efd_item_unpin,
+	iop_unpin_remove: (void(*)(xfs_log_item_t*, xfs_trans_t*))
+					xfs_efd_item_unpin_remove,
+	iop_trylock:	(uint(*)(xfs_log_item_t*))xfs_efd_item_trylock,
+	iop_unlock:	(void(*)(xfs_log_item_t*))xfs_efd_item_unlock,
+	iop_committed:	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))
+					xfs_efd_item_committed,
+	iop_push:	(void(*)(xfs_log_item_t*))xfs_efd_item_push,
+	iop_abort:	(void(*)(xfs_log_item_t*))xfs_efd_item_abort,
+	iop_pushbuf:	NULL,
+	iop_committing:	(void(*)(xfs_log_item_t*, xfs_lsn_t))
+					xfs_efd_item_committing
 };
 
 

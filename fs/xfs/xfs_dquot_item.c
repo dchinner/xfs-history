@@ -430,19 +430,22 @@ xfs_qm_dquot_logitem_committing(
  * This is the ops vector for dquots
  */
 struct xfs_item_ops xfs_dquot_item_ops = {
-	(uint(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_size,
-	(void(*)(xfs_log_item_t*, xfs_log_iovec_t*))xfs_qm_dquot_logitem_format,
-	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_pin,
-	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_unpin,
-	(void(*)(xfs_log_item_t*, xfs_trans_t*))
+	iop_size:	(uint(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_size,
+	iop_format:	(void(*)(xfs_log_item_t*, xfs_log_iovec_t*))
+					xfs_qm_dquot_logitem_format,
+	iop_pin:	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_pin,
+	iop_unpin:	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_unpin,
+	iop_unpin_remove: (void(*)(xfs_log_item_t*, xfs_trans_t*))
 					xfs_qm_dquot_logitem_unpin_remove,
-	(uint(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_trylock,
-	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_unlock,
-	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_qm_dquot_logitem_committed,
-	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_push,
-	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_abort,
-	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_pushbuf,
-	(void(*)(xfs_log_item_t*, xfs_lsn_t))xfs_qm_dquot_logitem_committing
+	iop_trylock:	(uint(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_trylock,
+	iop_unlock:	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_unlock,
+	iop_committed:	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))
+					xfs_qm_dquot_logitem_committed,
+	iop_push:	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_push,
+	iop_abort:	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_abort,
+	iop_pushbuf:	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_pushbuf,
+	iop_committing:	(void(*)(xfs_log_item_t*, xfs_lsn_t))
+					xfs_qm_dquot_logitem_committing
 };
 
 /*
@@ -642,36 +645,44 @@ xfs_qm_qoffend_logitem_committing(xfs_qoff_logitem_t *qip, xfs_lsn_t commit_lsn)
 }
 
 struct xfs_item_ops xfs_qm_qoffend_logitem_ops = {
-	(uint(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_size,
-	(void(*)(xfs_log_item_t*, xfs_log_iovec_t*))xfs_qm_qoff_logitem_format,
-	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_pin,
-	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_unpin,
-	(void(*)(xfs_log_item_t*,xfs_trans_t*))xfs_qm_qoff_logitem_unpin_remove,
-	(uint(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_trylock,
-	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_unlock,
-	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_qm_qoffend_logitem_committed,
-	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_push,
-	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_abort,
-	NULL,
-	(void(*)(xfs_log_item_t*, xfs_lsn_t))xfs_qm_qoffend_logitem_committing
+	iop_size:	(uint(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_size,
+	iop_format:	(void(*)(xfs_log_item_t*, xfs_log_iovec_t*))
+					xfs_qm_qoff_logitem_format,
+	iop_pin:	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_pin,
+	iop_unpin:	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_unpin,
+	iop_unpin_remove: (void(*)(xfs_log_item_t*,xfs_trans_t*))
+					xfs_qm_qoff_logitem_unpin_remove,
+	iop_trylock:	(uint(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_trylock,
+	iop_unlock:	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_unlock,
+	iop_committed:	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))
+					xfs_qm_qoffend_logitem_committed,
+	iop_push:	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_push,
+	iop_abort:	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_abort,
+	iop_pushbuf:	NULL,
+	iop_committing:	(void(*)(xfs_log_item_t*, xfs_lsn_t))
+					xfs_qm_qoffend_logitem_committing
 };
 
 /*
  * This is the ops vector shared by all quotaoff-start log items.
  */
 struct xfs_item_ops xfs_qm_qoff_logitem_ops = {
-	(uint(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_size,
-	(void(*)(xfs_log_item_t*, xfs_log_iovec_t*))xfs_qm_qoff_logitem_format,
-	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_pin,
-	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_unpin,
-	(void(*)(xfs_log_item_t*,xfs_trans_t*))xfs_qm_qoff_logitem_unpin_remove,
-	(uint(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_trylock,
-	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_unlock,
-	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_qm_qoff_logitem_committed,
-	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_push,
-	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_abort,
-	NULL,
-	(void(*)(xfs_log_item_t*, xfs_lsn_t))xfs_qm_qoff_logitem_committing
+	iop_size:	(uint(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_size,
+	iop_format:	(void(*)(xfs_log_item_t*, xfs_log_iovec_t*))
+					xfs_qm_qoff_logitem_format,
+	iop_pin:	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_pin,
+	iop_unpin:	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_unpin,
+	iop_unpin_remove: (void(*)(xfs_log_item_t*,xfs_trans_t*))
+					xfs_qm_qoff_logitem_unpin_remove,
+	iop_trylock:	(uint(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_trylock,
+	iop_unlock:	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_unlock,
+	iop_committed:	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))
+					xfs_qm_qoff_logitem_committed,
+	iop_push:	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_push,
+	iop_abort:	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_abort,
+	iop_pushbuf:	NULL,
+	iop_committing:	(void(*)(xfs_log_item_t*, xfs_lsn_t))
+					xfs_qm_qoff_logitem_committing
 };
 
 /*
