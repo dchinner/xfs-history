@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.19 $"
+#ident	"$Revision: 1.20 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1903,14 +1903,22 @@ xfs_bmap_read_extents(xfs_mount_t *mp, xfs_trans_t *tp, xfs_inode_t *ip)
 	buf_t *buf;
 	xfs_bmbt_rec_t *frp;
 	xfs_extnum_t i;
+	xfs_bmbt_ptr_t nextbno;
 	xfs_extnum_t room;
 	xfs_bmbt_rec_t *trp;
 	xfs_sb_t *sbp;
 
 	sbp = &mp->m_sb;
 	block = ip->i_broot;
+	/*
+	 * Root level must use BMAP_BROOT_PTR_ADDR macro to get ptr out.
+	 */
 	if (block->bb_level)
 		bno = *XFS_BMAP_BROOT_PTR_ADDR(block, 1, sbp->sb_inodesize);
+	/*
+	 * Go down the tree until leaf level is reached, following the first
+	 * pointer (leftmost) at each level.
+	 */
 	while (block->bb_level) {
 		buf = xfs_btree_breadl(mp, tp, bno);
 		block = xfs_buf_to_lblock(buf);
@@ -1919,18 +1927,38 @@ xfs_bmap_read_extents(xfs_mount_t *mp, xfs_trans_t *tp, xfs_inode_t *ip)
 		bno = *XFS_BTREE_PTR_ADDR(sbp->sb_blocksize, xfs_bmbt, block, 1);
 		xfs_trans_brelse(tp, buf);
 	}
+	/*
+	 * Here with buf and block set to the leftmost leaf node in the tree.
+	 */
 	trp = ip->i_u1.iu_extents;
 	room = ip->i_bytes / sizeof(*trp);
 	i = 0;
+	/*
+	 * Loop over all leaf nodes.  Copy information to the extent list.
+	 */
 	for (;;) {
 		ASSERT(i + block->bb_numrecs <= room);
+		/*
+		 * Copy records into the extent list.
+		 */
 		frp = XFS_BTREE_REC_ADDR(sbp->sb_blocksize, xfs_bmbt, block, 1);
 		bcopy(frp, trp, block->bb_numrecs * sizeof(*frp));
 		trp += block->bb_numrecs;
 		i += block->bb_numrecs;
+		/*
+		 * Get the next leaf block's address.
+		 */
+		nextbno = block->bb_rightsib;
+		/*
+		 * bno can only be NULLFSBLOCK if the root block is also a leaf;
+		 * we could make this illegal.
+		 */
 		if (bno != NULLFSBLOCK)
 			xfs_trans_brelse(tp, buf);
-		bno = block->bb_rightsib;
+		bno = nextbno;
+		/*
+		 * If we've reached the end, stop.
+		 */
 		if (bno == NULLFSBLOCK)
 			break;
 		buf = xfs_btree_breadl(mp, tp, bno);
