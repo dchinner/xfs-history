@@ -59,35 +59,11 @@
 
 pb_hash_t	pbhash[NHASH];
 
-static kmem_cache_t *pagebuf_registration_cache = NULL;
+static kmem_cache_t *pagebuf_target_cache;
 
 /*
  *	Initialization and Termination
  */
-
-/*
- *	pagebuf_locking_init
- */
-
-int __init pagebuf_locking_init(void)
-{
-	int	i;
-
-	if (pagebuf_registration_cache == NULL) {
-		pagebuf_registration_cache = kmem_cache_create("page_buf_reg_t",
-						sizeof(pb_target_t),
-						0, 0, NULL, NULL);
-		if (pagebuf_registration_cache == NULL)
-			return(-ENOMEM);
-	}
-
-	for (i = 0; i < NHASH; i++) {
-		spin_lock_init(&pbhash[i].pb_hash_lock);
-		INIT_LIST_HEAD(&pbhash[i].pb_hash);
-	}
-
-	return(0);
-}
 
 /*
  * Hash calculation
@@ -114,20 +90,6 @@ _bhash(kdev_t d, loff_t b)
 /*
  *	Buffer Locking Control
  */
-
-/*
- *	_pagebuf_registration_free
- *
- *	Free a page_buf_registration_t object.
- */
-
-static void
-_pagebuf_registration_free(pb_target_t *target)
-{
-	if (target != NULL) {
-		kmem_cache_free(pagebuf_registration_cache, target);
-	}
-}
 
 /*
  *	_pagebuf_get_lockable_buffer
@@ -361,24 +323,14 @@ int
 pagebuf_lock_disable(			/* disable buffer locking	*/
 		     pb_target_t *target)  /* inode for buffers	        */
 {
-	destroy_buffers(target->pbr_device);
-	truncate_inode_pages(target->pbr_inode->i_mapping, 0LL);
-	_pagebuf_registration_free(target);
+	bdput(target->pbr_bdev);
+	kmem_cache_free(pagebuf_target_cache, target);
 
 	return(0);
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,13)
-static struct address_space_operations pagebuf_aops = {
-	sync_page:	block_sync_page,
-};
-#endif
-
 /*
  *	pagebuf_lock_enable
- *
- *	pagebuf_lock_enable enables buffer object locking for an inode.
- *	This call fails with -EBUSY if buffers are in use for this inode.
  */
 
 pb_target_t *
@@ -388,36 +340,20 @@ pagebuf_lock_enable(
 {
 	pb_target_t	*target;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,13)
-	struct block_device *bdev = bdget(kdev);
-
-	if (!bdev)
-		return NULL;
-#endif
-
-	target = kmem_cache_zalloc(pagebuf_registration_cache,
-						SLAB_KERNEL);
-	if (target == NULL) {
-		return(NULL);
+	target = kmem_cache_alloc(pagebuf_target_cache, SLAB_KERNEL);
+	if (target) {
+		target->pbr_bdev = bdget(kdev);
+		if (!target->pbr_bdev)
+			goto fail;
+		target->pbr_device = kdev;
+		pagebuf_target_blocksize(target, PAGE_CACHE_SIZE);
+		target->pbr_mapping = target->pbr_bdev->bd_inode->i_mapping;
 	}
-	target->pbr_device = kdev;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,13)
-	target->pbr_inode = bdev->bd_inode;
-	bdput(bdev);
-#else
-	INIT_LIST_HEAD(&target->pbr_addrspace.clean_pages);
-	INIT_LIST_HEAD(&target->pbr_addrspace.dirty_pages);
-	INIT_LIST_HEAD(&target->pbr_addrspace.locked_pages);
-	spin_lock_init(&target->pbr_addrspace.i_shared_lock);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,4)
-	/* Also needed for AC kernels */
-	spin_lock_init(&target->pbr_addrspace.page_lock);
-#endif
-	target->pbr_addrspace.a_ops = &pagebuf_aops;
-#endif
-	pagebuf_target_blocksize(target, PAGE_CACHE_SIZE);
 
 	return target;
+fail:
+	kmem_cache_free(pagebuf_target_cache, target);
+	return NULL;
 }
 
 void
@@ -434,7 +370,7 @@ pagebuf_target_clear(
 	pb_target_t	*target)
 {
 	destroy_buffers(target->pbr_device);
-	truncate_inode_pages(target->pbr_inode->i_mapping, 0LL);
+	truncate_inode_pages(PBT_ADDR_SPACE(target), 0LL);
 	return 0;
 }
 
@@ -458,6 +394,26 @@ pagebuf_unlock(                     	/* unlock buffer                */
 	PB_TRACE(pb, PB_TRACE_REC(unlock), 0);
 }
 
+/*
+ *	pagebuf_locking_init
+ */
+
+int __init pagebuf_locking_init(void)
+{
+	int i;
+
+	pagebuf_target_cache = kmem_cache_create("pb_target",
+		sizeof(pb_target_t), 0, 0, NULL, NULL);
+	if (!pagebuf_target_cache)
+		return -ENOMEM;
+
+	for (i = 0; i < NHASH; i++) {
+		spin_lock_init(&pbhash[i].pb_hash_lock);
+		INIT_LIST_HEAD(&pbhash[i].pb_hash);
+	}
+
+	return 0;
+}
 
 /*
  *	pagebuf_terminate_locking.  Do not define as __exit, it is called from
@@ -466,6 +422,6 @@ pagebuf_unlock(                     	/* unlock buffer                */
 
 void pagebuf_locking_terminate(void)
 {
-	if (pagebuf_registration_cache != NULL)
-		kmem_cache_destroy(pagebuf_registration_cache);
+	if (pagebuf_target_cache)
+		kmem_cache_destroy(pagebuf_target_cache);
 }

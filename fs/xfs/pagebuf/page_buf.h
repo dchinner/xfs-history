@@ -171,29 +171,16 @@ typedef enum page_buf_flags_e {
 #define PBF_DONE(pb) (((pb)->pb_flags & (PBF_PARTIAL|PBF_NONE)) == 0)
 
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,13)
-
 typedef struct pb_target {
 	kdev_t			pbr_device;
 	unsigned int		pbr_blocksize;
 	unsigned int 		pbr_blocksize_bits;
-	struct address_space 	*pbr_addrspace;
+	struct block_device	*pbr_bdev;
+	struct address_space	*pbr_mapping;
 } pb_target_t;
 
-#define PB_ADDR_SPACE(pb)  (&(pb)->pb_target->pbr_addrspace)
-
-#else
-
-typedef struct pb_target {
-	kdev_t			pbr_device;
-	unsigned int		pbr_blocksize;
-	unsigned int 		pbr_blocksize_bits;
-	struct inode	 	*pbr_inode;
-} pb_target_t;
-
-#define PB_ADDR_SPACE(pb)  ((pb)->pb_target->pbr_inode->i_mapping)
-
-#endif
+#define PBT_ADDR_SPACE(pbt)	((pbt)->pbr_mapping)
+#define PB_ADDR_SPACE(pb)  	PBT_ADDR_SPACE((pb)->pb_target)
 
 typedef struct page_buf_bmap_s {
 	page_buf_daddr_t pbm_bn;	/* block number in file system 	    */
@@ -205,7 +192,6 @@ typedef struct page_buf_bmap_s {
 } page_buf_bmap_t;
 
 typedef page_buf_bmap_t pb_bmap_t;
-
 
 struct page_buf_s;
 
