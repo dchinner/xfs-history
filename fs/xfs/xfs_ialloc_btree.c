@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.17 $"
+#ident	"$Revision: 1.18 $"
 
 /*
  * Inode allocation management for xFS.
@@ -1051,6 +1051,7 @@ xfs_inobt_lookup(
 				mp->m_bsize, 0);
 			ASSERT(bp && !geterror(bp));
 			xfs_btree_setbuf(cur, level, bp);
+			bp->b_ref = XFS_INO_BTREE_REF;
 		}
 		/*
 		 * Point to the btree block, now that we have the buffer.
