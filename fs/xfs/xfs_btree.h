@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BTREE_H
 #define	_FS_XFS_BTREE_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.39 $"
 
 struct buf;
 struct xfs_bmap_free;
@@ -159,7 +159,6 @@ typedef struct xfs_btree_cur
 			char		whichfork;	/* data or attr fork */
 			char		flags;		/* flags */
 #define	XFS_BTCUR_BPRV_WASDEL	1			/* was delayed */
-#define	XFS_BTCUR_BPRV_LOWSPC	2			/* in low-space mode */
 		} b;
 		struct {			/* needed for INO */
 			struct buf	*agbp;	/* agi buffer pointer */

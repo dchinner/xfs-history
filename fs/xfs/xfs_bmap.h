@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.60 $"
+#ident "$Revision: 1.61 $"
 
 struct getbmap;
 struct xfs_bmbt_irec;
@@ -25,8 +25,9 @@ typedef struct xfs_bmap_free_item
  */
 typedef	struct xfs_bmap_free
 {
-	xfs_bmap_free_item_t	*xbf_first;
-	int			xbf_count;
+	xfs_bmap_free_item_t	*xbf_first;	/* list of to-be-free extents */
+	int			xbf_count;	/* count of items on list */
+	int			xbf_low;	/* kludge: alloc in low mode */
 } xfs_bmap_free_t;
 
 #define	XFS_BMAP_MAX_NMAP	4
@@ -79,7 +80,8 @@ void xfs_bmap_init(xfs_bmap_free_t *flp, xfs_fsblock_t *fbp);
 #define	XFS_BMAP_INIT(flp,fbp)	xfs_bmap_init(flp,fbp)
 #else
 #define	XFS_BMAP_INIT(flp,fbp)	\
-	((flp)->xbf_first = NULL, (flp)->xbf_count = 0, *(fbp) = NULLFSBLOCK)
+	((flp)->xbf_first = NULL, (flp)->xbf_count = 0, \
+	 (flp)->xbf_low = 0, *(fbp) = NULLFSBLOCK)
 #endif
 
 /*

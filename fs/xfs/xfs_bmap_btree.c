@@ -1406,7 +1406,7 @@ xfs_bmbt_split(
 	if (args.fsbno == NULLFSBLOCK) {
 		args.fsbno = lbno;
 		args.type = XFS_ALLOCTYPE_START_BNO;
-	} else if (cur->bc_private.b.flags & XFS_BTCUR_BPRV_LOWSPC)
+	} else if (cur->bc_private.b.flist->xbf_low)
 		args.type = XFS_ALLOCTYPE_FIRST_AG;
 	else
 		args.type = XFS_ALLOCTYPE_NEAR_BNO;

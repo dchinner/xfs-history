@@ -121,7 +121,6 @@ xfs_bmap_add_extent(
 	xfs_bmbt_irec_t		*new,	/* new data to put in extent list */
 	xfs_fsblock_t		*first,	/* pointer to firstblock variable */
 	xfs_bmap_free_t		*flist,	/* list of extents to be freed */
-	int			lowspace, /* set if running in low space mode */
 	int			*logflagsp, /* inode logging flags */
 	int			whichfork); /* data or attr fork */
 
@@ -138,7 +137,6 @@ xfs_bmap_add_extent_delay_real(
 	xfs_filblks_t		*dnew,	/* new delayed-alloc indirect blocks */
 	xfs_fsblock_t		*first,	/* pointer to firstblock variable */
 	xfs_bmap_free_t		*flist,	/* list of extents to be freed */
-	int			lowspace,/* set if running in low space mode */
 	int			*logflagsp);/* inode logging flags */
 
 /*
@@ -250,7 +248,6 @@ xfs_bmap_extents_to_btree(
 	xfs_bmap_free_t		*flist,		/* blocks freed in xaction */
 	xfs_btree_cur_t		**curp,		/* cursor returned to caller */
 	int			wasdel,		/* converting a delayed alloc */
-	int			lowspace,	/* running in low-space mode */
 	int			*logflagsp,	/* inode logging flags */
 	int			whichfork);	/* data or attr fork */
 
@@ -458,7 +455,7 @@ xfs_bmap_add_attrfork_extents(
 
 	if (ip->i_d.di_nextents * sizeof(xfs_bmbt_rec_t) <= XFS_IFORK_DSIZE(ip))
 		return 0;
-	error = xfs_bmap_extents_to_btree(tp, ip, firstblock, flist, &cur, 0, 0,
+	error = xfs_bmap_extents_to_btree(tp, ip, firstblock, flist, &cur, 0,
 		flags, XFS_DATA_FORK);
 	if (cur) {
 		cur->bc_private.b.allocated = 0;
@@ -513,7 +510,6 @@ xfs_bmap_add_extent(
 	xfs_bmbt_irec_t		*new,	/* new data to put in extent list */
 	xfs_fsblock_t		*first,	/* pointer to firstblock variable */
 	xfs_bmap_free_t		*flist,	/* list of extents to be freed */
-	int			lowspace,/* set if running in low space mode */
 	int			*logflagsp, /* inode logging flags */
 	int			whichfork) /* data or attr fork */
 {
@@ -596,9 +592,8 @@ xfs_bmap_add_extent(
 			if (cur)
 				ASSERT(cur->bc_private.b.flags &
 					XFS_BTCUR_BPRV_WASDEL);
-			error = xfs_bmap_add_extent_delay_real(ip, idx,
-					&cur, new, &da_new, first, flist,
-					lowspace, &logflags);
+			error = xfs_bmap_add_extent_delay_real(ip, idx, &cur,
+				new, &da_new, first, flist, &logflags);
 			if (error) {
 				return error;
 			}
@@ -625,9 +620,8 @@ xfs_bmap_add_extent(
 	if (XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_EXTENTS &&
 	    XFS_IFORK_NEXTENTS(ip, whichfork) > ifp->if_ext_max) {
 		ASSERT(cur == NULL);
-		error = xfs_bmap_extents_to_btree(ip->i_transp, ip,
-				first, flist, &cur, da_old > 0, lowspace,
-				&tmp_logflags, whichfork);
+		error = xfs_bmap_extents_to_btree(ip->i_transp, ip, first,
+			flist, &cur, da_old > 0, &tmp_logflags, whichfork);
 		if (error) {
 			return error;
 		}
@@ -671,7 +665,6 @@ xfs_bmap_add_extent_delay_real(
 	xfs_filblks_t		*dnew,	/* new delayed-alloc indirect blocks */
 	xfs_fsblock_t		*first,	/* pointer to firstblock variable */
 	xfs_bmap_free_t		*flist,	/* list of extents to be freed */
-	int			lowspace,/* set if running in low space mode */
 	int			*logflagsp) /* inode logging flags */
 {
 	xfs_bmbt_rec_t		*base;	/* base of extent entry list */
@@ -978,7 +971,7 @@ xfs_bmap_add_extent_delay_real(
 		if (ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS &&
 		    ip->i_d.di_nextents > ip->i_df.if_ext_max) {
 			error = xfs_bmap_extents_to_btree(ip->i_transp, ip,
-				first, flist, &cur, 1, lowspace, &tmp_rval,
+				first, flist, &cur, 1, &tmp_rval,
 				XFS_DATA_FORK);
 			if (error) {
 				return error;
@@ -1065,7 +1058,7 @@ xfs_bmap_add_extent_delay_real(
 		if (ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS &&
 		    ip->i_d.di_nextents > ip->i_df.if_ext_max) {
 			error = xfs_bmap_extents_to_btree(ip->i_transp, ip,
-				first, flist, &cur, 1, lowspace, &tmp_rval,
+				first, flist, &cur, 1, &tmp_rval,
 				XFS_DATA_FORK);
 			rval |= tmp_rval;
 			if (error) {
@@ -1117,7 +1110,7 @@ xfs_bmap_add_extent_delay_real(
 		if (ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS &&
 		    ip->i_d.di_nextents > ip->i_df.if_ext_max) {
 			error = xfs_bmap_extents_to_btree(ip->i_transp, ip,
-				first, flist, &cur, 1, lowspace, &tmp_rval,
+				first, flist, &cur, 1, &tmp_rval,
 				XFS_DATA_FORK);
 			if (error) {
 				return error;
@@ -2342,7 +2335,6 @@ xfs_bmap_extents_to_btree(
 	xfs_bmap_free_t		*flist,		/* blocks freed in xaction */
 	xfs_btree_cur_t		**curp,		/* cursor returned to caller */
 	int			wasdel,		/* converting a delayed alloc */
-	int			lowspace,	/* running in low-space mode */
 	int			*logflagsp,	/* inode logging flags */
 	int			whichfork)	/* data or attr fork */
 {
@@ -2386,9 +2378,7 @@ xfs_bmap_extents_to_btree(
 		whichfork);
 	cur->bc_private.b.firstblock = *firstblock;
 	cur->bc_private.b.flist = flist;
-	cur->bc_private.b.flags =
-		(wasdel ? XFS_BTCUR_BPRV_WASDEL : 0) |
-		(lowspace ? XFS_BTCUR_BPRV_LOWSPC : 0);
+	cur->bc_private.b.flags = wasdel ? XFS_BTCUR_BPRV_WASDEL : 0;
 	/*
 	 * Convert to a btree with two levels, one record in root.
 	 */
@@ -2398,7 +2388,7 @@ xfs_bmap_extents_to_btree(
 	if (*firstblock == NULLFSBLOCK) {
 		args.type = XFS_ALLOCTYPE_START_BNO;
 		args.fsbno = XFS_INO_TO_FSB(mp, ip->i_ino);
-	} else if (lowspace) {
+	} else if (flist->xbf_low) {
 		args.type = XFS_ALLOCTYPE_START_BNO;
 		args.fsbno = *firstblock;
 	} else {
@@ -2418,7 +2408,8 @@ xfs_bmap_extents_to_btree(
 	ASSERT(args.fsbno != NULLFSBLOCK);
 	ASSERT(*firstblock == NULLFSBLOCK ||
 	       args.agno == XFS_FSB_TO_AGNO(mp, *firstblock) ||
-	       (lowspace && args.agno > XFS_FSB_TO_AGNO(mp, *firstblock)));
+	       (flist->xbf_low &&
+	        args.agno > XFS_FSB_TO_AGNO(mp, *firstblock)));
 	*firstblock = cur->bc_private.b.firstblock = args.fsbno;
 	cur->bc_private.b.allocated++;
 	ip->i_d.di_nblocks++;
@@ -3568,7 +3559,6 @@ xfs_bmapi(
 	char		inhole;		/* current location is hole in file */
 	xfs_extnum_t	lastx;		/* last useful extent number */
 	int		logflags;	/* flags for transaction logging */
-	char		lowspace;	/* using the low-space algorithm */
 	xfs_extlen_t	minleft;	/* min blocks left after allocation */
 	xfs_extlen_t	minlen;		/* min allocation size */
 	int		n;		/* current extent index */
@@ -3616,7 +3606,6 @@ xfs_bmapi(
 	exact = (flags & XFS_BMAPI_EXACT) != 0;
 	ASSERT(wr || !delay);
 	logflags = 0;
-	lowspace = 0;
 	nallocs = 0;
 	if (XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_LOCAL) {
 		ASSERT(wr && tp);
@@ -3741,7 +3730,7 @@ xfs_bmapi(
 				bma.off = aoff;
 				bma.wasdel = wasdelay;
 				bma.minlen = minlen;
-				bma.low = lowspace;
+				bma.low = flist->xbf_low;
 				bma.minleft = minleft;
 				/*
 				 * Call allocator.
@@ -3763,7 +3752,7 @@ xfs_bmapi(
 				 * Copy out result fields.
 				 */
 				abno = bma.rval;
-				if (lowspace = bma.low)
+				if (flist->xbf_low = bma.low)
 					minleft = 0;
 				alen = bma.alen;
 				ASSERT(*firstblock == NULLFSBLOCK ||
@@ -3771,7 +3760,7 @@ xfs_bmapi(
 					       *firstblock) ==
 				       XFS_FSB_TO_AGNO(ip->i_mount,
 					       bma.firstblock) ||
-				       (lowspace &&
+				       (flist->xbf_low &&
 				        XFS_FSB_TO_AGNO(ip->i_mount,
 						*firstblock) <
 					XFS_FSB_TO_AGNO(ip->i_mount,
@@ -3799,14 +3788,12 @@ xfs_bmapi(
 			}
 			if (cur)
 				cur->bc_private.b.flags =
-					(wasdelay ? XFS_BTCUR_BPRV_WASDEL : 0) |
-					(lowspace ? XFS_BTCUR_BPRV_LOWSPC : 0);
+					wasdelay ? XFS_BTCUR_BPRV_WASDEL : 0;
 			got.br_startoff = aoff;
 			got.br_startblock = abno;
 			got.br_blockcount = alen;
 			error = xfs_bmap_add_extent(ip, lastx, &cur, &got,
-				firstblock, flist, lowspace, &tmp_logflags,
-				whichfork);
+				firstblock, flist, &tmp_logflags, whichfork);
 			if (error) {
 				/*
 				 * XXXajs
@@ -3972,7 +3959,7 @@ xfs_bmapi(
 		       XFS_FSB_TO_AGNO(ip->i_mount, *firstblock) ==
 		       XFS_FSB_TO_AGNO(ip->i_mount,
 			       cur->bc_private.b.firstblock) ||
-		       (lowspace &&
+		       (flist->xbf_low &&
 			XFS_FSB_TO_AGNO(ip->i_mount, *firstblock) < 
 			XFS_FSB_TO_AGNO(ip->i_mount,
 				cur->bc_private.b.firstblock)));
@@ -4224,8 +4211,8 @@ xfs_bunmapi(
 	 */
 	if (XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_EXTENTS &&
 	    XFS_IFORK_NEXTENTS(ip, whichfork) > ifp->if_ext_max) {
-		error = xfs_bmap_extents_to_btree(tp, ip, firstblock,
-				flist, &cur, 0, 0, &tmp_logflags, whichfork);
+		error = xfs_bmap_extents_to_btree(tp, ip, firstblock, flist,
+			&cur, 0, &tmp_logflags, whichfork);
 		if (error) {
 			/*
 			 * XXXajs
