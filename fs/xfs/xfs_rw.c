@@ -2160,13 +2160,12 @@ xfs_start_daemons(void)
 	int	num_pages;
 
 	num_daemons = 4;
-	do {
-		num_pages = (int)physmem - 32768;
-		if ((num_pages > 0) && (num_daemons < 13)) {
-			num_daemons++;
-		}
-	} while (num_pages > 0);
-	ASSERT(num_daemons < 13);
+	num_pages = (int)physmem - 32768;
+	while ((num_pages > 0) && (num_daemons < 13)) {
+		num_pages -= 32768;
+		num_daemons++;
+	}
+	ASSERT(num_daemons <= 13);
 
 	for (i = 0; i < num_daemons; i++) {
 		if (newproc(NP_SYSPROC, 0)) {
