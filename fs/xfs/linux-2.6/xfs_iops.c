@@ -885,24 +885,33 @@ int linvfs_bmap(struct address_space *mapping, long block)
 	xfs_bmbt_irec_t mval;
 	int error, nmaps = 1;
 	xfs_fsblock_t output;
-	long xfsblock;
+	xfs_fsblock_t firstblock;
+	xfs_fileoff_t xfsblock;
 	xfs_mount_t *mp;
 
 	vnode_t *vp = LINVFS_GET_VP(inode);
-	xfs_inode_t *xfs_inode;
+	xfs_inode_t *ip;
 
 	ASSERT(vp);
 
 	vn_trace_entry(vp, "linvfs_bmap", (inst_t *)__return_address);
 
-	xfs_inode = XFS_BHVTOI(vp->v_fbhv);
-	mp = xfs_inode->i_mount;
+	ip = XFS_BHVTOI(vp->v_fbhv);
+	mp = ip->i_mount;
+
+	/* If we want to report disk addresses then make sure we
+	 * have allocated disk addresses!
+	 */
+	if (ip->i_delayed_blks) {
+		VOP_FLUSH_PAGES(vp, (xfs_off_t)0, 0, FI_REMAPF, error);
+	}
 
 	/* The blockno passed is in terms of basic blocks */
 	xfsblock = XFS_BB_TO_FSBT(mp, block);
 
-	error = xfs_bmapi(NULL, xfs_inode, xfsblock, 1, 0, NULL, 0, &mval,
-			  &nmaps, NULL);
+	firstblock = NULLFSBLOCK;
+	error = xfs_bmapi(NULL, ip, xfsblock, (xfs_filblks_t)1,
+			XFS_BMAPI_IGSTATE, &firstblock, 0, &mval, &nmaps, NULL);
 
 	if (error) {
 		printk("error (%d)!\n", error);
@@ -912,8 +921,13 @@ int linvfs_bmap(struct address_space *mapping, long block)
 	if (mval.br_startblock == HOLESTARTBLOCK) {
 		return -1;
 	} else {
-		output = XFS_FSB_TO_DB(xfs_inode, mval.br_startblock) +
-			 XFS_BB_FSB_OFFSET(mp, block);
+		output = XFS_FSB_TO_DB(ip, mval.br_startblock) + block -
+			 XFS_FSB_TO_BB(mp, mval.br_startoff);
+
+		/* For when XFS really does use something other than 512 here 
+		output <<= inode->i_sb->i_blocksize_bits  - 9;
+		*/
+
 		return (int)output;
 	}
 }
