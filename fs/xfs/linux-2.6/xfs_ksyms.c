@@ -228,7 +228,9 @@ EXPORT_SYMBOL(pagebuf_delwri_dequeue);
 EXPORT_SYMBOL(_pagebuf_find);
 EXPORT_SYMBOL(pagebuf_iostart);
 EXPORT_SYMBOL(pagebuf_ispin);
+#ifdef DEBUG
 EXPORT_SYMBOL(pagebuf_lock_value);
+#endif
 EXPORT_SYMBOL(pagebuf_offset);
 EXPORT_SYMBOL(pagebuf_rele);
 EXPORT_SYMBOL(pagebuf_readahead);
