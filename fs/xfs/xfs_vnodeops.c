@@ -521,7 +521,7 @@ xfs_setattr(vnode_t	*vp,
 		commit_flags = 0;
 
 	} else {
-		if (DM_EVENT_ENABLED (ip, DM_TRUNCATE)) {
+		if (DM_EVENT_ENABLED (vp->v_vfsp, ip, DM_TRUNCATE)) {
 			code = dm_data_event (vp, DM_TRUNCATE, vap->va_size, 0);
 			if (code)
 				return code;
@@ -811,7 +811,7 @@ xfs_setattr(vnode_t	*vp,
 		xfs_iunlock (ip, lock_flags);
 	}
 
-	if (DM_EVENT_ENABLED(ip, DM_ATTRIBUTE)) {
+	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_ATTRIBUTE)) {
 		(void) dm_namesp_event (DM_ATTRIBUTE, vp, NULL, NULL, NULL,
 			0, 0);
 	}
@@ -1051,7 +1051,8 @@ xfs_inactive(vnode_t	*vp,
 		    ((ip->i_d.di_size != 0) || (ip->i_d.di_nextents > 0)) &&
 		    ((ip->i_d.di_mode & IFMT) == IFREG));
 
-	if (ip->i_d.di_nlink == 0 && DM_EVENT_ENABLED(ip, DM_DESTROY)) {
+	if (ip->i_d.di_nlink == 0 &&
+			DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_DESTROY)) {
 		(void) dm_namesp_event(DM_DESTROY, vp, NULL, NULL, NULL, 0, 0);
 	}
 
@@ -1843,7 +1844,7 @@ try_again:
 
         *vpp = vp;
 
-	if (DM_EVENT_ENABLED(dp, DM_POSTCREATE)) {
+	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_POSTCREATE)) {
 		(void) dm_namesp_event(DM_POSTCREATE, dir_vp, vp, name, NULL,
 			ip->i_d.di_mode, 0);
 	}
@@ -1857,7 +1858,7 @@ error_return:
 	if (!dp_joined_to_trans && (dp != NULL))
 		xfs_iunlock(dp, XFS_ILOCK_EXCL);
 	ASSERT(!truncated);
-	if (DM_EVENT_ENABLED(dp, DM_POSTCREATE)) {
+	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_POSTCREATE)) {
 		(void) dm_namesp_event(DM_POSTCREATE, dir_vp, vp, name, NULL,
 			ip->i_d.di_mode, error);
 	}
@@ -2232,7 +2233,7 @@ xfs_remove(vnode_t	*dir_vp,
 	vn_trace_entry(dir_vp, "xfs_remove");
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
 
-	if (DM_EVENT_ENABLED (XFS_VTOI (dir_vp), DM_REMOVE)) {
+	if (DM_EVENT_ENABLED (dir_vp->v_vfsp, XFS_VTOI (dir_vp), DM_REMOVE)) {
 		error = dm_namesp_event (DM_REMOVE, dir_vp, NULL,
 			name, NULL, 0, 0);
 		if (error)
@@ -2365,7 +2366,7 @@ xfs_remove(vnode_t	*dir_vp,
 
 	xfs_trans_commit (tp, XFS_TRANS_RELEASE_LOG_RES);
 
-	if (DM_EVENT_ENABLED (dp, DM_POSTREMOVE)) {
+	if (DM_EVENT_ENABLED (dir_vp->v_vfsp, dp, DM_POSTREMOVE)) {
 		(void) dm_namesp_event (DM_POSTREMOVE, dir_vp, NULL,
 			name, NULL, ip->i_d.di_mode, 0);
 	}
@@ -2375,7 +2376,7 @@ xfs_remove(vnode_t	*dir_vp,
 
 error_return:
 	xfs_trans_cancel(tp, cancel_flags);
-	if (DM_EVENT_ENABLED (dp, DM_POSTREMOVE)) {
+	if (DM_EVENT_ENABLED (dir_vp->v_vfsp, dp, DM_POSTREMOVE)) {
 		(void) dm_namesp_event (DM_POSTREMOVE, dir_vp, NULL,
 			name, NULL, ip->i_d.di_mode, error);
 	}
@@ -2723,8 +2724,8 @@ xfs_rename(vnode_t	*src_dir_vp,
 	vn_trace_entry(src_dir_vp, "xfs_rename");
 	vn_trace_entry(target_dir_vp, "xfs_rename");
 
-	if (DM_EVENT_ENABLED(XFS_VTOI(src_dir_vp), DM_RENAME) ||
-	    DM_EVENT_ENABLED(XFS_VTOI(target_dir_vp), DM_RENAME)) {
+	if (DM_EVENT_ENABLED( src_dir_vp->v_vfsp, XFS_VTOI(src_dir_vp), DM_RENAME) ||
+	    DM_EVENT_ENABLED( target_dir_vp->v_vfsp, XFS_VTOI(target_dir_vp), DM_RENAME)) {
 		error = dm_namesp_event (DM_RENAME, src_dir_vp, target_dir_vp,
 			src_name, target_name, 0, 0);
 		if (error)
@@ -3068,8 +3069,8 @@ start_over:
 		IRELE(target_ip);
 	}
 
-	if (DM_EVENT_ENABLED(XFS_VTOI(src_dir_vp), DM_POSTRENAME) ||
-	    DM_EVENT_ENABLED(XFS_VTOI(target_dir_vp), DM_POSTRENAME)) {
+	if (DM_EVENT_ENABLED(src_dir_vp->v_vfsp, XFS_VTOI(src_dir_vp), DM_POSTRENAME) ||
+	    DM_EVENT_ENABLED(target_dir_vp->v_vfsp, XFS_VTOI(target_dir_vp), DM_POSTRENAME)) {
 		(void) dm_namesp_event (DM_POSTRENAME, src_dir_vp,
 			target_dir_vp, src_name, target_name, 0, 0);
 	}
@@ -3079,8 +3080,8 @@ start_over:
 error_return:
 
 	xfs_trans_cancel(tp, cancel_flags);
-	if (DM_EVENT_ENABLED(XFS_VTOI(src_dir_vp), DM_POSTRENAME) ||
-	    DM_EVENT_ENABLED(XFS_VTOI(target_dir_vp), DM_POSTRENAME)) {
+	if (DM_EVENT_ENABLED(src_dir_vp->v_vfsp, XFS_VTOI(src_dir_vp), DM_POSTRENAME) ||
+	    DM_EVENT_ENABLED(target_dir_vp->v_vfsp, XFS_VTOI(target_dir_vp), DM_POSTRENAME)) {
 		(void) dm_namesp_event (DM_POSTRENAME, src_dir_vp,
 			target_dir_vp, src_name, target_name, 0, error);
 	}
