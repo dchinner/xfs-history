@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.189 $"
+#ident	"$Revision: 1.190 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -4309,7 +4309,7 @@ xfs_getbmap(
 			 */
 			remapf(vp, 0, 1);
 		}
-		pflushvp(vp, (off_t)last_byte, 0);
+		pflushvp(vp, (off_t)0, (off_t)last_byte, 0);
 	}
 	ASSERT(whichfork == XFS_ATTR_FORK || ip->i_delayed_blks == 0);
 	lock = xfs_ilock_map_shared(ip);
