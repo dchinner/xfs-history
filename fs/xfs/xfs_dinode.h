@@ -1,17 +1,19 @@
 #ifndef _FS_XFS_DINODE_H
 #define	_FS_XFS_DINODE_H
 
-#ident "$Revision: 1.38 $"
+#ident "$Revision$"
 
 struct buf;
 struct xfs_mount;
 
-#define	XFS_DINODE_VERSION	1
+#define	XFS_DINODE_VERSION_1	1
+#define	XFS_DINODE_VERSION_2	2
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DINODE_GOOD_VERSION)
 int xfs_dinode_good_version(int v);
 #define XFS_DINODE_GOOD_VERSION(v)	xfs_dinode_good_version(v)
 #else
-#define XFS_DINODE_GOOD_VERSION(v)	((v) == XFS_DINODE_VERSION)
+#define XFS_DINODE_GOOD_VERSION(v)	(((v) == XFS_DINODE_VERSION_1) || \
+					 ((v) == XFS_DINODE_VERSION_2))
 #endif
 #define	XFS_DINODE_MAGIC	0x494e	/* 'IN' */
 
@@ -36,10 +38,12 @@ typedef struct xfs_dinode_core
 	__uint16_t	di_mode;	/* mode and type of file */
 	__int8_t	di_version;	/* inode version */
 	__int8_t	di_format;	/* format of di_c data */
-	__uint16_t	di_nlink;	/* number of links to file */
+	__uint16_t	di_onlink;	/* old number of links to file */
 	__uint32_t	di_uid;		/* owner's user id */
 	__uint32_t	di_gid;		/* owner's group id */
-	uuid_t		di_uuid;	/* file unique id */
+	__uint32_t	di_nlink;	/* number of links to file */
+	__uint16_t	di_projid;	/* owner's project id */
+	__uint8_t	di_pad[10];	/* unused, zeroed space */
 	xfs_timestamp_t	di_atime;	/* time last accessed */
 	xfs_timestamp_t	di_mtime;	/* time last modified */
 	xfs_timestamp_t	di_ctime;	/* time created/inode modified */
@@ -81,7 +85,13 @@ typedef struct xfs_dinode
 	}		di_a;
 } xfs_dinode_t;
 
-#define	XFS_MAXLINK		MAXLINK		/* for now, 30000 */
+/*
+ * The 32 bit link count in the inode theoretically maxes out at UINT_MAX.
+ * We stop at UINT_MAX - 2 just to be safe.  The old inode format had a
+ * 16 bit link count, so its maximum is USHRT_MAX.
+ */
+#define	XFS_MAXLINK		(4294967295U - 2)
+#define	XFS_MAXLINK_1		65535U
 
 /*
  * Bit names for logging disk inodes only
@@ -90,28 +100,30 @@ typedef struct xfs_dinode
 #define	XFS_DI_MODE		0x0000002
 #define	XFS_DI_VERSION		0x0000004
 #define	XFS_DI_FORMAT		0x0000008
-#define	XFS_DI_NLINK		0x0000010
+#define	XFS_DI_ONLINK		0x0000010
 #define	XFS_DI_UID		0x0000020
 #define	XFS_DI_GID		0x0000040
-#define	XFS_DI_UUID		0x0000080
-#define	XFS_DI_ATIME		0x0000100
-#define	XFS_DI_MTIME		0x0000200
-#define	XFS_DI_CTIME		0x0000400
-#define	XFS_DI_SIZE		0x0000800
-#define	XFS_DI_NBLOCKS		0x0001000
-#define	XFS_DI_EXTSIZE		0x0002000
-#define	XFS_DI_NEXTENTS		0x0004000
-#define	XFS_DI_NAEXTENTS	0x0008000
-#define	XFS_DI_FORKOFF		0x0010000
-#define	XFS_DI_AFORMAT		0x0020000
-#define	XFS_DI_DMEVMASK		0x0040000
-#define	XFS_DI_DMSTATE		0x0080000
-#define	XFS_DI_FLAGS		0x0100000
-#define	XFS_DI_GEN		0x0200000
-#define	XFS_DI_NEXT_UNLINKED	0x0400000
-#define	XFS_DI_U		0x0800000
-#define	XFS_DI_A		0x1000000
-#define	XFS_DI_NUM_BITS		25
+#define	XFS_DI_NLINK		0x0000080
+#define	XFS_DI_PROJID		0x0000100
+#define	XFS_DI_PAD		0x0000200
+#define	XFS_DI_ATIME		0x0000400
+#define	XFS_DI_MTIME		0x0000800
+#define	XFS_DI_CTIME		0x0001000
+#define	XFS_DI_SIZE		0x0002000
+#define	XFS_DI_NBLOCKS		0x0004000
+#define	XFS_DI_EXTSIZE		0x0008000
+#define	XFS_DI_NEXTENTS		0x0010000
+#define	XFS_DI_NAEXTENTS	0x0020000
+#define	XFS_DI_FORKOFF		0x0040000
+#define	XFS_DI_AFORMAT		0x0080000
+#define	XFS_DI_DMEVMASK		0x0100000
+#define	XFS_DI_DMSTATE		0x0200000
+#define	XFS_DI_FLAGS		0x0400000
+#define	XFS_DI_GEN		0x0800000
+#define	XFS_DI_NEXT_UNLINKED	0x1000000
+#define	XFS_DI_U		0x2000000
+#define	XFS_DI_A		0x4000000
+#define	XFS_DI_NUM_BITS		27
 #define	XFS_DI_ALL_BITS		((1 << XFS_DI_NUM_BITS) - 1)
 #define	XFS_DI_CORE_BITS	(XFS_DI_ALL_BITS & ~(XFS_DI_U|XFS_DI_A))
 
