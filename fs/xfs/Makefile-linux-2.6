@@ -98,7 +98,7 @@ else
 XFS_GRIO_OBJS=
 endif
 ifeq ($(CONFIG_XFS_DMAPI),y)
-XFS_DMAPI_OBJS=dmapi/dmapi.o
+XFS_DMAPI_OBJS=dmapi/dmapi.o xfs_dmapi.o
 else
 XFS_DMAPI_OBJS=xfsdmapistubs.o
 endif
