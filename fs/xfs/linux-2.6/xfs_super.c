@@ -98,7 +98,6 @@ int spectodevs(
 	dev_t	*logdevp,
 	dev_t	*rtdevp)
 {
-#if 1
         *ddevp = sb->s_dev;
         if (args->logdev)
                 *logdevp = args->logdev;
@@ -108,11 +107,6 @@ int spectodevs(
                 *rtdevp = args->rtdev;
         else
                 *rtdevp = 0;
-#else
-	*ddevp = *logdevp = makedev(MAJOR(sb->s_dev), MINOR(sb->s_dev));
-	*rtdevp = 0;
-	printk("xfs: ddev=%d, logdev=%d\n", *ddevp, *logdevp);
-#endif
 	return 0;
 }
 

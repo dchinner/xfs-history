@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.123 $"
+#ident "$Revision: 1.124 $"
 
 #include <xfs_os_defs.h>
 #include <linux/stat.h>
@@ -185,8 +185,7 @@ xfs_iget_vnode_init(
 	vp->v_vfsp  = XFS_MTOVFS(mp);
 	vp->v_inode = LINVFS_GET_IP(vp);
 	vp->v_type  = IFTOVT(ip->i_d.di_mode);
-	vp->v_rdev  = MKDEV(emajor(ip->i_df.if_u2.if_rdev),
-			    eminor(ip->i_df.if_u2.if_rdev) );
+	vp->v_rdev  = IRIX_DEV_TO_KDEVT(ip->i_df.if_u2.if_rdev);
 #endif	/* !SIM */
 }
 
@@ -279,10 +278,8 @@ again:
 
 					xfs_iget_vnode_init(mp, vp, ip);
 				} else {
-					dev = MKDEV(emajor(ip->i_df.if_u2.
-								if_rdev),
-						    eminor(ip->i_df.if_u2.
-								if_rdev));
+					dev = IRIX_DEV_TO_KDEVT(
+                                                ip->i_df.if_u2.if_rdev);
 
 					mrunlock(&ih->ih_lock);
 					vp = vn_alloc(XFS_MTOVFS(mp), ino,
@@ -428,8 +425,7 @@ finish_inode:
 
 		xfs_iget_vnode_init(mp, vp, ip);
 	} else {
-		dev = MKDEV(emajor(ip->i_df.if_u2.if_rdev),
-			    eminor(ip->i_df.if_u2.if_rdev));
+		dev = IRIX_DEV_TO_KDEVT(ip->i_df.if_u2.if_rdev);
 
 		vp = vn_alloc(XFS_MTOVFS(mp), ino,
 					IFTOVT(ip->i_d.di_mode), dev);

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.465 $"
+#ident "$Revision: 1.466 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -447,8 +447,7 @@ xfs_getattr(
                                 (mp->m_sb.sb_rextsize << mp->m_sb.sb_blocklog);
 		}
 	} else {
-                vap->va_rdev = MKDEV(emajor(ip->i_df.if_u2.if_rdev),
-				     eminor(ip->i_df.if_u2.if_rdev));
+                vap->va_rdev = IRIX_DEV_TO_KDEVT(ip->i_df.if_u2.if_rdev);
                 vap->va_blksize = BLKDEV_IOSIZE;
 	}
 

@@ -32,7 +32,7 @@
 #ifndef __XFS_TYPES_H
 #define	__XFS_TYPES_H
 
-#ident	"$Revision: 1.42 $"
+#ident	"$Revision: 1.43 $"
 
 /*
  * XFS types
@@ -278,5 +278,18 @@ struct xfsstats {
 # define XFS_STATS64_INC(count)
 # define XFS_STATS64_ADD(count, inc)
 #endif	/* !CONFIG_PROC_FS */
+
+#define IRIX_DEV_BITSMAJOR      14
+#define IRIX_DEV_BITSMINOR      18 
+#define IRIX_DEV_MAXMAJ         0x1ff 
+#define IRIX_DEV_MAXMIN         0x3ffff
+#define IRIX_DEV_MAJOR(dev)     ((int)(((unsigned)(dev)>>IRIX_DEV_BITSMINOR) \
+                                    & IRIX_DEV_MAXMAJ))
+#define IRIX_DEV_MINOR(dev)     ((int)((dev)&IRIX_DEV_MAXMIN))
+#define IRIX_MKDEV(major,minor) ((xfs_dev_t)(((major)<<IRIX_DEV_BITSMINOR) \
+                                    | (minor&IRIX_DEV_MAXMIN)))
+                                    
+#define IRIX_DEV_TO_KDEVT(dev)  MKDEV(IRIX_DEV_MAJOR(dev),IRIX_DEV_MINOR(dev))
+#define IRIX_DEV_TO_DEVT(dev)   ((IRIX_DEV_MAJOR(dev)<<8)|IRIX_DEV_MINOR(dev))
 
 #endif	/* !__XFS_TYPES_H */

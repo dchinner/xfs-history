@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.295 $"
+#ident "$Revision: 1.296 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -1194,7 +1194,7 @@ xfs_ialloc(
 	case IFBLK:
 	case IFSOCK:
 		ip->i_d.di_format = XFS_DINODE_FMT_DEV;
-		ip->i_df.if_u2.if_rdev = makedev(MAJOR(rdev), MINOR(rdev));
+		ip->i_df.if_u2.if_rdev = IRIX_MKDEV(MAJOR(rdev), MINOR(rdev));
 		ip->i_df.if_flags = 0;
 		flags |= XFS_ILOG_DEV;
 		break;

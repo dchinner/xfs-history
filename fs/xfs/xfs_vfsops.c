@@ -31,7 +31,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident  "$Revision: 1.279 $"
+#ident  "$Revision: 1.280 $"
 
 #include <xfs_os_defs.h>
 
@@ -1043,26 +1043,10 @@ xfs_mountroot(
 	if (error) {
 		goto bad;
 	}
-
-#if 0
-	if (emajor(rootdev) == XLV_MAJOR) {
-		/*
-		 * logical volume
-		 */
-		if (xlv_get_subvolumes(rootdev, &ddev, &logdev, &rtdev) != 0) {
-			return XFS_ERROR(ENXIO);
-		}
-	} else {
-		/*
-		 * block device
-		 */
-		ddev = logdev = rootdev;
-		rtdev = 0;
-	}
-#else
+        
 	ddev = logdev = rootdev;
 	rtdev = 0;
-#endif
+        
 	ASSERT(ddev && logdev);
 
 	error = xfs_cmountfs(vfsp, ddev, logdev, rtdev, why, NULL, NULL, cr);

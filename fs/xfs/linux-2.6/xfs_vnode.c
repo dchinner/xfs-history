@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.34 $"
+#ident	"$Revision: 1.35 $"
 
 #include <xfs_os_defs.h>
 
@@ -315,8 +315,7 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 		vp->v_vfsp  = vfsp;
 		vp->v_inode = inode;
 		vp->v_type  = IFTOVT(ip->i_d.di_mode);
-		vp->v_rdev  = MKDEV(emajor(ip->i_df.if_u2.if_rdev),
-				    eminor(ip->i_df.if_u2.if_rdev));
+		vp->v_rdev  = IRIX_DEV_TO_KDEVT(ip->i_df.if_u2.if_rdev);
 
 		linvfs_set_inode_ops(inode);
 	}
