@@ -1,4 +1,4 @@
-#ident "$Revision: 1.206 $"
+#ident "$Revision: 1.207 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -90,6 +90,11 @@ int uiodbg_writeiolog[XFS_UIO_MAX_WRITEIO_LOG - XFS_UIO_MIN_WRITEIO_LOG + 1] =
 		{0, 0, 0, 0};
 int uiodbg_switch = 0;
 #endif
+
+/*
+ * XXXrcc - temporary until I get a tunable in
+ */
+#define XFS_NFS_IO_UNITS	10
 
 /*
  * This lock is used by xfs_strat_write().
@@ -771,7 +776,7 @@ xfs_iomap_read(
 		 * The I/O size for the file has not yet been
 		 * determined, so figure it out.
 		 */
-		if (XFS_B_TO_FSB(mp, count) <= mp->m_readio_blocks) {
+		if (XFS_B_TO_FSB(mp, count) <= ip->i_readio_blocks) {
 			/*
 			 * The request is smaller than our
 			 * minimum I/O size, so default to
@@ -1293,32 +1298,32 @@ xfs_read(
 		 * smallest value.  Silently ignore requests that aren't
 		 * within valid I/O size limits.
 		 */
+		mp = ip->i_mount;
+
 		if ((ioflag & IO_UIOSZ) &&
 		    uiop->uio_readiolog != ip->i_readio_log &&
-		    uiop->uio_readiolog >= ip->i_mount->m_sb.sb_blocklog &&
+		    uiop->uio_readiolog >= mp->m_sb.sb_blocklog &&
 		    uiop->uio_readiolog >= XFS_UIO_MIN_READIO_LOG &&
 		    uiop->uio_readiolog <= XFS_UIO_MAX_READIO_LOG) {
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
-#if defined(DEBUG) && !defined(UIOSZ_DEBUG)
 			if (!(ip->i_flags & XFS_IUIOSZ) ||
 			    uiop->uio_readiolog < ip->i_readio_log) {
-#endif
 				ip->i_readio_log =  uiop->uio_readiolog;
-				ip->i_readio_blocks = 
-					1 << (int) (ip->i_readio_log -
-						ip->i_mount->m_sb.sb_blocklog);
-				if (!(ip->i_flags & XFS_IUIOSZ))
+				ip->i_readio_blocks = 1 <<
+						(int) (ip->i_readio_log -
+							mp->m_sb.sb_blocklog);
+				/*
+				 * set inode max io field to largest
+				 * possible value that could have been
+				 * applied to the inode
+				 */
+				if (!(ip->i_flags & XFS_IUIOSZ))  {
+					ip->i_max_io_log = MAX(ip->i_max_io_log,
+							MAX(mp->m_readio_log,
+							    ip->i_readio_log));
 					ip->i_flags |= XFS_IUIOSZ;
-#if defined(DEBUG) && defined(UIOSZ_DEBUG)
-				atomicAddInt(&uiodbg_switch, 1);
-				atomicAddInt(
-					&(uiodbg_readiolog[ip->i_readio_log -
-						XFS_UIO_MIN_READIO_LOG]),
-					1);
-#endif
-#if defined(DEBUG) && !defined(UIOSZ_DEBUG)
+				}
 			}
-#endif
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		}
 #endif /* !SIM */
@@ -1632,7 +1637,9 @@ xfs_zero_last_block(
  * of the last block in the file and the unusual case of zeroing blocks
  * out beyond the size of the file.  This second case only happens
  * with fixed size extents and when the system crashes before the inode
- * size was updated but after blocks were allocated.
+ * size was updated but after blocks were allocated.  If fill is set,
+ * then any holes in the range are filled and zeroed.  If not, the holes
+ * are left alone as holes.
  */
 int					/* error */
 xfs_zero_eof(
@@ -1707,7 +1714,7 @@ xfs_zero_eof(
 
 		if (imap.br_startblock == HOLESTARTBLOCK) {
 			start_zero_fsb = imap.br_startoff +
-				         imap.br_blockcount;
+					 imap.br_blockcount;
 			ASSERT(start_zero_fsb <= (end_zero_fsb + 1));
 			continue;
 		}
@@ -1819,6 +1826,7 @@ xfs_iomap_write(
 	int		aeof;
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE) != 0);
+
 	xfs_iomap_enter_trace(XFS_IOMAP_WRITE_ENTER, ip, offset, count);
 
 	mp = ip->i_mount;
@@ -1981,6 +1989,7 @@ xfs_iomap_write(
 		writing_bytes = count;
 	}
 	bmapp->pbsize = writing_bytes;
+
 	xfs_iomap_map_trace(XFS_IOMAP_WRITE_MAP,
 			    ip, offset, count, bmapp, imap);
 
@@ -2151,8 +2160,18 @@ xfs_iomap_write(
 	XFS_INODE_CLEAR_READ_AHEAD(ip);
 	return 0;
 }
-
-
+#if 0
+int rcc = 0;
+int rcc_cnt_eof = 0;
+int rcc_cnt_back = 0;
+int rcc_overflow = 0;
+int rcc_array[30] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		     0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int rcc_eof_array[30] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		     0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+#endif
 int
 xfs_write_file(
 	bhv_desc_t	*bdp,
@@ -2168,11 +2187,18 @@ xfs_write_file(
 	xfs_inode_t	*ip;
 	int		error;
 	int		eof_zeroed;
+	int		fill;
 	int		gaps_mapped;
+	off_t		offset;
+	ssize_t		count;
+	int		read;
 	xfs_fsize_t	isize;
 	xfs_fsize_t	new_size;
 	xfs_mount_t	*mp;
 	extern void	chunkrelse(buf_t*);
+#if 0
+	int		rcc_index;
+#endif
 
 	vp = BHV_TO_VNODE(bdp);
 	ip = XFS_BHVTOI(bdp);
@@ -2226,13 +2252,63 @@ xfs_write_file(
 	 * This is protected by the io lock.
 	 */
 	ip->i_write_offset = uiop->uio_offset;
+#if 0
+	if (ip->i_ino == 131 && ip->i_mount->m_fsname[1] == 'x' &&
+			uiop->uio_resid == 32768 &&
+			uiop->uio_offset != ip->i_d.di_size)  {
+		atomicAddInt(&rcc, 1);
+		/*
+		 * write beyond eof, leaving a hole, update write offset
+		 */
+		if (uiop->uio_offset > ip->i_d.di_size)  {
+			rcc_index = (uiop->uio_offset - ip->i_d.di_size)
+					/ 32768;
+			if (rcc_index >= 30)  {
+				rcc_index = 29;
+				atomicAddInt(&rcc_overflow, 1);
+			}
+			atomicAddInt(&rcc_cnt_eof, 1);
+			atomicAddInt(&rcc_eof_array[rcc_index], 1);
+		} else if (uiop->uio_offset < ip->i_d.di_size)  {
+			/*
+			 * write into a hole, leave write offset alone
+			 */
+			rcc_index = (ip->i_d.di_size - uiop->uio_offset)
+					/ 32768;
+			if (rcc_index >= 30)  {
+				rcc_index = 29;
+				atomicAddInt(&rcc_overflow, 1);
+			}
+			atomicAddInt(&rcc_cnt_back, 1);
+			atomicAddInt(&rcc_array[rcc_index], 1);
+		}
+	}
+#endif
 
 	/*
 	 * Loop until uiop->uio_resid, which is the number of bytes the
 	 * caller has requested to write, goes to 0 or we get an error.
 	 * Each call to xfs_iomap_write() tries to map as much of the
-	 * request as it can in mp->m_writeio_blks sized chunks.
+	 * request as it can in ip->i_writeio_blocks sized chunks.
+	 *
+	 * Cope with NFS out-of-order writes.  If we're
+	 * extending eof to a point within the indicated
+	 * window, fill any holes between old and new eof.
 	 */
+	if (!((ioflag & IO_NFS3) &&
+	    uiop->uio_offset > ip->i_d.di_size &&
+	    uiop->uio_offset - ip->i_d.di_size <= (XFS_NFS_IO_UNITS *
+					 (1 << (int) MAX(ip->i_writeio_log,
+						   uiop->uio_writeiolog))))) {
+		fill = 0;
+		offset = uiop->uio_offset;
+		count = uiop->uio_resid;
+	} else  {
+		fill = 1;
+		offset = ip->i_d.di_size;
+		count = uiop->uio_offset - offset;
+	}
+
 	do {
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 		isize = ip->i_d.di_size;
@@ -2256,8 +2332,7 @@ xfs_write_file(
 		 * any entries in the gap list which overlap that buffer.
 		 */
 		if (!gaps_mapped) {
-			error = xfs_build_gap_list(ip, uiop->uio_offset,
-						   uiop->uio_resid);
+			error = xfs_build_gap_list(ip, offset, count);
 			if (error) {
 				goto error0;
 			}
@@ -2269,11 +2344,9 @@ xfs_write_file(
 		 * then we need to make sure that any buffer overlapping
 		 * the EOF is zeroed beyond the EOF.
 		 */
-		if (!eof_zeroed &&
-		    (uiop->uio_offset > isize) &&
-		    (isize != 0)) {
+		if (!eof_zeroed && uiop->uio_offset > isize && isize != 0) {
 			error = xfs_zero_eof(ip, uiop->uio_offset, isize,
-					     credp, uiop->uio_pmp);
+						credp, uiop->uio_pmp);
 			if (error) {
 				goto error0;
 			}
@@ -2281,8 +2354,7 @@ xfs_write_file(
 		}
 
 		nbmaps = sizeof(bmaps) / sizeof(bmaps[0]);
-		error = xfs_iomap_write(ip, uiop->uio_offset,
-					uiop->uio_resid, bmaps, &nbmaps,
+		error = xfs_iomap_write(ip, offset, count, bmaps, &nbmaps,
 					ioflag, uiop->uio_pmp);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
@@ -2329,8 +2401,10 @@ xfs_write_file(
 			    !((bmapp->pboff == 0) &&
 			      (uiop->uio_offset >= isize)))) {
 				bp = chunkread(vp, bmapp, 1, credp);
+				read = 1;
 			} else {
 				bp = getchunk(vp, bmapp, credp);
+				read = 0;
 			}
 
 			/*
@@ -2375,10 +2449,47 @@ xfs_write_file(
 				continue;
 			}
 
-			ASSERT((BBTOOFF(bmapp->offset) + bmapp->pboff) ==
-			       uiop->uio_offset);
-			if (error = biomove(bp, bmapp->pboff, bmapp->pbsize,
-					    UIO_WRITE, uiop)) {
+			ASSERT(fill || fill == 0 &&
+					BBTOOFF(bmapp->offset) + bmapp->pboff
+						== uiop->uio_offset);
+
+			/*
+			 * zero the bytes up to the data being written
+			 * but don't overwrite data we read in
+			 */
+			if (!read && BBTOOFF(bmapp->offset) + bmapp->pboff
+					<  uiop->uio_offset)  {
+				xfs_zero_bp(bp, bmapp->pboff,
+					MIN(bmapp->pbsize, uiop->uio_offset -
+					    (BBTOOFF(bmapp->offset) +
+					     bmapp->pboff)));
+			}
+
+			/*
+			 * biomove the data in the region to be written.
+			 * Be careful moving data into the first overlapped
+			 * buffer.
+			 */
+			if (!fill)
+				error = biomove(bp, bmapp->pboff, bmapp->pbsize,
+						UIO_WRITE, uiop);
+			else if (BBTOOFF(bmapp->offset) + bmapp->pboff +
+					bmapp->pbsize >= uiop->uio_offset)  {
+				ASSERT(BBTOOFF(bmapp->offset) + bmapp->pboff
+							<= uiop->uio_offset);
+				error = biomove(bp,
+						uiop->uio_offset -
+						 BBTOOFF(bmapp->offset),
+						bmapp->pbsize -
+						  (int)(uiop->uio_offset -
+						    (BBTOOFF(bmapp->offset) +
+						     bmapp->pboff)),
+						UIO_WRITE,
+						uiop);
+				fill = 0;
+			}
+
+			if (error)  {
 				/*
 				 * If the buffer is already done then just
 				 * mark it dirty without copying any more
@@ -2413,16 +2524,22 @@ xfs_write_file(
 			 * made it even bigger, so be careful not
 			 * to shrink it.
 			 *
-			 * Noone could have shrunken the file, because
+			 * No one could have shrunken the file, because
 			 * we are holding the iolock shared.
 			 */
-			if (uiop->uio_offset > isize) {
+			if (!fill)
+				offset = uiop->uio_offset;
+			else
+				offset = BBTOOFF(bmapp->offset) +
+					 bmapp->pboff + bmapp->pbsize;
+
+			if (offset > isize) {
 				xfs_ilock(ip, XFS_ILOCK_EXCL);
-				if (uiop->uio_offset > ip->i_d.di_size) {
-					ip->i_d.di_size = uiop->uio_offset;
+				if (offset > ip->i_d.di_size) {
+					ip->i_d.di_size = offset;
 					ip->i_update_core = 1;
 					ip->i_update_size = 1;
-					isize = uiop->uio_offset;
+					isize = offset;
 				}
 				xfs_iunlock(ip, XFS_ILOCK_EXCL);
 			}
@@ -2664,9 +2781,11 @@ start:
 		 * smallest value.  Silently ignore requests that aren't
 		 * within valid I/O size limits.
 		 */
+		mp = ip->i_mount;
+
 		if ((ioflag & IO_UIOSZ) &&
 		    uiop->uio_writeiolog != ip->i_writeio_log &&
-		    uiop->uio_writeiolog >= ip->i_mount->m_sb.sb_blocklog &&
+		    uiop->uio_writeiolog >= mp->m_sb.sb_blocklog &&
 		    uiop->uio_writeiolog >= XFS_UIO_MIN_WRITEIO_LOG &&
 		    uiop->uio_writeiolog <= XFS_UIO_MAX_WRITEIO_LOG) {
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
@@ -2674,12 +2793,20 @@ start:
 			if (!(ip->i_flags & XFS_IUIOSZ) ||
 			    uiop->uio_writeiolog < ip->i_writeio_log) {
 #endif
-				ip->i_writeio_log = (int) uiop->uio_writeiolog;
+				ip->i_writeio_log = uiop->uio_writeiolog;
 				ip->i_writeio_blocks = 1 <<
 					(int) (ip->i_writeio_log -
-						ip->i_mount->m_sb.sb_blocklog);
-				if (!(ip->i_flags & XFS_IUIOSZ))
+						mp->m_sb.sb_blocklog);
+				/*
+				 * set inode max io size to largest value
+				 * that the inode could ever have had
+				 */
+				if (!(ip->i_flags & XFS_IUIOSZ)) {
+					ip->i_max_io_log = MAX(ip->i_max_io_log,
+							MAX(mp->m_writeio_log,
+							    ip->i_writeio_log));
 					ip->i_flags |= XFS_IUIOSZ;
+				}
 #if defined(DEBUG) && defined(UIOSZ_DEBUG)
 				atomicAddInt(&uiodbg_switch, 1);
 				atomicAddInt(
@@ -2750,7 +2877,6 @@ retry:
 		 * which could require allocating memory.
 		 */
 		if ((ioflag & IO_SYNC) && !(vp->v_flag & VISSWAP)) {
-			mp = ip->i_mount;
 			tp = xfs_trans_alloc(mp, XFS_TRANS_WRITE_SYNC);
 			if (transerror = xfs_trans_reserve(tp, 0,
 						      XFS_SWRITE_LOG_RES(mp),
@@ -2770,11 +2896,10 @@ retry:
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		}
 		if ((ioflag & IO_DSYNC) && !(vp->v_flag & VISSWAP)) {
-			mp = ip->i_mount;
 			xfs_log_force(mp, (xfs_lsn_t)0,
 				      XFS_LOG_FORCE | XFS_LOG_SYNC );
 		}
-		if (ioflag & IO_NFS) {
+		if (ioflag & (IO_NFS|IO_NFS3)) {
 			xfs_refcache_insert(ip);
 		}
 		break;
