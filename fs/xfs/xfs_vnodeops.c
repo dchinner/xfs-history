@@ -1,4 +1,4 @@
-#ident "$Revision: 1.374 $"
+#ident "$Revision: 1.375 $"
 
 
 #ifdef SIM
@@ -1141,7 +1141,7 @@ xfs_setattr(
 	if (mp->m_flags & XFS_MOUNT_WSYNC)
 		xfs_trans_set_sync(tp);
 
-	code = xfs_trans_commit(tp, commit_flags);
+	code = xfs_trans_commit(tp, commit_flags, NULL);
 
 	/*
 	 * If the (regular) file's mandatory locking mode changed, then
@@ -1499,7 +1499,7 @@ xfs_fsync(
 			xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 			if (flag & FSYNC_WAIT)
 				xfs_trans_set_sync(tp);
-			error = xfs_trans_commit(tp, 0);
+			error = xfs_trans_commit(tp, 0, NULL);
 
 			xfs_iunlock(ip, XFS_IOLOCK_EXCL|XFS_ILOCK_EXCL);
 		}
@@ -1568,7 +1568,7 @@ xfs_fsync(
 			xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 			if (flag & FSYNC_WAIT)
 				xfs_trans_set_sync(tp);
-			error = xfs_trans_commit(tp, 0);
+			error = xfs_trans_commit(tp, 0, NULL);
 
 			xfs_iunlock(ip, XFS_IOLOCK_EXCL|XFS_ILOCK_EXCL);
 		}
@@ -1643,7 +1643,7 @@ xfs_inactive_free_eofblocks(
 	int		nimaps;
 	xfs_bmbt_irec_t	imap;
 	xfs_fsblock_t	first_block;
-		
+
 	/*
 	 * Figure out if there are any blocks beyond the end
 	 * of the file.  If not, then there is nothing to do.
@@ -1725,7 +1725,8 @@ xfs_inactive_free_eofblocks(
 					  XFS_TRANS_ABORT));
 		} else {
 			error = xfs_trans_commit(tp,
-						XFS_TRANS_RELEASE_LOG_RES);
+						XFS_TRANS_RELEASE_LOG_RES,
+						NULL);
 		}
 		xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 	}
@@ -1840,7 +1841,7 @@ xfs_inactive_symlink_rmt(
 	 * we need to unlock the inode since the new transaction doesn't
 	 * have the inode attached.
 	 */
-	error = xfs_trans_commit(tp, 0);
+	error = xfs_trans_commit(tp, 0, NULL);
 	tp = ntp;
 	if (error) {
 		ASSERT(XFS_FORCED_SHUTDOWN(mp));
@@ -1941,7 +1942,7 @@ xfs_inactive_attrs(
 	tp = *tpp;
 	mp = ip->i_mount;
 	ASSERT(ip->i_d.di_forkoff != 0);
-	xfs_trans_commit(tp, *commitflags);
+	xfs_trans_commit(tp, *commitflags, NULL);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	*commitflags = 0;
 
@@ -2187,7 +2188,7 @@ xfs_inactive(
 		 * Just ignore errors at this point.  There is
 		 * nothing we can do except to try to keep going.
 		 */
-		(void) xfs_trans_commit(tp, commit_flags);
+		(void) xfs_trans_commit(tp, commit_flags, NULL);
 	}
 	/*	
 	 * Release the dquots held by inode, if any.
@@ -2843,7 +2844,7 @@ xfs_create_new(
 		goto abort_rele;
 	}
 
-	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
+	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
 	if (truncated) {
 		/*
 		 * If we truncated the file, then the inode will
@@ -3111,7 +3112,8 @@ xfs_create_exists(
 
 			IHOLD(ip);
 			error = xfs_trans_commit(tp,
-					XFS_TRANS_RELEASE_LOG_RES);
+					XFS_TRANS_RELEASE_LOG_RES,
+					NULL);
 			/*
 			 * If we truncated the file, then the inode will
 			 * have been held within the transaction and must
@@ -3755,7 +3757,7 @@ xfs_remove(
 		goto error_rele;
 	}
 
-	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
+	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
 	if (error) {
 		IRELE(ip);
 		goto std_return;
@@ -4023,7 +4025,7 @@ xfs_link(
 		goto abort_return;
 	}
 
-	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
+	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
 	if (error) {
 		goto std_return;
 	}
@@ -4291,7 +4293,7 @@ xfs_mkdir(
 		goto error2;
 	}
 
-	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
+	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
 	if (udqp)
 		 xfs_qm_dqrele(udqp);
 	if (pdqp)
@@ -4581,7 +4583,7 @@ xfs_rmdir(
 		goto std_return;
 	}
 
-	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
+	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
 	if (error) {
 		IRELE(cdp);
 		goto std_return;
@@ -4968,7 +4970,7 @@ xfs_symlink(
 	if (error) {
 		goto error2;
 	}
-	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
+	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
 	if (udqp)
 		xfs_qm_dqrele(udqp);
 	if (pdqp)
@@ -5916,7 +5918,7 @@ xfs_set_dmattrs (
 
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	IHOLD(ip);
-	error = xfs_trans_commit(tp, 0);
+	error = xfs_trans_commit(tp, 0, NULL);
 
 	return error;
 }
@@ -6276,7 +6278,7 @@ retry:
 			goto error0;
 		}
 
-		error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
+		error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		XFS_INODE_CLEAR_READ_AHEAD(ip);
 		if (error) {
@@ -6532,7 +6534,7 @@ xfs_free_file_space(
 			goto error0;
 		}
 
-		error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
+		error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		XFS_INODE_CLEAR_READ_AHEAD(ip);
 	}
@@ -6677,7 +6679,7 @@ xfs_change_file_space(
 		ip->i_d.di_flags &= ~XFS_DIFLAG_PREALLOC;
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	xfs_trans_set_sync(tp);
-	error = xfs_trans_commit(tp, 0);
+	error = xfs_trans_commit(tp, 0, NULL);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	return error;
 }

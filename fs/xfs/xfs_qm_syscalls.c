@@ -1,4 +1,4 @@
-#ident "$Revision: 1.28 $"
+#ident "$Revision: 1.29 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -870,7 +870,7 @@ xfs_qm_scall_setqlim(
 	xfs_trans_log_dquot(tp, dqp);
 
 	xfs_dqtrace_entry(dqp, "Q_SETQLIM: COMMIT");
-	xfs_trans_commit(tp, 0);
+	xfs_trans_commit(tp, 0, NULL);
 	/* xfs_qm_dqprint(dqp); */
 	xfs_qm_dqrele(dqp);
 	mutex_unlock(&(XFS_QI_QOFFLOCK(mp)));
@@ -967,9 +967,8 @@ xfs_qm_log_quotaoff_end(
 	 * We don't care about quotoff's performance.
 	 */
 	xfs_trans_set_sync(tp);
-	error = xfs_trans_commit(tp, 0);
+	error = xfs_trans_commit(tp, 0, NULL);
 	return (error);
-
 }
 
 
@@ -1010,7 +1009,7 @@ xfs_qm_log_quotaoff(
 	 * We don't care about quotoff's performance.
 	 */
 	xfs_trans_set_sync(tp);
-	error = xfs_trans_commit(tp, 0);
+	error = xfs_trans_commit(tp, 0, NULL);
  
 error0:
 	if (error) {

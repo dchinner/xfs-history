@@ -1,4 +1,4 @@
-#ident "$Revision: 1.95 $"
+#ident "$Revision: 1.96 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -659,7 +659,8 @@ xfs_trans_unreserve_and_mod_sb(
 int
 xfs_trans_commit(
 	xfs_trans_t	*tp,
-	uint		flags)
+	uint		flags,
+	xfs_lsn_t	*commit_lsn_p)
 {
 	xfs_log_iovec_t		*log_vector;
 	int			nvec;
@@ -675,6 +676,8 @@ xfs_trans_commit(
 	static xfs_lsn_t	trans_lsn = 1;
 #endif
 	int			shutdown;
+
+	commit_lsn = -1;
 
 	/*
 	 * Determine whether this commit is releasing a permanent
@@ -718,6 +721,8 @@ shut_us_down:
 		xfs_trans_free_items(tp, shutdown? XFS_TRANS_ABORT : 0);
 		xfs_trans_free(tp);
 		XFSSTATS.xs_trans_empty++;
+		if (commit_lsn_p)
+			*commit_lsn_p = commit_lsn;
 		return (shutdown);
 	}
 #if defined(SIM) || defined(XLOG_NOLOG) || defined(DEBUG)
@@ -785,10 +790,13 @@ shut_us_down:
 	/* This is the regular case */
 	commit_lsn = xfs_log_done(mp, tp->t_ticket, log_flags);
 #endif
-	
+
 	if (nvec > XFS_TRANS_LOGVEC_COUNT) {
 		kmem_free(log_vector, nvec * sizeof(xfs_log_iovec_t));
 	}
+
+	if (commit_lsn_p)
+		*commit_lsn_p = commit_lsn;
 
 	/*
 	 * If we got a log write error. Unpin the logitems that we

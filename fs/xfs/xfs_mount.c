@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.174 $"
+#ident	"$Revision: 1.175 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -1520,8 +1520,8 @@ xfs_mount_reset_sbqflags(
 		return;
 	}
 	xfs_mod_sb(tp, XFS_SB_QFLAGS);
-	(void)xfs_trans_commit(tp, 0);
-}	
+	(void)xfs_trans_commit(tp, 0, NULL);
+}
 
 /*
  * Used to log changes to the superblock unit and width fields which could
@@ -1532,7 +1532,6 @@ xfs_mount_log_sbunit(
 	xfs_mount_t *mp,
 	__int64_t fields)
 {
-
 	xfs_trans_t *tp;
 
 	ASSERT(fields & (XFS_SB_UNIT|XFS_SB_WIDTH));
@@ -1547,7 +1546,7 @@ xfs_mount_log_sbunit(
 		return;
 	}
 	xfs_mod_sb(tp, fields);
-	(void)xfs_trans_commit(tp, 0);
+	(void)xfs_trans_commit(tp, 0, NULL);
 }
 	
 #endif /* !SIM */

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.42 $"
+#ident	"$Revision: 1.43 $"
 
 /*
  * Free realtime space allocation for XFS.
@@ -425,7 +425,7 @@ xfs_growfs_rt_alloc(
 		error = xfs_bmap_finish(&tp, &flist, firstblock, &committed);
 		if (error)
 			goto error_exit;
-		xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
+		xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
 		/*
 		 * Now we need to clear the allocated blocks.
 		 * Do this one block per transaction, to keep it simple.
@@ -462,7 +462,7 @@ xfs_growfs_rt_alloc(
 			/*
 			 * Commit the transaction.
 			 */
-			xfs_trans_commit(tp, 0);
+			xfs_trans_commit(tp, 0, NULL);
 		}
 		/*
 		 * Go on to the next extent, if any.
@@ -2377,7 +2377,7 @@ xfs_growfs_rt(
 		/*
 		 * Commit the transaction.
 		 */
-		xfs_trans_commit(tp, 0);
+		xfs_trans_commit(tp, 0, NULL);
 	}
 	return 0;
 

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.10 $"
+#ident "$Revision: 1.11 $"
 
 #include <sys/types.h>
 #include <sys/buf.h>
@@ -408,7 +408,7 @@ xfs_dir_ialloc(
 		}
 
 		ntp = xfs_trans_dup(tp);
-		code = xfs_trans_commit(tp, 0);
+		code = xfs_trans_commit(tp, 0, NULL);
 		tp = ntp;
 		if (committed != NULL) {
 			*committed = 1;
@@ -587,7 +587,6 @@ xfs_truncate_file(
 	xfs_trans_t	*tp;
 	int		error;
 
-
 #ifdef QUOTADEBUG
 	/* 
 	 * This is called to truncate the quotainodes too.
@@ -647,7 +646,8 @@ xfs_truncate_file(
 				 XFS_TRANS_ABORT);
 	} else {
 		xfs_ichgtime(ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
-		error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
+		error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES,
+					 NULL);
 	}
 	xfs_iunlock(ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 
