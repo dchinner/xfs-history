@@ -2596,7 +2596,7 @@ xlog_recover(xlog_t *log)
 	if (error = xlog_find_tail(log, &head_blk, &tail_blk))
 		return error;
 	if (tail_blk != head_blk) {
-#ifdef DEBUG
+#if defined(DEBUG) && defined(_KERNEL)
 		cmn_err(CE_NOTE,
 			"Starting xFS recovery on filesystem: %s (dev: %d/%d)",
 			log->l_mp->m_fsname, emajor(log->l_dev),
