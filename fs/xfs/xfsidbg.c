@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.26 $"
+#ident	"$Revision: 1.27 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -53,6 +53,7 @@
 #include "xfs_log_priv.h"
 #include "xfs_log_recover.h"
 #include "xfs_rw.h"
+#include "xfs_bit.h"
 #include "xfsidbg.h"
 
 /*
@@ -2690,8 +2691,9 @@ idbg_xmount(xfs_mount_t *mp)
 	qprintf("dircook_elog %d blkbit_log %d blkbb_log %d agno_log %d\n",
 		mp->m_dircook_elog, mp->m_blkbit_log, mp->m_blkbb_log,
 		mp->m_agno_log);
-	qprintf("blockmask 0x%x blockwsize 0x%x blockwmask 0x%x\n",
-		mp->m_blockmask, mp->m_blockwsize, mp->m_blockwmask);
+	qprintf("agino_log %d blockmask 0x%x blockwsize 0x%x blockwmask 0x%x\n",
+		mp->m_agino_log, mp->m_blockmask, mp->m_blockwsize,
+		mp->m_blockwmask);
 	qprintf("alloc_mxr[lf,nd] %d %d alloc_mnr[lf,nd] %d %d\n",
 		mp->m_alloc_mxr[0], mp->m_alloc_mxr[1],
 		mp->m_alloc_mnr[0], mp->m_alloc_mnr[1]);
@@ -2706,10 +2708,11 @@ idbg_xmount(xfs_mount_t *mp)
 		mp->m_bm_maxlevels[1], mp->m_in_maxlevels);
 	qprintf("perag 0x%x &peraglock 0x%x &growlock 0x%x rbmrotor %d\n",
 		mp->m_perag, &mp->m_peraglock, &mp->m_growlock, mp->m_rbmrotor);
-	qprintf("attroffset %d flags ",
-		mp->m_attroffset);
-	printflags(mp->m_flags, xmount_flags,"mount");
-	qprintf("\n");
+	printflags(mp->m_flags, xmount_flags,"flags");
+	qprintf("attroffset %d da_node_ents %d\n",
+		mp->m_attroffset, mp->m_da_node_ents);
+	qprintf("ialloc_inos %d ialloc_blks %d litino %d\n",
+		mp->m_ialloc_inos, mp->m_ialloc_blks, mp->m_litino);
 }
 
 void
