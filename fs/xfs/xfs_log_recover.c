@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.19 $"
+#ident	"$Revision: 1.23 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -61,8 +61,11 @@ STATIC void	xlog_recover_insert_item_frontq(xlog_recover_item_t **q,
 
 #ifdef DEBUG
 STATIC void	xlog_recover_check_summary(xlog_t *log);
+STATIC void	xlog_recover_check_ail(xfs_mount_t *mp, xfs_log_item_t *lip,
+				       int gen);
 #else
 #define	xlog_recover_check_summary(log)
+#define	xlog_recover_check_ail(mp, lip, gen)
 #endif
 
 buf_t *
@@ -1209,6 +1212,32 @@ xlog_recover_process_efi(xfs_mount_t		*mp,
 	xfs_trans_commit(tp, 0);
 }	/* xlog_recover_process_efi */
 
+/*
+ * Verify that once we've encountered something other than an EFI
+ * in the AIL that there are no more EFIs in the AIL.
+ */
+#ifdef DEBUG
+STATIC void
+xlog_recover_check_ail(xfs_mount_t	*mp,
+		       xfs_log_item_t	*lip,
+		       int		gen)
+{
+	int	orig_gen;
+
+	orig_gen = gen;
+	do {
+		ASSERT(lip->li_type != XFS_LI_EFI);
+		lip = xfs_trans_next_ail(mp, lip, &gen, NULL);
+		/*
+		 * The check will be bogus if we restart from the
+		 * beginning of the AIL, so ASSERT that we don't.
+		 * We never should since we're holding the AIL lock
+		 * the entire time.
+		 */
+		ASSERT(gen == orig_gen);
+	} while (lip != NULL);
+}
+#endif	/* DEBUG */
 
 /*
  * When this is called, all of the EFIs which did not have
@@ -1221,10 +1250,17 @@ xlog_recover_process_efi(xfs_mount_t		*mp,
  * We'll use a flag in the EFI to skip those that we've already
  * processed and use the AIL iteration mechanism's generation
  * count to try to speed this up at least a bit.
+ *
+ * When we start, we know that the EFIs are the only things in
+ * the AIL.  As we process them, however, other items are added
+ * to the AIL.  Since everything added to the AIL must come after
+ * everything already in the AIL, we stop processing as soon as
+ * we see something other than an EFI in the AIL.
  */
 STATIC void
 xlog_recover_process_efis(xlog_t	*log)
 {
+	xfs_log_item_t		*lip;
 	xfs_efi_log_item_t	*efip;
 	int			gen;
 	xfs_mount_t		*mp;
@@ -1232,25 +1268,29 @@ xlog_recover_process_efis(xlog_t	*log)
 
 	mp = log->l_mp;
 	spl = AIL_LOCK(mp);
-	efip = (xfs_efi_log_item_t *)xfs_trans_first_ail(mp, &gen);
-	while (efip != NULL) {
-		ASSERT(efip->efi_item.li_type == XFS_LI_EFI);
+	lip = xfs_trans_first_ail(mp, &gen);
+	while (lip != NULL) {
+		/*
+		 * We're done when we see something other than an EFI.
+		 */
+		if (lip->li_type != XFS_LI_EFI) {
+			xlog_recover_check_ail(mp, lip, gen);
+			break;
+		}
+
 		/*
 		 * Skip EFIs that we've already processed.
 		 */
+		efip = (xfs_efi_log_item_t *)lip;
 		if (efip->efi_flags & XFS_EFI_RECOVERED) {
-			efip = (xfs_efi_log_item_t*)
-				xfs_trans_next_ail(mp, (xfs_log_item_t*)efip,
-						   &gen, NULL);
+			lip = xfs_trans_next_ail(mp, lip, &gen, NULL);
 			continue;
 		}
 
 		AIL_UNLOCK(mp, spl);
 		xlog_recover_process_efi(mp, efip);
 		spl = AIL_LOCK(mp);
-		efip = (xfs_efi_log_item_t*)
-			xfs_trans_next_ail(mp, (xfs_log_item_t*)efip,
-					   &gen, NULL);
+		lip = xfs_trans_next_ail(mp, lip, &gen, NULL);
 	}
 	AIL_UNLOCK(mp, spl);
 }	/* xlog_recover_process_efis */
