@@ -223,22 +223,28 @@ typedef struct xfs_dirent32 {	/* Irix5 view of dirent structure */
 #endif
 
 #ifndef ENOTSUP
-#define ENOTSUP		ENOTSUPP	/* Not supported (POSIX 1003.1b) */
+#define ENOTSUP		EOPNOTSUPP	/* Not supported (POSIX 1003.1b) */
+#endif
+
+#ifndef ENOATTR
+#define ENOATTR		ENODATA		/* Attribute not found */
 #endif
 
 /* Note: EWRONGFS never visible outside the kernel */
 #define	EWRONGFS	EINVAL		/* Mount with wrong filesystem type */
 
 /*
- * XXX these need real values in errno.h. asm-i386/errno.h won't 
- * return errnos out of its known range in errno.
- * XXX also note these need to be < 1000 and fairly unique on linux
+ * XXX EFSCORRUPTED needs a real value in errno.h. asm-i386/errno.h won't
+ *     return codes out of its known range in errno.
+ * XXX Also note: needs to be < 1000 and fairly unique on Linux (mustn't
+ *     conflict with any code we use already or any code a driver may use)
+ * XXX Some options (currently we do #2):
+ *	1/ New error code ["Filesystem is corrupted", _after_ glibc updated]
+ *	2/ 990 ["Unknown error 990"]
+ *	3/ EUCLEAN ["Structure needs cleaning"]
+ *	4/ Convert EFSCORRUPTED to EIO [just prior to return into userspace]
  */
 #define EFSCORRUPTED    990		/* Filesystem is corrupted */
-
-#ifndef ENOATTR
-#define ENOATTR		ENODATA		/* Attribute not found */
-#endif
 
 #define SYNCHRONIZE()	barrier()
 #define lbolt		jiffies
