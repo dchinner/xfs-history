@@ -138,7 +138,7 @@ repeat:
 	}
 
 	rval = __vmalloc(size, flag_convert(flags), PAGE_KERNEL);
-	if (!rval && !(flags & KM_SLEEP))
+	if (!rval && (flags & KM_SLEEP))
 		panic("kmem_alloc: NULL memory on KM_SLEEP request!");
 
 	return rval;
@@ -175,7 +175,9 @@ kmem_realloc(void *ptr, size_t newsize, size_t oldsize, int flags)
 
 	new = kmem_alloc(newsize, flags);
 	if (ptr) {
-		memcpy(new, ptr, ((oldsize < newsize) ? oldsize : newsize));
+		if (new)
+			memcpy(new, ptr,
+				((oldsize < newsize) ? oldsize : newsize));
 		kmem_free(ptr, oldsize);
 	}
 
