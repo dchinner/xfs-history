@@ -38,6 +38,7 @@
 #define FSID_T
 #include <sys/types.h>
 #include <sys/sysmacros.h>
+#include <sys/systm.h>
 #include <linux/errno.h>
 
 #undef  NODEV
