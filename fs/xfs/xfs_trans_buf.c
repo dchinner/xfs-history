@@ -393,7 +393,7 @@ xfs_trans_read_buf(
 	}
 	if (bp != NULL) {
 		ASSERT(valusema(&bp->b_lock) <= 0);
-		ASSERT(XFS_BUF_FSPRIVATE2(bp, xfs_strans_t *) == tp);
+		ASSERT(XFS_BUF_FSPRIVATE2(bp, xfs_trans_t *) == tp);
 		ASSERT(XFS_BUF_FSPRIVATE(bp, void *) != NULL);
 		ASSERT((bp->b_flags & B_ERROR) == 0);
 		bp->b_target = mp->m_ddev_targp;
