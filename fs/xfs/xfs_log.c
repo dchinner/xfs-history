@@ -1740,6 +1740,8 @@ xlog_state_sync_all(xlog_t *log, uint flags)
 	    flags & XFS_LOG_SYNC)
 		spunlockspl_psema(log->l_icloglock, spl,	/* sleep */
 				  &iclog->ic_forcesema, 0);
+	else
+		spunlockspl(log->l_icloglock, spl);
 	return 0;
 }	/* xlog_state_sync_all */
 
