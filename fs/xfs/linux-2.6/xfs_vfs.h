@@ -186,10 +186,23 @@ extern struct inode *vfs_get_inode(bhv_desc_t *, xfs_ino_t, int);
 extern void vfs_init_vnode(bhv_desc_t *, struct vnode *, bhv_desc_t *, int);
 extern void vfs_force_shutdown(bhv_desc_t *, int, char *, int);
 
+#define XFS_DMOPS		"xfs_dm_operations"	/* Data Migration */
+#define XFS_QMOPS		"xfs_qm_operations"	/* Quota Manager  */
+#define XFS_IOOPS		"xfs_io_operations"	/* I/O subsystem  */
+#define XFS_DM_MODULE		"xfs_dmapi"
+#define XFS_QM_MODULE		"xfs_quota"
+#define XFS_IO_MODULE		"xfs_ioops"
+
 typedef struct bhv_vfsops {
 	struct vfsops		bhv_common;
 	void *			bhv_custom;
 } bhv_vfsops_t;
+
+typedef struct bhv_module {
+	bhv_desc_t		bm_desc;
+	const char *		bm_name;
+	bhv_vfsops_t *		bm_ops;
+} bhv_module_t;
 
 #define vfs_bhv_lookup(v, id)	( bhv_lookup_range(&(v)->vfs_bh, (id), (id)) )
 #define vfs_bhv_custom(b)	( ((bhv_vfsops_t *)BHV_OPS(b))->bhv_custom )
@@ -200,6 +213,13 @@ extern vfs_t *vfs_allocate(void);
 extern void vfs_deallocate(vfs_t *);
 extern void vfs_insertops(vfs_t *, bhv_vfsops_t *);
 extern void vfs_insertbhv(vfs_t *, bhv_desc_t *, vfsops_t *, void *);
+
+#define bhv_lookup_module(n,m)	( (m) ? \
+				inter_module_get_request(n, m) : \
+				inter_module_get(n) )
+#define bhv_remove_module(n)	inter_module_put(n)
+#define bhv_module_init(n,m,op)	inter_module_register(n,m,op)
+#define bhv_module_exit(n)	inter_module_unregister(n)
 
 extern void bhv_insert_all_vfsops(struct vfs *);
 extern void bhv_remove_all_vfsops(struct vfs *, int);

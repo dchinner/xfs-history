@@ -911,8 +911,6 @@ init_xfs_fs( void )
 	vn_init();
 	xfs_init();
 	uuid_init();
-	vfs_initdmapi();
-	vfs_initquota();
 
 	error = register_filesystem(&xfs_fs_type);
 	if (error)
@@ -934,8 +932,6 @@ exit_xfs_fs( void )
 {
 	unregister_filesystem(&xfs_fs_type);
 	xfs_cleanup();
-	vfs_exitquota();
-	vfs_exitdmapi();
 	pagebuf_terminate();
 	destroy_inodecache();
 	ktrace_uninit();
