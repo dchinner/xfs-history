@@ -2486,8 +2486,6 @@ xfs_dm_punch_hole(
 	xip->i_iocore.io_dmstate++;
 	xfs_iunlock(xip, XFS_IOLOCK_EXCL);
 
-	vn_revalidate(vp);
-
 up_and_out:
 	UP_TRUNC_SEM(inode);
 
