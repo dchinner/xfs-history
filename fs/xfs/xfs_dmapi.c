@@ -139,10 +139,9 @@ typedef struct	{
  * that we want xfs_bulkstat to send to our formatter.
  */
 typedef struct {
-	void		*laststruct;
+	void __user	*laststruct;
 	dm_dkattrname_t	attrname;
 	uint		bulkall : 1;
-	uint		kernel_buffer : 1;
 } dm_bulkstat_one_t;
 
 /* In the on-disk inode, DMAPI attribute names consist of the user-provided
@@ -340,25 +339,23 @@ xfs_bdp_to_hexhandle(
 
 STATIC int
 xfs_copyin_attrname(
-	dm_attrname_t	*from,		/* dm_attrname_t in user space */
+	dm_attrname_t	__user *from,	/* dm_attrname_t in user space */
 	dm_dkattrname_t *to)		/* name buffer in kernel space */
 {
-	int		error;
+	int error = 0;
 	size_t len;
 
 	strcpy(to->dan_chars, dmattr_prefix);
 
-	len = strnlen_user((char*)from, DM_ATTR_NAME_SIZE);
-	error = copy_from_user(&to->dan_chars[DMATTR_PREFIXLEN], from, len);
-	error = -error; /* copy_from_user returns negative error */
-
-	if (!error && (to->dan_chars[DMATTR_PREFIXLEN] == '\0'))
-		error = EINVAL;
-	if (error == EFAULT) {
+	len = strnlen_user((char __user *)from, DM_ATTR_NAME_SIZE);
+	if (copy_from_user(&to->dan_chars[DMATTR_PREFIXLEN], from, len))
 		to->dan_chars[sizeof(to->dan_chars) - 1] = '\0';
-		error = 0;
-	}
-	return(error);
+	else if (to->dan_chars[DMATTR_PREFIXLEN] == '\0')
+		error = EINVAL;
+	else
+		to->dan_chars[DMATTR_PREFIXLEN + len - 1] = '\0';
+
+	return error;
 }
 
 
@@ -486,7 +483,7 @@ xfs_ip_to_stat(
 
 
 /*
- * This is used by dm_get_bulkattr() as well as dm_get_dirattrs().
+ * This is used by dm_get_bulkattr().
  * Given a inumber, it igets the inode and fills the given buffer
  * with the dm_stat structure for the file.
  */
@@ -523,24 +520,15 @@ xfs_dm_bulkstat_one(
 	if (dmb->bulkall) {
 		stat_sz = DM_STAT_SIZE(*xbuf, 0);
 		stat_sz = (stat_sz+(DM_STAT_ALIGN-1)) & ~(DM_STAT_ALIGN-1);
-		if (dmb->kernel_buffer) {
-			xbuf = (dm_xstat_t *)buffer;
-		}
-		else {
-			kern_buf_sz = stat_sz;
-			xbuf = kmem_alloc(kern_buf_sz, KM_SLEEP);
-		}
+		kern_buf_sz = stat_sz;
+		xbuf = kmem_alloc(kern_buf_sz, KM_SLEEP);
+
 		sbuf = &xbuf->dx_statinfo;
 	} else {
 		stat_sz = DM_STAT_SIZE(*sbuf, 0);
 		stat_sz = (stat_sz+(DM_STAT_ALIGN-1)) & ~(DM_STAT_ALIGN-1);
-		if (dmb->kernel_buffer) {
-			sbuf = (dm_stat_t *)buffer;
-		}
-		else {
-			kern_buf_sz = stat_sz;
-			sbuf = kmem_alloc(kern_buf_sz, KM_SLEEP);
-		}
+		kern_buf_sz = stat_sz;
+		sbuf = kmem_alloc(kern_buf_sz, KM_SLEEP);
 	}
 
 	if (stat_sz > ubsize) {
@@ -586,7 +574,7 @@ xfs_dm_bulkstat_one(
 	/*
 	 * This is unused in bulkstat - so we zero it out.
 	 */
-	memset((void *) &sbuf->dt_compname, 0, sizeof(dm_vardata_t));
+	memset(&sbuf->dt_compname, 0, sizeof(dm_vardata_t));
 
   	/*
 	 * Do not hold ILOCK_SHARED during VOP_ATTR_GET.
@@ -608,16 +596,11 @@ xfs_dm_bulkstat_one(
 		if (value_len > ATTR_MAX_VALUELEN)
 			value_len = ATTR_MAX_VALUELEN;
 
-		attr_user_buf = ((char __user *)buffer) + stat_sz;
-		if (dmb->kernel_buffer) {
-			attr_buf = attr_user_buf;
-		}
-		else {
-			attr_buf_sz = value_len;
-			attr_buf = kmem_alloc(attr_buf_sz, KM_SLEEP);
-		}
+		attr_user_buf = buffer + stat_sz;
+		attr_buf_sz = value_len;
+		attr_buf = kmem_alloc(attr_buf_sz, KM_SLEEP);
 
-		memset((void *) &xbuf->dx_attrdata, 0, sizeof(dm_vardata_t));
+		memset(&xbuf->dx_attrdata, 0, sizeof(dm_vardata_t));
 		VOP_ATTR_GET(vp, dmb->attrname.dan_chars, attr_buf,
 			     &value_len, ATTR_ROOT, sys_cred, error);
 
@@ -648,31 +631,28 @@ xfs_dm_bulkstat_one(
 	 */
 	sbuf->_link = stat_sz;
 
-	if (!dmb->kernel_buffer) {
-		if (xbuf) {
-			if (copy_to_user(buffer, xbuf, kern_buf_sz)) {
-				error = EFAULT;
-				goto out_free_attr_buffer;
-			}
-			if (copy_to_user(attr_user_buf, attr_buf, value_len)){
-				error = EFAULT;
-				goto out_free_attr_buffer;
-			}
-		} else {
+	if (xbuf) {
+		if (copy_to_user(buffer, xbuf, kern_buf_sz)) {
 			error = EFAULT;
-			if (copy_to_user(buffer, sbuf, kern_buf_sz)) {
-				error = EFAULT;
-				goto out_free_buffer;
-			}
+			goto out_free_attr_buffer;
 		}
+		if (copy_to_user(attr_user_buf, attr_buf, value_len)){
+			error = EFAULT;
+			goto out_free_attr_buffer;
+		}
+	} else {
+		error = EFAULT;
+		if (copy_to_user(buffer, sbuf, kern_buf_sz)) {
+			error = EFAULT;
+			goto out_free_buffer;
+		}
+	}
 
-		if (xbuf) {
-			kmem_free(xbuf, kern_buf_sz);
-			kmem_free(attr_buf, attr_buf_sz);
-		}
-		else {
-			kmem_free(sbuf, kern_buf_sz);
-		}
+	if (xbuf) {
+		kmem_free(xbuf, kern_buf_sz);
+		kmem_free(attr_buf, attr_buf_sz);
+	} else {
+		kmem_free(sbuf, kern_buf_sz);
 	}
 
 	*res = BULKSTAT_RV_DIDONE;
@@ -696,7 +676,6 @@ xfs_dm_bulkstat_one(
 	*res = BULKSTAT_RV_NOTHING;
 	return error;
 }
-
 
 STATIC int
 xfs_get_dirents(
@@ -733,6 +712,64 @@ xfs_get_dirents(
 	return(rval);
 }
 
+STATIC int
+xfs_dm_stat_one(
+	xfs_mount_t	*mp,		/* mount point for filesystem */
+	xfs_ino_t	ino,		/* inode number to get data for */
+	dm_stat_t	*sbuf,		/* buffer to place output in */
+	int		ubsize)		/* size of buffer */
+{
+	xfs_inode_t	*xip = NULL;
+	dm_handle_t	handle;
+	u_int		stat_sz;
+	int		error;
+
+	stat_sz = DM_STAT_SIZE(*sbuf, 0);
+	stat_sz = (stat_sz+(DM_STAT_ALIGN-1)) & ~(DM_STAT_ALIGN-1);
+
+	if (stat_sz > ubsize)
+		goto out_fail;
+	if (ino == mp->m_sb.sb_rbmino || ino == mp->m_sb.sb_rsumino)
+		goto out_fail;
+
+	error = xfs_iget(mp, NULL, ino, 0, XFS_ILOCK_SHARED, &xip, 0);
+	if (error)
+		goto out_fail;
+	if (xip->i_d.di_mode == 0)
+		goto out_iput_new;
+
+	/*
+	 * copy everything to the dm_stat buffer
+	 */
+	xfs_ip_to_stat(mp, sbuf, xip);
+
+	/*
+	 * Make the handle and put it at the end of the stat buffer.
+	 */
+	dm_ip_to_handle(LINVFS_GET_IP(XFS_ITOV(xip)), &handle);
+
+	/* Handle follows outer struct, but ptr is always in dm_stat_t */
+	memcpy(sbuf + 1, &handle, sizeof(handle));
+	sbuf->dt_handle.vd_offset = (ssize_t) sizeof(dm_stat_t);
+	sbuf->dt_handle.vd_length = (size_t) DM_HSIZE(handle);
+
+	/*
+	 * This is unused in bulkstat - so we zero it out.
+	 */
+	memset(&sbuf->dt_compname, 0, sizeof(dm_vardata_t));
+
+	xfs_iput(xip, XFS_ILOCK_SHARED);
+
+	/*
+	 *  Update link in dm_stat_t to point to next struct.
+	 */
+	sbuf->_link = stat_sz;
+	return BULKSTAT_RV_DIDONE;
+ out_iput_new:
+	xfs_iput_new(xip, XFS_ILOCK_SHARED);
+ out_fail:
+	return BULKSTAT_RV_NOTHING;
+}
 
 STATIC int
 xfs_dirents_to_stats(
@@ -751,7 +788,6 @@ xfs_dirents_to_stats(
 	size_t		spaceleft;
 	xfs_off_t	prevoff;
 	int		res;
-	dm_bulkstat_one_t dmb;
 	int		needed;
 
 	spaceleft = *spaceleftp;
@@ -795,10 +831,7 @@ xfs_dirents_to_stats(
 
 		statp = (dm_stat_t *) bufp;
 
-		dmb.kernel_buffer = 1;
-		(void)xfs_dm_bulkstat_one(mp, (xfs_ino_t)p->d_ino,
-					  statp, spaceleft, &dmb,
-					  0, NULL, NULL, &res);
+		res = xfs_dm_stat_one(mp, (xfs_ino_t)p->d_ino, statp, spaceleft);
 		if (res != BULKSTAT_RV_DIDONE)
 			continue;
 
@@ -838,7 +871,6 @@ xfs_dirents_to_stats(
 	}
 	return(1);
 }
-
 
 /* xfs_dm_f_get_eventlist - return the dm_eventset_t mask for inode vp. */
 
@@ -1365,25 +1397,27 @@ xfs_dm_get_bulkall_rvp(
 	xfs_mount_t	*mp;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	vfs_t		*vfsp = vp->v_vfsp;
+	dm_attrname_t	attrname;
 	dm_bulkstat_one_t dmb;
-	dm_xstat_t	*dxs;
+	dm_xstat_t __user *dxs;
 
 	/* Returns negative errors to DMAPI */
 
-	if (attrnamep->an_chars[0] == '\0')
+	if (copy_from_user(&attrname, attrnamep, sizeof(attrname)) ||
+	    copy_from_user(&loc, locp, sizeof(loc)))
+		return -EFAULT;
+
+	if (attrname.an_chars[0] == '\0')
 		return(-EINVAL);
 
 	if (right < DM_RIGHT_SHARED)
 		return(-EACCES);
 
-	if (copy_from_user( &loc, locp, sizeof(loc)))
-		return(-EFAULT);
-
 	/* Because we will write directly to the user's buffer, make sure that
 	   the buffer is properly aligned.
 	*/
 
-	if (((__psint_t)bufp & (DM_STAT_ALIGN - 1)) != 0)
+	if (((unsigned long)bufp & (DM_STAT_ALIGN - 1)) != 0)
 		return(-EFAULT);
 
 	/* Size of the handle is constant for this function.
@@ -1409,7 +1443,7 @@ xfs_dm_get_bulkall_rvp(
 	/* Build the on-disk version of the attribute name. */
 	strcpy(dmb.attrname.dan_chars, dmattr_prefix);
 	strncpy(&dmb.attrname.dan_chars[DMATTR_PREFIXLEN],
-		(char *)attrnamep->an_chars, DM_ATTR_NAME_SIZE + 1);
+		attrname.an_chars, DM_ATTR_NAME_SIZE + 1);
 	dmb.attrname.dan_chars[sizeof(dmb.attrname.dan_chars) - 1] = '\0';
 
 	/*
@@ -1492,7 +1526,7 @@ xfs_dm_get_bulkattr_rvp(
 	   the buffer is properly aligned.
 	*/
 
-	if (((__psint_t)bufp & (DM_STAT_ALIGN - 1)) != 0)
+	if (((unsigned long)bufp & (DM_STAT_ALIGN - 1)) != 0)
 		return(-EFAULT);
 
 	/* size of the handle is constant for this function */
@@ -1662,8 +1696,8 @@ STATIC int
 xfs_dm_get_destroy_dmattr(
 	struct inode	*inode,
 	dm_right_t	right,
-	dm_attrname_t	*attrnamep,
-	char		**valuepp,
+	dm_attrname_t  *attrnamep,
+	char 		**valuepp,
 	int		*vlenp)
 {
 	char		buffer[XFS_BUG_KLUDGE];
@@ -2038,7 +2072,7 @@ xfs_dm_get_eventlist(
 	u_int		type,
 	u_int		nelem,
 	dm_eventset_t	*eventsetp,
-	u_int		*nelemp)
+	u_int 		*nelemp)
 {
 	int		error;
 	bhv_desc_t	*xbdp;
@@ -2860,7 +2894,7 @@ STATIC int
 xfs_dm_symlink_by_handle(
 	struct inode	*inode,
 	dm_right_t	right,
-	void		__user *hanp,
+	void __user	*hanp,
 	size_t		hlen,
 	char		__user *cname,
 	char		__user *path)
@@ -2920,7 +2954,7 @@ xfs_dm_write_invis_rvp(
 	int		flags,
 	dm_off_t	off,
 	dm_size_t	len,
-	void		__user *bufp,
+	void __user	*bufp,
 	int		*rvp)
 {
 	int		fflag = 0;
