@@ -890,7 +890,7 @@ xfs_dir_node_rebalance(struct xfs_dir_state *state,
 	/*
 	 * Adjust the expected index for insertion.
 	 */
-	if (blk1->index > node1->hdr.count) {
+	if (blk1->index >= node1->hdr.count) {
 		blk2->index = blk1->index - node1->hdr.count;
 		blk1->index = node1->hdr.count + 1;	/* make it invalid */
 	}
