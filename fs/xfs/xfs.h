@@ -33,6 +33,8 @@
 #define __XFS_H__
 
 #include <support/support.h>
+#include <xfs_types.h>
+#include <xfs_arch.h>
 
 #include <linux/xfs_linux.h>
 
@@ -65,7 +67,6 @@
 #include <linux/dmapi_kern.h>
 
 #include <xfs_macros.h>
-#include <xfs_types.h>
 #include <xfs_inum.h>
 #include <xfs_log.h>
 #include <xfs_cxfs.h>

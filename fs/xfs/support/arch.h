@@ -34,7 +34,6 @@
 
 #ifdef __KERNEL__
 
-#include <xfs_types.h>
 #include <asm/byteorder.h>
 
 #ifdef __LITTLE_ENDIAN
@@ -49,10 +48,6 @@
 #include <linux/byteorder/swab.h>
 
 #endif	/* __KERNEL__ */
-
-#ifndef XFS_BIG_FILESYSTEMS
-#error XFS_BIG_FILESYSTEMS must be defined true or false
-#endif
 
 /* do we need conversion? */
 
@@ -218,53 +213,12 @@
     } \
 }
 
-
 #define INT_ISZERO(reference,arch) \
     ((reference) == 0)
     
 #define INT_ZERO(reference,arch) \
     ((reference) = 0)
-    
-#define DIRINO4_GET_ARCH(pointer,arch) \
-    ( ((arch) == ARCH_NOCONVERT) \
-        ? \
-            (INT_GET_UNALIGNED_32(pointer)) \
-        : \
-            (INT_GET_UNALIGNED_32_BE(pointer)) \
-    )
-    
-#if XFS_BIG_FILESYSTEMS
-#define DIRINO_GET_ARCH(pointer,arch) \
-    ( ((arch) == ARCH_NOCONVERT) \
-        ? \
-            (INT_GET_UNALIGNED_64(pointer)) \
-        : \
-            (INT_GET_UNALIGNED_64_BE(pointer)) \
-    )
-#else
-/* MACHINE ARCHITECTURE dependent */
-#if __BYTE_ORDER == __LITTLE_ENDIAN 
-#define DIRINO_GET_ARCH(pointer,arch) \
-    DIRINO4_GET_ARCH((((__u8*)pointer)+4),arch)
-#else
-#define DIRINO_GET_ARCH(pointer,arch) \
-    DIRINO4_GET_ARCH(pointer,arch)
-#endif
-#endif    
-
-#define DIRINO_COPY_ARCH(from,to,arch) \
-    if ((arch) == ARCH_NOCONVERT) { \
-        bcopy(from,to,sizeof(xfs_ino_t)); \
-    } else { \
-        INT_SWAP_UNALIGNED_64(from,to); \
-    }
-#define DIRINO4_COPY_ARCH(from,to,arch) \
-    if ((arch) == ARCH_NOCONVERT) { \
-        bcopy((((__u8*)from+4)),to,sizeof(xfs_dir2_ino4_t)); \
-    } else { \
-        INT_SWAP_UNALIGNED_32(from,to); \
-    }
-    
+        
 #define INT_GET_UNALIGNED_16_ARCH(pointer,arch) \
     ( ((arch) == ARCH_NOCONVERT) \
         ? \
