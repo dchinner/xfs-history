@@ -1321,6 +1321,7 @@ probe_page(struct inode *inode, unsigned long index)
 /*
  * Allocate & map buffers for page given the extent map. Write it out.
  */
+
 STATIC void
 convert_page(struct inode *inode, struct page *page, page_buf_bmap_t *mp)
 {
@@ -1336,8 +1337,8 @@ convert_page(struct inode *inode, struct page *page, page_buf_bmap_t *mp)
 	head = bh;
 	do {
 		lock_buffer(bh);
-		clear_bit(BH_Delay, &bh->b_state);
-		if (atomic_set_buffer_clean(bh)) {
+		if (!test_and_clear_bit(BH_Delay, &bh->b_state) ||
+		    atomic_set_buffer_clean(bh)) {
 			get_bh(bh);
 			bh->b_end_io = end_buffer_io_sync;
 			refile_buffer(bh);
@@ -1358,6 +1359,7 @@ convert_page(struct inode *inode, struct page *page, page_buf_bmap_t *mp)
 	page_cache_release(page);
 }
 
+
 /*
  * Convert & write out a cluster of pages in the same extent as defined
  * by mp and surrounding the start page.
@@ -1369,7 +1371,6 @@ cluster_write(struct inode *inode,
 {
 	unsigned long tindex, tlast;
 	struct page *page;
-	int count = 0;
 
 	if (startpage->index != 0) {
 		tlast = mp->pbm_offset >> PAGE_CACHE_SHIFT;
@@ -1377,20 +1378,17 @@ cluster_write(struct inode *inode,
 			if (!(page = probe_page(inode, tindex)))
 				break;
 			convert_page(inode, page, mp);
-			count++;
 		}
 	}
 	convert_page(inode, startpage, mp);
-	count++;
 	tlast = PAGE_CACHE_ALIGN_LL(mp->pbm_offset + mp->pbm_bsize) >>
 							PAGE_CACHE_SHIFT;
 	for (tindex = startpage->index + 1; tindex < tlast; tindex++) {
 		if (!(page = probe_page(inode, tindex)))
 			break;
 		convert_page(inode, page, mp);
-		count++;
 	}
-	return count;
+	return 0;
 }
 
 STATIC int
@@ -1411,7 +1409,7 @@ allocate:
 	if (error)
 		return error;
 
-	if ((error == 0) && (maps[0].pbm_flags & PBMF_HOLE)) {
+	if ((maps[0].pbm_flags & PBMF_HOLE)) {
 		printk("delalloc page 0x%p with no extent index 0x%lx\n",
 			page, page->index);
 		BUG();
