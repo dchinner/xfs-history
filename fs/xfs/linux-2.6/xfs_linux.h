@@ -42,6 +42,7 @@
 #include <linux/sched.h>
 #include <linux/bitops.h>
 #include <linux/major.h>
+#include <linux/vfs.h>
 #include <linux/pagemap.h>
 
 #include <asm/page.h>
