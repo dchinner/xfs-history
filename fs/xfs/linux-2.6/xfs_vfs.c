@@ -73,6 +73,7 @@ vfs_t 		rootvfs_data;	/* root vfs */
 vfs_t 		*rootvfs = &rootvfs_data; 	/* pointer to root vfs; */
                                                 /*   head of VFS list. */
 lock_t 		vfslock;	/* spinlock protecting rootvfs and vfs_flag */
+zone_t          *pn_zone;       /* pathname zone */
 sema_t 		synclock;	/* sync in progress; initialized in sinit() */
                                 
 extern int xfs_statdevvp(struct statvfs *, struct vnode *);

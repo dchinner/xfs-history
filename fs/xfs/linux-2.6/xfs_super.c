@@ -25,6 +25,7 @@
 #include <ksys/behavior.h>
 #include <sys/statvfs.h>
 #include <asm/uaccess.h>
+#include <asm/init.h>
 
 #undef MS_RDONLY
 #undef MS_REMOUNT

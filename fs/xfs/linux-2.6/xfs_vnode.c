@@ -30,7 +30,7 @@
  *  
  */
 
-#ident	"$Revision: 1.40 $"
+#ident	"$Revision: 1.2 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -1057,4 +1057,25 @@ vn_relink(
 	vlist->vl_next = next;
 	vlist->vl_prev = prev;
 	prev->v_next = (struct vnode *)vlist;
+}
+
+pfd_t *
+vnode_pfind(vnode_t *vp, pgno_t pgno, int acquire)
+{
+	printk("XFS: vnode_pfind NOT IMPLEMENTED\n");
+	return(NULL);
+}
+
+typedef void *ckpt_handle_t;
+
+int
+lookupname(char *fnamep,                /* user pathname */
+        enum uio_seg seg,               /* addr space that name is in */
+        enum symfollow followlink,      /* follow sym links */
+        vnode_t **dirvpp,               /* ret for ptr to parent dir vnode */
+        vnode_t **compvpp,              /* ret for ptr to component vnode */
+        ckpt_handle_t *ckpt)            /* ret for ckpt lookup info */
+{
+	printk("XFS: lookupname NOT IMPLEMENTED\n");
+	return(ENOSYS);
 }

@@ -328,3 +328,28 @@ fs_pathconf(bhv_desc_t *bdp, int cmd, long *valp, struct cred *cr)
 	printk("XFS: fs_pathconf() NOT IMPLEMENTED\n");
 	return 0;
 }
+
+int
+fs_strgetmsg(bhv_desc_t *bdp,
+        struct strbuf   *mctl,
+        struct strbuf   *mdata,
+        unsigned char   *prip,
+        int             *flagsp,
+        int             fmode,
+        union rval      *rvp)
+{
+	printk("XFS: fs_strgetmsg() NOT IMPLEMENTED\n");
+	return(ENOSYS);
+}
+
+int
+fs_strputmsg(bhv_desc_t *bdp,
+        struct strbuf   *mctl,
+        struct strbuf   *mdata,
+        unsigned char   pri,
+        int             flag,
+        int             fmode)
+{
+	printk("XFS: fs_strputmsg() NOT IMPLEMENTED\n");
+	return(ENOSYS);
+}

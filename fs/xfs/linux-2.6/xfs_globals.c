@@ -49,3 +49,9 @@ int             restricted_chown = 0;
 int     	scache_linemask = 0x1f;       /* second level cache line size mask */
 int		imon_enabled;
 prid_t		dfltprid;
+long            physmem;
+int		maxdmasz = 0x401;	/* Obviously needs to be set dynamically */
+time_t          lbolt;                  /* time in HZ since last boot */
+struct ksa	ksa;
+struct ksa      *ksaptr = &ksa;        /* ptr to kernel system activities buf*/
+
