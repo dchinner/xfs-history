@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.35 $"
+#ident "$Revision: 1.36 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -28,7 +28,6 @@
 #include <sys/debug.h>
 #include "xfs_handle.h"
 #include "xfs_error.h"
-#include "os/proc/pproc_private.h"	/* XXX bogus */
 
 
 /*
