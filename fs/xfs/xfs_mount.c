@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.158 $"
+#ident	"$Revision: 1.159 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -105,7 +105,7 @@ xfs_mount_init(void)
 void
 xfs_mount_free(xfs_mount_t *mp)
 {
-	if (mp->m_ihashmask)
+	if (mp->m_ihash)
 		xfs_ihash_free(mp);
 
 	if (mp->m_perag) {
