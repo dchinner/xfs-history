@@ -647,39 +647,32 @@ STATIC struct buffer_head *
 _pagebuf_get_prealloc_bh(void)
 {
 	unsigned long		flags;
-	struct buffer_head	*bh = NULL;
-	struct task_struct	*tsk = current;
-	DECLARE_WAITQUEUE	(wait, tsk);
+	struct buffer_head	*bh;
+	DECLARE_WAITQUEUE	(wait, current);
 
 	spin_lock_irqsave(&pb_resv_bh_lock, flags);
 
 	if (pb_resv_bh_cnt < 1) {
-
 		add_wait_queue(&pb_resv_bh_wait, &wait);
 		do {
-			run_task_queue(&tq_disk);
-			set_task_state(tsk, TASK_UNINTERRUPTIBLE);
+			set_current_state(TASK_UNINTERRUPTIBLE);
 			spin_unlock_irqrestore(&pb_resv_bh_lock, flags);
+			run_task_queue(&tq_disk);
 			schedule();
 			spin_lock_irqsave(&pb_resv_bh_lock, flags);
 		} while (pb_resv_bh_cnt < 1);
-		tsk->state = TASK_RUNNING;
+		__set_current_state(TASK_RUNNING);
 		remove_wait_queue(&pb_resv_bh_wait, &wait);
 	}
 
-	if (pb_resv_bh_cnt < 1)
-		BUG();
+	BUG_ON(pb_resv_bh_cnt < 1);
+	BUG_ON(!pb_resv_bh);
 
 	bh = pb_resv_bh;
-
-	if (!bh)
-		BUG();
-
 	pb_resv_bh = bh->b_next;
 	pb_resv_bh_cnt--;
 
 	spin_unlock_irqrestore(&pb_resv_bh_lock, flags);
-
 	return bh;
 }
 
