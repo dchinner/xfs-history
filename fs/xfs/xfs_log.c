@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.151 $"
+#ident	"$Revision: 1.152 $"
 
 /*
  * High level interface routines for log manager
@@ -393,7 +393,7 @@ xfs_log_notify(xfs_mount_t	  *mp,		/* mount of partition */
  * As you can see, we currently do nothing.
  */
 int
-xfs_log_init()
+xfs_log_init(void)
 {
 	return( 0 );
 }
@@ -492,13 +492,20 @@ int
 xfs_log_mount(xfs_mount_t	*mp,
 	      dev_t		log_dev,
 	      daddr_t		blk_offset,
-	      int		num_bblks,
-	      int		*clean)
+	      int		num_bblks)
 {
 	xlog_t *log;
 	int    error;
 	
-	cmn_err(CE_NOTE, "!Start mounting filesystem: %s", mp->m_fsname);
+	if (!(mp->m_flags & XFS_MOUNT_NORECOVERY))
+		cmn_err(CE_NOTE,
+			"!Start mounting filesystem: %s", mp->m_fsname);
+	else {
+		cmn_err(CE_NOTE,
+			"!Mounting filesystem \"%s\" in no-recovery mode.  Filesystem will be inconsistent.",
+			mp->m_fsname);
+		ASSERT(XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY);
+	}
 
 	mp->m_log = log = xlog_alloc_log(mp, log_dev, blk_offset, num_bblks);
 
@@ -508,10 +515,18 @@ xfs_log_mount(xfs_mount_t	*mp,
 		return 0;
 	}
 #endif
-	if ((error = xlog_recover(log, XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY,
-				clean)) != NULL) {
-		xlog_unalloc_log(log);
-	}
+	/*
+	 * skip log recovery on a norecovery mount.  pretend it all
+	 * just worked.
+	 */
+	if (!(mp->m_flags & XFS_MOUNT_NORECOVERY)) {
+		if ((error = xlog_recover(log,
+					XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY))
+				!= NULL) {
+			xlog_unalloc_log(log);
+		}
+	} else
+		error = 0;
 
 	/* Normal transactions can now occur */
 	log->l_flags &= ~XLOG_ACTIVE_RECOVERY;
@@ -532,17 +547,13 @@ int
 xfs_log_mount_finish(xfs_mount_t *mp)
 {
 	int	error;
-	int	clean;
 
-	clean = 0;
-	error = xlog_recover_finish(mp->m_log, &clean);
-
-	/*
-	 * if the fs didn't need recovery and is marked read-only,
-	 * keep it clean.
-	 */
-	if (clean && (XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY))
-		mp->m_flags |= XFS_MOUNT_FS_IS_CLEAN;
+	if (!(mp->m_flags & XFS_MOUNT_NORECOVERY))
+		error = xlog_recover_finish(mp->m_log);
+	else {
+		error = 0;
+		ASSERT(XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY);
+	}
 
 	return error;
 }
@@ -572,11 +583,10 @@ xfs_log_unmount(xfs_mount_t *mp)
 #endif
 
 	/*
-	 * Don't write out unmount record if the fs was clean when
-	 * mounted (no recovery required) and the fs is readonly.
+	 * Don't write out unmount record on read-only mounts.
 	 * Or, if we are doing a forced umount (typically because of IO errors).
 	 */
-	if (mp->m_flags & XFS_MOUNT_FS_IS_CLEAN) {
+	if (XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY) {
 		xlog_unalloc_log(log);
 		return 0;
 	}
