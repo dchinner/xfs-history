@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.23 $"
+#ident "$Revision: 1.24 $"
 
 /*
  * List of extents to be free "later".
@@ -38,6 +38,8 @@ typedef	struct xfs_bmap_free
 #define	DELAYSTARTBLOCK		((xfs_fsblock_t)-1LL)
 #define	HOLESTARTBLOCK		((xfs_fsblock_t)-2LL)
 
+#define	XFS_BMAP_INIT(flp, fbp)	\
+	((flp)->xbf_first = NULL, (flp)->xbf_count = 0, *(fbp) = NULLFSBLOCK)
 
 /*
  * Add the extent to the list of extents to be free at transaction end.
