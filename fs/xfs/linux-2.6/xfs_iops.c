@@ -918,7 +918,7 @@ void linvfs_d_iput(struct dentry *dentry, struct inode *inode)
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 
 	if (vp) {
-		vn_put(vp);
+		vn_rele(vp);
 	} else {
 		iput(inode);
 	}

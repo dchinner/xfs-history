@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.39 $"
+#ident	"$Revision: 1.40 $"
 
 #include <xfs_os_defs.h>
 
@@ -72,10 +72,10 @@
 #include <sys/ktrace.h>
 #endif	/* CONFIG_XFS_VNODE_TRACING */
 
-#define LOCK_VFP(listp)	       	mutex_spinlock(&(listp)->vf_lock)
-#define UNLOCK_VFP(listp,s)	mutex_spinunlock(&(listp)->vf_lock, s)
-#define	NESTED_LOCK_VFP(listp)	nested_spinlock(&(listp)->vf_lock)
-#define	NESTED_UNLOCK_VFP(listp) nested_spinunlock(&(listp)->vf_lock)
+#define LOCK_VFP()	       	mutex_spinlock(&vlistlock)
+#define UNLOCK_VFP(s)		mutex_spinunlock(&vlistlock, s)
+#define	NESTED_LOCK_VFP()	nested_spinlock(&vlistlock)
+#define	NESTED_UNLOCK_VFP()	nested_spinunlock(&vlistlock)
 
 /*
  * Private vnode spinlock manipulation.
@@ -203,6 +203,7 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 	struct vnode	*vp;
 	xfs_inode_t	*ip;
 	xfs_mount_t	*mp;
+	int		s;
 
 	
 	XFS_STATS_INC(vn_active);
@@ -215,9 +216,9 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 
 	atomic_inc(&vn_vnumber);
 
-	/* We never free the vnodes in the simulator, so these don't
-	   get destroyed either */
 	spinlock_init(&vp->v_lock, "v_lock");
+	if (from_readinode)
+		s = VN_LOCK(vp);
 
 	spin_lock(&vnumber_lock);
 	vn_generation += 1;
@@ -257,9 +258,12 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 		{ int error;
 		error = linvfs_revalidate_core(inode);
 		if(error)
-		  printk("vn_initialize: linvfs_revalidate_core error %d\n",error);
+			printk("vn_initialize: linvfs_revalidate_core"
+				"error %d\n",error);
 		}
 	}
+	if (from_readinode)
+		VN_UNLOCK(vp, s);
 
 	vn_trace_exit(vp, "vn_initialize", (inst_t *)__return_address);
 
@@ -267,7 +271,7 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 }
 
 struct vnode *
-vn_alloc(struct vfs *vfsp, __uint64_t ino, enum vtype type, dev_t dev)
+vn_alloc(struct vfs *vfsp, __uint64_t ino, enum vtype type)
 {
 	struct inode	*inode;
 	struct vnode	*vp;
@@ -334,9 +338,9 @@ vn_get(struct vnode *vp, vmap_t *vmap, uint flags)
 
 	XFS_STATS_INC(vn_get);
 
-	inode = iget(vmap->v_vfsp->vfs_super, vmap->v_ino);
+	inode = ihold(vmap->v_vfsp->vfs_super, vmap->v_ino);
 
-	if (inode == NULL)		/* I_FREEING conflict */
+	if (inode == NULL)		/* Inode not present */
 		return NULL;
 
 	inum = inode->i_ino;
@@ -369,26 +373,6 @@ fail:
 	iput(inode);
 
 	return NULL;
-}
-
-
-/*
- * rele the vnode - this has to go to iput on linux
- */
-void
-vn_rele(struct vnode *vp)
-{
-	struct inode *inode;
-
-	XFS_STATS_INC(vn_rele);
-
-	vn_trace_entry(vp, "vn_rele", (inst_t *)__return_address);
-
-	inode = LINVFS_GET_IP(vp);
-
-	ASSERT(inode);
-
-	iput(inode);
 }
 
 
@@ -610,13 +594,16 @@ vn_hold(struct vnode *vp)
  * VOP_INACTIVE on last reference.
  */
 void
-vn_put(struct vnode *vp)
+vn_rele(struct vnode *vp)
 {
 	int	s;
 	int	vcnt;
 	/* REFERENCED */
 	int cache;
 
+	XFS_STATS_INC(vn_rele);
+
+	vn_trace_entry(vp, "vn_rele", (inst_t *)__return_address);
 
 	s = VN_LOCK(vp);
 

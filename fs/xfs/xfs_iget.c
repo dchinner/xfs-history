@@ -33,14 +33,9 @@
 
 #include <xfs_os_defs.h>
 #include <linux/stat.h>
-#ifndef SIM
 #include <linux/sched.h>
-#endif
 
 
-#ifdef SIM
-#define _KERNEL 1
-#endif
 #include <sys/param.h>
 #include <sys/mode.h>
 #include "xfs_buf.h"
@@ -51,13 +46,8 @@
 #include <sys/debug.h>
 #include <sys/cmn_err.h>
 
-#ifdef SIM
-#undef _KERNEL
-#endif
 #include <sys/kmem.h>
-#ifndef SIM
 #include <sys/systm.h>
-#endif
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -81,10 +71,6 @@
 #include "xfs_quota.h"
 #include "xfs_utils.h"
 #include "xfs_cxfs.h"
-
-#ifdef SIM
-#include "sim.h"
-#endif /* SIM */
 
 extern vnodeops_t xfs_vnodeops;
 extern xfs_zone_t *xfs_chashlist_zone;
@@ -181,11 +167,9 @@ xfs_iget_vnode_init(
 	vnode_t		*vp,
 	xfs_inode_t	*ip)
 {
-#ifndef SIM
 	vp->v_vfsp  = XFS_MTOVFS(mp);
 	vp->v_inode = LINVFS_GET_IP(vp);
 	vp->v_type  = IFTOVT(ip->i_d.di_mode);
-#endif	/* !SIM */
 }
 
 
@@ -231,7 +215,6 @@ xfs_iget_core(
 	xfs_daddr_t	bno)
 {
 	int		vn_alloc_used = 0;
-	dev_t		dev;
 	xfs_ihash_t	*ih;
 	xfs_inode_t	*ip;
 	xfs_inode_t	*iq;
@@ -277,13 +260,9 @@ again:
 
 					xfs_iget_vnode_init(mp, vp, ip);
 				} else {
-					dev = IRIX_DEV_TO_KDEVT(
-                                                ip->i_df.if_u2.if_rdev);
-
 					mrunlock(&ih->ih_lock);
 					vp = vn_alloc(XFS_MTOVFS(mp), ino,
-						      IFTOVT(ip->i_d.di_mode),
-						      dev);
+						      IFTOVT(ip->i_d.di_mode));
 
 					preallocated_vnode = vp;
 					vn_alloc_used = 1;
@@ -306,13 +285,7 @@ again:
 
 			} else if (preallocated_vnode) {
 				if (vn_alloc_used) {
-#ifdef SIM
-				        vn_bhv_remove(VN_BHV_HEAD(preallocated_vnode), 
-					        &(ip->i_bhv_desc));
-				        vn_free(preallocated_vnode);
-#else
-					vn_put(preallocated_vnode);
-#endif
+					vn_rele(preallocated_vnode);
 					preallocated_vnode = NULL;
 					vn_alloc_used = 0;
 				} else if (preallocated_vnode != vp) {
@@ -424,10 +397,7 @@ finish_inode:
 
 		xfs_iget_vnode_init(mp, vp, ip);
 	} else {
-		dev = IRIX_DEV_TO_KDEVT(ip->i_df.if_u2.if_rdev);
-
-		vp = vn_alloc(XFS_MTOVFS(mp), ino,
-					IFTOVT(ip->i_d.di_mode), dev);
+		vp = vn_alloc(XFS_MTOVFS(mp), ino, IFTOVT(ip->i_d.di_mode));
 		vn_alloc_used = 1;
 	}
 
@@ -443,10 +413,8 @@ finish_inode:
 
 #ifdef CELL_CAPABLE
 	quiesce_new = 0;
-#ifndef SIM
 	if (mp->m_inode_quiesce)
 		quiesce_new = cxfs_inode_qset(ip);
-#endif	/* !SIM */
 #endif	/* CELL_CAPABLE */
 
 	if (lock_flags != 0) {
@@ -480,14 +448,8 @@ finish_inode:
 		for (iq = ih->ih_next; iq != NULL; iq = iq->i_next) {
 			if (iq->i_ino == ino) {
 				mrunlock(&ih->ih_lock);
-#ifdef	SIM
-				vn_bhv_remove(VN_BHV_HEAD(vp), 
-					      &(ip->i_bhv_desc));
-				vn_free(vp);
-#else	/* ! SIM */
 				if (preallocated_vnode == NULL)
-					vn_put(vp);
-#endif	/* ! SIM */
+					vn_rele(vp);
 				xfs_idestroy(ip);
 
 				XFS_STATS_INC(xs_ig_dup);
@@ -606,7 +568,6 @@ finish_inode:
 	}
 #endif
 
-#ifndef SIM
 	error = vn_revalidate(vp, ATTR_LAZY);	/* Update the linux inode */
 
 	/*
@@ -617,7 +578,6 @@ finish_inode:
 	 */
 	if (vn_alloc_used)
 		vn_insert_in_linux_hash(vp);
-#endif	/* ! SIM */
 
 	*ipp = ip;
 
@@ -855,9 +815,7 @@ xfs_iextract(
 				chm = chl;
 			}
 		}
-#ifndef SIM
 		ASSERT_ALWAYS(chl != NULL);
-#endif
        } else {
 		/* delete one inode from a non-empty list */
 		iq = ip->i_cnext;
@@ -986,7 +944,7 @@ xfs_ilock_ra(xfs_inode_t	*ip,
 	ASSERT((lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) !=
 	       (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
 	ASSERT((lock_flags & ~XFS_LOCK_MASK) == 0);
-#if defined(SIM) || defined(__linux__)
+#if defined(__linux__)
 	ASSERT(!(lock_flags & XFS_IOLOCK_NESTED));
 #endif
 	if (return_address == NULL)
@@ -999,7 +957,7 @@ xfs_ilock_ra(xfs_inode_t	*ip,
 			mraccessf(&ip->i_iolock, PLTWAIT);
 		}
 	}
-#if !defined(SIM) && !defined(__linux__)
+#if !defined(__linux__)
 	else {
 #pragma mips_frequency_hint NEVER
 		ASSERT(XFST_ISNESTED_ENABLED());
@@ -1010,7 +968,7 @@ xfs_ilock_ra(xfs_inode_t	*ip,
 				"i/o lock recursion loop, inode 0x%Lx",
 				(uint64_t) ip);
 	}
-#endif /* !SIM && !__linux__ */
+#endif /* !__linux__ */
 	if (lock_flags & XFS_ILOCK_EXCL) {
 		mrupdatef(&ip->i_lock, PLTWAIT);
 		ip->i_ilock_ra = return_address;
@@ -1060,7 +1018,7 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 	ASSERT((lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) !=
 	       (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
 	ASSERT((lock_flags & ~XFS_LOCK_MASK) == 0);
-#if defined(SIM) || defined(__linux__)
+#if defined(__linux__)
 	ASSERT(!(lock_flags & XFS_IOLOCK_NESTED));
 #endif
 
@@ -1078,7 +1036,7 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 			}
 		}
 	}
-#if !defined(SIM) && !defined(__linux__)
+#if !defined(__linux__)
 	else {
 #pragma mips_frequency_hint NEVER
 		ASSERT(XFST_ISNESTED_ENABLED());
@@ -1090,7 +1048,7 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 				"i/o lock recursion loop, inode 0x%Lx",
 				(uint64_t) ip);
 	}
-#endif /* !SIM */
+#endif /* !__linux__ */
 	if (lock_flags & XFS_ILOCK_EXCL) {
 		ilocked = mrtryupdate(&ip->i_lock);
 		if (!ilocked) {
@@ -1150,7 +1108,7 @@ xfs_iunlock(xfs_inode_t	*ip,
 	       (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
 	ASSERT((lock_flags & ~(XFS_LOCK_MASK | XFS_IUNLOCK_NONOTIFY)) == 0);
 	ASSERT(lock_flags != 0);
-#if defined(SIM) || defined(__linux__)
+#if defined(__linux__)
 	ASSERT(!(lock_flags & XFS_IOLOCK_NESTED));
 #endif
 
@@ -1163,14 +1121,14 @@ xfs_iunlock(xfs_inode_t	*ip,
 			mrunlock(&ip->i_iolock);
 		}
 	}
-#if !defined(SIM) && !defined(__linux__)
+#if !defined(__linux__)
 	else {
 #pragma mips_frequency_hint NEVER
 		ASSERT_ALWAYS(XFST_ISNESTED_ENABLED());
 		ASSERT_ALWAYS(XFST_ISNESTED_USED());
 		XFST_NESTED_DECR();
 	}
-#endif /* !SIM */
+#endif /* !__linux__ */
 
 	if (lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) {
 		ASSERT(!(lock_flags & XFS_ILOCK_SHARED) ||
@@ -1196,7 +1154,6 @@ xfs_iunlock(xfs_inode_t	*ip,
 #endif
 }
 
-#ifndef SIM
 /*
  * give up write locks.  the i/o lock cannot be held nested
  * if it is being demoted.
@@ -1220,7 +1177,6 @@ xfs_ilock_demote(xfs_inode_t	*ip,
 		mrdemote(&ip->i_iolock);
 	}
 }
-#endif /* !SIM */
 
 /*
  * The following three routines simply manage the i_flock
