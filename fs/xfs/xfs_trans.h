@@ -147,6 +147,9 @@ typedef void(*xfs_trans_callback_t)(struct xfs_trans*, void*);
  * every transaction. It identifies the type and id of the
  * transaction, and contains the number of items logged by
  * the transaction so we know how many to expect during recovery.
+ *
+ * Do not change the below structure without redoing the code in
+ * xlog_recover_add_to_trans() and xlog_recover_add_to_cont_trans().
  */
 typedef struct xfs_trans_header {
 	uint		th_magic;		/* magic number */
