@@ -39,7 +39,7 @@ enum { MR_NONE, MR_ACCESS, MR_UPDATE };
 typedef struct {
 	struct rw_semaphore	mr_lock;
 	int			mr_writer;
-} xfs_mrlock_t;
+} mrlock_t;
 
 #define mrinit(mrp, name)	\
 	( (mrp)->mr_writer = 0, init_rwsem(&(mrp)->mr_lock) )
@@ -48,23 +48,23 @@ typedef struct {
 #define mraccess(mrp)		mraccessf(mrp, 0)
 #define mrupdate(mrp)		mrupdatef(mrp, 0)
 
-static inline void mraccessf(xfs_mrlock_t *mrp, int flags)
+static inline void mraccessf(mrlock_t *mrp, int flags)
 {
 	down_read(&mrp->mr_lock);
 }
 
-static inline void mrupdatef(xfs_mrlock_t *mrp, int flags)
+static inline void mrupdatef(mrlock_t *mrp, int flags)
 {
 	down_write(&mrp->mr_lock);
 	mrp->mr_writer = 1;
 }
 
-static inline int mrtryaccess(xfs_mrlock_t *mrp)
+static inline int mrtryaccess(mrlock_t *mrp)
 {
 	return down_read_trylock(&mrp->mr_lock);
 }
 
-static inline int mrtryupdate(xfs_mrlock_t *mrp)
+static inline int mrtryupdate(mrlock_t *mrp)
 {
 	if (!down_write_trylock(&mrp->mr_lock))
 		return 0;
@@ -72,7 +72,7 @@ static inline int mrtryupdate(xfs_mrlock_t *mrp)
 	return 1;
 }
 
-static inline void mrunlock(xfs_mrlock_t *mrp)
+static inline void mrunlock(mrlock_t *mrp)
 {
 	if (mrp->mr_writer) {
 		mrp->mr_writer = 0;
@@ -82,7 +82,7 @@ static inline void mrunlock(xfs_mrlock_t *mrp)
 	}
 }
 
-static inline void mrdemote(xfs_mrlock_t *mrp)
+static inline void mrdemote(mrlock_t *mrp)
 {
 	mrp->mr_writer = 0;
 	downgrade_write(&mrp->mr_lock);
@@ -94,7 +94,7 @@ static inline void mrdemote(xfs_mrlock_t *mrp)
  * (reader state is outside our visibility, we only track writer state).
  * Note: means !ismrlocked would give false positivies, so don't do that.
  */
-static inline int ismrlocked(xfs_mrlock_t *mrp, int type)
+static inline int ismrlocked(mrlock_t *mrp, int type)
 {
 	if (type == MR_UPDATE)
 		return mrp->mr_writer;
