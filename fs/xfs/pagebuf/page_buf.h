@@ -250,7 +250,6 @@ extern page_buf_t *pagebuf_get(		/* allocate a buffer		*/
 
 extern page_buf_t *pagebuf_lookup(
 		struct pb_target *,
-		struct inode *,
 		loff_t,			/* starting offset of range	*/
 		size_t,			/* length of range		*/
 		page_buf_flags_t);	/* PBF_READ, PBF_WRITE,		*/

@@ -892,18 +892,16 @@ pagebuf_get(				/* allocate a buffer		*/
 }
 
 /*
- * Create a pagebuf and populate it with pages from the address
- * space of the passed in inode.
+ * Create a skeletal pagebuf (no pages associated with it).
  */
 page_buf_t *
 pagebuf_lookup(
 	struct pb_target	*target,
-	struct inode		*inode,
 	loff_t			ioff,
 	size_t			isize,
 	page_buf_flags_t	flags)
 {
-	page_buf_t		*pb = NULL;
+	page_buf_t		*pb;
 
 	flags |= _PBF_PRIVATE_BH;
 	pb = pagebuf_allocate(flags);
@@ -1387,7 +1385,8 @@ STATIC void
 _end_io_pagebuf(
 	struct buffer_head	*bh,
 	int			uptodate,
-	int			fullpage)
+	int			fullpage,
+	int			freebufs)
 {
 	struct page		*page = bh->b_page;
 	page_buf_t		*pb = (page_buf_t *)bh->b_private;
@@ -1400,7 +1399,7 @@ _end_io_pagebuf(
 		pb->pb_error = EIO;
 	}
 
-	if (fullpage) {
+	if (freebufs) {
 		unlock_buffer(bh);
 		_pagebuf_free_bh(bh);
 	} else {
@@ -1431,7 +1430,7 @@ _pagebuf_end_io_complete_pages(
 	struct buffer_head	*bh,
 	int			uptodate)
 {
-	_end_io_pagebuf(bh, uptodate, 1);
+	_end_io_pagebuf(bh, uptodate, 1, 1);
 }
 
 STATIC void
@@ -1439,7 +1438,15 @@ _pagebuf_end_io_partial_pages(
 	struct buffer_head	*bh,
 	int			uptodate)
 {
-	_end_io_pagebuf(bh, uptodate, 0);
+	_end_io_pagebuf(bh, uptodate, 0, 1);
+}
+
+STATIC void
+_pagebuf_end_io_public_pages(
+	struct buffer_head	*bh,
+	int			uptodate)
+{
+	_end_io_pagebuf(bh, uptodate, 0, 0);
 }
 
 
@@ -1570,9 +1577,12 @@ request:
 	if (cnt) {
 		void	(*callback)(struct buffer_head *, int);
 
-		callback = (multi_ok && public_bh) ?
-				_pagebuf_end_io_partial_pages :
-				_pagebuf_end_io_complete_pages;
+		if (!multi_ok)
+			callback = _pagebuf_end_io_complete_pages;
+		else if (!public_bh)
+			callback = _pagebuf_end_io_partial_pages;
+		else
+			callback = _pagebuf_end_io_public_pages;
 
 		/* Account for additional buffers in progress */
 		atomic_add(cnt, &pb->pb_io_remaining);
