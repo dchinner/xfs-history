@@ -20,7 +20,7 @@
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  *									  *
  **************************************************************************/
-#ident "$Revision: 1.16 $"
+#ident "$Revision$"
 
 #include <sys/types.h>
  
@@ -56,8 +56,8 @@ struct xfs_args {
 	uchar_t	iosizelog;	/* log2 of the preferred I/O size */
 	uchar_t	reserved_0;	/* reserved fields */
 	short	reserved_1;
-	int	reserved_2;
-	int	reserved_3;
+	dev_t	logdev;		/* Log device */
+	dev_t	rtdev;		/* Realtime device */
 
         /*
 	 * The following items added in version 4.  This stuff is for

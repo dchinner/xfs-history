@@ -98,7 +98,6 @@
 #include "xfs_clnt.h"
 #include "xfs_cxfs.h"
 #include "xfs_utils.h"
-#include "xfs_fs_bio.h"
 
 #ifdef SIM
 #include "sim.h"
