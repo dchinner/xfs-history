@@ -156,9 +156,9 @@ obj-y				+= xfs_alloc.o \
 # Objects not built in this directory
 obj-y				+= linux/linux_xfs.o
 
-include $(TOPDIR)/Rules.make
-
 CFLAGS_xfsidbg.o += -I $(TOPDIR)/arch/$(ARCH)/kdb
+
+include $(TOPDIR)/Rules.make
 
 # This is really nasty, but Rules.make was never designed for multi directory
 # modules.  Keith Owens.
