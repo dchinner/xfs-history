@@ -45,6 +45,8 @@
  */
 lock_t	xfs_bli_reflock;
 
+zone_t	*xfs_buf_item_zone;
+
 #if 0
 STATIC void	xfs_buf_item_set_bit(uint *, uint, uint);
 #endif
@@ -280,8 +282,10 @@ xfs_buf_item_unpin(xfs_buf_log_item_t *bip)
 		xfs_buf_item_trace("UNPIN STALE", bip);
 		mp = bip->bli_item.li_mountp;
 		s = AIL_LOCK(mp);
-		xfs_trans_delete_ail(mp, (xfs_log_item_t *)bip);
-		AIL_UNLOCK(mp, s);
+		/*
+		 * xfs_trans_delete_ail() drops the AIL lock.
+		 */
+		xfs_trans_delete_ail(mp, (xfs_log_item_t *)bip, s);
 		xfs_buf_item_relse(bp);
 		ASSERT(bp->b_fsprivate == NULL);
 		brelse(bp);
@@ -517,15 +521,8 @@ xfs_buf_item_init(buf_t		*bp,
 	chunks = (int)((bp->b_bcount + (XFS_BLI_CHUNK - 1)) >> XFS_BLI_SHIFT);
 	map_size = (chunks + NBWORD) >> BIT_TO_WORD_SHIFT;
 
-	/*
-	 * Since the bitmap adds to the end of the structure, add
-	 * the space for the bitmap to the allocation.  The first
-	 * word of the bitmap is in the structure, so only allocate
-	 * map_size - 1 extra words.
-	 */
-	bip = (xfs_buf_log_item_t*)kmem_zalloc(sizeof(xfs_buf_log_item_t) +
-					       ((map_size - 1) * sizeof(int)),
-					       0);
+	bip = (xfs_buf_log_item_t*)kmem_zone_zalloc(xfs_buf_item_zone,
+						    KM_SLEEP);
 	bip->bli_item.li_type = XFS_LI_BUF;
 	bip->bli_item.li_ops = &xfs_buf_item_ops;
 	bip->bli_item.li_mountp = mp;
@@ -1000,8 +997,7 @@ xfs_buf_item_relse(buf_t *bp)
 #ifndef SIM
 	ktrace_free(bip->bli_trace);
 #endif
-	kmem_free(bip, sizeof(xfs_buf_log_item_t) +
-		  ((bip->bli_format.blf_map_size - 1) * sizeof(int)));
+	kmem_zone_free(xfs_buf_item_zone, bip);
 }
 
 
@@ -1096,8 +1092,10 @@ xfs_buf_iodone(buf_t			*bp,
 
 	mp = bip->bli_item.li_mountp;
 	s = AIL_LOCK(mp);
-	xfs_trans_delete_ail(mp, (xfs_log_item_t *)bip);
-	AIL_UNLOCK(mp, s);
+	/*
+	 * xfs_trans_delete_ail() drops the AIL lock.
+	 */
+	xfs_trans_delete_ail(mp, (xfs_log_item_t *)bip, s);
 
 #ifdef XFS_TRANS_DEBUG
 	kmem_free(bip->bli_orig, bp->b_bcount);
@@ -1109,8 +1107,7 @@ xfs_buf_iodone(buf_t			*bp,
 #ifndef SIM
 	ktrace_free(bip->bli_trace);
 #endif
-	kmem_free(bip, sizeof(xfs_buf_log_item_t) +
-		  ((bip->bli_format.blf_map_size - 1) * sizeof(int)));
+	kmem_zone_free(xfs_buf_item_zone, bip);
 }
 
 #if	(defined(DEBUG) && !defined(SIM))
