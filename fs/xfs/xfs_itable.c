@@ -306,9 +306,9 @@ xfs_bulkstat(
 	rval = 0;
 	while (ubleft > 0 && agno < mp->m_sb.sb_agcount) {
 		bp = NULL;
-		mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
+		down_read(&mp->m_peraglock);
 		error = xfs_ialloc_read_agi(mp, tp, agno, &agbp);
-		mrunlock(&mp->m_peraglock);
+		up_read(&mp->m_peraglock);
 		if (error) {
 			/*
 			 * Skip this allocation group and go to the next one.
@@ -698,9 +698,9 @@ xfs_inumbers(
 	agbp = NULL;
 	while (left > 0 && agno < mp->m_sb.sb_agcount) {
 		if (agbp == NULL) {
-			mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
+			down_read(&mp->m_peraglock);
 			error = xfs_ialloc_read_agi(mp, tp, agno, &agbp);
-			mrunlock(&mp->m_peraglock);
+			up_read(&mp->m_peraglock);
 			if (error) {
 				/*
 				 * If we can't read the AGI of this ag,

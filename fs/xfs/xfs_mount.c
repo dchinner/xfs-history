@@ -146,7 +146,6 @@ xfs_mount_free(
 	if (mp->m_perag) {
 		int	agno;
 
-		mrfree(&mp->m_peraglock);
 		for (agno = 0; agno < mp->m_maxagi; agno++)
 			if (mp->m_perag[agno].pagb_list)
 				kmem_free(mp->m_perag[agno].pagb_list,
@@ -879,7 +878,7 @@ xfs_mountfs(
 	/*
 	 * Allocate and initialize the per-ag data.
 	 */
-	mrlock_init(&mp->m_peraglock, MRLOCK_BARRIER, "xperag", -1);
+	init_rwsem(&mp->m_peraglock);
 	mp->m_perag =
 		kmem_zalloc(sbp->sb_agcount * sizeof(xfs_perag_t), KM_SLEEP);
 
@@ -1063,7 +1062,6 @@ xfs_mountfs(
  error2:
 	xfs_ihash_free(mp);
 	xfs_chash_free(mp);
-	mrfree(&mp->m_peraglock);
 	for (agno = 0; agno < sbp->sb_agcount; agno++)
 		if (mp->m_perag[agno].pagb_list)
 			kmem_free(mp->m_perag[agno].pagb_list,

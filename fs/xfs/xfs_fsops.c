@@ -138,7 +138,7 @@ xfs_growfs_data_private(
 	new = in->newblocks - mp->m_sb.sb_dblocks;
 	oagcount = mp->m_sb.sb_agcount;
 	if (nagcount > oagcount) {
-		mrlock(&mp->m_peraglock, MR_UPDATE, PINOD);
+		down_write(&mp->m_peraglock);
 		mp->m_perag = kmem_realloc(mp->m_perag,
 			sizeof(xfs_perag_t) * nagcount,
 			sizeof(xfs_perag_t) * oagcount,
@@ -147,7 +147,7 @@ xfs_growfs_data_private(
 			(nagcount - oagcount) * sizeof(xfs_perag_t));
 		mp->m_flags |= XFS_MOUNT_32BITINODES;
 		xfs_initialize_perag(mp, nagcount);
-		mrunlock(&mp->m_peraglock);
+		up_write(&mp->m_peraglock);
 	}
 	tp = xfs_trans_alloc(mp, XFS_TRANS_GROWFS);
 	if ((error = xfs_trans_reserve(tp, XFS_GROWFS_SPACE_RES(mp),

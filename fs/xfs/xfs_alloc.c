@@ -2307,7 +2307,7 @@ xfs_alloc_vextent(
 		 * These three force us into a single a.g.
 		 */
 		args->agno = XFS_FSB_TO_AGNO(mp, args->fsbno);
-		mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
+		down_read(&mp->m_peraglock);
 		args->pag = &mp->m_perag[args->agno];
 		minleft = args->minleft;
 		args->minleft = 0;
@@ -2318,14 +2318,14 @@ xfs_alloc_vextent(
 			goto error0;
 		}
 		if (!args->agbp) {
-			mrunlock(&mp->m_peraglock);
+			up_read(&mp->m_peraglock);
 			TRACE_ALLOC("noagbp", args);
 			break;
 		}
 		args->agbno = XFS_FSB_TO_AGBNO(mp, args->fsbno);
 		if ((error = xfs_alloc_ag_vextent(args)))
 			goto error0;
-		mrunlock(&mp->m_peraglock);
+		up_read(&mp->m_peraglock);
 		break;
 	case XFS_ALLOCTYPE_START_BNO:
 		/*
@@ -2374,7 +2374,7 @@ xfs_alloc_vextent(
 		 * Loop over allocation groups twice; first time with
 		 * trylock set, second time without.
 		 */
-		mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
+		down_read(&mp->m_peraglock);
 		for (;;) {
 			args->pag = &mp->m_perag[args->agno];
 			if ((error = xfs_alloc_fix_freelist(args, flags))) {
@@ -2416,7 +2416,7 @@ xfs_alloc_vextent(
 				}
 			}
 		}
-		mrunlock(&mp->m_peraglock);
+		up_read(&mp->m_peraglock);
 		if (bump_rotor || (type == XFS_ALLOCTYPE_ANY_AG))
 			mp->m_agfrotor = (args->agno + 1) % mp->m_sb.sb_agcount;
 		break;
@@ -2438,7 +2438,7 @@ xfs_alloc_vextent(
 	}
 	return 0;
 error0:
-	mrunlock(&mp->m_peraglock);
+	up_read(&mp->m_peraglock);
 	return error;
 }
 
@@ -2467,7 +2467,7 @@ xfs_free_extent(
 	args.agbno = XFS_FSB_TO_AGBNO(args.mp, bno);
 	args.alignment = 1;
 	args.minlen = args.minleft = args.minalignslop = 0;
-	mrlock(&args.mp->m_peraglock, MR_ACCESS, PINOD);
+	down_read(&args.mp->m_peraglock);
 	args.pag = &args.mp->m_perag[args.agno];
 	if ((error = xfs_alloc_fix_freelist(&args, 0)))
 		goto error0;
@@ -2479,7 +2479,7 @@ xfs_free_extent(
 	error = xfs_free_ag_extent(tp, args.agbp, args.agno, args.agbno,
 		len, 0);
 error0:
-	mrunlock(&args.mp->m_peraglock);
+	up_read(&args.mp->m_peraglock);
 	return error;
 }
 
