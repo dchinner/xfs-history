@@ -228,6 +228,7 @@ extern void vfs_insertbhv(vfs_t *, bhv_desc_t *, vfsops_t *, void *);
 #define bhv_module_init(n,m,op)	inter_module_register(n,m,op)
 #define bhv_module_exit(n)	inter_module_unregister(n)
 
+extern void bhv_get_vfsops(struct vfs *, const char *, const char *);
 extern void bhv_insert_all_vfsops(struct vfs *);
 extern void bhv_remove_all_vfsops(struct vfs *, int);
 extern void bhv_remove_vfsops(struct vfs *, int);

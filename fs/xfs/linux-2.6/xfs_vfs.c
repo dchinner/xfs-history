@@ -333,7 +333,7 @@ bhv_remove_all_vfsops(
 	xfs_mount_free(mp, 0);
 }
 
-STATIC void
+void
 bhv_get_vfsops(
 	struct vfs		*vfsp,
 	const char		*name,

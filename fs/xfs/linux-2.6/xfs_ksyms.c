@@ -186,6 +186,7 @@ EXPORT_SYMBOL(xfs_da_cookie_hash);
 EXPORT_SYMBOL(assfail);
 EXPORT_SYMBOL(cmn_err);
 EXPORT_SYMBOL(bhv_base);
+EXPORT_SYMBOL(bhv_get_vfsops);
 EXPORT_SYMBOL(bhv_head_destroy);
 EXPORT_SYMBOL(bhv_insert);
 EXPORT_SYMBOL(bhv_insert_initial);
