@@ -611,7 +611,7 @@ probe_unmapped_page(
 			struct buffer_head	*bh, *head;
 			bh = head = page_buffers(page);
 			do {
-				if (buffer_mapped(bh)) {
+				if (buffer_mapped(bh) || !buffer_uptodate(bh)) {
 					break;
 				}
 				ret += bh->b_size;
@@ -738,6 +738,8 @@ map_page(
 	bh = head = page_buffers(page);
 	do {
 		offset = i << bbits;
+		if (!buffer_uptodate(bh))
+			continue;
 		if (buffer_mapped(bh) && !buffer_delay(bh) && all_bh) {
 			if (startio && (offset < end)) {
 				lock_buffer(bh);
@@ -846,9 +848,14 @@ pagebuf_delalloc_convert(
 
 	len = bh->b_size;
 	do {
+		if (!buffer_uptodate(bh)) {
+			goto next_bh;
+		}
+
 		if (mp) {
 			mp = __pb_match_offset_to_mapping(page, maps, p_offset);
 		}
+
 		if (buffer_delay(bh)) {
 			if (!mp) {
 				err = bmap(inode, offset, len, maps,
@@ -902,6 +909,7 @@ pagebuf_delalloc_convert(
 			}
 		}
 
+next_bh:
 		offset += len;
 		p_offset += len;
 		bh = bh->b_this_page;

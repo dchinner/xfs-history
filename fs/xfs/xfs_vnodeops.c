@@ -5807,6 +5807,5 @@ vnodeops_t xfs_vnodeops = {
 	vop_tosspages:		fs_tosspages,
 	vop_flushinval_pages:	fs_flushinval_pages,
 	vop_flush_pages:	fs_flush_pages,
-	vop_pages_sethole:	fs_pages_sethole,
 	vop_release:		xfs_release,
 };
