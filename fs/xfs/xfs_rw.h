@@ -211,7 +211,8 @@ void
 xfs_inval_cached_pages(
 	struct xfs_inode	*ip,
 	off_t			offset,
-	off_t			len);
+	off_t			len,
+	void			*dio);
 
 void
 xfs_refcache_insert(

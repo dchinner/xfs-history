@@ -6572,7 +6572,7 @@ xfs_free_file_space(
 	ioffset = offset & ~(rounding - 1);
 	if (ilen & (rounding - 1))
 		ilen = (ilen + rounding) & ~(rounding - 1);
-	xfs_inval_cached_pages(ip, ioffset, ilen);
+	xfs_inval_cached_pages(ip, ioffset, ilen, NULL);
 	if (rt) {
 		if (startoffset_fsb & (rtextsize - 1)) {
 			startoffset_fsb += rtextsize & ~(rtextsize - 1);

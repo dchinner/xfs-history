@@ -7051,6 +7051,7 @@ struct dio_s {
 	bhv_desc_t	*bdp;
 	cred_t		*cr;
 	int		ioflag;
+	struct pm	*uio_pmp;
 };
 
 /*
@@ -7065,8 +7066,10 @@ void
 xfs_inval_cached_pages(
 	xfs_inode_t	*ip,
 	off_t		offset,
-	off_t		len)		    
+	off_t		len,
+	void		*dio)		    
 {
+	struct dio_s	*diop = (struct dio_s *)dio;
 	vnode_t		*vp;
 	int		relock;
 	__uint64_t	flush_end;
@@ -7084,6 +7087,17 @@ xfs_inval_cached_pages(
 		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 		xfs_ilock(ip, XFS_IOLOCK_EXCL);
 	}
+
+	/* Writing beyond EOF creates a hole that must be zeroed */
+	if (diop && (offset > ip->i_d.di_size)) {
+		xfs_ilock(ip, XFS_ILOCK_EXCL);
+		if (offset > ip->i_d.di_size) {
+			xfs_zero_eof(ip, offset, ip->i_d.di_size, diop->cr,
+					diop->uio_pmp);
+		}
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	}
+
 	/*
 	 * Round up to the next page boundary and then back
 	 * off by one byte.  We back off by one because this
@@ -7991,7 +8005,7 @@ xfs_diostrat(
 	 * it should be good enough.
 	 */
 	if (!(dp->ioflag & IO_IGNCACHE) && VN_CACHED(vp)) {
-		xfs_inval_cached_pages(ip, offset, bp->b_bcount);
+		xfs_inval_cached_pages(ip, offset, bp->b_bcount, dp);
 	}
 
 	/*
@@ -8102,6 +8116,7 @@ xfs_diordwr(
 	dp.bdp = bdp;
 	dp.cr = credp;
 	dp.ioflag = ioflag;
+	dp.uio_pmp = uiop->uio_pmp;
 
 	/*
  	 * Allocate local buf structure.
