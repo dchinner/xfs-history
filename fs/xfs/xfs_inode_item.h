@@ -15,7 +15,7 @@ typedef struct xfs_inode_log_format {
 	uint			ilf_fields;	/* flags for fields logged */
 	uint			ilf_dsize;	/* size of data/ext/root */
 	union {
-		dev_t		ilfu_rdev;	/* rdev value for dev inodes */
+		dev_t		ilfu_rdev;	/* rdev value for dev inode*/
 		uuid_t		ilfu_uuid;	/* mount point value */
 	} ilf_u;
 } xfs_inode_log_format_t;
@@ -48,6 +48,7 @@ typedef struct xfs_inode_log_item {
 
 #define	XFS_ILOG_NONCORE	(XFS_ILOG_DATA | XFS_ILOG_EXT | \
 				 XFS_ILOG_BROOT | XFS_ILOG_DEV)
+
 #define	XFS_ILOG_ALL		(XFS_ILOG_CORE | XFS_ILOG_DATA | \
 				 XFS_ILOG_EXT | XFS_ILOG_BROOT | \
 				 XFS_ILOG_DEV)
