@@ -301,12 +301,11 @@ linvfs_set_inode_ops(
 {
 	vnode_t	*vp;
 
-	vp = LINVFS_GET_VP(inode);
-	ASSERT(vp);
+	vp = LINVFS_GET_VN_ADDRESS(inode);
 
 	inode->i_mode = VTTOIF(vp->v_type);
 
-	if (S_ISREG(inode->i_mode)) {
+	if (vp->v_type == VNON || S_ISREG(inode->i_mode)) {
 		inode->i_op = &linvfs_file_inode_operations;
 		inode->i_fop = &linvfs_file_operations;
 		inode->i_mapping->a_ops = &linvfs_aops;
@@ -328,7 +327,7 @@ linvfs_read_inode(
 	vfs_t		*vfsp = LINVFS_GET_VFS(inode->i_sb);
 
 	if (vfsp) {
-		vn_initialize(inode);
+		vn_initialize(vfsp, inode, 1);
 	} else {
 		make_bad_inode(inode);
 		return;
@@ -391,6 +390,7 @@ linvfs_delete_inode(
 	} else {
 printk("linvfs_delete_inode: NOVP!: inode/0x%p ino/%ld icnt/%d\n",
 inode, inode->i_ino, inode->i_count);
+	BUG();
 	}
 
 	clear_inode(inode);

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.117 $"
+#ident "$Revision: 1.118 $"
 
 #include <xfs_os_defs.h>
 #include <linux/stat.h>
@@ -175,6 +175,23 @@ xfs_chash_free(xfs_mount_t *mp)
 	mp->m_chash = NULL;
 }
 
+
+static inline void
+xfs_iget_vnode_init(
+	xfs_mount_t	*mp,
+	vnode_t		*vp,
+	xfs_inode_t	*ip)
+{
+#ifndef SIM
+	vp->v_vfsp  = XFS_MTOVFS(mp);
+	vp->v_inode = LINVFS_GET_IP(vp);
+	vp->v_type  = IFTOVT(ip->i_d.di_mode);
+	vp->v_rdev  = MKDEV(emajor(ip->i_df.if_u2.if_rdev),
+			    eminor(ip->i_df.if_u2.if_rdev) );
+#endif	/* !SIM */
+}
+
+
 /*
  * Look up an inode by number in the given file system.
  * The inode is looked up in the hash table for the file system
@@ -207,14 +224,17 @@ xfs_chash_free(xfs_mount_t *mp)
  *	  if known (as by bulkstat), else 0.
  */
 int
-xfs_iget(
+xfs_iget_core(
+	vnode_t		*preallocated_vnode,
 	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_ino_t	ino,
 	uint		lock_flags,
 	xfs_inode_t	**ipp,
-	xfs_daddr_t		bno)
+	xfs_daddr_t	bno)
 {
+	int		vn_alloc_used = 0;
+	dev_t		dev;
 	xfs_ihash_t	*ih;
 	xfs_inode_t	*ip;
 	xfs_inode_t	*iq;
@@ -242,6 +262,7 @@ again:
   		if (ip->i_ino == ino) {
 
 			vp = XFS_ITOV_NULL(ip);
+
 			if (vp == NULL) {
 				if (ip->i_flags & XFS_IRECLAIM) {
 					mrunlock(&ih->ih_lock);
@@ -250,22 +271,47 @@ again:
 					goto again;
 				}
 					
-				vp = vn_alloc(XFS_MTOVFS(mp),
-					ino, IFTOVT(ip->i_d.di_mode),
-					MKDEV(emajor(ip->i_df.if_u2.if_rdev),
-					      eminor(ip->i_df.if_u2.if_rdev)));
+				if (preallocated_vnode) {
+					/*
+					 * Vnode provided by
+					 * vn_initialize.
+					 */
+					vp = preallocated_vnode;
+
+					xfs_iget_vnode_init(mp, vp, ip);
+				} else {
+					dev = MKDEV(emajor(ip->i_df.if_u2.
+								if_rdev),
+						    eminor(ip->i_df.if_u2.
+								if_rdev));
+
+					vp = vn_alloc(XFS_MTOVFS(mp), ino,
+						      IFTOVT(ip->i_d.di_mode),
+						      dev);
+
+					vn_alloc_used = 1;
+				}
 
 				vn_trace_exit(vp, "xfs_iget.alloc",
 					(inst_t *)__return_address);
 
 				bhv_desc_init(&(ip->i_bhv_desc), ip, vp,
-					&xfs_vnodeops);
+							&xfs_vnodeops);
 				vn_bhv_insert_initial(VN_BHV_HEAD(vp),
-					&(ip->i_bhv_desc));
+							&(ip->i_bhv_desc));
+
 				XFSSTATS.xs_ig_found++;
 
 				goto finish_inode;
+
+			} else if (preallocated_vnode) {
+				if (preallocated_vnode != vp) {
+					cmn_err(CE_PANIC,
+			"xfs_iget_core: ambiguous vns: vp/0x%p, invp/0x%p",
+						vp, preallocated_vnode);
+				}
 			}
+
 			VMAP(vp, ip, vmap);
 
 			/*
@@ -313,16 +359,25 @@ again:
 			 * call to vn_get.
 			 */
 #endif
-			if ( ! (vp = vn_get(vp, &vmap, 0))) {
+			if (preallocated_vnode) {
+				/*
+				 * Vnode provided by vn_initialize.
+				 */
+				vp = preallocated_vnode;
+
+				xfs_iget_vnode_init(mp, vp, ip);
+			} else {
+				if ( ! (vp = vn_get(vp, &vmap, 0))) {
 #pragma mips_frequency_hint NEVER
 #ifndef	SIM
-				mrunlock(&ih->ih_lock);
+					mrunlock(&ih->ih_lock);
 
-				delay(1);
+					delay(1);
 #endif
-				XFSSTATS.xs_ig_frecycle++;
+					XFSSTATS.xs_ig_frecycle++;
 
-				goto again;
+					goto again;
+				}
 			}
 
 finish_inode:
@@ -369,14 +424,28 @@ finish_inode:
 		return error;
 	}
 
-	vp = vn_alloc(XFS_MTOVFS(mp), ino, IFTOVT(ip->i_d.di_mode),
-				      MKDEV(emajor(ip->i_df.if_u2.if_rdev),
-					    eminor(ip->i_df.if_u2.if_rdev)));
+	if (preallocated_vnode) {
+		/*
+		 * Vnode provided by vn_initialize.
+		 */
+		vp = preallocated_vnode;
+
+		xfs_iget_vnode_init(mp, vp, ip);
+	} else {
+		dev = MKDEV(emajor(ip->i_df.if_u2.if_rdev),
+			    eminor(ip->i_df.if_u2.if_rdev));
+
+		vp = vn_alloc(XFS_MTOVFS(mp), ino,
+					IFTOVT(ip->i_d.di_mode), dev);
+		vn_alloc_used = 1;
+	}
 
 	vn_trace_exit(vp, "xfs_iget.alloc", (inst_t *)__return_address);
 
-	bhv_desc_init(&(ip->i_bhv_desc), ip, vp, &xfs_vnodeops);
-	vn_bhv_insert_initial(VN_BHV_HEAD(vp), &(ip->i_bhv_desc));
+	if (vp->v_fbhv == NULL) {
+		bhv_desc_init(&(ip->i_bhv_desc), ip, vp, &xfs_vnodeops);
+		vn_bhv_insert_initial(VN_BHV_HEAD(vp), &(ip->i_bhv_desc));
+	}
 
 	xfs_inode_lock_init(ip, vp);
 	xfs_iocore_inode_init(ip);
@@ -425,7 +494,8 @@ finish_inode:
 					      &(ip->i_bhv_desc));
 				vn_free(vp);
 #else	/* ! SIM */
-				vn_put(vp);
+				if (preallocated_vnode == NULL)
+					vn_put(vp);
 #endif	/* ! SIM */
 				xfs_idestroy(ip);
 
@@ -554,12 +624,57 @@ finish_inode:
 
 #ifndef SIM
 	error = vn_revalidate(vp, ATTR_LAZY);	/* Update the linux inode */
-#endif
+
+	/*
+	 * If we got this vnode via vn_alloc, it's been
+	 * allocated, & initialized by now, we need
+	 * to insert the linux inode into the visible
+	 * hashed namespace.
+	 */
+	if (vn_alloc_used)
+		vn_insert_in_linux_hash(vp);
+#endif	/* ! SIM */
 
 	*ipp = ip;
 
 	return 0;
 }
+
+
+/*
+ * The 'normal' internal xfs_iget, if needed it will
+ * 'allocate', or 'get', the vnode.
+ */
+int
+xfs_iget(
+	xfs_mount_t	*mp,
+	xfs_trans_t	*tp,
+	xfs_ino_t	ino,
+	uint		lock_flags,
+	xfs_inode_t	**ipp,
+	xfs_daddr_t	bno)
+{
+	return xfs_iget_core(NULL, mp, tp, ino, lock_flags, ipp, bno);
+}
+
+
+/*
+ * A 'special' interface to xfs_iget, where the
+ * vnode is already allocated.
+ */
+int
+xfs_vn_iget(
+	struct vnode	*vp,
+	xfs_mount_t	*mp,
+	xfs_trans_t	*tp,
+	xfs_ino_t	ino,
+	uint		lock_flags,
+	xfs_inode_t	**ipp,
+	xfs_daddr_t	bno)
+{
+	return xfs_iget_core(vp, mp, tp, ino, lock_flags, ipp, bno);
+}
+
 
 /*
  * Do the setup for the various locks within the incore inode.

@@ -54,7 +54,9 @@ EXTRA_CFLAGS += -g3 -Wno-unused  -Wno-parentheses \
 EXTRA_CFLAGS += $(shell if $(CC) -Wno-unknown-pragmas -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-Wno-unknown-pragmas"; fi)
 
 
-# EXTRA_CFLAGS += -DDEBUG -DXFSDEBUG
+ifeq ($(CONFIG_XFS_DEBUG),y)
+EXTRA_CFLAGS += -DDEBUG -DXFSDEBUG
+endif
 
 ifeq ($(CONFIG_XFS_GRIO),y)
 	ALL_SUB_DIRS = linux grio

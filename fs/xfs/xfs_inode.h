@@ -32,7 +32,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.136 $"
+#ident "$Revision: 1.137 $"
 
 struct bhv_desc;
 struct xfs_buf;
@@ -576,6 +576,9 @@ xfs_inode_t	*xfs_inode_incore(struct xfs_mount *, xfs_ino_t,
 				  struct xfs_trans *);
 void            xfs_inode_lock_init(xfs_inode_t *, struct vnode *);
 int		xfs_iget(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
+			 uint, xfs_inode_t **, xfs_daddr_t);
+int		xfs_vn_iget(struct vnode    *, struct xfs_mount *,
+			 struct xfs_trans *, xfs_ino_t,
 			 uint, xfs_inode_t **, xfs_daddr_t);
 void		xfs_iput(xfs_inode_t *, uint);
 void		xfs_ilock(xfs_inode_t *, uint);

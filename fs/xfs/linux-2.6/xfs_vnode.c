@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.27 $"
+#ident	"$Revision: 1.28 $"
 
 #include <xfs_os_defs.h>
 
@@ -76,6 +76,7 @@
 #include <xfs_trans.h>
 #include <xfs_sb.h>
 #include <xfs_mount.h>
+#include <xfs_iops.h>
 
 #ifdef	CONFIG_XFS_VNODE_TRACING
 #include <sys/ktrace.h>
@@ -146,7 +147,6 @@ sv_t vsync[NVSYNC];
  * Translate stat(2) file types to vnode types and vice versa.
  * Aware of numeric order of S_IFMT and vnode type values.
  */
-# if 1
 enum vtype iftovt_tab[] = {
 	VNON, VFIFO, VCHR, VNON, VDIR, VNON, VBLK, VNON,
 	VREG, VNON, VLNK, VNON, VSOCK, VNON, VNON, VNON
@@ -155,7 +155,6 @@ enum vtype iftovt_tab[] = {
 u_short vttoif_tab[] = {
 	0, S_IFREG, S_IFDIR, S_IFBLK, S_IFCHR, S_IFLNK, S_IFIFO, 0, S_IFSOCK
 };
-#endif
 
 void
 vn_init(void)
@@ -246,44 +245,29 @@ struct vnode *
 vn_address(struct inode *inode)
 {
 	vnode_t		*vp;
-	vfs_t		*vfsp;
-	xfs_inode_t	*ip;
-	xfs_mount_t	*mp;
 
 
 	vp = (vnode_t *)(&((inode)->u.xfs_i.vnode));
 
-	if ((vp->v_type != VNON) && vp->v_number && vp->v_inode) {
+	if (vp->v_inode == NULL)
+		return NULL;
+	/*
+	 * Catch half-constructed linux-inode/vnode/xfs-inode setups.
+	 */
+	if (vp->v_fbhv == NULL)
+		return NULL;
 
-		/*
-		 * Catch half-constructed linux-inode/vnode/xfs-inode
-		 * setups.
-		 */
-		if (vp->v_fbhv == NULL) {
-panic("vn_address: vp/0x%p inode/0x%p bh_first = NULL!", vp, inode);
-			vfsp = LINVFS_GET_VFS(inode->i_sb);	ASSERT(vfsp);
-			mp = XFS_BHVTOM(vfsp->vfs_fbhv);	ASSERT(mp);
-
-			if (xfs_iget(mp, NULL, (xfs_ino_t)inode->i_ino,
-							0, &ip, 0)) {
-panic("vn_address: vp/0x%p inode/0x%p bad xfs_iget!", vp, inode);
-				return NULL;
-			}
-
-			VN_RELE(vp);		/* Drop xfs_iget reference */
-		}
-
-		return vp;
-	}
-	
-	return NULL;
+	return vp;
 }
 
 
 struct vnode *
-vn_initialize(struct inode *inode)
+vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 {
 	struct vnode	*vp;
+	xfs_inode_t	*ip;
+	xfs_mount_t	*mp;
+
 	
 	VOPINFO.vn_active++;
 
@@ -315,6 +299,29 @@ vn_initialize(struct inode *inode)
 	vp->v_trace = ktrace_alloc(VNODE_TRACE_SIZE, KM_SLEEP);
 #endif	/* CONFIG_XFS_VNODE_TRACING */
 
+	/*
+	 * Check to see if we've been called from
+	 * read_inode, and we need to "stitch" it all
+	 * together right now.
+	 */
+	if (from_readinode) {
+		mp = XFS_BHVTOM(vfsp->vfs_fbhv);	ASSERT(mp);
+
+		if (xfs_vn_iget(vp, mp, NULL, (xfs_ino_t)inode->i_ino,
+								0, &ip, 0)) {
+			panic("vn_initialize: vp/0x%p inode/0x%p bad xfs_iget!",
+								vp, inode);
+		}
+
+		vp->v_vfsp  = vfsp;
+		vp->v_inode = inode;
+		vp->v_type  = IFTOVT(ip->i_d.di_mode);
+		vp->v_rdev  = MKDEV(emajor(ip->i_df.if_u2.if_rdev),
+				    eminor(ip->i_df.if_u2.if_rdev));
+
+		linvfs_set_inode_ops(inode);
+	}
+
 	vn_trace_exit(vp, "vn_initialize", (inst_t *)__return_address);
 
 	return vp;
@@ -329,7 +336,28 @@ vn_alloc(struct vfs *vfsp, __uint64_t ino, enum vtype type, dev_t dev)
 
 	VOPINFO.vn_alloc++;
 
-	inode = iget(vfsp->vfs_super, inum);
+#ifdef	CONFIG_XFS_DEBUG
+	inode = iget4_noallocate(vfsp->vfs_super, inum, NULL, NULL);
+	if (inode) {
+		panic("vn_alloc: Found inode/0x%p when it shouldn't be!",
+								inode);
+	}
+#endif	/* CONFIG_XFS_DEBUG */
+
+	inode = get_empty_inode();
+
+	if (inode == NULL) {
+		panic("vn_alloc: ENOMEM inode!");
+	}
+
+	inode->i_sb    = vfsp->vfs_super;
+	inode->i_dev   = vfsp->vfs_super->s_dev;
+	inode->i_ino   = inum;
+	inode->i_flags = 0;
+	inode->i_count = 1;
+	inode->i_state = 0;
+
+	vn_initialize(vfsp, inode, 0);
 
 	vp = LINVFS_GET_VN_ADDRESS(inode);
 
@@ -372,19 +400,11 @@ vnode_t *
 vn_get(struct vnode *vp, vmap_t *vmap, uint flags)
 {
 	struct inode	*inode;
-	xfs_ino_t		inum;
+	xfs_ino_t	inum;
 
 	VOPINFO.vn_get++;
 
-	/*
-	 * Don't use the vnode address for anything other than
-	 * calculating the linux inode address until after
-	 * we've grabbed the inode and verified it.
-	 */
-	inode = (struct inode *)((char *)vp
-				- offsetof(struct inode, u.xfs_i.vnode));
-
-	inode = igrab(inode);
+	inode = iget(vmap->v_vfsp->vfs_super, vmap->v_ino);
 
 	if (inode == NULL)		/* I_FREEING conflict */
 		return NULL;
@@ -501,6 +521,28 @@ vn_cached(struct vnode *vp)
 	ASSERT(inode);
 
 	return inode->i_data.nrpages;
+}
+
+
+/*
+ * "hash" the linux inode.
+ */
+void
+vn_insert_in_linux_hash(struct vnode *vp)
+{
+	struct inode *inode;
+
+	vn_trace_entry(vp, "vn_insert_in_linux_hash",
+				(inst_t *)__return_address);
+
+	inode = LINVFS_GET_IP(vp);
+
+	ASSERT(inode);
+
+	ASSERT(list_empty(&inode->i_hash));
+
+	insert_inode_hash(inode);	/* Add to i_hash	*/
+	mark_inode_dirty(inode);	/* Add to i_list	*/
 }
 
 
