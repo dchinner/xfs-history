@@ -73,7 +73,6 @@ static struct {
     { offsetof(xfs_sb_t, sb_inodesize),  0 },
     { offsetof(xfs_sb_t, sb_inopblock),  0 },
     { offsetof(xfs_sb_t, sb_fname[0]),   1 },
-    { offsetof(xfs_sb_t, sb_fpack[0]),   1 },
     { offsetof(xfs_sb_t, sb_blocklog),   0 },
     { offsetof(xfs_sb_t, sb_sectlog),    0 },
     { offsetof(xfs_sb_t, sb_inodelog),   0 },

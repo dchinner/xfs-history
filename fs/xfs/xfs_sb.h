@@ -106,8 +106,7 @@ typedef struct xfs_sb
 	__uint16_t	sb_sectsize;	/* volume sector size, bytes */
 	__uint16_t	sb_inodesize;	/* inode size, bytes */
 	__uint16_t	sb_inopblock;	/* inodes per block */
-	char		sb_fname[6];	/* file system name */
-	char		sb_fpack[6];	/* file system pack name */
+	char		sb_fname[12];	/* file system name */
 	__uint8_t	sb_blocklog;	/* log2 of sb_blocksize */
 	__uint8_t	sb_sectlog;	/* log2 of sb_sectsize */
 	__uint8_t	sb_inodelog;	/* log2 of sb_inodesize */
@@ -150,7 +149,7 @@ typedef enum {
 	XFS_SBS_RBMINO, XFS_SBS_RSUMINO, XFS_SBS_REXTSIZE, XFS_SBS_AGBLOCKS,
 	XFS_SBS_AGCOUNT, XFS_SBS_RBMBLOCKS, XFS_SBS_LOGBLOCKS,
 	XFS_SBS_VERSIONNUM, XFS_SBS_SECTSIZE, XFS_SBS_INODESIZE,
-	XFS_SBS_INOPBLOCK, XFS_SBS_FNAME, XFS_SBS_FPACK, XFS_SBS_BLOCKLOG,
+	XFS_SBS_INOPBLOCK, XFS_SBS_FNAME, XFS_SBS_BLOCKLOG,
 	XFS_SBS_SECTLOG, XFS_SBS_INODELOG, XFS_SBS_INOPBLOG, XFS_SBS_AGBLKLOG,
 	XFS_SBS_REXTSLOG, XFS_SBS_INPROGRESS, XFS_SBS_IMAX_PCT, XFS_SBS_ICOUNT,
 	XFS_SBS_IFREE, XFS_SBS_FDBLOCKS, XFS_SBS_FREXTENTS, XFS_SBS_UQUOTINO,
@@ -166,6 +165,7 @@ typedef enum {
  */
 #define	XFS_SB_MVAL(x)		(1LL << XFS_SBS_ ## x)
 #define	XFS_SB_UUID		XFS_SB_MVAL(UUID)
+#define	XFS_SB_FNAME		XFS_SB_MVAL(FNAME)
 #define	XFS_SB_ROOTINO		XFS_SB_MVAL(ROOTINO)
 #define	XFS_SB_RBMINO		XFS_SB_MVAL(RBMINO)
 #define	XFS_SB_RSUMINO		XFS_SB_MVAL(RSUMINO)
