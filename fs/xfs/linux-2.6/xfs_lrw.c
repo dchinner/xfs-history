@@ -143,8 +143,6 @@ xfs_read(
 /* We don' want the IRIX poff */
 #define poff(x) ((x) & (PAGE_SIZE-1))
 
-int xfs_zlb_debug = 0;
-
 /* ARGSUSED */
 STATIC int				/* error */
 xfs_zero_last_block(
@@ -172,9 +170,6 @@ xfs_zero_last_block(
 	size_t		lsize;
 
 
-	dprintk(xfs_zlb_debug,
-	       ("zlb: ip 0x%p off 0x%Lx isize 0x%Lx\n",
-		ip, offset, isize));
 	ASSERT(ismrlocked(io->io_lock, MR_UPDATE) != 0);
 	ASSERT(offset > isize);
 
@@ -190,20 +185,11 @@ xfs_zero_last_block(
 	 * this out to disk, we're just initializing it to zeroes like
 	 * we would have done in xfs_strat_read() had the size been bigger.
 	 */
-	dprintk(xfs_zlb_debug,
-	     ("zlb: sb_blocksize 0x%x poff(isize) 0x%Lx\n",
-		    mp->m_sb.sb_blocksize, poff(isize)));
 	if ((mp->m_sb.sb_blocksize < NBPP) && ((i = poff(isize)) != 0)) {
 		struct page *page;
 
 		page = find_lock_page(&ip->i_data, isize >> PAGE_CACHE_SHIFT);
 		if (page) {
-
-			dprintk(xfs_zlb_debug,
-			        ("zlb: memset page 0x%p paddr 0x%lx from 0x%lx sz 0x%lx\n",
-				page, page_address(page),
-				page_address(page) + i, PAGE_SIZE -i));
-
 			memset((void *)page_address(page)+i, 0, PAGE_SIZE-i);
 
 			/*
@@ -303,10 +289,6 @@ xfs_zero_last_block(
 	loff = XFS_FSB_TO_B(mp, last_fsb);
 	lsize = BBTOB(XFS_FSB_TO_BB(mp, 1));
 
-	dprintk(xfs_zlb_debug,
-	      ("zlb: pbget ip 0x%p loff 0x%Lx lsize 0x%x last_fsb 0x%Lx\n",
-		ip, loff, lsize, last_fsb));
-
 	zero_offset = isize_fsb_offset;
 	zero_len = mp->m_sb.sb_blocksize - isize_fsb_offset;
 
@@ -337,10 +319,6 @@ xfs_zero_last_block(
 			goto out_lock;
 		}
 	}
-
-	dprintk(xfs_zlb_debug,
-	      ("zlb: pb_iozero pb 0x%p zf 0x%x zl 0x%x\n",
-		pb, zero_offset, zero_len));
 
 	if (error = pagebuf_iozero(pb, zero_offset, zero_len)) {
 		pagebuf_rele(pb);
@@ -385,8 +363,6 @@ out_lock:
  * are left alone as holes.
  */
 
-int xfs_zeof_debug = 0;
-
 int					/* error */
 xfs_zero_eof(
 	vnode_t		*vp,
@@ -417,9 +393,6 @@ xfs_zero_eof(
 
 	mp = io->io_mount;
 
-	dprintk(xfs_zeof_debug,
-		("zeof ip 0x%p offset 0x%Lx size 0x%Lx\n",
-		ip, offset, isize));
 	/*
 	 * First handle zeroing the block on which isize resides.
 	 * We only zero a part of that block so it is handled specially.
@@ -443,10 +416,6 @@ xfs_zero_eof(
 	start_zero_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)isize);
 	end_zero_fsb = XFS_B_TO_FSBT(mp, offset - 1);
 
-	dprintk(xfs_zeof_debug,
-		("zero: last block %Ld end %Ld\n",
-		last_fsb, end_zero_fsb));
-
 	ASSERT((xfs_sfiloff_t)last_fsb < (xfs_sfiloff_t)start_zero_fsb);
 	if (last_fsb == end_zero_fsb) {
 		/*
@@ -464,9 +433,6 @@ xfs_zero_eof(
 	 * loop while we split the mappings into pagebufs?
 	 */
 	while (start_zero_fsb <= end_zero_fsb) {
-		dprintk(xfs_zeof_debug,
-			("zero: start block %Ld end %Ld\n",
-			start_zero_fsb, end_zero_fsb));
 		nimaps = 1;
 		zero_count_fsb = end_zero_fsb - start_zero_fsb + 1;
 		firstblock = NULLFSBLOCK;
@@ -488,15 +454,6 @@ xfs_zero_eof(
 			 * that sits on a hole and sets the page as P_HOLE
 			 * and calls remapf if it is a mapped file.
 			 */	
-			if ((prev_zero_fsb != NULLFILEOFF) && 
-			    (dtopt(XFS_FSB_TO_BB(mp, prev_zero_fsb)) ==
-			     dtopt(XFS_FSB_TO_BB(mp, imap.br_startoff)) ||
-			     dtopt(XFS_FSB_TO_BB(mp, prev_zero_fsb + 
-						     prev_zero_count)) ==
-			     dtopt(XFS_FSB_TO_BB(mp, imap.br_startoff)))) {
-				dprintk(xfs_zeof_debug,
-			     		("xfs_zero_eof: look for pages to zero? HOLE\n"));
-			}
 		   	prev_zero_fsb = NULLFILEOFF;
 			prev_zero_count = 0;
 		   	start_zero_fsb = imap.br_startoff +
@@ -515,8 +472,6 @@ xfs_zero_eof(
 		 */
 		buf_len_fsb = XFS_FILBLKS_MIN(imap.br_blockcount,
 					      io->io_writeio_blocks);
-		dprintk(xfs_zeof_debug,
-			("zero: buf len is %d block\n", buf_len_fsb));
 		/*
 		 * Drop the inode lock while we're doing the I/O.
 		 * We'll still have the iolock to protect us.
@@ -528,9 +483,6 @@ xfs_zero_eof(
 		/*
 		 * JIMJIM what about the real-time device
 		 */
-		dprintk(xfs_zeof_debug,
-			("xfs_zero_eof: NEW CODE doing %d starting at %Ld\n",
-			lsize, loff));
 
 		pb = pagebuf_get(ip, loff, lsize, 0);
 		if (!pb) {
@@ -544,12 +496,10 @@ xfs_zero_eof(
 		} else {
 			pb->pb_bn = XFS_FSB_TO_DB_IO(io, imap.br_startblock);
 			if (imap.br_state == XFS_EXT_UNWRITTEN) {
-				dprintk(xfs_zeof_debug,
-					("xfs_zero_eof: unwritten? what do we do here?\n"));
+				printk("xfs_zero_eof: unwritten? what do we do here?\n");
 			}
 			if (io->io_flags & XFS_IOCORE_RT) {
-				dprintk(xfs_zeof_debug,
-					("xfs_zero_eof: real time device? use diff inode\n"));
+				printk("xfs_zero_eof: real time device? use diff inode\n");
 			}
 
 			if (error = pagebuf_iozero(pb, 0, lsize)) {
@@ -558,8 +508,7 @@ xfs_zero_eof(
 			}
 			if (imap.br_startblock == DELAYSTARTBLOCK ||
 			    imap.br_state == XFS_EXT_UNWRITTEN) { /* DELWRI */
-				dprintk(xfs_zeof_debug,
-					("xfs_zero_eof: need to allocate? delwri\n"));
+				printk("xfs_zero_eof: need to allocate? delwri\n");
 			} else {
 				XFS_BUF_WRITE(pb);
 				XFS_BUF_ASYNC(pb);
@@ -573,14 +522,10 @@ xfs_zero_eof(
 		prev_zero_fsb = start_zero_fsb;
 		prev_zero_count = buf_len_fsb;
 		start_zero_fsb = imap.br_startoff + buf_len_fsb;
-		dprintk(xfs_zeof_debug,
-			("moved start to %Ld\n", start_zero_fsb));
 		ASSERT(start_zero_fsb <= (end_zero_fsb + 1));
 
 		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
 	}
-
-	dprintk(xfs_zeof_debug, ("zero: all done\n"));
 
 	return 0;
 
@@ -589,8 +534,6 @@ out_lock:
 	XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
 	return error;
 }
-
-int xfsw_debug = 0;
 
 ssize_t
 xfs_write(
@@ -639,10 +582,6 @@ xfs_write(
 	mp = io->io_mount;
 	xfs_ilock(xip, XFS_ILOCK_EXCL|XFS_IOLOCK_EXCL);
 	isize = xip->i_d.di_size;
-
-	dprintk(xfsw_debug,
-	     ("xfsw(%d): ip 0x%p(is 0x%Lx) offset 0x%Lx size 0x%x\n",
-		current->pid, ip, ip->i_size, *offsetp, size));
 
 #ifdef CONFIG_XFS_DMAPI
 start:
@@ -1405,8 +1344,6 @@ xfs_write_bmap(
 	pbmapp->pbm_bsize = XFS_FSB_TO_B(mp, length);
 }
 
-int iomapwd_debug = 0;
-
 int
 xfs_iomap_write_delay(
 	xfs_iocore_t	*io,
@@ -1456,9 +1393,6 @@ xfs_iomap_write_delay(
 	aeof = 0;
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	last_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)(offset + count)));
-	dprintk(iomapwd_debug,
-		("xfs_iomap_write_delay: allocating from offset %Ld to %Ld\n",
-			offset_fsb, last_fsb));
 	/*
 	 * If the caller is doing a write at the end of the file,
 	 * then extend the allocation (and the buffer used for the write)
