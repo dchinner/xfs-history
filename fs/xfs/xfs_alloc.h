@@ -55,6 +55,13 @@ typedef struct xfs_alloc_arg {
 } xfs_alloc_arg_t;
 
 /*
+ * Types for alloc tracing.
+ */
+#define	XFS_ALLOC_KTRACE_ALLOC	1
+#define	XFS_ALLOC_KTRACE_FREE	2
+#define	XFS_ALLOC_KTRACE_MODAGF	3
+
+/*
  * Prototypes for visible xfs_alloc.c routines
  */
 

@@ -1490,11 +1490,13 @@ xfs_bmap_alloc(
 			abno = args.fsbno;
 		if (abno != NULLFSBLOCK) {
 			*firstblock = abno;
+			*alen = args.len;
 			ip->i_d.di_nblocks += args.len;
 			xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 			if (wasdel)
 				ip->i_delayed_blks -= args.len;
-		}
+		} else
+			*alen = 0;
 	}
 	kmem_check();
 	return abno;
