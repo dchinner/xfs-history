@@ -1,4 +1,4 @@
-#ident "$Revision: 1.174 $"
+#ident "$Revision: 1.177 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -4301,6 +4301,12 @@ xfs_dio_cache_inval(
 		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 		xfs_ilock(ip, XFS_IOLOCK_EXCL);
 	}
+	/*
+	 * Set the VREMAPPING bit so that vfault can't
+	 * race in between the remapf and the pflushinvalvp
+	 * calls.
+	 */
+	VN_FLAGSET(vp, VREMAPPING);
 	if (VN_MAPPED(vp)) {
 		/*
 		 * Blow away mmap mappings to the files pages
@@ -4329,6 +4335,7 @@ xfs_dio_cache_inval(
 		flush_end = LONGLONG_MAX;
 	}
 	pflushinvalvp(vp, ctooff(offtoct(offset)), (off_t)flush_end);
+	VN_FLAGCLR(vp, VREMAPPING);
 	if (relock) {
 		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 		xfs_ilock(ip, XFS_IOLOCK_SHARED);

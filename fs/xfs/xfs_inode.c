@@ -1281,6 +1281,12 @@ xfs_itruncate_start(
 	xfs_itrunc_trace(XFS_ITRUNC_START, ip, flags, new_size, toss_start,
 			 last_byte);
 	if (last_byte > toss_start) {
+		/*
+		 * Set the VREMAPPING bit so that vfault can't
+		 * race in between the remapf and the pflushinvalvp
+		 * calls.
+		 */
+		VN_FLAGSET(vp, VREMAPPING);
 		if (flags & XFS_ITRUNC_DEFINITE) {
 			if (VN_MAPPED(vp)) {
 				remapf(vp, toss_start, 0);
@@ -1292,6 +1298,7 @@ xfs_itruncate_start(
 			}
 			pflushinvalvp(vp, toss_start, last_byte);
 		}
+		VN_FLAGCLR(vp, VREMAPPING);
 	}
 	ASSERT((new_size != 0) ||
 	       (!VN_DIRTY(vp) &&
