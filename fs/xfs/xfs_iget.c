@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.121 $"
+#ident "$Revision: 1.122 $"
 
 #include <xfs_os_defs.h>
 #include <linux/stat.h>
@@ -310,7 +310,13 @@ again:
 
 			} else if (preallocated_vnode) {
 				if (vn_alloc_used) {
+#ifdef SIM
+				        vn_bhv_remove(VN_BHV_HEAD(preallocated_vnode), 
+					        &(ip->i_bhv_desc));
+				        vn_free(preallocated_vnode);
+#else
 					vn_put(preallocated_vnode);
+#endif
 					preallocated_vnode = NULL;
 					vn_alloc_used = 0;
 				} else if (preallocated_vnode != vp) {
