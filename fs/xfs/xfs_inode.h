@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.85 $"
+#ident "$Revision: 1.86 $"
 
 struct buf;
 struct cred;
@@ -106,10 +106,10 @@ typedef struct xfs_inode {
 	struct vnode		*i_vnode;	/* ptr to associated vnode */
 
 	/* Inode location stuff */
-	dev_t			i_dev;		/* dev for this inode */
 	xfs_ino_t		i_ino;		/* inode number (agno/agino)*/
 	daddr_t			i_blkno;	/* blkno of inode buffer */
-	int			i_len;		/* len of inode buffer */
+	dev_t			i_dev;		/* dev for this inode */
+	short			i_len;		/* len of inode buffer */
 	short			i_boffset;	/* off of inode in buffer */
 
 	/* Transaction and locking information. */
@@ -138,10 +138,8 @@ typedef struct xfs_inode {
 	struct xfs_gap		*i_gap_list;	/* hole list in write range */
 
 	/* Miscellaneous state. */
-	unsigned int		i_flags;	/* see defined flags below */
-	unsigned long		i_vcode;	/* version code token (RFS) */
-	unsigned long		i_mapcnt;	/* count of mapped pages */
-	unsigned int		i_update_core;	/* timestamps are dirty */
+	unsigned short		i_flags;	/* see defined flags below */
+	unsigned short		i_update_core;	/* timestamps are dirty */
 	unsigned int		i_gen;		/* generation count */
 	unsigned int		i_delayed_blks;	/* count of delay alloc blks */
 	int			i_queued_bufs;	/* count of xfsd queued bufs*/
@@ -150,16 +148,20 @@ typedef struct xfs_inode {
 	xfs_ifork_t		i_df;		/* data fork */
 	xfs_ifork_t		i_af;		/* attribute fork */
 
+	/* DMI state */
+	unsigned int		i_dmevents;	/* events enabled on file */
+
+	xfs_dinode_core_t	i_d;		/* most of ondisk inode */
+
+#ifdef DEBUG
+	unsigned long		i_mapcnt;	/* count of mapped pages */
+
 	/* Trace buffers per inode. */
 	struct ktrace		*i_xtrace;	/* inode extent list trace */
 	struct ktrace		*i_btrace;	/* inode bmap btree trace */
 	struct ktrace		*i_rwtrace;	/* inode read/write trace */
 	struct ktrace		*i_strat_trace;	/* inode strat_write trace */
-
-	/* DMI state */
-	unsigned int		i_dmevents;	/* events enabled on file */
-
-	xfs_dinode_core_t	i_d;		/* most of ondisk inode */
+#endif /* DEBUG */
 } xfs_inode_t;
 
 /*
