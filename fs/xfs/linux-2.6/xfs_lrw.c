@@ -88,13 +88,13 @@ xfs_read(
 	xfs_iocore_t	*io;
 	xfs_mount_t	*mp;
         
-        ASSERT(uiop);                   /* we only support exactly 1  */
-        ASSERT(uiop->uio_iovcnt == 1);  /* iov in a uio on linux      */
-        ASSERT(uiop->uio_iov);      
-        
-        buf = uiop->uio_iov->iov_base;
-        size = uiop->uio_iov->iov_len;
-        offsetp = &uiop->uio_offset;
+	ASSERT(uiop);			/* we only support exactly 1  */
+	ASSERT(uiop->uio_iovcnt == 1);	/* iov in a uio on linux      */
+	ASSERT(uiop->uio_iov);
+
+	buf = uiop->uio_iov->iov_base;
+	size = uiop->uio_iov->iov_len;
+	offsetp = (loff_t *)&uiop->uio_offset;
 
 	ip = XFS_BHVTOI(bdp);
 	io = &(ip->i_iocore);
@@ -552,7 +552,7 @@ xfs_write(
 	xfs_inode_t	*xip;
 	struct file	*filp = uiop->uio_fp;
 	struct inode	*ip = filp->f_dentry->d_inode;
-        loff_t          *offsetp = &uiop->uio_offset;   
+        loff_t          *offsetp = (loff_t *)&uiop->uio_offset;   
 	xfs_mount_t	*mp;
 	xfs_trans_t	*tp;
 	ssize_t		ret;
@@ -573,15 +573,15 @@ xfs_write(
 	unsigned int	mode;
 
 
-        ASSERT(uiop);                   /* we only support exactly 1  */
-        ASSERT(uiop->uio_iovcnt == 1);  /* iov in a uio on linux      */
-        ASSERT(uiop->uio_iov);      
+	ASSERT(uiop);			/* we only support exactly 1  */
+	ASSERT(uiop->uio_iovcnt == 1);	/* iov in a uio on linux      */
+	ASSERT(uiop->uio_iov);
         
 	vp = BHV_TO_VNODE(bdp);
 	xip = XFS_BHVTOI(bdp);
 
-        buf = uiop->uio_iov->iov_base;
-        size = uiop->uio_iov->iov_len;
+	buf = uiop->uio_iov->iov_base;
+	size = uiop->uio_iov->iov_len;
 
 	if (size == 0)
 		return 0;
