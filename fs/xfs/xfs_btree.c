@@ -613,6 +613,8 @@ xfs_btree_init_cursor(
 		agi = XFS_BUF_TO_AGI(agbp);
 		nlevels = agi->agi_level;
 		break;
+	default:
+		ASSERT(0);
 	}
 	/*
 	 * Fill in the common fields.
@@ -919,6 +921,8 @@ xfs_btree_readahead(
 			rval++;
 		}
 		break;
+	default:
+		ASSERT(0);
 	}
 	return rval;
 }

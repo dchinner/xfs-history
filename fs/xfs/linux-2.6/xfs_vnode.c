@@ -129,61 +129,8 @@ enum vtype iftovt_tab[] = {
 u_short vttoif_tab[] = {
 	0, S_IFREG, S_IFDIR, S_IFBLK, S_IFCHR, S_IFLNK, S_IFIFO, 0, S_IFSOCK
 };
-
-/*
- * Vnode operations for a free or killed vnode.
- */
-struct vnodeops dead_vnodeops = {
-  	BHV_IDENTITY_INIT_POSITION(VNODE_POSITION_INVALID),
-   	(vop_open_t)fs_nosys,
-	(vop_close_t)fs_noerr,
-	(vop_read_t)fs_nosys,
-	(vop_write_t)fs_nosys,
-	(vop_ioctl_t)fs_nosys,
-	(vop_setfl_t)fs_nosys,
-	(vop_getattr_t)fs_nosys,
-	(vop_setattr_t)fs_nosys,
-	(vop_access_t)fs_nosys,
-	(vop_lookup_t)fs_nosys,
-	(vop_create_t)fs_nosys,
-	(vop_remove_t)fs_nosys,
-	(vop_link_t)fs_nosys,
-	(vop_rename_t)fs_nosys,
-	(vop_mkdir_t)fs_nosys,
-	(vop_rmdir_t)fs_nosys,
-	(vop_readdir_t)fs_nosys,
-	(vop_symlink_t)fs_nosys,
-	(vop_readlink_t)fs_nosys,
-	(vop_fsync_t)fs_nosys,
-	(vop_inactive_t)fs_noerr,
-	(vop_fid_t)fs_nosys,
-	(vop_fid2_t)fs_nosys,
-	(vop_rwlock_t)fs_noval,
-	(vop_rwunlock_t)fs_noval,
-	(vop_seek_t)fs_nosys,
-	(vop_cmp_t)fs_nosys,
-	(vop_frlock_t)fs_nosys,
-	(vop_realvp_t)fs_nosys,
-	(vop_bmap_t)fs_nosys,
-	(vop_strategy_t)fs_noval,
-	(vop_map_t)fs_nosys,
-	(vop_addmap_t)fs_nosys,
-	(vop_delmap_t)fs_nosys,
-	(vop_poll_t)fs_nosys,
-	(vop_dump_t)fs_nosys,
-	(vop_pathconf_t)fs_nosys,
-	(vop_allocstore_t)fs_nosys,
-	(vop_fcntl_t)fs_nosys,
-	(vop_reclaim_t)fs_noerr,
-	(vop_attr_get_t)fs_nosys,
-	(vop_attr_set_t)fs_nosys,
-	(vop_attr_remove_t)fs_nosys,
-	(vop_attr_list_t)fs_nosys,
-	(vop_cover_t)fs_nosys,
-	(vop_link_removed_t)fs_noval,
-	(vop_vnode_change_t)fs_nosys,
-};
 #endif
+
 void
 vn_init(void)
 {

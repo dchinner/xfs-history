@@ -481,32 +481,6 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 }	/* xfs_log_reserve */
 
 
-int
-xfs_log_stat(caddr_t mnt_pt, int *log_BBstart, int *log_BBsize)
-{
-	xfs_mount_t *xmp;
-	vnode_t *vp;
-	int error, start, size;
-	extern int xfs_fstype;
-
-	if (error = lookupname(mnt_pt, UIO_USERSPACE, NO_FOLLOW, NULLVPP, &vp, NULL))
-		return error;
-	if (vp->v_vfsp->vfs_fstype != xfs_fstype) {
-		error = XFS_ENOTXFS;
-	} else {
-		bhv_desc_t *bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vp->v_vfsp),
-						      &xfs_vfsops);
-		xmp = XFS_BHVTOM(bdp);
-		start = XFS_FSB_TO_DADDR(xmp, xmp->m_sb.sb_logstart);
-		size  = XFS_FSB_TO_BB(xmp, xmp->m_sb.sb_logblocks);
-		if ((error = copyout(&start, log_BBstart, sizeof(int))) == 0)
-			error = copyout(&size, log_BBsize, sizeof(int));
-	}
-	VN_RELE(vp);
-	return error;
-}	/* xfs_log_stat */
-
-
 /*
  * Mount a log filesystem
  *

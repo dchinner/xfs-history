@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 1999 Silicon Graphics, Inc.  All Rights Reserved.
  * 
@@ -17,10 +16,8 @@
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
 #ident "$Revision$"
-#if defined(__linux__)
-#include <xfs_linux.h>
-#endif
 
+#include <xfs_linux.h>
 
 #ifdef SIM
 #define _KERNEL 1
@@ -193,12 +190,6 @@ xfs_setattr(
 	cred_t		*credp);
 
 STATIC int
-xfs_access(
-	bhv_desc_t	*bdp,
-	int		mode,
-	cred_t		*credp);
-
-STATIC int
 xfs_fsync(
 	bhv_desc_t	*bdp,
 	int		flag,
@@ -269,44 +260,10 @@ xfs_symlink(
 	cred_t		*credp);
 
 STATIC int
-xfs_fid(
-	bhv_desc_t	*bdp,
-	fid_t		**fidpp);
-
-STATIC int
-xfs_fid2(
-	bhv_desc_t	*bdp,
-	fid_t		*fidp);
-
-STATIC int
 xfs_seek(
 	bhv_desc_t	*bdp,
 	off_t		old_offset,
 	off_t		*new_offsetp);
-
-STATIC int
-xfs_frlock(
-	bhv_desc_t	*bdp,
-	int		cmd,
-	flock_t		*flockp,
-	int		flag,
-	off_t		offset,
-	vrwlock_t	vrwlock,
-	cred_t		*credp);
-
-STATIC int
-xfs_allocstore(
-	bhv_desc_t	*bdp,
-	off_t		offset,
-	size_t		len,
-	cred_t		*credp);
-
-STATIC int
-xfs_pathconf(
-	bhv_desc_t	*bdp,
-	int		cmd,
-	long		*valp,
-	struct cred 	*credp);
 
 STATIC int
 xfs_fcntl(
@@ -326,25 +283,6 @@ xfs_change_file_space(
 	off_t		offset,
 	cred_t		*credp,
 	int		attr_flags);
-
-STATIC int
-xfs_ioctl(
-	bhv_desc_t	*bdp,
-	int		cmd,
-	void		*arg,
-	int		flag,
-	cred_t		*credp,
-	int		*rvalp,
-        struct vopbd    *vbds);
-
-#if 0
-STATIC void
-xfs_itruncate_cleanup(
-	xfs_trans_t	**tpp,
-	xfs_inode_t	*ip,
-	int		commit_flags,
-	int		fork);
-#endif
 
 #endif	/* !SIM */
 
@@ -1236,30 +1174,6 @@ xfs_setattr(
 	}
 	return code;
 } /* xfs_setattr */
-
-
-/*
- * xfs_access
- * Null conversion from vnode mode bits to inode mode bits, as in efs.
- */
-/*ARGSUSED*/
-STATIC int
-xfs_access(
-	bhv_desc_t	*bdp,
-	int		mode,
-	cred_t		*credp)
-{
-	xfs_inode_t	*ip;
-	int		error;
-
-	vn_trace_entry(BHV_TO_VNODE(bdp), "xfs_access",
-		       (inst_t *)__return_address);
-	ip = XFS_BHVTOI(bdp);
-	xfs_ilock(ip, XFS_ILOCK_SHARED);
-	error = xfs_iaccess(ip, mode, credp);
-	xfs_iunlock(ip, XFS_ILOCK_SHARED);
-	return error;
-}
 
 
 /*
@@ -5174,90 +5088,6 @@ std_return:
 }
 
 /*
- * This is called from the customized NFS server code that
- * keeps the fid structure on the stack rather than having
- * us kmem_alloc one.  It is much more CPU efficient to do
- * it this way.
- */
-int
-xfs_fast_fid(
-	bhv_desc_t	*bdp, 
-	xfs_fid_t	*xfid)
-{
-	xfs_inode_t	*ip;
-
-	ip = XFS_BHVTOI(bdp);
-
-	xfid->fid_len = sizeof(xfs_fid_t) - sizeof(xfid->fid_len);
-	xfid->fid_pad = ip->i_ino >> 32;
-	xfid->fid_ino = (xfs_fid_ino_t)ip->i_ino;
-	xfid->fid_gen = ip->i_d.di_gen;	
-
-	return 0;
-}
-
-/*
- * xfs_fid this returns the old ten-byte version for NFS.
- */
-STATIC int
-xfs_fid(
-	bhv_desc_t	*bdp,
-	fid_t		**fidpp)
-{
-	xfs_mount_t	*mp;
-
-	vn_trace_entry(BHV_TO_VNODE(bdp), "xfs_fid",
-		       (inst_t *)__return_address);
-
-	mp = XFS_BHVTOI(bdp)->i_mount;
-	if (XFS_INO_BITS(mp) > (NBBY * (sizeof(xfs_fid_ino_t)+sizeof(u_short)))) {
-	  /*
-	   * If the ino won't fit into the space that is
-	   * in our xfs_fid structure, then return an error.
-	   */
-		*fidpp = NULL;
-		return XFS_ERROR(EFBIG);
-	}
-	
-	*fidpp = (struct fid *)kmem_alloc(sizeof(xfs_fid_t), KM_SLEEP);
-	return (xfs_fast_fid(bdp, (xfs_fid_t *)*fidpp));
-}
-
-
-/*
- * xfs_fid2
- *
- * A fid routine that takes a pointer to a previously allocated
- * fid structure (like xfs_fast_fid) but uses a 64 bit inode number.
- */
-STATIC int
-xfs_fid2(
-	bhv_desc_t	*bdp,
-	fid_t		*fidp)
-{
-	xfs_inode_t	*ip;
-	xfs_fid2_t	*xfid;
-
-	vn_trace_entry(BHV_TO_VNODE(bdp), "xfs_fid2",
-		       (inst_t *)__return_address);
-	ASSERT(sizeof(fid_t) >= sizeof(xfs_fid2_t));
-
-	xfid = (xfs_fid2_t *)fidp;
-	ip = XFS_BHVTOI(bdp);
-	xfid->fid_len = sizeof(xfs_fid2_t) - sizeof(xfid->fid_len);
-	xfid->fid_pad = 0;
-	/*
-	 * use bcopy because the inode is a long long and there's no
-	 * assurance that xfid->fid_ino is properly aligned.
-	 */
-	bcopy(&ip->i_ino, &xfid->fid_ino, sizeof xfid->fid_ino);
-	xfid->fid_gen = ip->i_d.di_gen;	
-
-	return 0;
-}
-
-
-/*
  * xfs_rwlock
  */
 void
@@ -5371,45 +5201,6 @@ xfs_seek(
 	} else {
 		return 0;
 	}
-}
-
-
-
-/*
- * xfs_frlock
- *
- * This is a stub.
- */
-STATIC int
-xfs_frlock(
-	bhv_desc_t	*bdp,
-	int		cmd,
-	flock_t		*flockp,
-	int		flag,
-	off_t		offset,
-	vrwlock_t	vrwlock,
-	cred_t		*credp)
-{
-	xfs_inode_t	*ip;
-	int		dolock, error;
-
-	vn_trace_entry(BHV_TO_VNODE(bdp), "xfs_frlock",
-		       (inst_t *)__return_address);
-	ip = XFS_BHVTOI(bdp);
-
-	dolock = (vrwlock == VRWLOCK_NONE);
-	if (dolock) {
-		xfs_ilock(ip, XFS_IOLOCK_EXCL);
-		vrwlock = VRWLOCK_WRITE;
-	}
-
-	ASSERT(vrwlock == VRWLOCK_READ ? ismrlocked(&ip->i_iolock, MR_ACCESS) :
-	       ismrlocked(&ip->i_iolock, MR_UPDATE));	
-
-	error = fs_frlock(bdp, cmd, flockp, flag, offset, vrwlock, credp);
-	if (dolock)
-		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
-	return error;
 }
 
 
@@ -5589,29 +5380,6 @@ xfs_allocstore(
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	if (!error) {
 		error = XFS_ERROR(ENOSPC);
-	}
-	return error;
-}
-
-STATIC int
-xfs_pathconf(
-	bhv_desc_t	*bdp,
-	int		cmd,
-	long		*valp,
-	struct cred 	*credp)
-{
-	int error = 0;
-
-	switch (cmd) {
-	case _PC_LINK_MAX:
-		*valp = XFS_MAXLINK;
-		break;
-	case _PC_FILESIZEBITS:
-		*valp = 64;
-		break;
-	default:
-		error = fs_pathconf(bdp, cmd, valp, credp);
-		break;
 	}
 	return error;
 }
@@ -6950,20 +6718,6 @@ xfs_change_file_space(
 	return error;
 }
 
-/*ARGSUSED*/
-STATIC int
-xfs_ioctl(
-	bhv_desc_t	*bdp,
-	int		cmd,
-	void		*arg,
-	int		flag,
-	cred_t		*credp,
-	int		*rvalp,
-        struct vopbd    *vbds)
-{
-	return XFS_ERROR(ENOTTY);
-}
-
 /*
  * print out error describing the problem with the fs
  *
@@ -6997,16 +6751,12 @@ xfs_error(
 #ifdef SIM
 
 vnodeops_t xfs_vnodeops = {
-  	BHV_IDENTITY_INIT(VN_BHV_XFS,VNODE_POSITION_BASE),
-    (vop_open_t)fs_noerr,
+	(vop_open_t)fs_noerr,
 	(vop_close_t)fs_nosys,
 	(vop_read_t)fs_nosys,
 	(vop_write_t)fs_nosys,
-	(vop_ioctl_t)fs_nosys,
-	(vop_setfl_t)fs_noerr,
 	(vop_getattr_t)fs_nosys,
 	(vop_setattr_t)fs_nosys,
-	(vop_access_t)fs_nosys,
 	(vop_lookup_t)fs_nosys,
 	(vop_create_t)fs_nosys,
 	(vop_remove_t)fs_nosys,
@@ -7019,55 +6769,33 @@ vnodeops_t xfs_vnodeops = {
 	(vop_readlink_t)fs_nosys,
 	(vop_fsync_t)fs_nosys,
 	xfs_inactive,
-	(vop_fid_t)fs_nosys,
-	(vop_fid2_t)fs_nosys,
 	(vop_rwlock_t)fs_nosys,
 	(vop_rwunlock_t)fs_nosys,
 	(vop_seek_t)fs_nosys,
-	(vop_cmp_t)fs_nosys,
-	(vop_frlock_t)fs_nosys,
 	(vop_realvp_t)fs_nosys,
 	(vop_bmap_t)fs_nosys,
-	(vop_strategy_t)fs_nosys,
-	(vop_map_t)fs_nodev,
-	(vop_addmap_t)fs_nosys,
-	(vop_delmap_t)fs_nosys,
-	(vop_poll_t)fs_nosys,
-	(vop_dump_t)fs_nosys,
-	(vop_pathconf_t)fs_nosys,
-	(vop_allocstore_t)fs_nosys,
 	(vop_fcntl_t)fs_nosys,
 	xfs_reclaim,
 	(vop_attr_get_t)fs_nosys,
 	(vop_attr_set_t)fs_nosys,
 	(vop_attr_remove_t)fs_nosys,
 	(vop_attr_list_t)fs_nosys,
-	(vop_cover_t)fs_nosys,
 	(vop_link_removed_t)fs_nosys,
 	(vop_vnode_change_t)fs_nosys,
 	(vop_ptossvp_t)fs_nosys,
 	(vop_pflushinvalvp_t)fs_nosys,
 	(vop_pflushvp_t)fs_nosys,
-	(vop_pinvalfree_t)fs_nosys,
 	(vop_sethole_t)fs_nosys,
-	(vop_commit_t)fs_nosys,
-	(vop_readbuf_t)fs_nosys,
-	(vop_strgetmsg_t)fs_nosys,
-	(vop_strputmsg_t)fs_nosys,
 };
 
 #else
 vnodeops_t xfs_vnodeops = {
-	BHV_IDENTITY_INIT(VN_BHV_XFS,VNODE_POSITION_BASE),
 	xfs_open,
 	xfs_close,
 	(vop_read_t)xfs_read,
 	(vop_write_t)xfs_write,
-	(vop_ioctl_t)fs_nosys,/* xfs_ioctl, */
-	(vop_setfl_t)fs_noerr,
 	xfs_getattr,
 	xfs_setattr,
-	(vop_access_t)fs_nosys,/* xfs_access, */
 	xfs_lookup,
 	xfs_create,
 	xfs_remove,
@@ -7080,40 +6808,22 @@ vnodeops_t xfs_vnodeops = {
 	xfs_readlink,
 	xfs_fsync,
 	xfs_inactive,
-	(vop_fid_t)fs_nosys,/* xfs_fid, */
-	(vop_fid2_t)fs_nosys,/* xfs_fid2, */
-   	(vop_rwlock_t)xfs_rwlock,/* fs_nosys, */
-	(vop_rwunlock_t)xfs_rwunlock,/* fs_nosys, */
+	xfs_rwlock,/* fs_nosys, */
+	xfs_rwunlock,/* fs_nosys, */
 	xfs_seek,
-	(vop_cmp_t)fs_nosys,/* fs_cmp, */
-	(vop_frlock_t)fs_nosys,/* xfs_frlock, */
 	(vop_realvp_t)fs_nosys,
-	xfs_bmap,
-	(vop_strategy_t)fs_nosys, /* xfs_strategy, */
-	(vop_map_t)fs_noerr,
-	(vop_addmap_t)fs_noerr,
-	(vop_delmap_t)fs_noerr,
-	fs_poll,
-	(vop_dump_t)fs_nosys,
-	(vop_pathconf_t)fs_nosys,/* xfs_pathconf, */
-	(vop_allocstore_t)fs_nosys,/* xfs_allocstore, */
+	(vop_bmap_t)xfs_bmap,
 	(vop_fcntl_t)fs_nosys, /* xfs_fcntl, */
 	xfs_reclaim,
 	(vop_attr_get_t)fs_nosys,/* xfs_attr_get, */
 	(vop_attr_set_t)fs_nosys,/* xfs_attr_set, */
 	(vop_attr_remove_t)fs_nosys,/* xfs_attr_remove, */
 	(vop_attr_list_t)fs_nosys,/* xfs_attr_list, */
-	fs_cover,
 	(vop_link_removed_t)fs_noval,
 	fs_vnode_change,
 	fs_tosspages,
 	fs_flushinval_pages,
 	fs_flush_pages,
-	fs_invalfree_pages,
 	fs_pages_sethole,
-	(vop_commit_t)fs_nosys,
-	(vop_readbuf_t)fs_nosys,/* (vop_readbuf_t)xfs_vop_readbuf, */
-	fs_strgetmsg,
-	fs_strputmsg,
 };
 #endif /* SIM */

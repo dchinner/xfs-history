@@ -142,13 +142,6 @@ xfs_vfsmount(
 	cred_t		*credp);
 
 STATIC int
-xfs_mntupdate(
-	bhv_desc_t	*bdp,
-	vnode_t		*mvp,
-	struct mounta	*uap,
-	cred_t		*credp);
-
-STATIC int
 xfs_rootinit(
 	vfs_t		*vfsp);
 
@@ -180,13 +173,6 @@ xfs_sync(
 	bhv_desc_t	*bdp,
 	int		flags,
 	cred_t		*credp);
-
-STATIC int
-xfs_vget(
-	bhv_desc_t	*bdp,
-	vnode_t		**vpp,
-	fid_t		*fidp);
-
 
 STATIC int
 xfs_cmountfs(
@@ -484,8 +470,6 @@ xfs_cmountfs(
 	size_t		n;
 	char		*tmp_fsname_buffer;
         int             client = 0;
-	/*REFERENCED*/
-	int		noerr;
 	extern void linvfs_release_inode(struct inode *);
 
 	/*
@@ -1056,58 +1040,6 @@ xfs_vfsmount(
 }
 
 /*
- * xfs_mntupdate -- Use VFS_MNTUPDATE to update mount arguments 
- */
-/* ARGSUSED */
-STATIC int
-xfs_mntupdate(
-	bhv_desc_t	*bdp,
-        vnode_t         *mvp,
-        struct mounta   *uap,
-        cred_t          *credp)
-{
-        vfs_t           *vfsp = bhvtovfs(bdp);
-	xfs_mount_t     *mp = XFS_BHVTOM(bdp);
-        struct xfs_args args;
-	int		error;
-	 
-	if (!cap_able_cred(credp, CAP_MOUNT_MGT))
-		return XFS_ERROR(EPERM);
-	if (mvp->v_type != VDIR)
-		return XFS_ERROR(ENOTDIR);
-
-	/*
-	 * Get the xfs arguments.
-	 */
-	ASSERT((uap->flags & MS_REMOUNT) && (vfsp->vfs_flag & VFS_REMOUNT));
-	if (uap->flags != (MS_RDONLY | MS_REMOUNT | MS_FSS | MS_DATA))
-		return (EINVAL);
-	error = xfs_mountargs(uap, &args);
-	if (error)
-		return (error);
-
-	/*
-	 * Check for a NULL spec as a way of supporting mount's check
-	 * for supported versions on remount as well as normal mount.
-	 */
-	if (uap->spec == NULL)
-		return EFAULT;
-
-#ifdef CELL_CAPABLE
-	/*
-         * Note that calling cxfs_remount_server may involve relocation.  
-         * Thus, it may be that the xfs_mount structure may not exist when 
-	 * it returns.  You *must* not touch it upon return.
-	 */
-	error = cxfs_remount_server(mp, uap, &args);
-#endif
-	mp = NULL;
-
-	return (error);
-}
-
-
-/*
  * This function determines whether or not the given device has a
  * XFS file system. It reads a XFS superblock from the device and
  * checks the magic and version numbers.
@@ -1351,7 +1283,6 @@ xfs_ibusy(
 				ip = ip->i_mnext;
 				continue;
 			}
-			
 #ifdef DEBUG
 			printk("busy vp=0x%x ip=0x%x inum %d count=%d\n",
 				vp, ip, ip->i_ino & 0xffffffff, vp->v_count);
@@ -2361,79 +2292,6 @@ xfs_syncsub(
 	return XFS_ERROR(last_error);
 }
 
-
-/*
- * xfs_vget - called by NFS server to get vnode from file handle
- */
-STATIC int
-xfs_vget(
-	bhv_desc_t	*bdp,
-	vnode_t		**vpp,
-	fid_t		*fidp)
-{
-        xfs_fid_t	*xfid;
-	xfs_fid2_t	*xfid2;
-        xfs_inode_t	*ip;
-	int		error;
-	xfs_ino_t	ino;
-	unsigned int	igen;
-	xfs_mount_t	*mp;
-
-	xfid  = (struct xfs_fid *)fidp;
-	xfid2 = (struct xfs_fid2 *)fidp;
-	if (xfid->fid_len == sizeof *xfid - sizeof xfid->fid_len) {
-	  /*
-	   * The 10 byte fid used by NFS, using 48 bits of inode number
-	   */
-		ino  = (xfs_ino_t)xfid->fid_ino | ((xfs_ino_t)xfid->fid_pad << 32);
-		igen = xfid->fid_gen;
-	} else if (xfid2->fid_len == sizeof *xfid2 - sizeof xfid2->fid_len) {
-		ino  = xfid2->fid_ino;
-		igen = xfid2->fid_gen;
-	} else {
-#pragma mips_frequency_hint NEVER
-		/*
-		 * Invalid.  Since handles can be created in user space
-		 * and passed in via gethandle(), this is not cause for
-		 * a panic.
-		 */
-		return XFS_ERROR(EINVAL);
-	}
-	mp = XFS_BHVTOM(bdp);
-	error = xfs_iget(mp, NULL, ino, XFS_ILOCK_SHARED, &ip, 0);
-	if (error) {
-#pragma mips_frequency_hint NEVER
-		*vpp = NULL;
-		return error;
-	}
-        if (ip == NULL) {
-#pragma mips_frequency_hint NEVER
-                *vpp = NULL;
-                return XFS_ERROR(EIO);
-        }
-
-	if (ip->i_d.di_mode == 0 || ip->i_d.di_gen != igen) {
-#pragma mips_frequency_hint NEVER
-		xfs_iput(ip, XFS_ILOCK_SHARED);
-		*vpp = NULL;
-		return 0;
-        }
-
-        xfs_iunlock(ip, XFS_ILOCK_SHARED);
-        *vpp = XFS_ITOV(ip);
-        return 0;
-}
-
-int
-xfs_force_pinned(bhv_desc_t	*bdp)
-{
-	xfs_mount_t	*mp;
-	
-	mp = XFS_BHVTOM(bdp);
-	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
-	return 0;
-}
-
 STATIC int
 xfs_get_vnode(bhv_desc_t *bdp,
 	vnode_t		**vpp,
@@ -2470,22 +2328,13 @@ vfsops_t xfs_vfsops = {
 	BHV_IDENTITY_INIT(VFS_BHV_XFS,VFS_POSITION_BASE),
 	xfs_vfsmount,
 	xfs_rootinit,
-	xfs_mntupdate,
 	fs_dounmount,
 	xfs_unmount,
 	xfs_root,
 	xfs_statvfs,
 	xfs_sync,
-	xfs_vget,
 	xfs_vfsmountroot,
-	fs_realvfsops,	
-	fs_import,	
-	xfs_quotactl,
-	xfs_force_pinned,
 	xfs_get_vnode,
-	VFSOPS_MAGIC,
-	VFS_OPSVER_GROVE,/* interface version */
-        VFS_OPSFL_FRLOCK2/* interface flags */
 };
 #else	/* SIM */
 vfsops_t xfs_vfsops = {
@@ -2499,25 +2348,6 @@ vfsops_t xfs_vfsops = {
 	0,
 	0,
 	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-        VFSOPS_MAGIC,
-	VFS_OPSVER_GROVE,/* interface version */
-        VFS_OPSFL_FRLOCK2/* interface flags */
 };
 
 #endif	/* !SIM */
-
-
-
-
-
-
-
-
-
-
-
