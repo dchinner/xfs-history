@@ -574,7 +574,8 @@ mapit:
 		} else if (flags & PBF_MAPPED) {
 			if (as_list_len > 64)
 				purge_addresses();
-			pb->pb_addr = vmap(pb->pb_pages, page_count);
+			pb->pb_addr = vmap(pb->pb_pages, page_count,
+					VM_ALLOC, PAGE_KERNEL);
 			if (pb->pb_addr == NULL)
 				return -ENOMEM;
 			pb->pb_addr += pb->pb_offset;
