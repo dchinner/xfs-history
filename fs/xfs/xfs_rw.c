@@ -447,10 +447,6 @@ xfs_refcache_sbdirty(struct super_block *sb)
 	sb->s_dirt = 1;
 }
 
-typedef void (*timeout_fn)(unsigned long);
-struct timer_list xfs_refcache_sbdirty_timer = 
-	{ {NULL, NULL}, 0, 0, (timeout_fn)xfs_refcache_sbdirty };
-
 /*
  * Insert the given inode into the reference cache.
  */
@@ -719,11 +715,11 @@ xfs_refcache_purge_some(xfs_mount_t *mp)
 	 * purge some more later.
 	 */
 	if (xfs_refcache_count) {
-		del_timer(&xfs_refcache_sbdirty_timer);
-		xfs_refcache_sbdirty_timer.data = 
+		del_timer_sync(&mp->m_sbdirty_timer);
+		mp->m_sbdirty_timer.data = 
 		    (unsigned long)LINVFS_GET_IP(XFS_ITOV(mp->m_rootip))->i_sb;
-		xfs_refcache_sbdirty_timer.expires = jiffies + 2*HZ;
-		add_timer(&xfs_refcache_sbdirty_timer);
+		mp->m_sbdirty_timer.expires = jiffies + 2*HZ;
+		add_timer(&mp->m_sbdirty_timer);
 	}
 
 	/*

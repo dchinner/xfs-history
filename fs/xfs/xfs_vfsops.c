@@ -666,9 +666,10 @@ xfs_unmount(
 
 	/*
 	 * First blow any referenced inode from this file system
-	 * out of the reference cache.
+	 * out of the reference cache, and delete the timer.
 	 */
 	xfs_refcache_purge_mp(mp);
+	del_timer_sync(&mp->m_sbdirty_timer);
 
 	/*
 	 * Make sure there are no active users.
