@@ -3422,11 +3422,12 @@ xfs_ichgtime(xfs_inode_t *ip,
 		return;
 
 	/*
-	 * Don't update access timestamps on reads if mounted "noacctm"
+	 * Don't update access timestamps on reads if mounted "noatime"
 	 * Throw it away if anyone asks us.
 	 */
 	if (ip->i_mount->m_flags & XFS_MOUNT_NOATIME &&
-	    (flags & XFS_ICHGTIME_ACC) == XFS_ICHGTIME_ACC)
+	    ((flags & (XFS_ICHGTIME_ACC|XFS_ICHGTIME_MOD|XFS_ICHGTIME_CHG))
+			== XFS_ICHGTIME_ACC))
 		return;
 
 	nanotime(&tv);
