@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_IALLOC_H
 #define	_FS_XFS_IALLOC_H
 
-#ident	"$Revision: 1.13 $"
+#ident	"$Revision: 1.14 $"
 
 /*
  * Allocation parameters.
@@ -73,7 +73,7 @@ xfs_dialloc_next_free(
  * Free disk inode.  Carefully avoids touching the incore inode, all
  * manipulations incore are the caller's responsibility.
  */
-xfs_agino_t				/* next value to be stored in di_un */
+void
 xfs_difree(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	inode);		/* inode to be freed */
