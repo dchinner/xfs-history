@@ -426,7 +426,7 @@ extern int pagebuf_ispin( page_buf_t *); /* check if pagebuf is pinned	*/
 extern ssize_t pagebuf_generic_file_write(
 		struct pb_target *,
 		struct file *,		/* file to write		*/
-		char *,			/* buffer address		*/
+		const char *,		/* buffer address		*/
 		size_t,			/* size of buffer		*/
 		loff_t *,		/* file offset to use and update */
 		pagebuf_bmap_fn_t);	/* bmap function		*/

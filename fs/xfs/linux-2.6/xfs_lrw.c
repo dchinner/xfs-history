@@ -417,7 +417,7 @@ ssize_t				/* error (positive) */
 xfs_write(
         bhv_desc_t      *bdp,
         struct file	*file,
-	char		*buf,
+	const char	*buf,
 	size_t		size,
 	loff_t		*offset,
         cred_t          *credp)

@@ -161,7 +161,7 @@ typedef	int	(*vop_open_t)(bhv_desc_t *, vnode_t **, mode_t, struct cred *);
 typedef	int	(*vop_close_t)(bhv_desc_t *, int, lastclose_t, struct cred *);
 typedef	ssize_t	(*vop_read_t)(bhv_desc_t *, struct file *, char *, size_t,
 				loff_t *, struct cred *);
-typedef	ssize_t	(*vop_write_t)(bhv_desc_t *, struct file *, char *, size_t,
+typedef	ssize_t	(*vop_write_t)(bhv_desc_t *, struct file *, const char *, size_t,
 				loff_t *, struct cred *);
 typedef	int	(*vop_ioctl_t)(bhv_desc_t *, struct inode *, struct file *, unsigned int, unsigned long);
 typedef	int	(*vop_getattr_t)(bhv_desc_t *, struct vattr *, int,

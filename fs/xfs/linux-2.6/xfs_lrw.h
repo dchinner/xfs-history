@@ -57,7 +57,7 @@ extern ssize_t xfs_read (
 extern ssize_t xfs_write (
 	struct bhv_desc		*bdp,
         struct file		*file,
-	char			*buf,
+	const char		*buf,
 	size_t			size,
 	loff_t			*offset,
 	struct cred		*credp);
