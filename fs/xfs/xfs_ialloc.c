@@ -29,9 +29,9 @@
  */
 
 STATIC void
-xfs_ialloc_log_agi(xfs_trans_t *tp,
-		   buf_t *buf,
-		   int fields);
+xfs_ialloc_log_agi(xfs_trans_t *tp,	/* transaction pointer */
+		   buf_t *buf,		/* allocation group header buffer */
+		   int fields);		/* bitmask of fields to log */
 
 STATIC void
 xfs_ialloc_log_di(xfs_trans_t *tp,	/* transaction pointer */
@@ -39,10 +39,10 @@ xfs_ialloc_log_di(xfs_trans_t *tp,	/* transaction pointer */
 		  int off,		/* index of inode in buffer */
 		  int fields);		/* bitmask of fields to log */
 
-STATIC buf_t *
-xfs_ialloc_read_agi(xfs_mount_t *mp,
-		    xfs_trans_t *tp,
-		    xfs_agnumber_t agno);
+STATIC buf_t *				/* allocation group header buffer */
+xfs_ialloc_read_agi(xfs_mount_t *mp,	/* file system mount structure */
+		    xfs_trans_t *tp,	/* transaction pointer */
+		    xfs_agnumber_t agno); /* allocation group number */
 
 /*
  * Prototypes for per-allocation group routines.
@@ -68,9 +68,10 @@ xfs_ialloc_ag_select(xfs_trans_t *tp,	/* transaction pointer */
 STATIC void
 xfs_ialloc_log_agi(xfs_trans_t *tp, buf_t *buf, int fields)
 {
-	int first;
-	int last;
-	static const int offsets[] = {
+	int	first;			/* first byte number */
+	int	last;			/* last byte number */
+	static const int offsets[] = {	/* field starting offsets */
+					/* keep in sync with bit definitions */
 		offsetof(xfs_agi_t, agi_magicnum),
 		offsetof(xfs_agi_t, agi_versionnum),
 		offsetof(xfs_agi_t, agi_seqno),
@@ -83,7 +84,13 @@ xfs_ialloc_log_agi(xfs_trans_t *tp, buf_t *buf, int fields)
 		sizeof(xfs_agi_t)
 	};
 
+	/*
+	 * Compute byte offsets for the first and last fields.
+	 */
 	xfs_btree_offsets(fields, offsets, XFS_AGI_NUM_BITS, &first, &last);
+	/*
+	 * Log the allocation group inode header buffer.
+	 */
 	xfs_trans_log_buf(tp, buf, first, last);
 }
 
@@ -154,7 +161,7 @@ xfs_ialloc_log_di(xfs_trans_t *tp, buf_t *buf, int off, int fields)
 /*
  * Read in the allocation group header (inode allocation section)
  */
-buf_t *
+STATIC buf_t *
 xfs_ialloc_read_agi(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno)
 {
 	daddr_t		d;		/* disk block address */
@@ -387,17 +394,17 @@ xfs_ialloc_ag_select(xfs_trans_t *tp, xfs_ino_t parent, int sameag, mode_t mode)
 xfs_ino_t
 xfs_dialloc(xfs_trans_t *tp, xfs_ino_t parent, int sameag, mode_t mode)
 {
-	xfs_agblock_t	agbno;
+	xfs_agblock_t	agbno;		/* starting block number of inodes */
 	xfs_agnumber_t	agcount;	/* number of allocation groups */
 	buf_t		*agbuf;		/* allocation group header's buffer */
-	xfs_agino_t	agino;
+	xfs_agino_t	agino;		/* ag-relative inode to be returned */
 	xfs_agnumber_t	agno;		/* allocation group number */
 	xfs_agi_t	*agi;		/* allocation group header structure */
-	buf_t		*fbuf;
-	xfs_dinode_t	*free;
-	xfs_ino_t	ino;
+	buf_t		*fbuf;		/* buffer containing inode */
+	xfs_dinode_t	*free;		/* pointer into fbuf for our dinode */
+	xfs_ino_t	ino;		/* fs-relative inode to be returned */
 	xfs_mount_t	*mp;		/* mount point structure */
-	int		off;
+	int		off;		/* index of our inode in fbuf */
 	xfs_sb_t	*sbp;		/* superblock structure */
 	xfs_agnumber_t	tagno;		/* testing allocation group number */
 
@@ -453,6 +460,9 @@ xfs_dialloc(xfs_trans_t *tp, xfs_ino_t parent, int sameag, mode_t mode)
 	agino = agi->agi_freelist;
 	agbno = xfs_agino_to_agbno(sbp, agino);
 	off = xfs_agino_to_offset(sbp, agino);
+	/*
+	 * Get a buffer containing the free inode.
+	 */
 	fbuf = xfs_btree_breads(mp, tp, agno, agbno);
 	free = xfs_make_iptr(sbp, fbuf, off);
 	ASSERT(free->di_core.di_magic == XFS_DINODE_MAGIC);
@@ -587,9 +597,8 @@ xfs_difree(xfs_trans_t *tp, xfs_ino_t inode)
 
 /*
  * Return the location of the inode in bno/off, for mapping it into a buffer.
- * Returns success (always).
  */
-int
+void
 xfs_dilocate(xfs_mount_t *mp, xfs_trans_t *tp, xfs_ino_t ino,
 	     xfs_fsblock_t *bno, int *off)
 {
@@ -614,5 +623,4 @@ xfs_dilocate(xfs_mount_t *mp, xfs_trans_t *tp, xfs_ino_t ino,
 	 */
 	*bno = xfs_agb_to_fsb(sbp, agno, agbno);
 	*off = offset;
-	return 1;
 }
