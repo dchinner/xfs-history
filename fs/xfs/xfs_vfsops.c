@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.75 $"
+#ident  "$Revision: 1.76 $"
 
 #include <strings.h>
 #include <limits.h>
@@ -307,7 +307,6 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	struct vnode 	*ddevvp, *rdevvp, *ldevvp;
 	int		error = 0;
 	int		s, vfs_flags;
-	xfs_sb_t	*sbp;
 	size_t		n;
 	struct vnode 	*makespecvp(dev_t, vtype_t);
 
@@ -341,7 +340,7 @@ xfs_cmountfs(struct vfs 	*vfsp,
 		if (error) {
 			VN_RELE(rdevvp);
 			if (ddevvp) {
-				VOP_CLOSE(ddevvp, vfs_flags, 1, 0, cr);
+				VOP_CLOSE(ddevvp, vfs_flags, L_TRUE, 0, cr);
 				binval(ddev);
 				VN_RELE(ddevvp);
 			}
@@ -361,12 +360,12 @@ xfs_cmountfs(struct vfs 	*vfsp,
 			if (error) {
 				VN_RELE(ldevvp);
 				if (rdevvp) {
-					VOP_CLOSE(rdevvp, vfs_flags, 1, 0, cr);
+					VOP_CLOSE(rdevvp, vfs_flags, L_TRUE, 0, cr);
 					binval(rtdev);
 					VN_RELE(rdevvp);
 				}
 				if (ddevvp) {
-					VOP_CLOSE(ddevvp, vfs_flags, 1, 0, cr);
+					VOP_CLOSE(ddevvp, vfs_flags, L_TRUE, 0, cr);
 					binval(ddev);
 					VN_RELE(ddevvp);
 				}
@@ -413,28 +412,22 @@ xfs_cmountfs(struct vfs 	*vfsp,
 		xfs_mount_free(mp);
 error:
 		if (ldevvp) {
-			VOP_CLOSE(ldevvp, vfs_flags, 1, 0, cr);
+			VOP_CLOSE(ldevvp, vfs_flags, L_TRUE, 0, cr);
 			binval(logdev);
 			VN_RELE(ldevvp);
 		}
 		if (rdevvp) {
-			VOP_CLOSE(rdevvp, vfs_flags, 1, 0, cr);
+			VOP_CLOSE(rdevvp, vfs_flags, L_TRUE, 0, cr);
 			binval(rtdev);
 			VN_RELE(rdevvp);
 		}
 		if (ddevvp) {
-			VOP_CLOSE(ddevvp, vfs_flags, 1, 0, cr);
+			VOP_CLOSE(ddevvp, vfs_flags, L_TRUE, 0, cr);
 			binval(ddev);
 			VN_RELE(ddevvp);
 		}
 		return error;		/* error should be in errno.h */
 	}
-
-	/*
-	 * At this point, the super block has been read into
-	 * the mount structure - get the pointer to it.
-	 */
-	sbp = XFS_BUF_TO_SBP(mp->m_sb_bp);
 
 	/*
 	 * For root mounts, make sure the clock is set.  This
@@ -1071,7 +1064,7 @@ xfs_statdevvp(struct statvfs *sp, vnode_t *devvp)
 	} else
 		error = EINVAL;
 	brelse(bp);
-	(void) VOP_CLOSE(devvp, FREAD, 1, 0, u.u_cred);
+	(void) VOP_CLOSE(devvp, FREAD, L_TRUE, 0, u.u_cred);
 	return error;
 }
 
