@@ -629,6 +629,9 @@ linvfs_get_block_core(
 		set_buffer_mapped(bh_result);
 	}
 
+	if (create && !buffer_mapped(bh_result))
+		set_buffer_new(bh_result);
+
 	if (pbmap.pbm_flags & PBMF_DELAY) {
 		if (direct)
 			BUG();
@@ -646,8 +649,6 @@ linvfs_get_block_core(
 		set_buffer_delay(bh_result);
 	}
 
-	if (create && (pbmap.pbm_flags & PBMF_NEW))
-		set_buffer_new(bh_result);
 	return 0;
 }
 

@@ -53,7 +53,7 @@ STATIC int xfs_iomap_write_delay(xfs_iocore_t *, loff_t, size_t, pb_bmap_t *,
 STATIC int xfs_iomap_write_direct(xfs_iocore_t *, loff_t, size_t, pb_bmap_t *,
 			int *, int, int);
 STATIC int _xfs_imap_to_bmap(xfs_iocore_t *, xfs_off_t, xfs_bmbt_irec_t *,
-			pb_bmap_t *, int, int, bmap_flags_t);
+			pb_bmap_t *, int, int);
 
 #ifndef DEBUG
 #define	xfs_strat_write_check(io,off,count,imap,nimap)
@@ -872,7 +872,7 @@ xfs_strategy(bhv_desc_t	*bdp,
 
 	if (nimaps && !ISNULLSTARTBLOCK(imap[0].br_startblock)) {
 		*npbmaps = _xfs_imap_to_bmap(&ip->i_iocore, offset, imap,
-				pbmapp, nimaps, *npbmaps, 0);
+				pbmapp, nimaps, *npbmaps);
 		return 0;
 	}
 
@@ -1012,7 +1012,7 @@ xfs_strategy(bhv_desc_t	*bdp,
 				XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL | XFS_EXTSIZE_WR);
 				maps = min(nimaps, *npbmaps);
 				*npbmaps = _xfs_imap_to_bmap(io, offset, &imap[i],
-					pbmapp, maps, *npbmaps, 0);
+					pbmapp, maps, *npbmaps);
 				XFS_STATS_INC(xfsstats.xs_xstrat_quick);
 				return 0;
 			}
@@ -1054,8 +1054,7 @@ _xfs_imap_to_bmap(
 	xfs_bmbt_irec_t *imap,
 	pb_bmap_t	*pbmapp,
 	int		imaps,			/* Number of imap entries */
-	int		pbmaps,			/* Number of pbmap entries */
-	bmap_flags_t	flags)
+	int		pbmaps)			/* Number of pbmap entries */
 {
 	xfs_mount_t     *mp;
 	xfs_fsize_t	nisize;
@@ -1074,7 +1073,7 @@ _xfs_imap_to_bmap(
 		pbmapp->pbm_offset = XFS_FSB_TO_B(mp, imap->br_startoff);
 		pbmapp->pbm_delta = offset - pbmapp->pbm_offset;
 		pbmapp->pbm_bsize = XFS_FSB_TO_B(mp, imap->br_blockcount);
-		pbmapp->pbm_flags = flags;
+		pbmapp->pbm_flags = 0;
 
 		start_block = imap->br_startblock;
 		if (start_block == HOLESTARTBLOCK) {
@@ -1136,7 +1135,7 @@ xfs_iomap_read(
 
 	if(nimaps) {
 		*npbmaps = _xfs_imap_to_bmap(io, offset, imap, pbmapp, nimaps,
-			*npbmaps, 0);
+			*npbmaps);
 	} else
 		*npbmaps = 0;
 	return XFS_ERROR(error);
@@ -1321,7 +1320,7 @@ xfs_write_bmap(
 		}
 	} else {
 		pbmapp->pbm_bn = PAGE_BUF_DADDR_NULL;
-		pbmapp->pbm_flags = PBMF_DELAY|PBMF_NEW;
+		pbmapp->pbm_flags = PBMF_DELAY;
 	}
 	pbmapp->pbm_target = io->io_flags & XFS_IOCORE_RT ?
 		mp->m_rtdev_targ.pb_targ :
@@ -1732,7 +1731,8 @@ xfs_iomap_write_direct(
 	}
 
 	maps = min(nimaps, maps);
-	*npbmaps = _xfs_imap_to_bmap(io, offset, &imap[0], pbmapp, maps, *npbmaps, PBMF_NEW);
+	*npbmaps = _xfs_imap_to_bmap(io, offset, &imap[0], pbmapp, maps,
+								*npbmaps);
 	if(*npbmaps) {
 		/*
 		 * this is new since xfs_iomap_read
