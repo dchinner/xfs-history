@@ -1894,7 +1894,8 @@ XFS_log_write_unmount_ro(bhv_desc_t	*bdp)
 STATIC int
 xfs_is_read_only(xfs_mount_t *mp)
 {
-	if (is_read_only(mp->m_dev) || is_read_only(mp->m_logdev)) {
+	if (bdev_read_only(mp->m_ddev_targ.bd_targ) ||
+	    bdev_read_only(mp->m_logdev_targ.bd_targ)) {
 		cmn_err(CE_NOTE,
 			"XFS: write access unavailable, cannot proceed.");
 		return EROFS;
