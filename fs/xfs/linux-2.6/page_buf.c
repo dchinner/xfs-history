@@ -466,7 +466,7 @@ _pagebuf_lookup_pages(
 {
 	loff_t			next_buffer_offset;
 	unsigned long		page_count, pi, index;
-	struct page		*page, *cached_page;
+	struct page		*page;
 	int			gfp_mask, retry_count = 5, rval = 0;
 	int			all_mapped, good_pages, nbytes;
 	size_t			blocksize, size, offset;
@@ -515,8 +515,6 @@ _pagebuf_lookup_pages(
 		return rval;
 
 	rval = pi = 0;
-	cached_page = NULL;
-
 	blocksize = pb->pb_target->pbr_blocksize;
 	size = pb->pb_count_desired;
 	offset = pb->pb_offset;
@@ -526,36 +524,21 @@ _pagebuf_lookup_pages(
 	for (all_mapped = 1; pi < page_count; pi++, index++) {
 		if (pb->pb_pages[pi] == 0) {
 		      retry:
-			page = find_lock_page(aspace, index);
+			page = find_or_create_page(aspace, index, gfp_mask);
 			if (!page) {
-				PB_STATS_INC(pbstats.pb_page_alloc);
-				if (!cached_page) {
-					/* allocate a new page */
-					cached_page = alloc_pages(gfp_mask, 0);
-
-					if (!cached_page) {
-						if (--retry_count > 0) {
-							pagebuf_daemon_wakeup(1);
-							current->state = TASK_UNINTERRUPTIBLE;
-							schedule_timeout(10);
-							goto retry;
-						}
-
-						rval = -ENOMEM;
-						all_mapped = 0;
-						continue;
-					}
-				}
-				page = cached_page;
-				if (add_to_page_cache(page,
-					aspace, index))
+				if (--retry_count > 0) {
+					PB_STATS_INC(pbstats.pb_page_retries);
+					pagebuf_daemon_wakeup(1);
+					current->state = TASK_UNINTERRUPTIBLE;
+					schedule_timeout(10);
 					goto retry;
-				cached_page = NULL;
-			} else {
-				PB_STATS_INC(pbstats.pb_page_found);
-				mark_page_accessed(page);
+				}
+				rval = -ENOMEM;
+				all_mapped = 0;
+				continue;
 			}
-
+			PB_STATS_INC(pbstats.pb_page_found);
+			mark_page_accessed(page);
 			pb->pb_pages[pi] = page;
 		} else {
 			page = pb->pb_pages[pi];
@@ -598,9 +581,6 @@ _pagebuf_lookup_pages(
 			unlock_page(pb->pb_pages[pi]);
 		}
 	}
-
-	if (cached_page)
-		page_cache_release(cached_page);
 
 mapit:
 	pb->pb_flags |= _PBF_MEM_ALLOCATED;
