@@ -95,7 +95,6 @@ xfs_init(int	fstype)
 #endif
 	mutex_init(&xfs_uuidtabmon, MUTEX_DEFAULT, "xfs_uuidtab");
 	mutex_init(&xfs_Gqm_lock, MUTEX_DEFAULT, "xfs_qmlock");
-	ndquot = DQUOT_MAX_HEURISTIC;
 
 	/*
 	 * Initialize all of the zone allocators we use.

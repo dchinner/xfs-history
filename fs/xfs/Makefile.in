@@ -45,6 +45,7 @@ objlink( CONFIG_XFS_QUOTA xfs.o xfs_dquot.o xfs_trans_dquot.o xfs_dquot_item.o x
 objlink(!CONFIG_XFS_QUOTA xfs.o xfsquotasstubs.o)
 
 objlink(CONFIG_FS_POSIX_ACL xfs.o xfs_acl.o)
+objlink(CONFIG_FS_POSIX_MAC xfs.o xfs_mac.o)
 
 objlink(xfs.o xfs_alloc.o xfs_alloc_btree.o xfs_attr.o xfs_attr_fetch.o
 	xfs_attr_leaf.o xfs_bit.o xfs_bmap.o xfs_bmap_btree.o xfs_btree.o
@@ -56,7 +57,7 @@ objlink(xfs.o xfs_alloc.o xfs_alloc_btree.o xfs_attr.o xfs_attr_fetch.o
 	xfs_log_recover.o xfs_macros.o xfs_mount.o xfs_rename.o xfs_trans.o
 	xfs_trans_ail.o xfs_trans_buf.o xfs_trans_extfree.o xfs_trans_inode.o
 	xfs_trans_item.o xfs_utils.o xfs_vfsops.o xfs_vnodeops.o xfs_rw.o
-	macstubs.o pagebuf/pagebuf.o linux/linux_xfs.o)
+	pagebuf/pagebuf.o linux/linux_xfs.o)
 
 select(CONFIG_XFS_FS xfs.o)
 

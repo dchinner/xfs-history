@@ -92,11 +92,13 @@ xfs_attr_get(bhv_desc_t *bdp, char *name, char *value, int *valuelenp,
 	int             error;
         int             namelen;
 	xfs_inode_t	*ip = XFS_BHVTOI(bdp);
-        
-        ASSERT(MAXNAMELEN-1<=0xff); /* length is stored in uint8 */
-        namelen=strlen(name);
-        if (namelen>=MAXNAMELEN) return EFAULT; /* match irix behaviour */
 
+	if (!name)
+		return EINVAL;
+	ASSERT(MAXNAMELEN-1 <= 0xff);	/* length is stored in uint8 */
+	namelen = strlen(name);
+	if (namelen >= MAXNAMELEN)
+		return EFAULT;		/* match IRIX behaviour */
 	XFS_STATS_INC(xfsstats.xs_attr_get);
 
 	if (XFS_IFORK_Q(ip) == 0)
@@ -171,10 +173,11 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	int             rsvd = (flags & ATTR_ROOT) != 0;
         int             namelen;
 
-        ASSERT(MAXNAMELEN-1<=0xff); /* length is stored in uint8 */
-        namelen=strlen(name);
-        if (namelen>=MAXNAMELEN) return EFAULT; /* match irix behaviour */
-        
+        ASSERT(MAXNAMELEN-1 <= 0xff); /* length is stored in uint8 */
+        namelen = strlen(name);
+        if (namelen >= MAXNAMELEN)
+		return EFAULT; /* match irix behaviour */
+
 	XFS_STATS_INC(xfsstats.xs_attr_set);
 	/*
 	 * Do we answer them, or ignore them?
@@ -435,9 +438,10 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	xfs_mount_t         *mp;
         int                 namelen;
 
-        ASSERT(MAXNAMELEN-1<=0xff); /* length is stored in uint8 */
-        namelen=strlen(name);
-        if (namelen>=MAXNAMELEN) return EFAULT; /* match irix behaviour */
+	ASSERT(MAXNAMELEN-1<=0xff); /* length is stored in uint8 */
+	namelen = strlen(name);
+	if (namelen>=MAXNAMELEN)
+		return EFAULT; /* match irix behaviour */
         
 	XFS_STATS_INC(xfsstats.xs_attr_remove);
 
@@ -579,8 +583,14 @@ out:
 	return(error);
 }
 
-/*ARGSUSED*/
-int								/* error */
+/*
+ * Generate a list of extended attribute names and optionally
+ * also value lengths.  Positive return value follows the XFS
+ * convention of being an error, zero or negative return code
+ * is the length of the buffer returned (negated), indicating
+ * success.
+ */
+int
 xfs_attr_list(bhv_desc_t *bdp, char *buffer, int bufsize, int flags,
 		      attrlist_cursor_kern_t *cursor, struct cred *cred)
 {
@@ -593,20 +603,19 @@ xfs_attr_list(bhv_desc_t *bdp, char *buffer, int bufsize, int flags,
 	/*
 	 * Validate the cursor.
 	 */
-	if (cursor->pad1 || cursor->pad2) {
+	if (cursor->pad1 || cursor->pad2)
 		return(XFS_ERROR(EINVAL));
-	}
 	if ((cursor->initted == 0) &&
-	    (cursor->hashval || cursor->blkno || cursor->offset)) {
+	    (cursor->hashval || cursor->blkno || cursor->offset))
 		return(XFS_ERROR(EINVAL));
-	}
 
 	/*
 	 * Check for a properly aligned buffer.
 	 */
-	if (((long)buffer) & (sizeof(int)-1)) {
+	if (((long)buffer) & (sizeof(int)-1))
 		return(XFS_ERROR(EFAULT));
-	}
+	if (flags & ATTR_KERNOVAL)
+		bufsize = 0;
 
 	/*
 	 * Initialize the output buffer.
@@ -617,12 +626,19 @@ xfs_attr_list(bhv_desc_t *bdp, char *buffer, int bufsize, int flags,
 	context.dupcnt = 0;
 	context.resynch = 1;
 	context.flags = flags;
-	context.bufsize = (bufsize & ~(sizeof(int)-1));		/* align */
-	context.firstu = context.bufsize;
-	context.alist = (attrlist_t *)buffer;
-	context.alist->al_count = 0;
-	context.alist->al_more = 0;
-	context.alist->al_offset[0] = context.bufsize;
+	if (!(flags & ATTR_KERNAMES)) {
+		context.bufsize = (bufsize & ~(sizeof(int)-1));  /* align */
+		context.firstu = context.bufsize;
+		context.alist = (attrlist_t *)buffer;
+		context.alist->al_count = 0;
+		context.alist->al_more = 0;
+		context.alist->al_offset[0] = context.bufsize;
+	}
+	else {
+		context.bufsize = bufsize;
+		context.firstu = context.bufsize;
+		context.alist = (attrlist_t *)buffer;
+	}
 
 	if (XFS_FORCED_SHUTDOWN(dp->i_mount))
 		return (EIO);
@@ -632,9 +648,8 @@ xfs_attr_list(bhv_desc_t *bdp, char *buffer, int bufsize, int flags,
 	xfs_ilock(dp, XFS_ILOCK_SHARED);
 	if ((error = xfs_iaccess(dp, IREAD, cred))) {
 		xfs_iunlock(dp, XFS_ILOCK_SHARED);
-                return(XFS_ERROR(error));
+		return(XFS_ERROR(error));
 	}
-
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
@@ -653,6 +668,16 @@ xfs_attr_list(bhv_desc_t *bdp, char *buffer, int bufsize, int flags,
 	}
 	xfs_iunlock(dp, XFS_ILOCK_SHARED);
 	xfs_attr_trace_l_c("syscall end", &context);
+
+	if (!(context.flags & (ATTR_KERNOVAL|ATTR_KERNAMES))) {
+		ASSERT(error >= 0);
+	}
+	else {	/* must return negated buffer size or the error */
+		if (context.count < 0)
+			error = XFS_ERROR(ERANGE);
+		else
+			error = -context.count;
+	}
 
 	return(error);
 }
@@ -1077,7 +1102,7 @@ xfs_attr_leaf_get(xfs_da_args_t *args)
 	}
 	error = xfs_attr_leaf_getvalue(bp, args);
 	xfs_da_brelse(args->trans, bp);
-	if ((error == 0) && (args->rmtblkno > 0)) {
+	if (!error && (args->rmtblkno > 0) && !(args->flags & ATTR_KERNOVAL)) {
 		error = xfs_attr_rmtval_get(args);
 	}
 	return(error);
@@ -1685,7 +1710,8 @@ xfs_attr_node_get(xfs_da_args_t *args)
 		 * Get the value, local or "remote"
 		 */
 		retval = xfs_attr_leaf_getvalue(blk->bp, args);
-		if ((retval == 0) && (args->rmtblkno > 0)) {
+		if (!retval && (args->rmtblkno > 0)
+		    && !(args->flags & ATTR_KERNOVAL)) {
 			retval = xfs_attr_rmtval_get(args);
 		}
 	}
@@ -1856,6 +1882,8 @@ xfs_attr_rmtval_get(xfs_da_args_t *args)
 	xfs_buf_t *bp;
 	int nmap, error, tmp, valuelen, blkcnt, i;
 	xfs_dablk_t lblkno;
+
+	ASSERT(!(args->flags & ATTR_KERNOVAL));
 
 	mp = args->dp->i_mount;
 	dst = args->value;

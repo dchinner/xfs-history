@@ -29,40 +29,28 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef __XFS_ACL_H__
-#define __XFS_ACL_H__
+#ifndef __XFS_MAC_H__
+#define __XFS_MAC_H__
 
-#define SYSTEM_POSIXACL_ACCESS  "posix_acl_access"
-#define SYSTEM_POSIXACL_DEFAULT "posix_acl_default"
-
-#ifdef CONFIG_FS_POSIX_ACL
-
+struct xfs_inode;
 struct vattr;
 struct vnode;
-struct xfs_inode;
 
-extern int xfs_acl_inherit(struct vnode *, struct vattr *, xfs_acl_t *);
-extern int xfs_acl_iaccess(struct xfs_inode *, mode_t, cred_t *);
-extern int xfs_acl_get(struct vnode *, xfs_acl_t *, xfs_acl_t *);
-extern int xfs_acl_set(struct vnode *, xfs_acl_t *, xfs_acl_t *);
-extern int xfs_acl_vtoacl(struct vnode *, xfs_acl_t *, xfs_acl_t *);
-extern int xfs_acl_vset(struct vnode *, void *, size_t, int);
-extern int xfs_acl_vget(struct vnode *, void *, size_t, int);
-extern int xfs_acl_vremove(struct vnode *vp, int);
+extern int  xfs_mac_iaccess(struct xfs_inode *, mode_t, cred_t *);
+extern int  xfs_mac_syscall(vnode_t *, int, void *, size_t, int);
 
-#define _ACL_INHERIT(c,v,d)	(xfs_acl_inherit(c,v,d))
-#define _ACL_GET_DEFAULT(pv,pd) (xfs_acl_vtoacl(pv,NULL,pd)==0)
-#define _ACL_XFS_IACCESS(i,m,c)	(xfs_acl_iaccess(i,m,c))
+
+#ifdef CONFIG_FS_POSIX_MAC
+
+#define _MAC_XFS_IACCESS(i,m,c) (xfs_mac_iaccess(i,m,c))
+#define _MAC_VACCESS(v,c,m)	(xfs_mac_vaccess(v,c,m))
 
 #else
 
-#define xfs_acl_vset(v,p,sz,t)	(-ENOTSUP)
-#define xfs_acl_vget(v,p,sz,t)	(-ENOTSUP)
-#define xfs_acl_vremove(v,t)	(-ENOTSUP)
-#define _ACL_INHERIT(c,v,d)	((void)d,0)
-#define _ACL_GET_DEFAULT(pv,pd)	(0)
-#define _ACL_XFS_IACCESS(i,m,c)	(-1)
+#define _MAC_XFS_IACCESS(a,b,c)	(0)
+#define _MAC_VACCESS(v,c,m)	(0)
+#define xfs_mac_syscall(vp,cmd,pa,sz,fl)	(-ENOTSUP)
 
 #endif
 
-#endif /* __XFS_ACL_H__ */
+#endif /* __XFS_MAC_H__ */

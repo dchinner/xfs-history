@@ -81,6 +81,7 @@
 #include <xfs_dir2_node.h>
 #include <xfs_dir2_trace.h>
 #include <xfs_acl.h>
+#include <xfs_mac.h>
 #include <xfs_attr.h>
 #include <xfs_attr_leaf.h>
 #include <xfs_inode_item.h>

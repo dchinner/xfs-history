@@ -53,6 +53,83 @@
 #undef XFS_ATTR_TRACE
 #endif
 
+
+/*========================================================================
+ * External interfaces
+ *========================================================================*/
+
+#define ATTR_ROOT	0x0001	/* use attrs in root namespace, not user */
+#define ATTR_CREATE	0x0002	/* pure create: fail if attr already exists */
+#define ATTR_REPLACE	0x0004	/* pure set: fail if attr does not exist */
+#define ATTR_KERNOTIME	0x0008	/* [kernel] don't update inode timestamps */
+#define ATTR_KERNOVAL	0x0010	/* [kernel] get attr size only, not value */
+#define ATTR_KERNAMES	0x0020	/* [kernel] list attr names (simple list) */
+
+/*
+ * The maximum size (into the kernel or returned from the kernel) of an
+ * attribute value or the buffer used for an attr_list() call.  Larger
+ * sizes will result in an E2BIG return code.
+ */
+#define	ATTR_MAX_VALUELEN	(64*1024)	/* max length of a value */
+
+/*
+ * Define how lists of attribute names are returned to the user from
+ * the attr_list() call.  A large, 32bit aligned, buffer is passed in
+ * along with its size.  We put an array of offsets at the top that each
+ * reference an attrlist_ent_t and pack the attrlist_ent_t's at the bottom.
+ */
+typedef struct attrlist {
+	__s32	al_count;	/* number of entries in attrlist */
+	__s32	al_more;	/* T/F: more attrs (do call again) */
+	__s32	al_offset[1];	/* byte offsets of attrs [var-sized] */
+} attrlist_t;
+
+/*
+ * Show the interesting info about one attribute.  This is what the
+ * al_offset[i] entry points to.
+ */
+typedef struct attrlist_ent {	/* data from attr_list() */
+	__u32	a_valuelen;	/* number bytes in value of attr */
+	char	a_name[1];	/* attr name (NULL terminated) */
+} attrlist_ent_t;
+
+/*
+ * Given a pointer to the (char*) buffer containing the attr_list() result,
+ * and an index, return a pointer to the indicated attribute in the buffer.
+ */
+#define	ATTR_ENTRY(buffer, index)		\
+	((attrlist_ent_t *)			\
+	 &((char *)buffer)[ ((attrlist_t *)(buffer))->al_offset[index] ])
+
+/*
+ * Multi-attribute operation vector.
+ */
+typedef struct attr_multiop {
+	int	am_opcode;	/* operation to perform (ATTR_OP_GET, etc.) */
+	int	am_error;	/* [out arg] result of this sub-op (an errno) */
+	char	*am_attrname;	/* attribute name to work with */
+	char	*am_attrvalue;	/* [in/out arg] attribute value (raw bytes) */
+	int	am_length;	/* [in/out arg] length of value */
+	int	am_flags;	/* bitwise OR of attr API flags defined above */
+} attr_multiop_t;
+
+#define ATTR_OP_GET	1	/* return the indicated attr's value */
+#define ATTR_OP_SET	2	/* set/create the indicated attr/value pair */
+#define ATTR_OP_REMOVE	3	/* remove the indicated attr */
+
+/*
+ * Kernel-internal version of the attrlist cursor.
+ */
+typedef struct attrlist_cursor_kern {
+	__u32	hashval;	/* hash value of next entry to add */
+	__u32	blkno;		/* block containing entry (suggestion) */
+	__u32	offset;		/* offset in list of equal-hashvals */
+	__u16	pad1;		/* padding to match user-level */
+	__u8	pad2;		/* padding to match user-level */
+	__u8	initted;	/* T/F: cursor has been initialized */
+} attrlist_cursor_kern_t;
+
+
 /*========================================================================
  * Function prototypes for the kernel.
  *========================================================================*/

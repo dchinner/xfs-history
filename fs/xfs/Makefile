@@ -10,11 +10,10 @@ KERNEL_VERSION = 2.4.2
 
 SGI_VERSION = `cat $(WORKAREA)/SPECS/_sgi_kvers_`
 
-COMMANDS =	cmd/acl cmd/attr cmd/xfsprogs cmd/dmapi cmd/xfsdump
-COMMANDRPMS =	attr attr-devel acl acl-devel dmapi dmapi-devel \
-		xfsprogs xfsprogs-devel xfsdump
+COMMANDS = cmd/attr cmd/xfsprogs cmd/dmapi cmd/xfsdump
+COMMANDRPMS = attr attr-devel dmapi dmapi-devel xfsprogs xfsprogs-devel xfsdump
 
-default all: checkproc tarballs kernel cmds quota
+default all: checkproc tarballs kernel cmds acl
 
 checkproc:
 	if [ ! -e /proc/stat ]; then \
@@ -52,9 +51,11 @@ cmds: builddirs
 		( cd $(WORKAREA) && cp $$d/build/rpm/*.$(ARCH).rpm RPMS/$(ARCH) ) \
 	done
 
-quota: builddirs
+# nathans NOTE - wierd, I seem to need to remove = from the
+# --target=$(ARCH) below, on recent rpm versions...
+acl: builddirs
 	@echo "=== Making $@ `date`";
-	rpm -ba --target=$(ARCH) $(WORKAREA)/SPECS/quota.spec;
+	rpm -ba --target $(ARCH) $(WORKAREA)/SPECS/acl.spec;
 
 builddirs:
 	[ -d $(WORKAREA)/BUILD ] || mkdir $(WORKAREA)/BUILD

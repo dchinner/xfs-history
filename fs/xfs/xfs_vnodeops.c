@@ -5957,16 +5957,11 @@ vnodeops_t xfs_vnodeops = {
 #ifdef CELL_CAPABLE
 	vop_allocstore:		xfs_allocstore,
 #endif
-	vop_fcntl:		(vop_fcntl_t)fs_nosys,
 	vop_reclaim:		xfs_reclaim,
-	vop_attr_get:		(vop_attr_get_t)xfs_attr_get,
-	vop_attr_set:		(vop_attr_set_t)xfs_attr_set,
-	vop_attr_remove:	(vop_attr_remove_t)xfs_attr_remove,
-	vop_attr_list:		(vop_attr_list_t)xfs_attr_list,
-#ifdef CONFIG_FS_POSIX_ACL
-	vop_acl_get:		(vop_acl_get_t)xfs_acl_get,
-	vop_acl_set:		(vop_acl_set_t)xfs_acl_set,
-#endif
+	vop_attr_get:		xfs_attr_get,
+	vop_attr_set:		xfs_attr_set,
+	vop_attr_remove:	xfs_attr_remove,
+	vop_attr_list:		xfs_attr_list,
 	vop_link_removed:	(vop_link_removed_t)fs_noval,
 	vop_vnode_change:	fs_vnode_change,
 	vop_tosspages:		fs_tosspages,

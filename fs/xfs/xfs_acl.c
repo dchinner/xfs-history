@@ -31,34 +31,246 @@
  */
 
 #include <xfs.h>
-
-#define ACL_TYPE_ACCESS		0
-#define ACL_TYPE_DEFAULT	1
-
-#define SGI_ACL_FILE	"SGI_ACL_FILE"
-#define SGI_ACL_DEFAULT	"SGI_ACL_DEFAULT"
-
-#define ACL_PERM_NONE	0x00
-#define ACL_READ	0x04
-#define ACL_WRITE	0x02
-#define ACL_EXECUTE	0x01
-
-#define ACL_USER_OBJ	0x01
-#define ACL_USER	0x02
-#define ACL_GROUP_OBJ	0x04
-#define ACL_GROUP	0x08
-#define ACL_MASK	0x10
-#define ACL_OTHER	0x20
+#include <linux/acl_ea.h>
 
 STATIC int	xfs_acl_setmode(vnode_t *, xfs_acl_t *);
 STATIC void     xfs_acl_filter_mode(mode_t, xfs_acl_t *);
 STATIC void	xfs_acl_get_endian(xfs_acl_t *);
 STATIC int	xfs_acl_access(uid_t, gid_t, xfs_acl_t *, mode_t, cred_t *);
-STATIC int	xfs_acl_invalid(xfs_acl_t *aclp);
-STATIC void	xfs_acl_sync_mode(mode_t mode, xfs_acl_t *acl);
+STATIC int	xfs_acl_invalid(xfs_acl_t *);
+STATIC void	xfs_acl_sync_mode(mode_t, xfs_acl_t *);
+STATIC void	xfs_acl_get_attr(vnode_t *, xfs_acl_t *, int, int *);
+STATIC void	xfs_acl_set_attr(vnode_t *, xfs_acl_t *, int, int *);
+STATIC int	xfs_acl_allow_set(vnode_t *, int);
+
+/*
+ * Convert from extended attribute representation to in-memory for XFS.
+ */
+STATIC int
+acl_ext_attr_to_xfs(acl_ea_header *src, size_t size, xfs_acl_t *dest)
+{
+	char *src_acl = (char*)src;
+	const char *end = src_acl + size;
+	acl_ea_header *header;
+	int n, count;
+
+	if (!src_acl)
+		return EINVAL;
+	if (size < sizeof(acl_ea_header))
+		return EINVAL;
+	header = (acl_ea_header *)src;
+	if (header->a_version != cpu_to_le32(ACL_EA_VERSION))
+		return EINVAL;
+	src_acl = src_acl + sizeof(acl_ea_header);
+	count = acl_ea_count(size);
+	if (count <= 0)
+		return EINVAL;
+	memset(dest, 0, sizeof(xfs_acl_t));
+	dest->acl_cnt = count;
+
+	for (n=0; n < count; n++) {
+		acl_ea_entry *entry = (acl_ea_entry *)src_acl;
+
+		if (src_acl + sizeof(acl_ea_entry_short) > end)
+		       return EINVAL;
+		dest->acl_entry[n].ae_tag  = le16_to_cpu(entry->e_tag);
+		dest->acl_entry[n].ae_perm = le16_to_cpu(entry->e_perm);
+		switch(dest->acl_entry[n].ae_tag) {
+			case ACL_USER_OBJ:
+			case ACL_GROUP_OBJ:
+			case ACL_MASK:
+			case ACL_OTHER:
+				src_acl = src_acl +
+				       sizeof(acl_ea_entry_short);
+				dest->acl_entry[n].ae_id = ACL_UNDEFINED_ID;
+				break;
+
+			case ACL_USER:
+			case ACL_GROUP:
+				src_acl = src_acl +
+				       sizeof(acl_ea_entry);
+				if (src_acl > end)
+				       return EINVAL;
+				dest->acl_entry[n].ae_id =
+				       le32_to_cpu(entry->e_id);
+				break;
+
+			default:
+				return EINVAL;
+		}
+	}
+	if (src_acl != end)
+	    return EINVAL;
+	return 0;
+}
+
+/*
+ * Comparison function called from qsort().
+ * Primary key is ae_tag, secondary key is ae_id.  
+ */
+STATIC int
+acl_entry_compare(const void *va, const void *vb)
+{
+	xfs_acl_entry_t *a = (xfs_acl_entry_t *)va,
+			*b = (xfs_acl_entry_t *)vb;
+
+	if (a->ae_tag == b->ae_tag)
+		return (a->ae_id - b->ae_id);
+	return (a->ae_tag - b->ae_tag);
+}
+
+/*
+ * Convert from in-memory XFS to extended attribute representation.
+ */
+STATIC int
+acl_xfs_to_ext_attr(xfs_acl_t *src, acl_ea_header *ext_acl, size_t size)
+{
+	size_t new_size = acl_ea_size(src->acl_cnt);
+	acl_ea_entry *entry;
+	int n;
+
+	if (size < new_size)
+		return -E2BIG;	
+
+	/* Need to sort src XFS ACL by <ae_tag,ae_id> */
+	qsort(src->acl_entry, src->acl_cnt, sizeof(src->acl_entry[0]),
+		acl_entry_compare);
+
+	ext_acl->a_version = cpu_to_le32(ACL_EA_VERSION);
+	entry = &ext_acl->a_entries[0];
+	for (n=0; n < src->acl_cnt; n++) {
+		entry->e_tag  = cpu_to_le16(src->acl_entry[n].ae_tag);
+		entry->e_perm = cpu_to_le16(src->acl_entry[n].ae_perm);
+
+		switch(src->acl_entry[n].ae_tag) {
+			case ACL_USER:
+			case ACL_GROUP:
+				entry->e_id =
+					cpu_to_le32(src->acl_entry[n].ae_id);
+				entry++;
+				break;
+
+			case ACL_USER_OBJ:
+			case ACL_GROUP_OBJ:
+			case ACL_MASK:
+			case ACL_OTHER:
+				entry = (acl_ea_entry *)((char *)entry +
+					sizeof(acl_ea_entry_short));
+				break;
+
+			default:
+				return -EINVAL;
+		}
+	}
+	return new_size;
+}
 
 int
-xfs_acl_iaccess( xfs_inode_t *ip, mode_t mode, cred_t *cr )
+xfs_acl_vget(vnode_t *vp, void *acl, size_t size, int kind)
+{
+	acl_ea_header *ext_acl = acl;
+	xfs_acl_t xfs_acl;
+	vattr_t	va;
+	int error;
+
+	if (!size) {
+		/*
+		 * This is an overrestimate of the max size - used
+		 * to size a buffer for a subsequent "get" call.
+		 */	
+		size = sizeof(acl_ea_header);
+		size += sizeof(acl_ea_entry) * XFS_ACL_MAX_ENTRIES;
+		return size;
+	}
+
+	VN_HOLD(vp);
+
+	error = _MAC_VACCESS(vp, get_current_cred(), VREAD);
+	if (error)
+		goto out;
+
+	memset(&xfs_acl, 0, sizeof(xfs_acl));
+	xfs_acl_get_attr(vp, &xfs_acl, kind, &error);
+
+	if (!error && xfs_acl_invalid(&xfs_acl)) {
+		error = EINVAL;
+		goto out;
+	}
+
+	if (!error && (kind == ACL_TYPE_ACCESS)) {
+		/* For Access ACLs, get the mode for synchronization. */
+		va.va_mask = AT_MODE;
+		VOP_GETATTR(vp, &va, 0, sys_cred, error);
+	}
+
+	/* XXX: tes TODO - audit use of XFS_ACL_NOT_PRESENT */
+
+	/*
+	 * If there was an error retrieving or validating the ACL or 
+	 * an Access ACL and we had trouble synchronizing the mode with the
+	 * ACL, then the ACL is deemed NOT PRESENT.
+	 */
+	if (error)
+		xfs_acl.acl_cnt = XFS_ACL_NOT_PRESENT;
+	else if (kind == ACL_TYPE_ACCESS)
+		xfs_acl_sync_mode(va.va_mode, &xfs_acl);
+
+	if (!error)
+		error = -acl_xfs_to_ext_attr(&xfs_acl, ext_acl, size);
+
+out:
+	VN_RELE(vp);
+	return -error;
+}
+
+int
+xfs_acl_vremove(vnode_t *vp, int kind)
+{
+	int error;
+
+	VN_HOLD(vp);
+	error = xfs_acl_allow_set(vp, kind);
+	if (!error) {
+		VOP_ATTR_REMOVE(vp, kind == ACL_TYPE_DEFAULT?
+				SGI_ACL_DEFAULT: SGI_ACL_FILE,
+				ATTR_ROOT, sys_cred, error);
+		if (error == ENOATTR)
+			error = 0;	/* 'scool */
+	}
+	VN_RELE(vp);
+	return -error;
+}
+
+int
+xfs_acl_vset(vnode_t *vp, void *acl, size_t size, int kind)
+{
+	acl_ea_header *ext_acl = acl;
+	xfs_acl_t xfs_acl;
+	int error;
+
+	if (!acl)
+		return -EINVAL;
+
+	error = acl_ext_attr_to_xfs(ext_acl, size, &xfs_acl);
+	if (error)
+		return -error;
+
+	VN_HOLD(vp);
+	error = xfs_acl_allow_set(vp, kind);
+	if (error)
+		goto out;
+
+	/* Incoming ACL exists, set file mode based on its value */
+	if (kind == ACL_TYPE_ACCESS)
+		xfs_acl_setmode(vp, &xfs_acl);
+	xfs_acl_set_attr(vp, &xfs_acl, kind, &error);
+ out:
+	VN_RELE(vp);
+	return -error;
+}
+
+int
+xfs_acl_iaccess(xfs_inode_t *ip, mode_t mode, cred_t *cr)
 {
 	xfs_acl_t acl;
 
@@ -75,6 +287,32 @@ xfs_acl_iaccess( xfs_inode_t *ip, mode_t mode, cred_t *cr )
 	xfs_acl_sync_mode(ip->i_d.di_mode, &acl);
 
 	return xfs_acl_access(ip->i_d.di_uid, ip->i_d.di_gid, &acl, mode, cr);
+}
+
+STATIC int
+xfs_acl_allow_set(vnode_t *vp, int kind)
+{
+	vattr_t va;
+	int error;
+
+	error = ENOTDIR;
+	if (kind == ACL_TYPE_DEFAULT && vp->v_type != VDIR)
+		return error;
+	error = EROFS;
+	if (vp->v_vfsp->vfs_flag & VFS_RDONLY)
+		return error;
+
+	error = _MAC_VACCESS(vp, NULL, VWRITE);
+	if (error)
+		return error;
+	va.va_mask = AT_UID;
+	VOP_GETATTR(vp, &va, 0, NULL, error);
+	if (error)
+		return error;
+	error = EACCES;
+	if (va.va_uid != current->fsuid && !capable(CAP_FOWNER))
+		return error;
+	return 0;
 }
 
 /*
@@ -113,7 +351,7 @@ xfs_acl_access(uid_t fuid, gid_t fgid, xfs_acl_t *fap, mode_t md, cred_t *cr)
 	xfs_acl_entry_t matched;
 	int maskallows = -1;	/* true, but not 1, either */
 	int allows;
-        int seen_userobj = 0;
+	int seen_userobj = 0;
 
 	matched.ae_tag = 0;	/* Invalid type */
 	md >>= 6;	/* Normalize the bits for comparison */
@@ -129,7 +367,7 @@ xfs_acl_access(uid_t fuid, gid_t fgid, xfs_acl_t *fap, mode_t md, cred_t *cr)
 			if (maskallows != -1 && seen_userobj)
 				break;
 			if (fap->acl_entry[i].ae_tag != ACL_MASK &&
-                            fap->acl_entry[i].ae_tag != ACL_USER_OBJ)
+			    fap->acl_entry[i].ae_tag != ACL_USER_OBJ)
 				continue;
 		}
 		/* True if this entry allows the requested access */
@@ -326,7 +564,7 @@ xfs_acl_vtoacl(vnode_t *vp, xfs_acl_t *access_acl, xfs_acl_t *default_acl)
 		 * Get the Access ACL and the mode.  If either cannot
 		 * be obtained for some reason, invalidate the access ACL.
 		 */
-                xfs_acl_get_attr(vp, access_acl, ACL_TYPE_ACCESS, &error);
+		xfs_acl_get_attr(vp, access_acl, ACL_TYPE_ACCESS, &error);
 		if (!error) {
 			/* Got the ACL, need the mode... */
 			va.va_mask = AT_MODE;
@@ -373,199 +611,23 @@ xfs_acl_inherit(vnode_t *vp, vattr_t *vap, xfs_acl_t *pdaclp)
 	 * the u::,g::[m::], and o:: entries.  This is what makes
 	 * umask() "work" with ACL's.
 	 */
-        memcpy(&cacl, pdaclp, sizeof(cacl));
+	memcpy(&cacl, pdaclp, sizeof(cacl));
 	xfs_acl_filter_mode(vap->va_mode, &cacl);
 
-	/* Set the mode to the acl */ 
+	/* Set the mode to the ACL */ 
 	xfs_acl_setmode(vp, &cacl);
 
 	/*
-	 * Set the default and access acl on the file.  The mode is already
+	 * Set the Default and Access ACL on the file.  The mode is already
 	 * set on the file, so we don't need to worry about that.
 	 *
 	 * If the new file is a directory, its default ACL is a copy of
 	 * the containing directory's default ACL.
-	 *
 	 */
 	if (vp->v_type == VDIR)
 		xfs_acl_set_attr(vp, pdaclp, ACL_TYPE_DEFAULT, &error);
 	if (!error)
 		xfs_acl_set_attr(vp, &cacl, ACL_TYPE_ACCESS, &error);
-	return error;
-}
-
-STATIC int
-xfs_acl_vget(vnode_t *vp, int kind, xfs_acl_t *acl)
-{
-	xfs_acl_t kacl;
-	int size = sizeof(kacl);
-	int error = 0;
-	vattr_t	va;
-
-	memset(&kacl, 0, size);
-	xfs_acl_get_attr(vp, &kacl, kind, &error);
-
-	if (!error && xfs_acl_invalid(&kacl))
-		error = EINVAL;
-
-	if (!error && (kind == ACL_TYPE_ACCESS)) {
-		/* For Access ACLs, get the mode for synchronization. */
-		va.va_mask = AT_MODE;
-		VOP_GETATTR(vp, &va, 0, sys_cred, error);
-	}
-
-	/*
-	 * If there was an error retrieving or validating the ACL or 
-	 * an Access ACL and we had trouble synchronizing the mode with the
-	 * ACL, then the ACL is deemed NOT PRESENT.
-	 */
-	if (error)
-		kacl.acl_cnt = XFS_ACL_NOT_PRESENT;
-	else if (kind == ACL_TYPE_ACCESS)
-		/* Synchronize an Access ACL with the mode */
-		xfs_acl_sync_mode(va.va_mode, &kacl);
-
-
-	/*
-	 * If the whole problem was that the requested ACL does not exist, then
-	 * there is no problem.  Just copy out a NOT PRESENT ACL.  Otherwise,
-	 * don't do the copyout (an error should leave user level data
-	 * unchanged).
-	 */
-	if (error == ENOATTR)
-		error = 0;
-
-	if (!error && copyout((caddr_t)&kacl, (caddr_t)acl, sizeof(kacl)))
-		error = EFAULT;
-	return error;
-}
-
-int
-xfs_acl_get(vnode_t *vp, xfs_acl_t *acl, xfs_acl_t *dacl)
-{
-	int error;
-	int derror = 0;
-
-	if (!acl && !dacl)
-		return (EINVAL);
-
-	VN_HOLD(vp);
-	error = _MAC_VACCESS(vp, get_current_cred(), VREAD);
-	if (!error) {
-		if (acl)
-			error = xfs_acl_vget(vp, ACL_TYPE_ACCESS, acl);
-		if (dacl)
-			derror = xfs_acl_vget(vp, ACL_TYPE_DEFAULT, dacl);
-	}
-	VN_RELE(vp);
-
-	if (!error && derror)
-		error = derror;
-	return error;
-}
-
-STATIC int
-xfs_acl_vset(vnode_t *vp, xfs_acl_t *acl)
-{
-	int error;
-
-	/*
-	 * Check for an ACL deletion (the caller specifies a NOT PRESENT ACL).
-	 */
-	if (acl->acl_cnt == XFS_ACL_NOT_PRESENT) {
-		/* Deletion, remove the ACL if there is one. */
-		VOP_ATTR_REMOVE(vp, SGI_ACL_FILE, ATTR_ROOT, sys_cred, error);
-		if (error == ENOATTR) {
-			/* There was no Access ACL to delete, no big deal. */
-			error = 0;
-		}
-		return error;
-	}
-
-	/* The incoming ACL exists, so set the file mode based on it. */
-	xfs_acl_setmode(vp, acl);
-
-	xfs_acl_set_attr(vp, acl, ACL_TYPE_ACCESS, &error);
-	return error;
-}
-
-STATIC int
-xfs_dacl_vset(vnode_t *vp, xfs_acl_t *dacl)
-{
-	int	error = 0;
-
-	if (dacl->acl_cnt != XFS_ACL_NOT_PRESENT) {
-		/*  Apply the default ACL to the file */
-		xfs_acl_set_attr(vp, dacl, ACL_TYPE_DEFAULT, &error);
-	} else {
-		/*
-		 * Delete the ACL on the file.  If none is there, ignore the
-		 * error.  Report other errors to the caller.
-		 */
-		VOP_ATTR_REMOVE(vp, SGI_ACL_DEFAULT, ATTR_ROOT, sys_cred,
-				error);
-		if (error == ENOATTR) {
-			/* There was no default ACL to delete, no big deal. */
-			error = 0;
-		}
-	}
-	return error;
-}
-
-/*
- * Set the ACLs on a file system object.  Either or both the Access or
- * Default ACL may be set using this function.  If the 'acl' pointer is
- * non-NULL the Access ACL is set, if the 'dacl' pointer is non-NULL the
- * Default ACL is set.
- */
-int
-xfs_acl_set(vnode_t *vp, xfs_acl_t *acl, xfs_acl_t *dacl)
-{
-	xfs_acl_t kacl;
-	xfs_acl_t kdacl;
-	vattr_t va;
-	int error;
-
-	if (!acl && !dacl)
-		return (EINVAL);
-	if (acl) {
-		if (copy_from_user(&kacl, acl, sizeof(kacl)))
-			return (EFAULT);
-		if (xfs_acl_invalid(&kacl) && kacl.acl_cnt != XFS_ACL_NOT_PRESENT)
-			return (EINVAL);
-	}
-	if (dacl) {
-		if (copy_from_user(&kdacl, dacl, sizeof(kdacl)))
-			return (EFAULT);
-		if (xfs_acl_invalid(&kdacl) && kdacl.acl_cnt != XFS_ACL_NOT_PRESENT)
-			return (EINVAL);
-	}
-	VN_HOLD(vp);
-
-	/*
-	 * Only directories may have default acls
-	 * Better not try to update a read-only file system.
-	 */
-	if (dacl && vp->v_type != VDIR)
-		error = ENOTDIR;
-	else if (vp->v_vfsp->vfs_flag & VFS_RDONLY)
-		error = EROFS;
-	else {
-		error = _MAC_VACCESS(vp, NULL, VWRITE);
-		if (!error) {
-			va.va_mask = AT_UID;
-			VOP_GETATTR(vp, &va, 0, NULL, error);
-			if (!error && va.va_uid != current->fsuid &&
-			    !capable(CAP_FOWNER))
-				error = EACCES;
-		}
-		if (!error && acl)	/* Set the access ACL. */
-			error = xfs_acl_vset(vp, &kacl);
-		if (!error && dacl)	/* Set the default ACL. */
-			error = xfs_dacl_vset(vp, &kdacl);
-	}
-
-	VN_RELE(vp);
 	return error;
 }
 
