@@ -476,7 +476,6 @@ xfs_cmountfs(
 	struct cred	*cr)
 {
 	xfs_mount_t	*mp;
-	vnode_t 	*ddevvp = NULL, *rdevvp = NULL, *ldevvp = NULL;
 	int		error = 0;
 	int		vfs_flags;
 	size_t		n;
@@ -498,6 +497,9 @@ xfs_cmountfs(
 	/*
  	 * Open the data and real time devices now.
 	 */
+
+	printk("mp: %p, blocklog: %u\n", mp,
+	       (unsigned int)mp->m_sb.sb_blocklog);
 
 	vfs_flags = (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE;
 	xfs_fill_buftarg(&mp->m_ddev_targ, ddev, vfsp->vfs_super);
@@ -526,7 +528,6 @@ xfs_cmountfs(
 	}
 	if (logdev != 0) {
 		if (logdev == ddev) {
-			ldevvp = NULL;
 			mp->m_logdev_targ = mp->m_ddev_targ;
 		} else {
 			/* Ensure that logdev isn't already mounted */
@@ -580,8 +581,6 @@ xfs_cmountfs(
 			else
 				strcpy(mp->m_fsname, "/");
 		}
-	} else {
-		ldevvp = NULL;
 	}
 	if (rtdev != 0) {
 		if (rtdev == ddev || rtdev == logdev) {
@@ -733,23 +732,24 @@ xfs_cmountfs(
 		}
 	}
 
+	printk("blocklog end: %u\n", (unsigned int)mp->m_sb.sb_blocklog);
+
 	return error;
 
 	/*
 	 * Be careful not to clobber the value of 'error' here.
 	 */
  error3:
-	if (ldevvp) {
+	/* It's impossible to get here before buftargs are filled */
+	xfs_binval(mp->m_ddev_targ);
+	linvfs_release_inode(mp->m_ddev_targ.inode);
+	if (logdev && logdev != ddev) {
 		xfs_binval(mp->m_logdev_targ);
 		linvfs_release_inode(mp->m_logdev_targ.inode);
 	}
-	if (rdevvp) {
+	if (rtdev != 0) {
 		xfs_binval(mp->m_rtdev_targ);
 		linvfs_release_inode(mp->m_rtdev_targ.inode);
-	}
-	if (ddevvp) {
-		xfs_binval(mp->m_ddev_targ);
-		linvfs_release_inode(mp->m_ddev_targ.inode);
 	}
 	if (error) {
 #ifdef CELL_CAPABLE
