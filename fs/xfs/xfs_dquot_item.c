@@ -1,4 +1,4 @@
-#ident "$Revision: 1.7 $"
+#ident "$Revision: 1.8 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -49,6 +49,9 @@ STATIC uint		xfs_qm_dquot_logitem_size(xfs_dq_logitem_t *logitem);
 STATIC void		xfs_qm_dquot_logitem_format(xfs_dq_logitem_t *logitem,
 					      xfs_log_iovec_t *logvec);
 STATIC void		xfs_qm_dquot_logitem_unpin(xfs_dq_logitem_t *logitem);
+STATIC void		xfs_qm_dquot_logitem_unpin_remove(
+						xfs_dq_logitem_t *logitem,
+						xfs_trans_t *tp);
 STATIC xfs_lsn_t 	xfs_qm_dquot_logitem_committed(xfs_dq_logitem_t *logitem, 
 						 xfs_lsn_t lsn);
 STATIC void		xfs_qm_dquot_logitem_push(xfs_dq_logitem_t *logitem);
@@ -58,6 +61,9 @@ STATIC uint		xfs_qm_qoff_logitem_size(xfs_qoff_logitem_t *logitem);
 STATIC void		xfs_qm_qoff_logitem_format(xfs_qoff_logitem_t *logitem,
 					      xfs_log_iovec_t *logvec);
 STATIC void		xfs_qm_qoff_logitem_unpin(xfs_qoff_logitem_t *logitem);
+STATIC void		xfs_qm_qoff_logitem_unpin_remove(
+						xfs_qoff_logitem_t *logitem,
+						xfs_trans_t *tp);
 STATIC xfs_lsn_t 	xfs_qm_qoff_logitem_committed(xfs_qoff_logitem_t *logitem, 
 						 xfs_lsn_t lsn);
 STATIC void		xfs_qm_qoff_logitem_push(xfs_qoff_logitem_t *logitem);
@@ -139,6 +145,17 @@ xfs_qm_dquot_logitem_unpin(
 		sv_broadcast(&dqp->q_pinwait);
 	}
 	XFS_DQ_PINUNLOCK(dqp, s);
+}
+
+/* ARGSUSED */
+STATIC void
+xfs_qm_dquot_logitem_unpin_remove(
+	xfs_dq_logitem_t *logitem,
+	xfs_trans_t	 *tp)
+{
+	xfs_qm_dquot_logitem_unpin(logitem);
+
+	return;
 }
 
 /*
@@ -408,6 +425,8 @@ struct xfs_item_ops xfs_dquot_item_ops = {
 	(void(*)(xfs_log_item_t*, xfs_log_iovec_t*))xfs_qm_dquot_logitem_format,
 	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_pin,
 	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_unpin,
+	(void(*)(xfs_log_item_t*, xfs_trans_t*))
+					xfs_qm_dquot_logitem_unpin_remove,
 	(uint(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_trylock,
 	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_unlock,
 	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_qm_dquot_logitem_committed,
@@ -501,6 +520,13 @@ xfs_qm_qoff_logitem_unpin(xfs_qoff_logitem_t *qf)
 	return;
 }
 
+/*ARGSUSED*/
+STATIC void
+xfs_qm_qoff_logitem_unpin_remove(xfs_qoff_logitem_t *qf, xfs_trans_t *tp)
+{
+	return;
+}
+
 /*
  * Quotaoff items have no locking, so just return success.
  */
@@ -582,6 +608,7 @@ struct xfs_item_ops xfs_qm_qoffend_logitem_ops = {
 	(void(*)(xfs_log_item_t*, xfs_log_iovec_t*))xfs_qm_qoff_logitem_format,
 	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_pin,
 	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_unpin,
+	(void(*)(xfs_log_item_t*,xfs_trans_t*))xfs_qm_qoff_logitem_unpin_remove,
 	(uint(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_trylock,
 	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_unlock,
 	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_qm_qoffend_logitem_committed,
@@ -597,6 +624,7 @@ struct xfs_item_ops xfs_qm_qoff_logitem_ops = {
 	(void(*)(xfs_log_item_t*, xfs_log_iovec_t*))xfs_qm_qoff_logitem_format,
 	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_pin,
 	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_unpin,
+	(void(*)(xfs_log_item_t*,xfs_trans_t*))xfs_qm_qoff_logitem_unpin_remove,
 	(uint(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_trylock,
 	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_unlock,
 	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_qm_qoff_logitem_committed,
