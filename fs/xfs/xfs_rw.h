@@ -44,6 +44,18 @@ typedef struct xfs_strat_write_locals {
 #define	XFS_ZONE_NBMAPS	4
 
 /*
+ * Maximum size of a buffer that we\'ll map.  Making this
+ * too big will degrade performance due to the number of
+ * pages which need to be gathered.  Making it too small
+ * will prevent us from doing large I/O\'s to hardware that
+ * needs it.
+ *
+ * This is currently set to 512 KB.
+ */
+#define	XFS_MAX_BMAP_LEN_BB	1024
+#define	XFS_MAX_BMAP_LEN_BYTES	524288
+
+/*
  * Prototypes for functions in xfs_rw.c.
  */
 int
