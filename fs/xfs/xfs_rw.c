@@ -1678,10 +1678,20 @@ xfs_write_file(
 	xfs_fsize_t	new_size;
 
 	ip = XFS_VTOI(vp);
+	/*
+	 * If the file has fixed size extents, buffered 
+	 * I/O cannot be performed.
+	 * This check will be removed in the future.
+	 */
+	if (ip->i_d.di_extsize) {
+		return( EINVAL );
+	}
+
 	error = 0;
 	buffer_bytes_ok = 0;
 	eof_zeroed = 0;
 	bmaps = (struct bmapval *)kmem_zone_alloc(xfs_bmap_zone, KM_SLEEP);
+
 
 	/*
 	 * i_new_size is used by xfs_iomap_read() when the chunk
