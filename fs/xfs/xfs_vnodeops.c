@@ -1,4 +1,4 @@
-#ident "$Revision: 1.356 $"
+#ident "$Revision: 1.357 $"
 
 
 #ifdef SIM
@@ -46,7 +46,6 @@
 #endif
 #include <sys/kabi.h>
 #include <sys/kmem.h>
-#include <sys/mman.h>
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/pathname.h>
@@ -2680,6 +2679,12 @@ xfs_create_new(
 				error = XFS_ERROR(EEXIST);
 			} else if (vp->v_type == VDIR) {
 				error = XFS_ERROR(EISDIR);
+#ifndef SIM
+			} else if (vp->v_type == VREG && (vap->va_mask & AT_SIZE) &&
+				DM_EVENT_ENABLED (vp->v_vfsp, ip, DM_EVENT_TRUNCATE)) {
+					error = xfs_dm_send_data_event (DM_EVENT_TRUNCATE,
+						XFS_ITOBHV(ip), vap->va_size, 0, 0, NULL);
+#endif
 			}
 		}
 
@@ -4749,9 +4754,8 @@ xfs_symlink(
 		xfs_qm_dqrele(udqp);
 	if (pdqp)
 		xfs_qm_dqrele(pdqp);
-	if (error) {
+	if (error)
 		dnlc_remove(dir_vp, link_name);
-	}
 	
 	/* Fall through to std_return with error = 0 or errno from
 	 * xfs_trans_commit	*/
