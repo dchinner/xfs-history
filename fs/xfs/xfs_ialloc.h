@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_IALLOC_H
 #define	_FS_XFS_IALLOC_H
 
-#ident	"$Revision: 1.27 $"
+#ident	"$Revision: 1.28 $"
 
 struct buf;
 struct xfs_mount;
@@ -19,7 +19,7 @@ struct xfs_trans;
 /*
  * For small block file systems, move inodes in clusters of this size.
  */
-#define	XFS_INODE_CLUSTER_SIZE	4096
+#define	XFS_INODE_CLUSTER_SIZE	8192
 
 /*
  * Make an inode pointer out of the buffer/offset.
