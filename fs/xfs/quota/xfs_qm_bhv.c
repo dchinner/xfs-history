@@ -413,10 +413,3 @@ xfs_qm_exit(void)
 	if (qm_dqtrxzone)
 		kmem_cache_destroy(qm_dqtrxzone);
 }
-
-module_init(xfs_qm_init);
-module_exit(xfs_qm_exit);
-
-MODULE_AUTHOR("Silicon Graphics, Inc.");
-MODULE_DESCRIPTION("SGI XFS quota management subsystem");
-MODULE_LICENSE("GPL");
