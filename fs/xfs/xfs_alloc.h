@@ -151,6 +151,16 @@ xfs_alloc_put_freelist(
 	xfs_agblock_t	bno);	/* block being freed */
 
 /*
+ * Read in the allocation group header (free/alloc section).
+ */
+buf_t *					/* buffer for the ag freelist header */
+xfs_alloc_read_agf(
+	xfs_mount_t	*mp,		/* mount point structure */
+	xfs_trans_t	*tp,		/* transaction pointer */
+	xfs_agnumber_t	agno,		/* allocation group number */
+	int		flags);		/* XFS_ALLOC_FLAG_... */
+
+/*
  * Allocate an extent (variable-size).
  */
 void

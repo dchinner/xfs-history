@@ -1,23 +1,16 @@
-#ident	"$Revision: 1.5 $"
+#ident	"$Revision: 1.6 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/errno.h>
+#include <sys/vnode.h>
+#include <sys/systm.h>
+#include <sys/sema.h>
+#include <fs/specfs/snode.h>
 #include <sys/immu.h>
 #include <sys/kmem.h>
-#include <sys/sema.h>
 #include <sys/time.h>
-#include <sys/vnode.h>
 #include <sys/debug.h>
-#ifndef SIM
-#include <sys/systm.h>
-#else
-#define _KERNEL 1
-#endif
-#include <fs/specfs/snode.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -34,9 +27,6 @@
 #include "xfs_inode.h"
 #include "xfs_ialloc.h"
 #include "xfs_itable.h"
-#ifdef SIM
-#include "sim.h"
-#endif
 
 /*
  * Return stat information for one inode.
@@ -140,7 +130,9 @@ xfs_bulkstat(
 	if (agno >= mp->m_sb.sb_agcount)
 		return 0;
 	if (agino != 0) {
+		mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
 		agbp = xfs_ialloc_read_agi(mp, tp, agno);
+		mrunlock(&mp->m_peraglock);
 		cur = xfs_btree_init_cursor(mp, tp, agbp, agno,
 			XFS_BTNUM_INO, (xfs_inode_t *)0);
 		(void)xfs_inobt_lookup_le(cur, agino, 0, 0);
@@ -154,7 +146,9 @@ xfs_bulkstat(
 		i = XFS_INODES_PER_CHUNK;
 	while (left > 0 && agno < mp->m_sb.sb_agcount) {
 		if (i >= XFS_INODES_PER_CHUNK) {
+			mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
 			agbp = xfs_ialloc_read_agi(mp, tp, agno);
+			mrunlock(&mp->m_peraglock);
 			cur = xfs_btree_init_cursor(mp, tp, agbp, agno,
 				XFS_BTNUM_INO, (xfs_inode_t *)0);
 			(void)xfs_inobt_lookup_ge(cur, agino, 0, 0);
@@ -244,7 +238,9 @@ xfs_inumbers(
 	agbp = NULL;
 	while (left > 0 && agno < mp->m_sb.sb_agcount) {
 		if (agbp == NULL) {
+			mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
 			agbp = xfs_ialloc_read_agi(mp, tp, agno);
+			mrunlock(&mp->m_peraglock);
 			cur = xfs_btree_init_cursor(mp, tp, agbp, agno,
 				XFS_BTNUM_INO, (xfs_inode_t *)0);
 			(void)xfs_inobt_lookup_ge(cur, agino, 0, 0);

@@ -1,21 +1,21 @@
-#ident	"$Revision: 1.63 $"
+#ident	"$Revision: 1.64 $"
 
 #include <sys/param.h>
 #include <sys/stat.h>
-#include <sys/vnode.h>
 #include <sys/debug.h>
 #include <stddef.h>
-#include "xfs_types.h"
-#include "xfs_inum.h"
 #ifdef SIM
 #define _KERNEL
 #endif
+#include <sys/vnode.h>
 #include <sys/buf.h>
 #include <sys/uuid.h>
 #include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
+#include "xfs_types.h"
+#include "xfs_inum.h"
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
@@ -242,7 +242,9 @@ xfs_ialloc_ag_alloc(
 	}
 	agi->agi_count += newlen;
 	agi->agi_freecount += newlen;
+	mrlock(&args->mp->m_peraglock, MR_ACCESS, PINOD);
 	args->mp->m_perag[agi->agi_seqno].pagi_freecount += newlen;
+	mrunlock(&args->mp->m_peraglock);
 	agi->agi_newino = newino;
 	/*
 	 * Insert records describing the new inode chunk into the btree.
@@ -317,6 +319,7 @@ xfs_ialloc_ag_select(
 	agno = pagno;
 	flags = XFS_ALLOC_FLAG_TRYLOCK;
 	while (1) {
+		mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
 		pag = &mp->m_perag[agno];
 		if (!pag->pagi_init)
 			agbp = xfs_ialloc_read_agi(mp, tp, agno);
@@ -339,11 +342,13 @@ xfs_ialloc_ag_select(
 		    longest >= ineed) {
 			if (agbp == NULL)
 				agbp = xfs_ialloc_read_agi(mp, tp, agno);
+			mrunlock(&mp->m_peraglock);
 			if (S_ISDIR(mode))
 				mp->m_agirotor =
 					agno + 1 == agcount ? 0 : agno + 1;
 			return agbp;
 		}
+		mrunlock(&mp->m_peraglock);
 		if (agbp)
 			xfs_trans_brelse(tp, agbp);
 		agno++;
@@ -477,7 +482,9 @@ xfs_dialloc(
 			tagno = 0;
 		if (tagno == agno)
 			return NULLFSINO;
+		mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
 		agbp = xfs_ialloc_read_agi(mp, tp, tagno);
+		mrunlock(&mp->m_peraglock);
 		agi = XFS_BUF_TO_AGI(agbp);
 		ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
 	}
@@ -647,7 +654,9 @@ xfs_dialloc(
 	xfs_inobt_update(cur, rec.ir_startino, rec.ir_freecount, rec.ir_free);
 	xfs_btree_del_cursor(cur);
 	agi->agi_freecount--;
+	mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
 	mp->m_perag[tagno].pagi_freecount--;
+	mrunlock(&mp->m_peraglock);
 	xfs_ialloc_log_agi(tp, agbp, XFS_AGI_FREECOUNT);
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, -1);
 	return ino;
@@ -687,7 +696,9 @@ xfs_difree(
 	/*
 	 * Get the allocation group header.
 	 */
+	mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
 	agbp = xfs_ialloc_read_agi(mp, tp, agno);
+	mrunlock(&mp->m_peraglock);
 	agi = XFS_BUF_TO_AGI(agbp);
 	ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
 	ASSERT(agbno < agi->agi_length);
@@ -723,7 +734,9 @@ xfs_difree(
 	 * Change the inode free counts and log the ag/sb changes.
 	 */
 	agi->agi_freecount++;
+	mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
 	mp->m_perag[agno].pagi_freecount++;
+	mrunlock(&mp->m_peraglock);
 	xfs_ialloc_log_agi(tp, agbp, XFS_AGI_FREECOUNT);
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, 1);
 }
