@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_IALLOC_H
 #define	_FS_XFS_IALLOC_H
 
-#ident	"$Revision: 1.26 $"
+#ident	"$Revision: 1.27 $"
 
 struct buf;
 struct xfs_mount;
@@ -63,7 +63,7 @@ xfs_dialloc(
 	struct xfs_trans *tp,		/* transaction pointer */
 	xfs_ino_t	parent,		/* parent inode (directory) */
 	mode_t		mode,		/* mode bits for new inode */
-	struct buf		**agbp,		/* buf for a.g. inode header */
+	struct buf	**agbp,		/* buf for a.g. inode header */
 	boolean_t	*alloc_done,	/* an allocation was done to replenish
 					   the free inodes */
 	xfs_ino_t	*inop);		/* inode number allocated */
@@ -107,7 +107,7 @@ xfs_ialloc_compute_maxlevels(
 void
 xfs_ialloc_log_agi(
 	struct xfs_trans *tp,		/* transaction pointer */
-	struct buf	 *bp,		/* allocation group header buffer */
+	struct buf	*bp,		/* allocation group header buffer */
 	int		fields);	/* bitmask of fields to log */
 
 /*
