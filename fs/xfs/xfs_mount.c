@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.88 $"
+#ident	"$Revision: 1.89 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -130,6 +130,8 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	xfs_mount_t	*mp;
 	xfs_inode_t	*rip;
 	vnode_t		*rvp = 0;
+	int		readio_log;
+	int		writeio_log;
 
 	if (vfsp->vfs_flag & VFS_REMOUNT)   /* Can't remount xFS filesystems */
 		return 0;
@@ -231,17 +233,26 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 
 	/*
 	 * Set the default minimum read and write sizes.
+	 * We use smaller I/O sizes when the file system
+	 * is being used for NFS service (wsync mount option).
 	 */
-	if (sbp->sb_blocklog > XFS_READIO_LOG) {
+	if (mp->m_flags & XFS_MOUNT_WSYNC) {
+		readio_log = XFS_WSYNC_READIO_LOG;
+		writeio_log = XFS_WSYNC_WRITEIO_LOG;
+	} else {
+		readio_log = XFS_READIO_LOG;
+		writeio_log = XFS_WRITEIO_LOG;
+	}
+	if (sbp->sb_blocklog > readio_log) {
 		mp->m_readio_log = sbp->sb_blocklog;
 	} else {
-		mp->m_readio_log = XFS_READIO_LOG;
+		mp->m_readio_log = readio_log;
 	}
 	mp->m_readio_blocks = 1 << (mp->m_readio_log - sbp->sb_blocklog);
-	if (sbp->sb_blocklog > XFS_WRITEIO_LOG) {
+	if (sbp->sb_blocklog > writeio_log) {
 		mp->m_writeio_log = sbp->sb_blocklog;
 	} else {
-		mp->m_writeio_log = XFS_WRITEIO_LOG;
+		mp->m_writeio_log = writeio_log;
 	}
 	mp->m_writeio_blocks = 1 << (mp->m_writeio_log - sbp->sb_blocklog);
 
@@ -311,6 +322,11 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	 * file system.
 	 */
 	xfs_ihash_init(mp);
+
+	/*
+	 * Initialize the precomputed transaction reservations values.
+	 */
+	xfs_trans_init(mp);
 
 	/*
 	 * Allocate and initialize the per-ag data.
