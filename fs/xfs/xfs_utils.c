@@ -1,4 +1,4 @@
-#ident "$Revision: 1.2 $"
+#ident "$Revision: 1.3 $"
 
 #include <sys/types.h>
 #include <sys/buf.h>
@@ -558,7 +558,9 @@ xfs_bumplink(
 }
 
 /*
- * Try to truncate the given file to 0 length.
+ * Try to truncate the given file to 0 length.  Currently called
+ * only out of xfs_remove when it has to truncate a file to free
+ * up space for the remove to proceed.
  */
 int
 xfs_truncate_file(
@@ -606,8 +608,22 @@ xfs_truncate_file(
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 	xfs_trans_ihold(tp, ip);
+	/*
+	 * Signal a sync xaction.  The only case where that isn't
+	 * the case is if we're truncating an already unlinked file
+	 * on a wsync fs.  In that case, we know the blocks can't
+	 * reappear in the file because the links to file are
+	 * permanently toast.  Currently, we're always going to
+	 * want a sync transaction because this code is being
+	 * called from places where nlink is guaranteed to be 1
+	 * but I'm leaving the tests in to protect against future
+	 * changes -- rcc.
+	 */
 	error = xfs_itruncate_finish(&tp, ip, (xfs_fsize_t)0,
-				     XFS_DATA_FORK, 0);
+				     XFS_DATA_FORK,
+				     ((ip->i_d.di_nlink != 0 ||
+				       !(mp->m_flags & XFS_MOUNT_WSYNC))
+				      ? 1 : 0));
 	if (error) {
 		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES |
 				 XFS_TRANS_ABORT);
