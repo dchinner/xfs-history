@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.47 $"
+#ident	"$Revision: 1.66 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -2257,7 +2257,8 @@ xfs_bmapi(
 	int			wasdelay;
 	int			wr;
 
-	ASSERT(*nmap >= 1 && *nmap <= XFS_BMAP_MAX_NMAP);
+	ASSERT(*nmap >= 1 &&
+	       (*nmap <= XFS_BMAP_MAX_NMAP || !(flags & XFS_BMAPI_WRITE)));
 	ASSERT(ip->i_d.di_format == XFS_DINODE_FMT_BTREE ||
 	       ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS ||
 	       ip->i_d.di_format == XFS_DINODE_FMT_LOCAL);
@@ -2581,7 +2582,9 @@ xfs_bunmapi(
 		lastx = ip->i_lastex;
 		/*
 		 * If not done go on to the next (previous) record.
+		 * Reset ep in case the extents array was re-alloced.
 		 */
+		ep = &ip->i_u1.iu_extents[lastx];
 		if (bno != (xfs_fsblock_t)-1 && bno >= start && --lastx >= 0) {
 			ep--;
 			xfs_bmbt_get_all(ep, &got);
