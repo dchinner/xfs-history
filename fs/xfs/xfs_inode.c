@@ -2771,9 +2771,12 @@ xfs_iflush(
 	 * so if we clear i_update_core after they set it we
 	 * are guaranteed to see their updates to the timestamps.
 	 * I believe that this depends on strongly ordered memory
-	 * semantics, but we have that.
+	 * semantics, but we have that.  We use the SYNCHRONIZE
+	 * macro to make sure that the compiler does not reorder
+	 * the i_update_core access below the data copy below.
 	 */
 	ip->i_update_core = 0;
+	SYNCHRONIZE();
 
 	/*
 	 * Make sure the place we're flushing out to really looks
@@ -3273,5 +3276,16 @@ xfs_ichgtime(xfs_inode_t *ip,
 		ip->i_d.di_ctime.t_sec = tv.tv_sec;
 		ip->i_d.di_ctime.t_nsec = tv.tv_nsec;
 	}
+
+	/*
+	 * We update the i_update_core field _after_ changing
+	 * the timestamps in order to coordinate properly with
+	 * xfs_iflush() so that we don't lose timestamp updates.
+	 * This keeps us from having to hold the inode lock
+	 * while doing this.  We use the SYNCHRONIZE macro to
+	 * ensure that the compiler does not reorder the update
+	 * of i_update_core above the timestamp updates above.
+	 */
+	SYNCHRONIZE();
 	ip->i_update_core = 1;
 }
