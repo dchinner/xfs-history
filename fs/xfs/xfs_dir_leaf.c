@@ -1,4 +1,4 @@
-#ident "$Revision: 1.55 $"
+#ident "$Revision: 1.56 $"
 
 /*
  * xfs_dir_leaf.c
@@ -106,41 +106,29 @@ void qsort (void* base, size_t nel, size_t width,
 int
 xfs_dir_ino_validate(xfs_mount_t *mp, xfs_ino_t ino)
 {
-	xfs_agnumber_t	agno;
-	xfs_agino_t	agino;
 	xfs_agblock_t	agblkno;
+	xfs_agino_t	agino;
+	xfs_agnumber_t	agno;
+	int		ino_ok;
 	int		ioff;
-	int		error = 0;
 
 	agno = XFS_INO_TO_AGNO(mp, ino);
-	if (agno >= mp->m_sb.sb_agcount) {
-		xfs_fs_cmn_err(CE_WARN, mp,
-			"Invalid inode number 0x%llx\n", ino);
-		error = EIO;
-	}
 	agblkno = XFS_INO_TO_AGBNO(mp, ino);
-	if (agblkno >= mp->m_sb.sb_agblocks || agblkno == 0) {
-		xfs_fs_cmn_err(CE_WARN, mp,
-			"Invalid inode number 0x%llx\n", ino);
-		error = EIO;
-	}
 	ioff = XFS_INO_TO_OFFSET(mp, ino);
-	if (ioff >= (1 << mp->m_sb.sb_inopblog)) {
-		xfs_fs_cmn_err(CE_WARN, mp,
-			"Invalid inode number 0x%llx\n", ino);
-		error = EIO;
-	}
 	agino = XFS_OFFBNO_TO_AGINO(mp, agblkno, ioff);
-	if (XFS_AGINO_TO_INO(mp, agno, agino) != ino) {
+	ino_ok =
+		agno < mp->m_sb.sb_agcount &&
+		agblkno < mp->m_sb.sb_agblocks &&
+		agblkno != 0 &&
+		ioff < (1 << mp->m_sb.sb_inopblog) &&
+		XFS_AGINO_TO_INO(mp, agno, agino) == ino;
+	if (XFS_TEST_ERROR(!ino_ok, mp, XFS_ERRTAG_DIR_INO_VALIDATE,
+			XFS_RANDOM_DIR_INO_VALIDATE)) {
 		xfs_fs_cmn_err(CE_WARN, mp,
 			"Invalid inode number 0x%llx\n", ino);
-		error = EIO;
+		return XFS_ERROR(EFSCORRUPTED);
 	}
-
-	if (error) {
-		xfs_force_shutdown(mp, XFS_CORRUPT_INCORE);
-	}
-	return XFS_ERROR(error);
+	return 0;
 }
 
 #ifndef XFS_REPAIR_SIM
