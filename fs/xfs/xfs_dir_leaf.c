@@ -1,4 +1,4 @@
-#ident "$Revision: 1.59 $"
+#ident "$Revision: 1.60 $"
 
 /*
  * xfs_dir_leaf.c
@@ -506,7 +506,7 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 {
 	xfs_dir_shortform_t *sf;
 	xfs_dir_sf_entry_t *sfe;
-	int retval, i, sbsize, nsbuf, lastresid;
+	int retval, i, sbsize, nsbuf, lastresid, want_entno;
 	xfs_mount_t *mp;
 	xfs_dahash_t cookhash, hash;
 	xfs_dir_put_args_t p;
@@ -515,6 +515,7 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	mp = dp->i_mount;
 	sf = (xfs_dir_shortform_t *)dp->i_df.if_u1.if_data;
 	cookhash = XFS_DA_COOKIE_HASH(mp, uio->uio_offset);
+	want_entno = XFS_DA_COOKIE_ENTRY(mp, uio->uio_offset);
 	nsbuf = sf->hdr.count + 2;
 	sbsize = (nsbuf + 1) * sizeof(*sbuf);
 	sbp = sbuf = kmem_alloc(sbsize, KM_SLEEP);
@@ -527,7 +528,7 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	 */
 	sbp->entno = 0;
 	sbp->seqno = 0;
-	sbp->hash = 0;		/* special case - seekdir to 0 is 1st entry */
+	sbp->hash = xfs_dir_hash_dot;
 	sbp->ino = dp->i_ino;
 	sbp->name = ".";
 	sbp->namelen = 1;
@@ -591,7 +592,8 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	 * Find our place.
 	 */
 	for (sbp = sbuf; sbp < &sbuf[nsbuf + 1]; sbp++) {
-		if (sbp->hash >= cookhash)
+		if (sbp->hash > cookhash ||
+		    (sbp->hash == cookhash && sbp->seqno >= want_entno))
 			break;
 	}
 	/* 
@@ -613,7 +615,7 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 		 * Save the first resid in a run of equal-hashval entries
 		 * so that we can back them out if they don't all fit.
 		 */
-		if (sbp->seqno == 0)
+		if (sbp->seqno == 0 || sbp == sbuf)
 			lastresid = uio->uio_resid;
 		XFS_PUT_COOKIE(p.cook, mp, 0, sbp[1].seqno, sbp[1].hash);
 #if XFS_BIG_FILESYSTEMS
