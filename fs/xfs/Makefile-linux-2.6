@@ -13,8 +13,10 @@ EXTRA_CFLAGS += -g3 -Wno-unused  -Wno-unknown-pragmas -Wno-parentheses \
 
 ALL_SUB_DIRS = linux
 SUB_DIRS = ${ALL_SUB_DIRS}
+MOD_SUB_DIRS := ${ALL_SUB_DIRS}
 
 
+MOD_LIST_NAME := FS_MODULES
 O_TARGET := xfs.o
 
 M_OBJS   := $(O_TARGET)
@@ -82,8 +84,11 @@ FS_LINKS = xfs_alloc xfs_macros xfs_types xfs_inum xfs_log \
            xfs_dir_leaf xfs_fsops xfs_attr_leaf xfs_dir2_data xfs_dir2_leaf \
            xfs_dir2_block xfs_dir2_node xfs_buf xfs_attr xfs_trans_space
 
-#O_OBJS :=  $(XFS_OBJS) $(LINO_OBJS) linux/linux_xfs.o libgcc.a
-O_OBJS :=  $(XFS_OBJS) linux/linux_xfs.o libgcc.a
+O_OBJS :=  $(XFS_OBJS) libgcc.a
+ifeq ($(CONFIG_XFS_FS),y)
+  O_OBJS += linux/linux_xfs.o
+endif 
+
 
 include $(TOPDIR)/Rules.make
 
