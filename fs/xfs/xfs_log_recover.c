@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.101 $"
+#ident	"$Revision: 1.102 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -134,7 +134,7 @@ xlog_bread(xlog_t	*log,
 	iowait(bp);
 
 	if (bp->b_flags & B_ERROR) {
-		cmn_err(CE_WARN, "XFS: error reading log block #%d",
+		cmn_err(CE_ALERT, "XFS: error reading log block #%d",
 			bp->b_blkno);
 		ASSERT(0);
 		return bp->b_error;
@@ -166,7 +166,7 @@ xlog_bwrite(
 	(void) bwrite(bp);
 
 	if (bp->b_flags & B_ERROR) {
-		cmn_err(CE_WARN, "XFS: error writing log block #%d",
+		cmn_err(CE_ALERT, "XFS: error writing log block #%d",
 			bp->b_blkno);
 		ASSERT(0);
 		return bp->b_error;
@@ -2254,7 +2254,7 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	mp = log->l_mp;
 	bp = bread(mp->m_dev, blkno, len);
 	if (bp->b_flags & B_ERROR) {
-		cmn_err(CE_WARN,
+		cmn_err(CE_ALERT,
 			"XFS: xlog_recover_do_buffer_trans: bread error (%d)",
 			blkno);
 		ASSERT(0);
@@ -2350,7 +2350,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	}
 	bp = bread(mp->m_dev, imap.im_blkno, imap.im_len);
 	if (bp->b_flags & B_ERROR) {
-		cmn_err(CE_WARN,
+		cmn_err(CE_ALERT,
 			"XFS: xlog_recover_do_inode_trans: bread error (%d)",
 			bp->b_blkno);
 		ASSERT(0);
