@@ -2996,6 +2996,8 @@ start_over:
 		error = xfs_dir_replace (tp, src_ip, "..", 2,
 					     target_dp->i_ino);
 		xfs_ichgtime(src_ip, XFS_ICHGTIME_MOD);
+
+		dnlc_remove (XFS_ITOV(src_ip), "..");
 		
 		ASSERT (! error);
 
