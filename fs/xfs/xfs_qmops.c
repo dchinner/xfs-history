@@ -31,6 +31,7 @@
  */
 #include <xfs.h>
 
+#ifndef CONFIG_XFS_QUOTA
 STATIC struct xfs_dquot *
 xfs_dqvopchown_default(
 	struct xfs_trans	*tp,
@@ -56,3 +57,4 @@ xfs_qmops_t	xfs_qmcore_xfs = {
 	.xfs_dqvopchown		= xfs_dqvopchown_default,
 	.xfs_dqvopchownresv	= (xfs_dqvopchownresv_t) fs_noerr,
 };
+#endif /* CONFIG_XFS_QUOTA */

@@ -34,6 +34,7 @@
 
 STATIC void	xfs_mount_log_sbunit(xfs_mount_t *, __int64_t);
 STATIC int	xfs_uuid_mount(xfs_mount_t *);
+STATIC void	xfs_uuid_unmount(xfs_mount_t *mp);
 
 mutex_t		xfs_uuidtabmon;		/* monitor for uuidtab */
 STATIC int	xfs_uuidtab_size;
@@ -1547,7 +1548,7 @@ xfs_uuid_mount(xfs_mount_t *mp)
 /*
  * Remove filesystem from the uuid table.
  */
-void
+STATIC void
 xfs_uuid_unmount(xfs_mount_t *mp)
 {
 	int	i;
