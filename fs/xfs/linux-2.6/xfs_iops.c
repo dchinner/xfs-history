@@ -810,7 +810,7 @@ linvfs_write_full_page(
 	return error;
 
 out_fail:
-	SetPageDirty(page);
+	set_page_dirty(page);
 	unlock_page(page);
 	return 0;
 }
