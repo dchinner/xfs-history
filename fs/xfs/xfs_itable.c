@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.18 $"
+#ident	"$Revision: 1.22 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -15,7 +15,7 @@
 #include <sys/vfs.h>
 #include <sys/syssgi.h>
 #include <sys/capability.h>
-#include <sys/user.h>
+#include <sys/kthread.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -178,7 +178,7 @@ xfs_bulkstat(
 	nimask = ~(nicluster - 1);
 	nbcluster = nicluster >> mp->m_sb.sb_inopblog;
 	if (!useracc(buffer, bcount * statstruct_size, B_READ|B_PHYS))
-		return u.u_error ? u.u_error : EFAULT;
+		return curthreadp->k_error ? curthreadp->k_error : EFAULT;
 	if (agino != 0) {
 		mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
 		error = xfs_ialloc_read_agi(mp, tp, agno, &agbp);
