@@ -42,7 +42,11 @@ int		xpg4_sticky_dir = 1;	/* see xfs_stickytest */
 int		xfs_fstype;
 uint64_t	xfs_panic_mask;		/* set to cause more panics */
 
-int             restricted_chown = 0;
+/*
+ * restricted_chown = 1  bsd style chown(2), only super-user can give away files
+ * restricted_chown = 0  sysV style chown(2), non super-user can give away files
+ */
+int             restricted_chown = 1;
 int     	scache_linemask = 0x1f;       /* second level cache line size mask */
 prid_t		dfltprid;
 unsigned long   xfs_physmem;

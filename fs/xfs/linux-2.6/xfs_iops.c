@@ -622,7 +622,7 @@ STATIC int linvfs_revalidate(struct dentry *dentry)
 
 
 int
-linvfs_notify_change(
+linvfs_setattr(
 	struct dentry	*dentry,
 	struct iattr	*attr)
 {
@@ -634,9 +634,6 @@ linvfs_notify_change(
 	struct inode	*inode;
 
 	inode = dentry->d_inode;
-	error = inode_change_ok(inode, attr);
-	if (error)
-		return(error);
 
 	memset(&vattr, 0, sizeof(vattr_t));
 	if (ia_valid & ATTR_UID) {
@@ -793,7 +790,7 @@ struct inode_operations linvfs_file_inode_operations =
 {
   permission:		linvfs_permission,
   revalidate:		linvfs_revalidate,
-  setattr:		linvfs_notify_change,
+  setattr:		linvfs_setattr,
 #ifdef CONFIG_HAVE_ATTRCTL
   attrctl:		linvfs_attrctl,
 #endif
@@ -816,7 +813,7 @@ struct inode_operations linvfs_dir_inode_operations =
   rename:		linvfs_rename,	
   permission:		linvfs_permission,
   revalidate:		linvfs_revalidate,
-  setattr:		linvfs_notify_change,
+  setattr:		linvfs_setattr,
 #ifdef CONFIG_HAVE_ATTRCTL
   attrctl:		linvfs_attrctl,
 #endif
@@ -832,7 +829,7 @@ struct inode_operations linvfs_symlink_inode_operations =
   follow_link:		linvfs_follow_link,
   permission:		linvfs_permission,
   revalidate:		linvfs_revalidate,
-  setattr:		linvfs_notify_change,
+  setattr:		linvfs_setattr,
 #ifdef CONFIG_HAVE_ATTRCTL
   attrctl:		linvfs_attrctl,
 #endif

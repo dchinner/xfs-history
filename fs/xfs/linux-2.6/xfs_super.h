@@ -75,7 +75,7 @@
 # define XFS_VNTRACE_STRING
 #endif
 
-#ifdef CONFIG_XFS_DEBUG
+#ifdef XFSDEBUG
 # define XFS_DBG_STRING		"debug"
 #else
 # define XFS_DBG_STRING		"no debug"

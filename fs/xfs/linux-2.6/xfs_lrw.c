@@ -792,7 +792,7 @@ retry:
 		 * size, force the log.
 		 */
 
-		if ((mp->m_flags & XFS_MOUNT_OSYNCISDSYNC) 
+		if (!(mp->m_flags & XFS_MOUNT_OSYNCISOSYNC) 
 			&& !(xip->i_update_size)) {
 			/*
 			 * If an allocation transaction occurred

@@ -98,6 +98,8 @@ static struct super_operations linvfs_sops;
 #define MNTOPT_SWIDTH   "swidth"        /* data volume stripe width */
 #define MNTOPT_NORECOVERY "norecovery"  /* don't run XFS recovery */
 #define MNTOPT_OSYNCISDSYNC "osyncisdsync" /* o_sync == o_dsync on this fs */
+					   /* (this is now the default!) */
+#define MNTOPT_OSYNCISOSYNC "osyncisosync" /* o_sync is REALLY o_sync */
 #define MNTOPT_QUOTA    "quota"         /* disk quotas */
 #define MNTOPT_MRQUOTA  "mrquota"       /* don't turnoff if SB has quotas on */
 #define MNTOPT_NOSUID   "nosuid"        /* disallow setuid program execution */
@@ -195,7 +197,9 @@ xfs_parseargs(
 		} else if (!strcmp(this_char, MNTOPT_NOATIME)) {
 			args->flags |= XFSMNT_NOATIME;
 		} else if (!strcmp(this_char, MNTOPT_OSYNCISDSYNC)) {
-			args->flags |= XFSMNT_OSYNCISDSYNC;
+			/* no-op, this is now the default */
+		} else if (!strcmp(this_char, MNTOPT_OSYNCISOSYNC)) {
+			args->flags |= XFSMNT_OSYNCISOSYNC;
 		} else if (!strcmp(this_char, MNTOPT_NORECOVERY)) {
 			args->flags |= XFSMNT_NORECOVERY;
 		} else if (!strcmp(this_char, MNTOPT_UQUOTA)) {
@@ -291,6 +295,9 @@ spectodev(
 
 	if (path_init(name, LOOKUP_FOLLOW, &nd))
 		rval = path_walk(name, &nd);
+	/* Watch out for negative dentries */
+	if (!nd.dentry->d_inode)
+		rval = -ENOENT;
 	if (rval)
 		printk("XFS: Invalid %s device [%s], err=%d\n", id, name, rval);
 	else
