@@ -269,6 +269,8 @@ vn_alloc(struct vfs *vfsp, __uint64_t ino, enum vtype type, int flags)
 void
 vn_free(struct vnode *vp)
 {
+	struct inode *inode;
+
 	XFS_STATS_INC(vn_free);
 
 	vn_trace_entry(vp, "vn_free", (inst_t *)__return_address);
@@ -276,8 +278,10 @@ vn_free(struct vnode *vp)
 	ASSERT(vn_count(vp) == 1);
 
 	ASSERT((vp->v_flag & VPURGE) == 0);
-
 	vp->v_fbhv = NULL;
+	inode = LINVFS_GET_IP(vp);
+	inode->i_sb = NULL;
+	iput(inode);
 }
 
 

@@ -393,8 +393,10 @@ finish_inode:
 		for (iq = ih->ih_next; iq != NULL; iq = iq->i_next) {
 			if (iq->i_ino == ino) {
 				mrunlock(&ih->ih_lock);
+				vn_bhv_remove(VN_BHV_HEAD(vp),
+					&(ip->i_bhv_desc));
 				if (preallocated_vnode == NULL)
-					vn_rele(vp);
+					vn_free(vp);
 				xfs_idestroy(ip);
 
 				XFS_STATS_INC(xs_ig_dup);
