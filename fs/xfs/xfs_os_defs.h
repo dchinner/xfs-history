@@ -37,6 +37,8 @@
 #endif
 
 #ifndef SIM
+#include <asm/div64.h>
+
 typedef __u64    xfs_off_t;
 typedef	__u64    xfs_ino_t;		/* <inode> type */
 typedef	__s64    xfs_daddr_t;	/* <disk address> type */
@@ -44,6 +46,12 @@ typedef	char *	 xfs_caddr_t;	/* ?<core address> type */
 
 typedef off_t linux_off_t;
 typedef __kernel_ino_t linux_ino_t;
+
+/* Side effect free 64 bit mod operation */
+extern inline __u32 do_mod(__u64 a, __u32 b) {
+	return do_div(a, b);
+}
+
 #else
 typedef loff_t  xfs_off_t;
 typedef	__u64	xfs_ino_t;		/* <inode> type */
@@ -51,6 +59,14 @@ typedef __s64   xfs_daddr_t;
 typedef	char *	xfs_caddr_t;	/* ?<core address> type */
 typedef ino_t   linux_ino_t;
 typedef off_t   linux_off_t;
+
+#define do_mod(a, b)	((a) % (b))
+#define do_div(n,base) ({ \
+        int __res; \
+        __res = ((unsigned long) n) % (unsigned) base; \
+        n = ((unsigned long) n) / (unsigned) base; \
+        __res; })
+
 #endif
 
 #define XFS_kmem_realloc(ptr,new,old,flag) kmem_realloc(ptr,new,old,flag)

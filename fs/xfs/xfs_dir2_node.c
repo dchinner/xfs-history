@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.13 $"
+#ident "$Revision: 1.14 $"
 
 /*
  * xfs_dir2_node.c
@@ -234,7 +234,7 @@ xfs_dir2_leaf_to_node(
 	 */
 	INT_SET(free->hdr.magic, ARCH_CONVERT, XFS_DIR2_FREE_MAGIC);
 	INT_ZERO(free->hdr.firstdb, ARCH_CONVERT);
-	ASSERT(INT_GET(ltp->bestcount, ARCH_CONVERT) <= dp->i_d.di_size / mp->m_dirblksize);
+	ASSERT(INT_GET(ltp->bestcount, ARCH_CONVERT) <= (uint)dp->i_d.di_size / mp->m_dirblksize);
 	INT_SET(free->hdr.nvalid, ARCH_CONVERT, INT_GET(ltp->bestcount, ARCH_CONVERT));
 	/*
 	 * Copy freespace entries from the leaf block to the new block.

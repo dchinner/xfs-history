@@ -32,7 +32,7 @@
 #ifndef _FS_XFS_AG_H
 #define	_FS_XFS_AG_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.35 $"
 
 /*
  * Allocation group header
@@ -295,20 +295,10 @@ xfs_daddr_t xfs_agb_to_daddr(struct xfs_mount *mp, xfs_agnumber_t agno,
 	((xfs_daddr_t)(XFS_FSB_TO_BB(mp, \
 		(xfs_fsblock_t)(agno) * (mp)->m_sb.sb_agblocks + (agbno))))
 #endif
-#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DADDR_TO_AGNO)
-xfs_agnumber_t xfs_daddr_to_agno(struct xfs_mount *mp, xfs_daddr_t d);
-#define	XFS_DADDR_TO_AGNO(mp,d)		xfs_daddr_to_agno(mp,d)
-#else
-#define	XFS_DADDR_TO_AGNO(mp,d) \
-	((xfs_agnumber_t)(XFS_BB_TO_FSBT(mp, d) / (mp)->m_sb.sb_agblocks))
-#endif
-#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DADDR_TO_AGBNO)
-xfs_agblock_t xfs_daddr_to_agbno(struct xfs_mount *mp, xfs_daddr_t d);
-#define	XFS_DADDR_TO_AGBNO(mp,d)	xfs_daddr_to_agbno(mp,d)
-#else
-#define	XFS_DADDR_TO_AGBNO(mp,d) \
-	((xfs_agblock_t)(XFS_BB_TO_FSBT(mp, d) % (mp)->m_sb.sb_agblocks))
-#endif
+/*
+ * XFS_DADDR_TO_AGNO and XFS_DADDR_TO_AGBNO moved to xfs_mount.h
+ * to avoid header file ordering change
+ */
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_AG_DADDR)
 xfs_daddr_t xfs_ag_daddr(struct xfs_mount *mp, xfs_agnumber_t agno, xfs_daddr_t d);

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.229 $"
+#ident	"$Revision: 1.230 $"
 
 #include <xfs_os_defs.h>
 
@@ -674,12 +674,16 @@ xfs_mountfs_int(
 	vfsp->vfs_bsize = (u_int)XFS_FSB_TO_B(mp, 1);
 
 	if (sbp->sb_imax_pct) {
+		__uint64_t	icount;
+
 		/* Make sure the maximum inode count is a multiple of the
 		 * units we allocate inodes in.
 		 */
-		mp->m_maxicount = (sbp->sb_dblocks * sbp->sb_imax_pct) / 100;
-		mp->m_maxicount = ((mp->m_maxicount / mp->m_ialloc_blks) *
-				   mp->m_ialloc_blks)  <<
+
+		icount = sbp->sb_dblocks * sbp->sb_imax_pct;
+		do_div(icount, 100);
+		do_div(icount, mp->m_ialloc_blks);
+		mp->m_maxicount = (icount * mp->m_ialloc_blks)  <<
 				   sbp->sb_inopblog;
 	} else
 		mp->m_maxicount = 0;

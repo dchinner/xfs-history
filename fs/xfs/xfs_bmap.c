@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.255 $"
+#ident	"$Revision: 1.256 $"
 
 #include <xfs_os_defs.h>
 
@@ -2242,6 +2242,7 @@ xfs_bmap_alloc(
 		xfs_extlen_t	orig_alen;	/* original ap->alen */
 		xfs_fileoff_t	orig_end;	/* original off+len */
 		xfs_fileoff_t	orig_off;	/* original ap->off */
+		xfs_extlen_t	mod_off;	/* modulus calculations */
 		xfs_fileoff_t	prevo;		/* previous file offset */
 		xfs_rtblock_t	rtx;		/* realtime extent number */
 		xfs_extlen_t	temp;		/* temp for rt calculations */
@@ -2261,15 +2262,17 @@ xfs_bmap_alloc(
 		 * the file was previously written with a kernel that didn't
 		 * perform this alignment.
 		 */
-		if (ap->off % extsz) {
-			ap->alen += ap->off % extsz;
-			ap->off -= ap->off % extsz;
+		mod_off = do_mod(orig_off, extsz);
+		if (mod_off) {
+			ap->alen += mod_off;
+			ap->off -= mod_off;
 		}
 		/*
 		 * Same adjustment for the end of the requested area.
 		 */
-		if ((ap->off + ap->alen) % extsz)
-			ap->alen = roundup(ap->alen, extsz);
+
+		if (temp = (ap->alen % extsz))
+			ap->alen += extsz - temp;
 		/*
 		 * If the previous block overlaps with this proposed allocation
 		 * then move the start forward without adjusting the length.
@@ -2351,7 +2354,7 @@ xfs_bmap_alloc(
 		 * If the offset & length are not perfectly aligned
 		 * then kill prod, it will just get us in trouble.
 		 */
-		if (ap->off % extsz || ap->alen % extsz)
+		if (do_mod(ap->off, extsz) || ap->alen % extsz)
 			prod = 1;
 		/*
 		 * Set ralen to be the actual requested length in rtextents.
@@ -2529,7 +2532,7 @@ xfs_bmap_alloc(
 
 		atype = ap->rval == 0 ?
 			XFS_ALLOCTYPE_ANY_AG : XFS_ALLOCTYPE_NEAR_BNO;
-		ap->rval /= mp->m_sb.sb_rextsize;
+		do_div(ap->rval, mp->m_sb.sb_rextsize);
 		rtb = ap->rval;
 		ap->alen = ralen;
 		if (error = xfs_rtallocate_extent(ap->tp, ap->rval, 1, ap->alen,
@@ -2655,14 +2658,14 @@ xfs_bmap_alloc(
 		}
 		if (ap->ip->i_d.di_extsize) {
 			args.prod = ap->ip->i_d.di_extsize;
-			if (args.mod = (xfs_extlen_t)(ap->off % args.prod))
+			if (args.mod = (xfs_extlen_t)do_mod(ap->off, args.prod))
 				args.mod = (xfs_extlen_t)(args.prod - args.mod);
 		} else if (mp->m_sb.sb_blocksize >= NBPP) {
 			args.prod = 1;
 			args.mod = 0;
 		} else {
 			args.prod = NBPP >> mp->m_sb.sb_blocklog;
-			if (args.mod = (xfs_extlen_t)(ap->off % args.prod))
+			if (args.mod = (xfs_extlen_t)(do_mod(ap->off, args.prod)))
 				args.mod = (xfs_extlen_t)(args.prod - args.mod);
 		}
 		/*
@@ -2978,10 +2981,14 @@ xfs_bmap_del_extent(
 			xfs_fsblock_t	bno;
 			xfs_filblks_t	len;
 
-			ASSERT(del->br_blockcount % mp->m_sb.sb_rextsize == 0);
-			ASSERT(del->br_startblock % mp->m_sb.sb_rextsize == 0);
-			bno = del->br_startblock / mp->m_sb.sb_rextsize;
-			len = del->br_blockcount / mp->m_sb.sb_rextsize;
+			ASSERT(do_mod(del->br_blockcount,
+				      mp->m_sb.sb_rextsize) == 0);
+			ASSERT(do_mod(del->br_startblock,
+				      mp->m_sb.sb_rextsize) == 0);
+			bno = del->br_startblock;
+			do_div(bno, mp->m_sb.sb_rextsize);
+			len = del->br_blockcount;
+			do_div(len, mp->m_sb.sb_rextsize);
 			if (error = xfs_rtfree_extent(ip->i_transp, bno,
 					(xfs_extlen_t)len))
 				goto done;
@@ -3862,7 +3869,8 @@ xfs_bmap_worst_indlen(
 	for (level = 0, rval = 0;
 	     level < XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK);
 	     level++) {
-		len = (len + maxrecs - 1) / maxrecs;
+		len += maxrecs - 1;
+		do_div(len, maxrecs);
 		rval += len;
 		if (len == 1)
 			return rval + XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) -
@@ -5433,8 +5441,8 @@ xfs_bunmapi(
 		if (del.br_startoff + del.br_blockcount > bno + 1)
 			del.br_blockcount = bno + 1 - del.br_startoff;
 		if (isrt &&
-		    (mod = (del.br_startblock + del.br_blockcount) %
-			   mp->m_sb.sb_rextsize)) {
+		    (mod = do_mod(del.br_startblock + del.br_blockcount,
+						   mp->m_sb.sb_rextsize))) {
 			/*
 			 * Realtime extent not lined up at the end.
 			 * The extent could have been split into written
@@ -5479,7 +5487,7 @@ xfs_bunmapi(
 				goto error0;
 			goto nodelete;
 		}
-		if (isrt && (mod = del.br_startblock % mp->m_sb.sb_rextsize)) {
+		if (isrt && (mod = do_mod(del.br_startblock, mp->m_sb.sb_rextsize))) {
 			/*
 			 * Realtime extent is lined up at the end but not
 			 * at the front.  We'll get rid of full extents if

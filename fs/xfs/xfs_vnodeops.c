@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.468 $"
+#ident "$Revision: 1.469 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -5053,7 +5053,7 @@ xfs_allocstore(
 		for (i = 0; i < nimaps; i++) {
 			ASSERT(imap[i].br_startblock != HOLESTARTBLOCK);
 			count_fsb -= imap[i].br_blockcount;
-			ASSERT(((long)count_fsb) >= 0);
+			ASSERT(count_fsb >= 0LL);
 			curr_off_fsb += imap[i].br_blockcount;
 			ASSERT(curr_off_fsb <= last_fsb);
 		}
@@ -5644,9 +5644,10 @@ retry:
 		if (rt) {
 			xfs_fileoff_t s, e;
 
-			s = startoffset_fsb / rtextsize;
+			s = startoffset_fsb;
+			do_div(s, rtextsize);
 			s *= rtextsize;
-			e = roundup(startoffset_fsb + allocatesize_fsb,
+			e = roundup_64(startoffset_fsb + allocatesize_fsb,
 				rtextsize);
 			numrtextents = (int)(e - s) / mp->m_sb.sb_rextsize;
 			datablocks = 0;
@@ -5847,7 +5848,7 @@ xfs_free_file_space(
 {
 	int			committed;
 	int			done;
-	xfs_off_t			end_dmi_offset;
+	xfs_off_t		end_dmi_offset;
 	xfs_fileoff_t		endoffset_fsb;
 	int			error;
 	xfs_fsblock_t		firstfsb;
@@ -5919,8 +5920,11 @@ xfs_free_file_space(
 			return error;
 		ASSERT(nimap == 0 || nimap == 1);
 		if (nimap && imap.br_startblock != HOLESTARTBLOCK) {
+			xfs_daddr_t	block;
+
 			ASSERT(imap.br_startblock != DELAYSTARTBLOCK);
-			mod = imap.br_startblock % mp->m_sb.sb_rextsize;
+			block = imap.br_startblock;
+			mod = do_div(block, mp->m_sb.sb_rextsize);
 			if (mod)
 				startoffset_fsb += mp->m_sb.sb_rextsize - mod;
 		}
@@ -5932,8 +5936,8 @@ xfs_free_file_space(
 		ASSERT(nimap == 0 || nimap == 1);
 		if (nimap && imap.br_startblock != HOLESTARTBLOCK) {
 			ASSERT(imap.br_startblock != DELAYSTARTBLOCK);
-			mod = (imap.br_startblock + 1) % mp->m_sb.sb_rextsize;
-			if (mod)
+			mod++;
+			if (mod && (mod != mp->m_sb.sb_rextsize))
 				endoffset_fsb -= mod;
 		}
 	}

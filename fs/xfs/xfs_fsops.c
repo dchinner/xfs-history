@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision$"
+#ident	"$Revision: 1.52 $"
 
 #include <xfs_os_defs.h>
 
@@ -139,7 +139,7 @@ xfs_growfs_data(
 	int			dpct;
 	int			error;
 	xfs_agnumber_t		nagcount;
-	xfs_rfsblock_t		nb;
+	xfs_rfsblock_t		nb, nb_mod;
 	xfs_rfsblock_t		new;
 	xfs_rfsblock_t		nfree;
 	xfs_agnumber_t		oagcount;
@@ -160,16 +160,15 @@ xfs_growfs_data(
 	ASSERT(bp);
 	xfs_buf_relse(bp);
 
-	nagcount = (nb / mp->m_sb.sb_agblocks) +
-		   ((nb % mp->m_sb.sb_agblocks) != 0);
-	if (nb % mp->m_sb.sb_agblocks &&
-	    nb % mp->m_sb.sb_agblocks < XFS_MIN_AG_BLOCKS) {
+	nb_mod = do_div(nb, mp->m_sb.sb_agblocks);
+	nagcount = nb + (nb_mod != 0);
+	if (nb_mod && nb_mod < XFS_MIN_AG_BLOCKS) {
 		nagcount--;
 		nb = nagcount * mp->m_sb.sb_agblocks;
 		if (nb < mp->m_sb.sb_dblocks)
 			return XFS_ERROR(EINVAL);
 	}
-	new = nb - mp->m_sb.sb_dblocks;
+	new = in->newblocks - mp->m_sb.sb_dblocks;
 	oagcount = mp->m_sb.sb_agcount;
 	if (nagcount > oagcount) {
 		mrlock(&mp->m_peraglock, MR_UPDATE, PINOD);
@@ -363,11 +362,11 @@ xfs_growfs_data(
 	if (error) {
 		return error;
 	}
-	if (mp->m_sb.sb_imax_pct)
-		mp->m_maxicount =
-			((mp->m_sb.sb_dblocks * mp->m_sb.sb_imax_pct) / 100) <<
-			mp->m_sb.sb_inopblog;
-	else
+	if (mp->m_sb.sb_imax_pct) {
+		__uint64_t icount = mp->m_sb.sb_dblocks * mp->m_sb.sb_imax_pct;
+		do_div(icount, 100);
+		mp->m_maxicount = icount << mp->m_sb.sb_inopblog;
+	} else
 		mp->m_maxicount = 0;
 	for (agno = 1; agno < nagcount; agno++) {
 	        error = xfs_read_buf(mp, mp->m_ddev_targp,

@@ -1292,7 +1292,7 @@ xfs_iomap_write_delay(
 	if (mp->m_dalign && (XFS_SIZE(mp, io) >= mp->m_swidth) && aeof) {
 		int eof;
 		xfs_fileoff_t new_last_fsb;
-		new_last_fsb = roundup(last_fsb, mp->m_swidth);
+		new_last_fsb = roundup_64(last_fsb, mp->m_swidth);
 		error = XFS_BMAP_EOF(mp, io, new_last_fsb, XFS_DATA_FORK, &eof);
 		if (error) {
 			return error;
@@ -1773,7 +1773,7 @@ xfs_iomap_write_direct(
 	if (!found && mp->m_dalign && (isize >= 524288) && aeof) {
 		int eof;
 		xfs_fileoff_t new_last_fsb;
-		new_last_fsb = roundup(last_fsb, mp->m_dalign);
+		new_last_fsb = roundup_64(last_fsb, mp->m_dalign);
 		printk("xfs_iomap_write_direct: about to XFS_BMAP_EOF %Ld\n",
 			new_last_fsb);
 		error = XFS_BMAP_EOF(mp, io, new_last_fsb, XFS_DATA_FORK, &eof);
@@ -1806,8 +1806,8 @@ xfs_iomap_write_direct(
 	 * the data or realtime partition.
 	 */
 	if (rt) {
-		numrtextents = (count_fsb + rtextsize - 1) /
-				rtextsize;
+		numrtextents = (count_fsb + rtextsize - 1);
+		do_div(numrtextents, rtextsize);
 		datablocks = 0;
 	} else {
 		datablocks = count_fsb;

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.321 $"
+#ident "$Revision: 1.322 $"
 
 #include <xfs_os_defs.h>
 
@@ -659,7 +659,7 @@ xfs_build_gap_list(
 		for (i = 0; i < nimaps; i++) {
 			imapp = &imaps[i];
 			count_fsb -= imapp->br_blockcount;
-			ASSERT(((long)count_fsb) >= 0);
+			ASSERT(count_fsb >= 0LL);
 			ASSERT(offset_fsb == imapp->br_startoff);
 			offset_fsb += imapp->br_blockcount;
 			ASSERT(offset_fsb <= last_fsb);

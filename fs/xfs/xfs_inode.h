@@ -196,7 +196,7 @@ typedef struct xfs_ihash {
  * Inode hashing and hash bucket locking.
  */
 #define XFS_BUCKETS(mp) (37*(mp)->m_sb.sb_agcount-1)
-#define XFS_IHASH(mp,ino) ((mp)->m_ihash + (ino % (mp)->m_ihsize))
+#define XFS_IHASH(mp,ino) ((mp)->m_ihash + (((uint)ino) % (mp)->m_ihsize))
 
 /*
  * This is the xfs inode cluster hash.  This hash is used by xfs_iflush to
@@ -562,7 +562,7 @@ xfs_inode_t *xfs_bhvtoi(struct bhv_desc *bhvp);
  * Pick the inode cluster hash bucket
  * (m_chash is the same size as m_ihash)
  */
-#define XFS_CHASH(mp,blk) ((mp)->m_chash + (blk % (mp)->m_chsize))
+#define XFS_CHASH(mp,blk) ((mp)->m_chash + (((uint)blk) % (mp)->m_chsize))
 
 
 /*

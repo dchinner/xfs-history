@@ -32,7 +32,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.113 $"
+#ident	"$Revision: 1.114 $"
 
 struct cred;
 struct mounta;
@@ -425,6 +425,45 @@ xfs_mount_t *xfs_bhvtom(bhv_desc_t *bdp);
 #define	XFS_BHVTOM(bdp)		((xfs_mount_t *)BHV_PDATA(bdp))
 #endif
  
+
+/*
+ * Moved here from xfs_ag.h to avoid reordering header files
+ */
+
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DADDR_TO_AGNO)
+xfs_agnumber_t xfs_daddr_to_agno(struct xfs_mount *mp, xfs_daddr_t d);
+#define XFS_DADDR_TO_AGNO(mp,d)         xfs_daddr_to_agno(mp,d)
+#else
+#if defined(__linux__) && !defined(SIM)
+static inline xfs_agnumber_t XFS_DADDR_TO_AGNO(xfs_mount_t *mp, xfs_daddr_t d)
+{
+        d = XFS_BB_TO_FSBT(mp, d);
+        do_div(d, mp->m_sb.sb_agblocks);
+
+        return (xfs_agnumber_t) d;
+}
+#else
+#define XFS_DADDR_TO_AGNO(mp,d) \
+        ((xfs_agnumber_t)(XFS_BB_TO_FSBT(mp, d) / (mp)->m_sb.sb_agblocks))
+#endif
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DADDR_TO_AGBNO)
+xfs_agblock_t xfs_daddr_to_agbno(struct xfs_mount *mp, xfs_daddr_t d);
+#define XFS_DADDR_TO_AGBNO(mp,d)        xfs_daddr_to_agbno(mp,d)
+#else
+#if defined(__linux__) && !defined(SIM)
+static inline xfs_agblock_t XFS_DADDR_TO_AGBNO(xfs_mount_t *mp, xfs_daddr_t d)
+{
+        d = XFS_BB_TO_FSBT(mp, d);
+
+        return (xfs_agblock_t) do_div(d, mp->m_sb.sb_agblocks);
+}
+#else
+#define XFS_DADDR_TO_AGBNO(mp,d) \
+        ((xfs_agblock_t)(XFS_BB_TO_FSBT(mp, d) % (mp)->m_sb.sb_agblocks))
+#endif
+#endif
+
 /*
  * This structure is for use by the xfs_mod_incore_sb_batch() routine.
  */

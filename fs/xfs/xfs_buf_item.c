@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.106 $"
+#ident "$Revision: 1.107 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -1308,7 +1308,7 @@ xfs_buf_iodone_callbacks(
 		if ((XFS_BUF_TARGET(bp) != lastdev) ||
 		    ((lbolt - lasttime) > 500)) {
 			prdev("XFS write error in file system meta-data "
-			      "block 0x%x in %s",
+			      "block 0x%Lx in %s",
 			      (int)XFS_BUF_TARGET(bp), XFS_BUF_ADDR(bp), 
 			      mp->m_fsname);
 			lasttime = lbolt;
