@@ -305,8 +305,10 @@ extern void pagebuf_unlock(		/* unlock buffer		*/
 		page_buf_t *);		/* buffer to unlock		*/
 
 /* Buffer Utility Routines */
-
-#define pagebuf_geterror(pb)	((pb)->pb_error)
+static inline int pagebuf_geterror(page_buf_t *pb)
+{
+	return (pb ? pb->pb_error : ENOMEM);
+}
 
 extern void pagebuf_queue_task(
 		struct tq_struct *);
