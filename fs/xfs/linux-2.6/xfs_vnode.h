@@ -133,9 +133,17 @@ extern ushort           vttoif_tab[];
 #define VMODIFIED	       0x8	/* XFS inode state possibly differs */
 					/* to the Linux inode state.	*/
 
-typedef enum vrwlock	{ VRWLOCK_NONE, VRWLOCK_READ,
-			  VRWLOCK_WRITE, VRWLOCK_WRITE_DIRECT,
-			  VRWLOCK_TRY_READ, VRWLOCK_TRY_WRITE } vrwlock_t;
+/*
+ * Values for the VOP_RWLOCK and VOP_RWUNLOCK flags parameter.
+ */
+typedef enum vrwlock {
+	VRWLOCK_NONE,
+	VRWLOCK_READ,
+	VRWLOCK_WRITE,
+	VRWLOCK_WRITE_DIRECT,
+	VRWLOCK_TRY_READ,
+	VRWLOCK_TRY_WRITE
+} vrwlock_t;
 
 /*
  * Return values for VOP_INACTIVE.  A return value of
@@ -356,6 +364,7 @@ typedef struct vnodeops {
  * Flags for read/write calls - same values as IRIX
  */
 
+#define IO_ISDIRECT	0x00004
 #define IO_NFS		0x00100
 #define IO_ISLOCKED	0x00800
 #define IO_NFS3		0x02000

@@ -160,7 +160,6 @@ xfs_read(
 	xfs_mount_t		*mp;
 	vnode_t			*vp;
 	unsigned long		seg;
-	int			direct = (file->f_flags & O_DIRECT);
 	int			invisible = (file->f_mode & FINVIS);
 
 	ip = XFS_BHVTOI(bdp);
@@ -184,7 +183,7 @@ xfs_read(
 	}
 	/* END copy & waste from filemap.c */
 
-	if (direct) {
+	if (ioflags & IO_ISDIRECT) {
 		pb_target_t	*target =
 			(ip->i_d.di_flags & XFS_DIFLAG_REALTIME) ?
 				mp->m_rtdev_targp : mp->m_ddev_targp;
@@ -541,7 +540,6 @@ xfs_write(
 	vnode_t			*vp;
 	unsigned long		seg;
 	int			iolock;
-	int			direct = (file->f_flags & O_DIRECT);
 	int			invisible = (file->f_mode & FINVIS);
 	int			eventsent = 0;
 	vrwlock_t		locktype;
@@ -578,7 +576,7 @@ xfs_write(
 		return -EIO;
 	}
 
-	if (direct) {
+	if (ioflags & IO_ISDIRECT) {
 		pb_target_t	*target =
 			(xip->i_d.di_flags & XFS_DIFLAG_REALTIME) ?
 				mp->m_rtdev_targp : mp->m_ddev_targp;
@@ -667,7 +665,7 @@ start:
 	 * to zero it out up to the new size.
 	 */
 
-	if (!direct && (*offset > isize && isize)) {
+	if (!(ioflags & IO_ISDIRECT) && (*offset > isize && isize)) {
 		error = xfs_zero_eof(BHV_TO_VNODE(bdp), io, *offset,
 			isize, *offset + size);
 		if (error) {
@@ -696,7 +694,7 @@ start:
 	}
 
 retry:
-	if (direct) {
+	if (ioflags & IO_ISDIRECT) {
 		xfs_inval_cached_pages(vp, &xip->i_iocore, *offset, 1, 1);
 	}
 

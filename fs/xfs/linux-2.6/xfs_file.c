@@ -66,13 +66,15 @@ linvfs_read(
 	loff_t			pos)
 {
 	struct iovec		iov = {buf, count};
+	struct file		*file = iocb->ki_filp;
 	vnode_t			*vp;
+	int			ioflags;
 	int			error;
 
 	BUG_ON(iocb->ki_pos != pos);
-	vp = LINVFS_GET_VP(iocb->ki_filp->f_dentry->d_inode);
-	VOP_READ(vp, iocb, &iov, 1, &iocb->ki_pos, 0, NULL, error);
-
+	vp = LINVFS_GET_VP(file->f_dentry->d_inode);
+	ioflags = (file->f_flags & O_DIRECT) ? IO_ISDIRECT : 0;
+	VOP_READ(vp, iocb, &iov, 1, &iocb->ki_pos, ioflags, NULL, error);
 	return error;
 }
 
@@ -88,21 +90,23 @@ linvfs_write(
 	struct file	*file = iocb->ki_filp;
 	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
+	int		ioflags;
 	int		error;
-	int		direct = file->f_flags & O_DIRECT;
 
 	BUG_ON(iocb->ki_pos != pos);
-
-	if (direct) {
-		VOP_WRITE(vp, iocb, &iov, 1, &iocb->ki_pos, 0, NULL, error);
+	ioflags = (file->f_flags & O_DIRECT) ? IO_ISDIRECT : 0;
+	if (ioflags & IO_ISDIRECT) {
+		VOP_WRITE(vp, iocb, &iov, 1, &iocb->ki_pos,
+				ioflags, NULL, error);
 	} else {
 		down(&inode->i_sem);
-		VOP_WRITE(vp, iocb, &iov, 1, &iocb->ki_pos, 0, NULL, error);
+		VOP_WRITE(vp, iocb, &iov, 1, &iocb->ki_pos,
+				ioflags, NULL, error);
 		up(&inode->i_sem);
 	}
-
 	return error;
 }
+
 
 STATIC ssize_t
 linvfs_readv(
@@ -114,17 +118,20 @@ linvfs_readv(
 	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	struct		kiocb kiocb;
+	int		ioflags;
 	int		error;
 
 	init_sync_kiocb(&kiocb, file);
 	kiocb.ki_pos = *ppos;
-	VOP_READ(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos, 0, NULL, error);
+	ioflags = (file->f_flags & O_DIRECT) ? IO_ISDIRECT : 0;
+	VOP_READ(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos, ioflags, NULL, error);
 	if (-EIOCBQUEUED == error)
 		error = wait_on_sync_kiocb(&kiocb);
 	*ppos = kiocb.ki_pos;
 
 	return error;
 }
+
 
 STATIC ssize_t
 linvfs_writev(
@@ -136,16 +143,19 @@ linvfs_writev(
 	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	struct		kiocb kiocb;
+	int		ioflags;
 	int		error;
-	int		direct = file->f_flags & O_DIRECT;
 
 	init_sync_kiocb(&kiocb, file);
 	kiocb.ki_pos = *ppos;
-	if (direct) {
-		VOP_WRITE(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos, 0, NULL, error);
+	ioflags = (file->f_flags & O_DIRECT) ? IO_ISDIRECT : 0;
+	if (ioflags & IO_ISDIRECT) {
+		VOP_WRITE(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos,
+				ioflags, NULL, error);
 	} else {
 		down(&inode->i_sem);
-		VOP_WRITE(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos, 0, NULL, error);
+		VOP_WRITE(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos,
+				ioflags, NULL, error);
 		up(&inode->i_sem);
 	}
 	if (-EIOCBQUEUED == error)
@@ -154,6 +164,7 @@ linvfs_writev(
 
 	return error;
 }
+
 
 STATIC ssize_t
 linvfs_sendfile(
@@ -167,7 +178,6 @@ linvfs_sendfile(
 	int			error;
 
 	VOP_SENDFILE(vp, filp, ppos, 0, count, actor, target, NULL, error);
-
 	return error;
 }
 
