@@ -227,7 +227,7 @@ typedef void	(*vop_vnode_change_t)(bhv_desc_t *, vchange_t, __psint_t);
 typedef void	(*vop_ptossvp_t)(bhv_desc_t *, xfs_off_t, xfs_off_t, int);
 typedef void	(*vop_pflushinvalvp_t)(bhv_desc_t *, xfs_off_t, xfs_off_t, int);
 typedef int	(*vop_pflushvp_t)(bhv_desc_t *, xfs_off_t, xfs_off_t, uint64_t, int);
-typedef int	(*vop_iflush_t)(bhv_desc_t *);
+typedef int	(*vop_iflush_t)(bhv_desc_t *, int);
 
 
 typedef struct vnodeops {
@@ -498,12 +498,21 @@ typedef struct vnodeops {
 	rv = _VOP_(vop_ioctl, vp)((vp)->v_fbhv,inode,filp,cmd,arg);	\
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
-#define VOP_IFLUSH(vp, rv)						\
+#define VOP_IFLUSH(vp, flags, rv)					\
 {									\
 	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
-	rv = _VOP_(vop_iflush, vp)((vp)->v_fbhv);			\
+	rv = _VOP_(vop_iflush, vp)((vp)->v_fbhv, flags);		\
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
+
+/*
+ * Flags for VOP_IFLUSH call
+ */
+
+#define FLUSH_SYNC		1	/* wait for flush to complete	*/
+#define FLUSH_INODE		2	/* flush the inode itself	*/
+#define FLUSH_LOG		4	/* force the last log entry for
+					 * this inode out to disk	*/
 
 /*
  * Flush/Invalidate options for VOP_TOSS_PAGES, VOP_FLUSHINVAL_PAGES and
