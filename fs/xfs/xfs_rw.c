@@ -1,4 +1,3 @@
-
 #include <sys/types.h>
 #ifdef SIM
 #define _KERNEL 1
@@ -125,7 +124,9 @@ xfs_grio_req(
 	uio_t *,
 	int,
 	cred_t *,
+	off_t,
 	int);
+
 
 /*
  * Round the given file offset down to the nearest read/write
@@ -836,7 +837,8 @@ xfs_read(
 		id.pid = MAKE_REQ_PID(u.u_procp->p_pid, 0);
 #endif
 		id.ino = ip->i_ino;
-		error  = xfs_grio_req(ip, &id, uiop, ioflag, credp, UIO_READ);
+		error  = xfs_grio_req(ip, &id, uiop, ioflag, credp, offset, UIO_READ);
+		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
 
 		break;
 
@@ -1471,7 +1473,7 @@ xfs_write(
 		id.pid = MAKE_REQ_PID(u.u_procp->p_pid, 0);
 #endif
 		id.ino = ip->i_ino;
-		error = xfs_grio_req( ip, &id, uiop, ioflag, credp, UIO_WRITE);
+		error = xfs_grio_req( ip, &id, uiop, ioflag, credp, offset, UIO_WRITE);
 
 		/*
 		 * Add back whatever we refused to do because of
@@ -2330,7 +2332,7 @@ xfs_diostrat( buf_t *bp)
 	}
 
 	ASSERT(!(bp->b_flags & B_DONE));
-        ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
+        ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS| MR_UPDATE) != 0);
 
 	/*
 	 * Alignment checks are done in xfs_diordwr().
@@ -2640,6 +2642,9 @@ xfs_diostrat( buf_t *bp)
 	 */
 	bioerror( bp, error);
 	iodone( bp );
+
+        ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS| MR_UPDATE) != 0);
+
 	return(0);
 }
 
