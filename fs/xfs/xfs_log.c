@@ -1420,9 +1420,6 @@ log_print_head(log_rec_header_t *head, int *len)
 	printf("length of Log Record: %d	prev offset: %d		num ops: %d\n",
 	       head->h_len, head->h_prev_offset, head->h_num_logops);
 	
-	if (head->h_lsn == 0xd00000f9e) {
-		i = 9;
-	}
 	printf("cycle num overwrites: ");
 	for (i=0; i< LOG_RECORD_BSIZE/BBSIZE; i++) {
 		printf("%d  ", head->h_cycle_data[i]);
@@ -1455,8 +1452,8 @@ log_print_record(int		  fd,
 	read_len = BBTOB(BTOBB(len+sizeof(log_op_header_t)));
 	if (*partial_read != -1) {
 		read_len -= *partial_read;
-		ptr = buf =
-		      (caddr_t)((psint)(*partial_buf) + (psint)(*partial_read));
+		buf = (caddr_t)((psint)(*partial_buf) + (psint)(*partial_read));
+		ptr = *partial_buf;
 	} else {
 		ptr = buf = (caddr_t) kmem_alloc(read_len, 0);
 	}
@@ -1471,7 +1468,8 @@ log_print_record(int		  fd,
 	}
 	if (*partial_read != -1)
 		read_len += *partial_read;
-	for (i = 0, ptr = buf; ptr < buf + read_len; ptr += BBSIZE, i++) {
+	buf = ptr;
+	for (i = 0; ptr < buf + read_len; ptr += BBSIZE, i++) {
 		rechead = (log_rec_header_t *)ptr;
 		if (rechead->h_magicno == LOG_HEADER_MAGIC_NUM) {
 		    if (lseek(fd, -read_len+i*BBSIZE, SEEK_CUR) < 0)
@@ -1697,6 +1695,9 @@ void xfs_log_print(xfs_mount_t	*mp,
 partial_log_read:
 	    error= log_print_record(fd, num_ops, len, &partial_read,
 				    &partial_buf, (log_rec_header_t *)hbuf);
+	    if (partial_read != -1)
+		    len -= partial_read;
+	    partial_read = -1;
 	    if (!error)
 		    block_no += BTOBB(len);
 	    else {
