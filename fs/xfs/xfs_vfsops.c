@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.56 $"
+#ident  "$Revision: 1.57 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -661,6 +661,7 @@ xfs_mountroot(vfs_t		*vfsp,
 		 * XXX copied from efs_mountroot() - Is this right?
 		 */
 		error = xfs_cleanfs(XFS_VFSTOM(vfsp));
+		xfs_log_unmount(XFS_VFSTOM(vfsp));
 		binval(rootdev);
 		pflushinvalvfsp(vfsp);
 		return error;
