@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.37 $"
+#ident  "$Revision: 1.38 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -392,6 +392,13 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	 * XXX Anything special for root mounts?
 	 * if (why == ROOT_INIT) {}
 	 */
+#ifndef SIM
+        if (why == ROOT_INIT) {
+                extern void clkset( time_t );
+
+                clkset(time);
+        }
+#endif
 
 	/*
 	 * XXX Anything special for read-only mounts?
@@ -625,7 +632,9 @@ xfs_mountroot(vfs_t		*vfsp,
 	static int	xfsrootdone;
 	struct cred	*cr = u.u_cred;
 	extern dev_t	rootdev;		/* from sys/systm.h */
+	dev_t		ddev, logdev, rtdev;
 
+	
 	/*
 	 * Check that the root device holds a XFS file system.
 	 */
@@ -655,7 +664,49 @@ xfs_mountroot(vfs_t		*vfsp,
 	error = vfs_lock(vfsp);
 	if (error)
 		goto bad;
-	error = xfs_cmountfs(vfsp, rootdev, rootdev, 0, why, NULL, cr);
+
+	if (emajor(rootdev) == XLV_MAJOR) {
+		/*
+		 * logical volume
+		 */
+		xlv_tab_subvol_t *xlv_p;
+		xlv_tab_subvol_t *sv_p;
+
+		/*
+		 * XXX This XLV section should be moved to a xlv function
+		 * that can be stub'ed when xlv does not exist.
+		 */
+		if (xlv_tab == NULL) {
+			printf("logical volume info not present \n");
+			ddev = rootdev;
+			logdev = rtdev = 0;
+		} else {
+			XLV_IO_LOCK(minor(rootdev), MR_ACCESS);
+			xlv_p = &xlv_tab->subvolume[minor(rootdev)];
+			if (! XLV_SUBVOL_EXISTS(xlv_p)) {
+				XLV_IO_UNLOCK(minor(rootdev));
+				return XFS_ERROR(ENXIO);
+			}
+			ddev   = (sv_p = xlv_p->vol_p->data_subvol) ?
+				sv_p->dev : 0;
+			logdev = (sv_p = xlv_p->vol_p->log_subvol) ?
+				sv_p->dev : 0;
+			rtdev  = (sv_p = xlv_p->vol_p->rt_subvol) ?
+				sv_p->dev : 0;
+			ASSERT(ddev && logdev);
+			XLV_IO_UNLOCK(minor(rootdev));
+		}
+	} else {
+		/*
+		 * block device
+		 */
+		printf("mount xfs - block device \n");
+		ddev = logdev = rootdev;
+		rtdev = 0;
+	}
+
+	error = xfs_cmountfs(vfsp, ddev, logdev, rtdev, why, NULL, cr);
+
 	if (error) {
 		vfs_unlock(vfsp);
 		goto bad;
