@@ -208,7 +208,7 @@ xfs_dir_split(struct xfs_dir_state *state)
 	 * Split the root node.
 	 */
 	oldblk = &state->path.blk[0];
-	ASSERT(oldblk->bp->b_un.b_addr == 0);	/* root must be at block 0 */
+	ASSERT(oldblk->bp->b_offset == 0);	/* root must be at block 0 */
 	ASSERT(oldblk->blkno == 0);
 	retval = xfs_dir_root_split(state, oldblk, addblk);
 	if (retval)	
@@ -950,7 +950,7 @@ xfs_dir_node_add(struct xfs_dir_state *state,
  * Deallocate an empty leaf node, remove it from its parent,
  * possibly deallocating that block, etc...
  */
-void
+int
 xfs_dir_join(struct xfs_dir_state *state)
 {
 	struct xfs_dir_state_blk *drop_blk, *save_blk;
@@ -958,8 +958,10 @@ xfs_dir_join(struct xfs_dir_state *state)
 	uint lasthash;
 	int retval, tmp, i;
 
+	retval = 0;
 	drop_blk = &state->path.blk[ state->path.active-1 ];
 	save_blk = &state->altpath.blk[ state->path.active-1 ];
+	ASSERT(state->path.blk[0].leafblk == 0);
 	ASSERT(drop_blk->leafblk == 1);
 
 	/*
@@ -995,6 +997,8 @@ xfs_dir_join(struct xfs_dir_state *state)
 			break;
 		}
 		xfs_dir_blk_unlink(state, drop_blk, save_blk);
+		retval = xfs_dir_shrink_inode(state->trans, state->args,
+			drop_blk->blkno);
 		xfs_dir_fixhashpath(state, &state->altpath, i);
 	}
 out:
@@ -1004,11 +1008,12 @@ out:
 		 * entry in the root, make the child block the new root.
 		 */
 		drop_blk = &state->path.blk[0];
-		ASSERT(drop_blk->bp->b_un.b_addr == 0);
+		ASSERT(drop_blk->bp->b_offset == 0);
 		ASSERT(drop_blk->blkno == 0);
 		ASSERT(drop_blk->leafblk == 0);
-		xfs_dir_root_join(state, drop_blk);
+		retval = xfs_dir_root_join(state, drop_blk);
 	}
+	return(retval);
 }
 
 /*
@@ -1032,6 +1037,7 @@ xfs_dir_root_join(struct xfs_dir_state *state,
 		return(0);
 
 	blkno = oldroot->btree[ oldroot->hdr.count-1 ].before;
+	ASSERT(blkno != 0);
 	bp = xfs_dir_read_buf(state->trans, state->args->dp, blkno);
 	if (oldroot->hdr.level == 1) {
 		leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;

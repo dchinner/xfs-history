@@ -740,7 +740,10 @@ xfs_dir_shortform_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
 	sf = (struct xfs_dir_shortform *)dp->i_u1.iu_data;
 	if (args->namelen == 2 &&
 	    args->name[0] == '.' && args->name[1] == '.') {
-		bcopy((char *)&args->inumber, sf->hdr.parent, sizeof(xfs_ino_t));
+		ASSERT(bcmp((char *)&args->inumber, sf->hdr.parent,
+			sizeof(xfs_ino_t)));
+		bcopy((char *)&args->inumber, sf->hdr.parent,
+			sizeof(xfs_ino_t));
 		xfs_trans_log_inode(trans, dp, XFS_ILOG_DATA);
 		return(0);
 	}
@@ -749,8 +752,10 @@ xfs_dir_shortform_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
 	for (i = sf->hdr.count-1; i >= 0; i--) {
 		if (sfe->namelen == args->namelen) {
 			if (bcmp(args->name, sfe->name, args->namelen) == 0) {
+				ASSERT(bcmp((char *)&args->inumber,
+					sfe->inumber, sizeof(xfs_ino_t)));
 				bcopy((char *)&args->inumber, sfe->inumber,
-						    sizeof(xfs_ino_t));
+					sizeof(xfs_ino_t));
 				xfs_trans_log_inode(trans, dp, XFS_ILOG_DATA);
 				return(0);
 			}
@@ -1022,6 +1027,7 @@ xfs_dir_leaf_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
 		leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
 		entry = &leaf->leaves[index];
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
+		ASSERT(bcmp((char *)&inum, namest->inumber, sizeof(inum)));
 		bcopy((char *)&inum, namest->inumber, sizeof(inum));
 		xfs_trans_log_buf(trans, bp,
 			(char *)namest->inumber - (char *)leaf,
@@ -1141,8 +1147,8 @@ xfs_dir_node_removename(xfs_trans_t *trans, struct xfs_dir_name *args)
 	/*
 	 * Check to see if the tree needs to be collapsed.
 	 */
-	xfs_dir_join(&state);
-	return(0);
+	retval = xfs_dir_join(&state);
+	return(retval);
 }
 
 /*
@@ -1303,6 +1309,7 @@ xfs_dir_node_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
 		leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
 		entry = &leaf->leaves[blk->index];
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
+		ASSERT(bcmp((char *)&inum, namest->inumber, sizeof(inum)));
 		bcopy((char *)&inum, namest->inumber, sizeof(inum));
 		xfs_trans_log_buf(trans, bp,
 			(char *)namest->inumber - (char *)leaf,
