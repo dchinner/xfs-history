@@ -316,7 +316,6 @@ static inline void xfs_buf_undelay(page_buf_t *pb)
 {
 	if (pb->pb_list.next != &pb->pb_list) {
 		pagebuf_delwri_dequeue(pb);
-		pagebuf_rele(pb);
 	} else {
 		pb->pb_flags &= ~PBF_DELWRI;
 	}

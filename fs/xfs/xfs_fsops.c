@@ -175,8 +175,10 @@ xfs_growfs_data(
 	if (nagcount > oagcount) {
 		mrlock(&mp->m_peraglock, MR_UPDATE, PINOD);
 		mp->m_perag =
-			kmem_realloc(mp->m_perag,
-				sizeof(xfs_perag_t) * nagcount, KM_SLEEP);
+		  XFS_kmem_realloc(mp->m_perag,
+						   sizeof(xfs_perag_t) * nagcount,
+						   sizeof(xfs_perag_t) * oagcount,
+						   KM_SLEEP);
 		bzero(&mp->m_perag[oagcount],
 			(nagcount - oagcount) * sizeof(xfs_perag_t));
 		mrunlock(&mp->m_peraglock);

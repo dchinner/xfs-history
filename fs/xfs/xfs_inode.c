@@ -2240,8 +2240,11 @@ xfs_iroot_realloc(
 		cur_max = XFS_BMAP_BROOT_MAXRECS(ifp->if_broot_bytes);
 		new_max = cur_max + rec_diff;
 		new_size = (size_t)XFS_BMAP_BROOT_SPACE_CALC(new_max);
-		ifp->if_broot = (xfs_bmbt_block_t *)
-			      kmem_realloc(ifp->if_broot, new_size, KM_SLEEP);
+		ifp->if_broot = (xfs_bmbt_block_t *) 
+		  XFS_kmem_realloc(ifp->if_broot,
+						   new_size,
+						   (size_t)XFS_BMAP_BROOT_SPACE_CALC(cur_max), /* old size */
+						   KM_SLEEP);
 		op = (char *)XFS_BMAP_BROOT_PTR_ADDR(ifp->if_broot, 1,
 						      ifp->if_broot_bytes);
 		np = (char *)XFS_BMAP_BROOT_PTR_ADDR(ifp->if_broot, 1,
@@ -2383,8 +2386,10 @@ xfs_iext_realloc(
 			      sizeof(ifp->if_u2.if_inline_ext));
 		} else if (rnew_size != ifp->if_real_bytes) {
 			ifp->if_u1.if_extents = (xfs_bmbt_rec_t *)
-				kmem_realloc(ifp->if_u1.if_extents,
-					     rnew_size, KM_SLEEP);
+			  XFS_kmem_realloc(ifp->if_u1.if_extents,
+							   rnew_size,
+							   ifp->if_real_bytes,
+							   KM_SLEEP);
 		}
 	}
 	ifp->if_real_bytes = rnew_size;
@@ -2465,8 +2470,10 @@ xfs_idata_realloc(
 			 */
 			if (ifp->if_real_bytes != real_size) {
 				ifp->if_u1.if_data =
-					kmem_realloc(ifp->if_u1.if_data,
-						     real_size, KM_SLEEP);
+					XFS_kmem_realloc(ifp->if_u1.if_data,
+									 real_size,
+									 ifp->if_real_bytes,
+									 KM_SLEEP);
 			}
 		} else {
 			ASSERT(ifp->if_real_bytes == 0);

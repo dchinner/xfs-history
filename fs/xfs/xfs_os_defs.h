@@ -35,3 +35,14 @@
 #ifdef NEED_FS_H
 # include <linux/fs.h>
 #endif
+
+#if 0
+typedef __U64 xfs_off_t;
+typedef __U64 xfs_ino_t;
+#endif
+
+#ifndef SIM
+#define XFS_kmem_realloc(ptr,new,old,flag) kmem_realloc(ptr,new,old,flag)
+#else
+#define XFS_kmem_realloc(ptr,new,old,flag) kmem_realloc(ptr,new,flag)
+#endif
