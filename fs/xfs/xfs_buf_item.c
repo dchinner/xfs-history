@@ -1202,8 +1202,8 @@ xfs_buf_iodone_callbacks(
 		    ((lbolt - lasttime) > 500)) {
 			prdev("XFS write error in file system meta-data "
 			      "block 0x%Lx in %s",
-			      (int)XFS_BUF_TARGET(bp), XFS_BUF_ADDR(bp), 
-			      mp->m_fsname);
+			      XFS_BUF_TARGET(bp),
+			      XFS_BUF_ADDR(bp), mp->m_fsname);
 			lasttime = lbolt;
 		}
 		lastdev = XFS_BUF_TARGET(bp);

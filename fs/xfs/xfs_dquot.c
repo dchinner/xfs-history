@@ -51,10 +51,10 @@
 STATIC void 		xfs_qm_dqflush_done(xfs_buf_t *, xfs_dq_logitem_t *);
 
 #ifdef DEBUG
+kdev_t xfs_dqerror_dev = NODEV;
 int xfs_do_dqerror = 0;
 int xfs_dqreq_num = 0;
 int xfs_dqerror_mod = 33;
-dev_t xfs_dqerror_dev = 0;
 #endif
 
 /*
@@ -872,7 +872,7 @@ xfs_qm_dqget(
 
 #ifdef DEBUG
 	if (xfs_do_dqerror) {
-		if (xfs_dqerror_dev == mp->m_dev &&
+		if (kdev_same(xfs_dqerror_dev, mp->m_dev) &&
 		    (xfs_dqreq_num++ % xfs_dqerror_mod) == 0) {
 			printk("Returning error in dqget\n");
 			return (EIO);
