@@ -70,10 +70,15 @@
 #define GFP_READAHEAD	0
 #endif
 
-static inline void set_cpus_allowed(struct task_struct *p, unsigned long mask)
-{
-
-}
+/*
+ * A backport of the 2.5 scheduler is used by many vendors of 2.4-based
+ * distributions.
+ * We can only guess it's presences by the lack of the SCHED_YIELD flag.
+ * If the heuristic doesn't work, change this define by hand.
+ */
+#ifndef SCHED_YIELD
+#define __HAVE_NEW_SCHEDULER	1
+#endif
 
 /*
  * Debug code
@@ -2058,11 +2063,14 @@ pagebuf_iodone_daemon(
 	spin_unlock_irq(&current->sigmask_lock);
 
 	/* Migrate to the right CPU */
-#ifdef SCHED_YIELD			/* XXX: actualy testing for O(1) sched */
+#ifdef __HAVE_NEW_SCHEDULER
+	set_cpus_allowed(current, 1UL << cpu);
+	if (smp_processor_id() != cpu)
+		BUG();
+#else
+	current->cpus_allowed = 1UL << cpu;
 	while (smp_processor_id() != cpu)
 		schedule();
-#else
-	set_cpus_allowed(current, 1UL << cpu);
 #endif
 
 	sprintf(current->comm, "pagebuf_io_CPU%d", bind_cpu);
@@ -2302,19 +2310,11 @@ pagebuf_daemon_start(void)
 				printk("pagebuf_daemon_start failed\n");
 			} else {
 				while (!pb_daemons[cpu_logical_map(cpu)]) {
-					/*
-					 * Must be that ugly because yield()
-					 * is broken in 2.4.19 (my fault, btw)
-					 *
-					 * XXX: Rip this out once we've merged
-					 * up to 2.4.20.
-					 *			--hch
-					 */
-#ifdef SCHED_YIELD
+#ifdef __HAVE_NEW_SCHEDULER
+					yield();
+#else
 					current->policy |= SCHED_YIELD;
 					schedule();
-#else
-					yield();
 #endif
 				}
 			}
