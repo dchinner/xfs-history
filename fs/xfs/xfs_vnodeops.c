@@ -182,7 +182,7 @@ STATIC int	xfs_frlock(vnode_t	*vp,
 			   cred_t	*credp);
 
 STATIC int	xfs_map(vnode_t	*vp,
-			uint	offset,
+			off_t	offset,
 			preg_t	*pregp,
 			addr_t	*addrp,
 			uint	len,
@@ -192,7 +192,7 @@ STATIC int	xfs_map(vnode_t	*vp,
 			cred_t	*credp);
 
 STATIC int	xfs_addmap(vnode_t	*vp,
-			   uint		offset,
+			   off_t	offset,
 			   preg_t	*pregp,
 			   addr_t	addr,
 			   uint		len,
@@ -202,7 +202,7 @@ STATIC int	xfs_addmap(vnode_t	*vp,
 			   cred_t	*credp);
 
 STATIC int	xfs_delmap(vnode_t	*vp,
-			   uint		offset,
+			   off_t	offset,
 			   preg_t	*pregp,
 			   addr_t	addr,
 			   uint		len,
@@ -3324,7 +3324,7 @@ xfs_frlock(vnode_t	*vp,
  */
 STATIC int
 xfs_map(vnode_t	*vp,
-	uint	offset,
+	off_t	offset,
 	preg_t	*pregp,
 	addr_t	*addrp,
 	uint	len,
@@ -3353,7 +3353,7 @@ xfs_map(vnode_t	*vp,
  */
 STATIC int
 xfs_addmap(vnode_t	*vp,
-	   uint		offset,
+	   off_t	offset,
 	   preg_t	*pregp,
 	   addr_t	addr,
 	   uint		len,
@@ -3383,7 +3383,7 @@ xfs_addmap(vnode_t	*vp,
  */
 STATIC int
 xfs_delmap(vnode_t	*vp,
-	   uint		offset,
+	   off_t	offset,
 	   preg_t	*pregp,
 	   addr_t	addr,
 	   uint		len,
