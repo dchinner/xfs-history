@@ -78,7 +78,6 @@ static struct export_operations linvfs_export_ops;
 #define MNTOPT_XDSM     "xdsm"          /* DMI enabled (DMAPI / XDSM) */
 #define MNTOPT_BIOSIZE  "biosize"       /* log2 of preferred buffered io size */
 #define MNTOPT_WSYNC    "wsync"         /* safe-mode nfs compatible mount */
-#define MNTOPT_NOATIME  "noatime"       /* don't modify access times on reads */
 #define MNTOPT_INO64    "ino64"         /* force inodes into 64-bit range */
 #define MNTOPT_NOALIGN  "noalign"       /* turn off stripe alignment */
 #define MNTOPT_SUNIT    "sunit"         /* data volume stripe unit */
@@ -89,15 +88,12 @@ static struct export_operations linvfs_export_ops;
 #define MNTOPT_OSYNCISOSYNC "osyncisosync" /* o_sync is REALLY o_sync */
 #define MNTOPT_QUOTA    "quota"         /* disk quotas */
 #define MNTOPT_MRQUOTA  "mrquota"       /* don't turnoff if SB has quotas on */
-#define MNTOPT_NOSUID   "nosuid"        /* disallow setuid program execution */
 #define MNTOPT_NOQUOTA  "noquota"       /* no quotas */
 #define MNTOPT_UQUOTA   "usrquota"      /* user quota enabled */
 #define MNTOPT_GQUOTA   "grpquota"      /* group quota enabled */
 #define MNTOPT_UQUOTANOENF "uqnoenforce"/* user quota limit enforcement */
 #define MNTOPT_GQUOTANOENF "gqnoenforce"/* group quota limit enforcement */
 #define MNTOPT_QUOTANOENF  "qnoenforce" /* same as uqnoenforce */
-#define MNTOPT_RO       "ro"            /* read only */
-#define MNTOPT_RW       "rw"            /* read/write */
 #define MNTOPT_NOUUID   "nouuid"	/* Ignore FS uuid */
 #define MNTOPT_IRIXSGID "irixsgid"	/* Irix-style sgid inheritance */
 #define MNTOPT_NOLOGFLUSH	"nologflush"	/* Don't use hard flushes in log writing */
@@ -122,11 +118,8 @@ xfs_parseargs(
 	args->mtpt[0] = '\0';
 
 	/* Copy the already-parsed mount(2) flags we're interested in */
-	args->flags = flags & MS_RDONLY;
 	if (flags & MS_NOATIME)
 		args->flags |= XFSMNT_NOATIME;
-
-	args->flags |= XFSMNT_32BITINODES;
 
 	if (!options) {
 		args->logbufs = logbufs;
@@ -190,10 +183,9 @@ xfs_parseargs(
 			args->iosizelog = (uint8_t) iosize;
 		} else if (!strcmp(this_char, MNTOPT_WSYNC)) {
 			args->flags |= XFSMNT_WSYNC;
-		} else if (!strcmp(this_char, MNTOPT_NOATIME)) {
-			args->flags |= XFSMNT_NOATIME;
 		} else if (!strcmp(this_char, MNTOPT_OSYNCISDSYNC)) {
 			/* no-op, this is now the default */
+printk("XFS: osyncisdsync is now the default, and will soon be deprecated.\n");
 		} else if (!strcmp(this_char, MNTOPT_OSYNCISOSYNC)) {
 			args->flags |= XFSMNT_OSYNCISOSYNC;
 		} else if (!strcmp(this_char, MNTOPT_NORECOVERY)) {
@@ -228,10 +220,6 @@ xfs_parseargs(
 			dsunit = simple_strtoul(value, &eov, 10);
 		} else if (!strcmp(this_char, MNTOPT_SWIDTH)) {
 			dswidth = simple_strtoul(value, &eov, 10);
-		} else if (!strcmp(this_char, MNTOPT_RO)) {
-			args->flags |= MS_RDONLY;
-		} else if (!strcmp(this_char, MNTOPT_NOSUID)) {
-			args->flags |= MS_NOSUID;
 		} else if (!strcmp(this_char, MNTOPT_NOUUID)) {
 			args->flags |= XFSMNT_NOUUID; 
 		} else if (!strcmp(this_char, MNTOPT_IRIXSGID)) {
@@ -245,7 +233,7 @@ xfs_parseargs(
 	}
 
 	if (args->flags & XFSMNT_NORECOVERY) {
-		if ((args->flags & MS_RDONLY) == 0) {
+		if ((flags & MS_RDONLY) == 0) {
 			printk("XFS: no-recovery mounts must be read-only.\n");
 			return rval;
 		}
@@ -695,22 +683,30 @@ linvfs_remount(
 {
 	struct xfs_args	args;
 	vfs_t		*vfsp;
+	xfs_mount_t	*mp;
 
 	vfsp = LINVFS_GET_VFS(sb);
+	mp = XFS_BHVTOM(vfsp->vfs_fbhv);
+
+	if (xfs_parseargs(options, *flags, &args))
+		return -EINVAL;
+
+	if (args.flags & XFSMNT_NOATIME)
+		mp->m_flags |= XFS_MOUNT_NOATIME;
+	else
+		mp->m_flags &= ~XFS_MOUNT_NOATIME;
+
+	linvfs_write_super(sb);
 
 	if ((*flags & MS_RDONLY) == (sb->s_flags & MS_RDONLY))
 		return 0;
 
-	if (xfs_parseargs(options, *flags, &args))
-                return -EINVAL;
-
-	if (*flags & MS_RDONLY || args.flags & MS_RDONLY) {
+	if (*flags & MS_RDONLY) {
 		sb->s_flags |= MS_RDONLY;
 		XFS_log_write_unmount_ro(vfsp->vfs_fbhv);
 		vfsp->vfs_flag |= VFS_RDONLY;
 	} else {
 		vfsp->vfs_flag &= ~VFS_RDONLY;
-		sb->s_flags &= ~MS_RDONLY;
 	}
 
 	return 0;
