@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_AG_H
 #define	_FS_XFS_AG_H
 
-#ident	"$Revision: 1.23 $"
+#ident	"$Revision: 1.24 $"
 
 /*
  * Allocation group header
@@ -13,6 +13,12 @@
 #define	XFS_AGI_MAGIC	0x58414749	/* 'XAGI' */
 #define	XFS_AGF_VERSION	1
 #define	XFS_AGI_VERSION	1
+
+/*
+ * Btree number 0 is bno, 1 is cnt.  This value gives the size of the
+ * arrays below.
+ */
+#define	XFS_BTNUM_AGF	((int)XFS_BTNUM_CNTi + 1)
 
 /*
  * The second word of agf_levels in the first a.g. overlaps the EFS
@@ -32,8 +38,10 @@ typedef struct xfs_agf
 	/*
 	 * Freespace information
 	 */
-	xfs_agblock_t	agf_roots[XFS_BTNUM_MAX - 1];	/* root blocks */
-	__uint32_t	agf_levels[XFS_BTNUM_MAX - 1];	/* btree levels */
+	xfs_agblock_t	agf_roots[XFS_BTNUM_AGF];	/* root blocks */
+	__uint32_t	agf_spare0;	/* spare field */
+	__uint32_t	agf_levels[XFS_BTNUM_AGF];	/* btree levels */
+	__uint32_t	agf_spare1;	/* spare field */
 	__uint32_t	agf_flfirst;	/* first freelist block's index */
 	__uint32_t	agf_fllast;	/* last freelist block's index */
 	__uint32_t	agf_flcount;	/* count of blocks in freelist */
@@ -129,7 +137,7 @@ typedef struct xfs_perag
 {
 	char		pagf_init;	/* this agf's entry is initialized */
 	char		pagi_init;	/* this agi's entry is initialized */
-	char		pagf_levels[XFS_BTNUM_MAX - 1];
+	char		pagf_levels[XFS_BTNUM_AGF];
 					/* # of levels in bno & cnt btree */
 	__uint32_t	pagf_flcount;	/* count of blocks in freelist */
 	xfs_extlen_t	pagf_freeblks;	/* total free blocks */
