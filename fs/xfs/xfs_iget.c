@@ -1,4 +1,4 @@
-#ident "$Revision: 1.59 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -9,6 +9,7 @@
 #include <sys/buf.h>
 #include <sys/sysmacros.h>
 #include <sys/vnode.h>
+#include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/sysinfo.h>
 #include <sys/ksa.h>
@@ -16,7 +17,6 @@
 #undef _KERNEL
 #endif
 #include <sys/debug.h>
-#include <sys/uuid.h>
 #include <sys/kmem.h>
 #ifndef SIM
 #include <sys/systm.h>
