@@ -1058,23 +1058,8 @@ int xfs_ioctl (
 
 	case XFS_IOC_GETFSUUID: {
 
-		char	uuidbuf[UUID_STR_LEN + 1];
-		uint_t	status;
-		char	*p;
-
-		uuidbuf[0] = '\0';
-		p = uuidbuf;
-		status = uuid_s_ok;
-
-		uuid_to_string(&mp->m_sb.sb_uuid, &p, &status);
-
-		if (status != uuid_s_ok)
-			return -XFS_ERROR(EINVAL);
-
-		return copy_to_user((char *)arg,
-				    uuidbuf,
-				    (UUID_STR_LEN + 1) * sizeof(char));
-		
+		return copy_to_user((char *)arg, (char *)&mp->m_sb.sb_uuid,
+						sizeof(uuid_t));
 	}
 
 	default:
