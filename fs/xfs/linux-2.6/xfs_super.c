@@ -36,6 +36,7 @@
 #include <linux/blkdev.h>
 #include <linux/namei.h>
 #include <linux/init.h>
+#include <linux/ctype.h>
 
 /* xfs_vfs[ops].c */
 extern int  xfs_init(int fstype);
@@ -89,7 +90,8 @@ static struct export_operations linvfs_export_ops;
 #define MNTOPT_QUOTANOENF  "qnoenforce" /* same as uqnoenforce */
 #define MNTOPT_NOUUID	"nouuid"	/* Ignore FS uuid */
 #define MNTOPT_IRIXSGID "irixsgid"	/* Irix-style sgid inheritance */
-#define MNTOPT_NOLOGFLUSH	"nologflush"	/* Don't use hard flushes in log writing */
+#define MNTOPT_NOLOGFLUSH  "nologflush"	/* Don't use hard flushes in
+					   log writing */
 #define MNTOPT_MTPT	"mtpt"		/* filesystem mount point */
 
 STATIC int
@@ -127,33 +129,17 @@ xfs_parseargs(
 			*value++ = 0;
 
 		if (!strcmp(this_char, MNTOPT_LOGBUFS)) {
-			if (!strcmp(value, "none")) {
-				logbufs = 0;
-				printk(
-				"XFS: this FS is trash after writing to it\n");
-			} else {
-				logbufs = simple_strtoul(value, &eov, 10);
-				if (logbufs < XLOG_NUM_ICLOGS ||
-				    logbufs > XLOG_MAX_ICLOGS) {
-					printk(
-					"XFS: Illegal logbufs: %d [not %d-%d]\n",
-						logbufs, XLOG_NUM_ICLOGS,
-						XLOG_MAX_ICLOGS);
-					return rval;
-				}
-			}
+			logbufs = simple_strtoul(value, &eov, 10);
 		} else if (!strcmp(this_char, MNTOPT_LOGBSIZE)) {
-			logbufsize = simple_strtoul(value, &eov, 10);
-			if (logbufsize != 16*1024 &&
-			    logbufsize != 32*1024 &&
-			    logbufsize != 64*1024 &&
-			    logbufsize != 128*1024 &&
-			    logbufsize != 256*1024) {
-				printk(
-			"XFS: Illegal logbufsize: %d [not 16k,32k,64k,128k or 256k]\n",
-					logbufsize);
-				return rval;
+			int in_kilobytes = 0;
+
+			if (toupper(value[strlen(value)-1]) == 'K') {
+				in_kilobytes = 1;
+				value[strlen(value)-1] = '\0';
 			}
+			logbufsize = simple_strtoul(value, &eov, 10);
+			if (in_kilobytes)
+				logbufsize = logbufsize * 1024;
 		} else if (!strcmp(this_char, MNTOPT_LOGDEV)) {
 			strncpy(args->logname, value, MAXNAMELEN);
 		} else if (!strcmp(this_char, MNTOPT_MTPT)) {
@@ -173,12 +159,6 @@ xfs_parseargs(
 			strncpy(args->rtname, value, MAXNAMELEN);
 		} else if (!strcmp(this_char, MNTOPT_BIOSIZE)) {
 			iosize = simple_strtoul(value, &eov, 10);
-			if (iosize > 255 || iosize <= 0) {
-				printk(
-			"XFS: biosize value %d is out of bounds [0-255]\n",
-					iosize);
-				return rval;
-			}
 			args->flags |= XFSMNT_IOSIZE;
 			args->iosizelog = (uint8_t) iosize;
 		} else if (!strcmp(this_char, MNTOPT_WSYNC)) {
