@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_BTREE_H
 #define	_FS_XFS_BMAP_BTREE_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.39 $"
 
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 
@@ -33,6 +33,7 @@ typedef struct xfs_bmdr_block
  *  l0:0-8 and l1:21-63 are startblock.
  *  l1:0-20 are blockcount.
  */
+#ifndef __linux__
 #define	BMBT_TOTAL_BITLEN	128	/* 128 bits, 16 bytes */
 #define	BMBT_EXNTFLAG_BITOFF	0
 #define	BMBT_EXNTFLAG_BITLEN	1
@@ -43,6 +44,17 @@ typedef struct xfs_bmdr_block
 #define	BMBT_BLOCKCOUNT_BITOFF	\
 	(BMBT_STARTBLOCK_BITOFF + BMBT_STARTBLOCK_BITLEN)
 #define	BMBT_BLOCKCOUNT_BITLEN	(BMBT_TOTAL_BITLEN - BMBT_BLOCKCOUNT_BITOFF)
+#else /* linux */
+#define	BMBT_TOTAL_BITLEN	128	/* 128 bits, 16 bytes */
+#define	BMBT_EXNTFLAG_BITOFF	63
+#define	BMBT_EXNTFLAG_BITLEN	1
+#define	BMBT_STARTOFF_BITOFF	(BMBT_EXNTFLAG_BITOFF - BMBT_STARTOFF_BITLEN)
+#define	BMBT_STARTOFF_BITLEN	54
+#define	BMBT_STARTBLOCK_BITOFF	85 /* 128 - 43 (other 9 is in first word) */
+#define	BMBT_STARTBLOCK_BITLEN	52
+#define	BMBT_BLOCKCOUNT_BITOFF	64 /* Start of second 64 bit container */
+#define	BMBT_BLOCKCOUNT_BITLEN	21
+#endif /* linux */
 
 #define	BMBT_USE_64	(_MIPS_SIM == _ABI64 || _MIPS_SIM == _ABIN32)
 
