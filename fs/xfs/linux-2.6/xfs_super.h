@@ -80,24 +80,7 @@
 	((s)->u.generic_sbp = vfsp)
 
 
-struct buftarg;
 struct xfs_mount_args;
-
-extern int
-linvfs_fill_buftarg(
-	struct buftarg	*btp,
-	dev_t		dev,
-	struct super_block *sb,
-	int		data);
-
-extern void
-linvfs_bsize_buftarg(
-	struct buftarg	*btp,
-	unsigned int	bsize);
-
-extern void
-linvfs_release_buftarg(
-	struct buftarg	*btp);
 
 extern void
 linvfs_set_inode_ops(

@@ -1052,8 +1052,8 @@ _xfs_imap_to_bmap(
 
 	for (im=0, pbm=0; im < imaps && pbm < pbmaps; im++,pbmapp++,imap++,pbm++) {
 		pbmapp->pbm_target = io->io_flags & XFS_IOCORE_RT ?
-			mp->m_rtdev_targ.pb_targ :
-			mp->m_ddev_targ.pb_targ;
+			mp->m_rtdev_targp :
+			mp->m_ddev_targp;
 		pbmapp->pbm_offset = XFS_FSB_TO_B(mp, imap->br_startoff);
 		pbmapp->pbm_delta = offset - pbmapp->pbm_offset;
 		pbmapp->pbm_bsize = XFS_FSB_TO_B(mp, imap->br_blockcount);
@@ -1255,8 +1255,8 @@ xfs_write_bmap(
 		pbmapp->pbm_flags = PBMF_DELAY;
 	}
 	pbmapp->pbm_target = io->io_flags & XFS_IOCORE_RT ?
-		mp->m_rtdev_targ.pb_targ :
-		mp->m_ddev_targ.pb_targ;
+		mp->m_rtdev_targp :
+		mp->m_ddev_targp;
 	length = iosize;
 
 	/*
@@ -1744,9 +1744,9 @@ xfsbdstrat(
 
 
 void
-XFS_bflush(buftarg_t target)
+XFS_bflush(xfs_buftarg_t *target)
 {
-	pagebuf_delwri_flush(target.pb_targ, PBDF_WAIT, NULL);
+	pagebuf_delwri_flush(target, PBDF_WAIT, NULL);
 }
 
 
@@ -1763,12 +1763,12 @@ XFS_log_write_unmount_ro(bhv_desc_t	*bdp)
 
 	mp = XFS_BHVTOM(bdp);
 	xfs_refcache_purge_mp(mp);
-	xfs_binval(mp->m_ddev_targ);
+	xfs_binval(mp->m_ddev_targp);
 
 	do {
 		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
 		VFS_SYNC(XFS_MTOVFS(mp), SYNC_ATTR|SYNC_WAIT, NULL, error);
-		pagebuf_delwri_flush(mp->m_ddev_targ.pb_targ,
+		pagebuf_delwri_flush(mp->m_ddev_targp,
 				PBDF_WAIT, &pincount);
 		if (pincount == 0) {delay(50); count++;}
 	}  while (count < 2);
@@ -1785,8 +1785,8 @@ XFS_log_write_unmount_ro(bhv_desc_t	*bdp)
 STATIC int
 xfs_is_read_only(xfs_mount_t *mp)
 {
-	if (bdev_read_only(mp->m_ddev_targ.bd_targ) ||
-	    bdev_read_only(mp->m_logdev_targ.bd_targ)) {
+	if (bdev_read_only(mp->m_ddev_targp->pbr_bdev) ||
+	    bdev_read_only(mp->m_logdev_targp->pbr_bdev)) {
 		cmn_err(CE_NOTE,
 			"XFS: write access unavailable, cannot proceed.");
 		return EROFS;

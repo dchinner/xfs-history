@@ -141,6 +141,7 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 
 typedef struct pb_target {
 	int			pbr_flags;
+	dev_t			pbr_dev;
 	struct block_device	*pbr_bdev;
 	struct address_space	*pbr_mapping;
 	unsigned int		pbr_blocksize;

@@ -318,45 +318,6 @@ spectodevs(
 	return rval;
 }
 
-/*
- * Initialise a device forming part of a filessystem.
- *
- * This is likely to go away.  Keep the unused data argument for now..
- */
-int
-linvfs_fill_buftarg(
-	struct buftarg		*btp,
-	dev_t			dev,
-	struct super_block	*sb,
-	int			data)
-{
-	btp->pb_targ = pagebuf_lock_enable(dev, sb);
-	btp->dev = dev;
-
-	if (unlikely(!btp->pb_targ))
-		return -ENOMEM;
-	return 0;
-}
-
-void
-linvfs_bsize_buftarg(
-	struct buftarg		*btp,
-	unsigned int		blocksize)
-{
-	pagebuf_target_blocksize(btp->pb_targ, blocksize);
-}
-
-void
-linvfs_release_buftarg(
-	struct buftarg		*btp)
-{
-	struct pb_target	*target = btp->pb_targ;
-
-	if (target) {
-		pagebuf_delwri_flush(target, PBDF_WAIT, NULL);
-		pagebuf_lock_disable(target);
-	}
-}
 
 static kmem_cache_t * linvfs_inode_cachep;
 
