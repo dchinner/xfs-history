@@ -1,4 +1,4 @@
-#ident "$Revision: 1.151 $"
+#ident "$Revision: 1.152 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -379,7 +379,7 @@ xfs_iformat(
 		XFS_IFORK_ASIZE(ip) / sizeof(xfs_bmbt_rec_t);
 	switch (dip->di_core.di_aformat) {
 	case XFS_DINODE_FMT_LOCAL:
-		atp = (xfs_attr_shortform_t *)XFS_DFORK_PTR(dip, XFS_ATTR_FORK);
+		atp = (xfs_attr_shortform_t *)XFS_DFORK_APTR(dip);
 		size = (int)atp->hdr.totsize;
 		xfs_iformat_local(ip, dip, XFS_ATTR_FORK, size);
 		break;

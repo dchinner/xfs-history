@@ -162,10 +162,10 @@ typedef enum xfs_dinode_fmt
  */
 #define	XFS_DFORK_Q(dip)	XFS_CFORK_Q(&dip->di_core)
 #define	XFS_DFORK_BOFF(dip)	XFS_CFORK_BOFF(&(dip)->di_core)
+#define	XFS_DFORK_DPTR(dip)	((dip)->di_u.di_c)
+#define	XFS_DFORK_APTR(dip)	((dip)->di_u.di_c + XFS_DFORK_BOFF(dip))
 #define	XFS_DFORK_PTR(dip,w)	\
-	((w) == XFS_DATA_FORK ? \
-		(dip)->di_u.di_c : \
-		(dip)->di_u.di_c + XFS_DFORK_BOFF(dip))
+	((w) == XFS_DATA_FORK ? XFS_DFORK_DPTR(dip) : XFS_DFORK_APTR(dip))
 #define	XFS_CFORK_FORMAT(dcp,w) \
 	((w) == XFS_DATA_FORK ? (dcp)->di_format : (dcp)->di_aformat)
 #define	XFS_CFORK_FMT_SET(dcp,w,n) \

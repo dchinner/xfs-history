@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.60 $"
+#ident	"$Revision: 1.62 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1893,14 +1893,14 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		switch (in_f->ilf_fields & XFS_ILOG_DFORK) {
 		case XFS_ILOG_DDATA:
 		case XFS_ILOG_DEXT:
-			dest = XFS_DFORK_PTR(dip, XFS_ATTR_FORK);
+			dest = XFS_DFORK_APTR(dip);
 			ASSERT(dest+len <= bp->b_dmaaddr+bp->b_bcount);
 			ASSERT(len < XFS_DFORK_ASIZE(dip, mp));
 			bcopy(src, dest, len);
 			break;
 
 		case XFS_ILOG_DBROOT:
-			dest = XFS_DFORK_PTR(dip, XFS_ATTR_FORK);
+			dest = XFS_DFORK_APTR(dip);
 			xfs_bmbt_to_bmdr((xfs_bmbt_block_t *)src, len,
 					 (xfs_bmdr_block_t*)dest,
 					 XFS_DFORK_ASIZE(dip, mp));
