@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_BTREE_H
 #define	_FS_XFS_DIR_BTREE_H
 
-#ident	"$Revision: 1.8 $"
+#ident	"$Revision: 1.9 $"
 
 /*
  * xfs_dir_btree.h
@@ -56,11 +56,10 @@ struct xfs_dir_state {
 /*
  * Utility macros to aid in logging changed structure fields.
  */
-#define XFS_DIR_LOGSTART(BASE, FIELD)	((char *)&(FIELD) - (char *)(BASE))
-#define XFS_DIR_LOGSIZE(FIELD)		sizeof(FIELD)
-#define XFS_DIR_LOGRANGE(B1, F1, F2)	( XFS_DIR_LOGSTART(B1, F2) + \
-					  XFS_DIR_LOGSIZE(F2) - \
-					  XFS_DIR_LOGSTART(B1, F1) )
+#define XFS_DIR_LOGOFF(BASE, ADDR)	((char *)(ADDR) - (char *)(BASE))
+#define XFS_DIR_LOGRANGE(BASE, ADDR, SIZE)	\
+					XFS_DIR_LOGOFF(BASE, ADDR), \
+					XFS_DIR_LOGOFF(BASE, ADDR)+(SIZE)-1
 
 /*========================================================================
  * Function prototypes for the kernel.
