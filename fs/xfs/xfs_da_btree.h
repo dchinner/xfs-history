@@ -103,9 +103,15 @@ typedef struct xfs_da_args {
 	struct xfs_bmap_free *flist;	/* ptr to freelist for bmap_finish */
 	xfs_extlen_t	total;		/* total blocks needed, for 1st bmap */
 	int		whichfork;	/* data or attribute fork */
-	int		aleaf_blkno;	/* blkno of attr leaf of interest */
-	int		aleaf_index;	/* index of attr of interest in blk */
-	int		aleaf_rmtblkno;	/* remote attr value starting blkno */
+	int		blkno;		/* blkno of attr leaf of interest */
+	int		index;		/* index of attr of interest in blk */
+	int		rmtblkno;	/* remote attr value starting blkno */
+	int		rmtblkcnt;	/* remote attr value block count */
+	int		rename;		/* T/F: this is an atomic rename op */
+	int		blkno2;		/* blkno of 2nd attr leaf of interest */
+	int		index2;		/* index of 2nd attr in blk */
+	int		rmtblkno2;	/* remote attr value starting blkno */
+	int		rmtblkcnt2;	/* remote attr value block count */
 } xfs_da_args_t;
 
 /*
@@ -122,10 +128,12 @@ typedef struct xfs_da_state_blk {
 	uint		hashval;	/* last hash value in block */
 	int		magic;		/* blk's magic number, ie: blk type */
 } xfs_da_state_blk_t;
+
 typedef struct xfs_da_state_path {
 	int			active;		/* number of active levels */
 	struct xfs_da_state_blk	blk[XFS_DA_NODE_MAXDEPTH];
 } xfs_da_state_path_t;
+
 typedef struct xfs_da_state {
 	struct xfs_da_args	 *args;		/* filename arguments */
 	struct xfs_mount	 *mp;		/* filesystem mount point */
@@ -168,7 +176,6 @@ void	xfs_da_fixhashpath(struct xfs_da_state *state,
  * Routines used for finding things in the Btree.
  */
 int	xfs_da_node_lookup_int(struct xfs_da_state *state, int *result);
-int	xfs_da_node_getvalue(struct xfs_da_state *state);
 int	xfs_da_path_shift(struct xfs_da_state *state,
 				 struct xfs_da_state_path *path,
 				 int forward, int release, int *result);
