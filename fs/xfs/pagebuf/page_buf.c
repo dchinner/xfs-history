@@ -512,9 +512,7 @@ _pagebuf_lookup_pages(
 			pb->pb_pages[pi] = cp;
 		} else {
 			cp = pb->pb_pages[pi];
-			while (TryLockPage(cp)) {
-				___wait_on_page(cp);
-			}
+			lock_page(cp);
 		}
 
 		/* Test for the page being valid. There is a special case
