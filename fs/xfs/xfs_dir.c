@@ -1454,7 +1454,8 @@ xfs_dir_shrink_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
 	int done;
 
 	dp = args->dp;
-	*(args->firstblock) = xfs_bunmapi(trans, dp, dead_blkno, 1, 1,
+	*(args->firstblock) = xfs_bunmapi(trans, dp, dead_blkno, 1,
+					 XFS_BMAPI_METADATA, 1,
 					 *(args->firstblock), args->flist,
 					 &done);
 	ASSERT(done);

@@ -671,6 +671,29 @@ xfs_itruncate_finish(
 	ntp = *tp;
 	mp = (ntp)->t_mountp;
 	first_unmap_block = XFS_B_TO_FSB(mp, new_size);
+
+	/*
+	 * The first thing we do is set the size to new_size permanently
+	 * on disk.  This way we don't have to worry about anyone ever
+	 * being able to look at the data being freed even in the face
+	 * of a crash.  What we're getting around here is the case where
+	 * we free a block, it is allocated to another file, it is written
+	 * to, and then we crash.  If the new data gets written to the
+	 * file but the log buffers containing the free and reallocation
+	 * don't, then we'd end up with garbage in the blocks being freed.
+	 * As long as we make the new_size permanent before actually
+	 * freeing any blocks it doesn't matter if they get writtten to.
+	 *
+	 * We actually only do this if there are blocks in the file.
+	 * We could restrict it even more if we wanted to check to see
+	 * if we'll actually be freeing any of them, but the common case
+	 * is to free them all so the check is not worth the expense.
+	 */
+	if (ip->i_d.di_nblocks > 0) {
+		ip->i_d.di_size = new_size;
+		xfs_trans_set_sync(ntp);
+	}
+
 	/*
 	 * Since it is possible for space to become allocated beyond
 	 * the end of the file (in a crash where the space is allocated
@@ -690,7 +713,8 @@ xfs_itruncate_finish(
 		 */
 		XFS_BMAP_INIT(&free_list, &first_block);
 		first_block = xfs_bunmapi(ntp, ip, first_unmap_block,
-					  unmap_len, XFS_ITRUNC_MAX_EXTENTS,
+					  unmap_len, 0,
+					  XFS_ITRUNC_MAX_EXTENTS,
 					  first_block, &free_list, &done);
 
 		/*
