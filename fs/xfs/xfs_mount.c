@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.136 $"
+#ident	"$Revision: 1.137 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -629,7 +629,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 			xfs_mount_reset_sbqflags(mp);
 	}
 
-#ifdef DEBUG
+#if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
 	if (! (XFS_IS_QUOTA_ON(mp))) {
 		cmn_err(CE_NOTE, "Disk quotas not turned on: %s", mp->m_fsname);
 	} else {
