@@ -4,6 +4,7 @@
 #include "xfs_ag.h"
 #include "xfs_alloc.h"
 #include "xfs_ialloc.h"
+#include "xfs_dinode.h"
 #include "xfs_mount.h"
 #include "sim.h"
 #include <sys/stat.h>
@@ -1280,9 +1281,10 @@ xfs_ialloc_ag_alloc(xfs_ialloc_cur_t *cur)
 	for (j = newblocks - 1; j >= 0; j--) {
 		fbuf = xfs_ialloc_bread(tp, agp->xfsag_seqno, newbno + j);
 		for (i = inopb - 1; i >= 0; i--) {
-			free = xfs_make_iptr(sbp, fbuf, i);
-			free->i_mode = 0;
-			free->i_next = agp->xfsag_iflist;
+			free = (xfs_inode_free_t *)xfs_make_iptr(sbp, fbuf, i);
+			free->di_magic = XFS_DINODE_MAGIC;
+			free->di_mode = free->di_nlink = 0;
+			free->di_next = agp->xfsag_iflist;
 			first = (caddr_t)free - (caddr_t)xfs_buf_to_iblock(fbuf);
 			last = first + sizeof(xfs_inode_free_t) - 1;
 			xfs_trans_log_buf(tp, fbuf, first, last);
@@ -1402,6 +1404,7 @@ xfs_ialloc(xfs_trans_t *tp, xfs_ino_t parent, int sameag, int mode)
 	int first;
 	xfs_inode_free_t *free;
 	xfs_ino_t ino;
+	xfs_dinode_t *ip;
 	int last;
 	xfs_mount_t *mp;
 	int off;
@@ -1437,12 +1440,16 @@ xfs_ialloc(xfs_trans_t *tp, xfs_ino_t parent, int sameag, int mode)
 	xfs_ialloc_ag_locate(cur, agino, &agbno, &off);
 	xfs_ialloc_del_cursor(cur);
 	fbuf = xfs_ialloc_bread(tp, agno, agbno);
-	free = xfs_make_iptr(sbp, fbuf, off);
-	ASSERT(free->i_mode == 0);
-	agp->xfsag_iflist = free->i_next;
-	free->i_mode = mode;
-	first = (caddr_t)&free->i_mode - (caddr_t)xfs_buf_to_iblock(fbuf);
-	last = first + sizeof(free->i_mode) - 1;
+	free = (xfs_inode_free_t *)xfs_make_iptr(sbp, fbuf, off);
+	ASSERT(free->di_mode == 0);
+	ASSERT(free->di_magic == XFS_DINODE_MAGIC);
+	agp->xfsag_iflist = free->di_next;
+	ip = (xfs_dinode_t *)free;
+	ip->di_mode = mode;
+	ip->di_version = XFS_DINODE_VERSION;
+	first = (caddr_t)&ip->di_mode - (caddr_t)xfs_buf_to_dinode(fbuf);
+	last = (caddr_t)&ip->di_version - (caddr_t)xfs_buf_to_dinode(fbuf) +
+		sizeof(ip->di_version) - 1;
 	xfs_trans_log_buf(tp, fbuf, first, last);
 	agp->xfsag_ifcount--;
 	first = offsetof(xfs_aghdr_t, xfsag_ifcount);
@@ -1477,8 +1484,8 @@ xfs_ialloc_next_free(xfs_trans_t *tp, buf_t *agbuf, xfs_agino_t agino)
 	mp = tp->t_mountp;
 	sbp = mp->m_sb;
 	fbuf = xfs_ialloc_bread(tp, agno, agbno);
-	free = xfs_make_iptr(sbp, fbuf, off);
-	agino = free->i_next;
+	free = (xfs_inode_free_t *)xfs_make_iptr(sbp, fbuf, off);
+	agino = free->di_next;
 	return agino;
 }
 
@@ -1494,6 +1501,7 @@ xfs_ifree(xfs_trans_t *tp, xfs_ino_t inode)
 	buf_t *fbuf;
 	int first;
 	xfs_inode_free_t *free;
+	xfs_dinode_t *ip;
 	int last;
 	xfs_mount_t *mp;
 	int off;
@@ -1513,12 +1521,15 @@ xfs_ifree(xfs_trans_t *tp, xfs_ino_t inode)
 	xfs_ialloc_ag_locate(cur, agino, &agbno, &off);
 	xfs_ialloc_del_cursor(cur);
 	fbuf = xfs_ialloc_bread(tp, agno, agbno);
-	free = xfs_make_iptr(sbp, fbuf, off);
-	ASSERT(free->i_mode);
-	free->i_mode = 0;
-	free->i_next = agp->xfsag_iflist;
-	first = (caddr_t)free - (caddr_t)xfs_buf_to_iblock(fbuf);
-	last = first + sizeof(*free) - 1;
+	ip = xfs_make_iptr(sbp, fbuf, off);
+	ASSERT(ip->di_magic == XFS_DINODE_MAGIC);
+	ASSERT(ip->di_mode);
+	ip->di_mode = 0;
+	free = (xfs_inode_free_t *)ip;
+	free->di_next = agp->xfsag_iflist;
+	first = (caddr_t)&free->di_mode - (caddr_t)xfs_buf_to_dinode(fbuf);
+	last = (caddr_t)&free->di_next - (caddr_t)xfs_buf_to_dinode(fbuf) +
+		sizeof(free->di_next) - 1;
 	xfs_trans_log_buf(tp, fbuf, first, last);
 	agp->xfsag_iflist = agino;
 	agp->xfsag_ifcount++;
