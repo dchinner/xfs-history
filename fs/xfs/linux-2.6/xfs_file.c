@@ -255,7 +255,6 @@ STATIC int linvfs_readdir(
 	uio.uio_offset = filp->f_pos;
 	uio.uio_segflg = UIO_USERSPACE;
 	uio.uio_resid = 0;
-	uio.uio_limit = PAGE_SIZE;	/* JIMJIM OK for now? */
 
 	VOP_READDIR(vp, &uio, &cred, &eof, error);
 	filp->f_pos = uio.uio_offset;

@@ -703,11 +703,6 @@ xfs_readlink_by_handle(
 
 	auio.uio_iov	= &aiov;
 	auio.uio_iovcnt	= 1;
-	auio.uio_pmp	= NULL;
-
-	auio.uio_readiolog	= 0;
-	auio.uio_writeiolog	= 0;
-
 	auio.uio_fmode	= FINVIS;
 	auio.uio_offset	= 0;
 	auio.uio_segflg	= UIO_USERSPACE;
