@@ -8,11 +8,11 @@
 #define _KERNEL 1
 #endif
 #include <sys/param.h>
+#include <sys/buf.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
 #include <sys/errno.h>
-#include <sys/buf.h>
 #include <sys/vnode.h>
 #include <sys/kmem.h>
 #include <sys/dirent.h>

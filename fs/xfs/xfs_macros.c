@@ -1,12 +1,18 @@
-#ident	"$Revision$"
+#ident	"$Revision: 1.1 $"
 
 #define	XFS_MACRO_C
 
+#ifdef SIM
+#define _KERNEL 1
+#endif
 #include <sys/param.h>
 #include <sys/buf.h>
-#include <sys/debug.h>
 #include <sys/sema.h>
+#ifdef SIM
+#undef _KERNEL
+#endif
 #include <sys/vfs.h>
+#include <sys/debug.h>
 #include <sys/vnode.h>
 #include "xfs_macros.h"
 #include "xfs_types.h"
