@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.207 $"
+#ident  "$Revision: 1.208 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -2105,9 +2105,13 @@ xfs_sync(
 				 * Drop the inode lock since we can't hold it
 				 * across calls to the buffer cache.
 				 */
-				xfs_iunlock(ip, XFS_ILOCK_SHARED);
-				pdflush(vp, B_DELWRI);
-				xfs_ilock(ip, XFS_ILOCK_SHARED);
+
+				ASSERT(vp->v_type == VREG);
+				if (vp->v_type == VREG) {
+					xfs_iunlock(ip, XFS_ILOCK_SHARED);
+					pdflush(vp, B_DELWRI);
+					xfs_ilock(ip, XFS_ILOCK_SHARED);
+				}
 			}
 
 		} else if (flags & SYNC_BDFLUSH) {
