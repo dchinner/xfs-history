@@ -192,8 +192,8 @@ extern void xfs_iocore_inode_reinit(struct xfs_inode *);
  * file system to hash the inodes for that file system.
  */
 typedef struct xfs_ihash {
-	struct xfs_inode	*ih_next;
-	mrlock_t		ih_lock;
+	struct xfs_inode	*ih_next;	
+	rwlock_t		ih_lock;
 	uint			ih_version;
 } xfs_ihash_t;
 #if defined(MP)

@@ -50,7 +50,7 @@ xfs_ihash_init(xfs_mount_t *mp)
 				      * sizeof(xfs_ihash_t), KM_SLEEP);
 	ASSERT(mp->m_ihash != NULL);
 	for (i = 0; i < mp->m_ihsize; i++) {
-		mrlock_init(&(mp->m_ihash[i].ih_lock), MRLOCK_BARRIER, "xfshash", i);
+		rwlock_init(&(mp->m_ihash[i].ih_lock));
 	}
 }
 
@@ -62,8 +62,6 @@ xfs_ihash_free(xfs_mount_t *mp)
 {
 	int	i;
 
-	for (i = 0; i < mp->m_ihsize; i++)
-		mrfree(&mp->m_ihash[i].ih_lock);
 	kmem_free(mp->m_ihash, mp->m_ihsize*sizeof(xfs_ihash_t));
 	mp->m_ihash = NULL;
 }
@@ -191,7 +189,7 @@ xfs_iget_core(
 	ih = XFS_IHASH(mp, ino);
 
 again:
-	mraccess(&ih->ih_lock);
+	read_lock(&ih->ih_lock);
 
 	for (ip = ih->ih_next; ip != NULL; ip = ip->i_next) {
 		if (ip->i_ino == ino) {
@@ -200,7 +198,7 @@ again:
 
 			if (inode_vp == NULL) {
 				if (ip->i_flags & XFS_IRECLAIM) {
-					mrunlock(&ih->ih_lock);
+					read_unlock(&ih->ih_lock);
 					delay(1);
 					XFS_STATS_INC(xfsstats.xs_ig_frecycle);
 
@@ -219,14 +217,14 @@ again:
 
 				XFS_STATS_INC(xfsstats.xs_ig_found);
 
-				mrunlock(&ih->ih_lock);
+				read_unlock(&ih->ih_lock);
 				goto finish_inode;
 
 			} else if (vp != inode_vp) {
 				struct inode *inode = LINVFS_GET_IP(inode_vp);
 
 				if (inode->i_state & (I_FREEING | I_CLEAR)) {
-					mrunlock(&ih->ih_lock);
+					read_unlock(&ih->ih_lock);
 					delay(1);
 					XFS_STATS_INC(xfsstats.xs_ig_frecycle);
 
@@ -242,28 +240,7 @@ again:
 				BUG();
 			}
 
-			/*
-			 * Inode cache hit: if ip is not at the front of
-			 * its hash chain, move it there now.
-			 * Do this with the lock held for update, but
-			 * do statistics after releasing the lock.
-			 */
-			if (ip->i_prevp != &ih->ih_next
-			    && mrtrypromote(&ih->ih_lock)) {
-
-				if ((iq = ip->i_next)) {
-					iq->i_prevp = ip->i_prevp;
-				}
-
-				*ip->i_prevp = iq;
-				iq = ih->ih_next;
-				iq->i_prevp = &ip->i_next;
-				ip->i_next = iq;
-				ip->i_prevp = &ih->ih_next;
-				ih->ih_next = ip;
-			}
-
-			mrunlock(&ih->ih_lock);
+			read_unlock(&ih->ih_lock);
 
 			XFS_STATS_INC(xfsstats.xs_ig_found);
 
@@ -296,7 +273,7 @@ finish_inode:
 
 	version = ih->ih_version;
 
-	mrunlock(&ih->ih_lock);
+	read_unlock(&ih->ih_lock);
 
 	/*
 	 * Read the disk inode attributes into a new inode structure and get
@@ -333,12 +310,12 @@ finish_inode:
 	 * Put ip on its hash chain, unless someone else hashed a duplicate
 	 * after we released the hash lock.
 	 */
-	mrupdate(&ih->ih_lock);
+	write_lock(&ih->ih_lock);
 
 	if (ih->ih_version != version) {
 		for (iq = ih->ih_next; iq != NULL; iq = iq->i_next) {
 			if (iq->i_ino == ino) {
-				mrunlock(&ih->ih_lock);
+				write_unlock(&ih->ih_lock);
 				xfs_idestroy(ip);
 
 				XFS_STATS_INC(xfsstats.xs_ig_dup);
@@ -359,6 +336,8 @@ finish_inode:
 	ih->ih_next = ip;
 	ip->i_udquot = ip->i_gdquot = NULL;
 	ih->ih_version++;
+
+	write_unlock(&ih->ih_lock);
 
 	/*
 	 * put ip on its cluster's hash chain
@@ -418,7 +397,6 @@ finish_inode:
 
 	mutex_spinunlock(&ch->ch_lock, s);
 
-	mrunlock(&ih->ih_lock);
 
 	/*
 	 * Link ip to its mount and thread it on the mount's inode list.
@@ -578,7 +556,7 @@ xfs_inode_incore(xfs_mount_t	*mp,
 	xfs_inode_t	*iq;
 
 	ih = XFS_IHASH(mp, ino);
-	mraccess(&ih->ih_lock);
+	read_lock(&ih->ih_lock);
 	for (ip = ih->ih_next; ip != NULL; ip = ip->i_next) {
 		if (ip->i_ino == ino) {
 			/*
@@ -589,25 +567,13 @@ xfs_inode_incore(xfs_mount_t	*mp,
 			 * NULL.
 			 */
 			if (ip->i_transp == tp) {
-				if (ip->i_prevp != &ih->ih_next &&
-				    mrtrypromote(&ih->ih_lock)) {
-					if ((iq = ip->i_next)) {
-						iq->i_prevp = ip->i_prevp;
-					}
-					*ip->i_prevp = iq;
-					iq = ih->ih_next;
-					iq->i_prevp = &ip->i_next;
-					ip->i_next = iq;
-					ip->i_prevp = &ih->ih_next;
-					ih->ih_next = ip;
-				}
-				mrunlock(&ih->ih_lock);
+				read_unlock(&ih->ih_lock);
 				return (ip);
 			}
 			break;
 		}
-	}
-	mrunlock(&ih->ih_lock);
+	}	
+	read_unlock(&ih->ih_lock);
 	return (NULL);
 }
 
@@ -727,11 +693,12 @@ xfs_iextract(
 	SPLDECL(s);
 
 	ih = ip->i_hash;
-	mrupdate(&ih->ih_lock);
+	write_lock(&ih->ih_lock);
 	if ((iq = ip->i_next)) {
 		iq->i_prevp = ip->i_prevp;
 	}
 	*ip->i_prevp = iq;
+	write_unlock(&ih->ih_lock);
 
 	/*
 	 * Remove from cluster hash list
@@ -777,7 +744,6 @@ xfs_iextract(
 		ip->i_cnext = __return_address;
 	}
 	mutex_spinunlock(&ch->ch_lock, s);
-	mrunlock(&ih->ih_lock);
 
 	/*
 	 * Remove from mount's inode list.

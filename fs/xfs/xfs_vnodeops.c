@@ -4993,9 +4993,9 @@ xfs_finish_reclaim(
 	if (!locked) {
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 	}
-	mrupdate(&ih->ih_lock);
+	read_lock(&ih->ih_lock);
 	if (XFS_ITOV_NULL(ip)) {
-		mrunlock(&ih->ih_lock);
+		read_unlock(&ih->ih_lock);
 		if (!locked)
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		return(0);
@@ -5003,11 +5003,11 @@ xfs_finish_reclaim(
 	if (ip->i_flags & XFS_IRECLAIM) {
 		if (!locked)
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
-		mrunlock(&ih->ih_lock);
+		read_unlock(&ih->ih_lock);
 		return(1);
 	}
 	ip->i_flags |= XFS_IRECLAIM;
-	mrunlock(&ih->ih_lock);
+	read_unlock(&ih->ih_lock);
 
 	sync_mode = from_umount ? XFS_IFLUSH_ASYNC :
 				XFS_IFLUSH_DELWRI_ELSE_SYNC;
