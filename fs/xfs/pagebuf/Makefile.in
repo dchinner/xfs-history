@@ -1,0 +1,16 @@
+#
+# Makefile for the linux pagebuf routines.
+#
+
+expsyms(page_buf.o page_buf_io.o page_buf_locking.o)
+objlink(pagebuf.o avl.o page_buf.o page_buf_io.o page_buf_locking.o)
+select(CONFIG_PAGE_BUF pagebuf.o)
+
+# Debug options:
+#	-DCONFIG_AVL_DEBUG
+#	-DPAGEBUF_TRACKING
+#	-DPAGEBUF_LOCKING
+#	-DPAGEBUF_DEBUG
+ifsel(CONFIG_PAGEBUF_DEBUG)
+	extra_cflags_all(-g -DPAGEBUF_DEBUG -DPAGEBUF_TRACKING -DSTATIC="")
+endif
