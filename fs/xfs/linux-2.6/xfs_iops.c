@@ -58,6 +58,7 @@ static void validate_fields(struct inode *ip)
 	VOP_GETATTR(vp, &va, ATTR_LAZY, NULL, error);
 	ip->i_nlink = va.va_nlink;
 	ip->i_size = va.va_size;
+	ip->i_blocks = va.va_nblocks;
 }
 
 

@@ -157,6 +157,8 @@ xfs_getattr(
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
                 return 0;
 	}
+	vap->va_nblocks =
+		XFS_FSB_TO_BB(mp, ip->i_d.di_nblocks + ip->i_delayed_blks);
         vap->va_fsid = ip->i_dev;
 #if XFS_BIG_FILESYSTEMS
 	vap->va_nodeid = ip->i_ino + mp->m_inoadd;
@@ -232,8 +234,6 @@ xfs_getattr(
         vap->va_mtime.tv_nsec = ip->i_d.di_mtime.t_nsec;
         vap->va_ctime.tv_sec = ip->i_d.di_ctime.t_sec;
         vap->va_ctime.tv_nsec = ip->i_d.di_ctime.t_nsec;
-	vap->va_nblocks =
-		XFS_FSB_TO_BB(mp, ip->i_d.di_nblocks + ip->i_delayed_blks);
 
 	/*
 	 * Exit for stat callers.  See if any of the rest of the fields
