@@ -12,7 +12,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident "$Revision: 1.3 $"
+#ident "$Revision: 1.4 $"
 
 /*
  * XFS arguments to the mount system call.
@@ -24,6 +24,16 @@ struct xfs_args {
 	int	logbufsize;	/* Size of log buffers */
 	char	*fsname;	/* filesystem name */
 };
+
+#ifdef _KERNEL
+struct irix5_xfs_args {
+	__int32_t	version;
+	__int32_t	flags;
+	__int32_t	logbufs;
+	__int32_t	logbufsize;
+	app32_ptr_t	fsname;
+};
+#endif /* _KERNEL */
 
 /*
  * XFS mount option flags
