@@ -1620,7 +1620,9 @@ try_again:
 	 * the case we'll drop the one and get a more appropriate
 	 * transaction later.
 	 */
-	if (error = xfs_trans_reserve(tp, XFS_IALLOC_BLOCKS(mp) +
+	if (error = xfs_trans_reserve(tp,
+				      XFS_IALLOC_BLOCKS(mp) +
+				      XFS_IN_MAXLEVELS(mp) +
 				      XFS_BM_MAXLEVELS(mp) + 10,
 				      XFS_CREATE_LOG_RES(mp), 0,
 				      XFS_TRANS_PERM_LOG_RES,
@@ -3118,7 +3120,9 @@ xfs_mkdir(vnode_t	*dir_vp,
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
         tp = xfs_trans_alloc(mp, XFS_TRANS_MKDIR);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-        if (code = xfs_trans_reserve(tp, XFS_IALLOC_BLOCKS(mp) + 10,
+        if (code = xfs_trans_reserve(tp,
+				     XFS_IALLOC_BLOCKS(mp) +
+				     XFS_IN_MAXLEVELS(mp) + 10,
 				     XFS_MKDIR_LOG_RES(mp), 0,
 				     XFS_TRANS_PERM_LOG_RES,
 				     XFS_MKDIR_LOG_COUNT)) {
@@ -3452,7 +3456,9 @@ xfs_symlink(vnode_t	*dir_vp,
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
         tp = xfs_trans_alloc(mp, XFS_TRANS_SYMLINK);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-        if (error = xfs_trans_reserve(tp, XFS_IALLOC_BLOCKS(mp) + 12,
+        if (error = xfs_trans_reserve(tp,
+				      XFS_IALLOC_BLOCKS(mp) +
+				      XFS_IN_MAXLEVELS(mp) + 12,
 				      XFS_SYMLINK_LOG_RES(mp), 0,
 				      XFS_TRANS_PERM_LOG_RES,
 				      XFS_SYMLINK_LOG_COUNT)) {
