@@ -603,7 +603,7 @@ xfs_ioctl(
 		struct dioattr	da;
 
 		da.d_miniosz = mp->m_sb.sb_blocksize;
-		da.d_mem = 512;
+		da.d_mem = mp->m_sb.sb_blocksize;
 
 		/*
 		 * this only really needs to be BBSIZE.

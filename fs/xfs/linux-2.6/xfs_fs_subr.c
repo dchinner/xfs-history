@@ -183,20 +183,6 @@ fs_flush_pages(
 }
 
 
-/*
- * vnode pcache layer for vnode_pages_sethole.
- */
-void
-fs_pages_sethole(
-        bhv_desc_t	*bdp,
-	void		*pfd,
-	int		cnt,
-	int		doremap,
-	xfs_off_t	remap_offset)
-{
-	printk("XFS: fs_pages_sethole() NOT IMPLEMENTED\n");
-}
-
 #ifdef CELL_CAPABLE
 EXPORT_SYMBOL(fs_noerr);
 EXPORT_SYMBOL(fs_nosys);
@@ -207,5 +193,4 @@ EXPORT_SYMBOL(fs_dounmount);
 EXPORT_SYMBOL(fs_tosspages);
 EXPORT_SYMBOL(fs_flushinval_pages);
 EXPORT_SYMBOL(fs_flush_pages);
-EXPORT_SYMBOL(fs_pages_sethole);
 #endif

@@ -361,8 +361,8 @@ linvfs_fill_buftarg(
 		}
 	}
 
-	btp->bd_targ = bdev;
 	btp->pb_targ = pagebuf_lock_enable(dev, sb);
+	btp->bd_targ = bdev;
 	btp->dev = dev;
 	return 0;
 }
@@ -502,8 +502,6 @@ linvfs_fill_super(
 	LINVFS_SET_CVP(sb, cvp);
 	vfsp->vfs_super = sb;
 
-	sb->s_blocksize = BBSIZE;
-	sb->s_blocksize_bits = BBSHIFT;
 	set_blocksize(sb->s_dev, BBSIZE);
 	set_posix_acl(sb);
 	sb->s_xattr_flags |= XATTR_MNT_FLAG_USER;
@@ -523,6 +521,8 @@ linvfs_fill_super(
 
 	sb->s_magic = XFS_SB_MAGIC;
 	sb->s_dirt = 1;
+	sb->s_blocksize = statvfs.f_bsize;
+	sb->s_blocksize_bits = ffs(statvfs.f_bsize) - 1;
 
         VFS_ROOT(vfsp, &rootvp, error);
         if (error)

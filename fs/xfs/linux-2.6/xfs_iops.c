@@ -583,8 +583,112 @@ linvfs_setattr(
 	if (error)
 		return(-error);	/* Positive error up from XFS */
 
-	error = inode_setattr(inode, attr);
-	return(error);
+	return inode_setattr(inode, attr);
+}
+
+STATIC int
+linvfs_get_block_core(
+	struct inode		*inode,
+	sector_t		iblock, 
+	struct buffer_head	*bh_result,
+	int			create,
+	int			direct,
+	page_buf_flags_t	flags)
+{
+	vnode_t			*vp = LINVFS_GET_VP(inode);
+	page_buf_bmap_t		pbmap;
+	int			retpbbm = 1;
+	int			error;
+	ssize_t			size;
+	loff_t			offset = (loff_t)iblock << inode->i_blkbits;
+
+	/* If we are doing writes at the end of the file,
+	 * allocate in chunks
+	 */
+	if (create && (offset >= inode->i_size) && !(flags & PBF_SYNC))
+		size = XFS_WRITEIO_LOG_LARGE << inode->i_blkbits;
+	else
+		size = 1 << inode->i_blkbits;
+
+	VOP_BMAP(vp, offset, size,
+		create ? flags : PBF_READ, NULL,
+		(struct page_buf_bmap_s *)&pbmap, &retpbbm, error);
+	if (error)
+		return -error;
+
+	if (retpbbm == 0)
+		return 0;
+
+	if (pbmap.pbm_bn != PAGE_BUF_DADDR_NULL) {
+		page_buf_daddr_t	bn;
+		loff_t			delta;
+
+		delta = offset - pbmap.pbm_offset;
+		delta >>= inode->i_blkbits;
+
+		bn = pbmap.pbm_bn >> (inode->i_blkbits - 9);
+		bn += delta;
+
+		bh_result->b_blocknr = bn;
+		bh_result->b_bdev = pbmap.pbm_bdev;
+		set_bit(BH_Mapped, &bh_result->b_state);
+	}
+
+	if (pbmap.pbm_flags & PBMF_DELAY) {
+		if (direct)
+			BUG();
+		if (!create) {
+			struct page	*page = bh_result->b_page;
+			unsigned int	poffset = offset & ~PAGE_CACHE_MASK;
+
+			memset(kmap(page) + poffset, 0, bh_result->b_size);
+			flush_dcache_page(page);
+			kunmap(page);
+		}
+		bh_result->b_bdev = pbmap.pbm_bdev;
+		set_bit(BH_Mapped, &bh_result->b_state);
+		set_bit(BH_Uptodate, &bh_result->b_state);
+		set_bit(BH_Delay, &bh_result->b_state);
+	}
+
+	if (create && (pbmap.pbm_flags & PBMF_NEW))
+		set_bit(BH_New, &bh_result->b_state);
+	return 0;
+}
+
+int
+linvfs_get_block(
+	struct inode		*inode,
+	sector_t		iblock, 
+	struct buffer_head	*bh_result,
+	int			create)
+{
+	return linvfs_get_block_core(inode, iblock, bh_result,
+					create, 0, PBF_WRITE);
+}
+
+int
+linvfs_get_block_sync(
+	struct inode		*inode,
+	sector_t		iblock, 
+	struct buffer_head	*bh_result,
+	int			create)
+{
+	return linvfs_get_block_core(inode, iblock, bh_result,
+					create, 0, PBF_SYNC|PBF_WRITE);
+}
+
+
+
+int
+linvfs_get_block_direct(
+	struct inode		*inode,
+	sector_t		iblock, 
+	struct buffer_head	*bh_result,
+	int			create)
+{
+	return linvfs_get_block_core(inode, iblock, bh_result,
+					create, 1, PBF_WRITE|PBF_DIRECT);
 }
 
 int
@@ -628,8 +732,8 @@ linvfs_bmap(
 {
 	struct inode		*inode = (struct inode *)mapping->host;
 	vnode_t			*vp = LINVFS_GET_VP(inode);
-	pb_bmap_t		bmap = {0};
-	int			error, nbm = 1;
+	xfs_inode_t		*ip = XFS_BHVTOI(vp->v_fbhv);
+	int			error;
 
 	/* block             - Linux disk blocks    512b */
 	/* bmap input offset - bytes                  1b */
@@ -639,111 +743,47 @@ linvfs_bmap(
 	vn_trace_entry(vp, "linvfs_bmap", (inst_t *)__return_address);
 
 	VOP_RWLOCK(vp, VRWLOCK_READ);
-	if (inode->i_mapping->nrpages) {
+	if (ip->i_delayed_blks) {
 		VOP_FLUSH_PAGES(vp, (xfs_off_t)0, -1, 0, FI_REMAPF, error);
-		if (error) {
-			VOP_RWUNLOCK(vp, VRWLOCK_READ);
-			/* VOP_FLUSH_PAGES currently returns nothing but 0... */
-			return -error;
-		}
 	}
 
-	VOP_BMAP(vp, block << 9, 1, PBF_READ, NULL, &bmap, &nbm, error);
 	VOP_RWUNLOCK(vp, VRWLOCK_READ);
-	if (error)
-		return -error;
-	if (bmap.pbm_bn == PAGE_BUF_DADDR_NULL)
-		return 0;
-	ASSERT(bmap.pbm_bn >= 0);
-	return (int)(bmap.pbm_bn + (bmap.pbm_delta >> 9));
+	return generic_block_bmap(mapping, block, linvfs_get_block_direct);
 }
  
-int
-xfs_read_full_page(
-	bhv_desc_t	*bdp,
-	struct page	*page)
-{
-	xfs_inode_t	*xip = XFS_BHVTOI(bdp);
-	xfs_mount_t	*mp = xip->i_mount;
-
-	return pagebuf_read_full_page(
-			(xip->i_d.di_flags & XFS_DIFLAG_REALTIME)?
-			mp->m_rtdev_targ.pb_targ : mp->m_ddev_targ.pb_targ,
-			page, linvfs_pb_bmap);
-}
-
-int
-xfs_write_full_page(
-	bhv_desc_t	*bdp,
-	struct page	*page)
-{
-	xfs_inode_t	*xip = XFS_BHVTOI(bdp);
-	xfs_mount_t	*mp = xip->i_mount;
-
-	return pagebuf_write_full_page(
-			(xip->i_d.di_flags & XFS_DIFLAG_REALTIME)?
-			mp->m_rtdev_targ.pb_targ : mp->m_ddev_targ.pb_targ,
-			page, linvfs_pb_bmap);
-}
-
-int
-xfs_prepare_write(
-	bhv_desc_t	*bdp,
-	struct page	*page,
-	unsigned int	from,
-	unsigned int	to)
-{
-	xfs_inode_t	*xip = XFS_BHVTOI(bdp);
-	xfs_mount_t	*mp = xip->i_mount;
-
-	return pagebuf_prepare_write(
-			(xip->i_d.di_flags & XFS_DIFLAG_REALTIME)?
-			mp->m_rtdev_targ.pb_targ : mp->m_ddev_targ.pb_targ,
-			page, from, to, linvfs_pb_bmap);
-}
-
-int
-xfs_commit_write(
-	bhv_desc_t	*bdp,
-	struct page	*page,
-	unsigned int	from,
-	unsigned int	to)
-{
-	xfs_inode_t	*xip = XFS_BHVTOI(bdp);
-	xfs_mount_t	*mp = xip->i_mount;
-
-	return pagebuf_commit_write(
-			(xip->i_d.di_flags & XFS_DIFLAG_REALTIME)?
-			mp->m_rtdev_targ.pb_targ : mp->m_ddev_targ.pb_targ,
-			page, from, to);
-}
-
-int
-xfs_release_page(
-	bhv_desc_t	*bdp,
-	struct page	*page)
-{
-	xfs_inode_t	*xip = XFS_BHVTOI(bdp);
-	xfs_mount_t	*mp = xip->i_mount;
-
-	pagebuf_release_page(
-			(xip->i_d.di_flags & XFS_DIFLAG_REALTIME)?
-			mp->m_rtdev_targ.pb_targ : mp->m_ddev_targ.pb_targ,
-			page, linvfs_pb_bmap);
-	return 1;
-}
-
 STATIC int
 linvfs_read_full_page(
 	struct file	*unused,
 	struct page	*page)
 {
-	int		error;
-	struct inode	*inode = page->mapping->host;
-	struct vnode	*vp = LINVFS_GET_VP(inode);
+	return block_read_full_page(page, linvfs_get_block);
+}
 
-	VOP_READ_FULL_PAGE(vp, page, error);
-	return error;
+STATIC int
+count_page_state(
+	struct page	*page,
+	int		*nr_delalloc,
+	int		*nr_unmapped)
+{
+	*nr_delalloc = *nr_unmapped = 0;
+
+	if (page_has_buffers(page)) {
+		struct buffer_head	*bh, *head;
+
+		bh = head = page_buffers(page);
+		do {
+			if (buffer_uptodate(bh) && !buffer_mapped(bh)) {
+				(*nr_unmapped)++;
+				continue;
+			}
+			if (!buffer_delay(bh))
+				continue;
+			(*nr_delalloc)++;
+		} while ((bh = bh->b_this_page) != head);
+		return 1;
+	}
+
+	return 0;
 }
 
 STATIC int
@@ -754,22 +794,29 @@ linvfs_write_full_page(
 	int		error;
 	struct vnode	*vp;
 	struct inode	*inode;
+	int		need_trans;
+	int		nr_delalloc, nr_unmapped;
 
-	if ((current->flags & PF_FSTRANS) && PageDelalloc(page))
+	if (count_page_state(page, &nr_delalloc, &nr_unmapped)) {
+		need_trans = nr_delalloc + nr_unmapped;
+	} else {
+		need_trans = 1;
+	}
+
+	if ((current->flags & (PF_FSTRANS|PF_NOIO)) && need_trans)
 		goto out_fail;
 
-	if ((current->flags & (PF_FSTRANS|PF_NOIO)) &&
-	    (!page_has_buffers(page) || buffer_delay(page_buffers(page))))
-		goto out_fail;
-
-	if (!page_has_buffers(page) || buffer_delay(page_buffers(page))) {
+	if (need_trans) {
 		current->flags |= PF_NOIO;
 		flagset = 1;
 	}
 
 	inode = page->mapping->host;
 	vp = LINVFS_GET_VP(inode);
-	VOP_WRITE_FULL_PAGE(vp, page, error);
+	if (vp->v_flag & VMODIFIED) {
+		linvfs_revalidate_core(inode, 0);
+	}
+	error = pagebuf_write_full_page(page, nr_delalloc, linvfs_pb_bmap);
 
 	if (flagset)
 		current->flags &= ~PF_NOIO;
@@ -783,53 +830,57 @@ out_fail:
 
 STATIC int
 linvfs_prepare_write(
-	struct file	*unused,
+	struct file	*file,
 	struct page	*page,
 	unsigned int	from,
 	unsigned int	to)
 {
-	int		error;
-	struct inode	*inode = page->mapping->host;
-	struct vnode	*vp = LINVFS_GET_VP(inode);
-
-	VOP_PREPARE_WRITE(vp, page, from, to, error);
-	return error;
+	if (file && (file->f_flags & O_SYNC)) {
+		return block_prepare_write(page, from, to,
+						linvfs_get_block_sync);
+	} else {
+		return block_prepare_write(page, from, to,
+						linvfs_get_block);
+	}
 }
 
 STATIC int
-linvfs_commit_write(
-	struct file	*unused,
-	struct page	*page,
-	unsigned int	from,
-	unsigned int	to)
+linvfs_direct_IO(
+	int		rw,
+	struct inode	*inode,
+	struct kiobuf	*iobuf,
+	unsigned long	blocknr,
+	int		blocksize)
 {
-	int		error;
-	struct inode	*inode = page->mapping->host;
-	struct vnode	*vp = LINVFS_GET_VP(inode);
-
-	VOP_COMMIT_WRITE(vp, page, from, to, error);
-	return error;
+	return generic_direct_IO(rw, inode, iobuf, blocknr,
+				blocksize, linvfs_get_block_direct);
 }
 
 /*
  * This gets a page into cleanable state - page locked on entry
- * kept locked on exit.
+ * kept locked on exit. If the page is marked dirty we should 
+ * not come this way.
  */
 STATIC int
 linvfs_release_page(
 	struct page	*page,
 	int		gfp_mask)
 {
-	if (page_has_buffers(page) && !buffer_delay(page_buffers(page))) {
+	int		need_trans;
+	int		nr_delalloc, nr_unmapped;
+
+	if (count_page_state(page, &nr_delalloc, &nr_unmapped)) {
+		need_trans = nr_delalloc;
+	} else {
+		need_trans = 0;
+	}
+
+	if (need_trans == 0) {
 		return try_to_free_buffers(page, gfp_mask);
 	}
 
 	if (gfp_mask & __GFP_FS) {
-		int		error;
-		struct inode	*inode = page->mapping->host;
-		struct vnode	*vp = LINVFS_GET_VP(inode);
-
-		VOP_RELEASE_PAGE(vp, page, error);
+		pagebuf_release_page(page, linvfs_pb_bmap);
 		return try_to_free_buffers(page, gfp_mask);
 	}
 	return 0;
@@ -841,9 +892,10 @@ struct address_space_operations linvfs_aops = {
 	writepage:		linvfs_write_full_page,
 	sync_page:		block_sync_page,
 	releasepage:		linvfs_release_page,
-	bmap:			linvfs_bmap,
 	prepare_write:		linvfs_prepare_write,
-	commit_write:		linvfs_commit_write,
+	commit_write:		generic_commit_write,
+	bmap:			linvfs_bmap,
+	direct_IO:		linvfs_direct_IO,
 };
 
 struct inode_operations linvfs_file_inode_operations =

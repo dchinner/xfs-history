@@ -101,11 +101,13 @@ typedef enum {
 	PBMF_DELAY = 		0x04,	/* mapping covers delalloc region  */
 	PBMF_UNWRITTEN = 	0x20,	/* mapping covers allocated 	*/
 					/* but uninitialized XFS data 	*/
+	PBMF_NEW =		0x40	/* we just allocated this space	*/
 } bmap_flags_t;
 
 typedef struct page_buf_bmap_s {
-	page_buf_daddr_t pbm_bn;	/* block number in file system 	    */
-	loff_t 		pbm_offset;	/* byte offset of mapping in file   */
+	page_buf_daddr_t	pbm_bn;	/* block number in file system 	    */
+	struct block_device	*pbm_bdev;
+	loff_t 		pbm_offset; /* byte offset of mapping in file   */
 	size_t		pbm_delta;	/* offset of request into bmap	    */
 	size_t		pbm_bsize;	/* size of this mapping in bytes    */
 	bmap_flags_t	pbm_flags;	/* options flags for mapping	    */
@@ -158,7 +160,7 @@ typedef enum page_buf_flags_e {
 
 	/* flags used only internally */
 	_PBF_LOCKABLE = (1 << 19), /* page_buf_t may be locked		   */
-	_PBF_NEXT_KEY = (1 << 20), /* page_buf_t is a dummy used as a key  */
+	_PBF_PRIVATE_BH = (1 << 20), /* do not use public buffer heads	   */
 	_PBF_ALL_PAGES_MAPPED = (1 << 22),
 				/* all pages in rage are mapped		   */
 	_PBF_SOME_INVALID_PAGES = (1 << 23),
@@ -391,9 +393,7 @@ extern int pagebuf_iozero(		/* zero contents of buffer	*/
 		page_buf_t *,		/* buffer to zero		*/
 		off_t,			/* offset in buffer		*/
 		size_t, 		/* size of data to zero		*/
-		loff_t,			/* last permissible isize value */
-		pb_bmap_t *,		/* pointer to pagebuf bmap	*/
-		int);			/* number of maps               */
+		loff_t);		/* last permissible isize value */
 
 extern caddr_t	pagebuf_offset(page_buf_t *, off_t);
 
@@ -430,23 +430,6 @@ extern int pagebuf_ispin( page_buf_t *); /* check if pagebuf is pinned	*/
 
 /* Reading and writing pages */
 
-extern ssize_t pagebuf_direct_file_read(
-		struct pb_target *,
-		struct file *,		/* file to read			*/
-		char *,			/* buffer address		*/
-		size_t,			/* size of buffer		*/
-		loff_t *,		/* file offset to use and update */
-		pagebuf_bmap_fn_t);	/* bmap function		*/
-
-	/*
-	 * pagebuf_direct_file_read reads data from the specified file
-	 * at the loff_t referenced, updating the loff_t to point after the
-	 * data read and returning the count of bytes read.
-	 * The data is read into the supplied buffer, up to a maximum of the
-	 * specified size.
-	 */
-
-
 extern ssize_t pagebuf_generic_file_write(
 		struct pb_target *,
 		struct file *,		/* file to write		*/
@@ -464,32 +447,13 @@ extern ssize_t pagebuf_generic_file_write(
 	 * is an error.
 	 */
 
-extern int pagebuf_read_full_page(	/* read a page via pagebuf	*/
-		struct pb_target *,
-		struct page *, 		/* page to read			*/
-		pagebuf_bmap_fn_t);	/* bmap function		*/
-
 extern int pagebuf_write_full_page(	/* write a page via pagebuf	*/
-		struct pb_target *,
 		struct page *,		/* page to write		*/
+		int delalloc,		/* delalloc bh present		*/
 		pagebuf_bmap_fn_t);	/* bmap function		*/
 
 extern void pagebuf_release_page(	/* Attempt to convert a delalloc page */
-		struct pb_target *,
 		struct page *,		/* page to release		*/
-		pagebuf_bmap_fn_t);	/* bmap function		*/
-
-extern int pagebuf_commit_write(
-		struct pb_target *,
-		struct page *,		/* page to write		*/
-		unsigned,		/* from offset			*/
-		unsigned);		/* to offset			*/
-
-extern int pagebuf_prepare_write(
-		struct pb_target *,
-		struct page *,		/* page to write		*/
-		unsigned,		/* from offset			*/
-		unsigned,		/* to offset			*/
 		pagebuf_bmap_fn_t);	/* bmap function		*/
 
 extern void pagebuf_delwri_queue(page_buf_t *, int);

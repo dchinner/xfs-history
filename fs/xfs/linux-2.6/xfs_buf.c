@@ -413,25 +413,22 @@ void _pagebuf_free_object(
 
 int
 _pagebuf_lookup_pages(
-    page_buf_t * pb,
-    struct address_space *aspace,
-    page_buf_flags_t flags)
+	page_buf_t		*pb,
+	struct address_space	*aspace,
+	page_buf_flags_t	flags)
 {
-	loff_t next_buffer_offset;
-	unsigned long page_count;
-	int rval = 0;
-	unsigned long pi;
-	unsigned long index;
-	int all_mapped, good_pages;
-	struct page *cp, *cached_page;
-	int gfp_mask;
-	int	retry_count = 0;
+	loff_t			next_buffer_offset;
+	unsigned long		page_count, pi, index;
+	struct page		*cp, **hash, *cached_page;
+	int			gfp_mask, retry_count = 0, rval = 0;
+	int			all_mapped, good_pages;
+	size_t			blocksize;
 
 	/* For pagebufs where we want to map an address, do not use
 	 * highmem pages - so that we do not need to use kmap resources
 	 * to access the data.
 	 *
-	 * For pages were the caller has indicated there may be resource
+	 * For pages where the caller has indicated there may be resource
 	 * contention (e.g. called from a transaction) do not flush
 	 * delalloc pages to obtain memory.
 	 */
@@ -447,7 +444,7 @@ _pagebuf_lookup_pages(
 	next_buffer_offset = pb->pb_file_offset + pb->pb_buffer_length;
 
 	good_pages = page_count = (page_buf_btoc(next_buffer_offset) -
-	    page_buf_btoct(pb->pb_file_offset));
+				   page_buf_btoct(pb->pb_file_offset));
 
 	if (pb->pb_flags & _PBF_ALL_PAGES_MAPPED) {
 		/* Bring pages forward in cache */
@@ -458,16 +455,18 @@ _pagebuf_lookup_pages(
 			all_mapped = 1;
 			goto mapit;
 		}
-		return (0);
+		return 0;
 	}
 
-	/* assure that we have a page list */
+	/* Ensure pb_pages field has been initialised */
 	rval = _pagebuf_get_pages(pb, page_count, flags);
-	if (rval != 0)
-		return (rval);
+	if (rval)
+		return rval;
 
 	rval = pi = 0;
 	cached_page = NULL;
+	blocksize = pb->pb_target->pbr_blocksize;
+
 	/* enter the pages in the page list */
 	index = (pb->pb_file_offset - pb->pb_offset) >> PAGE_CACHE_SHIFT;
 	for (all_mapped = 1; pi < page_count; pi++, index++) {
@@ -506,9 +505,7 @@ _pagebuf_lookup_pages(
 			pb->pb_pages[pi] = cp;
 		} else {
 			cp = pb->pb_pages[pi];
-			while (TryLockPage(cp)) {
-				___wait_on_page(cp);
-			}
+			lock_page(cp);
 		}
 
 		/* Test for the page being valid. There is a special case
@@ -518,12 +515,21 @@ _pagebuf_lookup_pages(
 		 * way we do not need to deal with partially valid pages.
 		 * We keep the page locked, and in the read path fake out
 		 * the lower layers to issue an I/O for the whole page.
+		 *
+		 * This doesn't work for filesystem blocksizes which are
+		 * smaller than the pagesize.  We can have metadata blocks
+		 * on these block device inode pages overlapping with file
+		 * data...  so it would be possible to have multiple pages
+		 * thinking they all have uptodate (different) data. :(
+		 * We'll have to use a different approach for that case.
 		 */
 		if (!Page_Uptodate(cp)) {
 			good_pages--;
-			if (unlikely((pb->pb_buffer_length < PAGE_CACHE_SIZE) &&
-			    (flags & PBF_READ) && !PageSlab(cp))) {
-				pb->pb_locked = 1;
+			if (blocksize == PAGE_CACHE_SIZE) {
+				if ((pb->pb_buffer_length < PAGE_CACHE_SIZE) &&
+				    (flags & PBF_READ) && !PageSlab(cp)) {
+					pb->pb_locked = 1;
+				}
 			}
 		}
 		if (!pb->pb_locked)
@@ -699,6 +705,7 @@ pagebuf_lookup(
 	page_buf_t		*pb = NULL;
 	int			status;
 
+	flags |= _PBF_PRIVATE_BH;
 	pb = __pagebuf_allocate(flags);
 	if (pb) {
 		_pagebuf_initialize(pb, target, ioff, isize, flags);
@@ -787,7 +794,7 @@ pagebuf_associate_memory(
 	pb->pb_locked = 0;
 
 	pb->pb_count_desired = pb->pb_buffer_length = len;
-	pb->pb_flags |= PBF_MAPPED;
+	pb->pb_flags |= PBF_MAPPED | _PBF_PRIVATE_BH;
 
 	return 0;
 }
@@ -1393,7 +1400,7 @@ int pagebuf_segment(		/* return next segment of buffer */
 				/* (NULL if not in mem_map[])   */
     size_t * soff_p,		/* offset in page (updated)     */
     size_t * ssize_p,		/* length of segment (updated)  */
-    page_buf_flags_t flags)	/* PBF_ALWAYS_ALLOC             */
+    page_buf_flags_t flags)	/* unused 			*/
 {
 	loff_t kpboff;		/* offset in pagebuf		*/
 	int kpi;		/* page index in pagebuf	*/
