@@ -148,6 +148,7 @@ typedef struct xfs_da_args {
 	struct xfs_inode *dp;		/* directory inode to manipulate */
 	xfs_fsblock_t	*firstblock;	/* ptr to firstblock for bmap calls */
 	struct xfs_bmap_free *flist;	/* ptr to freelist for bmap_finish */
+	struct xfs_trans *trans;	/* current trans (changes over time) */
 	xfs_extlen_t	total;		/* total blocks needed, for 1st bmap */
 	int		whichfork;	/* data or attribute fork */
 	xfs_dablk_t	blkno;		/* blkno of attr leaf of interest */
@@ -170,7 +171,8 @@ typedef struct xfs_da_args {
  */
 typedef struct xfs_da_state_blk {
 	struct buf	*bp;		/* buffer containing block */
-	xfs_dablk_t	blkno;		/* blkno of buffer */
+	xfs_dablk_t	blkno;		/* filesystem blkno of buffer */
+	daddr_t		disk_blkno;	/* on-disk blkno (in BBs) of buffer */
 	int		index;		/* relevant index into block */
 	xfs_dahash_t	hashval;	/* last hash value in block */
 	int		magic;		/* blk's magic number, ie: blk type */
@@ -184,7 +186,6 @@ typedef struct xfs_da_state_path {
 typedef struct xfs_da_state {
 	struct xfs_da_args	 *args;		/* filename arguments */
 	struct xfs_mount	 *mp;		/* filesystem mount point */
-	struct xfs_trans	 *trans;	/* transaction context */
 	int			 blocksize;	/* logical block size */
 	int			 inleaf;	/* insert into 1->lf, 0->splf */
 	struct xfs_da_state_path path;		/* search/split paths */
@@ -205,9 +206,8 @@ typedef struct xfs_da_state {
 /*
  * Routines used for growing the Btree.
  */
-int	xfs_da_node_create(struct xfs_trans *trans, struct xfs_inode *dp,
-				  xfs_dablk_t blkno, int level,
-				  struct buf **bpp, int whichfork);
+int	xfs_da_node_create(struct xfs_da_args *args, xfs_dablk_t blkno,
+				  int level, struct buf **bpp, int whichfork);
 int	xfs_da_split(struct xfs_da_state *state);
 
 /*
@@ -239,8 +239,8 @@ int	xfs_da_blk_link(struct xfs_da_state *state,
 /*
  * Utility routines.
  */
-int	xfs_da_grow_inode(struct xfs_trans *trans, struct xfs_da_args *args,
-				 int length, xfs_dablk_t *new_blkno);
+int	xfs_da_grow_inode(struct xfs_da_args *args, int length,
+				 xfs_dablk_t *new_blkno);
 int	xfs_da_get_buf(struct xfs_trans *trans, struct xfs_inode *dp,
 			      xfs_dablk_t bno, struct buf **bp, int whichfork);
 int	xfs_da_read_buf(struct xfs_trans *trans, struct xfs_inode *dp,
@@ -249,9 +249,8 @@ int	xfs_da_read_buf(struct xfs_trans *trans, struct xfs_inode *dp,
 #ifndef SIM
 daddr_t	xfs_da_reada_buf(struct xfs_trans *trans, struct xfs_inode *dp,
 				xfs_dablk_t bno, int whichfork);
-int	xfs_da_shrink_inode(struct xfs_trans *trans, struct xfs_da_args *args,
-				   xfs_dablk_t dead_blkno, int length,
-				   struct buf *dead_buf);
+int	xfs_da_shrink_inode(struct xfs_da_args *args, xfs_dablk_t dead_blkno,
+				   int length, struct buf *dead_buf);
 #endif	/* !SIM */
 
 uint xfs_da_hashname(char *name_string, int name_length);
