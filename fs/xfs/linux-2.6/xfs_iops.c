@@ -773,7 +773,6 @@ STATIC int
 linvfs_write_full_page(
 	struct page	*page)
 {
-	int		flagset = 0;
 	int		error;
 	struct vnode	*vp;
 	struct inode	*inode;
@@ -789,13 +788,6 @@ linvfs_write_full_page(
 	if ((current->flags & (PF_FSTRANS)) && need_trans)
 		goto out_fail;
 
-#if 0
-	if (need_trans) {
-		current->flags |= PF_NOIO;
-		flagset = 1;
-	}
-#endif
-
 	inode = page->mapping->host;
 	vp = LINVFS_GET_VP(inode);
 	if (vp->v_flag & VMODIFIED) {
@@ -803,10 +795,6 @@ linvfs_write_full_page(
 	}
 	error = pagebuf_write_full_page(page, nr_delalloc, linvfs_pb_bmap);
 
-#if 0
-	if (flagset)
-		current->flags &= ~PF_NOIO;
-#endif
 	return error;
 
 out_fail:
