@@ -13,6 +13,7 @@
 #include <sys/systm.h>
 #include <sys/dnlc.h>
 #include <sys/sysmacros.h>
+#include <sys/prctl.h>
 #include <sys/cred.h>
 #include <sys/grio.h>
 #include <sys/pfdat.h>
@@ -258,9 +259,13 @@ xfs_close(vnode_t	*vp,
 	  cred_t	*credp)
 {
 	extern int 	xfs_remove_grio_guarantee( xfs_inode_t *, pid_t);
-        xfs_inode_t	*ip;
+
 	struct ufchunk  *ufp;
 	struct file	*fp;
+        xfs_inode_t	*ip;
+	proc_t		*p  = u.u_procp;
+	shaddr_t	*sa = p->p_shaddr;
+	int		isshd, nofiles;
 	int		i, vpcount, ret;
 
 	vn_trace_entry(vp, "xfs_close");
@@ -273,14 +278,29 @@ xfs_close(vnode_t	*vp,
 	if (lastclose && (ip->i_flags & XFS_IGRIO)) {
 
 		vpcount = 0;
-		for (i = 0 ; i < u.u_nofiles; i++ ) {
-			ufp = (struct ufchunk *)&(u.u_flist);
-			if ((ret = ufget( i,(int)(u.u_nofiles),&ufp,&fp)) == 0){
+
+#ifndef SIM
+		if (isshd = ISSHDFD(p, sa)) {
+			mrlock(&sa->s_fsync, MR_ACCESS, PZERO);
+			ufp = sa->s_flist;
+			nofiles  = sa->s_nofiles;
+		} else {
+			ufp = u.u_flist;
+			nofiles = u.u_nofiles;
+		}
+
+		for (i = 0 ; i < nofiles; i++ ) {
+			if ((fp = ufgetfast( i,nofiles, ufp) ) == 0){
 				if ((fp->f_vnode == vp) && (fp->f_count > 0)) {
 					vpcount++;
 				}
 			}
 		}
+
+		if (isshd) {
+			mrunlock(&sa->s_fsync);
+		}
+#endif
 
 		/*
 		 * If this process is nolonger accessing 
