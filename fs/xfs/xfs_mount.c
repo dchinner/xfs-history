@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.123 $"
+#ident	"$Revision: 1.124 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -214,6 +214,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 		cmn_err(CE_WARN,
 "XFS:  File systems greater than 1TB not supported on this system.\n");
 		error = XFS_ERROR(E2BIG);
+		goto error0;
 	}
 #endif
 #ifndef SIM
