@@ -41,7 +41,7 @@
    dquot hash-chain lock    (hashlock)
    xqm dquot freelist lock  (freelistlock
    mount's dquot list lock  (mplistlock)
-   user dquot lock - lock ordering among dquots is based on the uid or prid
+   user dquot lock - lock ordering among dquots is based on the uid or gid
    group dquot lock - similar to udquots. Between the two dquots, the udquot 
                       has to be locked first.
    pin lock - the dquot lock must be held to take this lock. 

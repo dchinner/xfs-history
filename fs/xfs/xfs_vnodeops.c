@@ -2182,10 +2182,11 @@ xfs_create(
 	 * Make sure that we have allocated dquot(s) on disk.
 	 */
 	if (XFS_IS_QUOTA_ON(mp)) {
-		if ((error = xfs_qm_vop_dqalloc(mp, dp, current->fsuid,
-					       current->fsgid,
-					       XFS_QMOPT_QUOTALL,
-					       &udqp, &gdqp))) 
+		error = xfs_qm_vop_dqalloc(mp, dp,
+					   current->fsuid, current->fsgid,
+					   XFS_QMOPT_QUOTALL|XFS_QMOPT_INHERIT,
+					   &udqp, &gdqp);
+		if (error)
 			goto std_return;
 	}
 
@@ -3616,13 +3617,14 @@ xfs_mkdir(
 	 * Make sure that we have allocated dquot(s) on disk.
 	 */
 	if (XFS_IS_QUOTA_ON(mp)) {
-		if ((error = xfs_qm_vop_dqalloc(mp, dp, current->fsuid,
-					       current->fsgid,
-					       XFS_QMOPT_QUOTALL,
-					       &udqp, &gdqp))) 
+		error = xfs_qm_vop_dqalloc(mp, dp,
+					   current->fsuid, current->fsgid,
+					   XFS_QMOPT_QUOTALL|XFS_QMOPT_INHERIT,
+					   &udqp, &gdqp);
+		if (error)
 			goto std_return;
 	}
-	
+
 	tp = xfs_trans_alloc(mp, XFS_TRANS_MKDIR);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
 	resblks = XFS_MKDIR_SPACE_RES(mp, dir_namelen);
@@ -4263,10 +4265,11 @@ xfs_symlink(
 	 * Make sure that we have allocated dquot(s) on disk.
 	 */
 	if (XFS_IS_QUOTA_ON(mp)) {
-		if ((error = xfs_qm_vop_dqalloc(mp, dp, current->fsuid,
-					       current->fsgid,
-					       XFS_QMOPT_QUOTALL,
-					       &udqp, &gdqp))) 
+		error = xfs_qm_vop_dqalloc(mp, dp,
+					   current->fsuid, current->fsgid,
+					   XFS_QMOPT_QUOTALL|XFS_QMOPT_INHERIT,
+					   &udqp, &gdqp);
+		if (error)
 			goto std_return;
 	}
 

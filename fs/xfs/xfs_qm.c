@@ -2523,6 +2523,10 @@ xfs_qm_vop_dqalloc(
 	lockflags = XFS_ILOCK_EXCL;
 	xfs_ilock(ip, lockflags);
 
+	if ((flags & XFS_QMOPT_INHERIT) &&
+	    XFS_INHERIT_GID(ip, XFS_MTOVFS(mp)))
+		gid = ip->i_d.di_gid;
+
 	/*
 	 * Attach the dquot(s) to this inode, doing a dquot allocation
 	 * if necessary. The dquot(s) will not be locked.
@@ -2799,7 +2803,6 @@ xfs_qm_vop_dqattach_and_dqmod_newinode(
 		ASSERT(ip->i_d.di_gid == INT_GET(gdqp->q_core.d_id, ARCH_CONVERT));
 		xfs_trans_mod_dquot(tp, gdqp, XFS_TRANS_DQ_ICOUNT, 1);
 	}
-
 }
 
 /* ------------- list stuff -----------------*/

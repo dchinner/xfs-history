@@ -989,9 +989,7 @@ xfs_ialloc(
 	 * Call the space management code to pick
 	 * the on-disk inode to be allocated.
 	 */
-#ifdef __KERNEL__
 	ASSERT(pip != NULL);
-#endif
 	error = xfs_dialloc(tp, pip ? pip->i_ino : 0, mode, okalloc,
 			    ialloc_context, call_again, &ino);
 	if (error != 0) {
@@ -1040,22 +1038,13 @@ xfs_ialloc(
 		 */
 	}
 
-#ifdef __KERNEL__
 	/*
 	 * Project ids won't be stored on disk if we are using a version 1 inode.
 	 */ 
 	if ( (prid != 0) && (ip->i_d.di_version == XFS_DINODE_VERSION_1))
 		xfs_bump_ino_vers2(tp, ip);
-#endif
 
-	/*
-	 * For multiple groups support: if ISGID bit is set in the parent
-	 * directory, group of new file is set to that of the parent, and
-	 * new subdirectory gets ISGID bit from parent.
-	 */
-	if (pip != NULL &&
-	    ((vp->v_vfsp->vfs_flag & VFS_GRPID) ||
-	     (pip->i_d.di_mode & ISGID))) {
+	if (XFS_INHERIT_GID(pip, vp->v_vfsp)) {
 		ip->i_d.di_gid = pip->i_d.di_gid;
 		if ((pip->i_d.di_mode & ISGID) && (mode & IFMT) == IFDIR) {
 			ip->i_d.di_mode |= ISGID;
