@@ -1866,13 +1866,13 @@ xfs_attr_rmtval_get(xfs_da_args_t *args)
 			dblkno = XFS_FSB_TO_DADDR(mp, map[i].br_startblock);
 			blkcnt = XFS_FSB_TO_BB(mp, map[i].br_blockcount);
 			error = xfs_read_buf(mp, mp->m_ddev_targp, dblkno,
-					     blkcnt, 0, &bp);
+					     blkcnt, XFS_BUF_LOCK, &bp);
 			if (error)
 				return(error);
 
 			tmp = (valuelen < XFS_BUF_SIZE(bp))
 				? valuelen : XFS_BUF_SIZE(bp);
-			bcopy(XFS_BUF_PTR(bp), dst, tmp);
+			xfs_biomove(bp, 0, tmp, dst, XFS_B_READ);
 			xfs_buf_relse(bp);
 			dst += tmp;
 			valuelen -= tmp;
@@ -1995,15 +1995,16 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 		dblkno = XFS_FSB_TO_DADDR(mp, map.br_startblock),
 		blkcnt = XFS_FSB_TO_BB(mp, map.br_blockcount);
 
-		bp = xfs_buf_get(mp->m_ddev_targp, dblkno, blkcnt, 0);
+		bp = xfs_buf_get_flags(mp->m_ddev_targp, dblkno,
+							blkcnt, XFS_BUF_LOCK);
 		ASSERT(bp);
 		ASSERT(!XFS_BUF_GETERROR(bp));
 
 		tmp = (valuelen < XFS_BUF_SIZE(bp)) ? valuelen :
 							XFS_BUF_SIZE(bp);
-		bcopy(src, XFS_BUF_PTR(bp), tmp);
+		xfs_biomove(bp, 0, tmp, src, XFS_B_WRITE);
 		if (tmp < XFS_BUF_SIZE(bp))
-			bzero(XFS_BUF_PTR(bp) + tmp, XFS_BUF_SIZE(bp) - tmp);
+			xfs_biozero(bp, tmp, XFS_BUF_SIZE(bp) - tmp);
 		if (error = xfs_bwrite(mp, bp)) {/* GROT: NOTE: synchronous write */
 			return (error);
 		}

@@ -618,8 +618,11 @@ xfs_read_buf(
 {
 	xfs_buf_t	 *bp;
 	int 		 error;
-	
-	bp = xfs_buf_read(target, blkno, len, flags);
+
+	if (flags)
+		bp = xfs_buf_read_flags(target, blkno, len, flags);
+	else
+		bp = xfs_buf_read(target, blkno, len, flags);
 	if (!bp)
 		return XFS_ERROR(EIO);
 	error = XFS_BUF_GETERROR(bp);

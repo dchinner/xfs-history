@@ -249,7 +249,6 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
 #define xfs_bpin(bp)		pagebuf_pin(bp)
 #define xfs_bunpin(bp)		pagebuf_unpin(bp)
 #define	xfs_bwait_unpin(bp)	pagebuf_wait_unpin(bp)
-#define xfs_bp_mapin(bp)	pagebuf_mapin(bp)
 
 #ifdef PAGEBUF_TRACE
 #define PB_DEFINE_TRACES
@@ -266,6 +265,14 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
 
 #define xfs_incore(buftarg,blkno,len,lockit) \
             pagebuf_find(buftarg.inode,blkno<<9,len<<9,lockit)
+
+
+#define xfs_biomove(pb, off, len, data, rw) \
+	    pagebuf_iomove((pb), (off), (len), (data), \
+		((rw) == XFS_B_WRITE) ? PBRW_READ : PBRW_WRITE)
+
+#define xfs_biozero(pb, off, len) \
+	    pagebuf_iomove((pb), (off), (len), NULL, PBRW_ZERO)
 
 extern void xfs_trigger_io(void);
 
