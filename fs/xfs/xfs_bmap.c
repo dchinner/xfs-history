@@ -2866,6 +2866,14 @@ xfs_bmap_add_attrfork(
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	if (XFS_IFORK_Q(ip))
 		goto error1;
+	/*
+	 * For inodes coming from pre-6.2 filesystems.
+	 */
+	if (ip->i_d.di_aformat == 0)
+		ip->i_d.di_aformat = XFS_DINODE_FMT_EXTENTS;
+	else
+		ASSERT(ip->i_d.di_aformat == XFS_DINODE_FMT_EXTENTS);
+	ASSERT(ip->i_d.di_anextents == 0);
 	VN_HOLD(XFS_ITOV(ip));
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 	switch (ip->i_d.di_format) {
@@ -2886,7 +2894,10 @@ xfs_bmap_add_attrfork(
 		goto error1;
 	}
 	ip->i_df.if_ext_max = XFS_IFORK_DSIZE(ip) / sizeof(xfs_bmbt_rec_t);
-	ip->i_af.if_ext_max = XFS_IFORK_ASIZE(ip) / sizeof(xfs_bmbt_rec_t);
+	ASSERT(ip->i_afp == NULL);
+	ip->i_afp = kmem_zone_zalloc(xfs_ifork_zone, KM_SLEEP);
+	ip->i_afp->if_ext_max = XFS_IFORK_ASIZE(ip) / sizeof(xfs_bmbt_rec_t);
+	ip->i_afp->if_flags = XFS_IFEXTENTS;
 	logflags = XFS_ILOG_CORE;
 	XFS_BMAP_INIT(&flist, &firstblock);
 	switch (ip->i_d.di_format) {
