@@ -1473,7 +1473,7 @@ _pagebuf_page_io(
 	pb_target_t		*pbr,	/* device parameters (bsz, ssz, dev) */
 	page_buf_t		*pb,	/* pagebuf holding it, can be NULL */
 	page_buf_daddr_t	bn,	/* starting block number */
-	off_t			pg_offset,	/* starting offset in page */
+	size_t			pg_offset,	/* starting offset in page */
 	size_t			pg_length,	/* count of data to process */
 	int			locking,	/* page locking in use */
 	int			rw,	/* read/write operation */
@@ -1692,7 +1692,7 @@ _page_buf_page_apply(
 
 	if (pb->pb_flags & PBF_READ) {
 		err = _pagebuf_page_io(page, pbr, pb, bn,
-			(off_t)pg_offset, pg_length, pb->pb_locked, READ, 0);
+			pg_offset, pg_length, pb->pb_locked, READ, 0);
 	} else if (pb->pb_flags & PBF_WRITE) {
 		int locking = (pb->pb_flags & _PBF_LOCKABLE) == 0;
 
@@ -1700,7 +1700,7 @@ _page_buf_page_apply(
 		if (locking && (pb->pb_locked == 0))
 			lock_page(page);
 		err = _pagebuf_page_io(page, pbr, pb, bn,
-			(off_t)pg_offset, pg_length, locking, WRITE,
+			pg_offset, pg_length, locking, WRITE,
 			last && (pb->pb_flags & PBF_FLUSH));
 	}
 
@@ -1797,7 +1797,7 @@ pagebuf_mapout_locked(
 caddr_t
 pagebuf_offset(
 	page_buf_t		*pb,
-	off_t			offset)
+	size_t			offset)
 {
 	struct page		*page;
 
