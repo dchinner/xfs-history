@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.155 $"
+#ident	"$Revision: 1.156 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -145,10 +145,10 @@ xfs_mount_validate_sb(
 	 * we have a zero sb_logstart in this case, we may be trying to mount
 	 * a volume filesystem in a non-volume manner.
 	 */
-	if ((sbp->sb_magicnum != XFS_SB_MAGIC)		||
-	    !XFS_SB_GOOD_VERSION(sbp)			||
-	    (sbp->sb_logstart == 0 && mp->m_logdev == mp->m_dev))
-		return XFS_ERROR(EINVAL);
+	if (sbp->sb_magicnum != XFS_SB_MAGIC || !XFS_SB_GOOD_VERSION(sbp))
+		return XFS_ERROR(EWRONGFS);
+	if (sbp->sb_logstart == 0 && mp->m_logdev == mp->m_dev)
+		return XFS_ERROR(EFSCORRUPTED);
 
 	/* 
 	 * More sanity checking. These were stolen directly from
@@ -164,7 +164,7 @@ xfs_mount_validate_sb(
 	    (sbp->sb_rextsize * sbp->sb_blocksize > XFS_MAX_RTEXTSIZE) 	||
 	    (sbp->sb_rextsize * sbp->sb_blocksize < XFS_MIN_RTEXTSIZE) 	||
 	    sbp->sb_imax_pct > 100)
-		return XFS_ERROR(EINVAL);
+		return XFS_ERROR(EFSCORRUPTED);
 
 	/* 
 	 * sanity check ag count, size fields against data size field 
@@ -173,7 +173,7 @@ xfs_mount_validate_sb(
 	    (sbp->sb_dblocks > (sbp->sb_agcount * sbp->sb_agblocks)) ||
 	    (sbp->sb_dblocks < ((sbp->sb_agcount - 1) * 
 			       sbp->sb_agblocks + XFS_MIN_AG_BLOCKS)))
-		return XFS_ERROR(EINVAL);
+		return XFS_ERROR(EFSCORRUPTED);
 
 #if !XFS_BIG_FILESYSTEMS
 	if (sbp->sb_dblocks > INT_MAX || sbp->sb_rblocks > INT_MAX)  {
@@ -188,7 +188,7 @@ xfs_mount_validate_sb(
 	 * Except for from mkfs, don't let partly-mkfs'ed filesystems mount.
 	 */
 	if (sbp->sb_inprogress) 
-		return XFS_ERROR(EINVAL);
+		return XFS_ERROR(EFSCORRUPTED);
 #endif	
 	return (0);
 }
@@ -594,7 +594,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 			goto error2;
 		}
 	} else {	/* No log has been defined */
-		error = XFS_ERROR(EINVAL);
+		error = XFS_ERROR(EFSCORRUPTED);
 		goto error2;
 	}
 
@@ -620,7 +620,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 			xfs_iunlock(rip, XFS_ILOCK_EXCL);
 			VN_RELE(rvp);
 			vn_purge(rvp, &vmap);
-			error = XFS_ERROR(EINVAL);
+			error = XFS_ERROR(EFSCORRUPTED);
 			goto error2;
 		}
 		VN_FLAGSET(rvp, VROOT);
