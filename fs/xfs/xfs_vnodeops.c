@@ -672,31 +672,35 @@ xfs_create(vnode_t	*dir_vp,
         xfs_ino_t               e_inum;
         struct xfs_mount        *mp;
 	dev_t			rdev;
-        int                     code;
+	unsigned long   	dir_generation;
+        int                     error;
 
         dp = XFS_VTOI(dir_vp);
 
 	xfs_ilock (dp, XFS_ILOCK_EXCL);
 
-	code = xfs_dir_lookup_int (NULL, dir_vp, 0, name, NULL, &e_inum, NULL);
-	if ((code != 0) && (code != ENOENT)) 
+try_again:
+
+	error = xfs_dir_lookup_int (NULL, dir_vp, DLF_IGET, name, NULL, 
+		&e_inum, &ip);
+	if ((error != 0) && (error != ENOENT)) 
 		goto error_return;
 
-	if (code == ENOENT) {
+	if (error == ENOENT) {
 
 		/* check access */
 
 		mp = XFS_VFSTOM(dir_vp->v_vfsp);
 		tp = xfs_trans_alloc (mp, XFS_TRANS_WAIT);
-		if (code = xfs_trans_reserve (tp, 10, 10, 0, 0))
+		if (error = xfs_trans_reserve (tp, 10, 10, 0, 0))
 			goto error_return;
 
 		rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : NODEV;
 
-		code = xfs_dir_ialloc(&tp, dp, 
+		error = xfs_dir_ialloc(&tp, dp, 
 			MAKEIMODE(vap->va_type,vap->va_mode), 
 			1, rdev, credp, &ip);
-		if (code)
+		if (error)
 			goto error_return;
 
 		/*
@@ -711,7 +715,7 @@ xfs_create(vnode_t	*dir_vp,
 		/*
 		 * XXX Need to sanity check namelen.
 		 */
-		if (code = xfs_dir_createname (tp, dp, name, ip->i_ino)) {
+		if (error = xfs_dir_createname (tp, dp, name, ip->i_ino)) {
 			xfs_droplink (tp, ip);
 		}
 
@@ -719,9 +723,52 @@ xfs_create(vnode_t	*dir_vp,
 
 	}
 	else {
-		/* Truncate case, not implemented yet. 
-			GET the inode, droplink. */
-		ASSERT (0);
+		ASSERT (ip != NULL);
+
+		vp = XFS_ITOV(ip);
+		if (excl == EXCL)
+                        error = EEXIST;
+		else if (vp->v_type == VDIR && (I_mode & IWRITE))
+                        error = EISDIR;
+		else if (I_mode) {
+			/* XXX Do access checks */
+			error = 0;
+		}
+		if (!error && vp->v_type == VREG && (vap->va_mask & AT_SIZE)) {
+
+			/*
+			 * Truncation case, not implemented yet.
+			 */
+			ASSERT (0);
+
+			/* Truncate case, not implemented yet.
+				GET the inode, droplink. */
+			ASSERT (0);
+
+			ASSERT (ip != NULL);
+
+			/* Now lock the inode also, in the right order. */
+			if (dp->i_ino < ip->i_ino) {
+				xfs_ilock (ip, XFS_ILOCK_EXCL);
+			}
+			else {
+				dir_generation = dp->i_gen;
+				xfs_iunlock (dp, XFS_ILOCK_EXCL);
+				xfs_ilock (ip, XFS_ILOCK_EXCL);
+				xfs_ilock (dp, XFS_ILOCK_EXCL);
+
+				/*
+				 * If things have changed while the dp was
+				 * unlocked, drop all except the lock on the
+				 * directory inode & try again.
+				 */
+				if (dp->i_gen != dir_generation) {
+				xfs_iunlock (ip, XFS_ILOCK_EXCL);
+				goto try_again;
+				}
+			}
+		}
+
 	}
 
 
@@ -733,10 +780,12 @@ xfs_create(vnode_t	*dir_vp,
 	 * after the commit.
 	 */
 	xfs_trans_ihold (tp, dp);
+	xfs_trans_ihold (tp, ip);
 
 	xfs_trans_commit (tp, 0);
 
 	xfs_iunlock (dp, XFS_ILOCK_EXCL);
+	xfs_iunlock (ip, XFS_ILOCK_EXCL);
 
 	
 	vp = XFS_ITOV (ip);
@@ -774,6 +823,8 @@ error_return:
 	if ((ip != NULL) && (ip != dp)) {
 		xfs_iunlock (ip, XFS_ILOCK_EXCL);
 	}
+	return error;
+
 }
 
 
@@ -820,7 +871,7 @@ again:
 		 */
 		xfs_ilock (ip, XFS_ILOCK_EXCL);
 	}
-        else {
+        else if (e_inum < dp->i_ino) {
                 dir_generation = dp->i_gen;
                 xfs_iunlock (dp, XFS_ILOCK_EXCL);
 
@@ -855,6 +906,11 @@ again:
                         }
                 }
         }
+	/*
+	 * else (e_inum == dp->i_ino)
+	 *     This can happen if we're asked to lock /x/..
+	 *     the entry is "..", which is also the parent directory.
+	 */
 
 	*ipp = ip;
 
@@ -946,10 +1002,10 @@ xfs_lock_for_rename(
 	 */
 	for (i=0; i < num_inodes; i++) {
 		for (j=1; j < num_inodes; j++) {
-			if (i_tab[j] < i_tab[j-1]) {
+			if (i_tab[j]->i_ino < i_tab[j-1]->i_ino) {
 				temp = i_tab[j];
 				i_tab[j] = i_tab[j-1];
-				i_tab[j-1] = i_tab[j];
+				i_tab[j-1] = temp;
 			}
 		}
 	}
@@ -1110,7 +1166,8 @@ xfs_remove(vnode_t	*dir_vp,
 
 error_return:
 	xfs_iunlock (dp, XFS_ILOCK_EXCL);               
-	xfs_iunlock (ip, XFS_ILOCK_EXCL);               
+	if (dp != ip)
+		xfs_iunlock (ip, XFS_ILOCK_EXCL);               
 	return error;
 
 
@@ -1196,7 +1253,6 @@ error_return:
 /*
  * xfs_rename
  *
- * This is a stub.
  */
 STATIC int
 xfs_rename(vnode_t	*src_dir_vp,
@@ -1310,6 +1366,8 @@ xfs_rename(vnode_t	*src_dir_vp,
 	if (new_parent)
 		xfs_trans_ijoin (tp, target_dp, XFS_ILOCK_EXCL);
 
+	xfs_trans_ijoin (tp, src_ip, XFS_ILOCK_EXCL);
+
 	/*
 	 * Set up the target.
 	 */
@@ -1323,7 +1381,7 @@ xfs_rename(vnode_t	*src_dir_vp,
 		 */
 
 		if (error = xfs_dir_createname (tp, target_dp,
-				target_name, target_ip->i_ino))
+				target_name, src_ip->i_ino))
 			goto error_return;
 			
 		if (new_parent && src_is_directory)
@@ -1374,22 +1432,23 @@ xfs_rename(vnode_t	*src_dir_vp,
 		}
 
 		/*
-		 * Purge all name cache references to the old target.
-                 */
-                dnlc_purge_vp(XFS_ITOV(target_ip));
-
-		/*
 		 * Link the source inode under the target inode.
 		 * If the source inode is a directory and we are moving
 		 * it across directories, its ".." entry will be 
 		 * inconsistent until xfs_dir_init.
+		 *
+		 * In case there is already an entry with the same
+		 * name at the destination directory, remove it first.
 		 */
-		error = xfs_dir_removename (tp, src_ip, src_name);
-		ASSERT (! error);
+		error = xfs_dir_removename (tp, target_dp, target_name);
+		ASSERT ((! error) || (error == ENOENT));
+		error = 0;
 
-		error = xfs_dir_createname (tp, target_ip, 
+		error = xfs_dir_createname (tp, target_dp, 
 				target_name, target_ip->i_ino);
 		ASSERT (! error);	
+
+		dnlc_enter (src_dir_vp, target_name, XFS_ITOV(src_ip), credp);
 
 		/*
 		 * Decrement the link count on the target since the target
@@ -1412,8 +1471,6 @@ xfs_rename(vnode_t	*src_dir_vp,
 	 * Remove the source.
 	 */
 	if (new_parent && src_is_directory) {
-
-		xfs_trans_ijoin (tp, src_ip, XFS_ILOCK_EXCL);
 
 		/*
 		 * Add the "." and ".." entries.
@@ -1453,7 +1510,8 @@ xfs_rename(vnode_t	*src_dir_vp,
 	xfs_trans_commit (tp, 0);
 
 	xfs_iunlock (src_dp, XFS_ILOCK_EXCL);
-	xfs_iunlock (target_dp, XFS_ILOCK_EXCL);
+	if (new_parent)
+		xfs_iunlock (target_dp, XFS_ILOCK_EXCL);
 
 	return 0;
 
@@ -1481,7 +1539,6 @@ error_return:
 /*
  * xfs_mkdir
  *
- * This is a stub.
  */
 STATIC int
 xfs_mkdir(vnode_t	*dir_vp,
@@ -1507,13 +1564,18 @@ xfs_mkdir(vnode_t	*dir_vp,
 	 * Since dp was not locked between VOP_LOOKUP and VOP_MKDIR,
 	 * the directory could have been removed.
 	 */
-        if (dp->i_d.di_nlink <= 0) 
+        if (dp->i_d.di_nlink <= 0) {
+		code = ENOENT;
                 goto error_return;
+	}
 
         code = xfs_dir_lookup_int(NULL, dir_vp, 0, dir_name, NULL,
 				  &e_inum, NULL);
-        if (code != ENOENT) 
+        if (code != ENOENT) {
+		if (code == 0)
+			code = EEXIST;
                 goto error_return;
+	}
 
 
 
@@ -1596,6 +1658,7 @@ xfs_rmdir(vnode_t	*dir_vp,
         int                     error;
 
         dp = XFS_VTOI(dir_vp);
+	cdp = NULL;
 
 	/* check access */
 
@@ -1670,6 +1733,8 @@ xfs_rmdir(vnode_t	*dir_vp,
 
 error_return:
 	xfs_iunlock (dp, XFS_ILOCK_EXCL);
+	if (cdp)
+		xfs_iunlock (cdp, XFS_ILOCK_EXCL);
 	return error;
 }
 
