@@ -1,4 +1,4 @@
-#ident "$Revision: 1.11 $"
+#ident "$Revision: 1.12 $"
 
 
 #include <sys/param.h>
@@ -1677,73 +1677,53 @@ xfs_qm_dqiterate(
 	xfs_dqbuf_iter	iterfunc)
 {
         xfs_bmbt_irec_t         map[XFS_DQITER_MAP_SIZE];          
-        int                     i, nmap;    	/* number of map entries */
-	xfs_fsblock_t           firstblock;     /* start block for bmapi */
+        int                     i, nmaps;    	/* number of map entries */
 	int                     error;          /* return value */
-	__int64_t               len, end, off, newoff, outlen;
-	xfs_dfiloff_t		lblkno;
-	xfs_filblks_t		lblkcnt, nblks;
+	xfs_fileoff_t		lblkno;
+	xfs_filblks_t		maxlblkcnt;
 	xfs_dqid_t		firstid;
 
 	error = 0;
 	/*
 	 * This looks racey, but we can't keep an inode lock across a 
 	 * trans_reserve. But, this gets called during quotacheck, and that
-	 * happens only at mount time which is single threaded. We take the
-	 * ilock here because di_nblocks is a 64-bit number, but even that
-	 * isn't necessary.
+	 * happens only at mount time which is single threaded.
 	 */
-	xfs_ilock(qip, XFS_ILOCK_SHARED);
-	nblks = (xfs_filblks_t)qip->i_d.di_nblocks;
-	xfs_iunlock(qip, XFS_ILOCK_SHARED);
-	if (nblks == 0)
+	if (qip->i_d.di_nblocks == 0)
 		return (0);
 
 	lblkno = 0;
-	lblkcnt = XFS_B_TO_FSB(mp, (xfs_ufsize_t)XFS_MAX_FILE_OFFSET);
-	len = XFS_FSB_TO_BB(mp, lblkcnt);
-	if (nblks > 500) {
-		cmn_err(CE_NOTE, 
-		     "XFS quotacheck: Iterating over quota entries in 0x%x blocks",
-		     nblks);
-	}
+	maxlblkcnt = XFS_B_TO_FSB(mp, (xfs_ufsize_t)XFS_MAX_FILE_OFFSET);
 	do {
-		firstblock = NULLFSBLOCK;
-		nmap = XFS_DQITER_MAP_SIZE;
+		nmaps = XFS_DQITER_MAP_SIZE;
 		/*
 		 * We aren't changing the inode itself. Just changing
 		 * some of its data. No new blocks are added here, and
 		 * the inode is never added to the transaction.
 		 */
 		xfs_ilock(qip, XFS_ILOCK_SHARED);
-		error = xfs_bmapi(NULL, qip, (xfs_fileoff_t) lblkno,
-				  lblkcnt, 
-				  XFS_BMAPI_ENTIRE|XFS_BMAPI_METADATA,
-				  &firstblock,
-				  0, map, &nmap, NULL);
+		error = xfs_bmapi(NULL, qip, lblkno,
+				  maxlblkcnt - lblkno, 
+				  XFS_BMAPI_METADATA,
+				  NULL,
+				  0, map, &nmaps, NULL);
 		xfs_iunlock(qip, XFS_ILOCK_SHARED);
-		if (error) {	
+		if (error) 	
 			break;
-		}
-		if (nmap == 0)
-			continue;
-
-		ASSERT(nmap <= XFS_DQITER_MAP_SIZE);
 		
-		end = len;
-		for (i = 0; i < nmap && len; i++) {
+		ASSERT(nmaps <= XFS_DQITER_MAP_SIZE);
+		for (i = 0; i < nmaps; i++) {
 			ASSERT(map[i].br_startblock != DELAYSTARTBLOCK);
 			if (map[i].br_blockcount == 0)
 				continue;
 
 			lblkno += map[i].br_blockcount;
-			lblkcnt -= map[i].br_blockcount;
+
 			if (map[i].br_startblock == HOLESTARTBLOCK)
 				continue;
+
 			firstid = (xfs_dqid_t) map[i].br_startoff * 
 				XFS_QM_DQPERBLK(mp);
-			off = XFS_FSB_TO_BB(mp, map[i].br_startoff);
-			outlen = XFS_FSB_TO_BB(mp, map[i].br_blockcount);
 			if (error = xfs_qm_dqiter_bufs(mp, 
 						       firstid,
 						       map[i].br_startblock, 
@@ -1752,15 +1732,11 @@ xfs_qm_dqiterate(
 						       flags)) {
 				break;
 			}
-				
-			newoff = off + outlen;
-			len = MAX(0, end - newoff);
-			nblks -= map[i].br_blockcount;
 		}
 
 		if (error) 
 			break;
-	} while (len && nmap && nblks > 0); 
+	} while (nmaps > 0); 
 
         return (error);
 }
@@ -1977,9 +1953,20 @@ xfs_qm_quotacheck(
 	 * We don't log our changes till later.
 	 */
 	if (uip = mp->QI_UQIP) {
+		/* 
+		 * XXX warn just for user quotas for now, until we figure out
+		 * what to do ..
+		 */
+		if (uip->i_d.di_nblocks > 500) {
+			cmn_err(CE_NOTE, "XFS quotacheck %s PASS 1: Please wait.",
+				mp->m_fsname);
+		}
 		if (error = xfs_qm_dqiterate(mp, uip, XFS_QMOPT_UQUOTA,
 					     xfs_qm_reset_dqcounts))
 			return (error);
+		if (uip->i_d.di_nblocks > 500) 
+			cmn_err(CE_NOTE, "XFS quotacheck %s PASS 1: Done.",
+				mp->m_fsname);
 	}
 	
 	if (pip = mp->QI_PQIP) {
@@ -1987,11 +1974,7 @@ xfs_qm_quotacheck(
 					     xfs_qm_reset_dqcounts))
 			return (error);
 	}
-	/*
-	 * Hack. XXX temporary.
-	 */
-	bflush(mp->m_dev);
-		
+
 	do {
 		/*
 		 * Iterate thru all the inodes in the file system,
@@ -2034,11 +2017,18 @@ xfs_qm_quotacheck(
 	 * somehow are permanent before we stamp the file system q'checked.
 	 */
 	if (uip) {
+		if (uip->i_d.di_nblocks > 500) {
+			cmn_err(CE_NOTE, "XFS quotacheck %s PASS 2: Please wait.",
+				mp->m_fsname);
+		}
 		if (error = xfs_qm_dqiterate(mp, uip, 
 					     XFS_QMOPT_UQUOTA | XFS_QMOPT_DOLOG,
 					     NULL))
 			return (error);
 		flags |= XFS_UQUOTA_CHKD;
+		if (uip->i_d.di_nblocks > 500) 
+			cmn_err(CE_NOTE, "XFS quotacheck %s PASS 2: Done.",
+				mp->m_fsname);
 	}
 	
 	if (pip) {
