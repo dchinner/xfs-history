@@ -207,10 +207,7 @@ vfs_busydev(dev_t dev, int type)
 	kdev_t	kdev = mk_kdev(MAJOR(dev), MINOR(dev));
 	struct super_block *sb;
 
-	lock_kernel();
 	sb = get_super(kdev);
-	unlock_kernel();
-
 	if (!sb)
 		return NULL;
 	
@@ -266,24 +263,19 @@ vfs_unbusy_wakeup(register struct vfs *vfsp)
 STATIC struct vfs *
 vfs_devsearch_nolock(dev_t dev, int fstype)
 {
-        register struct vfs *vfsp;
+	struct vfs *vfsp = NULL;
 	kdev_t	kdev = mk_kdev(MAJOR(dev), MINOR(dev));
 	struct super_block *sb;
 
-	lock_kernel();
 	sb = get_super(kdev);
-
 	if (sb) {
 		vfsp = LINVFS_GET_VFS(sb);
-		drop_super(sb);
-                if ((vfsp->vfs_dev == dev) &&
-                    (fstype == VFS_FSTYPE_ANY || fstype == vfsp->vfs_fstype)) {
-			unlock_kernel();
-                        return vfsp;
-		}
+		if (fstype != VFS_FSTYPE_ANY && fstype != vfsp->vfs_fstype)
+			vfsp = NULL;
 	}
-	unlock_kernel();
-        return NULL;
+
+	drop_super(sb);
+	return vfsp;
 }
 
 void
