@@ -951,7 +951,7 @@ xlog_find_zeroed(struct log	*log,
 	if (new_blk >= 0)
 		last_blk = new_blk;
 	else if (new_blk != -1) {
-		error = last_blk;
+		error = new_blk;
 		goto bp_err;
 	}
 
