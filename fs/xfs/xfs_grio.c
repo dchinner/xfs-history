@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.28 1994/07/20 00:30:14 doucette Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.29 1994/07/26 23:02:22 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -71,20 +71,18 @@ int xfs_grio_add_ticket( file_id_t *, int, char *);
 int xfs_grio_remove_ticket( file_id_t *, char *);
 int xfs_add_ticket_to_inode( xfs_inode_t *, int, struct reservation_id *);
 void xfs_remove_ticket_from_inode( xfs_inode_t *, struct reservation_id *);
-void ticket_lock_shared( xfs_inode_t *);
-void ticket_lock_exclusive( xfs_inode_t *);
-void ticket_unlock( xfs_inode_t *);
-xfs_inode_t *xfs_get_inode ( dev_t, int);
-grio_ticket_t *xfs_io_is_guaranteed( xfs_inode_t *, struct reservation_id *);
-STATIC int xfs_grio_issue_io( vnode_t *, uio_t *,int, cred_t *,int);
-STATIC int xfs_crack_file_id(file_id_t *, dev_t *, xfs_ino_t *);
-
-
+int ticket_lock( xfs_inode_t *);
+void ticket_unlock( xfs_inode_t *, int);
 extern int xfs_read_file(vnode_t *, uio_t *, int, cred_t *);
 extern int xfs_write_file(vnode_t *, uio_t *, int, cred_t *);
 extern int xfs_diordwr(vnode_t *,uio_t *, int, cred_t *,int);
-extern struct vfs *vfs_devsearch( dev_t );
 extern int strncmp(char *, char *, int);
+extern struct vfs *vfs_devsearch( dev_t );
+STATIC int xfs_grio_issue_io( vnode_t *, uio_t *,int, cred_t *,int);
+STATIC int xfs_crack_file_id(file_id_t *, dev_t *, xfs_ino_t *);
+xfs_inode_t *xfs_get_inode ( dev_t, int);
+grio_ticket_t *xfs_io_is_guaranteed( xfs_inode_t *, struct reservation_id *, int *);
+
 #ifndef SIM
 extern void fasthz_delay( struct timeval *);
 extern void timestruc_sub( timestruc_t *, timestruc_t *);
@@ -107,9 +105,9 @@ extern void timestruc_fix( timestruc_t *);
 xfs_inode_t *
 xfs_get_inode(  dev_t fs_dev, int ino)
 {
-        struct vfs 	*vfsp;
-        xfs_inode_t 	*ip = NULL ;
-	extern struct vfs *vfs_devsearch( dev_t );
+        struct vfs		*vfsp;
+        xfs_inode_t		*ip = NULL ;
+	extern struct vfs	*vfs_devsearch( dev_t );
 
         vfsp = vfs_devsearch( fs_dev );
         if (vfsp) {
@@ -117,11 +115,11 @@ xfs_get_inode(  dev_t fs_dev, int ino)
 		 * Verify that this is an xfs file system.
 		 */
 #ifndef SIM
-		if (strncmp(vfssw[vfsp->vfs_fstype].vsw_name, "xfs", 3) == 0) {
-#else
-		{
+		if (strncmp(vfssw[vfsp->vfs_fstype].vsw_name, "xfs", 3) == 0) 
 #endif
-                	ip = xfs_iget( XFS_VFSTOM( vfsp ), NULL, ino, XFS_ILOCK_EXCL);
+		{
+                	ip = xfs_iget( XFS_VFSTOM( vfsp ), 
+					NULL, ino, XFS_ILOCK_EXCL);
 
 #ifdef DEBUG
 			if (!ip) 
@@ -146,18 +144,18 @@ xfs_get_inode(  dev_t fs_dev, int ino)
 int
 xfs_add_ticket_to_inode( xfs_inode_t *ip, int sz, struct reservation_id *id )
 {
-	grio_ticket_t *ticket;
-	int 	ret = 0;
+	int		ret = 0, s;
+	grio_ticket_t	*ticket;
 
 	/*
  	 * Check if ticket with this id is already on the list.
  	 */
-	if (xfs_io_is_guaranteed( ip, id ) ) {
+	if (xfs_io_is_guaranteed( ip, id, &s ) ) {
 		ret = -1;
 	} else {
 		if (ticket = kmem_zalloc( sizeof( grio_ticket_t), KM_SLEEP)) {
-			ticket->sz = sz;
-			ticket->type = NON_ROTATE_TYPE;
+			ticket->sz     = sz;
+			ticket->type   = NON_ROTATE_TYPE;
 			ticket->id.ino = id->ino;
 			ticket->id.pid = id->pid;
 			if (id->vod_rotate_slot != NULL_VOD_SLOT) {
@@ -175,7 +173,7 @@ xfs_add_ticket_to_inode( xfs_inode_t *ip, int sz, struct reservation_id *id )
 			ip->i_ticket = ticket;
 		}
 	}
-	ticket_unlock(ip);
+	ticket_unlock(ip, s);
 	return(ret);
 }
 
@@ -192,11 +190,11 @@ xfs_add_ticket_to_inode( xfs_inode_t *ip, int sz, struct reservation_id *id )
 int
 xfs_grio_add_ticket( file_id_t *fileidp, int sz, char *idptr)
 {
-	xfs_ino_t	ino;
-	dev_t		fs_dev;
-	int ret = -1;
-	xfs_inode_t *ip;
-	struct reservation_id id;
+	int			ret = -1;
+	dev_t			fs_dev;
+	xfs_ino_t		ino;
+	xfs_inode_t		*ip;
+	struct reservation_id	id;
 
 
 	xfs_crack_file_id( fileidp, &fs_dev, &ino);
@@ -206,7 +204,6 @@ xfs_grio_add_ticket( file_id_t *fileidp, int sz, char *idptr)
 		printf("add ticket: ino = %llx, dev = %x \n",
 					(__int64_t)ino, fs_dev);
 #endif
-	
 
 	if (copyin(idptr, (caddr_t)&id, sizeof(id))) {
 #ifdef DEBUG
@@ -216,19 +213,6 @@ xfs_grio_add_ticket( file_id_t *fileidp, int sz, char *idptr)
 		return( ret );
 	}
 
-#ifdef DEBUG
-	{
-		int t1,t2;
-       		char    str[80];
-
-		t1 = id.ino;
-		t2 = id.pid;
-
-        	sprintf(str,"grio add tkt: dev %x, ino %x, sz %x, id (%llx,%x)\n",
-                     fs_dev, ino, sz, id.ino, id.pid);
-        	GRIO_DBPRNT(0, str);
-	}
-#endif
         /*
          * Lock the inode IOLOCK_EXCL so that the i_ticket
          * list in the inode can be safely updated.
@@ -264,8 +248,9 @@ void
 xfs_remove_ticket_from_inode( xfs_inode_t *ip, struct reservation_id *id)
 {
 	grio_ticket_t *ticket, *previousticket;
+	int s;
 
-	ticket_lock_exclusive( ip );
+	s = ticket_lock( ip );
 	if (ticket = ip->i_ticket) {
 		if (MATCH_ID((&(ticket->id)), id)) {
 			ip->i_ticket = ticket->nextticket;
@@ -281,7 +266,7 @@ xfs_remove_ticket_from_inode( xfs_inode_t *ip, struct reservation_id *id)
 			kmem_free( ticket, sizeof( grio_ticket_t ) );
 		}
 	}
-	ticket_unlock( ip );
+	ticket_unlock( ip, s );
 }
 
 /*
@@ -297,10 +282,10 @@ xfs_remove_ticket_from_inode( xfs_inode_t *ip, struct reservation_id *id)
 int
 xfs_grio_remove_ticket( file_id_t *fileidp, char *idptr)
 {
-	xfs_ino_t	ino;
-	dev_t		fs_dev;
-	xfs_inode_t *ip;
-	struct reservation_id id;
+	dev_t			fs_dev;
+	xfs_ino_t		ino;
+	xfs_inode_t 		*ip;
+	struct reservation_id	id;
 
 	xfs_crack_file_id( fileidp, &fs_dev, &ino);
 
@@ -317,20 +302,6 @@ xfs_grio_remove_ticket( file_id_t *fileidp, char *idptr)
 #endif
 		return( EFAULT );
 	}
-
-#ifdef DEBUG
-	{
-        	char str[80];
-		int t1, t2;
-	
-		t1  = id.ino;
-		t2  = id.pid;
-
-       		sprintf(str,"grio rm tkt: dev %x, ino %x, id (%llx,%x)\n",
-                        fs_dev, ino, id.ino, id.pid);
-        	GRIO_DBPRNT(0, str);
-	}
-#endif
 
 	if (ip = xfs_get_inode( fs_dev, ino)) {
 		xfs_remove_ticket_from_inode (ip, &id);
@@ -357,11 +328,11 @@ xfs_grio_remove_ticket( file_id_t *fileidp, char *idptr)
  *	non-zero if there is a guarantee
  */
 grio_ticket_t *
-xfs_io_is_guaranteed( xfs_inode_t *ip, struct reservation_id *id)
+xfs_io_is_guaranteed( xfs_inode_t *ip, struct reservation_id *id, int *s)
 {
 	grio_ticket_t *ticket;
 
-	ticket_lock_shared( ip );
+	*s = ticket_lock( ip );
 	ticket = ip->i_ticket;
 
 	while (ticket && (!MATCH_ID((&(ticket->id)), id))) {
@@ -394,22 +365,20 @@ xfs_grio_req( xfs_inode_t *ip,
 	off_t	offset,
 	int rw)
 {
-	int 		sz, ret = 0, remainingio, thisioreq, set_size; 
+	int 		sz, ret = 0, remainingio, thisioreq, set_size, s; 
 	int		which_disk, current_disk, num_sec, sec, delay_ticks;
-	vnode_t 	*vp;
 	time_t		snap_lbolt;
-	grio_ticket_t 	*ticket;
+	vnode_t 	*vp;
 	timestruc_t	tv, nexttv;
+	grio_ticket_t 	*ticket;
 	struct	timeval	tvl;
-
-int	loopcnt = 0;
 
 retry_request:
 
         /*
          * Determine if this request has a guaranteed rate of I/O.
          */
-        if (ticket = xfs_io_is_guaranteed( ip, id)) {
+        if (ticket = xfs_io_is_guaranteed( ip, id, &s)) {
 		/*
  		 * Mark this request as being rate guaranteed. 
 		 */
@@ -451,7 +420,7 @@ retry_request:
 				delay_ticks = 1;
 #endif
 
-                        	ticket_unlock(ip);
+                        	ticket_unlock(ip, s );
 		                delay( delay_ticks );
 				goto retry_request;
 			}
@@ -526,15 +495,14 @@ retry_request:
 
 				ticket->iothissecond    += thisioreq; 
 
-                        	ticket_unlock(ip);
+                        	ticket_unlock(ip, s);
 				vp = XFS_ITOV(ip);
 
 				/*
 				 * Issue the request.
 				 */
 				ret = xfs_grio_issue_io( vp, 
-						uiop, ioflag, credp, rw);
-
+					uiop, ioflag, credp, rw);
 
 				/*
 			 	 * Check for errors.
@@ -552,7 +520,7 @@ retry_request:
                  		 * The granularity of this delay is 1/fasthz 
 				 * (1 millisecond).
                  		 */
-                        	ticket_unlock(ip);
+                        	ticket_unlock(ip, s );
                 		GRIO_DBPRNT(2,"request issued too soon \n");
 
 #ifdef SIM
@@ -570,8 +538,8 @@ retry_request:
 		 	 * Check if rate guarantee was removed while
 		 	 * I/O was taking place.
 		 	 */
-			if (( ticket = xfs_io_is_guaranteed( ip, id)) == NULL) {
-       				ticket_unlock(ip);
+			if (( ticket = xfs_io_is_guaranteed(ip,id,&s)) == NULL){
+       				ticket_unlock(ip, s);
 				if (ret) {
 		        		uiop->uio_resid += remainingio;
 				} else {
@@ -596,15 +564,15 @@ retry_request:
                 	uiop->uio_resid = remainingio;
 			uiop->uio_iov[0].iov_len = remainingio;
 		}
-       		ticket_unlock(ip);
+       		ticket_unlock(ip, s);
 	} else {
-       		ticket_unlock(ip);
+       		ticket_unlock(ip, s);
 		vp = XFS_ITOV(ip);
 
 #ifndef SIM
      		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
 #endif
-		xfs_grio_issue_io(vp, uiop, ioflag, credp, rw);
+		ret = xfs_grio_issue_io(vp, uiop, ioflag, credp, rw);
 #ifndef SIM
      		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
 #endif
@@ -628,10 +596,10 @@ retry_request:
  */
 STATIC int
 xfs_grio_issue_io( vnode_t *vp, 
-		   uio_t   *uiop, 
-		   int     ioflag,
-		   cred_t  *credp,
-		   int     rw)
+	uio_t   *uiop, 
+	int     ioflag,
+	cred_t  *credp,
+	int     rw)
 {
 	int ret;
 
@@ -662,33 +630,21 @@ xfs_grio_issue_io( vnode_t *vp,
 
 
 /*
- * ticket_lock_shared()
- *      Locks the per inode ticket lock in shared mode.
- *
- * RETURNS:
- *	none
- */
-void
-ticket_lock_shared(xfs_inode_t *ip)
-{
-#ifndef SIM
-        mrlock(&ip->i_ticketlock, MR_ACCESS, PINOD);
-#endif
-}
-
-/*
- * ticket_lock_exclusive()
+ * ticket_lock()
  *      Locks the per inode ticket lock in exclusive mode.
  *
  * RETURNS:
- *	none
+ *	The current spl level.
  */
-void
-ticket_lock_exclusive(xfs_inode_t *ip)
+int
+ticket_lock(xfs_inode_t *ip)
 {
+	int s;
+
 #ifndef SIM
-        mrlock(&ip->i_ticketlock, MR_UPDATE, PINOD);
+	s = splockspl(ip->i_ticketlock, splhi);
 #endif
+	return( s );
 }
 
 /*
@@ -699,10 +655,10 @@ ticket_lock_exclusive(xfs_inode_t *ip)
  *	none
  */
 void
-ticket_unlock(xfs_inode_t *ip)
+ticket_unlock(xfs_inode_t *ip, int s)
 {
 #ifndef SIM
-        mrunlock(&ip->i_ticketlock);
+	spunlockspl(ip->i_ticketlock, s);
 #endif
 }
 
@@ -721,13 +677,13 @@ ticket_unlock(xfs_inode_t *ip)
 int
 xfs_get_file_extents(file_id_t *fileidp, xfs_bmbt_irec_t extents[], int *count)
 {
+	int			i, recsize, num_extents = 0, ret = 0;
 	dev_t			fs_dev;
 	xfs_ino_t		ino;
 	xfs_inode_t 		*ip;
 	xfs_bmbt_rec_t 		*ep;
 	xfs_bmbt_irec_t 	thisrec;
 	grio_bmbt_irec_t	*grec;
-	int			i, recsize, num_extents = 0, ret = 0;
 
 	xfs_crack_file_id( fileidp, &fs_dev, &ino);
 
@@ -737,7 +693,6 @@ xfs_get_file_extents(file_id_t *fileidp, xfs_bmbt_irec_t extents[], int *count)
 				(__int64_t)ino, fs_dev);
 	}
 #endif
-
 	/*
  	 * Get the inode.
 	 */
@@ -861,8 +816,7 @@ xfs_get_block_size(dev_t fsdev, int *fs_size)
 	int 		ret = 0;
 	struct vfs	*vfsp;
 
-	vfsp = vfs_devsearch( fsdev );
-	if ( vfsp ) {
+	if (vfsp = vfs_devsearch( fsdev )) {
 		if (copyout(&(vfsp->vfs_bsize), fs_size, sizeof(*fs_size))) {
 			ret = EFAULT;
 		}
@@ -918,6 +872,7 @@ xfs_remove_all_tickets()
 {
 	int 		s;
 	vfs_t		*vfsp;
+	extern int	xfs_type;
 	extern vfs_t	*rootvfs;
 	extern lock_t	vfslock;
 	extern int	xfs_fstype;
@@ -1008,9 +963,7 @@ xfs_mark_inode_grio( file_id_t *fileidp)
 		return( 1 );
 	}
 
-	if (!(ip->i_flags & XFS_IGRIO)) {
-		ip->i_flags |= XFS_IGRIO;
-	} 
+	ip->i_flags |= XFS_IGRIO;
 
 	xfs_iunlock( ip, XFS_ILOCK_EXCL );
 	IRELE( ip );
@@ -1050,9 +1003,7 @@ xfs_clear_inode_grio( file_id_t *fileidp)
 		return( 1 );
 	}
 
-	if (ip->i_flags & XFS_IGRIO) {
-		ip->i_flags &= ~XFS_IGRIO;
-	} 
+	ip->i_flags &= ~XFS_IGRIO;
 
 	xfs_iunlock( ip, XFS_ILOCK_EXCL );
 	IRELE( ip );
