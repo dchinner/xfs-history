@@ -1595,7 +1595,6 @@ xfs_bmapi(
 	xfs_alloctype_t		type;
 	int			wasdelay;
 	int			wr;
-	int			inhole_last_loop;
 
 	ASSERT(*nmap >= 1 && *nmap <= XFS_BMAP_MAX_NMAP);
 	ASSERT(ip->i_d.di_format == XFS_DINODE_FMT_BTREE ||
@@ -1604,7 +1603,6 @@ xfs_bmapi(
 	wr = (flags & XFS_BMAPI_WRITE) != 0;
 	delay = (flags & XFS_BMAPI_DELAY) != 0;
 	trim = (flags & XFS_BMAPI_ENTIRE) == 0;
-	inhole_last_loop = 0;
 	ASSERT(wr || !delay);
 	if (ip->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
 		if (!wr) {
@@ -1694,13 +1692,12 @@ xfs_bmapi(
 			 * Reading in a hole.
 			 */
 			mval->br_startoff = bno;
-			mval->br_startblock = NULLSTARTBLOCK;
+			mval->br_startblock = HOLESTARTBLOCK;
 			mval->br_blockcount = xfs_extlen_min(len, got.br_startoff - bno);
 			bno += mval->br_blockcount;
 			len -= mval->br_blockcount;
 			mval++;
 			n++;
-			inhole_last_loop = 1;
 			continue;
 		}
 		/*
@@ -1710,27 +1707,31 @@ xfs_bmapi(
 		if (trim) {
 			mval->br_startoff = bno;
 			if (got.br_startblock == NULLSTARTBLOCK)
-				mval->br_startblock = NULLSTARTBLOCK;
+				mval->br_startblock = DELAYSTARTBLOCK;
 			else
 				mval->br_startblock = got.br_startblock +
 					(bno - got.br_startoff);
 			mval->br_blockcount =
 				xfs_extlen_min(len, got.br_blockcount -
 					(bno - got.br_startoff));
-		} else
+		} else {
 			*mval = got;
+			if (mval->br_startblock == NULLSTARTBLOCK)
+				mval->br_startblock = DELAYSTARTBLOCK;
+		}
 		bno = mval->br_startoff + mval->br_blockcount;
 		len = end - bno;
-		if (n > 0 && mval->br_startblock != NULLSTARTBLOCK &&
-		    mval[-1].br_startblock != NULLSTARTBLOCK &&
+		if (n > 0 && mval->br_startblock != DELAYSTARTBLOCK &&
+		    mval[-1].br_startblock != DELAYSTARTBLOCK &&
+		    mval[-1].br_startblock != HOLESTARTBLOCK &&
 		    mval->br_startblock ==
 		    mval[-1].br_startblock + mval[-1].br_blockcount) {
 			ASSERT(mval->br_startoff ==
 			       mval[-1].br_startoff + mval[-1].br_blockcount);
 			mval[-1].br_blockcount += mval->br_blockcount;
-		} else if (n > 0 && inhole_last_loop == 0 &&
-			   mval->br_startblock == NULLSTARTBLOCK &&
-			   mval[-1].br_startblock == NULLSTARTBLOCK &&
+		} else if (n > 0 &&
+			   mval->br_startblock == DELAYSTARTBLOCK &&
+			   mval[-1].br_startblock == DELAYSTARTBLOCK &&
 			   mval->br_startoff ==
 			   mval[-1].br_startoff + mval[-1].br_blockcount) {
 			mval[-1].br_blockcount += mval->br_blockcount;
@@ -1738,7 +1739,6 @@ xfs_bmapi(
 			mval++;
 			n++;
 		}
-		inhole_last_loop = 0;
 		/*
 		 * If we're done, stop now.
 		 */
