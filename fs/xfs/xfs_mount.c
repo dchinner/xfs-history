@@ -1,5 +1,6 @@
-#ident	"$Revision: 1.82 $"
+#ident	"$Revision: 1.83 $"
 
+#include <limits.h>
 #include <sys/param.h>
 #ifdef SIM
 #define _KERNEL
@@ -64,6 +65,7 @@ xfs_mount_init(void)
 	xfs_mount_t *mp;
 
 	mp = kmem_zalloc(sizeof(*mp), 0);
+	mp->m_fsname = kmem_alloc(PATH_MAX, 0);
 
 	initnlock(&mp->m_ail_lock, "xfs_ail");
 	initnlock(&mp->m_async_lock, "xfs_async");
@@ -103,6 +105,7 @@ xfs_mount_free(xfs_mount_t *mp)
 	freesplock(mp->m_ipinlock);
 	freesplock(mp->m_sb_lock);
 
+	kmem_free(mp->m_fsname, PATH_MAX);
 	kmem_free(mp, sizeof(xfs_mount_t));
 }	/* xfs_mount_free */
 
@@ -317,8 +320,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		kmem_zalloc(sbp->sb_agcount * sizeof(xfs_perag_t), KM_SLEEP);
 
 	/*
-	 * Call the log's mount-time initialization.  Will perform recovery
-	 * if needed.
+	 * log's mount-time initialization. Perform 1st part recovery if needed
 	 */
 	if (sbp->sb_logblocks > 0) {		/* check for volume case */
 		error = xfs_log_mount(mp, mp->m_logdev,
