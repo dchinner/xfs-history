@@ -1077,7 +1077,8 @@ xfs_inactive(vnode_t	*vp,
 
 				done = 0;
 				XFS_BMAP_INIT(&free_list, &first_block);
-				first_block = xfs_bunmapi(tp, ip, 0, 2, 2,
+				first_block = xfs_bunmapi(tp, ip, 0, 2,
+						  XFS_BMAPI_METADATA, 2,
 						  first_block, &free_list,
 						  &done);
 				ASSERT(done);
@@ -3817,7 +3818,7 @@ xfs_allocstore(vnode_t	*vp,
 			unmap_len_fsb = imapp->br_startoff -
 				        unmap_offset_fsb;
 			(void) xfs_bunmapi(NULL, ip, unmap_offset_fsb,
-					   unmap_len_fsb, 1, NULLFSBLOCK,
+					   unmap_len_fsb, 0, 1, NULLFSBLOCK,
 					   NULL, NULL);
 		}
 		unmap_offset_fsb = imapp->br_startoff + imapp->br_blockcount;
@@ -3831,7 +3832,7 @@ xfs_allocstore(vnode_t	*vp,
 					        unmap_offset_fsb;
 				(void) xfs_bunmapi(NULL, ip,
 						   unmap_offset_fsb,
-						   unmap_len_fsb, 1,
+						   unmap_len_fsb, 0, 1,
 						   NULLFSBLOCK, NULL, NULL);
 			}
 		}

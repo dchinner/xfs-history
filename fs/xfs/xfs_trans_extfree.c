@@ -74,7 +74,7 @@ xfs_trans_log_efi_extent(xfs_trans_t		*tp,
 	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)efip);
 	ASSERT(lidp != NULL);
 
-	tp->t_flags |= (XFS_TRANS_DIRTY | XFS_TRANS_SYNC);
+	tp->t_flags |= XFS_TRANS_DIRTY;
 	lidp->lid_flags |= XFS_LID_DIRTY;
 
 	next_extent = efip->efi_next_extent;
