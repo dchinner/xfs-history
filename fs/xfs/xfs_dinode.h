@@ -3,20 +3,6 @@
 
 #ident "$Revision$"
 
-#include "xfs_types.h"
-#include "xfs_inum.h"
-
-/* 
- * Dummy freelist inode structure.
- */
-typedef struct xfs_inode_free
-{
-	__uint32_t	di_magic;
-	__uint16_t	di_mode;
-	__int16_t	di_nlink;
-	xfs_agino_t	di_next;	/* next free inode, or NULLAGINO */
-} xfs_inode_free_t;
-
 #define	XFS_DINODE_VERSION	1
 #define	XFS_DINODE_MAGIC	0x494e4f44	/* 'INOD' */
 
@@ -29,9 +15,9 @@ typedef struct xfs_dinode
 {
 	__uint32_t	di_magic;	/* inode magic # = XFS_DINODE_MAGIC */
 	__uint16_t	di_mode;	/* mode and type of file */
-	__int16_t	di_nlink;	/* number of links to file */
 	__int8_t	di_version;	/* inode version */
-	__int8_t	di_pad;		/* unused */
+	__int8_t	di_format;	/* format of di_c data */
+	__int16_t	di_nlink;	/* number of links to file */
 	__uint16_t	di_uid;		/* owner's user id */
 	__uint16_t	di_gid;		/* owner's group id */
 	__int64_t	di_size;	/* number of bytes in file */
@@ -47,12 +33,28 @@ typedef struct xfs_dinode
 	 * Should this be 64 bits? What does nfs3.0 want?
 	 */
 	__uint32_t	di_gen;		/* generation number */
-	union di_addr {
-		dev_t	di_dev;		/* device for IFCHR/IFBLK */
-		xfs_uuid_t	di_mp;	/* mount point value */
-		char	di_c[1];	/* extensible information */
+	union {
+		xfs_agino_t	di_next;/* next inode for freelist inodes */
+		dev_t		di_dev;	/* device for IFCHR/IFBLK */
+		char		di_c[1];/* local contents */
+		xfs_bmx_t	di_bmx; /* extent list */
+		xfs_btree_block_t di_bmbt;/* btree root */
+		xfs_uuid_t	di_uuid;/* mount point value */
 	}		di_u;
 } xfs_dinode_t;
+
+/*
+ * Values for di_format
+ */
+typedef enum xfs_dinode_fmt
+{
+	XFS_DINODE_FMT_AGINO,		/* free inodes: di_next */
+	XFS_DINODE_FMT_DEV,		/* CHR, BLK: di_dev */
+	XFS_DINODE_FMT_LOCAL,		/* DIR, REG, LNK: di_c */
+	XFS_DINODE_FMT_EXTENTS,		/* DIR, REG, LNK: di_bmx */
+	XFS_DINODE_FMT_BTREE,		/* DIR, REG, LNK: di_bmbt */
+	XFS_DINODE_FMT_UUID 		/* MNT: di_uuid */
+} xfs_dinode_fmt_t;
 
 /*
  * File types (mode field)
