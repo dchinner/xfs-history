@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.27 $"
+#ident	"$Revision: 1.29 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -694,12 +694,16 @@ xfs_buf_item_print(xfs_buf_log_item_t *blip)
 		blip->bli_buf, blip->bli_recur, blip->bli_refcount);
 	printflags(blip->bli_flags, bli_flags, NULL);
 	qprintf("\n");
-	qprintf("size %d blkno 0x%llx len 0x%x map size %d map 0x%x\n",
+	qprintf("size %d blkno 0x%llx len 0x%hx map size %d map 0x%x\n",
 		blip->bli_format.blf_size, blip->bli_format.blf_blkno,
 		blip->bli_format.blf_len, blip->bli_format.blf_map_size,
-		&(blip->bli_format.blf_data_map));
-	qprintf("blf flags:");
+		&(blip->bli_format.blf_data_map[0]));
+	qprintf("blf flags: ");
 	printflags((uint)blip->bli_format.blf_flags, blf_flags, NULL);
+#ifdef XFS_TRANS_DEBUG
+	qprintf("orig 0x%x logged 0x%x\n",
+		blip->bli_orig, blip->bli_logged);
+#endif
 }
 
 /*
@@ -914,6 +918,10 @@ xfs_inode_item_print(xfs_inode_log_item_t *ilip)
 	qprintf("ilock recur %d iolock recur %d ext buf 0x%x\n",
 		ilip->ili_ilock_recur, ilip->ili_iolock_recur,
 		ilip->ili_extents_buf);
+#ifdef XFS_TRANS_DEBUG
+	qprintf("root bytes %d root orig 0x%x\n",
+		ilip->ili_root_size, ilip->ili_orig_root);
+#endif
 	qprintf("inode buf 0x%x\n", ilip->ili_bp);
 	qprintf("size %d fields: ", ilip->ili_format.ilf_size);
 	printflags(ilip->ili_format.ilf_fields, ilf_fields, "formatfield");
@@ -2590,7 +2598,7 @@ idbg_xlogitem(xfs_log_item_t *lip)
 	xfs_log_item_t	*bio_lip;
 	static char *lid_type[] = {
 		"???",		/* 0 */
-		"obuf",		/* 1 */
+		"5-3-buf",		/* 1 */
 		"5-3-inode",	/* 2 */
 		"efi",		/* 3 */
 		"efd",		/* 4 */
@@ -2607,7 +2615,8 @@ idbg_xlogitem(xfs_log_item_t *lip)
 		};
 
 	qprintf("type %s mountp 0x%x flags ",
-		lid_type[lip->li_type - XFS_LI_BUF + 1], lip->li_mountp);
+		lid_type[lip->li_type - XFS_LI_5_3_BUF + 1],
+		lip->li_mountp);
 	printflags((uint)(lip->li_flags), li_flags,"log");
 	qprintf("\n");
 	qprintf("ail forw 0x%x ail back 0x%x lsn %s desc %x ops 0x%x\n",
