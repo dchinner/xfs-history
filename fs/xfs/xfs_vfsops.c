@@ -22,7 +22,7 @@
  * this program; if not, write the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident  "$Revision: 1.240 $"
+#ident  "$Revision: 1.241 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -1338,7 +1338,7 @@ xfs_isdev(
 		return 1;
 
 	/* this is the only place we call bread... think about changing this a bit */
-	bp = bread(dev, XFS_SB_DADDR, BTOBB(sizeof(xfs_sb_t)));
+	bp = read_buf(dev, XFS_SB_DADDR, BTOBB(sizeof(xfs_sb_t)), 0);
 	error = (XFS_BUF_ISERROR(bp)) ? 1 : 0;
 
 	if (error == 0) {
