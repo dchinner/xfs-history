@@ -1518,12 +1518,14 @@ _pagebuf_page_io(
 			}
 		}
 
+		i = sector >> BBSHIFT;
+		bn -= (pg_offset >> BBSHIFT);
+
 		/* Find buffer_heads belonging to just this pagebuf */
 		bh = head = page_buffers(page);
 		do {
 			if (buffer_uptodate(bh) && cache_ok)
 				continue;
-			blk_length = i << sector_shift;
 			if (blk_length < pg_offset)
 				continue;
 			if (blk_length >= pg_offset + pg_length)
@@ -1532,9 +1534,12 @@ _pagebuf_page_io(
 			lock_buffer(bh);
 			get_bh(bh);
 			bh->b_size = sector;
-			bh->b_blocknr = bn + i - (pg_offset >> BBSHIFT);
+			bh->b_blocknr = bn;
 			bufferlist[cnt++] = bh;
-		} while (i++, (bh = bh->b_this_page) != head);
+
+		} while ((bn += i),
+			 (blk_length += sector),
+			  (bh = bh->b_this_page) != head);
 
 		goto request;
 	}
