@@ -1,4 +1,4 @@
-#ident "$Revision: 1.265 $"
+#ident "$Revision: 1.266 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -60,6 +60,8 @@
 #include <sys/dirent.h>
 #include <sys/attributes.h>
 #include <sys/arsess.h>
+#include <sys/prio.h>
+#include <sys/major.h>
 #include <ksys/fdt.h>
 #include "xfs_macros.h"
 #include "xfs_types.h"
@@ -6096,6 +6098,7 @@ xfs_fcntl(
 	struct fsdmidata	d;
 	extern int		scache_linemask;
 	prioAllocReq_t          req_info;
+#if IP30 || IP27
 	dev_t                   *disks;
 	bandwidth_t		*old_req_bw_rd, *old_alloc_bw_rd;
 	bandwidth_t		*old_req_bw_wr, *old_alloc_bw_wr;
@@ -6108,6 +6111,7 @@ xfs_fcntl(
 	bandwidth_t             total_bytesec, bytesec;
 	bandwidth_t		old_req_bandwidth, old_alloc_bandwidth;
 	int			error_on_write=0;
+#endif /* IP30 || IP27 */
 
 	vp = BHV_TO_VNODE(bdp);
 	vn_trace_entry(vp, "xfs_fcntl", (inst_t *)__return_address);
@@ -7321,14 +7325,14 @@ vnodeops_t xfs_vnodeops = {
 int
 xfs_match_file_open_mode(int fd, int req_mode)
 {
-	file_t  *fp;
+	vfile_t  *fp;
 
 	if ( getf( fd, &fp ) != 0 ) {
 	        return( 0 );
 	}
 
-	if (((req_mode & PRIO_READ_ALLOCATE) && !(fp->f_flag & FREAD)) ||
-	   ((req_mode & PRIO_WRITE_ALLOCATE) && !(fp->f_flag & FWRITE)))
+	if (((req_mode & PRIO_READ_ALLOCATE) && !(fp->vf_flag & FREAD)) ||
+	   ((req_mode & PRIO_WRITE_ALLOCATE) && !(fp->vf_flag & FWRITE)))
 		return 0;
 
 	return 1;
@@ -7388,7 +7392,7 @@ xfs_file_to_disks(int fd, dev_t *disks, int *disk_count)
 int
 xfs_get_inumber_fs_dev( int fdes, xfs_ino_t *ino, dev_t *dev)
 {
-	file_t  *fp;
+	vfile_t  *fp;
 	vnode_t *vp;
 	xfs_inode_t     *ip;
 	bhv_desc_t      *bdp;
@@ -7398,9 +7402,9 @@ xfs_get_inumber_fs_dev( int fdes, xfs_ino_t *ino, dev_t *dev)
 		return( -1 );
 	}
 
-	vp = fp->f_vnode;
+	vp = fp->vf_vnode;
 	bhp = VN_BHV_HEAD(vp);
-	BHV_INSERT_PREVENT(bhp);
+	BHV_READ_LOCK(bhp);
 	bdp = bhv_lookup(bhp, &xfs_vnodeops);
 	if (bdp == NULL) {
 		*ino = (xfs_ino_t)0;
@@ -7410,7 +7414,7 @@ xfs_get_inumber_fs_dev( int fdes, xfs_ino_t *ino, dev_t *dev)
 		*ino = ip->i_ino;
 		*dev = ip->i_dev;
 	}
-	BHV_INSERT_ALLOW(bhp);
+	BHV_READ_UNLOCK(bhp);
 	return(0);
 }
 
