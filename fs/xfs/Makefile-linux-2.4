@@ -44,6 +44,7 @@ MODFLAGS	= -DMODULE
 CFLAGS_KERNEL	=
 PERL		= perl
 AWK		= awk
+TMPPREFIX	=
 
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
 	CONFIG_SHELL TOPDIR HPATH HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
@@ -198,7 +199,7 @@ DRIVERS += $(DRIVERS-y)
 CLEAN_FILES = \
 	kernel/ksyms.lst include/linux/compile.h \
 	vmlinux System.map \
-	.tmp* \
+	$(TMPPREFIX).tmp* \
 	drivers/char/consolemap_deftbl.c drivers/video/promcon_tbl.c \
 	drivers/char/conmakehash \
 	drivers/pci/devlist.h drivers/pci/classlist.h drivers/pci/gen-devlist \
@@ -242,14 +243,14 @@ MRPROPER_DIRS = \
 
 include arch/$(ARCH)/Makefile
 
-export	CPPFLAGS CFLAGS AFLAGS
+export	CPPFLAGS CFLAGS CFLAGS_KERNEL AFLAGS AFLAGS_KERNEL
 
 export	NETWORKS DRIVERS LIBS HEAD LDFLAGS LINKFLAGS MAKEBOOT ASFLAGS
 
 .S.s:
-	$(CPP) $(AFLAGS) -traditional -o $*.s $<
+	$(CPP) $(AFLAGS) $(AFLAGS_KERNEL) -traditional -o $*.s $<
 .S.o:
-	$(CC) $(AFLAGS) -traditional -c -o $*.o $<
+	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -traditional -c -o $*.o $<
 
 Version: dummy
 	@rm -f include/linux/compile.h
@@ -265,26 +266,31 @@ LD_VMLINUX	:= $(LD) $(LINKFLAGS) $(HEAD) init/main.o init/version.o \
 			$(LIBS) \
 			--end-group
 ifeq ($(CONFIG_KALLSYMS),y)
-LD_VMLINUX_KALLSYMS	:= .tmp_kallsyms3.o
+LD_VMLINUX_KALLSYMS	:= $(TMPPREFIX).tmp_kallsyms3.o
 else
 LD_VMLINUX_KALLSYMS	:=
 endif
 
 vmlinux: $(CONFIGURATION) init/main.o init/version.o linuxsubdirs
+	@$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" kallsyms
+
+.PHONY:	kallsyms
+
+kallsyms:
 ifeq ($(CONFIG_KALLSYMS),y)
 	@echo kallsyms pass 1
-	$(LD_VMLINUX) -o .tmp_vmlinux1
-	@$(KALLSYMS) .tmp_vmlinux1 > .tmp_kallsyms1.o
+	$(LD_VMLINUX) -o $(TMPPREFIX).tmp_vmlinux1
+	@$(KALLSYMS) $(TMPPREFIX).tmp_vmlinux1 > $(TMPPREFIX).tmp_kallsyms1.o
 	@echo kallsyms pass 2
-	@$(LD_VMLINUX) .tmp_kallsyms1.o -o .tmp_vmlinux2
-	@$(KALLSYMS) .tmp_vmlinux2 > .tmp_kallsyms2.o
+	@$(LD_VMLINUX) $(TMPPREFIX).tmp_kallsyms1.o -o $(TMPPREFIX).tmp_vmlinux2
+	@$(KALLSYMS) $(TMPPREFIX).tmp_vmlinux2 > $(TMPPREFIX).tmp_kallsyms2.o
 	@echo kallsyms pass 3
-	@$(LD_VMLINUX) .tmp_kallsyms2.o -o .tmp_vmlinux3
-	@$(KALLSYMS) .tmp_vmlinux3 > .tmp_kallsyms3.o
+	@$(LD_VMLINUX) $(TMPPREFIX).tmp_kallsyms2.o -o $(TMPPREFIX).tmp_vmlinux3
+	@$(KALLSYMS) $(TMPPREFIX).tmp_vmlinux3 > $(TMPPREFIX).tmp_kallsyms3.o
 endif
 	$(LD_VMLINUX) $(LD_VMLINUX_KALLSYMS) -o vmlinux
 	$(NM) vmlinux | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
-	@rm -f .tmp_vmlinux* .tmp_kallsyms*
+	@rm -f $(TMPPREFIX).tmp_vmlinux* $(TMPPREFIX).tmp_kallsyms*
 
 symlinks:
 	rm -f include/asm
