@@ -146,7 +146,7 @@ void
 xlog_trace_loggrant(xlog_t *log, xlog_ticket_t *tic, caddr_t string)
 {
 	if (! log->l_grant_trace)
-		log->l_grant_trace = ktrace_alloc(100, 0);
+		log->l_grant_trace = ktrace_alloc(1024, 0);
 
 	ktrace_enter(log->l_grant_trace,
 		     (void *)tic,
@@ -156,11 +156,11 @@ xlog_trace_loggrant(xlog_t *log, xlog_ticket_t *tic, caddr_t string)
 		     (void *)log->l_grant_reserve_bytes,
 		     (void *)log->l_grant_write_cycle,
 		     (void *)log->l_grant_write_bytes,
+		     (void *)log->l_curr_cycle,
+		     (void *)log->l_curr_block,
+		     (void *)CYCLE_LSN(log->l_tail_lsn),
+		     (void *)BLOCK_LSN(log->l_tail_lsn),
 		     (void *)string,
-		     (void *)9,
-		     (void *)10,
-		     (void *)11,
-		     (void *)12,
 		     (void *)13,
 		     (void *)14,
 		     (void *)15,
@@ -1574,6 +1574,7 @@ xlog_grant_log_space(xlog_t	   *log,
 	int		 free_bytes;
 	int		 need_bytes;
 	int		 spl;
+	
 
 #ifdef DEBUG
 	if (log->l_flags & XLOG_ACTIVE_RECOVERY)
@@ -1619,7 +1620,12 @@ redo:
 	/* we've got enough space */
 	XLOG_GRANT_ADD_SPACE(log, need_bytes, 'w');
 	XLOG_GRANT_ADD_SPACE(log, need_bytes, 'r');
-
+#ifdef DEBUG
+	if (CYCLE_LSN(log->l_tail_lsn) != log->l_grant_write_cycle) {
+		ASSERT(log->l_grant_write_cycle-1 == CYCLE_LSN(log->l_tail_lsn));
+		ASSERT(log->l_grant_write_bytes < BBTOB(BLOCK_LSN(log->l_tail_lsn)));
+	}
+#endif
 	xlog_trace_loggrant(log, tic, "xlog_grant_log_space: exit");
 	xlog_verify_grant_head(log, 1);
 	GRANT_UNLOCK(log, spl);
@@ -1670,6 +1676,12 @@ redo:
 		XLOG_DEL_TICKETQ(log->l_write_headq, tic);
 
 	XLOG_GRANT_ADD_SPACE(log, need_bytes, 'w'); /* we've got enough space */
+#ifdef DEBUG
+	if (CYCLE_LSN(log->l_tail_lsn) != log->l_grant_write_cycle) {
+		ASSERT(log->l_grant_write_cycle-1 == CYCLE_LSN(log->l_tail_lsn));
+		ASSERT(log->l_grant_write_bytes < BBTOB(BLOCK_LSN(log->l_tail_lsn)));
+	}
+#endif
 
 	xlog_trace_loggrant(log, tic, "xlog_regrant_write_log_space: exit");
 	xlog_verify_grant_head(log, 1);
