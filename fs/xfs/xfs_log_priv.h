@@ -19,8 +19,10 @@
 
 #define NBLOCKS(size)		((size)+LOG_BBSIZE-1 >> LOG_BBSHIFT)
 
-#define ASSIGN_LSN(lsn,log)	{ ((uint *)&(lsn))[0] = (log)->l_cycle; \
-				  ((uint *)&(lsn))[1] = (log)->l_currblock; }
+#define ASSIGN_LSN(lsn,log)	{ ((uint *)&(lsn))[0] = (log)->l_curr_cycle; \
+				  ((uint *)&(lsn))[1] = (log)->l_curr_block; }
+#define CYCLE_LSN(lsn)		(((uint *)&(lsn))[0])
+#define BLOCK_LSN(lsn)		(((uint *)&(lsn))[1] >> 32)
 #define log_panic(s)		{printf("%s\n", s); abort();}
 
 
@@ -84,23 +86,39 @@ typedef struct log_rec_header {
 	xfs_lsn_t h_sync_lsn;	/* lsn of last LR with buffers committed:  8 */
 	int	  h_len;	/* len in bytes; should be 64-bit aligned: 4 */
 	uint	  h_chksum;	/* may not be used; non-zero if used	:  4 */
-	int	  h_prev_offset;/* offset in bytes to previous LR	:  4 */
+	int	  h_prev_offset;/* block offset to previous LR		:  4 */
 	int	  h_num_logops;	/* number of log operations in this LR	:  4 */
 	uint	  h_cycle_data[LOG_RECORD_BSIZE / BBSIZE];
 } log_rec_header_t;
 
 
+/*
+ * - A log record header is 512 bytes.  There is plenty of room to grow the
+ *	log_rec_header_t into the reserved space.
+ * - ic_data follows, so a write to disk can start at the beginning of
+ *	the iclog.
+ * - ic_forcesema is used to implement synchronous forcing of the iclog to disk.
+ * - ic_next is the pointer to the next iclog in the ring.
+ * - ic_bp is a pointer to the buffer used to write this incore log to disk.
+ * - ic_log is a pointer back to the global log structure.
+ * - ic_callback is a linked list of callback function/argument pairs to be
+ *	called after an iclog finishes writing.
+ * - ic_size is the full size of the header plus data.
+ * - ic_offset is the current number of bytes written to in this iclog.
+ * - ic_refcnt is bumped when someone is writing to the log.
+ * - ic_state is the state of the iclog.
+ */
 typedef struct log_in_core {
 	union {
 		log_rec_header_t hic_header;
 		char		 hic_sector[LOG_HEADER_SIZE];
 	} ic_h;
 	char			ic_data[LOG_RECORD_BSIZE-LOG_HEADER_SIZE];
-	sema_t			ic_forcesema;	/* used for xfs_log_force() */
+	sema_t			ic_forcesema;
 	struct log_in_core	*ic_next;
 	buf_t	  		*ic_bp;
-	struct log		*ic_log;	/* back ptr to log */
-	xfs_log_callback_t	*ic_callback;	/* callback list */
+	struct log		*ic_log;
+	xfs_log_callback_t	*ic_callback;
 	int	  		ic_size;
 	int	  		ic_offset;
 	int	  		ic_refcnt;
@@ -110,25 +128,25 @@ typedef struct log_in_core {
 
 #define ic_header	ic_h.hic_header
 
-
 /*
- * l_freelist	: the freelist of unused tickets.
- * l_iclog	: the current active IC write log.
- * l_iclog2	: the IC log being synced to disk or in inactive state.
- * l_dev	: device of log partition.
+ * 
  */
 typedef struct log {
-	log_ticket_t	*l_freelist;	/* free list of tickets:	4b */
-	log_in_core_t	*l_iclog;	/* head log queue:		4b */
-	sema_t		l_flushsema;	/* iclog flushing semaphore	20b */
-	lock_t		l_icloglock;	/* grab to change iclog state:	 b */
-	xfs_lsn_t	l_sync_lsn;	/* lsn of last LR w/ buffers committed*/
-	xfs_lsn_t	l_tail_lsn;	/* lsn of 1st LR w/ unflushed buffers */
-	dev_t		l_dev;		/* dev_t of log */
-	int		l_logsize;	/* size in bytes of log */
-	int		l_cycle;	/* Cycle number of log writes */
-	int		l_currblock;	/* current logical block of log */
-	int		l_logreserved;	/* log space reserved */
+	log_ticket_t	*l_freelist;  /* free list of tickets		  :  4*/
+	log_in_core_t	*l_iclog;     /* head log queue			  :  4*/
+	sema_t		l_flushsema;  /* iclog flushing semaphore	  : 20*/
+	lock_t		l_icloglock;  /* grab to change iclog state	  :  4*/
+	xfs_lsn_t	l_sync_lsn;   /* lsn of 1st LR w/ unflushed buffers: 8*/
+	xfs_mount_t	*l_mp;	      /* mount point			   : 4*/
+	dev_t		l_dev;	      /* dev_t of log			   : 4*/
+	int		l_logstart;   /* start block of log		   : 4*/
+	int		l_logsize;    /* size of log in bytes 		   : 4*/
+	int		l_logBBsize;  /* size of log in 512 byte chunks    : 4*/
+	int		l_curr_cycle; /* Cycle number of log writes	   : 4*/
+	int		l_prev_cycle; /* Cycle # b4 last block increment   : 4*/
+	int		l_curr_block; /* current logical block of log	   : 4*/
+	int		l_prev_block; /* previous logical block of log	   : 4*/
+	int		l_logreserved;/* log space reserved		   : 4*/
 } log_t;
 
 

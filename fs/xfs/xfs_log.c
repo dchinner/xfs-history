@@ -96,11 +96,15 @@ STATIC int  log_write(xfs_mount_t *mp, xfs_log_iovec_t	region[], int nentries,
 
 /* local state machine functions */
 STATIC void log_state_done_syncing(log_in_core_t *iclog);
-STATIC void log_state_finish_copy(log_t *log, log_in_core_t *iclog, int bytes);
+STATIC void log_state_finish_copy(log_t *log, log_in_core_t *iclog,
+				  int first_write, int bytes);
 STATIC int  log_state_get_iclog_space(log_t *log, int len,
 				      log_in_core_t **iclog, int *last_write);
+STATIC xfs_log_ticket_t log_state_get_ticket(log_t *log, int len,
+					     char log_client);
 STATIC int  log_state_lsn_is_synced(log_t *log, xfs_lsn_t lsn,
 				    xfs_log_callback_t *cb);
+STATIC void log_state_put_ticket(log_t *log, log_ticket_t *tic);
 STATIC void log_state_release_iclog(log_t *log,	log_in_core_t *iclog);
 STATIC int  log_state_sync(log_t *log, xfs_lsn_t lsn, uint flags);
 STATIC void log_state_want_sync(log_t *log, log_in_core_t *iclog);
@@ -141,7 +145,7 @@ xfs_log_done(xfs_mount_t	*mp,
 	 */
 	if ((ticket->t_flags & LOG_TIC_PERM_RESERV) == 0 ||
 	    (flags & XFS_LOG_REL_PERM_RESERV))
-		log_putticket(log, ticket);
+		log_state_put_ticket(log, ticket);
 
 	/* If this ticket was a permanent reservation and we aren't
 	 * trying to release it, reset the inited flags; so next time
@@ -244,11 +248,8 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 			((len+LOG_RECORD_BSIZE-1) >> LOG_RECORD_BSHIFT);
 	}
 
-	/* Eventually force out buffers */
-	if (log->l_logreserved + len > log->l_logsize)
-		return XFS_ENOLOGSPACE;
-	log->l_logreserved += len;
-	*ticket = log_maketicket(mp->m_log, len, log_client);
+	*ticket = log_state_get_ticket(log, len, log_client);
+
 	if (flags & XFS_LOG_PERM_RESERV)
 		((log_ticket_t *)ticket)->t_flags |= LOG_TIC_PERM_RESERV;
 
@@ -339,16 +340,20 @@ log_alloc(xfs_mount_t	*mp,
 	log = mp->m_log = (void *)kmem_zalloc(sizeof(log_t), 0);
 	log_alloc_tickets(log);
 	
-	log->l_dev = log_dev;
-	log->l_logreserved = 0;
-	log->l_currblock = 0;
-	log->l_cycle = 1;	      /* 0 is bad since this is initial value */
+	log->l_mp	   = mp;
+	log->l_dev	   = log_dev;
+/*	log->l_logreserved = 0; done with kmem_zalloc()*/
+/*	log->l_curr_block  = 0; done with kmem_zalloc()*/
+	log->l_prev_block  = -1;
+	log->l_sync_lsn    = 0x100000000;  /* cycle=1;current block=0*/
+	log->l_curr_cycle  = 1;	      /* 0 is bad since this is initial value */
 	initnlock(&log->l_icloglock, "iclog");
 	initnsema(&log->l_flushsema, LOG_NUM_ICLOGS, "iclog-flush");
 
 	if ((log->l_logsize = log_findlogsize(log_dev)) == -1)
 		log_panic("log_findlogsize");
 	
+	log->l_logBBsize = BTOBB(log->l_logsize);
 	iclogp = &log->l_iclog;
 	for (i=0; i < LOG_NUM_ICLOGS; i++) {
 		*iclogp =(log_in_core_t *)kmem_zalloc(sizeof(log_in_core_t), 0);
@@ -357,7 +362,8 @@ log_alloc(xfs_mount_t	*mp,
 		head = &iclog->ic_header;
 		head->h_magicno = LOG_HEADER_MAGIC_NUM;
 		head->h_version = 1;
-		head->h_lsn = 0;
+/*		head->h_lsn = 0;*/
+/*		head->h_sync_lsn = 0;*/
 
 /* XXXmiken: Need to make the size of an iclog at least 2x the size of
  *		a filesystem block.  This means some code will not be
@@ -449,7 +455,7 @@ log_sync(log_t		*log,
 	     dptr < (caddr_t)iclog->ic_data + iclog->ic_offset;
 	     dptr += BBSIZE, i++) {
 		iclog->ic_header.h_cycle_data[i] = *(uint *)dptr;
-		*(uint *)dptr = log->l_cycle;
+		*(uint *)dptr = log->l_curr_cycle;
 	}
 	iclog->ic_header.h_len = iclog->ic_offset;
 
@@ -509,16 +515,20 @@ log_write(xfs_mount_t *		mp,
 	int		need_copy;	/* # of bytes needed to bcopy */
 	int		copy_len;	/* # of bytes actually bcopy'ing */
 	int		lastwr;		/* last write of in-core log? */
+	int		firstwr=0;	/* first write of transaction */
 
-	/* calculate potential maximum space */
-	for (len=0, index=0; index < nentries; index++) {
-		len += reg[index].i_len;
+	/* Calculate potential maximum space.  Each region gets its own
+	 * log_op_header_t and may need to be double word aligned.
+	 */
+	len = 0;
+	if (ticket->t_flags & LOG_TIC_INITED)	/* acct 4 start rec of xact */
 		len += sizeof(log_op_header_t);
+
+	for (index=0; index < nentries; index++) {
+		len += sizeof(log_op_header_t);
+		len += reg[index].i_len;
 	}
 	*start_lsn = 0;
-
-	if (ticket->t_flags & LOG_TIC_INITED)
-		len += sizeof(log_op_header_t);	    /* acct for start record */
 
 	if (ticket->t_reservation < len)
 		log_panic("xfs_log_write: reservation ran out")
@@ -530,10 +540,14 @@ log_write(xfs_mount_t *		mp,
 	    log_offset = log_state_get_iclog_space(log, len, &iclog, &lastwr);
 
 	    ptr = &iclog->ic_data[log_offset];
+
+	    /* start_lsn is the first lsn written to. That's all we need. */
 	    if (! *start_lsn)
 		    *start_lsn = iclog->ic_header.h_lsn;
+
 	    for ( ;index < nentries; ) {
 		ASSERT(reg[index].i_len % sizeof(long) == 0);
+		ASSERT((uint)ptr % sizeof(long) == 0);
 
 		/*
 		 * If first write for transaction, insert start record.
@@ -547,6 +561,7 @@ log_write(xfs_mount_t *		mp,
 		    logop_head->oh_len	    = 0;
 		    logop_head->oh_flags    = LOG_START_TRANS;
 		    ticket->t_flags	    &= ~LOG_TIC_INITED;	/* clear bit */
+		    firstwr++;		/* increment log ops below */
 
 		    start_rec_copy = sizeof(log_op_header_t);
 		    log_write_adv_cnt(ptr, len, log_offset, start_rec_copy);
@@ -588,12 +603,12 @@ log_write(xfs_mount_t *		mp,
 		/* copy region */
 		bcopy(reg[index].i_addr, ptr, copy_len);
 		log_write_adv_cnt(ptr, len, log_offset, copy_len);
-		log_state_finish_copy(log, iclog,
+		log_state_finish_copy(log, iclog, firstwr,
 			(lastwr ?
 			 copy_len + start_rec_copy + sizeof(log_op_header_t) :
 			 0));
 
-		start_rec_copy = 0;
+		firstwr = start_rec_copy = 0;
 		if (remains_to_copy) {		/* copied partial region */
 		    /* already marked WANT_SYNC */
 		    log_state_release_iclog(log, iclog);
@@ -636,6 +651,7 @@ log_state_clean_log(log_t *log)
 			iclog->ic_header.h_num_logops = 0;
 			bzero(iclog->ic_header.h_cycle_data,
 			      sizeof(iclog->ic_header.h_cycle_data));
+			iclog->ic_header.h_lsn = 0;
 			vsema(&log->l_flushsema);
 		} else if (iclog->ic_state == LOG_STATE_ACTIVE)
 			/* do nothing */;
@@ -689,12 +705,15 @@ log_state_done_syncing(log_in_core_t	*iclog)
 void
 log_state_finish_copy(log_t		*log,
 		      log_in_core_t	*iclog,
+		      int		first_write,
 		      int		copy_bytes)
 {
 	int spl;
 
 	spl = splockspl(log->l_icloglock, splhi);
 
+	if (first_write)
+		iclog->ic_header.h_num_logops++;
 	iclog->ic_header.h_num_logops++;
 	iclog->ic_offset += copy_bytes;
 
@@ -729,10 +748,10 @@ log_state_get_iclog_space(log_t		*log,
 			  log_in_core_t **iclogp,
 			  int		*last_write)
 {
-	int		spl;
-	int		log_offset;
+	int		 spl;
+	int		 log_offset;
 	log_rec_header_t *head;
-	log_in_core_t	*iclog;
+	log_in_core_t	 *iclog;
 
 restart:
 	spl = splockspl(log->l_icloglock, splhi);
@@ -758,7 +777,7 @@ restart:
 	 * must be written.
 	 */
 	if (log_offset == 0) {
-		head->h_cycle = log->l_cycle;
+		head->h_cycle = log->l_curr_cycle;
 		ASSIGN_LSN(head->h_lsn, log);
 	}
 
@@ -767,31 +786,63 @@ restart:
 	 * LOG_STATE_WANT_SYNC bit is on, so this will get flushed out.
 	 */
 	if (len < iclog->ic_size - iclog->ic_offset) {
-		iclog->ic_offset += len;
-		*last_write = 0;
+	    iclog->ic_offset += len;
+	    *last_write = 0;
 	} else {
-		*last_write = 1;
-		if (iclog->ic_state != LOG_STATE_WANT_SYNC) {
-		    iclog->ic_state = LOG_STATE_WANT_SYNC;
-		    log->l_currblock +=	BTOBB(iclog->ic_size);
-		    log->l_iclog = iclog->ic_next;
+	    *last_write = 1;
+	    if (iclog->ic_state != LOG_STATE_WANT_SYNC) {
+		iclog->ic_state = LOG_STATE_WANT_SYNC;
+		iclog->ic_header.h_prev_offset = log->l_prev_block;
+		log->l_prev_block = log->l_curr_block;
+		log->l_prev_cycle = log->l_curr_cycle;
+
+		/* roll log? */
+		log->l_curr_block += BTOBB(iclog->ic_size);
+		if (log->l_curr_block + BTOBB(iclog->ic_offset) + 1 >
+		    log->l_logBBsize) {
+		    log->l_curr_cycle++;
+		    log->l_curr_block -= log->l_logBBsize;
 		}
+		log->l_iclog = iclog->ic_next;
+		psema(&log->l_flushsema, PINOD);
+	    }
 		
-		/* log_write() algorithm assumes that at least 2
-		 * log_op_header_t's can fit into remaining data section.
-		 */
-		if (iclog->ic_size - iclog->ic_offset <
-		    2*sizeof(log_op_header_t)) {
-			iclog->ic_refcnt--;
-			spunlockspl(log->l_icloglock, spl);
-			goto restart;
-		}
+	    /* log_write() algorithm assumes that at least 2
+	     * log_op_header_t's can fit into remaining data section.
+	     */
+	    if (iclog->ic_size - iclog->ic_offset < 2*sizeof(log_op_header_t)) {
+		iclog->ic_refcnt--;
+		spunlockspl(log->l_icloglock, spl);
+		goto restart;
+	    }
 	}
 	*iclogp = iclog;
 
 	spunlockspl(log->l_icloglock, spl);
 	return log_offset;
 }	/* log_state_get_iclog_space */
+
+
+xfs_log_ticket_t
+log_state_get_ticket(log_t	*log,
+		     int	len,
+		     char	log_client)
+{
+	int		 spl;
+	xfs_log_ticket_t tic;
+
+	spl = splockspl(log->l_icloglock, splhi);
+
+	/* Eventually force out buffers */
+	if (log->l_logreserved + len > log->l_logsize)
+		log_panic("xfs_log_reserve: over reserved");
+	log->l_logreserved += len;
+	tic = log_maketicket(log, len, log_client);
+	spunlockspl(log->l_icloglock, spl);
+
+	return tic;
+
+}	/* log_state_get_ticket */
 
 
 /*
@@ -834,9 +885,22 @@ log_state_lsn_is_synced(log_t		   *log,
 }	/* log_state_lsn_is_synced */
 
 
+void
+log_state_put_ticket(log_t	  *log,
+		     log_ticket_t *tic)
+{
+	int		 spl;
+
+	spl = splockspl(log->l_icloglock, splhi);
+
+	log->l_logreserved -= tic->t_reservation;
+	log_putticket(log, tic);
+
+	spunlockspl(log->l_icloglock, spl);
+}	/* log_state_reserve_space */
+
+
 /*
- * So why can't the below psema() sleep?
- *
  * When this function is entered, the iclog is not necessarily in the
  * WANT_SYNC state.  It may be sitting around waiting to get filled.
  */
@@ -844,29 +908,57 @@ void
 log_state_release_iclog(log_t		*log,
 			log_in_core_t	*iclog)
 {
-	int spl;
-	int sync = 0;
+    int		spl;
+    int		sync = 0;	/* do we sync? */
+    xfs_lsn_t	sync_lsn;
+    int		blocks;
+    
+    spl = splockspl(log->l_icloglock, splhi);
+    
+    ASSERT(iclog->ic_refcnt > 0);
+    
+    if (--iclog->ic_refcnt == 0 && iclog->ic_state == LOG_STATE_WANT_SYNC) {
+	ASSERT(valusema(&log->l_flushsema) > 0);
+	sync++;
+	iclog->ic_state = LOG_STATE_SYNCING;
+	
+	if ((sync_lsn = xfs_trans_tail_ail(log->l_mp)) == 0)
+	    sync_lsn = iclog->ic_header.h_sync_lsn = log->l_sync_lsn;
+	else
+	    iclog->ic_header.h_sync_lsn = log->l_sync_lsn = sync_lsn;
 
-	spl = splockspl(log->l_icloglock, splhi);
-
-	ASSERT(iclog->ic_refcnt > 0);
-
-	if (--iclog->ic_refcnt == 0 &&
-	    iclog->ic_state == LOG_STATE_WANT_SYNC) {
-		ASSERT(valusema(&log->l_flushsema) > 0);
-		sync++;
-		iclog->ic_state = LOG_STATE_SYNCING;
-		psema(&log->l_flushsema, PINOD);	/* won't sleep! */
+	/* check if it will fit */
+	if (CYCLE_LSN(sync_lsn) == log->l_prev_cycle) {
+	    blocks = log->l_logBBsize - (log->l_prev_block-BLOCK_LSN(sync_lsn));
+	    if (blocks < BTOBB(iclog->ic_offset)+1)
+		log_panic("ran out of log space");
+	} else {
+	    ASSERT(CYCLE_LSN(sync_lsn)+1 == log->l_prev_cycle);
+	    if (BLOCK_LSN(sync_lsn) == log->l_prev_block)
+		log_panic("ran out of log space");
+		
+	    blocks = log->l_logBBsize - BLOCK_LSN(sync_lsn) + log->l_prev_block;
+	    if (blocks < BTOBB(iclog->ic_offset) + 1)
+		log_panic("ran out of log space");
 	}
-
-	spunlockspl(log->l_icloglock, spl);
-
-	if (sync)
-		log_sync(log, iclog, 0);
-
+	/* cycle incremented when incrementing curr_block */
+    }
+    
+    spunlockspl(log->l_icloglock, spl);
+    
+    if (sync)
+	log_sync(log, iclog, 0);
+    
 }	/* log_state_release_iclog */
 
 
+/*
+ * Find in-core log with lsn.
+ *	If it is in the DIRTY state, just return.
+ *	If it is in the ACTIVE state, move the in-core log into the WANT_SYNC
+ *		state and go to sleep or return.
+ *	If it is in any other state, go to sleep or return.
+ */
 int
 log_state_sync(log_t *log, xfs_lsn_t lsn, uint flags)
 {
@@ -883,17 +975,28 @@ log_state_sync(log_t *log, xfs_lsn_t lsn, uint flags)
 	    } else {
 		if (iclog->ic_state == LOG_STATE_ACTIVE) {
 		    iclog->ic_state = LOG_STATE_WANT_SYNC;
-		    log->l_currblock +=
-			((iclog->ic_offset + (BBSIZE-1)) >> BBSHIFT) + 1;
+		    iclog->ic_header.h_prev_offset = log->l_prev_block;
+		    log->l_prev_block = log->l_curr_block;
+		    log->l_prev_cycle = log->l_curr_cycle;
+
+		    /* roll log? */
+		    log->l_curr_block += BTOBB(iclog->ic_offset)+1;
+		    if (log->l_curr_block + BTOBB(iclog->ic_offset) + 1 >
+			log->l_logBBsize) {
+			log->l_curr_cycle++;
+			log->l_curr_block -= log->l_logBBsize;
+		    }
+		    log->l_iclog = iclog->ic_next;
+		    psema(&log->l_flushsema, PINOD);
 	        } else if (iclog->ic_state == LOG_STATE_DIRTY) {
 		    spunlockspl(log->l_icloglock, spl);
 		    return 0;
 		}
-		if (flags & XFS_LOG_SYNC)
-		    spunlockspl(log->l_icloglock, spl);
-	        else
+		if (flags & XFS_LOG_SYNC)			/* sleep */
 		    spunlockspl_psema(log->l_icloglock, spl,
 				      &iclog->ic_forcesema, 0);
+	        else						/* just return*/
+		    spunlockspl(log->l_icloglock, spl);
 		return 0;
 	    }
 	} while (iclog != log->l_iclog);
@@ -912,9 +1015,20 @@ log_state_want_sync(log_t *log, log_in_core_t *iclog)
 
 	if (iclog->ic_state == LOG_STATE_ACTIVE) {
 		iclog->ic_state = LOG_STATE_WANT_SYNC;
-		log->l_currblock +=
-			((iclog->ic_offset + (BBSIZE-1)) >> BBSHIFT) + 1;
+		iclog->ic_header.h_prev_offset = log->l_prev_block;
+		log->l_prev_block = log->l_curr_block;
+		log->l_prev_cycle = log->l_curr_cycle;
+
+		/* roll log? */
+		log->l_curr_block += BTOBB(iclog->ic_offset)+1;
+		if (log->l_curr_block + BTOBB(iclog->ic_offset) + 1 >
+		    log->l_logBBsize) {
+		    log->l_curr_cycle++;
+		    log->l_curr_block -= log->l_logBBsize;
+		}
+
 		log->l_iclog = log->l_iclog->ic_next;
+		psema(&log->l_flushsema, PINOD);
 	} else if (iclog->ic_state != LOG_STATE_WANT_SYNC)
 		log_panic("log_state_want_sync: bad state");
 
@@ -960,7 +1074,7 @@ log_alloc_tickets(log_t *log)
 /*
  *
  */
-void log_putticket(log_t *log,
+void log_putticket(log_t	*log,
 		   log_ticket_t *ticket)
 {
 	log_ticket_t *t_list;
@@ -1056,7 +1170,7 @@ void print_tid(caddr_t string, log_tid_t *tid)
 #endif
 
 
-uint log_print_head(log_rec_header_t *head)
+int log_print_head(log_rec_header_t *head, int *len)
 {
 	uint *uint_ptr;
 	int i;
@@ -1078,11 +1192,12 @@ uint log_print_head(log_rec_header_t *head)
 	}
 	printf("\n");
 
-	return(head->h_len);
+	*len = head->h_len;
+	return(head->h_num_logops);
 }
 
 
-void log_print_record(int fd, int len, log_rec_header_t *rhead)
+void log_print_record(int fd, int num_ops, int len, log_rec_header_t *rhead)
 {
 	caddr_t buf, ptr;
 	log_op_header_t *op_head;
@@ -1102,7 +1217,7 @@ void log_print_record(int fd, int len, log_rec_header_t *rhead)
 		*(uint *)ptr = rhead->h_cycle_data[i];
 	}
 	ptr = buf;
-	for (i=1; len > 0; i++) {
+	for (i=0; i<num_ops; i++) {
 		op_head = (log_op_header_t *)ptr;
 		printf("Operation (%d): ", i);
 		print_tid("tid", &op_head->oh_tid);
@@ -1131,35 +1246,93 @@ void log_print_record(int fd, int len, log_rec_header_t *rhead)
 			ptr++;
 		}
 		printf("\n");
-		len -= sizeof(log_op_header_t) + op_head->oh_len;
 	}
 	printf("\n");
 }
 
 
+int
+log_find_head(int fd)
+{
+    char		hbuf[LOG_HEADER_SIZE];
+    log_rec_header_t	*head;
+    int			done = 0;
+    int			block_start = 0;
+    int			block_no = 0;
+    int			cycle_no = 0;
+
+    if (lseek(fd, 0, SEEK_SET) < 0)		/* start reading from 0 */
+	log_panic("log_find_head: lseek 0 failed");
+
+    do {
+	if (read(fd, hbuf, LOG_HEADER_SIZE) == 0) {
+	    break;
+	}
+	head = (log_rec_header_t *)hbuf;
+	if (head->h_magicno != LOG_HEADER_MAGIC_NUM) {
+	    block_no++;
+	    continue;
+	}
+	if (cycle_no == 0) {
+	    cycle_no	= CYCLE_LSN(head->h_lsn);
+	    block_start = block_no;
+	} else if (CYCLE_LSN(head->h_lsn) < cycle_no) {
+	    cycle_no	= CYCLE_LSN(head->h_lsn);
+	    block_start	= block_no;
+	    break;
+	}
+	block_no++;
+    } while (1);
+    if (lseek(fd, block_start*LOG_HEADER_SIZE, SEEK_SET) < 0)
+	log_panic("log_find_head: lseek block # failed");
+
+    return block_start;
+}	/* log_find_head */
+
+
+/*
+ * XXXmiken: code assumes log starts at block 0
+ */
 void xfs_log_print(xfs_mount_t *mp, dev_t log_dev)
 {
-	int fd = bmajor(log_dev);
-	char hbuf[LOG_HEADER_SIZE];
-	int done = 0;
-	uint len;
-	
+    int fd = bmajor(log_dev);
+    char hbuf[LOG_HEADER_SIZE];
+    int loop = 0;
+    int num_ops, len, block_start, block_no;
+    int dont_loop = 0;
+    
+    block_start = log_find_head(fd);
+    block_no    = block_start;
+
+    if (block_start == 0)
+	dont_loop = 1;
+    do {
 	do {
-		if ((len=read(fd, hbuf, 512)) == -1) {
-			printf("xfs_log_print end of log\n");
-			done++;
-			continue;
-		}
-		len = log_print_head((log_rec_header_t *)hbuf);
-		log_print_record(fd, len, (log_rec_header_t *)hbuf);
+	    if (read(fd, hbuf, 512) == 0) {
+		printf("xfs_log_print: physical end of log\n");
 		printf("=================================\n");
-	} while (!done);
+		break;
+	    }
+	    num_ops = log_print_head((log_rec_header_t *)hbuf, &len);
+	    block_no += BTOBB(len);
+	    log_print_record(fd, num_ops, len, (log_rec_header_t *)hbuf);
+	    printf("=================================\n");
+	    block_no++;
+	    if (loop && block_no == block_start)
+		goto end;
+	} while (1);
+	loop++;
+	if (dont_loop)
+	    break;
+	block_no = 0;
+	if (lseek(fd, 0, SEEK_SET) < 0)
+	    log_panic("xfs_log_print: lseek error");
+    } while (block_no != block_start);
+
+end:
+    printf("xfs_log_print: logical end of log\n");
+    printf("=================================\n");
 }
 #endif /* !_KERNEL */
-
-
-
-
-
 
 #endif /* _LOG_DEBUG */
