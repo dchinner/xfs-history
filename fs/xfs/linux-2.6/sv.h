@@ -83,9 +83,6 @@ static inline void _sv_wait(sv_t *sv, spinlock_t *lock, int state,
 	_sv_wait(sv, lock, TASK_UNINTERRUPTIBLE, timespec_to_jiffies(ts))
 #define sv_timedwait_sig(sv, pri, lock, s, svf, ts, rts) \
 	_sv_wait(sv, lock, TASK_INTERRUPTIBLE, timespec_to_jiffies(ts))
-/* this one is used only by dmapi */
-#define mp_sv_wait_sig(sv, pri, lock, s) \
-	sv_wait_sig(sv, pri, lock, s)
 #define sv_signal(sv) \
 	wake_up(&(sv)->waiters)
 #define sv_broadcast(sv) \
