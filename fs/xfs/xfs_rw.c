@@ -1,4 +1,4 @@
-#ident "$Revision: 1.165 $"
+#ident "$Revision: 1.166 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -5121,7 +5121,6 @@ xfs_refcache_purge_mp(
 			 */
 			if (i % 16 == 0) {
 				mp_mutex_spinunlock(&xfs_refcache_lock, s);
-				preemptchk();
 				s = mp_mutex_spinlock(&xfs_refcache_lock);
 			}
 		}
