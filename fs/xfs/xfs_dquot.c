@@ -1,4 +1,4 @@
-#ident "$Revision: 1.13 $"
+#ident "$Revision: 1.14 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -8,7 +8,7 @@
 #include <sys/atomic_ops.h>
 #include <sys/kmem.h>
 #include <sys/debug.h>
-#include <sys/proc.h>
+#include <ksys/vproc.h>
 #include <sys/cmn_err.h>
 #include <sys/atomic_ops.h>
 #include <sys/idbg.h>
@@ -220,7 +220,7 @@ xfs_dqtrace_entry(
 		     (void *)(__psint_t)dqp->q_core.d_ino_hardlimit,
 		     (void *)(__psint_t)dqp->q_core.d_ino_softlimit,
 		     (void *)(__psint_t)dqp->q_core.d_id, /* 11 */
-		     (void *)(__psint_t)curprocp->p_pid,
+		     (void *)(__psint_t)current_pid(),
 		     (void *)(__psint_t)time,
 		     0, 0);
 	return;
