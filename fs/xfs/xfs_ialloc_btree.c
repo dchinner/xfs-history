@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.18 $"
+#ident	"$Revision: 1.19 $"
 
 /*
  * Inode allocation management for xFS.
@@ -277,14 +277,17 @@ xfs_inobt_delrec(
 	if (level > 0) {
 		kp = XFS_INOBT_KEY_ADDR(block, 1, cur);
 		pp = XFS_INOBT_PTR_ADDR(block, 1, cur);
-		for (i = ptr; i < block->bb_numrecs; i++) {
-			kp[i - 1] = kp[i];
+#ifdef DEBUG
+		for (i = ptr; i < block->bb_numrecs; i++)
 			xfs_btree_check_sptr(cur, pp[i], level);
-			pp[i - 1] = pp[i];
-		}
-		if (ptr < i) {
-			xfs_inobt_log_ptrs(cur, bp, ptr, i - 1);
-			xfs_inobt_log_keys(cur, bp, ptr, i - 1);
+#endif
+		if (ptr < block->bb_numrecs) {
+			ovbcopy(&kp[ptr], &kp[ptr - 1],
+				(block->bb_numrecs - ptr) * sizeof(*kp));
+			ovbcopy(&pp[ptr], &pp[ptr - 1],
+				(block->bb_numrecs - ptr) * sizeof(*pp));
+			xfs_inobt_log_keys(cur, bp, ptr, block->bb_numrecs - 1);
+			xfs_inobt_log_ptrs(cur, bp, ptr, block->bb_numrecs - 1);
 		}
 	}
 	/*
@@ -293,10 +296,11 @@ xfs_inobt_delrec(
 	 */
 	else {
 		rp = XFS_INOBT_REC_ADDR(block, 1, cur);
-		for (i = ptr; i < block->bb_numrecs; i++)
-			rp[i - 1] = rp[i];
-		if (ptr < i)
-			xfs_inobt_log_recs(cur, bp, ptr, i - 1);
+		if (ptr < block->bb_numrecs) {
+			ovbcopy(&rp[ptr], &rp[ptr - 1],
+				(block->bb_numrecs - ptr) * sizeof(*rp));
+			xfs_inobt_log_recs(cur, bp, ptr, block->bb_numrecs - 1);
+		}
 		/*
 		 * If it's the first record in the block, we'll need a key
 		 * structure to pass up to the next level (updkey).
@@ -554,11 +558,12 @@ xfs_inobt_delrec(
 		lpp = XFS_INOBT_PTR_ADDR(left, left->bb_numrecs + 1, cur);
 		rkp = XFS_INOBT_KEY_ADDR(right, 1, cur);
 		rpp = XFS_INOBT_PTR_ADDR(right, 1, cur);
-		for (i = 0; i < right->bb_numrecs; i++) {
-			lkp[i] = rkp[i];
+#ifdef DEBUG
+		for (i = 0; i < right->bb_numrecs; i++)
 			xfs_btree_check_sptr(cur, rpp[i], level);
-			lpp[i] = rpp[i];
-		}
+#endif
+		bcopy(rkp, lkp, right->bb_numrecs * sizeof(*lkp));
+		bcopy(rpp, lpp, right->bb_numrecs * sizeof(*lpp));
 		xfs_inobt_log_keys(cur, lbp, left->bb_numrecs + 1,
 				   left->bb_numrecs + right->bb_numrecs);
 		xfs_inobt_log_ptrs(cur, lbp, left->bb_numrecs + 1,
@@ -569,8 +574,7 @@ xfs_inobt_delrec(
 		 */
 		lrp = XFS_INOBT_REC_ADDR(left, left->bb_numrecs + 1, cur);
 		rrp = XFS_INOBT_REC_ADDR(right, 1, cur);
-		for (i = 0; i < right->bb_numrecs; i++)
-			lrp[i] = rrp[i];
+		bcopy(rrp, lrp, right->bb_numrecs * sizeof(*lrp));
 		xfs_inobt_log_recs(cur, lbp, left->bb_numrecs + 1,
 				   left->bb_numrecs + right->bb_numrecs);
 	}
@@ -765,17 +769,20 @@ xfs_inobt_insrec(
 		 */
 		kp = XFS_INOBT_KEY_ADDR(block, 1, cur);
 		pp = XFS_INOBT_PTR_ADDR(block, 1, cur);
-		for (i = block->bb_numrecs; i >= ptr; i--) {
-			kp[i] = kp[i - 1];
+#ifdef DEBUG
+		for (i = block->bb_numrecs; i >= ptr; i--)
 			xfs_btree_check_sptr(cur, pp[i - 1], level);
-			pp[i] = pp[i - 1];
-		}
-		xfs_btree_check_sptr(cur, *bnop, level);
+#endif
+		ovbcopy(&kp[ptr - 1], &kp[ptr],
+			(block->bb_numrecs - ptr + 1) * sizeof(*kp));
+		ovbcopy(&pp[ptr - 1], &pp[ptr],
+			(block->bb_numrecs - ptr + 1) * sizeof(*pp));
 		/*
 		 * Now stuff the new data in, bump numrecs and log the new data.
 		 */
-		kp[i] = key;
-		pp[i] = *bnop;
+		xfs_btree_check_sptr(cur, *bnop, level);
+		kp[ptr - 1] = key;
+		pp[ptr - 1] = *bnop;
 		block->bb_numrecs++;
 		xfs_inobt_log_keys(cur, bp, ptr, block->bb_numrecs);
 		xfs_inobt_log_ptrs(cur, bp, ptr, block->bb_numrecs);
@@ -784,13 +791,13 @@ xfs_inobt_insrec(
 		 * It's a leaf entry.  Make a hole for the new record.
 		 */
 		rp = XFS_INOBT_REC_ADDR(block, 1, cur);
-		for (i = block->bb_numrecs; i >= ptr; i--)
-			rp[i] = rp[i - 1];
+		ovbcopy(&rp[ptr - 1], &rp[ptr],
+			(block->bb_numrecs - ptr + 1) * sizeof(*rp));
 		/*
 		 * Now stuff the new record in, bump numrecs
 		 * and log the new data.
 		 */
-		rp[i] = *recp;
+		rp[ptr - 1] = *recp;
 		block->bb_numrecs++;
 		xfs_inobt_log_recs(cur, bp, ptr, block->bb_numrecs);
 	}
@@ -804,9 +811,11 @@ xfs_inobt_insrec(
 	 */
 	if (ptr < block->bb_numrecs) {
 		if (level == 0)
-			xfs_btree_check_rec(cur->bc_btnum, rp + i, rp + i + 1);
+			xfs_btree_check_rec(cur->bc_btnum, rp + ptr - 1,
+				rp + ptr);
 		else
-			xfs_btree_check_key(cur->bc_btnum, kp + i, kp + i + 1);
+			xfs_btree_check_key(cur->bc_btnum, kp + ptr - 1,
+				kp + ptr);
 	}
 #endif
 	/*
@@ -1286,16 +1295,16 @@ xfs_inobt_lshift(
 	 * Slide the contents of right down one entry.
 	 */
 	if (level > 0) {
-		for (i = 0; i < right->bb_numrecs; i++) {
-			rkp[i] = rkp[i + 1];
+#ifdef DEBUG
+		for (i = 0; i < right->bb_numrecs; i++)
 			xfs_btree_check_sptr(cur, rpp[i + 1], level);
-			rpp[i] = rpp[i + 1];
-		}
+#endif
+		ovbcopy(rkp + 1, rkp, right->bb_numrecs * sizeof(*rkp));
+		ovbcopy(rpp + 1, rpp, right->bb_numrecs * sizeof(*rpp));
 		xfs_inobt_log_keys(cur, rbp, 1, right->bb_numrecs);
 		xfs_inobt_log_ptrs(cur, rbp, 1, right->bb_numrecs);
 	} else {
-		for (i = 0; i < right->bb_numrecs; i++)
-			rrp[i] = rrp[i + 1];
+		ovbcopy(rrp + 1, rrp, right->bb_numrecs * sizeof(*rrp));
 		xfs_inobt_log_recs(cur, rbp, 1, right->bb_numrecs);
 		key.ir_startino = rrp->ir_startino;
 		rkp = &key;
@@ -1628,11 +1637,12 @@ xfs_inobt_rshift(
 		lpp = XFS_INOBT_PTR_ADDR(left, left->bb_numrecs, cur);
 		rkp = XFS_INOBT_KEY_ADDR(right, 1, cur);
 		rpp = XFS_INOBT_PTR_ADDR(right, 1, cur);
-		for (i = right->bb_numrecs - 1; i >= 0; i--) {
-			rkp[i + 1] = rkp[i];
+#ifdef DEBUG
+		for (i = right->bb_numrecs - 1; i >= 0; i--)
 			xfs_btree_check_sptr(cur, rpp[i], level);
-			rpp[i + 1] = rpp[i];
-		}
+#endif
+		ovbcopy(rkp, rkp + 1, right->bb_numrecs * sizeof(*rkp));
+		ovbcopy(rpp, rpp + 1, right->bb_numrecs * sizeof(*rpp));
 		xfs_btree_check_sptr(cur, *lpp, level);
 		*rkp = *lkp;
 		*rpp = *lpp;
@@ -1641,8 +1651,7 @@ xfs_inobt_rshift(
 	} else {
 		lrp = XFS_INOBT_REC_ADDR(left, left->bb_numrecs, cur);
 		rrp = XFS_INOBT_REC_ADDR(right, 1, cur);
-		for (i = right->bb_numrecs - 1; i >= 0; i--)
-			rrp[i + 1] = rrp[i];
+		ovbcopy(rrp, rrp + 1, right->bb_numrecs * sizeof(*rrp));
 		*rrp = *lrp;
 		xfs_inobt_log_recs(cur, rbp, 1, right->bb_numrecs + 1);
 		key.ir_startino = rrp->ir_startino;
@@ -1756,11 +1765,12 @@ xfs_inobt_split(
 		lpp = XFS_INOBT_PTR_ADDR(left, i, cur);
 		rkp = XFS_INOBT_KEY_ADDR(right, 1, cur);
 		rpp = XFS_INOBT_PTR_ADDR(right, 1, cur);
-		for (i = 0; i < right->bb_numrecs; i++) {
-			rkp[i] = lkp[i];
+#ifdef DEBUG
+		for (i = 0; i < right->bb_numrecs; i++)
 			xfs_btree_check_sptr(cur, lpp[i], level);
-			rpp[i] = lpp[i];
-		}
+#endif
+		bcopy(lkp, rkp, right->bb_numrecs * sizeof(*rkp));
+		bcopy(lpp, rpp, right->bb_numrecs * sizeof(*rpp));
 		xfs_inobt_log_keys(cur, rbp, 1, right->bb_numrecs);
 		xfs_inobt_log_ptrs(cur, rbp, 1, right->bb_numrecs);
 		*keyp = *rkp;
@@ -1771,8 +1781,7 @@ xfs_inobt_split(
 	else {
 		lrp = XFS_INOBT_REC_ADDR(left, i, cur);
 		rrp = XFS_INOBT_REC_ADDR(right, 1, cur);
-		for (i = 0; i < right->bb_numrecs; i++)
-			rrp[i] = lrp[i];
+		bcopy(lrp, rrp, right->bb_numrecs * sizeof(*rrp));
 		xfs_inobt_log_recs(cur, rbp, 1, right->bb_numrecs);
 		keyp->ir_startino = rrp->ir_startino;
 	}

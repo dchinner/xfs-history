@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.134 $"
+#ident	"$Revision: 1.135 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1883,15 +1883,13 @@ xfs_bmap_delete_exlist(
 	xfs_extnum_t	count)		/* count of items to delete */
 {
 	xfs_bmbt_rec_t	*base;		/* base of extent list */
-	xfs_extnum_t	from;		/* from counter in copy */
 	xfs_extnum_t	nextents;	/* number of extents in list after */
-	xfs_extnum_t	to;		/* to counter in copy */
 
 	ASSERT(ip->i_flags & XFS_IEXTENTS);
 	base = ip->i_u1.iu_extents;
 	nextents = ip->i_bytes / sizeof(xfs_bmbt_rec_t) - count;
-	for (to = idx, from = to + count; to < nextents; from++, to++)
-		base[to] = base[from];
+	ovbcopy(&base[idx + count], &base[idx],
+		(nextents - idx) * sizeof(*base));
 	xfs_iext_realloc(ip, -count);
 	kmem_check();
 }
@@ -2028,7 +2026,6 @@ xfs_bmap_insert_exlist(
 	xfs_bmbt_irec_t	*new)		/* items to insert */
 {
 	xfs_bmbt_rec_t	*base;
-	xfs_extnum_t	from;
 	xfs_extnum_t	nextents;
 	xfs_extnum_t	to;
 
@@ -2036,8 +2033,8 @@ xfs_bmap_insert_exlist(
 	xfs_iext_realloc(ip, count);
 	base = ip->i_u1.iu_extents;
 	nextents = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
-	for (to = nextents - 1, from = to - count; from >= idx; from--, to--)
-		base[to] = base[from];
+	ovbcopy(&base[idx], &base[idx + count],
+		(nextents - (idx + count)) * sizeof(*base));
 	for (to = idx; to < idx + count; to++, new++)
 		xfs_bmbt_set_all(&base[to], new);
 	kmem_check();
