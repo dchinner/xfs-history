@@ -65,8 +65,6 @@
 #include <support/time.h>
 #include <support/kmem.h>
 
-#include <xfs_fs.h>	/* for BBMASK */
-
 #include "page_buf_internal.h"
 
 #define SECTOR_SHIFT	9
@@ -530,6 +528,13 @@ _pagebuf_lookup_pages(
 		}
 		offset = 0;
 	}
+
+	if (!pb->pb_locked) {
+		for (pi = 0; pi < page_count; pi++) {
+			unlock_page(pb->pb_pages[pi]);
+		}
+	}
+
 	if (cached_page)
 		page_cache_release(cached_page);
 
@@ -561,11 +566,6 @@ mapit:
 		pb->pb_flags &= ~(PBF_NONE);
 		if (good_pages != page_count) {
 			pb->pb_flags |= PBF_PARTIAL;
-		}
-	}
-	if (!pb->pb_locked) {
-		for (pi = 0; pi < page_count; pi++) {
-			unlock_page(pb->pb_pages[pi]);
 		}
 	}
 
@@ -818,14 +818,15 @@ pagebuf_get_no_daddr(size_t len, pb_target_t *target)
 			/*
 			printk(
 			"pb_get_no_daddr NOT block 0x%p mask 0x%p len %d\n",
-				rmem, ((size_t)rmem & (size_t)~BBMASK), len);
+				rmem, ((size_t)rmem & (size_t)~SECTOR_MASK),
+				len);
 			*/
 		}
 		if ((rmem = kmalloc(tlen, GFP_KERNEL)) == 0) {
 			pagebuf_free(pb);
 			return (NULL);
 		}
-	} while ((size_t)rmem != ((size_t)rmem & (size_t)~BBMASK));
+	} while ((size_t)rmem != ((size_t)rmem & (size_t)~SECTOR_MASK));
 
 	if ((rval = pagebuf_associate_memory(pb, rmem, len)) != 0) {
 		kfree(rmem);
