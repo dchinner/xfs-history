@@ -361,7 +361,7 @@ xfs_zero_last_block(
 		}
 	}
 
-	npbmaps = _xfs_imap_to_bmap(io, offset, &imap, &pbmap, nimaps, npbmaps);
+	npbmaps = _xfs_imap_to_bmap(io, loff, &imap, &pbmap, nimaps, npbmaps);
 	error = -pagebuf_iozero(ip, pb, zero_offset, zero_len, end_size,
 			&pbmap, npbmaps);
 	pagebuf_rele(pb);
@@ -520,7 +520,7 @@ xfs_zero_eof(
 			}
 		}
 
-		npbmaps = _xfs_imap_to_bmap(io, offset,
+		npbmaps = _xfs_imap_to_bmap(io, loff,
 				&imap, &pbmap, nimaps, npbmaps);
 		error = -pagebuf_iozero(ip, pb, 0, lsize, end_size,
 				&pbmap, npbmaps);
