@@ -1,4 +1,4 @@
-#ident "$Revision: 1.204 $"
+#ident "$Revision: 1.205 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1221,7 +1221,7 @@ xfs_read(
 	if ((vp->v_flag & (VENF_LOCKING|VFRLOCKS)) == 
 	    (VENF_LOCKING|VFRLOCKS)) {
 		error = fs_checklock(vp, FREAD, offset, count, uiop->uio_fmode,
-				     credp, fl);
+				     credp, fl, VRWLOCK_READ);
 		if (error)
 			goto out;
 	}
@@ -2591,7 +2591,8 @@ start:
 	if ((vp->v_flag & (VENF_LOCKING|VFRLOCKS)) == 
 	    (VENF_LOCKING|VFRLOCKS)) {
 		error = fs_checklock(vp, FWRITE, offset, count, 
-				     uiop->uio_fmode, credp, fl);	
+				     uiop->uio_fmode, credp, fl, 
+				     VRWLOCK_WRITE);	
 		if (error)
 			goto out;
 	}

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.326 $"
+#ident "$Revision: 1.327 $"
 
 
 #ifdef SIM
@@ -255,6 +255,7 @@ xfs_frlock(
 	flock_t		*flockp,
 	int		flag,
 	off_t		offset,
+	vrwlock_t	vrwlock,
 	cred_t		*credp);
 
 STATIC int
@@ -4629,6 +4630,7 @@ xfs_frlock(
 	flock_t		*flockp,
 	int		flag,
 	off_t		offset,
+	vrwlock_t	vrwlock,
 	cred_t		*credp)
 {
 	xfs_inode_t	*ip;
@@ -4638,14 +4640,16 @@ xfs_frlock(
 		       (inst_t *)__return_address);
 	ip = XFS_BHVTOI(bdp);
 
-	dolock = !(cmd == F_CHKLK || cmd == F_CHKLKW);
-	if (dolock)
+	dolock = (vrwlock == VRWLOCK_NONE);
+	if (dolock) {
 		xfs_ilock(ip, XFS_IOLOCK_EXCL);
-	else
-		ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) ||
-		       ismrlocked(&ip->i_iolock, MR_ACCESS));
+		vrwlock = VRWLOCK_WRITE;
+	}
 
-	error = fs_frlock(bdp, cmd, flockp, flag, offset, credp);
+	ASSERT(vrwlock == VRWLOCK_READ ? ismrlocked(&ip->i_iolock, MR_ACCESS) :
+	       ismrlocked(&ip->i_iolock, MR_UPDATE));	
+
+	error = fs_frlock(bdp, cmd, flockp, flag, offset, vrwlock, credp);
 	if (dolock)
 		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 	return error;
