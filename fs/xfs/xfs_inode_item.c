@@ -58,8 +58,16 @@ xfs_inode_item_size(xfs_inode_log_item_t *iip)
 	uint	nvecs;
 
 	nvecs = 2;
-	if (iip->ili_format.ilf_fields &
-	    (XFS_ILOG_DATA | XFS_ILOG_EXT | XFS_ILOG_BROOT)) {
+
+	/*
+	 * Only log the data/extents/b-tree root if there is something
+	 * left to log.
+	 */
+	if ((iip->ili_format.ilf_fields & (XFS_ILOG_DATA | XFS_ILOG_EXT)) &&
+	    (iip->ili_inode->i_bytes != 0)) {
+		nvecs++;
+	} else if ((iip->ili_format.ilf_fields & XFS_ILOG_BROOT) &&
+		   (iip->ili_inode->i_broot_bytes != 0)) {
 		nvecs++;
 	}
 
