@@ -108,6 +108,7 @@ xfs_validate_extents(
 	xfs_bmbt_rec_32_t	*ep,
 	int			nrecs);
 
+#ifndef SIM
 STATIC void
 xfs_itrunc_trace(
 	int		tag,
@@ -116,6 +117,9 @@ xfs_itrunc_trace(
 	xfs_fsize_t	new_size,
 	off_t		toss_start,
 	off_t		toss_finish);
+#else
+#define	xfs_itrunc_trace(tag, ip, flag, new_size, toss_start, toss_finish)
+#endif /* !SIM */
 #else /* DEBUG */
 #define xfs_validate_extents(ep, nrecs)
 #define	xfs_itrunc_trace(tag, ip, flag, new_size, toss_start, toss_finish)
@@ -932,7 +936,7 @@ xfs_file_last_byte(
 	return last_byte;
 }
 
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(SIM)
 STATIC void
 xfs_itrunc_trace(
 	int		tag,
