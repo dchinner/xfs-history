@@ -1,4 +1,4 @@
-#ident "$Revision: 1.23 $"
+#ident "$Revision: 1.24 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -1381,7 +1381,8 @@ xfs_dqunlock(
 {
 	mutex_unlock(&(dqp->q_qlock)); 
 	if (dqp->q_logitem.qli_dquot == dqp) { 
-		xfs_trans_unlocked_item(dqp->q_mount,
+		/* Once was dqp->q_mount, but might just have been cleared */
+		xfs_trans_unlocked_item(dqp->q_logitem.qli_item.li_mountp,
 					(xfs_log_item_t*)&(dqp->q_logitem));	
 	}
 }
