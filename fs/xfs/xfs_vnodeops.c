@@ -444,18 +444,23 @@ xfs_getattr(
 	/*
 	 * XFS-added attributes
 	 */
-	if (flags & (AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS|AT_UUID)) {
-		/* convert di_flags to xflags
+	if (flags & (AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS|AT_UUID|AT_ANEXTENTS)) {
+		/*
+		 * convert di_flags to xflags
 		 */
 		vap->va_xflags = 0;
-		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
-			vap->va_xflags |= XFS_XFLAG_REALTIME ;
-		}
+		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
+			vap->va_xflags |= XFS_XFLAG_REALTIME;
+		if (ip->i_d.di_flags & XFS_DIFLAG_PREALLOC)
+			vap->va_xflags |= XFS_XFLAG_PREALLOC;
 		vap->va_extsize = ip->i_d.di_extsize << mp->m_sb.sb_blocklog;
 		vap->va_nextents = (ip->i_df.if_flags & XFS_IFEXTENTS) ?
 			ip->i_df.if_bytes / sizeof(xfs_bmbt_rec_t) :
 			ip->i_d.di_nextents;
 		vap->va_uuid = ip->i_d.di_uuid;
+		vap->va_anextents = (ip->i_af.if_flags & XFS_IFEXTENTS) ?
+			ip->i_af.if_bytes / sizeof(xfs_bmbt_rec_t) :
+			ip->i_d.di_anextents;
 	}
 
 	xfs_iunlock (ip, XFS_ILOCK_SHARED);
@@ -829,6 +834,7 @@ xfs_setattr(
 			if ( vap->va_xflags & XFS_XFLAG_REALTIME) {
 				ip->i_d.di_flags |= XFS_DIFLAG_REALTIME;
 			}
+			/* can't set PREALLOC this way, just ignore it */
 		}
 		xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 		timeflags |= XFS_ICHGTIME_CHG;
@@ -4779,7 +4785,6 @@ xfs_fcntl(
 	struct flock		bf;
 	struct irix4_flock	i4_bf;
 	struct irix5_flock	i5_bf;
-
 	
 	vn_trace_entry(vp, "xfs_fcntl");
 	mp = XFS_VFSTOM( vp->v_vfsp );
@@ -4816,17 +4821,22 @@ xfs_fcntl(
 		break;
 	    }
 
-	case F_FSGETXATTR: {
+	case F_FSGETXATTR:
+	case F_FSGETXATTRA: {
 		struct fsxattr fa;
 		vattr_t va;
 
-		error = xfs_getattr(vp, &va, AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS|AT_UUID, credp);
+		error = xfs_getattr(vp, &va,
+			AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS|AT_UUID|AT_ANEXTENTS,
+			credp);
 		if (error) {
 			break;
 		}
 		fa.fsx_xflags = va.va_xflags;
 		fa.fsx_extsize = va.va_extsize;
-		fa.fsx_nextents = va.va_nextents;
+		fa.fsx_nextents =
+			(cmd == F_FSGETXATTR) ?
+				va.va_nextents : va.va_anextents;
 		fa.fsx_uuid = va.va_uuid;
 		if (copyout(&fa, arg, sizeof(fa))) {
 			error = XFS_ERROR(EFAULT);
@@ -4849,7 +4859,8 @@ xfs_fcntl(
 		break;
 	    }
 
-	case F_GETBMAP: {
+	case F_GETBMAP:
+	case F_GETBMAPA: {
 		struct getbmap bm;
 
 		if (copyin(arg, &bm, sizeof(bm))) {
@@ -4860,7 +4871,8 @@ xfs_fcntl(
 			error = XFS_ERROR(EINVAL);
 			break;
 		}
-		error = xfs_getbmap(vp, &bm, (struct getbmap *)arg + 1);
+		error = xfs_getbmap(vp, &bm, (struct getbmap *)arg + 1,
+			cmd == F_GETBMAP ? XFS_DATA_FORK : XFS_ATTR_FORK);
 		if (!error && copyout(&bm, arg, sizeof(bm))) {
 			error = XFS_ERROR(EFAULT);
 		}
