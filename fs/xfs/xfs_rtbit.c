@@ -1,4 +1,4 @@
-#ident "$Revision: 1.2 $"
+#ident "$Revision: 1.3 $"
 
 /*
  * XFS bit manipulation routines, used only in realtime code.
@@ -14,18 +14,21 @@ int
 xfs_lowbit32(
 	__uint32_t	v)
 {
+	int		i;
+
 	if (v & 0x0000ffff)
 		if (v & 0x000000ff)
-			return xfs_lowbit[v & 0xff];
+			i = 0;
 		else
-			return 8 + xfs_lowbit[(v >> 8) & 0xff];
+			i = 8;
 	else if (v & 0xffff0000)
 		if (v & 0x00ff0000)
-			return 16 + xfs_lowbit[(v >> 16) & 0xff];
+			i = 16;
 		else
-			return 24 + xfs_lowbit[(v >> 24) & 0xff];
+			i = 24;
 	else
 		return -1;
+	return i + xfs_lowbit[(v >> i) & 0xff];
 }
 
 /*
@@ -35,57 +38,61 @@ int
 xfs_highbit64(
 	__uint64_t	v)
 {
+	int		i;
 #if (_MIPS_SIM == _ABIN32 || _MIPS_SIM == _ABI64)
 	if (v & 0xffffffff00000000)
 		if (v & 0xffff000000000000)
 			if (v & 0xff00000000000000)
-				return 56 + xfs_highbit[(v >> 56) & 0xff];
+				i = 56;
 			else
-				return 48 + xfs_highbit[(v >> 48) & 0xff];
+				i = 48;
 		else
 			if (v & 0x0000ff0000000000)
-				return 40 + xfs_highbit[(v >> 40) & 0xff];
+				i = 40;
 			else
-				return 32 + xfs_highbit[(v >> 32) & 0xff];
+				i = 32;
 	else if (v & 0x00000000ffffffff)
 		if (v & 0x00000000ffff0000)
 			if (v & 0x00000000ff000000)
-				return 24 + xfs_highbit[(v >> 24) & 0xff];
+				i = 24;
 			else
-				return 16 + xfs_highbit[(v >> 16) & 0xff];
+				i = 16;
 		else
 			if (v & 0x000000000000ff00)
-				return 8 + xfs_highbit[(v >> 8) & 0xff];
+				i = 8;
 			else
-				return xfs_highbit[v & 0xff];
+				i = 0;
 	else
 		return -1;
+	return i + xfs_highbit[(v >> i) & 0xff];
 #else
 	__uint32_t	vw;
 
-	if (vw = v >> 32)
+	if (vw = v >> 32) {
 		if (vw & 0xffff0000)
 			if (vw & 0xff000000)
-				return 56 + xfs_highbit[(vw >> 24) & 0xff];
+				i = 56;
 			else
-				return 48 + xfs_highbit[(vw >> 16) & 0xff];
+				i = 48;
 		else
 			if (vw & 0x0000ff00)
-				return 40 + xfs_highbit[(vw >> 8) & 0xff];
+				i = 40;
 			else
-				return 32 + xfs_highbit[vw & 0xff];
-	else if (vw = v)
+				i = 32;
+		return i + xfs_highbit[(vw >> (i - 32)) & 0xff];
+	} else if (vw = v) {
 		if (vw & 0xffff0000)
 			if (vw & 0xff000000)
-				return 24 + xfs_highbit[(vw >> 24) & 0xff];
+				i = 24;
 			else
-				return 16 + xfs_highbit[(vw >> 16) & 0xff];
+				i = 16;
 		else
 			if (vw & 0x0000ff00)
-				return 8 + xfs_highbit[(vw >> 8) & 0xff];
+				i = 8;
 			else
-				return xfs_highbit[vw & 0xff];
-	else
+				i = 0;
+		return i + xfs_highbit[(vw >> i) & 0xff];
+	} else
 		return -1;
 #endif
 }
