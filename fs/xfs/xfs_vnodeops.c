@@ -1,4 +1,4 @@
-#ident "$Revision: 1.290 $"
+#ident "$Revision: 1.294 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -10,7 +10,11 @@
 #include <sys/uio.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
-#include <specfs/snode.h>
+#ifdef	OLDSPECFS
+#include <fs/specfs/snode.h>
+#else	/* ! OLDSPECFS */
+#include <fs/specfs/spec_asnode.h>
+#endif	/* ! OLDSPECFS */
 #include <sys/systm.h>
 #include <sys/dnlc.h>
 #include <sys/sysmacros.h>
@@ -1930,15 +1934,16 @@ xfs_lookup(
 
 	/*
 	 * If vnode is a device return special vnode instead.
-         */
-        if (ISVDEV(vp->v_type)) {
-                newvp = specvp(vp, vp->v_rdev, vp->v_type, credp);
-                VN_RELE(vp);
-                if (newvp == NULL) {
-                        return XFS_ERROR(ENOSYS);
+	 */
+	if (ISVDEV(vp->v_type)) {
+		newvp = spec_vp(vp, vp->v_rdev, vp->v_type, credp);
+
+		VN_RELE(vp);
+		if (newvp == NULL) {
+			return XFS_ERROR(ENOSYS);
 		}
-                vp = newvp;
-        }
+		vp = newvp;
+	}
 
 	*vpp = vp;
 
@@ -2403,18 +2408,20 @@ xfs_create(
 	if (pdqp)
 		xfs_qm_dqrele(pdqp);
 
-        /*
-         * If vnode is a device, return special vnode instead.
-         */
-        if (ISVDEV(vp->v_type)) {
-                newvp = specvp(vp, vp->v_rdev, vp->v_type, credp);
-                VN_RELE(vp);
-                if (newvp == NULL)
-                        return XFS_ERROR(ENOSYS);
-                vp = newvp;
-        }
+	/*
+	 * If vnode is a device, return special vnode instead.
+	 */
+	if (ISVDEV(vp->v_type)) {
+		newvp = spec_vp(vp, vp->v_rdev, vp->v_type, credp);
 
-        *vpp = vp;
+		VN_RELE(vp);
+		if (newvp == NULL)
+			return XFS_ERROR(ENOSYS);
+
+		vp = newvp;
+	}
+
+	*vpp = vp;
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_POSTCREATE)) {
 		(void) dm_namesp_event(DM_POSTCREATE, dir_vp, vp, name, NULL,

@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.154 $"
+#ident  "$Revision: 1.155 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -32,7 +32,11 @@
 #include <sys/grio.h>
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
-#include <specfs/snode.h>
+#ifdef	OLDSPECFS
+#include <fs/specfs/snode.h>
+#else	/* ! OLDSPECFS */
+#include <fs/specfs/spec_asnode.h>
+#endif	/* ! OLDSPECFS */
 #include <sys/kmem.h>
 #ifdef SIM
 #undef _KERNEL
@@ -410,7 +414,6 @@ xfs_cmountfs(
 	char		*tmp_fsname_buffer;
 	/*REFERENCED*/
 	int		noerr;
-	vnode_t 	*makespecvp(dev_t, vtype_t);
 
 	/*
 	 * Remounting a XFS file system is bad. The log manager
@@ -428,7 +431,8 @@ xfs_cmountfs(
 	if (ddev != 0) {
 		vnode_t *openvp;
 
-		openvp = ddevvp = makespecvp( ddev, VBLK );
+		openvp = ddevvp = make_specvp(ddev, VBLK);
+
 		VOP_OPEN(openvp, &ddevvp, vfs_flags, cr, error);
 		if (error) {
 			VN_RELE(ddevvp);
@@ -456,7 +460,8 @@ xfs_cmountfs(
 	if (rtdev != 0) {
 		vnode_t *openvp;
 
-		openvp = rdevvp = makespecvp( rtdev, VBLK );
+		openvp = rdevvp = make_specvp(rtdev, VBLK);
+
 		VOP_OPEN(openvp, &rdevvp, vfs_flags, cr, error);
 		if (error) {
 			VN_RELE(rdevvp);
@@ -473,7 +478,8 @@ xfs_cmountfs(
 		} else {
 			vnode_t *openvp;
 
-			openvp = ldevvp = makespecvp( logdev, VBLK );
+			openvp = ldevvp = make_specvp(logdev, VBLK);
+
 			VOP_OPEN(openvp, &ldevvp, vfs_flags, cr, error);
 			if (error) {
 				VN_RELE(ldevvp);
@@ -1242,14 +1248,19 @@ devvptoxfs(
 	xfs_sb_t	**fsp,
 	cred_t		*cr)
 {
+#ifndef	OLDSPECFS
+	int	retval;
+#endif	/* ! OLDSPECFS */
 	buf_t		*bp;
 	dev_t		dev;
 	int		error;
 	xfs_sb_t	*fs;
 	vnode_t		*openvp;
+#ifdef	OLDSPECFS
 	bhv_desc_t	*bdp;
 	bhv_head_t	*bhp;
 	struct snode	*sp;
+#endif	/* OLDSPECFS */
 	bhv_desc_t	*vfs_bdp;
 
 	if (devvp->v_type != VBLK)
@@ -1261,6 +1272,7 @@ devvptoxfs(
 	dev = devvp->v_rdev;
 	VOP_RWLOCK(devvp, VRWLOCK_WRITE);
 
+#ifdef	OLDSPECFS
 	/*
 	 * Find the spec behavior for this vnode so that we can look
 	 * at the snode.
@@ -1273,7 +1285,19 @@ devvptoxfs(
 	}
 
 	sp = (struct snode *)BHV_PDATA(bdp);
-	if (sp->s_flag & SMOUNTED) {
+	if (sp->s_flag & SMOUNTED)
+#else	/* ! OLDSPECFS */
+	/*
+	 * Ask specfs to check for the SMOUNTED flag in the common snode.
+	 */
+	if ((retval = spec_ismounted(devvp)) == -1) {
+		VOP_RWUNLOCK(devvp, VRWLOCK_WRITE);
+		return XFS_ERROR(ENODEV);
+	}
+
+	if (retval)
+#endif	/* ! OLDSPECFS */
+	{
 		extern vfsops_t xfs_vfsops;
 		/*
 		 * Device is mounted.  Get an empty buffer to hold a
