@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.74 $"
+#ident  "$Revision: 1.75 $"
 
 #include <strings.h>
 #include <limits.h>
@@ -1410,16 +1410,23 @@ xfs_sync(vfs_t		*vfsp,
 					mount_locked = B_FALSE;
 				}
 
-				xfs_iflock(ip);
 				if (flags & SYNC_WAIT) {
+					xfs_iflock(ip);
 					xfs_iflush(ip, XFS_IFLUSH_SYNC);
 				} else {
 					/*
-					 * Tell xfs_iflush() to use a delwri
-					 * flush if it can and to otherwise
-					 * do it async.
+					 * If we can't acquire the flush
+					 * lock, then the inode is already
+					 * being flushed so don't bother
+					 * waiting.  If we can lock it then
+					 * do a delwri flush so we can
+					 * combine multiple inode flushes
+					 * in each disk write.
 					 */
-					xfs_iflush(ip, XFS_IFLUSH_DELWRI);
+					if (xfs_iflock_nowait(ip)) {
+						xfs_iflush(ip,
+							   XFS_IFLUSH_DELWRI);
+					}
 				}
 			}
 		}
