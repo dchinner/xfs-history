@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.72 $"
+#ident	"$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -962,26 +962,26 @@ xlog_recover_print_buffer(xlog_recover_item_t *item)
 {
     xfs_agi_t			*agi;
     xfs_agf_t			*agf;
+    xfs_buf_log_format_v1_t	*old_f;
     xfs_buf_log_format_t	*f;
-    xfs_buf_log_format64_t	*f64;
     caddr_t			p;
     int				len, num, i;
     daddr_t			blkno;
     extern int			print_buffer;
 
     f = (xfs_buf_log_format_t *)item->ri_buf[0].i_addr;
-    f64 = (xfs_buf_log_format64_t *)item->ri_buf[0].i_addr;
+    old_f = (xfs_buf_log_format_v1_t *)f;
     len = item->ri_buf[0].i_len;
     printf("	");
-    if ((f->blf_type == XFS_LI_BUF) || (f->blf_type == XFS_LI_OBUF)) {
-	    printf("BUF:  #regs:%d   start blkno:0x%x   len:%d   bmap size:%d\n",
+    if (f->blf_type == XFS_LI_BUF) {
+	    printf("BUF:  #regs:%d   start blkno:0x%llx   len:%d   bmap size:%d\n",
 		   f->blf_size, f->blf_blkno, f->blf_len, f->blf_map_size);
 	    blkno = (daddr_t)f->blf_blkno;
     } else {
-	    printf("BUF:  #regs:%d   start blkno:0x%llx   len:%d   bmap size:%d\n",
-		   f64->blf_size, f64->blf_blkno, f64->blf_len,
-		   f64->blf_map_size);
-	    blkno = f64->blf_blkno;
+	    printf("BUF32:  #regs:%d   start blkno:0x%x   len:%d   bmap size:%d\n",
+		   old_f->blf_size, old_f->blf_blkno, old_f->blf_len,
+		   old_f->blf_map_size);
+	    blkno = (daddr_t)old_f->blf_blkno;
     }
     num = f->blf_size-1;
     i = 1;
@@ -1232,17 +1232,21 @@ xlog_recover_print_item(xlog_recover_item_t *item)
 	int i;
 
 	switch (ITEM_TYPE(item)) {
-	    case XFS_LI_BUF:
-	    case XFS_LI_OBUF: {
+	    case XFS_LI_BUF: {
 		printf("BUF");
 		break;
 	    }
-	    case XFS_LI_BUF64: {
-		printf("BUF64");
+	    case XFS_LI_6_1_BUF:
+	    case XFS_LI_OBUF: {
+		printf("BUF32");
 		break;
 	    }
-	    case XFS_LI_OINODE: {
-		printf("OINO");
+	    case XFS_LI_5_3_INODE: {
+		printf("5.3-XFS INO");
+		break;
+	    }
+	    case XFS_LI_6_1_INODE: {
+		printf("INO (4K CL)");
 		break;
 	    }
 	    case XFS_LI_INODE: {
@@ -1276,13 +1280,14 @@ xlog_recover_print_item(xlog_recover_item_t *item)
 #ifdef SIM
 	switch (ITEM_TYPE(item)) {
 	    case XFS_LI_BUF:
-	    case XFS_LI_BUF64:
+	    case XFS_LI_6_1_BUF:
 	    case XFS_LI_OBUF: {
 		xlog_recover_print_buffer(item);
 		break;
 	    }
 	    case XFS_LI_INODE:
-	    case XFS_LI_OINODE: {
+	    case XFS_LI_6_1_INODE:
+	    case XFS_LI_5_3_INODE: {
 		xlog_recover_print_inode(item);
 		break;
 	    }
@@ -1364,13 +1369,14 @@ xlog_recover_reorder_trans(xlog_t	  *log,
 	itemq_next = itemq->ri_next;
 	switch (ITEM_TYPE(itemq)) {
 	    case XFS_LI_BUF:
-	    case XFS_LI_BUF64:
+	    case XFS_LI_6_1_BUF:
 	    case XFS_LI_OBUF: {
 		xlog_recover_insert_item_frontq(&trans->r_itemq, itemq);
 		break;
 	    }
 	    case XFS_LI_INODE:
-	    case XFS_LI_OINODE:
+	    case XFS_LI_6_1_INODE:
+	    case XFS_LI_5_3_INODE:
 	    case XFS_LI_EFD:
 	    case XFS_LI_EFI: {
 		xlog_recover_insert_item_backq(&trans->r_itemq, itemq);
@@ -1409,20 +1415,24 @@ xlog_recover_do_buffer_pass1(xlog_t			*log,
 	xfs_buf_cancel_t	*nextp;
 	xfs_buf_cancel_t	*prevp;
 	xfs_buf_cancel_t	**bucket;
-	xfs_buf_log_format64_t	*buf64_f;
+	xfs_buf_log_format_v1_t	*obuf_f;
 	daddr_t			blkno;
 	uint			len;
 	ushort			flags;
 
-	if (buf_f->blf_type == XFS_LI_BUF64) {
-		buf64_f = (xfs_buf_log_format64_t*)buf_f;
-		blkno = buf64_f->blf_blkno;
-		len = buf64_f->blf_blkno;
-		flags = buf64_f->blf_flags;
-	} else {
+	switch (buf_f->blf_type) {
+	case XFS_LI_BUF:
 		blkno = buf_f->blf_blkno;
 		len = buf_f->blf_len;
 		flags = buf_f->blf_flags;
+		break;
+	case XFS_LI_6_1_BUF:
+	case XFS_LI_OBUF:
+		obuf_f = (xfs_buf_log_format_v1_t*)buf_f;
+		blkno = (daddr_t) obuf_f->blf_blkno;
+		len = obuf_f->blf_len;
+		flags = obuf_f->blf_flags;
+		break;
 	}
 
 	/*
@@ -1501,20 +1511,24 @@ xlog_recover_do_buffer_pass2(xlog_t			*log,
 	xfs_buf_cancel_t	*bcp;
 	xfs_buf_cancel_t	*prevp;
 	xfs_buf_cancel_t	**bucket;
-	xfs_buf_log_format64_t	*buf64_f;
+	xfs_buf_log_format_v1_t	*obuf_f;
 	daddr_t			blkno;
 	int			len;
 	ushort			flags;
 
-	if (buf_f->blf_type == XFS_LI_BUF64) {
-		buf64_f = (xfs_buf_log_format64_t*)buf_f;
-		blkno = buf64_f->blf_blkno;
-		len = buf64_f->blf_blkno;
-		flags = buf64_f->blf_flags;
-	} else {
+	switch (buf_f->blf_type) {
+	case XFS_LI_BUF:
 		blkno = buf_f->blf_blkno;
 		len = buf_f->blf_len;
 		flags = buf_f->blf_flags;
+		break;
+	case XFS_LI_6_1_BUF:
+	case XFS_LI_OBUF:
+		obuf_f = (xfs_buf_log_format_v1_t*)buf_f;
+		blkno = (daddr_t) obuf_f->blf_blkno;
+		len = obuf_f->blf_len;
+		flags = obuf_f->blf_flags;
+		break;
 	}
 	if (log->l_buf_cancel_table == NULL) {
 		/*
@@ -1607,17 +1621,21 @@ xlog_recover_do_inode_buffer(xfs_mount_t		*mp,
 	int			inodes_per_buf;
 	xfs_agino_t		*logged_nextp;
 	xfs_agino_t		*buffer_nextp;
-	xfs_buf_log_format64_t	*buf64_f;
+	xfs_buf_log_format_v1_t	*obuf_f;
 	unsigned int		*data_map;
 	unsigned int		map_size;
 
-	if (buf_f->blf_type == XFS_LI_BUF64) {
-		buf64_f = (xfs_buf_log_format64_t*)buf_f;
-		data_map = buf64_f->blf_data_map;
-		map_size = buf64_f->blf_map_size;
-	} else {
+	switch (buf_f->blf_type) {
+	case XFS_LI_BUF:
 		data_map = buf_f->blf_data_map;
 		map_size = buf_f->blf_map_size;
+		break;
+	case XFS_LI_6_1_BUF:
+	case XFS_LI_OBUF:
+		obuf_f = (xfs_buf_log_format_v1_t*)buf_f;
+		data_map = obuf_f->blf_data_map;
+		map_size = obuf_f->blf_map_size;
+		break;
 	}
 	/*
 	 * Set the variables corresponding to the current region to
@@ -1703,17 +1721,21 @@ xlog_recover_do_reg_buffer(xfs_mount_t		*mp,
 	int			i;
 	int			bit;
 	int			nbits;
-	xfs_buf_log_format64_t	*buf64_f;
+	xfs_buf_log_format_v1_t	*obuf_f;
 	unsigned int		*data_map;
 	unsigned int		map_size;
 
-	if (buf_f->blf_type == XFS_LI_BUF64) {
-		buf64_f = (xfs_buf_log_format64_t*)buf_f;
-		data_map = buf64_f->blf_data_map;
-		map_size = buf64_f->blf_map_size;
-	} else {
+	switch (buf_f->blf_type) {
+	case XFS_LI_BUF:
 		data_map = buf_f->blf_data_map;
 		map_size = buf_f->blf_map_size;
+		break;
+	case XFS_LI_6_1_BUF:
+	case XFS_LI_OBUF:
+		obuf_f = (xfs_buf_log_format_v1_t*)buf_f;
+		data_map = obuf_f->blf_data_map;
+		map_size = obuf_f->blf_map_size;
+		break;
 	}
 	bit = 0;
 	i = 1;  /* 0 is the buf format structure */
@@ -1769,7 +1791,7 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 			     int		 pass)
 {
 	xfs_buf_log_format_t	*buf_f;
-	xfs_buf_log_format64_t	*buf64_f;
+	xfs_buf_log_format_v1_t	*obuf_f;
 	xfs_mount_t	     	*mp;
 	buf_t		     	*bp;
 	int		     	error;
@@ -1800,16 +1822,21 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 			return 0;
 		}
 	}
-	if (buf_f->blf_type == XFS_LI_BUF64) {
-		buf64_f = (xfs_buf_log_format64_t*)buf_f;
-		blkno = buf64_f->blf_blkno;
-		len = buf64_f->blf_len;
-		flags = buf64_f->blf_flags;
-	} else {
+	switch (buf_f->blf_type) {
+	case XFS_LI_BUF:
 		blkno = buf_f->blf_blkno;
 		len = buf_f->blf_len;
 		flags = buf_f->blf_flags;
+		break;
+	case XFS_LI_6_1_BUF:
+	case XFS_LI_OBUF:
+		obuf_f = (xfs_buf_log_format_v1_t*)buf_f;
+		blkno = obuf_f->blf_blkno;
+		len = obuf_f->blf_len;
+		flags = obuf_f->blf_flags;
+		break;
 	}
+
 	mp = log->l_mp;
 	bp = bread(mp->m_dev, blkno, len);
 	if (bp->b_flags & B_ERROR) {
@@ -1831,13 +1858,22 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	/*
 	 * Perform delayed write on the buffer.  Asynchronous writes will be
 	 * slower when taking into account all the buffers to be flushed.
-	 * If it is an old, unclustered inode buffer, then make sure to
-	 * keep it out of the buffer cache so that it doesn't overlap with
-	 * future reads of those inodes.
+	 *
+	 * Also make sure that only inode buffers with good sizes stay in
+	 * the buffer cache.  The kernel moves inodes in buffers of 1 block
+	 * or XFS_INODE_CLUSTER_SIZE bytes, whichever is bigger.  The inode
+	 * buffers in the log can be a different size if the log was generated
+	 * by an older kernel using unclustered inode buffers or a newer kernel
+	 * running with a different inode cluster size.  Regardless, if the
+	 * the inode buffer size isn't MAX(blocksize, XFS_INODE_CLUSTER_SIZE)
+	 * for *our* value of XFS_INODE_CLUSTER_SIZE, then we need to keep
+	 * the buffer out of the buffer cache so that the buffer won't
+	 * overlap with future reads of those inodes.
 	 */
-	if ((log->l_mp->m_sb.sb_blocksize < XFS_INODE_CLUSTER_SIZE) &&
-	    (bp->b_bcount < XFS_INODE_CLUSTER_SIZE) &&
-	    (*((__uint16_t *)(bp->b_un.b_addr)) == XFS_DINODE_MAGIC)) {
+
+	if ((*((__uint16_t *)(bp->b_un.b_addr)) == XFS_DINODE_MAGIC) &&
+		bp->b_bcount != MAX(log->l_mp->m_sb.sb_blocksize,
+					XFS_INODE_CLUSTER_SIZE))  { 
 		bp->b_flags |= B_STALE;
 		bwrite(bp);
 	} else {
@@ -2153,25 +2189,24 @@ xlog_recover_do_trans(xlog_t	     *log,
 
 	first_item = item = trans->r_itemq;
 	do {
-#if !XFS_BIG_FILESYSTEMS
 		/*
-		 * Kernels that do not support big filesystems cannot
-		 * recover 64 bit buffer log records.
+		 * we don't need to worry about the block number being
+		 * truncated in > 1 TB buffers because in user-land,
+		 * we're now n32 or 64-bit so daddr_t is 64-bits so
+		 * the blkno's will get through the user-mode buffer
+		 * cache properly.  The only bad case is o32 kernels
+		 * where daddr_t is 32-bits but mount will warn us
+		 * off a > 1 TB filesystem before we get here.
 		 */
-		if (ITEM_TYPE(item) == XFS_LI_BUF64) {
-			xlog_warn("XFS: File systems greater than 1TB not supported on this system");
-			error = XFS_ERROR(E2BIG);
-			break;
-		}
-#endif
 		if ((ITEM_TYPE(item) == XFS_LI_BUF) ||
-		    (ITEM_TYPE(item) == XFS_LI_BUF64) ||
+		    (ITEM_TYPE(item) == XFS_LI_6_1_BUF) ||
 		    (ITEM_TYPE(item) == XFS_LI_OBUF)) {
 			if (error = xlog_recover_do_buffer_trans(log, item,
 								 pass))
 				break;
 		} else if ((ITEM_TYPE(item) == XFS_LI_INODE) ||
-			   (ITEM_TYPE(item) == XFS_LI_OINODE)) {
+			   (ITEM_TYPE(item) == XFS_LI_6_1_INODE) ||
+			   (ITEM_TYPE(item) == XFS_LI_5_3_INODE)) {
 			if (error = xlog_recover_do_inode_trans(log, item,
 								pass))
 				break;
@@ -2756,7 +2791,7 @@ xlog_do_recovery_pass(xlog_t	*log,
 		if (error = xlog_recover_process_data(log, rhash,
 						      rhead, dbp->b_dmaaddr,
 						      pass))
-		    return error;
+			goto bread_err;
 	    }
 	    blk_no += (bblks+1);
 	}
