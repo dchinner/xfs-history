@@ -1979,7 +1979,12 @@ retry:
 			 */
 			
 			lowest_lsn = xlog_get_lowest_lsn(log);
-			if (lowest_lsn && (lowest_lsn < INT_GET(iclog->ic_header.h_lsn, ARCH_UNKNOWN))) {
+			if (lowest_lsn && (
+                                XFS_LSN_CMP_ARCH(
+                                    lowest_lsn, 
+                                    INT_GET(iclog->ic_header.h_lsn, ARCH_UNKNOWN), 
+                                    ARCH_NOCONVERT
+                                )<0)) {
 				iclog = iclog->ic_next;
 				continue; /* Leave this guy for someone later */
 			}

@@ -42,11 +42,21 @@
  */
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
+#if XFS_ARCH_MODE == XFS_ARCH_MODE_NATIVE
+#define LSN_FIELD_CYCLE(arch) (1)
+#define LSN_FIELD_BLOCK(arch) (0)
+#else
 #define LSN_FIELD_CYCLE(arch) (((arch)==ARCH_NOCONVERT)?1:0)
 #define LSN_FIELD_BLOCK(arch) (((arch)==ARCH_NOCONVERT)?0:1)
+#endif
+#else
+#if XFS_ARCH_MODE == XFS_ARCH_MODE_NATIVE
+#define LSN_FIELD_CYCLE(arch) (0)
+#define LSN_FIELD_BLOCK(arch) (1)
 #else
 #define LSN_FIELD_CYCLE(arch) (((arch)==ARCH_NOCONVERT)?0:1)
 #define LSN_FIELD_BLOCK(arch) (((arch)==ARCH_NOCONVERT)?1:0)
+#endif
 #endif
 
 /* get lsn fields */
@@ -61,13 +71,13 @@
 
 static inline xfs_lsn_t	_lsn_cmp(xfs_lsn_t lsn1, xfs_lsn_t lsn2, xfs_arch_t arch)
 {
-	if (CYCLE_LSN(lsn1, arch) != CYCLE_LSN(lsn2, arch)) {
-		return (((__int32_t)CYCLE_LSN(lsn1, arch)) - 
-                        ((__int32_t)CYCLE_LSN(lsn2, arch)));
-	}
+	if (CYCLE_LSN(lsn1, arch) != CYCLE_LSN(lsn2, arch))
+		return (CYCLE_LSN(lsn1, arch)<CYCLE_LSN(lsn2, arch))? -999 : 999;
 
-	return (((__int32_t)BLOCK_LSN(lsn1, arch)) - 
-                ((__int32_t)BLOCK_LSN(lsn2, arch)));
+        if (BLOCK_LSN(lsn1, arch) != BLOCK_LSN(lsn2, arch))
+                return (BLOCK_LSN(lsn1, arch)<BLOCK_LSN(lsn2, arch))? -999 : 999;
+        
+        return 0;
 }
 
 #define	XFS_LSN_CMP_ARCH(x,y,arch)	_lsn_cmp(x, y, arch)
