@@ -362,6 +362,7 @@ done:
 
 
 
+#ifdef CONFIG_XFS_DMAPI
 int linvfs_dmapi_map_event(struct file *filp, struct vm_area_struct *vma,
 			   unsigned int wantflag)
 {
@@ -409,6 +410,7 @@ int linvfs_dmapi_map_event(struct file *filp, struct vm_area_struct *vma,
 
 	return -ret;
 }
+#endif
 
 
 
