@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.45 $"
+#ident	"$Revision: 1.46 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -267,7 +267,7 @@ static struct xif {
 static void	xfsidbg_vfs_data_print(void *);
 static void	xfsidbg_vfs_vnodes_print(vfs_t *, int);
 static void	xfsidbg_vnode_data_print(void *);
-static vnode_t	*xfsidbg_vnode_find(vfs_t *, long);
+static vnode_t	*xfsidbg_vnode_find(vfs_t *, vnumber_t);
 
 static idbgfssw_t xfsidbgfssw = {
 	NULL, "xfs", &xfs_vnodeops, &xfs_vfsops,
@@ -3798,7 +3798,7 @@ xfsidbg_vnode_data_print(void *p)
  * Called from vnode command.
  */
 static vnode_t *
-xfsidbg_vnode_find(vfs_t *vfsp, long vnum)
+xfsidbg_vnode_find(vfs_t *vfsp, vnumber_t vnum)
 {
 	bhv_desc_t *bdp;
 	xfs_mount_t	*mp;
