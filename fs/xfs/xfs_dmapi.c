@@ -1069,7 +1069,6 @@ xfs_dm_rdwr(
 {
 	int		error;
 	int		oflags;
-	int		ioflags;
 	ssize_t		xfer;
 	struct file	file;
 	struct inode	*inode;
@@ -1092,12 +1091,9 @@ xfs_dm_rdwr(
 	 */
 
 	oflags |= O_LARGEFILE | O_NONBLOCK;
-	ioflags = IO_INVIS;
 	XFS_BHV_LOOKUP(vp, xbdp);
-	if (xfs_dm_direct_ok(xbdp, off, len, bufp)) {
-		ioflags |= IO_ISDIRECT;
+	if (xfs_dm_direct_ok(xbdp, off, len, bufp))
 		oflags |= O_DIRECT;
-	}
 
 	if (fflag & O_SYNC)
 		oflags |= O_SYNC;
