@@ -54,6 +54,11 @@
 
 #include "page_buf_internal.h"
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,9)
+#define page_buffers(page)	((page)->buffers)
+#define page_has_buffers(page)	((page)->buffers)
+#endif
+
 #define MAX_BUF_PER_PAGE 	(PAGE_CACHE_SIZE / 512)
 #define PBF_IO_CHUNKSIZE 	65536
 #define PBF_MAX_MAPS		1 /* TODO: XFS_BMAP_MAX_NMAP? */
@@ -390,6 +395,9 @@ _pb_direct_io(
 		rval = pagebuf_iostart(pb, pb_flags);
 		unmap_kiobuf(kp);
 	}
+	if (kp->array_len > KIO_STATIC_PAGES) {
+		kfree(kp->maplist);
+	}
 	kfree(kp);
 
 	if (rdp) {
@@ -715,7 +723,7 @@ pagebuf_read_full_page(
 	if (!PageLocked(page))
 		PAGE_BUG(page);
 
-	if (!page->buffers) {
+	if (!page_has_buffers(page)) {
 		/* shortcut, may not need a buffer_head here */
 		if (target->pbr_blocksize == PAGE_CACHE_SIZE) {
 			mp = maps;
@@ -738,7 +746,7 @@ pagebuf_read_full_page(
 		create_empty_buffers(page, target->pbr_device,
 					   target->pbr_blocksize);
 	}
-	bh = head = page->buffers;
+	bh = head = page_buffers(page);
 
 	/* Stage 1: find buffers in need of IO */
 	do {
@@ -888,11 +896,11 @@ __pb_block_prepare_write_async(
 	char			*kaddr = kmap(page);
 	page_buf_bmap_t		*tmp, maps[PBF_MAX_MAPS];
 
-	if (!page->buffers)
+	if (!page_has_buffers(page))
 		create_empty_buffers(page, target->pbr_device,
 					   target->pbr_blocksize);
 
-	bh = head = page->buffers;
+	bh = head = page_buffers(page);
 	do {
 		if (buffer_mapped(bh))
 			continue;
@@ -1006,10 +1014,10 @@ __pb_block_commit_write_async(
 	 * parts of page not covered by from/to. Page is now fully valid.
 	 */
 	SetPageUptodate(page);
-	if (!page->buffers)
+	if (!page_has_buffers(page))
 		create_empty_buffers(page, target->pbr_device,
 					   target->pbr_blocksize);
-	bh = head = page->buffers;
+	bh = head = page_buffers(page);
 	do {
 		if (buffer_mapped(bh)) {
 			int need_balance_dirty = 0;
@@ -1101,13 +1109,19 @@ __pagebuf_do_delwri(
 		err = __pb_block_prepare_write_async(target, inode, page,
 			offset, offset + bytes,
 			at_eof, NULL, mp, nmaps, PBF_WRITE);
-		if (err)
+		if (err) {
+			ClearPageUptodate(page);
+			kunmap(page);
 			goto unlock;
+		}
 		kaddr = page_address(page);
 
 		err = __copy_from_user(kaddr + offset, buf, bytes);
-		if (err)
+		if (err) {
+			ClearPageUptodate(page);
+			kunmap(page);
 			goto unlock;
+		}
 
 		pagebuf_commit_write(target, page, offset, offset + bytes);
 
@@ -1338,14 +1352,20 @@ pagebuf_generic_file_write(
 			offset, offset + bytes, at_eof, bmap,
 			NULL, 0, pb_flags);
 			
-		if (status)
+		if (status) {
+			ClearPageUptodate(page);
+			kunmap(page);
 			goto unlock;
+		}
 
 		kaddr = page_address(page);
 		status = __copy_from_user(kaddr+offset, buf, bytes);
 
-		if (status)
+		if (status) {
+			ClearPageUptodate(page);
+			kunmap(page);
 			goto unlock;
+		}
 
 		pagebuf_commit_write(target, page, offset, offset + bytes);
 
@@ -1400,7 +1420,7 @@ submit_page_io(struct page *page)
 	struct buffer_head	*bh, *head, *arr[MAX_BUF_PER_PAGE];
 	int			i, nr = 0;
 
-	bh = head = page->buffers;
+	bh = head = page_buffers(page);
 	do {
 		if (buffer_uptodate(bh))
 			continue;
@@ -1446,10 +1466,10 @@ map_page(
 	int			index = 0, i = 0, nr;
 	int			bbits = target->pbr_blocksize_bits;
 
-	if (!page->buffers)
+	if (!page_has_buffers(page))
 		create_empty_buffers(page, target->pbr_device,
 					   target->pbr_blocksize);
-	bh = head = page->buffers;
+	bh = head = page_buffers(page);
 	do {
 		offset = i << bbits;
 		if (!mp) {
@@ -1590,7 +1610,8 @@ pagebuf_delalloc_convert(
 	int			nmaps, nr = 0;
 
 	/* Fast path for completely mapped page */
-	if ((bh = head = page->buffers) != NULL) {
+	if (page_has_buffers(page)) {
+		bh = page_buffers(page);
 		do {
 			if (!buffer_delay(bh) && buffer_mapped(bh))
 				continue;
