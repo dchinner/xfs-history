@@ -875,7 +875,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 {
 	xfs_da_intnode_t *node;
 	xfs_da_node_entry_t *btree;
-	xfs_dir_leafblock_t *leaf;
+	xfs_dir_leafblock_t *leaf = NULL;
 	xfs_dablk_t bno, nextbno;
 	xfs_dahash_t cookhash;
 	xfs_mount_t *mp;
