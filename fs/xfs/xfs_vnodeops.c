@@ -71,6 +71,7 @@
 #include "sim.h"
 #endif
 
+#ifndef SIM
 STATIC int	xfs_truncate_file(xfs_mount_t	*mp,
 				  xfs_inode_t	*ip);
 
@@ -101,9 +102,6 @@ STATIC int	xfs_access(vnode_t	*vp,
 STATIC int	xfs_fsync(vnode_t	*vp,
 			  int		flag,
 			  cred_t	*credp);
-
-STATIC void	xfs_inactive(vnode_t	*vp,
-			     cred_t	*credp);
 
 STATIC int	xfs_lookup(vnode_t	*dir_vp,
 			   char		*name,
@@ -218,9 +216,6 @@ STATIC int	xfs_allocstore(vnode_t	*vp,
 			       uint	len,
 			       cred_t	*credp);
 
-STATIC int	xfs_reclaim(vnode_t	*vp,
-			    int		flag);
-
 STATIC int	xfs_fcntl(vnode_t	*vp,
 			  int		cmd,
 			  void		*arg,
@@ -228,7 +223,15 @@ STATIC int	xfs_fcntl(vnode_t	*vp,
 			  off_t		offset,
 			  cred_t	*credp,
 			  rval_t	*rvalp);
+#endif	/* !SIM */
 
+STATIC void	xfs_inactive(vnode_t	*vp,
+			     cred_t	*credp);
+
+STATIC int	xfs_reclaim(vnode_t	*vp,
+			    int		flag);
+
+#ifndef SIM
 
 extern struct igetstats XFS_IGETINFO;
 
@@ -279,7 +282,6 @@ xfs_close(vnode_t	*vp,
 
 		vpcount = 0;
 
-#ifndef SIM
 		if (isshd = ISSHDFD(p, sa)) {
 			mrlock(&sa->s_fsync, MR_ACCESS, PZERO);
 			ufp = sa->s_flist;
@@ -300,7 +302,6 @@ xfs_close(vnode_t	*vp,
 		if (isshd) {
 			mrunlock(&sa->s_fsync);
 		}
-#endif
 
 		/*
 		 * If this process is nolonger accessing 
@@ -966,6 +967,7 @@ xfs_fsync(vnode_t	*vp,
 	return 0;
 }
 
+#endif	/* !SIM */
 
 /*
  * xfs_inactive
@@ -1170,6 +1172,8 @@ xfs_inactive(vnode_t	*vp,
 	return;
 }
 
+
+#ifndef SIM
 
 /*
  * Test the sticky attribute of a directory.  We can unlink from a sticky
@@ -1778,10 +1782,8 @@ try_again:
                 vp = newvp;
         }
 
-#ifndef SIM
 	if (truncated && vp->v_type == VREG && VN_MAPPED(vp))
                 remapf(vp, 0, 0);
-#endif
 
         *vpp = vp;
 
@@ -3838,85 +3840,6 @@ xfs_allocstore(vnode_t	*vp,
 
 
 /*
- * xfs_reclaim
- */
-STATIC int
-xfs_reclaim(vnode_t	*vp,
-	    int		flag)
-{
-	xfs_inode_t		*ip;
-	xfs_mount_t		*mp;
-
-	vn_trace_entry(vp, "xfs_reclaim");
-	ASSERT(!VN_MAPPED(vp));
-	ip = XFS_VTOI(vp);
-	mp = ip->i_mount;
-	ASSERT(ip->i_queued_bufs >= 0);
-
-	/*
-	 * If this is not an unmount (flag == 0) and there are dirty
-	 * buffers or pages still associated with the file, then don't
-	 * allow it to be reclaimed.  Doing the pflushinvalvp() can cause
-	 * us to wait in the buffer cache.  We can be called here via
-	 * vn_alloc() from xfs_iget().  We can be holding any number of
-	 * locks at that point in the middle of a transaction, so we
-	 * can't do anything that might need log space or the locks we
-	 * might be holding.  Flushing our buffers can require log space
-	 * to allocate the space for delayed allocation extents underlying
-	 * them.  If the transaction we're already in has all the log
-	 * space, then we won't be able to get any more and we'll hang.
-	 *
-	 * Not allowing the inode to be reclaimed if it has dirty data
-	 * also prevents memory deadlocks where it is vhand calling here
-	 * via the vnode shake routine.  Since our dirty data might be
-	 * delayed allocation dirty data which will require us to allocate
-	 * memory to flush, we can't do this from vhand.
-	 *
-	 * It is OK to return an error here.  The vnode cache will just
-	 * come back later.
-	 */
-	if (!(flag & FSYNC_INVAL) &&
-	    (VN_DIRTY(vp) || (ip->i_queued_bufs > 0))) {
-		return EAGAIN;
-	} else if (((ip->i_d.di_mode & IFMT) == IFREG) &&
-		   (ip->i_d.di_size > 0)) {
-		/*
-		 * Flush and invalidate any data left around that is
-		 * a part of this file.
-		 *
-		 * Get the inode's i/o lock so that buffers are pushed
-		 * out while holding the proper lock.  We can't hold
-		 * the inode lock here since flushing out buffers may
-		 * cause us to try to get the lock in xfs_strategy().
-		 */
-	 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
-		pflushinvalvp(vp, 0,
-			      (ip->i_d.di_size + (1 << mp->m_writeio_log)));
-		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
-	}
-
-	dnlc_purge_vp(vp);
-	/*
-	 * If the inode is still dirty, then flush it out synchronously.
-	 * We get the flush lock regardless, though, just to make sure
-	 * we don't free it while it is being flushed.
-	 */
-	xfs_ilock(ip, XFS_ILOCK_EXCL);
-	xfs_iflock(ip);
-	if (ip->i_update_core || (ip->i_item.ili_format.ilf_fields != 0)) {
-		xfs_iflush(ip, 0);
-	}
-	xfs_iunlock(ip, XFS_ILOCK_EXCL);
-	ASSERT(ip->i_update_core == 0);
-	ASSERT(ip->i_item.ili_format.ilf_fields == 0);
-	ASSERT(!VN_DIRTY(vp) && (ip->i_queued_bufs == 0));
-	xfs_ireclaim(ip);
-	return 0;
-}
-
-
-
-/*
  * xfs_fcntl
  */
 STATIC int
@@ -4002,7 +3925,132 @@ xfs_fcntl(vnode_t	*vp,
 	}
 	return error;
 }
+#endif	/* !SIM */
 
+/*
+ * xfs_reclaim
+ */
+STATIC int
+xfs_reclaim(vnode_t	*vp,
+	    int		flag)
+{
+	xfs_inode_t		*ip;
+	xfs_mount_t		*mp;
+
+	vn_trace_entry(vp, "xfs_reclaim");
+	ASSERT(!VN_MAPPED(vp));
+	ip = XFS_VTOI(vp);
+	mp = ip->i_mount;
+	ASSERT(ip->i_queued_bufs >= 0);
+
+	/*
+	 * If this is not an unmount (flag == 0) and there are dirty
+	 * buffers or pages still associated with the file, then don't
+	 * allow it to be reclaimed.  Doing the pflushinvalvp() can cause
+	 * us to wait in the buffer cache.  We can be called here via
+	 * vn_alloc() from xfs_iget().  We can be holding any number of
+	 * locks at that point in the middle of a transaction, so we
+	 * can't do anything that might need log space or the locks we
+	 * might be holding.  Flushing our buffers can require log space
+	 * to allocate the space for delayed allocation extents underlying
+	 * them.  If the transaction we're already in has all the log
+	 * space, then we won't be able to get any more and we'll hang.
+	 *
+	 * Not allowing the inode to be reclaimed if it has dirty data
+	 * also prevents memory deadlocks where it is vhand calling here
+	 * via the vnode shake routine.  Since our dirty data might be
+	 * delayed allocation dirty data which will require us to allocate
+	 * memory to flush, we can't do this from vhand.
+	 *
+	 * It is OK to return an error here.  The vnode cache will just
+	 * come back later.
+	 */
+	if (!(flag & FSYNC_INVAL) &&
+	    (VN_DIRTY(vp) || (ip->i_queued_bufs > 0))) {
+		return EAGAIN;
+	} else if (((ip->i_d.di_mode & IFMT) == IFREG) &&
+		   (ip->i_d.di_size > 0)) {
+		/*
+		 * Flush and invalidate any data left around that is
+		 * a part of this file.
+		 *
+		 * Get the inode's i/o lock so that buffers are pushed
+		 * out while holding the proper lock.  We can't hold
+		 * the inode lock here since flushing out buffers may
+		 * cause us to try to get the lock in xfs_strategy().
+		 */
+	 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
+		pflushinvalvp(vp, 0,
+			      (ip->i_d.di_size + (1 << mp->m_writeio_log)));
+		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
+	}
+
+#ifndef SIM
+	dnlc_purge_vp(vp);
+#endif	/* !SIM */
+	/*
+	 * If the inode is still dirty, then flush it out synchronously.
+	 * We get the flush lock regardless, though, just to make sure
+	 * we don't free it while it is being flushed.
+	 */
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	xfs_iflock(ip);
+	if (ip->i_update_core || (ip->i_item.ili_format.ilf_fields != 0)) {
+		xfs_iflush(ip, 0);
+	}
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	ASSERT(ip->i_update_core == 0);
+	ASSERT(ip->i_item.ili_format.ilf_fields == 0);
+	ASSERT(!VN_DIRTY(vp) && (ip->i_queued_bufs == 0));
+	xfs_ireclaim(ip);
+	return 0;
+}
+
+#ifdef SIM
+
+struct vnodeops xfs_vnodeops = {
+	fs_noerr,
+	fs_nosys,
+	fs_nosys,
+	fs_nosys,
+	fs_nosys,
+	fs_noerr,
+	fs_nosys,
+	fs_nosys,
+	fs_nosys,
+	fs_nosys,
+	fs_nosys,
+	fs_nosys,
+	fs_nosys,
+	fs_nosys,
+	fs_nosys,
+	fs_nosys,
+	fs_nosys,
+	fs_nosys,
+	fs_nosys,
+	fs_nosys,
+	xfs_inactive,
+	fs_nosys,
+	(void (*))fs_nosys,
+	(void (*))fs_nosys,
+	fs_nosys,
+	fs_nosys,
+	fs_nosys,
+	fs_nosys,	/* realvp */
+	fs_nosys,
+	(void (*))fs_nosys,
+	fs_nosys,
+	fs_nosys,
+	fs_nosys,
+	(int (*)(vnode_t *, short, int, short *, struct pollhead **))fs_nosys,
+	fs_nosys,	/* dump */
+	fs_nosys,
+	fs_nosys,
+	fs_nosys,
+	xfs_reclaim,
+};
+
+#else
 
 struct vnodeops xfs_vnodeops = {
 	fs_noerr,
@@ -4045,3 +4093,5 @@ struct vnodeops xfs_vnodeops = {
 	xfs_fcntl,
 	xfs_reclaim,
 };
+
+#endif	/* SIM */
