@@ -41,6 +41,8 @@ typedef	struct xfs_bmap_free
 #define	XFS_BMAPI_EXACT		0x10	/* allocate only to spec'd bounds */
 #define	XFS_BMAPI_ATTRFORK	0x20	/* use attribute fork not data */
 
+#define	XFS_BMAPI_AFLAG(w)	((w) == XFS_ATTR_FORK ? XFS_BMAPI_ATTRFORK : 0)
+
 /*
  * Special values for xfs_bmbt_irec_t br_startblock field.
  */
