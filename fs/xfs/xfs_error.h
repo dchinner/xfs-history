@@ -119,7 +119,7 @@ int		xfs_errortag_add(int error_tag, int fd);
 int		xfs_errortag_clear(int error_tag, int fd);
 
 int		xfs_errortag_clearall(int fd);
-int		xfs_errortag_clearall_umount(__int64_t fsid, char *fsname,
+int		xfs_errortag_clearall_umount(int64_t fsid, char *fsname,
 						int loud);
 #else
 #define XFS_TEST_ERROR(expr, mp, tag, rf)	(expr)
@@ -137,7 +137,7 @@ int		xfs_errortag_clearall_umount(__int64_t fsid, char *fsname,
 
 struct xfs_mount;
 /* PRINTFLIKE4 */
-void		xfs_cmn_err(__uint64_t panic_tag, int level, struct xfs_mount *mp,
+void		xfs_cmn_err(uint64_t panic_tag, int level, struct xfs_mount *mp,
 			    char *fmt, ...);
 /* PRINTFLIKE3 */
 void		xfs_fs_cmn_err(int level, struct xfs_mount *mp, char *fmt, ...);
