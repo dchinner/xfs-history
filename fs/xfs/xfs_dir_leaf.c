@@ -111,24 +111,23 @@ void
 xfs_dir_ino_validate(xfs_mount_t *mp, xfs_ino_t ino)
 {
 	xfs_agnumber_t	agno;
+	xfs_agino_t	agino;
 	xfs_agblock_t	agblkno;
 	int		ioff;
 
 	agno = XFS_INO_TO_AGNO(mp, ino);
-	if (agno >= mp->m_sb.sb_agcount) {
-		cmn_err(CE_PANIC, "Invalid inode number 0x%x\n", (long)ino);
-		return;
-	}
+	if (agno >= mp->m_sb.sb_agcount)
+		cmn_err(CE_PANIC, "Invalid inode number 0x%llx\n", ino);
 	agblkno = XFS_INO_TO_AGBNO(mp, ino);
-	if (agblkno >= mp->m_sb.sb_agblocks || agblkno == 0) {
-		cmn_err(CE_PANIC, "Invalid inode number 0x%x\n", (long)ino);
-		return;
-	}
+	if (agblkno >= mp->m_sb.sb_agblocks || agblkno == 0)
+		cmn_err(CE_PANIC, "Invalid inode number 0x%llx\n", ino);
 	ioff = XFS_INO_TO_OFFSET(mp, ino);
-	if (ioff >= (1 << mp->m_sb.sb_inopblog)) {
-		cmn_err(CE_PANIC, "Invalid inode number 0x%x\n", (long)ino);
-		return;
-	}
+	if (ioff >= (1 << mp->m_sb.sb_inopblog))
+		cmn_err(CE_PANIC, "Invalid inode number 0x%llx\n", ino);
+	agino = XFS_OFFBNO_TO_AGINO(mp, agblkno, ioff);
+	if (XFS_AGINO_TO_INO(mp, agno, agino) != ino)
+		cmn_err(CE_PANIC, "Invalid inode number 0x%llx\n", ino);
+
 	return;
 }
 
@@ -147,6 +146,7 @@ xfs_dir_shortform_validate(xfs_mount_t *mp, xfs_inode_t *dp)
 	xfs_dir_shortform_t	*sf;
 	xfs_dir_sf_entry_t	*sfe;
 	int			i;
+#endif
 	
 	if ((dp->i_d.di_mode & IFMT) != IFDIR) {
 		return;

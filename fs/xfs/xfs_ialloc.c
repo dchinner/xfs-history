@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.95 $"
+#ident	"$Revision: 1.96 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -921,10 +921,20 @@ xfs_difree(
 	 * Break up inode number into its components.
 	 */
 	agno = XFS_INO_TO_AGNO(mp, inode);
-	ASSERT(agno < mp->m_sb.sb_agcount);
+	if (agno >= mp->m_sb.sb_agcount)  {
+		ASSERT(0);
+		return XFS_ERROR(EINVAL);
+	}
 	agino = XFS_INO_TO_AGINO(mp, inode);
-	ASSERT(agino != NULLAGINO);
+	if (inode != XFS_AGINO_TO_INO(mp, agno, agino))  {
+		ASSERT(0);
+		return XFS_ERROR(EINVAL);
+	}
 	agbno = XFS_AGINO_TO_AGBNO(mp, agino);
+	if (agbno >= mp->m_sb.sb_agblocks)  {
+		ASSERT(0);
+		return XFS_ERROR(EINVAL);
+	}
 	/*
 	 * Get the allocation group header.
 	 */
@@ -1056,8 +1066,10 @@ xfs_dilocate(
 	 * Split up the inode number into its parts.
 	 */
 	agno = XFS_INO_TO_AGNO(mp, ino);
-	agbno = XFS_INO_TO_AGBNO(mp, ino);
-	if ((agno >= mp->m_sb.sb_agcount) || (agbno >= mp->m_sb.sb_agblocks))
+	agino = XFS_INO_TO_AGINO(mp, ino);
+	agbno = XFS_AGINO_TO_AGBNO(mp, agino);
+	if (agno >= mp->m_sb.sb_agcount || agbno >= mp->m_sb.sb_agblocks ||
+	    ino != XFS_AGINO_TO_INO(mp, agno, agino))
 		return XFS_ERROR(EINVAL);
 	if ((mp->m_sb.sb_blocksize >= XFS_INODE_CLUSTER_SIZE(mp)) ||
 	    !(flags & XFS_IMAP_LOOKUP)) {
@@ -1082,7 +1094,6 @@ xfs_dilocate(
 		offset_agbno = agbno % mp->m_inoalign;
 		chunk_agbno = agbno - offset_agbno;
 	} else {
-		agino = XFS_INO_TO_AGINO(mp, ino);
 		mraccess(&mp->m_peraglock);
 		error = xfs_ialloc_read_agi(mp, tp, agno, &agbp);
 		mraccunlock(&mp->m_peraglock);
