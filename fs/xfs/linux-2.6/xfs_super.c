@@ -883,10 +883,6 @@ init_xfs_fs( void )
 	xfs_init();
 	uuid_init();
 
-	error = xfs_ioctl32_init();
-	if (error)
-		goto undo_ioctl32;
-
 	error = register_filesystem(&xfs_fs_type);
 	if (error)
 		goto undo_register;
@@ -894,10 +890,6 @@ init_xfs_fs( void )
 	return 0;
 
 undo_register:
-	xfs_ioctl32_exit();
-
-undo_ioctl32:
-
 	pagebuf_terminate();
 
 undo_pagebuf:
@@ -912,7 +904,6 @@ exit_xfs_fs( void )
 {
 	XFS_DM_EXIT(&xfs_fs_type);
 	unregister_filesystem(&xfs_fs_type);
-	xfs_ioctl32_exit();
 	xfs_cleanup();
 	pagebuf_terminate();
 	destroy_inodecache();
