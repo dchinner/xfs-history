@@ -234,6 +234,10 @@ xfs_init(int	fstype)
 	cxfs_arrinit();
 #endif
 
+#if (defined(DEBUG) || defined(INDUCE_IO_ERROR))
+	xfs_error_test_init();
+#endif /* DEBUG || INDUCE_IO_ERROR */
+
 	xfs_init_procfs();
 
 	/*

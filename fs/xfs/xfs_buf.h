@@ -150,8 +150,10 @@ extern void xfs_pb_nfreer(page_buf_t *);
 			pagebuf_set_iodone(buf, func)
 #define XFS_BUF_CLR_IODONE_FUNC(buf)		\
 			pagebuf_set_iodone(buf, NULL)
-#define XFS_BUF_SET_BDSTRAT_FUNC(buf, func)
-#define XFS_BUF_CLR_BDSTRAT_FUNC(buf)
+#define XFS_BUF_SET_BDSTRAT_FUNC(buf, func)	\
+			pagebuf_set_bdstrat(buf, func)
+#define XFS_BUF_CLR_BDSTRAT_FUNC(buf)		\
+			pagebuf_set_bdstrat(buf, NULL)
 
 #define XFS_BUF_FSPRIVATE(buf, type)		\
 			((type)(buf)->pb_fspriv)
@@ -278,7 +280,7 @@ static inline int	XFS_bwrite(page_buf_t *pb)
 
 	xfs_buf_undelay(pb);
 
-	pagebuf_iorequest(pb);
+	__pagebuf_iorequest(pb);
 
 	if (sync) {
 		error = pagebuf_iowait(pb);

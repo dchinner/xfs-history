@@ -801,10 +801,6 @@ xfs_ioctl(
 
 	ASSERT(vfsp);
 
-	if (XFS_FORCED_SHUTDOWN(mp))
-		return (EIO);
-
-
 	switch (cmd) {
 	case XFS_IOC_ALLOCSP:
 	case XFS_IOC_FREESP:
@@ -1253,7 +1249,7 @@ xfs_ioctl(
 	}
 #endif /* DEBUG || INDUCE_IO_ERROR */
 
-	default:
+	default: 
 		return -EINVAL;
 	}
 }

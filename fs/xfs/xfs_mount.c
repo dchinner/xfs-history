@@ -1066,7 +1066,7 @@ xfs_unmountfs_writesb(xfs_mount_t *mp)
 	 */
 	sbp = xfs_getsb(mp, 0);
 	if (!(XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY ||
-	      mp->m_flags & XFS_MOUNT_FS_SHUTDOWN)) {
+		XFS_FORCED_SHUTDOWN(mp))) {
 		/*
 		 * mark shared-readonly if desired
 		 */

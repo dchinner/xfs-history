@@ -100,6 +100,7 @@ extern int	xfs_error_trap(int);
 
 #if (defined(DEBUG) || defined(INDUCE_IO_ERROR))
 extern int	xfs_error_test(int, int *, char *, int, char *, unsigned long);
+void xfs_error_test_init(void);
 
 #define	XFS_NUM_INJECT_ERROR				10
 

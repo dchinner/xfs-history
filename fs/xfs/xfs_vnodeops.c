@@ -5330,9 +5330,12 @@ xfs_finish_reclaim(
 		ASSERT(ip->i_itemp == NULL || 
 		       ip->i_itemp->ili_format.ilf_fields == 0);
 		ASSERT(ip->i_iocore.io_queued_bufs == 0);
+	} else {
+		if (!locked) 
+			mrunlock(&ih->ih_lock);
+		else
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	}
-	else if (!locked) 
-		mrunlock(&ih->ih_lock);
 
 	xfs_ireclaim(ip);
 	return 0;

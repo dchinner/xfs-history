@@ -1238,7 +1238,12 @@ xfs_buf_iodone_callbacks(
 			    XFS_BUF_UNSHUT(bp);
 				xfs_buf_relse(bp);
 			} else {
+				int flags = XFS_BUF_ISASYNC(bp);
+
 				xfs_biodone(bp);
+				if(!flags) {
+					xfs_buf_relse(bp);
+				}
 			}
 			
 			return;

@@ -973,7 +973,7 @@ xlog_bdstrat_cb(struct xfs_buf *bp)
 	iclog = XFS_BUF_FSPRIVATE(bp, xlog_in_core_t *);
 
 	if ((iclog->ic_state & XLOG_STATE_IOERROR) == 0) {
-		pagebuf_iostart(bp,0);
+		pagebuf_iorequest(bp);
 		return 0;
 	}
 
@@ -3364,6 +3364,7 @@ xfs_log_force_umount(
 	if (!log ||
 	    log->l_flags & XLOG_ACTIVE_RECOVERY) {
 		mp->m_flags |= XFS_MOUNT_FS_SHUTDOWN;
+		XFS_BUF_DONE(mp->m_sb_bp);
 		return (0);
 	}
 	
@@ -3384,6 +3385,7 @@ xfs_log_force_umount(
 	spl = GRANT_LOCK(log);
 	spl2 = LOG_LOCK(log);
 	mp->m_flags |= XFS_MOUNT_FS_SHUTDOWN;
+	XFS_BUF_DONE(mp->m_sb_bp);
 	/*	
 	 * This flag is sort of redundant because of the mount flag, but
 	 * it's good to maintain the separation between the log and the rest

@@ -124,7 +124,6 @@ xfs_errortag_add(int error_tag, xfs_mount_t *mp)
 			len = strlen(mp->m_fsname);
 			xfs_etest_fsname[i] = kmem_alloc(len + 1, KM_SLEEP);
 			strcpy(xfs_etest_fsname[i], mp->m_fsname);
-			mp->m_flags |= XFS_MOUNT_FS_SHUTDOWN;
 			return 0;
 		}
 	}
