@@ -31,10 +31,11 @@ typedef struct xfs_log_item {
 /*
  * Log item types.
  */
-#define	XFS_LI_BUF	0x01
-#define	XFS_LI_INODE	0x02
-#define	XFS_LI_EFI	0x04
-#define	XFS_LI_EFD	0x08
+#define	XFS_LI_BUF	1
+#define	XFS_LI_INODE	2
+#define	XFS_LI_EFI	3
+#define	XFS_LI_EFD	4
+#define	XFS_LI_IUNLINK	5
 
 
 
@@ -193,13 +194,15 @@ typedef struct xfs_trans {
  */
 #define	XFS_TRANS_DIRTY		0x1
 #define	XFS_TRANS_SB_DIRTY	0x2
+#define	XFS_TRANS_PERM_LOG_RES	0x4
 
 /*
  * Values for call flags parameter.
  */
-#define	XFS_TRANS_NOSLEEP	0x1
-#define	XFS_TRANS_WAIT		0x2
-#define	XFS_TRANS_SYNC		0x4
+#define	XFS_TRANS_NOSLEEP		0x1
+#define	XFS_TRANS_WAIT			0x2
+#define	XFS_TRANS_SYNC			0x4
+#define	XFS_TRANS_RELEASE_LOG_RES	0x8
 
 /*
  * Field values for xfs_trans_mod_sb.
@@ -225,9 +228,10 @@ struct xfs_efd_log_item;
  * xFS transaction mechanism exported interfaces.
  */
 xfs_trans_t	*xfs_trans_alloc(struct xfs_mount *, uint);
+xfs_trans_t	*xfs_trans_dup(xfs_trans_t *);
 int		xfs_trans_reserve(xfs_trans_t *, uint, uint, uint, uint);
-void		xfs_trans_callback(xfs_trans_t *, void(*)(xfs_trans_t*, void*),
-				   void *);
+void		xfs_trans_callback(xfs_trans_t *,
+				   void(*)(xfs_trans_t*, void*), void *);
 void		xfs_trans_mod_sb(xfs_trans_t *, uint, int);
 buf_t		*xfs_trans_get_buf(xfs_trans_t *, dev_t, daddr_t, int, uint);
 buf_t		*xfs_trans_getsb(xfs_trans_t *);
@@ -255,10 +259,12 @@ void		xfs_trans_log_efd_extent(xfs_trans_t *,
 					 struct xfs_efd_log_item *,
 					 xfs_fsblock_t,
 					 xfs_extlen_t);
+void		xfs_trans_log_iui(xfs_trans_t *, struct xfs_inode *);
+void		xfs_trans_log_iui_done(xfs_trans_t *, struct xfs_inode *);
 xfs_trans_id_t	xfs_trans_id(xfs_trans_t *);
 void		xfs_trans_commit(xfs_trans_t *, uint flags);
 void		xfs_trans_commit_async(struct xfs_mount *);
-void		xfs_trans_cancel(xfs_trans_t *);
+void		xfs_trans_cancel(xfs_trans_t *, int);
 void		xfs_trans_ail_init(struct xfs_mount *);
 xfs_lsn_t	xfs_trans_tail_ail(struct xfs_mount *);
 
