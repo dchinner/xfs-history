@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.8 $"
+#ident	"$Revision: 1.9 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -79,9 +79,12 @@ xfs_growfs_data(
 	if (nb <= mp->m_sb.sb_dblocks)
 		return XFS_ERROR(EINVAL);
 	bp = read_buf(mp->m_dev, XFS_FSB_TO_BB(mp, nb) - 1, 1, 0);
-	if (bp == NULL || geterror(bp))
+	if (bp == NULL)
 		return XFS_ERROR(EINVAL);
+	error = geterror(bp);
 	brelse(bp);
+	if (error)
+		return XFS_ERROR(error);
 	nagcount = (nb / mp->m_sb.sb_agblocks) +
 		   ((nb % mp->m_sb.sb_agblocks) != 0);
 	if (nb % mp->m_sb.sb_agblocks < XFS_MIN_AG_BLOCKS) {
