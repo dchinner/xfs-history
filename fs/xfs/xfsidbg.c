@@ -3178,7 +3178,7 @@ xfs_attr_trace_entry(ktrace_entry_t *ktep)
 		"DONTFOLLOW",	/* 0x0001 */
 		"ROOT",		/* 0x0002 */
 		"TRUSTED",	/* 0x0004 */
-		"?",		/* 0x0008 */
+		"SECURE",	/* 0x0008 */
 		"CREATE",	/* 0x0010 */
 		"REPLACE",	/* 0x0020 */
 		"?",		/* 0x0040 */
@@ -4791,9 +4791,12 @@ xfsidbg_xattrleaf(xfs_attr_leafblock_t *leaf)
 			kdb_printf("LOCAL ");
 		if (e->flags & XFS_ATTR_ROOT)
 			kdb_printf("ROOT ");
+		if (e->flags & XFS_ATTR_SECURE)
+			kdb_printf("SECURE ");
 		if (e->flags & XFS_ATTR_INCOMPLETE)
 			kdb_printf("INCOMPLETE ");
-		k = ~(XFS_ATTR_LOCAL | XFS_ATTR_ROOT | XFS_ATTR_INCOMPLETE);
+		k = ~(XFS_ATTR_LOCAL | XFS_ATTR_ROOT |
+			XFS_ATTR_SECURE | XFS_ATTR_INCOMPLETE);
 		if ((e->flags & k) != 0)
 			kdb_printf("0x%x", e->flags & k);
 		kdb_printf(">\n     name \"");
@@ -5652,13 +5655,16 @@ xfsidbg_xdaargs(xfs_da_args_t *n)
 		  (uint_t)n->hashval, n->whichfork);
 	if (n->flags & ATTR_ROOT)
 		kdb_printf("ROOT ");
+	if (n->flags & ATTR_SECURE)
+		kdb_printf("SECURE ");
 	if (n->flags & ATTR_CREATE)
 		kdb_printf("CREATE ");
 	if (n->flags & ATTR_REPLACE)
 		kdb_printf("REPLACE ");
 	if (n->flags & XFS_ATTR_INCOMPLETE)
 		kdb_printf("INCOMPLETE ");
-	i = ~(ATTR_ROOT | ATTR_CREATE | ATTR_REPLACE | XFS_ATTR_INCOMPLETE);
+	i = ~(ATTR_ROOT | ATTR_SECURE |
+		ATTR_CREATE | ATTR_REPLACE | XFS_ATTR_INCOMPLETE);
 	if ((n->flags & i) != 0)
 		kdb_printf("0x%x", n->flags & i);
 	kdb_printf(">\n");
