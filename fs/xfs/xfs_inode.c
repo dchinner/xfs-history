@@ -329,6 +329,8 @@ xfs_iread(
 	 */
 	ip->i_xtrace = ktrace_alloc(XFS_BMAP_KTRACE_SIZE, 0);
 	ip->i_btrace = ktrace_alloc(XFS_BMBT_KTRACE_SIZE, 0);
+	ip->i_rwtrace = ktrace_alloc(XFS_RW_KTRACE_SIZE, 0);
+	ip->i_strat_trace = ktrace_alloc(XFS_STRAT_KTRACE_SIZE, 0);
 #endif
 
 	/*
@@ -1421,6 +1423,8 @@ xfs_idestroy(
 #ifndef SIM
 	ktrace_free(ip->i_btrace);
 	ktrace_free(ip->i_xtrace);
+	ktrace_free(ip->i_rwtrace);
+	ktrace_free(ip->i_strat_trace);
 #endif
 	kmem_zone_free(xfs_inode_zone, ip);
 }
