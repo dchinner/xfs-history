@@ -1,4 +1,4 @@
-#ident "$Revision: 1.45 $"
+#ident "$Revision: 1.46 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -478,7 +478,13 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 	 * Default to a normal brelse() call if the tp is NULL.
 	 */
 	if (tp == NULL) {
+#ifndef NO_XFS_PARANOIA
+		ASSERT(bp->b_fsprivate2 == NULL || bp->b_flags2 & B_XFS_INO &&
+			((xfs_trans_t *) bp->b_fsprivate2)->t_magic !=
+			XFS_TRANS_HEADER_MAGIC);
+#else
 		ASSERT(bp->b_fsprivate2 == NULL);
+#endif
 		/*
 		 * If there's a buf log item attached to the buffer,
 		 * then let the AIL know that the buffer is being
@@ -578,7 +584,14 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 		xfs_buf_item_relse(bp);
 		bip = NULL;
 	}
+#ifndef NO_XFS_PARANOIA
+	if (bp->b_flags2 & B_XFS_INO)
+		bp->b_fsprivate2 = tp->t_mountp;
+	else
+		bp->b_fsprivate2 = NULL;
+#else
 	bp->b_fsprivate2 = NULL;
+#endif
 
 	/*
 	 * If we've still got a buf log item on the buffer, then
@@ -607,7 +620,13 @@ xfs_trans_bjoin(xfs_trans_t	*tp,
 	xfs_buf_log_item_t	*bip;
 
 	ASSERT(bp->b_flags & B_BUSY);
+#ifndef NO_XFS_PARANOIA
+	ASSERT(bp->b_fsprivate2 == NULL || bp->b_flags & B_XFS_INO &&
+		((xfs_trans_t *) bp->b_fsprivate2)->t_magic !=
+		XFS_TRANS_HEADER_MAGIC);
+#else
 	ASSERT(bp->b_fsprivate2 == NULL);
+#endif
 
 	/*
 	 * The xfs_buf_log_item pointer is stored in b_fsprivate.  If
