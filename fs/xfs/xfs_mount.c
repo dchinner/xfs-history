@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.167 $"
+#ident	"$Revision: 1.169 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -895,6 +895,9 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	int		unused;
 #ifndef SIM
 	int		ndquots;
+#if defined(DEBUG) || defined(INDUCE_IO_ERROR)
+	int64_t		fsid;
+#endif
 #endif
 
 	xfs_iflush_all(mp, XFS_FLUSH_ALL);
@@ -993,7 +996,16 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	    incore_delwri_relse(mp->m_dev, 1); /* synchronous */
 
 	xfs_uuid_unmount(mp);
+
+#if defined(DEBUG) || defined(INDUCE_IO_ERROR)
+	/*
+	 * clear all error tags on this filesystem
+	 */
+	bcopy(&(XFS_MTOVFS(mp)->vfs_fsid), &fsid, sizeof(int64_t));
+	(void) xfs_errortag_clearall_umount(fsid, mp->m_fsname, 0);
 #endif
+
+#endif /* !SIM */
 #if CELL || NOTYET
 	cxfs_unmount(mp);
 #endif /* CELL || NOTYET */
