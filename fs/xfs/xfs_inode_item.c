@@ -14,6 +14,7 @@
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
+#include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/user.h>
 #ifdef SIM
