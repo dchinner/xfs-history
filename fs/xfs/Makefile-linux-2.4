@@ -35,6 +35,7 @@ OBJCOPY		= $(CROSS_COMPILE)objcopy
 OBJDUMP		= $(CROSS_COMPILE)objdump
 MAKEFILES	= $(TOPDIR)/.config
 GENKSYMS	= /sbin/genksyms
+KALLSYMS	= /sbin/kallsyms
 MODFLAGS	= -DMODULE
 CFLAGS_KERNEL	=
 PERL		= perl
@@ -83,7 +84,10 @@ endif
 
 CPPFLAGS := -D__KERNEL__ -I$(HPATH)
 
-CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer
+CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes -O2
+ifndef CONFIG_FRAME_POINTER
+CFLAGS += -fomit-frame-pointer
+endif
 AFLAGS := -D__ASSEMBLY__ $(CPPFLAGS)
 
 #
@@ -122,6 +126,11 @@ DRIVERS		=drivers/block/block.o \
 	         drivers/parport/parport.a
 LIBS		=$(TOPDIR)/lib/lib.a
 SUBDIRS		=kernel drivers mm fs net ipc lib
+
+ifeq ($(CONFIG_KDB),y)
+CORE_FILES	+= kdb/kdb.o
+SUBDIRS		+= kdb
+endif
 
 DRIVERS-n :=
 DRIVERS-y :=
@@ -193,16 +202,34 @@ Version: dummy
 boot: vmlinux
 	@$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" -C arch/$(ARCH)/boot
 
+LD_VMLINUX	:= $(LD) $(LINKFLAGS) $(HEAD) init/main.o init/version.o \
+			--start-group \
+			$(CORE_FILES) \
+			$(DRIVERS) \
+			$(NETWORKS) \
+			$(LIBS) \
+			--end-group
+ifeq ($(CONFIG_KALLSYMS),y)
+LD_VMLINUX_KALLSYMS	:= .tmp_kallsyms3.o
+else
+LD_VMLINUX_KALLSYMS	:=
+endif
+
 vmlinux: $(CONFIGURATION) init/main.o init/version.o linuxsubdirs
-	$(LD) $(LINKFLAGS) $(HEAD) init/main.o init/version.o \
-		--start-group \
-		$(CORE_FILES) \
-		$(DRIVERS) \
-		$(NETWORKS) \
-		$(LIBS) \
-		--end-group \
-		-o vmlinux
+ifeq ($(CONFIG_KALLSYMS),y)
+	@echo kallsyms pass 1
+	$(LD_VMLINUX) -o .tmp_vmlinux1
+	@$(KALLSYMS) .tmp_vmlinux1 > .tmp_kallsyms1.o
+	@echo kallsyms pass 2
+	@$(LD_VMLINUX) .tmp_kallsyms1.o -o .tmp_vmlinux2
+	@$(KALLSYMS) .tmp_vmlinux2 > .tmp_kallsyms2.o
+	@echo kallsyms pass 3
+	@$(LD_VMLINUX) .tmp_kallsyms2.o -o .tmp_vmlinux3
+	@$(KALLSYMS) .tmp_vmlinux3 > .tmp_kallsyms3.o
+endif
+	$(LD_VMLINUX) $(LD_VMLINUX_KALLSYMS) -o vmlinux
 	$(NM) vmlinux | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aU] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
+	@rm -f .tmp_vmlinux* .tmp_kallsyms*
 
 symlinks:
 	rm -f include/asm
