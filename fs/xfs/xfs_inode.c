@@ -335,13 +335,13 @@ xfs_iread(
 #endif
 
 	/*
-	 * If we got something that isn't an inode we're in deep
-	 * trouble.
+	 * If we got something that isn't an inode it means someone
+	 * (nfs or dmi) has a stale handle.
 	 */
 	if (dip->di_core.di_magic != XFS_DINODE_MAGIC) {
-		cmn_err(CE_PANIC,
-			"xfs_iread: bad inode magic number dip 0x%x",
-			dip);
+		kmem_zone_free(xfs_inode_zone, ip);
+		xfs_trans_brelse(tp, bp);
+		return NULL;
 	}
 
 	/*

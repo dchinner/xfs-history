@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.83 $"
+#ident	"$Revision: 1.84 $"
 
 #include <limits.h>
 #include <sys/param.h>
@@ -345,6 +345,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		 * Save the pointer to it in the mount structure.
 		 */
 		rip = xfs_iget(mp, NULL, sbp->sb_rootino, XFS_ILOCK_EXCL);
+		ASSERT(rip != NULL);
 		rvp = XFS_ITOV(rip);
 		if ((rip->i_d.di_mode & IFMT) != IFDIR) {
 			vmap_t vmap;
@@ -370,8 +371,10 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	 */
 	if (sbp->sb_rbmino != NULLFSINO) {
 		mp->m_rbmip = xfs_iget(mp, NULL, sbp->sb_rbmino, NULL);
+		ASSERT(mp->m_rbmip != NULL);
 		ASSERT(sbp->sb_rsumino != NULLFSINO);
 		mp->m_rsumip = xfs_iget(mp, NULL, sbp->sb_rsumino, NULL);
+		ASSERT(mp->m_rsumip != NULL);
 	}
 
 	/*

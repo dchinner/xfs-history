@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.40 $"
+#ident	"$Revision: 1.42 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2208,6 +2208,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 
 			ino = XFS_AGINO_TO_INO(mp, agno, agino);
 			ip = xfs_iget(mp, NULL, ino, 0);
+			ASSERT(ip != NULL);
 			ASSERT(ip->i_d.di_nlink == 0);
 			ASSERT(ip->i_d.di_mode != 0);
 			ASSERT(ip->i_vnode->v_count == 1);

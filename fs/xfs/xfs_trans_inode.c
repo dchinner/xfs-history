@@ -121,6 +121,7 @@ xfs_trans_iget(
 
 	ASSERT(lock_flags & XFS_ILOCK_EXCL);
 	ip = xfs_iget(tp->t_mountp, tp, ino, lock_flags);
+	ASSERT(ip != NULL);
 
 	/*
 	 * Get a log_item_desc to point at the new item.

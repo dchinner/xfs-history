@@ -1374,6 +1374,7 @@ xfs_dir_lookup_int (xfs_trans_t  *tp,
 	code = xfs_dir_lookup(tp, XFS_VTOI(dir_vp), name, name_len, inum);
 	if (! code && do_iget) {
 		*ip = xfs_iget(XFS_VFSTOM(dir_vp->v_vfsp), NULL, *inum, 0);
+		ASSERT(*ip != NULL);
 		vp = XFS_ITOV(*ip);
 		if ((*ip)->i_d.di_mode == 0) {
 			/*
@@ -2768,6 +2769,7 @@ xfs_ancestor_check (xfs_inode_t *src_dp,
 			IRELE (ip);
 
 		ip = xfs_iget(mp, NULL, parent_ino, XFS_ILOCK_EXCL);
+		ASSERT(ip != NULL);
 		if (((ip->i_d.di_mode & IFMT) != IFDIR) ||
 		    (ip->i_d.di_nlink <= 0)) {
                         prdev("Ancestor inode %d is not a directory",
