@@ -790,6 +790,98 @@ linvfs_dmapi_mount(
 }
 
 
+STATIC int linvfs_dentry_to_fh(
+	struct dentry *dentry,
+	__u32 *data,
+	int *lenp,
+	int need_parent)
+{
+	struct inode *inode = dentry->d_inode ;
+	vnode_t *vp = LINVFS_GET_VN_ADDRESS(inode);
+	int maxlen = *lenp;
+	xfs_fid2_t fid;
+	int error;
+
+	if (maxlen < 3)
+		return 255 ;
+
+	VOP_FID2(vp, (struct fid *)&fid, error);
+	memcpy(&data[0], &fid.fid_ino, sizeof(__u64));
+	data[2] = fid.fid_gen;
+
+	*lenp = 3 ;
+	if (maxlen < 5 || ! need_parent)
+		return 3 ;
+
+	inode = dentry->d_parent->d_inode ;
+	vp = LINVFS_GET_VN_ADDRESS(inode);
+
+	VOP_FID2(vp, (struct fid *)&fid, error);
+	memcpy(&data[3], &fid.fid_ino, sizeof(__u64));
+	*lenp = 5 ;
+	if (maxlen < 6)
+		return 5 ;
+	data[5] = fid.fid_gen;
+	*lenp = 6 ;
+	return 6 ;
+}
+
+STATIC struct dentry *linvfs_fh_to_dentry(
+	struct super_block *sb,
+	__u32 *data,
+	int len,
+	int fhtype,
+	int parent)
+{
+	vnode_t *vp;
+	struct inode *inode = NULL;
+	struct list_head *lp;
+	struct dentry *result;
+	xfs_fid2_t xfid;
+	vfs_t *vfsp = LINVFS_GET_VFS(sb);
+	int error;
+
+	xfid.fid_len = sizeof(xfs_fid2_t) - sizeof(xfid.fid_len);
+	xfid.fid_pad = 0;
+
+	if (!parent) {
+		xfid.fid_gen = data[2];
+		memcpy(&xfid.fid_ino, &data[0], sizeof(__u64));
+	} else {
+		if (fhtype == 6)	
+			xfid.fid_gen = data[5];
+		else
+			xfid.fid_gen = 0;
+		memcpy(&xfid.fid_ino, &data[3], sizeof(__u64));
+	}
+
+	VFS_VGET(vfsp, &vp, (fid_t *)&xfid, error);
+	if (error || vp == NULL)
+		return ERR_PTR(-ESTALE) ;
+
+	inode = LINVFS_GET_IP(vp);
+	spin_lock(&dcache_lock);
+	for (lp = inode->i_dentry.next; lp != &inode->i_dentry ; lp=lp->next) {
+		result = list_entry(lp,struct dentry, d_alias);
+		if (! (result->d_flags & DCACHE_NFSD_DISCONNECTED)) {
+			dget_locked(result);
+			result->d_vfs_flags |= DCACHE_REFERENCED;
+			spin_unlock(&dcache_lock);
+			iput(inode);
+			return result;
+		}
+	}
+	spin_unlock(&dcache_lock);
+	result = d_alloc_root(inode);
+	if (result == NULL) {
+		iput(inode);
+		return ERR_PTR(-ENOMEM);
+	}
+	result->d_flags |= DCACHE_NFSD_DISCONNECTED;
+	return result;
+}
+
+
 static struct super_operations linvfs_sops = {
 	read_inode:		linvfs_read_inode,
 	write_inode:		linvfs_write_inode,
@@ -804,7 +896,10 @@ static struct super_operations linvfs_sops = {
 	write_super_lockfs:	linvfs_freeze_fs,
 	unlockfs:		linvfs_unfreeze_fs,
 	statfs:			linvfs_statfs,
-	remount_fs:		linvfs_remount
+	remount_fs:		linvfs_remount,
+
+	fh_to_dentry:		linvfs_fh_to_dentry,
+	dentry_to_fh:		linvfs_dentry_to_fh,
 };
 
 DECLARE_FSTYPE_DEV(xfs_fs_type, XFS_NAME, linvfs_read_super);
