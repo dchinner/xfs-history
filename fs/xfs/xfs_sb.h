@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_SB_H
 #define	_FS_XFS_SB_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.12 $"
 
 /*
  * Super block
@@ -101,8 +101,25 @@ typedef struct xfs_sb
 	xfs_agb_to_fsb(s, xfs_daddr_to_agno(s,d), xfs_daddr_to_agbno(s,d))
 #define	xfs_fsb_to_daddr(s,fsbno) \
 	xfs_agb_to_daddr(s, xfs_fsb_to_agno(s,fsbno), xfs_fsb_to_agbno(s,fsbno))
-#define	xfs_btod(s,l)	((daddr_t)((l) << (xfs_fsblock_t)((s)->sb_blocklog - BBSHIFT)))
-#define	xfs_dtobt(s,l)	((xfs_fsblock_t)((l) >> (daddr_t)((s)->sb_blocklog - BBSHIFT)))
+
+/*
+ * File system block to basic block conversions.
+ */
+#define	xfs_fsb_to_bb(s,fsbno)	((fsbno) << ((s)->sb_blocklog - BBSHIFT))
+#define	xfs_bb_to_fsb(s,bb)	(((bb) + (xfs_fsb_to_bb(s,1) - 1)) >> \
+				 ((s)->sb_blocklog - BBSHIFT))
+#define	xfs_bb_to_fsbt(s,bb)	((bb) >> ((s)->sb_blocklog - BBSHIFT))
+
+/*
+ * File system block to byte conversions.
+ */
+#define	xfs_fsb_to_b(s,fsbno)	((fsbno) << (s)->sb_blocklog)
+#define	xfs_b_to_fsb(s,b)	(((b) + ((s)->sb_blocksize - 1)) >> \
+				 (s)->sb_blocklog)
+#define	xfs_b_to_fsbt(s,b)	((b) >> (s)->sb_blocklog)
+     
+#define	xfs_btod(s,l)	((daddr_t)((l) << ((s)->sb_blocklog - BBSHIFT)))
+#define	xfs_dtobt(s,l)	((l) >> ((s)->sb_blocklog - BBSHIFT))
 
 #define	xfs_buf_to_sbp(buf)	((xfs_sb_t *)(buf)->b_un.b_addr)
 
