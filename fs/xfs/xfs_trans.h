@@ -80,6 +80,7 @@ typedef struct xfs_log_item {
 #define XFS_TRANS_STRAT_WRITE		15
 #define XFS_TRANS_DIOSTRAT		16
 #define	XFS_TRANS_WRITE_SYNC		17
+#define	XFS_TRANS_WRITEID		18
 
 
 typedef struct xfs_item_ops {
@@ -532,6 +533,16 @@ typedef struct xfs_trans {
 
 #define	XFS_SWRITE_LOG_RES(mp)	((mp)->m_reservations.tr_swrite)
      
+/*
+ * Logging the inode mode bits when writing a setuid/setgid file
+ *	inode
+ */
+#define	XFS_CALC_WRITEID_LOG_RES(mp) \
+     	((mp)->m_sb.sb_inodesize + 128)
+
+#define	XFS_WRITEID_LOG_RES(mp)	((mp)->m_reservations.tr_swrite)
+     
+/*
 /*
  * Various log count values.
  */
