@@ -23,13 +23,16 @@
 				  ((uint *)&(lsn))[1] = (log)->l_curr_block; }
 #define CYCLE_LSN(lsn)		(((uint *)&(lsn))[0])
 #define BLOCK_LSN(lsn)		(((uint *)&(lsn))[1])
+#define XLOG_SET(f,b)		(((f) & (b)) == (b))
 
 #ifdef _KERNEL
 #define xlog_panic(s)		{panic(s); }
 #define xlog_exit(s)		{panic(s); }
+#define xlog_warning(s)		{cmn_err(CE_WARN, s); }
 #else
 #define xlog_panic(s)		{printf("%s\n", s); abort();}
 #define xlog_exit(s)		{printf("%s\n", s); exit(1);}
+#define xlog_warning(s)		{printf("%s\n", s); }
 #endif
 
 
@@ -83,7 +86,7 @@ typedef struct xlog_ticket {
 
 typedef struct xlog_op_header {
 	xlog_tid_t oh_tid;	/* transaction id of operation	:  4 b */
-	int	   oh_len;	/* bytes in data region		:  4 b */
+	int	   oh_len;	/* bytes in data region		:  2 b */
 	char	   oh_clientid;	/* who sent me this		:  1 b */
 	char	   oh_flags;	/* 				:  1 b */
 	ushort	   oh_res2;	/* 32 bit align			:  2 b */
@@ -183,6 +186,7 @@ typedef struct log {
 
 
 /* common routines */
-extern uint	 xlog_find_oldest(dev_t log_dev, uint log_bbnum);
+extern uint	xlog_find_oldest(dev_t log_dev, uint log_bbnum);
+extern daddr_t	xlog_find_head(xlog_t *log);
 
 #endif	/* _XFS_LOG_PRIV_H */
