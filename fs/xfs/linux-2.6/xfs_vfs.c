@@ -350,32 +350,6 @@ vfs_devsearch_nolock(dev_t dev, int fstype)
         return NULL;
 }
 
-/*
- * Map VFS flags to statvfs flags.  These shouldn't really be separate
- * flags at all.
- */
-u_long
-vf_to_stf(u_long vf)
-{
-	u_long stf = 0;
-
-	if (vf & VFS_RDONLY)
-		stf |= ST_RDONLY;
-	if (vf & VFS_NOSUID)
-		stf |= ST_NOSUID;
-	if (vf & VFS_NOTRUNC)
-		stf |= ST_NOTRUNC;
-	if (vf & VFS_DMI)
-		stf |= ST_DMI;
-	if (vf & VFS_NODEV)
-		stf |= ST_NODEV;
-	if (vf & VFS_GRPID)
-		stf |= ST_GRPID;
-	if (vf & VFS_LOCAL)
-		stf |= ST_LOCAL;
-
-	return stf;
-}
 void
 vfsinit(void)
 {

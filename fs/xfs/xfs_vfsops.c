@@ -107,10 +107,9 @@
 
 #ifdef SIM
 #include "sim.h"
-#else
-#include <fs/fs_bhv_id.h>
 #endif
 #include <fs/fs_bhv_id.h>
+#include <fs/specfs/spec_lsnode.h>
 
 #ifndef SIM
 #define	whymount_t	whymountroot_t
@@ -416,7 +415,7 @@ xfs_fill_buftarg(buftarg_t *btp, dev_t dev, struct super_block *sb)
 extern int	kmem_cache_destroy(zone_t *);
 
 void
-xfs_cleanup()
+xfs_cleanup(void)
 {
 	extern zone_t	*xfs_bmap_free_item_zone;
 	extern zone_t	*xfs_btree_cur_zone;
@@ -698,7 +697,6 @@ xfs_cmountfs(
 		xfs_binval(mp->m_logdev_targ);
 		linvfs_release_inode(mp->m_logdev_targ.inode);
 	}
- error2:
 	if (rdevvp) {
 		xfs_binval(mp->m_rtdev_targ);
 		linvfs_release_inode(mp->m_rtdev_targ.inode);
@@ -707,7 +705,6 @@ xfs_cmountfs(
 		xfs_binval(mp->m_ddev_targ);
 		linvfs_release_inode(mp->m_ddev_targ.inode);
 	}
- error0:
 	if (error) {
 #ifdef CELL_CAPABLE
 	        cxfs_unmount(mp);
@@ -1549,9 +1546,6 @@ xfs_statvfs(
 	statp->f_ffree = statp->f_favail =
 		statp->f_files - (sbp->sb_icount - sbp->sb_ifree);
 	XFS_SB_UNLOCK(mp, s);
-	statp->f_flag = vf_to_stf(vfsp->vfs_flag);
-	if (vp && vp->v_flag & VISSWAP && vp->v_type == VREG)
-		statp->f_flag &= ~ST_LOCAL;
 
 	statp->f_fsid = mp->m_dev;
 	(void) strcpy(statp->f_basetype, "xfs");
