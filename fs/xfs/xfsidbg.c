@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.89 $"
+#ident	"$Revision: 1.90 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3012,14 +3012,15 @@ xfsidbg_xiclog(xlog_in_core_t *iclog)
 {
 	int i;
 	static char *ic_flags[] = {
-		"ACTIVE",	/* 0x01 */
-		"WANT_SYNC",	/* 0x02 */
-		"SYNCING",	/* 0X04 */
-		"DONE_SYNC",	/* 0X08 */
-		"CALLBACK",	/* 0X10 */
-		"DIRTY",	/* 0X20 */
-		"IOERROR",	/* 0X40 */
-		"NOTUSED",	/* 0X80 */
+		"ACTIVE",	/* 0x0001 */
+		"WANT_SYNC",	/* 0x0002 */
+		"SYNCING",	/* 0X0004 */
+		"DONE_SYNC",	/* 0X0008 */
+		"DO_CALLBACK",	/* 0X0010 */
+		"CALLBACK",	/* 0X0020 */
+		"DIRTY",	/* 0X0040 */
+		"IOERROR",	/* 0X0080 */
+		"NOTUSED",	/* 0X8000 */
 		0
 	};
 
