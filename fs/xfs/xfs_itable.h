@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ITABLE_H
 #define	_FS_XFS_ITABLE_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.16 $"
 
 struct xfs_mount;
 struct xfs_trans;
@@ -11,7 +11,7 @@ struct xfs_trans;
  */
 
 /*
- * This is just like a timestruc_t but the size is the same 
+ * This is just like a timespec_t but the size is the same 
  * for 32 and 64 bit applications.
  */
 typedef struct xfs_bstime

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.179 $"
+#ident "$Revision: 1.180 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -3206,7 +3206,7 @@ void
 xfs_ichgtime(xfs_inode_t *ip,
 	     int flags)
 {
-	timestruc_t	tv;
+	timespec_t	tv;
 
 	/*
 	 * We're not supposed to change timestamps in readonly-mounted
