@@ -644,7 +644,7 @@ bp_err:
 static int
 xlog_test_footer(xlog_t *log)
 {
-	int error;
+	int error = 0;
 	xfs_buf_t *bp;
 
 	bp = xlog_get_bp(1, log->l_mp);
