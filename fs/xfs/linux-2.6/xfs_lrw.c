@@ -779,7 +779,9 @@ retry:
 
 		/* Flush all inode data buffers */
 
-		fsync_inode_buffers(ip);
+		error = -fsync_inode_buffers(ip);
+		if (error)
+			goto out;
 		
 		/* 
 		 * If we're treating this as O_DSYNC and we have not updated the
@@ -856,6 +858,8 @@ retry:
 			}
 		}
 	} /* (ioflag & PBF_SYNC) */
+
+out:
 
 	/*
 	 * If we are coming from an nfsd thread then insert into the
