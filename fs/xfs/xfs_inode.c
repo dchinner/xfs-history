@@ -284,8 +284,7 @@ xfs_iread(
 	xfs_dinode_t	*dip;
 	xfs_inode_t	*ip;
 
-	if (!xfs_inode_zone)
-		xfs_inode_zone = kmem_zone_init(sizeof(*ip), "xfs_inode");
+	ASSERT(xfs_inode_zone != NULL);
 
 	ip = kmem_zone_zalloc(xfs_inode_zone, KM_SLEEP);
 	ip->i_ino = ino;

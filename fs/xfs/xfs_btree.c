@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.31 $"
+#ident	"$Revision: 1.34 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -45,7 +45,7 @@
 /*
  * Cursor allocation zone.
  */
-STATIC zone_t	*xfs_btree_cur_zone;
+zone_t	*xfs_btree_cur_zone;
 
 /*
  * Btree magic numbers.
@@ -508,12 +508,7 @@ xfs_btree_init_cursor(
 	xfs_btree_cur_t	*cur;		/* return value */
 	int		nlevels;	/* number of levels in the btree */
 
-	/*
-	 * Start up the zone, if this is the first call.
-	 */
-	if (xfs_btree_cur_zone == NULL)
-		xfs_btree_cur_zone = kmem_zone_init(sizeof(*cur),
-			"xfs_btree_cur");
+	ASSERT(xfs_btree_cur_zone != NULL);
 	/*
 	 * Allocate a new cursor.
 	 */
