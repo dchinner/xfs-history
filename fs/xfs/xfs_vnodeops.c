@@ -1821,14 +1821,16 @@ again:
                 if (dp->i_gen != dir_generation) {
 			error = xfs_dir_lookup_int (NULL, XFS_ITOV(dp),
 				DLF_IGET, name, NULL, &e_inum, &new_ip);
-			ITRACE(new_ip);
-			IRELE (new_ip); /* ref from xfs_dir_lookup_int */
+
                         if (error) {
 				xfs_iunlock (dp, XFS_ILOCK_EXCL);
 				xfs_iunlock (ip, XFS_ILOCK_EXCL);
+				IRELE (ip);
 				*ipp = NULL;
 				return error;
 			}
+
+			ITRACE(new_ip);
 
                         if (new_ip != ip) {
 
@@ -1843,6 +1845,7 @@ again:
 
 				goto again;
                         }
+			IRELE (new_ip); /* ref from xfs_dir_lookup_int */
                 }
         }
 	/* else  e_inum == dp->i_ino */
