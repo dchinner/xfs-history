@@ -89,7 +89,7 @@ typedef struct xfs_attr_leaf_name_remote xfs_attr_leaf_name_remote_t;
 /*
  * Flags used in the leaf_entry[i].flags field.
  * NOTE: the INCOMPLETE bit must not collide with the flags bits specified
- * on the system call, they are "or"ed together for a remove operation.
+ * on the system call, they are "or"ed together for various operations.
  */
 #define	XFS_ATTR_LOCAL_BIT	0	/* attr is stored locally */
 #define	XFS_ATTR_ROOT_BIT	1	/* limit access to attr to userid 0 */
@@ -101,7 +101,6 @@ typedef struct xfs_attr_leaf_name_remote xfs_attr_leaf_name_remote_t;
 /*
  * Cast typed pointers for "local" and "remote" name/value structs.
  */
- /* GROT: fix all uses of ENTRY_NAME to know about local vs. remote */
 #define XFS_ATTR_LEAF_NAME_REMOTE(LEAFP, IDX)	/* remote name struct ptr */ \
 	((xfs_attr_leaf_name_remote_t *)		\
 	 &((char *)(LEAFP))[ (LEAFP)->entries[IDX].nameidx ])
@@ -146,12 +145,11 @@ int	xfs_attr_shortform_add(struct xfs_trans *trans,
 				      struct xfs_da_args *add);
 int	xfs_attr_shortform_lookup(struct xfs_trans *trans,
 					 struct xfs_da_args *args);
-int	xfs_attr_shortform_getvalue(struct xfs_trans *trans,
-					   struct xfs_da_args *args);
+int	xfs_attr_shortform_getvalue(struct xfs_da_args *args);
 int	xfs_attr_shortform_to_leaf(struct xfs_trans *trans,
 					  struct xfs_da_args *args);
-int	xfs_attr_shortform_removename(struct xfs_trans *trans,
-					     struct xfs_da_args *remove);
+int	xfs_attr_shortform_remove(xfs_trans_t *trans,
+					      struct xfs_da_args *remove);
 int	xfs_attr_shortform_list(struct xfs_inode *dp, struct attrlist *alist,
 				       int flags,
 				       struct attrlist_cursor_kern *cursor);
@@ -168,6 +166,7 @@ int	xfs_attr_leaf_to_shortform(struct xfs_trans *trans, buf_t *bp,
 					  struct xfs_da_args *args);
 int	xfs_attr_leaf_clearflag(struct xfs_da_args *args);
 int	xfs_attr_leaf_setflag(struct xfs_da_args *args);
+int	xfs_attr_leaf_flipflags(xfs_da_args_t *args);
 
 /*
  * Routines used for growing the Btree.
@@ -182,8 +181,7 @@ int	xfs_attr_leaf_lookup_int(struct buf *leaf, struct xfs_da_args *args);
 int	xfs_attr_leaf_getvalue(struct buf *bp, struct xfs_da_args *args);
 int	xfs_attr_leaf_add(struct xfs_trans *trans, struct buf *leaf_buffer,
 				 struct xfs_da_args *args);
-int	xfs_attr_leaf_addname(struct xfs_trans *trans,
-				     struct xfs_da_args *args);
+int	xfs_attr_leaf_addname(struct xfs_da_args *args);
 int	xfs_attr_leaf_remove(struct xfs_trans *trans, struct buf *leaf_buffer,
 				    struct xfs_da_args *args);
 int	xfs_attr_leaf_list_int(struct buf *bp, struct attrlist *alist,
