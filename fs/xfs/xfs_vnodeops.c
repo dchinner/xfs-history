@@ -1,4 +1,4 @@
-#ident "$Revision: 1.254 $"
+#ident "$Revision: 1.255 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1801,11 +1801,18 @@ xfs_inactive(
 #endif /* !SIM */
  out:
 	/*
-	 * Clear all the inode's read-ahead state.  We don't need the
-	 * lock for this because the inode is inactive.  Noone can
-	 * be looking at this stuff.
+	 * Clear all the inode's read-ahead state.  We need to take
+	 * the lock here even though the inode is inactive, because
+	 * someone might be in xfs_sync() where we play with
+	 * inodes without taking references.  Of course, this is only
+	 * necessary if it is a regular file since no other inodes
+	 * use the read ahead state.
 	 */
-	XFS_INODE_CLEAR_READ_AHEAD(ip);
+	if (vp->v_type == VREG) {
+		xfs_ilock(ip, XFS_ILOCK_EXCL);
+		XFS_INODE_CLEAR_READ_AHEAD(ip);
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	}
 
 	return VN_INACTIVE_CACHE;
 }
