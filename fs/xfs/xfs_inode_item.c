@@ -36,9 +36,10 @@
 #include "xfs_trans_priv.h"
 #include "xfs_ag.h"
 #include "xfs_alloc_btree.h"
-#include "xfs_ialloc.h"
 #include "xfs_bmap_btree.h"
+#include "xfs_ialloc_btree.h"
 #include "xfs_btree.h"
+#include "xfs_ialloc.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
@@ -120,10 +121,6 @@ xfs_inode_item_size(xfs_inode_log_item_t *iip)
 		iip->ili_format.ilf_fields &=
 			~(XFS_ILOG_DATA | XFS_ILOG_BROOT |
 			  XFS_ILOG_EXT | XFS_ILOG_DEV);
-		break;
-
-	case XFS_DINODE_FMT_AGINO:
-		iip->ili_format.ilf_fields &= ~XFS_ILOG_NONCORE;
 		break;
 
 	default:
@@ -240,16 +237,6 @@ xfs_inode_item_format(xfs_inode_log_item_t	*iip,
 		if (iip->ili_format.ilf_fields & XFS_ILOG_UUID) {
 			iip->ili_format.ilf_u.ilfu_uuid = ip->i_u2.iu_uuid;
 		}
-		break;
-
-	case XFS_DINODE_FMT_AGINO:
-		ASSERT(!(iip->ili_format.ilf_fields & XFS_ILOG_NONCORE));
-		/*
-		 * We don't mess with the next free pointer in freed
-		 * inodes, because this is managed at the disk buffer
-		 * level.  At the in-core inode level we just make sure
-		 * to never over-write the value in the disk buffer.
-		 */
 		break;
 
 	default:
