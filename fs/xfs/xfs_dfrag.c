@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Id$"
+#ident "$Id: xfs_dfrag.c,v 1.15 2000/06/09 03:24:37 lord Exp $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -217,7 +217,7 @@ xfs_swapext(
 	}
 
 	/* Verify O_DIRECT for ftmp */
-	if (tvp->v_pgcnt != 0 || tvp->v_buf != 0) {
+	if (VN_CACHED(tvp) != 0) {
 		error = XFS_ERROR(EINVAL);
 		goto error0;
 	}

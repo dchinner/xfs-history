@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision$"
+#ident "$Revision: 1.115 $"
 
 #include <xfs_os_defs.h>
 #include <linux/stat.h>
@@ -551,14 +551,6 @@ finish_inode:
 #endif
 		IMON_CHECK(vp, ip->i_dev, (xfs_ino_t)ino);
 	}
-#endif
-	/*
-	 * Add in the v_nodeid field like xfs_lookup.
-	 */
-#if XFS_BIG_FILESYSTEMS
-	vp->v_nodeid = ip->i_ino + mp->m_inoadd;
-#else
-	vp->v_nodeid = ip->i_ino;
 #endif
 
 #ifndef SIM

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision$"
+#ident	"$Revision: 1.24 $"
 
 #include <xfs_os_defs.h>
 
@@ -189,7 +189,7 @@ vn_reclaim(struct vnode *vp, int flag)
 	 * Remove the debris and print a warning.
 	 * XXX LONG_MAX won't work for 64-bit offsets!
 	 */
-	if (vp->v_pgcnt || vp->v_dpages || vp->v_buf) {
+	if (VN_CACHED(vp) || vp->v_dpages) {
 		int i;
 
 		if (vp->v_vfsp)
@@ -200,16 +200,10 @@ vn_reclaim(struct vnode *vp, int flag)
 		cmn_err(CE_WARN,
 			"vn_reclaim: vnode 0x%x fstype %d (xfs) has unreclaimed data (pgcnt %d, dbuf %d dpages 0x%x), flag:%x",
 			vp, i, 
-			vp->v_pgcnt, vp->v_dbuf, vp->v_dpages, vp->v_flag);
+			VN_CACHED(vp), vp->v_dbuf, vp->v_dpages, vp->v_flag);
 	}
 
-	ASSERT(vp->v_dpages == NULL && vp->v_dbuf == 0 && vp->v_pgcnt == 0);
-	/*
-	 * The v_pgcnt assertion will catch debug systems that screw up.
-	 * Patch up v_pgcnt for non-debug systems -- v_pgcnt probably
-	 * means accounting problem here, not hashed data.
-	 */
-	vp->v_pgcnt = 0;
+	ASSERT(vp->v_dpages == NULL && vp->v_dbuf == 0 && VN_CACHED(vp) == 0);
 
 	s = VN_LOCK(vp);
 
@@ -224,8 +218,6 @@ vn_reclaim(struct vnode *vp, int flag)
 
 	vp->v_trace = NULL;
 #endif  /* CONFIG_XFS_VNODE_TRACING */
-
-	ASSERT(vp->v_mreg == (struct pregion *)vp);
 
 	return 0;
 }
@@ -275,13 +267,12 @@ vn_initialize(struct inode *ip)
 	/* We never free the vnodes in the simulator, so these don't
 	   get destroyed either */
 	spinlock_init(&vp->v_lock, "v_lock");
-	vp->v_mreg = vp->v_mregb = (struct pregion *)vp;
 
 	vp->v_number = atomicAddUint64(&vn_generation, 1);
 
 	ASSERT(vp->v_number);
 
-	ASSERT(vp->v_dpages == NULL && vp->v_dbuf == 0 && vp->v_pgcnt == 0);
+	ASSERT(vp->v_dpages == NULL && vp->v_dbuf == 0 && VN_CACHED(vp) == 0);
 
 	/* Initialize the first behavior and the behavior chain head. */
 	vn_bhv_head_init(VN_BHV_HEAD(vp), "vnode");
@@ -438,6 +429,44 @@ vn_count(struct vnode *vp)
 	ASSERT(inode);
 
 	return inode->i_count;
+}
+
+
+/*
+ * "Temporary" routine to return the linux inode
+ * 'pages mapped' state, after everybody else can
+ * directly reference the inode (header magic!),
+ * this routine is dead meat..
+ */
+int
+vn_mapped(struct vnode *vp)
+{
+	struct inode *inode;
+
+	inode = LINVFS_GET_IP(vp);
+
+	ASSERT(inode);
+
+	return inode->i_data.i_mmap != NULL;
+}
+
+
+/*
+ * "Temporary" routine to return the linux inode
+ * # pages cached count, after everybody else can
+ * directly reference the inode (header magic!),
+ * this routine is dead meat..
+ */
+int
+vn_cached(struct vnode *vp)
+{
+	struct inode *inode;
+
+	inode = LINVFS_GET_IP(vp);
+
+	ASSERT(inode);
+
+	return inode->i_data.nrpages;
 }
 
 

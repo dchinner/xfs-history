@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision$"
+#ident "$Revision: 1.452 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -1364,8 +1364,7 @@ xfs_fsync(
 		    ip->i_df.if_bytes > 0) {
 			VOP_FLUSHINVAL_PAGES(vp, start, FI_REMAPF_LOCKED);
 		}
-		ASSERT(syncall == 0 ||
-		       (vp->v_pgcnt == 0 && vp->v_buf == 0));
+		ASSERT(syncall == 0 || (VN_CACHED(vp) == 0));
 	} else if (VN_DIRTY(vp)) {
 		/*
 		 * In the non-invalidating case, calls to fsync() do not
@@ -1973,7 +1972,7 @@ xfs_release(
 
 	if (ip->i_d.di_nlink != 0) {
 		if ((((ip->i_d.di_mode & IFMT) == IFREG) &&
-		     ((ip->i_d.di_size > 0) || (vp->v_pgcnt > 0)) &&
+		     ((ip->i_d.di_size > 0) || (VN_CACHED(vp) > 0)) &&
 		     (ip->i_df.if_flags & XFS_IFEXTENTS))  &&
 		    (!(ip->i_d.di_flags & XFS_DIFLAG_PREALLOC))) {
 			if (error = xfs_inactive_free_eofblocks(mp, ip))
@@ -2060,7 +2059,7 @@ xfs_inactive(
 	error = 0;
 	if (ip->i_d.di_nlink != 0) {
 		if ((((ip->i_d.di_mode & IFMT) == IFREG) &&
-		     ((ip->i_d.di_size > 0) || (vp->v_pgcnt > 0)) &&
+		     ((ip->i_d.di_size > 0) || (VN_CACHED(vp) > 0)) &&
 		     (ip->i_df.if_flags & XFS_IFEXTENTS))  &&
 		    (!(ip->i_d.di_flags & XFS_DIFLAG_PREALLOC))) {
 			if (error = xfs_inactive_free_eofblocks(mp, ip))
@@ -2335,11 +2334,6 @@ xfs_lookup(
 
 	xfs_iunlock_map_shared(dp, lock_mode);
 
-#if XFS_BIG_FILESYSTEMS
-	vp->v_nodeid = ip->i_ino + ip->i_mount->m_inoadd;
-#else
-	vp->v_nodeid = ip->i_ino;
-#endif
 	*vpp = vp;
 
 	return 0;
@@ -2846,12 +2840,6 @@ xfs_create(
 			VOP_VNODE_CHANGE(vp, VCHANGE_FLAGS_TRUNCATED, 0);
 	}
 #endif	/* CELL_CAPABLE */
-
-#if XFS_BIG_FILESYSTEMS
-	vp->v_nodeid = ip->i_ino + mp->m_inoadd;
-#else
-	vp->v_nodeid = ip->i_ino;
-#endif
 
         *vpp = vp;
 
@@ -4100,11 +4088,7 @@ xfs_mkdir(
 	dnlc_remove(cvp, "..");
 
 	created = B_TRUE;
-#if XFS_BIG_FILESYSTEMS
-	cvp->v_nodeid = cdp->i_ino + mp->m_inoadd;
-#else
-	cvp->v_nodeid = cdp->i_ino;
-#endif
+
 	*vpp = cvp;
 	IHOLD(cdp);
 		
@@ -4882,11 +4866,6 @@ std_return:
 
 		ASSERT(ip);
 		vp = XFS_ITOV(ip);
-#if XFS_BIG_FILESYSTEMS
-		vp->v_nodeid = ip->i_ino + mp->m_inoadd;
-#else
-		vp->v_nodeid = ip->i_ino;
-#endif
 		*vpp = vp;
 	}
 	return error;
@@ -5534,8 +5513,7 @@ xfs_reclaim(
 			
 			ASSERT(!VN_DIRTY(vp) && 
 			       (ip->i_iocore.io_queued_bufs == 0) &&
-			       (vp->v_pgcnt == 0) &&
-			       (vp->v_buf == NULL));
+			       (VN_CACHED(vp) == 0));
 			ASSERT(XFS_FORCED_SHUTDOWN(ip->i_mount) ||
 			       ip->i_delayed_blks == 0);
 			xfs_iunlock(ip, XFS_IOLOCK_EXCL);
@@ -5547,8 +5525,7 @@ xfs_reclaim(
 			VOP_TOSS_PAGES(vp, 0, FI_NONE);
 			ASSERT(!VN_DIRTY(vp) && 
 			       (ip->i_iocore.io_queued_bufs == 0) &&
-			       (vp->v_pgcnt == 0) &&
-			       (vp->v_buf == NULL));
+			       (VN_CACHED(vp) == 0));
 		}
 	}
 
