@@ -552,11 +552,6 @@ linvfs_delete_inode(
 		 */
 		vp->v_flag |= VPURGE;
 		vn_remove(vp);
-
-	} else {
-printk("linvfs_delete_inode: NOVP!: inode/0x%p ino/%ld icnt/%d\n",
-inode, inode->i_ino, atomic_read(&inode->i_count));
-	BUG();
 	}
 
 	clear_inode(inode);

@@ -220,9 +220,23 @@ again:
 				goto finish_inode;
 
 			} else if (vp != inode_vp) {
+				struct inode *inode = inode_vp->v_inode;
+
+				if (inode->i_state & (I_FREEING | I_CLEAR)) {
+					mrunlock(&ih->ih_lock);
+					delay(1);
+					XFS_STATS_INC(xfsstats.xs_ig_frecycle);
+
+					goto again;
+				}
+/* Chances are the other vnode (the one in the inode) is being torn
+ * down right now, and we landed on top of it. Question is, what do
+ * we do? Unhook the old inode and hook up the new one?
+ */
 				cmn_err(CE_PANIC,
 			"xfs_iget_core: ambiguous vns: vp/0x%p, invp/0x%p",
 						inode_vp, vp);
+				BUG();
 			}
 
 			/*
@@ -331,7 +345,6 @@ finish_inode:
 		for (iq = ih->ih_next; iq != NULL; iq = iq->i_next) {
 			if (iq->i_ino == ino) {
 				mrunlock(&ih->ih_lock);
-				vn_rele(vp);
 				xfs_idestroy(ip);
 
 				XFS_STATS_INC(xfsstats.xs_ig_dup);
@@ -450,10 +463,10 @@ finish_inode:
 	}
 #endif
 
+	*ipp = ip;
+
 	/* Update the linux inode */
 	error = vn_revalidate(vp, ATTR_COMM|ATTR_LAZY);
-
-	*ipp = ip;
 
 	return 0;
 }
