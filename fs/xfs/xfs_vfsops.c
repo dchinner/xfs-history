@@ -508,8 +508,6 @@ xfs_vfsmount(vfs_t		*vfsp,
 	if (((uap->flags & MS_REMOUNT) == 0) &&
 	    ((mvp->v_count != 1) || (mvp->v_flag & VROOT)))
 		return XFS_ERROR(EBUSY);
-	if (uap->flags & MS_DMI)
-		vfsp->vfs_flag |= VFS_DMI;
 
 	/*
 	 * Copy in XFS-specific arguments.
@@ -573,6 +571,12 @@ xfs_vfsmount(vfs_t		*vfsp,
 
 	error = xfs_cmountfs(vfsp, ddev, logdev, rtdev, NONROOT_MOUNT,
 			     &args, credp);
+	/*
+	 *  Don't set the VFS_DMI flag until here because we don't want
+	 *  to send events while replaying the log.
+	 */
+	if (uap->flags & MS_DMI)
+		vfsp->vfs_flag |= VFS_DMI;
 
 	return error;
 
