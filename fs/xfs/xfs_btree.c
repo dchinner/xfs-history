@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.57 $"
+#ident	"$Revision: 1.58 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -178,20 +178,29 @@ xfs_btree_check_lblock(
 	xfs_btree_lblock_t	*block,	/* btree long form block pointer */
 	int			level)	/* level of the btree block */
 {
+	int			lblock_ok; /* block passes checks */
 	xfs_mount_t		*mp;	/* file system mount point */
 
 	mp = cur->bc_mp;
-	XFS_WANT_CORRUPTED_RETURN(
+	lblock_ok =
 		block->bb_magic == xfs_magics[cur->bc_btnum] &&
 		block->bb_level == level &&
 		block->bb_numrecs <=
 			xfs_btree_maxrecs(cur, (xfs_btree_block_t *)block) &&
 		block->bb_leftsib != 0 &&
 		(block->bb_leftsib == NULLDFSBNO ||
-			XFS_FSB_SANITY_CHECK(mp, block->bb_leftsib)) &&
+		 XFS_FSB_SANITY_CHECK(mp, block->bb_leftsib)) &&
 		block->bb_rightsib != 0 &&
 		(block->bb_rightsib == NULLDFSBNO ||
-			XFS_FSB_SANITY_CHECK(mp, block->bb_rightsib)));
+		 XFS_FSB_SANITY_CHECK(mp, block->bb_rightsib));
+	if (XFS_TEST_ERROR(!lblock_ok, mp, XFS_ERRTAG_BTREE_CHECK_LBLOCK,
+			XFS_RANDOM_BTREE_CHECK_LBLOCK)) {
+#ifndef SIM
+#pragma mips_frequency_hint NEVER
+		buftrace("LBTREE ERROR", cur->bc_bufs[level]);
+#endif
+		return XFS_ERROR(EFSCORRUPTED);
+	}
 	return 0;
 }
 
@@ -282,20 +291,30 @@ xfs_btree_check_sblock(
 {
 	buf_t			*agbp;	/* buffer for ag. freespace struct */
 	xfs_agf_t		*agf;	/* ag. freespace structure */
+	int			sblock_ok; /* block passes checks */
 
 	agbp = cur->bc_private.a.agbp;
 	agf = XFS_BUF_TO_AGF(agbp);
-	XFS_WANT_CORRUPTED_RETURN(
+	sblock_ok =
 		block->bb_magic == xfs_magics[cur->bc_btnum] &&
 		block->bb_level == level &&
 		block->bb_numrecs <=
 			xfs_btree_maxrecs(cur, (xfs_btree_block_t *)block) &&
 		(block->bb_leftsib == NULLAGBLOCK ||
-			block->bb_leftsib < agf->agf_length) &&
+		 block->bb_leftsib < agf->agf_length) &&
 		block->bb_leftsib != 0 &&
 		(block->bb_rightsib == NULLAGBLOCK ||
-			block->bb_rightsib < agf->agf_length) &&
-		block->bb_rightsib != 0);
+		 block->bb_rightsib < agf->agf_length) &&
+		block->bb_rightsib != 0;
+	if (XFS_TEST_ERROR(!sblock_ok, cur->bc_mp,
+			XFS_ERRTAG_BTREE_CHECK_SBLOCK,
+			XFS_RANDOM_BTREE_CHECK_SBLOCK)) {
+#ifndef SIM
+#pragma mips_frequency_hint NEVER
+		buftrace("SBTREE ERROR", cur->bc_bufs[level]);
+#endif
+		return XFS_ERROR(EFSCORRUPTED);
+	}
 	return 0;
 }
 
@@ -394,6 +413,9 @@ xfs_btree_dup_cursor(
 		if (bp = cur->bc_bufs[i]) {
 			if (error = xfs_trans_read_buf(mp, tp, mp->m_dev,
 					bp->b_blkno, mp->m_bsize, 0, &bp)) {
+#ifndef SIM
+#pragma mips_frequency_hint NEVER
+#endif
 				xfs_btree_del_cursor(new, error);
 				*ncur = NULL;
 				return error;
@@ -705,8 +727,12 @@ xfs_btree_read_bufl(
 	ASSERT(fsbno != NULLFSBLOCK);
 	d = XFS_FSB_TO_DADDR(mp, fsbno);
 	if (error = xfs_trans_read_buf(mp, tp, mp->m_dev, d, mp->m_bsize, lock,
-			&bp))
+			&bp)) {
+#ifndef SIM
+#pragma mips_frequency_hint NEVER
+#endif
 		return error;
+	}
 	ASSERT(!bp || !geterror(bp));
 	if (bp != NULL)
 		bp->b_ref = refval;
@@ -736,8 +762,12 @@ xfs_btree_read_bufs(
 	ASSERT(agbno != NULLAGBLOCK);
 	d = XFS_AGB_TO_DADDR(mp, agno, agbno);
 	if (error = xfs_trans_read_buf(mp, tp, mp->m_dev, d, mp->m_bsize, lock,
-			&bp))
+			&bp)) {
+#ifndef SIM
+#pragma mips_frequency_hint NEVER
+#endif
 		return error;
+	}
 	ASSERT(!bp || !geterror(bp));
 	if (bp != NULL)
 		bp->b_ref = refval;

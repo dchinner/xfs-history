@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.110 $"
+#ident	"$Revision: 1.111 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -1240,6 +1240,7 @@ xfs_ialloc_read_agi(
 	buf_t		**bpp)		/* allocation group hdr buf */
 {
 	xfs_agi_t	*agi;		/* allocation group header */
+	int		agi_ok;		/* agi is consistent */
 	buf_t		*bp;		/* allocation group hdr buf */
 	daddr_t		d;		/* disk block address */
 	int		error;
@@ -1257,11 +1258,13 @@ xfs_ialloc_read_agi(
 	 * Validate the magic number of the agi block.
 	 */
 	agi = XFS_BUF_TO_AGI(bp);
-	if ((agi->agi_magicnum != XFS_AGI_MAGIC) ||
-	    !XFS_AGI_GOOD_VERSION(agi->agi_versionnum)) {
-		bp->b_flags |= B_ERROR;
+	agi_ok =
+		agi->agi_magicnum == XFS_AGI_MAGIC &&
+		XFS_AGI_GOOD_VERSION(agi->agi_versionnum);
+	if (XFS_TEST_ERROR(!agi_ok, mp, XFS_ERRTAG_IALLOC_READ_AGI,
+			XFS_RANDOM_IALLOC_READ_AGI)) {
 		xfs_trans_brelse(tp, bp);
-		return XFS_ERROR(EIO);
+		return XFS_ERROR(EFSCORRUPTED);
 	}
 	pag = &mp->m_perag[agno];
 	if (!pag->pagi_init) {

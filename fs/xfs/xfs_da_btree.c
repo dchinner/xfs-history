@@ -1820,10 +1820,14 @@ xfs_da_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,
 	else
 		bp->b_ref = XFS_DIR_BTREE_REF;
 	info = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
-	if ((info->magic != XFS_DA_NODE_MAGIC) &&
-	    (info->magic != XFS_DIR_LEAF_MAGIC) &&
-	    (info->magic != XFS_ATTR_LEAF_MAGIC)) {
-		bp->b_flags |= B_ERROR;
+	if (XFS_TEST_ERROR((info->magic != XFS_DA_NODE_MAGIC) &&
+			   (info->magic != XFS_DIR_LEAF_MAGIC) &&
+			   (info->magic != XFS_ATTR_LEAF_MAGIC),
+			dp->i_mount,
+			XFS_ERRTAG_DA_READ_BUF, XFS_RANDOM_DA_READ_BUF)) {
+#ifndef SIM
+		buftrace("DA READ ERROR", bp);
+#endif
 		xfs_trans_brelse(trans, bp);
 		*bpp = NULL;
 		return XFS_ERROR(EFSCORRUPTED);
