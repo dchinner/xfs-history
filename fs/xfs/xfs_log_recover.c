@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.9 $"
+#ident	"$Revision: 1.14 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -58,6 +58,12 @@ STATIC void	xlog_recover_insert_item_backq(xlog_recover_item_t **q,
 					       xlog_recover_item_t *item);
 STATIC void	xlog_recover_insert_item_frontq(xlog_recover_item_t **q,
 						xlog_recover_item_t *item);
+
+#ifdef DEBUG
+STATIC void	xlog_recover_check_summary(xlog_t *log);
+#else
+#define	xlog_recover_check_summary(log)
+#endif
 
 buf_t *
 xlog_get_bp(int num_bblks)
@@ -1407,6 +1413,8 @@ xlog_do_recover(xlog_t	*log,
     log->l_mp->m_sb = *sbp;
     brelse(bp);
 
+    xlog_recover_check_summary(log);
+
     /*
      * Now we're ready to do the transactions needed for the
      * rest of recovery.  Start with completing all the extent
@@ -1417,6 +1425,7 @@ xlog_do_recover(xlog_t	*log,
      */
     xlog_recover_process_efis(log);
     xlog_recover_process_iunlinks(log);
+    xlog_recover_check_summary(log);
 }	/* xlog_do_recover */
 
 
@@ -1435,3 +1444,64 @@ xlog_recover(xlog_t *log)
 	return 0;
 }
 
+
+#ifdef DEBUG
+/*
+ * Read all of the agf and agi counters and check that they
+ * are consistent with the superblock counters.
+ */
+void
+xlog_recover_check_summary(xlog_t	*log)
+{
+	xfs_mount_t	*mp;
+	xfs_agf_t	*agfp;
+	xfs_agi_t	*agip;
+	buf_t		*agfbp;
+	buf_t		*agibp;
+	daddr_t		agfdaddr;
+	daddr_t		agidaddr;
+	buf_t		*sbbp;
+	xfs_sb_t	*sbp;
+	xfs_agnumber_t	agno;
+	__uint64_t	freeblks;
+	__uint64_t	itotal;
+	__uint64_t	ifree;
+
+	mp = log->l_mp;
+	freeblks = 0LL;
+	itotal = 0LL;
+	ifree = 0LL;
+	for (agno = 0; agno < mp->m_sb.sb_agcount; agno++) {
+		agfdaddr = XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR);
+		agfbp = read_buf(mp->m_dev, agfdaddr, 1, 0);
+		agfp = XFS_BUF_TO_AGF(agfbp);
+		ASSERT(agfp->agf_magicnum == XFS_AGF_MAGIC);
+		ASSERT(agfp->agf_versionnum == XFS_AGF_VERSION);
+		ASSERT(agfp->agf_seqno == agno);
+
+		freeblks += agfp->agf_freeblks + agfp->agf_flcount;
+		brelse(agfbp);
+
+		agidaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
+		agibp = read_buf(mp->m_dev, agidaddr, 1, 0);
+		agip = XFS_BUF_TO_AGI(agibp);
+		ASSERT(agip->agi_magicnum == XFS_AGI_MAGIC);
+		ASSERT(agip->agi_versionnum == XFS_AGI_VERSION);
+		ASSERT(agip->agi_seqno == agno);
+
+		itotal += agip->agi_count;
+		ifree += agip->agi_freecount;
+		brelse(agibp);
+	}
+
+	sbbp = xfs_getsb(mp, 0);
+	sbp = XFS_BUF_TO_SBP(sbbp);
+	cmn_err(CE_WARN, "xlog_recover_check_summary: sb_icount %lld itotal %lld\n", sbp->sb_icount, itotal);
+	cmn_err(CE_WARN, "xlog_recover_check_summary: sb_ifree %lld itotal %lld\n", sbp->sb_ifree, ifree);
+	cmn_err(CE_WARN, "xlog_recover_check_summary: sb_fdblocks %lld freeblks %lld\n", sbp->sb_fdblocks, freeblks);
+	ASSERT(sbp->sb_icount == itotal);
+	ASSERT(sbp->sb_ifree == ifree);
+	ASSERT(sbp->sb_fdblocks == freeblks);
+	brelse(sbbp);
+}
+#endif
