@@ -1309,11 +1309,11 @@ xfs_dir2_sf_to_block(
 	 */
 	qsort(blp, INT_GET(btp->count, ARCH_CONVERT), sizeof(*blp), xfs_dir2_block_sort);
 	/* 
-	 * Log the leaf entry area, header and tail.
+	 * Log the leaf entry area and tail.
+	 * Already logged the header in data_init, ignore needlog.
 	 */
 	ASSERT(needscan == 0);
-	xfs_dir2_data_log_header(tp, bp);
-	xfs_dir2_block_log_leaf(tp, bp, 0, INT_GET(btp->count, ARCH_CONVERT)-1);
+	xfs_dir2_block_log_leaf(tp, bp, 0, INT_GET(btp->count, ARCH_CONVERT) - 1);
 	xfs_dir2_block_log_tail(tp, bp);
 	xfs_dir2_data_check(dp, bp);
 	xfs_da_buf_done(bp);
