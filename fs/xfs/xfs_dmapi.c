@@ -32,8 +32,7 @@
 
 #include <xfs.h>
 
-/* XXX */
-#define MAXNAMLEN 255
+#define MAXNAMLEN MAXNAMELEN
 
 STATIC int prohibited_mr_events(bhv_desc_t	*bdp);
 
