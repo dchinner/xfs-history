@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.25 $"
+#ident	"$Revision: 1.26 $"
 
 /*
  * Free space allocation for xFS.
@@ -1528,7 +1528,7 @@ xfs_alloc_newroot(
 		return 0;
 	}
 	xfs_trans_agbtree_delta(cur->bc_tp, 1);
-	error = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp, 
+	error = xfs_btree_get_bufs(cur->bc_mp, cur->bc_tp, 
 			cur->bc_private.a.agno, nbno, 0, &nbp);
 	if (error) {
 		return error;
@@ -1927,7 +1927,7 @@ xfs_alloc_split(
 		return 0;
 	}
 	xfs_trans_agbtree_delta(cur->bc_tp, 1);
-	error = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
+	error = xfs_btree_get_bufs(cur->bc_mp, cur->bc_tp,
 			cur->bc_private.a.agno, rbno, 0, &rbp);
 	if (error) {
 		return error;
