@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.82 $"
+#ident	"$Revision$"
 
 /*
  * Free space allocation for XFS.
@@ -19,6 +19,7 @@
 #include <sys/ktrace.h>
 #include <sys/kmem.h>
 #include <sys/errno.h>
+#include <sys/uuid.h>
 #include <stddef.h>
 #ifdef SIM
 #include <stdlib.h>
@@ -100,7 +101,7 @@ xfs_alloc_read_agfl(
 	xfs_agnumber_t	agno,		/* allocation group number */
 	buf_t		**bpp);		/* buffer for the ag free block array */
 
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_ALLOC_TRACE)
 /*
  * Put an entry in the allocation trace buffer.
  */
@@ -159,7 +160,7 @@ xfs_alloc_trace_modagf(
 #define	xfs_alloc_trace_alloc(n,s,a)
 #define	xfs_alloc_trace_free(n,s,a,b,c,d,e)
 #define	xfs_alloc_trace_modagf(n,s,a,b,c)
-#endif	/* DEBUG && !SIM */
+#endif	/* XFS_ALLOC_TRACE */
 
 /*
  * Prototypes for per-ag allocation routines
@@ -342,7 +343,7 @@ xfs_alloc_read_agfl(
 	return 0;
 }
 
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_ALLOC_TRACE)
 /*
  * Put an entry in the allocation trace buffer.
  */
@@ -439,7 +440,7 @@ xfs_alloc_trace_modagf(
 		(int)agf->agf_flcount, (int)agf->agf_freeblks,
 		(int)agf->agf_longest);
 }
-#endif	/* DEBUG && !SIM */
+#endif	/* XFS_ALLOC_TRACE */
 
 /*
  * Allocation group level functions.
@@ -733,7 +734,7 @@ xfs_alloc_ag_vextent_near(
 	xfs_btree_cur_t	*bno_cur_gt;	/* cursor for bno btree, right side */
 	xfs_btree_cur_t	*bno_cur_lt;	/* cursor for bno btree, left side */
 	xfs_btree_cur_t	*cnt_cur;	/* cursor for count btree */
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_ALLOC_TRACE)
 	static char	fname[] = "xfs_alloc_ag_vextent_near";
 #endif
 	xfs_agblock_t	gtbno;		/* start bno of right side entry */
@@ -1542,7 +1543,7 @@ xfs_alloc_ag_vextent_size(
 	int		error;
 	xfs_agblock_t	fbno;		/* start of found freespace */
 	xfs_extlen_t	flen;		/* length of found freespace */
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_ALLOC_TRACE)
 	static char	fname[] = "xfs_alloc_ag_vextent_size";
 #endif
 	int		i;		/* temp status variable */
@@ -1734,7 +1735,7 @@ xfs_free_ag_extent(
 	xfs_btree_cur_t	*bno_cur;	/* cursor for by-block btree */
 	xfs_btree_cur_t	*cnt_cur;	/* cursor for by-size btree */
 	int		error;
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_ALLOC_TRACE)
 	static char	fname[] = "xfs_free_ag_extent";
 #endif
 	xfs_agblock_t	gtbno;		/* start of right neighbor block */
@@ -2215,7 +2216,7 @@ xfs_alloc_get_freelist(
 	buf_t		*agflbp;/* buffer for a.g. freelist structure */
 	xfs_agblock_t	bno;	/* block number returned */
 	int		error;
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_ALLOC_TRACE)
 	static char	fname[] = "xfs_alloc_get_freelist";
 #endif
 	xfs_perag_t	*pag;	/* per allocation group data */
@@ -2324,7 +2325,7 @@ xfs_alloc_put_freelist(
 	xfs_agfl_t		*agfl;	/* a.g. free block array */
 	xfs_agblock_t		*blockp;/* pointer to array entry */
 	int			error;
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_ALLOC_TRACE)
 	static char		fname[] = "xfs_alloc_put_freelist";
 #endif
 	xfs_perag_t		*pag;	/* per allocation group data */
@@ -2431,7 +2432,7 @@ xfs_alloc_vextent(
 	xfs_agblock_t	agsize;	/* allocation group size */
 	int		error;
 	int		flags;	/* XFS_ALLOC_FLAG_... locking flags */
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_ALLOC_TRACE)
 	static char	fname[] = "xfs_alloc_vextent";
 #endif
 	xfs_mount_t	*mp;	/* mount structure pointer */
