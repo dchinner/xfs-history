@@ -718,8 +718,8 @@ xlog_iodone(buf_t *bp)
 /*
  * Return size of each in-core log record buffer.
  *
- * Low memory machines only get 4 8KB buffers.  We don't want to waste
- * memory here.  However, all other machines get at least 4 16KB buffers.
+ * Low memory machines only get 2 16KB buffers.  We don't want to waste
+ * memory here.  However, all other machines get at least 2 32KB buffers.
  * The number is hard coded because we don't care about the minimum
  * memory size, just 16MB systems.
  *
@@ -736,23 +736,61 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 			   xlog_t	*log)
 {
 	uint bs;					/* buffer size */
+	int size;
 
-	if (mp->m_logbufs == 0) {			/* turn off log */
+	/*
+	 * When logbufs == 0, someone has disabled the log from the FSTAB
+	 * file.  This is not a documented feature.  We need to set xlog_debug
+	 * to zero (this deactivates the log) and set xlog_devt to the
+	 * appropriate dev_t.  Only one filesystem may be affected as such
+	 * since this is just a performance hack to test what we might be able
+	 * to get if the log were not present.
+	 */
+	if (mp->m_logbufs == 0) {
 		xlog_debug = 0;
-		xlog_devt = log->l_dev;			/* don't log this dev */
+		xlog_devt = log->l_dev;
 		log->l_iclog_bufs = XLOG_NUM_ICLOGS;
 	} else {
-		if (mp->m_logbufs == -1) {		/* = -1 for default */
+		/*
+		 * This is the normal path.  If m_logbufs == -1, then the
+		 * admin has chosen to use the system defaults for logbuffers.
+		 */
+		if (mp->m_logbufs == -1)
 			log->l_iclog_bufs = XLOG_NUM_ICLOGS;
-		} else {
+		else
 			log->l_iclog_bufs = mp->m_logbufs;
-		}
+
 		/* We are reactivating a filesystem after it was active */
 		if (log->l_dev == xlog_devt) {
 			xlog_devt = 1;
 			xlog_debug = 1;
 		}
 	}
+
+	/*
+	 * We can't allow 64k log record sizes because there isn't enough
+	 * room in the log record header for all the cycle numbers.
+	 */
+	ASSERT(XLOG_MAX_RECORD_BSIZE == 32*1024);
+
+	/*
+	 * Buffer size passed in from mount system call.
+	 */
+	if (mp->m_logbsize != -1) {
+		size = log->l_iclog_size = mp->m_logbsize;
+		log->l_iclog_size_log = 0;
+		while (size != 1) {
+			log->l_iclog_size_log++;
+			size >>= 1;
+		}
+		return;
+	}
+
+	/*
+	 * We don't necessarily want the 16MB number to scale as the
+	 * minimum memory configuration scales.  If a machine has more than
+	 * the 16MB, then use more memory.
+	 */
 	if (physmem <= btoc(16*1024*1024)) {
 		/* Don't change; min configuration */
 		log->l_iclog_size = XLOG_RECORD_BSIZE;		/* 16k */
@@ -763,23 +801,32 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 	}
 
 	/*
-	 * We can't allow 64k log record sizes because there isn't enough
-	 * room in the log record header for all the cycle numbers.
+	 * For 16KB, we use 3 32KB buffers.  For 32KB block sizes, we use
+	 * 4 32KB buffers.  For 64KB block sizes, we use 8 32KB buffers.
 	 */
-	ASSERT(XLOG_MAX_RECORD_BSIZE == 32*1024);
-
-	if (mp->m_sb.sb_blocksize == XLOG_MAX_RECORD_BSIZE) {	       /* 32k */
+	if (mp->m_sb.sb_blocksize >= 16*1024) {
 		log->l_iclog_size = XLOG_MAX_RECORD_BSIZE;
 		log->l_iclog_size_log = XLOG_MAX_RECORD_BSHIFT;
-		if (mp->m_logbufs == -1)
-			log->l_iclog_bufs *= 2;				/* 4 */
-	} else if (mp->m_sb.sb_blocksize > XLOG_MAX_RECORD_BSIZE) {    /* 64k */
-		log->l_iclog_size = XLOG_MAX_RECORD_BSIZE;
-		log->l_iclog_size_log = XLOG_MAX_RECORD_BSHIFT;
-		if (mp->m_logbufs == -1)
-			log->l_iclog_bufs  *= 4;			/* 8 */
+		if (mp->m_logbufs == -1) {
+			switch (mp->m_sb.sb_blocksize) {
+			    case 16*1024:			/* 16 KB */
+				log->l_iclog_bufs = 3;
+				break;
+			    case 32*1024:			/* 32 KB */
+				log->l_iclog_bufs = 4;
+				break;
+			    case 64*1024:			/* 64 KB */
+				log->l_iclog_bufs = 8;
+				break;
+			    default:
+				xlog_panic("xFS: Illegal blocksize");
+				break;
+			}
+		}
 	}
-	if (xlogs != 0) {				/* debug code */
+
+	/* DEBUG code */
+	if (xlogs != 0) {
 		log->l_iclog_bufs = xlogs;
 		log->l_iclog_size = xlogsize;
 		log->l_iclog_size_log = xloglog;
