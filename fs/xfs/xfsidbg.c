@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.62 $"
+#ident	"$Revision: 1.63 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -4066,6 +4066,7 @@ xfsidbg_xsb(xfs_sb_t *sbp)
 	qprintf("pquotino %s ", xfs_fmtino(sbp->sb_pquotino, NULL));
 	qprintf("qflags 0x%x inoaligmt %d\n",
 		sbp->sb_qflags, sbp->sb_inoalignmt);
+	qprintf("unit %d width %d\n", sbp->sb_unit, sbp->sb_width);
 }
 
 #ifdef DEBUG
@@ -4224,6 +4225,7 @@ xfsidbg_xtp(xfs_trans_t *tp)
 	case XFS_TRANS_QM_DQCLUSTER:	qprintf("QM_DQCLUSTER");	break;
 	case XFS_TRANS_QM_QINOCREATE:	qprintf("QM_QINOCREATE");	break;
 	case XFS_TRANS_QM_QUOTAOFF_END:	qprintf("QM_QOFF_END");		break;
+	case XFS_TRANS_SB_UNIT:		qprintf("SB_UNIT");		break;
 
 	default:			qprintf("0x%x", tp->t_type);	break;
 	}
