@@ -668,7 +668,8 @@ xfs_bmap_add_extent_delay_real(
 				LEFT.br_blockcount + new->br_blockcount);
 			rval = 0;
 		}
-		temp = xfs_bmap_worst_indlen(ip, temp);
+		temp = XFS_EXTLEN_MIN(xfs_bmap_worst_indlen(ip, temp),
+			STARTBLOCKVAL(PREV.br_startblock));
 		xfs_bmbt_set_startblock(ep, NULLSTARTBLOCK(temp));
 		xfs_bmap_trace_post_update(fname, "LF|LC", ip, idx);
 		*dnew = temp;
@@ -705,7 +706,7 @@ xfs_bmap_add_extent_delay_real(
 		base = ip->i_u1.iu_extents;
 		ep = &base[idx + 1];
 		xfs_bmbt_set_startblock(ep, NULLSTARTBLOCK(temp));
-		xfs_bmap_trace_post_update(fname, "LF", ip, idx);
+		xfs_bmap_trace_post_update(fname, "LF", ip, idx + 1);
 		*dnew = temp;
 		break;
 
@@ -734,7 +735,8 @@ xfs_bmap_add_extent_delay_real(
 				new->br_blockcount + RIGHT.br_blockcount);
 			rval = 0;
 		}
-		temp = xfs_bmap_worst_indlen(ip, temp);
+		temp = XFS_EXTLEN_MIN(xfs_bmap_worst_indlen(ip, temp),
+			STARTBLOCKVAL(PREV.br_startblock));
 		xfs_bmbt_set_startblock(ep, NULLSTARTBLOCK(temp));
 		xfs_bmap_trace_post_update(fname, "RF|RC", ip, idx);
 		*dnew = temp;
