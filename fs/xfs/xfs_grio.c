@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.23 1994/05/23 15:32:05 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.24 1994/05/23 16:46:49 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -633,9 +633,13 @@ retry_request:
        		ticket_unlock(ip);
 		vp = XFS_ITOV(ip);
 
+#ifndef SIM
      		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
+#endif
 		xfs_grio_issue_io(vp, uiop, ioflag, credp, rw);
+#ifndef SIM
      		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
+#endif
 
 
 	}
