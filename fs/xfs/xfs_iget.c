@@ -460,7 +460,7 @@ retry:
 		vp = LINVFS_GET_VP(inode);
 		if (inode->i_state & I_NEW) {
 			XFS_STATS_INC(xfsstats.vn_alloc);
-			vn_initialize(XFS_MTOVFS(mp), inode);
+			vn_initialize(inode);
 			error = xfs_iget_core(vp, mp, tp, ino,
 							lock_flags, ipp, bno);
 			if (error) {
@@ -556,8 +556,6 @@ xfs_inode_incore(xfs_mount_t	*mp,
 		if (ip->i_ino == ino) {
 			/*
 			 * If we find it and tp matches, return it.
-			 * Also move it to the front of the hash list
-			 * if we find it and it is not already there.
 			 * Otherwise break from the loop and return
 			 * NULL.
 			 */

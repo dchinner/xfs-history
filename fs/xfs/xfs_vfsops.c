@@ -1182,7 +1182,7 @@ xfs_syncsub(
 			VMAP(vp, ip, vmap);
 			IPOINTER_INSERT(ip, mp);
 
-			vp = vn_get(vp, &vmap, 0);
+			vp = vn_get(vp, &vmap);
 			if (vp == NULL) {
 				/*
 				 * The vnode was reclaimed once we let go

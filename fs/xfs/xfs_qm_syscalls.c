@@ -1066,7 +1066,7 @@ again:
 			XFS_MOUNT_IUNLOCK(mp);
 
 			/* XXX restart limit ? */
-			if ( ! (vp = vn_get(vp, &vmap, 0)))
+			if ( ! (vp = vn_get(vp, &vmap)))
 				goto again;
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
 			vnode_refd = B_TRUE;
