@@ -1,4 +1,4 @@
-#ident "$Revision: 1.51 $"
+#ident "$Revision: 1.54 $"
 
 /*
  * xfs_dir_leaf.c
@@ -1090,13 +1090,25 @@ xfs_dir_leaf_compact(xfs_trans_t *trans, buf_t *bp, int musthave, int justcheck)
 	xfs_dir_leaf_hdr_t *hdr_s, *hdr_d;
 	xfs_mount_t *mp;
 	char *tmpbuffer;
+	char *tmpbuffer2;
 	int rval;
-
+	int lbsize;
+	
 	mp = trans->t_mountp;
-	tmpbuffer = kmem_alloc(XFS_LBSIZE(mp), KM_SLEEP);
+	lbsize = XFS_LBSIZE(mp);
+	tmpbuffer = kmem_alloc(lbsize, KM_SLEEP);
 	ASSERT(tmpbuffer != NULL);
-	bcopy(bp->b_un.b_addr, tmpbuffer, XFS_LBSIZE(mp));
-	bzero(bp->b_un.b_addr, XFS_LBSIZE(mp));
+	bcopy(bp->b_un.b_addr, tmpbuffer, lbsize);
+
+	/*
+	 * Make a second copy in case xfs_dir_leaf_moveents()
+	 * below destroys the original.
+	 */
+	if (musthave || justcheck) {
+	        tmpbuffer2 = kmem_alloc(lbsize, KM_SLEEP);
+	  	bcopy(bp->b_un.b_addr, tmpbuffer2, lbsize);
+	} 
+	bzero(bp->b_un.b_addr, lbsize);
 
 	/*
 	 * Copy basic information
@@ -1106,9 +1118,9 @@ xfs_dir_leaf_compact(xfs_trans_t *trans, buf_t *bp, int musthave, int justcheck)
 	hdr_s = &leaf_s->hdr;
 	hdr_d = &leaf_d->hdr;
 	hdr_d->info = hdr_s->info;	/* struct copy */
-	hdr_d->firstused = XFS_LBSIZE(mp);
+	hdr_d->firstused = lbsize;
 	if (hdr_d->firstused == 0)
-		hdr_d->firstused = XFS_LBSIZE(mp) - 1;
+		hdr_d->firstused = lbsize - 1;
 	hdr_d->namebytes = 0;
 	hdr_d->count = 0;
 	hdr_d->holes = 0;
@@ -1118,6 +1130,7 @@ xfs_dir_leaf_compact(xfs_trans_t *trans, buf_t *bp, int musthave, int justcheck)
 	/*
 	 * Copy all entry's in the same (sorted) order,
 	 * but allocate filenames packed and in sequence.
+	 * This changes the source (leaf_s) as well.
 	 */
 	xfs_dir_leaf_moveents(leaf_s, 0, leaf_d, 0, (int)hdr_s->count, mp);
 
@@ -1125,12 +1138,17 @@ xfs_dir_leaf_compact(xfs_trans_t *trans, buf_t *bp, int musthave, int justcheck)
 		rval = XFS_ERROR(ENOSPC);
 	else
 		rval = 0;
-	if (justcheck || rval == ENOSPC)
-		bcopy(tmpbuffer, bp->b_un.b_addr, XFS_LBSIZE(mp));
-	else
-		xfs_trans_log_buf(trans, bp, 0, XFS_LBSIZE(mp) - 1);
+	
+	if (justcheck || rval == ENOSPC) {
+	        ASSERT(tmpbuffer2);
+		bcopy(tmpbuffer2, bp->b_un.b_addr, lbsize);
+	} else {
+		xfs_trans_log_buf(trans, bp, 0, lbsize - 1);
+	}
 
-	kmem_free(tmpbuffer, XFS_LBSIZE(mp));
+	kmem_free(tmpbuffer, lbsize);
+	if (musthave || justcheck)
+	  	kmem_free(tmpbuffer2, lbsize);
 	return(rval);
 }
 
