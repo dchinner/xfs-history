@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.82 $"
+#ident	"$Revision: 1.83 $"
 
 struct buf;
 struct cred;
@@ -176,6 +176,14 @@ typedef struct xfs_mount {
 #define	XFS_WSYNC_READIO_LOG	15
 #define	XFS_WSYNC_WRITEIO_LOG	14
 
+
+/* 
+ * Flags sent to xfs_force_shutdown.
+ */
+#define XFS_METADATA_IO_ERROR	0x1
+#define XFS_LOG_IO_ERROR	0x2
+#define XFS_FORCE_UMOUNT	0x4
+
 /*
  * Macros for getting from mount to vfs and back.
  */
@@ -219,6 +227,6 @@ int		xfs_unmountfs(xfs_mount_t *, int, struct cred *);
 int		xfs_mod_incore_sb(xfs_mount_t *, xfs_sb_field_t, int);
 int		xfs_mod_incore_sb_batch(xfs_mount_t *, xfs_mod_sb_t *, uint);
 struct buf	*xfs_getsb(xfs_mount_t *, int);
-void		xfs_force_shutdown(struct xfs_mount *mp);
+void		xfs_force_shutdown(struct xfs_mount *, int);
 extern	struct vfsops xfs_vfsops;
 #endif	/* !_FS_XFS_MOUNT_H */
