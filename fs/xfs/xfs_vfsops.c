@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.9 $"
+#ident  "$Revision: 1.10 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -39,6 +39,7 @@
 #include <stdio.h>
 #else
 #include <sys/systm.h>
+#include <sys/conf.h>
 #endif
 #include <sys/major.h>
 #include <sys/mount.h>
@@ -89,12 +90,12 @@
 #include "sim.h"
 #endif
 
+#define	xfs_vfstosb(vfsp)	(&((xfs_mount_t *)XFS_VFSTOM(vfsp))->m_sb)
 
 #define	whymount_t	whymountroot_t
 #define	NONROOT_MOUNT	ROOT_UNMOUNT
 
 static char *whymount[] = { "initial mount", "remount", "unmount" };
-
 
 /*
  * Static function prototypes.
@@ -126,6 +127,7 @@ STATIC int	xfs_vget(vfs_t		*vfsp,
 			 vnode_t	**vpp,
 			 fid_t		*fidp);
 
+
 STATIC int	xfs_cmountfs(struct vfs	*vfsp,
 			     dev_t		ddev,
 			     dev_t		rtdev,
@@ -137,6 +139,10 @@ STATIC int	xfs_cmountfs(struct vfs	*vfsp,
 STATIC xfs_mount_t *_xfs_get_vfsmount(struct vfs	*vfsp,
 				      dev_t		ddev,
 				      dev_t		rtdev);
+
+STATIC int	_spectodev(char *spec, dev_t *devp);
+STATIC int	_xfs_isdev(dev_t dev);
+STATIC int	_xfs_ibusy(xfs_mount_t *mp);
 
 
 
@@ -180,8 +186,8 @@ xfs_init(vfssw_t	*vswp,
  * Resolve path name of special file to its device.
  */
 STATIC int
-_spectodev(char	*spec,
-	  dev_t *devp)
+_spectodev(char	 *spec,
+	   dev_t *devp)
 {
 	struct vnode *bvp;
 	int error;
@@ -216,10 +222,6 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	int		error = 0;
 	int		s;
 	xfs_sb_t	*sbp;
-	xfs_inode_t	*rip;
-	vnode_t		*rvp = 0;
-
-/* XXXjleong More work needed to finish xfs_cmountfs() */
 
 	/*
 	 * Remounting a XFS file system is bad. The log manager
@@ -245,34 +247,8 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	sbp = xfs_buf_to_sbp(mp->m_sb_bp);
 
 	/*
-	 * Get and sanity-check the root inode.
-	 */
-	rip = xfs_iget(mp, NULL, sbp->sb_rootino, XFS_ILOCK_EXCL);
-	rvp = XFS_ITOV(rip);
-	ASSERT(IFDIR == (rip->i_d.di_mode & IFMT));
-	if ((rip->i_d.di_mode & IFMT) != IFDIR) {
-		vmap_t vmap;
-
-		VMAP(rvp, vmap);
-		VN_RELE(rvp);
-		vn_purge(rvp, &vmap);
-
-		prdev("Root inode %d is not a directory",
-		      rip->i_dev, rip->i_ino);
-
-		return (error = EINVAL);
-	}
-
-	s = VN_LOCK(rvp);
-	rvp->v_flag |= VROOT;
-	VN_UNLOCK(rvp, s);
-	mp->m_rootip = rip;				/* save it */
-	xfs_iunlock(rip, XFS_ILOCK_EXCL);
-
-	/*
-	 * XXX Set time from root's superblock on first mount.
-	 * if (why == ROOT_INIT)
-	 *	clkset(mp->m_time);
+	 * XXX Anything special for root mounts?
+	 * if (why == ROOT_INIT) {}
 	 */
 
 	/*
@@ -297,6 +273,7 @@ xfs_cmountfs(struct vfs 	*vfsp,
 
 	return error;
 } /* end of xfs_cmountfs() */
+
 
 /*
  * _xfs_get_vfsmount() ensures that the given vfs struct has an
@@ -341,6 +318,7 @@ _xfs_get_vfsmount(struct vfs	*vfsp,
 
 	return mp;
 }
+
 
 /*
  * xfs_vfsmount
@@ -441,6 +419,7 @@ xfs_vfsmount(vfs_t		*vfsp,
 
 } /* xfs_vfsmount() */
 
+
 /*
  * Clean the given file system.
  * This function should be called when unmounting.
@@ -452,17 +431,54 @@ xfs_cleanfs(xfs_sb_t *sbp)
 	return 0;
 }
 
+
+/*
+ * This function determines whether or not the given device has a
+ * XFS file system. It reads a XFS superblock from the device and
+ * checks the magic and version numbers.
+ *
+ * Return 0 if device has a XFS file system.
+ */
+STATIC int
+_xfs_isdev(dev_t dev)
+{
+	xfs_sb_t *sbp;
+	buf_t	 *bp;
+	int	 error;
+
+	bp = bread(dev, XFS_SB_DADDR, BTOBB(sizeof(xfs_sb_t)));
+	error = (bp->b_flags & B_ERROR);
+
+	if (error == 0) {
+		sbp = xfs_buf_to_sbp(bp);
+		error = ((sbp->sb_magicnum != XFS_SB_MAGIC) ||
+			 (sbp->sb_versionnum != XFS_SB_VERSION));
+	}
+
+	bp->b_flags |= B_AGE;
+	brelse(bp);
+	return error;
+}
+
+
 /*
  * xfs_mountroot() mounts the root file system.
+ *
+ * This function is called by vfs_mountroot(), which is called my main().
+ * Must check that the root device has a XFS superblock and as such a
+ * XFS file system. If the device does not, reject the mountroot request
+ * and return error so that vfs_mountroot() knows to continue its search
+ * for someone able to mount root.
+ *
  * "why" is:
  *	ROOT_INIT	initial call.
  *	ROOT_REMOUNT	remount the root file system.
  *	ROOT_UNMOUNT	unmounting the root (e.g., as part a system shutdown).
  *
- * NOTE: Currently XFS doesn't support mounting a logical volume as root.
+ * NOTE:
+ *	Currently XFS doesn't support mounting a logical volume as root.
  * Mounting a logical volume as root requires xlv_assemble to run before
  * the mount.
- * XXX xfs_mountroot() is just a stub
  */
 STATIC int
 xfs_mountroot(vfs_t		*vfsp,
@@ -476,16 +492,18 @@ xfs_mountroot(vfs_t		*vfsp,
 	struct cred	*cr = u.u_cred;
 	extern dev_t	rootdev;		/* from sys/systm.h */
 
-	return ENOSYS;		/* XXX not done yet */
+	/*
+	 * Check that the root device holds a XFS file system.
+	 */
+	if ((why == ROOT_INIT) && _xfs_isdev(rootdev))
+		return ENOSYS;
+	
 	switch (why) {
 	  case ROOT_INIT:
 		if (xfsrootdone++)
 			return EBUSY;
 		if (rootdev == NODEV)
 			return ENODEV;
-		/*
-		 * XXX Check that the root device holds a XFS file system.
-		 */
 		vfsp->vfs_dev = rootdev;
 		break;
 	  case ROOT_REMOUNT:
@@ -495,7 +513,6 @@ xfs_mountroot(vfs_t		*vfsp,
 		/*
 		 * XXX copied from efs_mountroot() - Is this right?
 		 */
-#define	xfs_vfstosb(vfsp)	(&((xfs_mount_t *)XFS_VFSTOM(vfsp))->m_sb)
 		error = xfs_cleanfs(xfs_vfstosb(vfsp));
 		binval(rootdev);
 		pflushinvalvfsp(vfsp);
@@ -522,6 +539,38 @@ bad:
 
 
 /*
+ * _xfs_ibusy searches for a busy inode in the mounted file system.
+ *
+ * Return 0 if there are no active inodes otherwise return 1.
+ */
+STATIC int
+_xfs_ibusy(xfs_mount_t *mp)
+{
+	xfs_inode_t	*ip;
+	vnode_t		*vp;
+	int		busy;
+	int		s;
+
+	busy = 0;
+
+	s = XFS_MOUNT_ILOCK(mp);
+
+	for (ip = mp->m_inodes; ip && !busy; ip = ip->i_mnext) {
+		vp = XFS_ITOV(ip);
+		if (vp->v_count != 0) {
+			if ((vp->v_count == 1) && (ip == mp->m_rootip))
+				continue;
+			busy++;
+		}
+	}
+	
+	XFS_MOUNT_IUNLOCK(mp, s);
+
+	return busy;
+}
+
+
+/*
  * xfs_unmount
  *
  * XXX xfs_unmount() needs return code work and more error checking.
@@ -532,7 +581,6 @@ xfs_unmount(vfs_t	*vfsp,
 	    cred_t	*credp)
 {
 	xfs_mount_t	*mp;
-	xfs_sb_t	*sbp;
 	xfs_inode_t	*rip;
 	vnode_t		*rvp = 0;
 	vmap_t		vmap;
@@ -541,35 +589,40 @@ xfs_unmount(vfs_t	*vfsp,
 		return EPERM;
 
 	mp = XFS_VFSTOM(vfsp);
-	sbp = &(mp->m_sb);
-		/*
-		 * Using the copy of the sb in the mount structure
-		 * as oppose to the copy in the buffer which is what
-		 * the following would have done:
-		 *	sbp = xfs_buf_to_sbp(mp->m_sb_bp);
-		 */
 
 	/*
+	 * Make sure there are no active users.
+	 */
+	if (_xfs_ibusy(mp))
+		return EBUSY;
+	
+	/*
 	 * Get rid of root inode (vnode) first, if we can.
+	 *
+	 * Does this prevent another process from traversing 
+	 * into this file system?
 	 */
 	rip = mp->m_rootip;
 	xfs_ilock(rip, XFS_ILOCK_EXCL);
+	xfs_iflock(rip);
+	xfs_iflush(rip, 0);		/* synchronously flush to disk */
 	rvp = XFS_ITOV(rip);
 	if (rvp->v_count != 1) {
 		xfs_iunlock(rip, XFS_ILOCK_EXCL);
 		return EBUSY;
 	}
 	xfs_iunlock(rip, XFS_ILOCK_EXCL);
-
 	VMAP(rvp, vmap);
 	VN_RELE(rvp);
 	vn_purge(rvp, &vmap);
 
 	/*
+	 * XXX Okay to call xfs_unmountfs() after deleting the root inode?
+	 *
 	 * Call common unmount function to flush to disk
 	 * and free the super block buffer & mount structures.
 	 */
-	xfs_umount(mp);			/* XXX okay after deleting vnode? */
+	xfs_unmountfs(mp);	
 
 	/*
 	 * XXX Later when xfs_unmount()'s inode freeing is implemented, do:
@@ -594,25 +647,8 @@ xfs_root(vfs_t		*vfsp,
 	 vnode_t	**vpp)
 {
 	struct vnode	*vp;
-	xfs_inode_t	*ip;
-	xfs_mount_t	*mp;
 
-#if 1
 	vp = XFS_ITOV((XFS_VFSTOM(vfsp))->m_rootip);	
-#else
-	/*
-	 * XXX	Save pointer to the root inode in the mount struct
-	 * so we don't need to do a iget everytime we want the root
-	 * inode. By saving the root inode, we can do:
-	 *
-	 * 	vp = XFS_ITOV(XFS_VFSTOM(vfsp)->m_rootip);
-	 */
-	mp = XFS_VFSTOM(vfsp);
-	ip = xfs_iget(mp, NULL, mp->m_sb.sb_rootino, 0);
-	ASSERT(ip != NULL);
-	vp = XFS_ITOV(ip);
-#endif
-
 	VN_HOLD(vp);
 	*vpp = vp;
 	return 0;
@@ -658,16 +694,94 @@ xfs_statvfs(vfs_t	*vfsp,
 
 
 /*
- * xfs_sync
+ * xfs_sync flushes any pending I/O to file system vfsp.
  *
- * XXX xfs_sync() is just a stub
+ * Flags: from efs_sync()'s
+ *      SYNC_BDFLUSH - do NOT sleep waiting for an inode - also, when
+ *                      when pushing DELWRI - only push old ones.
+ *      SYNC_ATTR    - sync attributes - note that ordering considerations
+ *                      dictate that we also flush dirty pages
+ *      SYNC_WAIT    - do synchronouse writes - inode & delwri
+ *      SYNC_DELWRI  - look at inodes w/ delwri pages. Other flags
+ *                      decide how to deal with them.
+ *      SYNC_CLOSE   - flush delwri and invalidate others.
+ *      SYNC_FSDATA  - push fs data (e.g. superblocks)
+ *
  */
 STATIC int
-xfs_sync(vfs_t		*vp,
+xfs_sync(vfs_t		*vfsp,
 	 short		flags,
 	 cred_t		*credp)
 {
-	return 0;
+	xfs_mount_t	*mp;
+	xfs_inode_t	*ip;
+	buf_t		*bp;
+	int		error;
+	int		fflag;
+
+	mp = XFS_VFSTOM(vfsp);
+
+	error = 0;
+
+	/*
+	 * if not interested in inodes, skip all this
+	 */
+	if ((flags & (SYNC_DELWRI|SYNC_ATTR)) == 0)
+		goto end;
+
+	/*
+	 * XXX if (flags & SYNC_CLOSE) { pflushinvalvp(vp, 0, ???); }
+	 */
+
+	/*
+	 * Should not need to flush the log cuz flushing the
+	 * buffers should do the trick.
+	 *
+	 * Synchronize inodes
+	 *
+	 * xfs_iflush() only flushes dirty inode so don't need
+	 * to check if the inode is dirty.
+	 */
+	fflag = B_ASYNC;		/* default is don't wait */
+	if (flags & SYNC_BDFLUSH)
+		fflag = B_DELWRI;
+	if (flags & SYNC_WAIT)
+		fflag = 0;		/* synchronous overrides all */
+	for (ip = mp->m_inodes; ip; ip = ip->i_mnext) {
+		xfs_ilock(ip, XFS_ILOCK_EXCL);
+		xfs_iflock(ip);
+		xfs_iflush(ip, B_DELWRI);
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	}
+
+	/*
+	 * Done with inodes and their data.  Push the superblock.
+	 */
+end:
+#ifndef SIM
+	if (flags & SYNC_FSDATA) {
+		/*
+		 * get and lock the buffer for the superblock
+		 */
+		ASSERT(mp->m_sb_bp != NULL);
+		bp = mp->m_sb_bp;
+		psema(&bp->b_lock, PRIBIO);
+		ASSERT(bp->b_flags & B_DONE);
+
+		/*
+		 * write to disk
+		 */
+		bp->b_flags &= ~(B_DONE | B_READ);
+		bp->b_flags |= B_WRITE;
+		bdstrat(bmajor(mp->m_dev), bp);
+		error = iowait(bp);
+		ASSERT(error == 0);
+
+		vsema(&bp->b_lock);
+	}
+#endif
+
+	return error;
 }
 
 
