@@ -1,4 +1,4 @@
-#ident "$Revision: 1.221 $"
+#ident "$Revision: 1.222 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2366,12 +2366,8 @@ xfs_write_file(
 	 * caller has requested to write, goes to 0 or we get an error.
 	 * Each call to xfs_iomap_write() tries to map as much of the
 	 * request as it can in ip->i_writeio_blocks sized chunks.
-	 *
-	 * Cope with NFS out-of-order writes.  If we're
-	 * extending eof to a point within the indicated
-	 * window, fill any holes between old and new eof.
 	 */
-	if (!((ioflag & IO_NFS3) &&
+	if (!((ioflag & (IO_NFS3|IO_NFS)) &&
 	    uiop->uio_offset > ip->i_d.di_size &&
 	    uiop->uio_offset - ip->i_d.di_size <= (xfs_nfs_io_units *
 					 (1 << (int) MAX(ip->i_writeio_log,
@@ -2381,9 +2377,11 @@ xfs_write_file(
 		count = uiop->uio_resid;
 	} else  {
 		/*
-		 * have to zero-fill for NFS3.  Set up offset/count
-		 * so we deal with all the bytes between current eof
-		 * and end of the new write.
+		 * Cope with NFS out-of-order writes.  If we're
+		 * extending eof to a point within the indicated
+		 * window, fill any holes between old and new eof.
+		 * Set up offset/count so we deal with all the bytes
+		 * between current eof and end of the new write.
 		 */
 		fillhole = 1;
 		offset = ip->i_d.di_size;
