@@ -279,6 +279,12 @@ xfs_mountfs_int(vfs_t *vfsp, dev_t dev, int read_rootinos)
 	vfsp->vfs_bsize = XFS_FSB_TO_B(mp, 1);
 	mp->m_ialloc_inos = MAX(XFS_INODES_PER_CHUNK, sbp->sb_inopblock);
 	mp->m_ialloc_blks = mp->m_ialloc_inos >> sbp->sb_inopblog;
+	if (sbp->sb_imax_pct)
+		mp->m_maxicount =
+			((sbp->sb_dblocks * sbp->sb_imax_pct) / 100) <<
+			sbp->sb_inopblog;
+	else
+		mp->m_maxicount = 0;
 
 	/*
 	 * XFS uses the uuid from the superblock as the unique
@@ -738,7 +744,7 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
 		offsetof(xfs_sb_t, sb_agblklog),
 		offsetof(xfs_sb_t, sb_rextslog),
 		offsetof(xfs_sb_t, sb_inprogress),
-		offsetof(xfs_sb_t, sb_pad1),
+		offsetof(xfs_sb_t, sb_imax_pct),
 		offsetof(xfs_sb_t, sb_icount),
 		offsetof(xfs_sb_t, sb_ifree),
 		offsetof(xfs_sb_t, sb_fdblocks),
@@ -828,6 +834,15 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, __int64_t field, int delta)
 			return (XFS_ERROR(EINVAL));
 		}
 		mp->m_sb.sb_agcount = scounter;
+		return (0);
+	case XFS_SB_IMAX_PCT:
+		scounter = mp->m_sb.sb_imax_pct;
+		scounter += delta;
+		if (scounter < 0) {
+			ASSERT(0);
+			return (XFS_ERROR(EINVAL));
+		}
+		mp->m_sb.sb_imax_pct = scounter;
 		return (0);
 	default:
 		ASSERT(0);
