@@ -383,7 +383,6 @@ linvfs_release_buftarg(
 	}
 	if (bdev) {
 		blkdev_put(bdev, BDEV_FS);
-		bdput(bdev);
 	}
 }
 
