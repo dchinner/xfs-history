@@ -59,8 +59,6 @@
 
 pb_hash_t	pbhash[NHASH];
 
-static kmem_cache_t *pagebuf_target_cache;
-
 /*
  *	Initialization and Termination
  */
@@ -324,7 +322,7 @@ pagebuf_lock_disable(			/* disable buffer locking	*/
 		     pb_target_t *target)  /* inode for buffers	        */
 {
 	bdput(target->pbr_bdev);
-	kmem_cache_free(pagebuf_target_cache, target);
+	kfree(target);
 
 	return(0);
 }
@@ -340,7 +338,7 @@ pagebuf_lock_enable(
 {
 	pb_target_t	*target;
 
-	target = kmem_cache_alloc(pagebuf_target_cache, SLAB_KERNEL);
+	target = kmalloc(sizeof(pb_target_t), GFP_KERNEL);
 	if (target) {
 		target->pbr_bdev = bdget(kdev);
 		if (!target->pbr_bdev)
@@ -352,7 +350,7 @@ pagebuf_lock_enable(
 
 	return target;
 fail:
-	kmem_cache_free(pagebuf_target_cache, target);
+	kfree(target);
 	return NULL;
 }
 
@@ -402,11 +400,6 @@ int __init pagebuf_locking_init(void)
 {
 	int i;
 
-	pagebuf_target_cache = kmem_cache_create("pb_target",
-		sizeof(pb_target_t), 0, 0, NULL, NULL);
-	if (!pagebuf_target_cache)
-		return -ENOMEM;
-
 	for (i = 0; i < NHASH; i++) {
 		spin_lock_init(&pbhash[i].pb_hash_lock);
 		INIT_LIST_HEAD(&pbhash[i].pb_hash);
@@ -415,13 +408,3 @@ int __init pagebuf_locking_init(void)
 	return 0;
 }
 
-/*
- *	pagebuf_terminate_locking.  Do not define as __exit, it is called from
- *	pagebuf_terminate.
- */
-
-void pagebuf_locking_terminate(void)
-{
-	if (pagebuf_target_cache)
-		kmem_cache_destroy(pagebuf_target_cache);
-}

@@ -2390,17 +2390,9 @@ void pagebuf_terminate(void)
 
 	kmem_shake_deregister(pagebuf_shaker);
 
-	pagebuf_locking_terminate();
 	unregister_sysctl_table(pagebuf_table_header);
 #ifdef  CONFIG_PROC_FS
 	remove_proc_entry("fs/pagebuf/stat", NULL);
 	remove_proc_entry("fs/pagebuf", NULL);
 #endif
 }
-
-
-/*
- *	Module management
- */
-
-EXPORT_SYMBOL(pagebuf_offset);

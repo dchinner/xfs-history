@@ -189,7 +189,6 @@ extern int _pagebuf_initialize(
 			size_t, page_buf_flags_t);
 
 extern int pagebuf_locking_init(void);
-extern void pagebuf_locking_terminate(void);
 
 extern int pagebuf_init(void);
 extern void pagebuf_terminate(void);
