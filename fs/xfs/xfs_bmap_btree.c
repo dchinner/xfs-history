@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.89 $"
+#ident	"$Revision: 1.90 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1380,42 +1380,6 @@ xfs_bmbt_lshift(
 	cur->bc_ptrs[level]--;
 	XFS_BMBT_TRACE_CURSOR(cur, EXIT);
 	*stat = 1;
-	return 0;
-}
-
-/*
- * Read in the allocation group header (free/alloc section)
- */
-int					/* error */
-xfs_bmbt_read_agf(
-	xfs_mount_t	*mp,
-	xfs_trans_t	*tp,
-	xfs_agnumber_t	agno,
-	buf_t		**bpp)
-{
-	buf_t		*bp;		/* return value */
-	daddr_t		d;		/* disk block address */
-	int		error;		/* error return value */
-	xfs_agf_t	*agf;
-
-	ASSERT(agno != NULLAGNUMBER);
-	d = XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR);
-	if (error = xfs_trans_read_buf(mp, tp, mp->m_dev, d, 1, 0, &bp))
-		return error;
-	ASSERT(bp);
-	ASSERT(!geterror(bp));
-	/*
-	 * Validate the magic number of the agf block.
-	 */
-	agf = XFS_BUF_TO_AGF(bp);
-	if ((agf->agf_magicnum != XFS_AGF_MAGIC) ||
-	    !XFS_AGF_GOOD_VERSION(agf->agf_versionnum)) {
-		bp->b_flags |= B_ERROR;
-		xfs_trans_brelse(tp, bp);
-		return XFS_ERROR(EFSCORRUPTED);
-	}
-	bp->b_ref = XFS_AGF_REF;
-	*bpp = bp;
 	return 0;
 }
 
