@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.31 $"
+#ident	"$Revision: 1.32 $"
 
 #include <xfs_os_defs.h>
 
@@ -735,24 +735,12 @@ vn_rele(struct vnode *vp)
 
 		vn_trace_exit(vp, "vn_rele", (inst_t *)__return_address);
 
-		/*
-		 * Don't reference the vnode after the 'put',
-		 * it'll be gone.
-		 */
-		vn_put(vp);
-
 		return;
 	}
 
 	VN_UNLOCK(vp, s);
 
 	vn_trace_exit(vp, "vn_rele", (inst_t *)__return_address);
-
-	/*
-	 * The vnode will still be around after the 'put',
-	 * but keep the same trace sequence for consistency.
-	 */
-	vn_put(vp);
 }
 
 

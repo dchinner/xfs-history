@@ -342,7 +342,7 @@ linvfs_read_inode(
 #ifdef	CONFIG_XFS_VNODE_TRACING
 
 /*
- * We only 'use' the "put" & "write" methods to
+ * The put method maps onto a real VN_RELE, the write method is only used to
  * trace interesting events in the life of a vnode.
  */
 void
@@ -354,6 +354,7 @@ linvfs_put_inode(
 	if (vp) {
 		vn_trace_entry(vp, "linvfs_put_inode",
 					(inst_t *)__return_address);
+		vn_rele(vp);
 	}
 }
 
