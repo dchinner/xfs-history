@@ -1,7 +1,7 @@
 #ifndef	_XFS_RW_H
 #define	_XFS_RW_H
 
-#ident "$Revision: 1.29 $"
+#ident "$Revision: 1.30 $"
 
 struct bhv_desc;
 struct bdevsw;
@@ -60,6 +60,12 @@ typedef struct xfs_gap {
 #define	XFS_MAX_BMAP_LEN_BB	1024
 #define	XFS_MAX_BMAP_LEN_BYTES	524288
 
+#if 0
+#define xfs_bioerror(bp)	
+#define xfs_bwrite(mp, bp)	bwrite(bp)
+#define xfsbdstrat(mp, bp)	bdstrat(
+#endif
+
 /*
  * Convert the given file system block to a disk block.
  * We have to treat it differently based on whether the
@@ -78,11 +84,11 @@ daddr_t xfs_fsb_to_db(struct xfs_inode *ip, xfs_fsblock_t fsb);
 
 #define	xfs_bdwrite(mp, bp) \
           (!XFS_FORCED_SHUTDOWN(mp) ? \
-	   ((bp)->b_bdstrat = xfs_bdstrat, bdwrite(bp)) : \
+	   ((bp)->b_bdstrat = xfs_bdstrat_cb, bdwrite(bp)) : \
 	   (void)xfs_bioerror(bp))
 #define	xfs_bawrite(mp, bp) \
 	  (!XFS_FORCED_SHUTDOWN(mp) ? \
-	   ((bp)->b_bdstrat = xfs_bdstrat, bawrite(bp)) : \
+	   ((bp)->b_bdstrat = xfs_bdstrat_cb, bawrite(bp)) : \
 	   (void)xfs_bioerror(bp))
 
 /*
@@ -220,7 +226,7 @@ xfs_read_buf(
 	struct buf	 **bpp);
 
 int
-xfs_bdstrat(struct buf *bp);
+xfs_bdstrat_cb(struct buf *bp);
 
 void
 xfs_ioerror_alert(
