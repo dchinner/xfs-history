@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.9 $"
+#ident	"$Revision: 1.10 $"
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
@@ -68,7 +68,6 @@ xfs_trans_dqjoin(
         ASSERT(XFS_DQ_IS_LOCKED(dqp));
         ASSERT(XFS_DQ_IS_LOGITEM_INITD(dqp));
 	lp = &dqp->q_logitem;
-        ASSERT(lp->qli_flags == 0);
 	
         /*
          * Get a log_item_desc to point at the new item.
