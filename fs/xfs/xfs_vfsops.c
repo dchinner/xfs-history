@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.24 $"
+#ident  "$Revision: 1.25 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -80,10 +80,11 @@
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_ialloc.h"
 #include "xfs_bmap_btree.h"
+#include "xfs_ialloc_btree.h"
+#include "xfs_alloc_btree.h"
 #include "xfs_btree.h"
+#include "xfs_ialloc.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
