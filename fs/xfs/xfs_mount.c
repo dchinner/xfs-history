@@ -1,5 +1,4 @@
-
-#ident	"$Revision: 1.162 $"
+#ident	"$Revision: 1.163 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -56,6 +55,9 @@
 #include "xfs_rw.h"
 #include "xfs_quota.h"
 #include "xfs_fsops.h"
+#if CELL || NOTYET
+#include "xfs_cxfs.h"
+#endif
 
 #ifdef SIM
 #include "sim.h"
@@ -193,6 +195,63 @@ xfs_mount_validate_sb(
 	return (0);
 }
 
+/*
+ * xfs_readsb 
+ * 
+ * Does the initial read of the superblock.  This has been split out from
+ * xfs_mountfs_int so that the cxfs v1 array mount code can get at the
+ * unique id for the file system before deciding whether we are going
+ * to mount things as a cxfs client or server.
+ */
+int
+xfs_readsb(xfs_mount_t *mp, dev_t dev)
+{
+	buf_t		*bp;
+	xfs_sb_t	*sbp;
+	int		error = 0;
+
+	ASSERT(mp->m_sb_bp == 0);
+
+	/*
+	 * Allocate a (locked) buffer to hold the superblock.
+	 * This will be kept around at all time to optimize
+	 * access to the superblock.
+	 */
+	bp = ngetrbuf(BBTOB(BTOBB(sizeof(xfs_sb_t))));
+	ASSERT(bp != NULL);
+	ASSERT((bp->b_flags & B_BUSY) && valusema(&bp->b_lock) <= 0);
+
+	/*
+	 * Initialize and read in the superblock buffer.
+	 */
+	bp->b_edev = dev;
+	bp->b_relse = xfs_sb_relse;
+	bp->b_blkno = XFS_SB_DADDR;		
+	bp->b_flags |= B_READ;
+	xfsbdstrat(mp, bp);
+	if (error = iowait(bp)) {
+		goto err;
+	}
+
+	/*
+	 * Initialize the mount structure from the superblock.
+	 * But first do some basic consistency checking.
+	 */
+	sbp = XFS_BUF_TO_SBP(bp);
+	if (error = xfs_mount_validate_sb(mp, sbp)) {
+		goto err;
+	}
+
+	mp->m_sb_bp = bp;
+	mp->m_sb = *sbp;				/* bcopy structure */
+	brelse(bp);
+	ASSERT(valusema(&bp->b_lock) > 0);
+	return 0;
+
+ err:
+	nfreerbuf(bp);
+	return error;
+}
 
 /*
  * xfs_mountfs_int
@@ -218,10 +277,10 @@ xfs_mount_validate_sb(
  *		code for fixing up the filesystem btrees.
  */
 STATIC int
-xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
+xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, int read_rootinos)
 {
-	buf_t		*bp;
-	xfs_sb_t	*sbp;
+	buf_t		*bp = mp->m_sb_bp;
+	xfs_sb_t	*sbp = &(mp->m_sb);
 	int		error = 0;
 	int		i;
 	xfs_inode_t	*rip;
@@ -242,44 +301,6 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	if (vfsp->vfs_flag & VFS_REMOUNT)   /* Can't remount XFS filesystems */
 		return 0;
 
-	ASSERT(mp->m_sb_bp == 0);
-
-	/*
-	 * Allocate a (locked) buffer to hold the superblock.
-	 * This will be kept around at all time to optimize
-	 * access to the superblock.
-	 */
-	bp = ngetrbuf(BBTOB(BTOBB(sizeof(xfs_sb_t))));
-	ASSERT(bp != NULL);
-	ASSERT((bp->b_flags & B_BUSY) && valusema(&bp->b_lock) <= 0);
-
-	/*
-	 * Initialize and read in the superblock buffer.
-	 */
-	bp->b_edev = dev;
-	bp->b_relse = xfs_sb_relse;
-	bp->b_blkno = XFS_SB_DADDR;		
-	bp->b_flags |= B_READ;
-	xfsbdstrat(mp, bp);
-	if (error = iowait(bp)) {
-		goto error0;
-	}
-
-	/*
-	 * Initialize the mount structure from the superblock.
-	 * But first do some basic consistency checking.
-	 */
-	sbp = XFS_BUF_TO_SBP(bp);
-	if (error = xfs_mount_validate_sb(mp, sbp)) {
-		goto error0;
-	}
-
-	mp->m_sb_bp = bp;
-	mp->m_sb = *sbp;				/* bcopy structure */
-	brelse(bp);
-	ASSERT(valusema(&bp->b_lock) > 0);
-
-	sbp = &(mp->m_sb);
 	mp->m_agfrotor = mp->m_agirotor = 0;
 	mp->m_blkbit_log = sbp->sb_blocklog + XFS_NBBYLOG;
 	mp->m_blkbb_log = sbp->sb_blocklog - BBSHIFT;
@@ -751,16 +772,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	mp->m_perag = NULL;
 	/* FALLTHROUGH */
  error1:
-	/*
-	 * Use xfs_getsb() so that the buffer will be locked
-	 * when we call nfreerbuf().
-	 */
-	bp = xfs_getsb(mp, 0);
-	nfreerbuf(bp);
-	mp->m_sb_bp = NULL;
-	return error;
- error0:
-	nfreerbuf(bp);
+	xfs_freesb(mp);
 	return error;
 }	/* xfs_mountfs_int */
 
@@ -768,9 +780,9 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
  * wrapper routine for the kernel
  */
 int
-xfs_mountfs(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev)
+xfs_mountfs(vfs_t *vfsp, xfs_mount_t *mp)
 {
-	return(xfs_mountfs_int(vfsp, mp, dev, 1));
+	return(xfs_mountfs_int(vfsp, mp, 1));
 }
 
 #ifdef SIM
@@ -791,8 +803,9 @@ xfs_mount_int(dev_t dev, dev_t logdev, dev_t rtdev, int read_rootinos)
 	mp->m_logdev = logdev;
 	vfsp->vfs_dev = dev;
 
-
-        error = xfs_mountfs_int(vfsp, mp, dev, read_rootinos);
+	error = xfs_readsb(mp, dev);
+	if (error == 0)
+        	error = xfs_mountfs_int(vfsp, mp, read_rootinos);
 	if (error) {
 		kmem_free(mp, sizeof(*mp));
 		return 0;
@@ -934,6 +947,9 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 
 	xfs_uuid_unmount(mp);
 #endif
+#if CELL || NOTYET
+	cxfs_unmount(mp);
+#endif /* CELL || NOTYET */
 	xfs_mount_free(mp);
 	return 0;
 }	/* xfs_unmountfs */
@@ -1284,6 +1300,23 @@ xfs_getsb(xfs_mount_t	*mp,
 	return (bp);
 }
 
+/*
+ * Used to free the superblock along various error paths.
+ */
+void 
+xfs_freesb(
+        xfs_mount_t	*mp)
+{
+        buf_t	*bp;
+
+	/*
+	 * Use xfs_getsb() so that the buffer will be locked
+	 * when we call nfreerbuf().
+	 */
+	bp = xfs_getsb(mp, 0);
+	nfreerbuf(bp);
+	mp->m_sb_bp = NULL;
+}
 
 /*
  * This is the brelse function for the private superblock buffer.
