@@ -1143,7 +1143,8 @@ xfs_vget(vfs_t		*vfsp,
         xfs_inode_t	*ip;
 
         xfid = (struct xfs_fid *)fidp;
-	ip = xfs_iget(XFS_VFSTOM(vfsp), NULL, xfid->fid_ino, XFS_ILOCK_EXCL);
+	ip = xfs_iget(XFS_VFSTOM(vfsp), NULL, (xfs_ino_t)(xfid->fid_ino),
+		      XFS_ILOCK_EXCL);
         if (NULL == ip) {
                 *vpp = NULL;
                 return XFS_ERROR(EIO);
