@@ -197,12 +197,6 @@ typedef struct xfs_dirent {		/* data from readdir() */
 #define MAXNAMELEN      256
 #define	MAXPATHLEN	1024
 
-#define	PSWP	0
-#define PMEM	0
-#define PINOD   10
-#define PRIBIO  20
-
-#define	PLTWAIT 0x288 /* O'01000' */
 #define	PVFS	27
 
 #define FREAD		0x01
