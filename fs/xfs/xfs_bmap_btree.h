@@ -101,13 +101,8 @@ typedef struct xfs_bmbt_rec_64
 	__uint64_t		l0, l1;
 } xfs_bmbt_rec_64_t;
 
-#if BMBT_USE_64
 typedef __uint64_t	xfs_bmbt_rec_base_t;	/* use this for casts */
 typedef xfs_bmbt_rec_64_t xfs_bmbt_rec_t, xfs_bmdr_rec_t;
-#else	/* !BMBT_USE_64 */
-typedef __uint32_t	xfs_bmbt_rec_base_t;	/* use this for casts */
-typedef xfs_bmbt_rec_32_t xfs_bmbt_rec_t, xfs_bmdr_rec_t;
-#endif	/* BMBT_USE_64 */
 
 /*
  * Values and macros for delayed-allocation startblock fields.

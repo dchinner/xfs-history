@@ -436,19 +436,13 @@ void xfs_ifork_next_set(xfs_inode_t *ip, int w, int n);
 /*
  * if XFS_BIG_FILES, 2^(31+PAGE_SHIFT) - 1 (due to linux page cache),
  * else 2^40 - 1 (40=31+9) (might be an int holding a block #)
- * For the not XFS_BIG_FILES case, the value could be 1 higher but we don't
- * do that, for symmetry.
  *
  * NOTE: XFS itself can handle 2^63 - 1 (largest positive value of xfs_fsize_t)
  * but Linux can't go above 2^(31+PAGE_SHIFT)-1: the Linux VM uses a 32 bit
  * signed variable to index cache data, so 2^31 * PAGE_SIZE is as big as
  * you can go.
  */
-#if XFS_BIG_FILES
 #define XFS_MAX_FILE_OFFSET	((long long)((1ULL<<(31+PAGE_SHIFT))-1ULL))
-#else
-#define XFS_MAX_FILE_OFFSET	((1LL<<40)-1LL)
-#endif
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_ITOV)
 struct vnode *xfs_itov(xfs_inode_t *ip);

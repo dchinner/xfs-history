@@ -89,14 +89,6 @@ xfs_open(
 		(void)xfs_da_reada_buf(NULL, ip, 0, XFS_DATA_FORK);
 		xfs_iunlock(ip, mode);
 	}
-#if !XFS_BIG_FILES
-	else if (vp->v_type == VREG) {
-		xfs_ilock(ip, XFS_ILOCK_SHARED);
-		if (ip->i_d.di_size > XFS_MAX_FILE_OFFSET)
-			rval = XFS_ERROR(EFBIG);
-		xfs_iunlock(ip, XFS_ILOCK_SHARED);
-	}
-#endif
 	return rval;
 }
 

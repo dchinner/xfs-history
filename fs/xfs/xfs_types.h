@@ -34,17 +34,18 @@
 
 /*
  * Some types are conditional based on the selected configuration.
- * Set XFS_BIG_FILES=1 or 0 and XFS_BIG_FILESYSTEMS=1 or 0 depending
- * on the desired configuration.
- * XFS_BIG_FILES needs pgno_t to be 64 bits (64-bit kernels).
- * XFS_BIG_FILESYSTEMS needs daddr_t to be 64 bits (N32 and 64-bit kernels).
+ * Set XFS_BIG_FILESYSTEMS=1 or 0 depending on the desired configuration.
+ * XFS_BIG_FILESYSTEMS needs daddr_t to be 64 bits
  *
- * Expect these to be set from klocaldefs, or from the machine-type
- * defs files for the normal case.
+ * On linux right now we are limited to 2^32 512 byte blocks in a
+ * filesystem, Once this limit is changed, setting this to 1
+ * will allow XFS to go larger. With BIG_FILESYSTEMS set to 0
+ * a 4K block filesystem could still theoretically be 16Gbytes
+ * long, so on an ia32 box the 32 bit page index will then be
+ * the limiting factor.
  */
 
-#define XFS_BIG_FILES		1
-#define XFS_BIG_FILESYSTEMS	1
+#define XFS_BIG_FILESYSTEMS	0
 
 typedef __uint32_t	xfs_agblock_t;	/* blockno in alloc. group */
 typedef __uint32_t	xfs_extlen_t;	/* extent length in blocks */
@@ -89,15 +90,9 @@ typedef __uint32_t	xfs_rfsblock_t; /* blockno in filesystem (raw) */
 typedef __uint32_t	xfs_rtblock_t;	/* extent (block) in realtime area */
 typedef __int32_t	xfs_srtblock_t; /* signed version of xfs_rtblock_t */
 #endif
-#if XFS_BIG_FILES
 typedef __uint64_t	xfs_fileoff_t;	/* block number in a file */
 typedef __int64_t	xfs_sfiloff_t;	/* signed block number in a file */
 typedef __uint64_t	xfs_filblks_t;	/* number of blocks in a file */
-#else
-typedef __uint32_t	xfs_fileoff_t;	/* block number in a file */
-typedef __int32_t	xfs_sfiloff_t;	/* signed block number in a file */
-typedef __uint32_t	xfs_filblks_t;	/* number of blocks in a file */
-#endif
 
 typedef __uint8_t	xfs_arch_t;	/* architecutre of an xfs fs */
 

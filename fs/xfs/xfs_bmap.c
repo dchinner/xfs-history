@@ -3566,7 +3566,6 @@ xfs_bmap_trace_addentry(
 		(void *)(__psint_t)cnt,
 		(void *)(__psunsigned_t)(ip->i_ino >> 32),
 		(void *)(__psunsigned_t)(unsigned)ip->i_ino,
-#if BMBT_USE_64
 		(void *)(__psunsigned_t)(INT_GET(r1->l0, ARCH_CONVERT) >> 32),
 		(void *)(__psunsigned_t)(unsigned)(INT_GET(r1->l0, ARCH_CONVERT)),
 		(void *)(__psunsigned_t)(INT_GET(r1->l1, ARCH_CONVERT) >> 32),
@@ -3575,16 +3574,6 @@ xfs_bmap_trace_addentry(
 		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l0, ARCH_CONVERT)),
 		(void *)(__psunsigned_t)(INT_GET(r2->l1, ARCH_CONVERT) >> 32),
 		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l1, ARCH_CONVERT))
-#else	/* !BMBT_USE_64 */
-		(void *)(__psunsigned_t)(INT_GET(r1->l0, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r1->l1, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r1->l2, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r1->l3, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l0, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l1, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l2, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l3, ARCH_CONVERT))
-#endif	/* BMBT_USE_64 */
 		);
 	ASSERT(ip->i_xtrace);
 	ktrace_enter(ip->i_xtrace,
@@ -3594,7 +3583,6 @@ xfs_bmap_trace_addentry(
 		(void *)(__psint_t)cnt,
 		(void *)(__psunsigned_t)(ip->i_ino >> 32),
 		(void *)(__psunsigned_t)(unsigned)ip->i_ino,
-#if BMBT_USE_64
 		(void *)(__psunsigned_t)(INT_GET(r1->l0, ARCH_CONVERT) >> 32),
 		(void *)(__psunsigned_t)(unsigned)(INT_GET(r1->l0, ARCH_CONVERT)),
 		(void *)(__psunsigned_t)(INT_GET(r1->l1, ARCH_CONVERT) >> 32),
@@ -3603,16 +3591,6 @@ xfs_bmap_trace_addentry(
 		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l0, ARCH_CONVERT)),
 		(void *)(__psunsigned_t)(INT_GET(r2->l1, ARCH_CONVERT) >> 32),
 		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l1, ARCH_CONVERT))
-#else	/* !BMBT_USE_64 */
-		(void *)(__psunsigned_t)(INT_GET(r1->l0, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r1->l1, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r1->l2, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r1->l3, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l0, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l1, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l2, ARCH_CONVERT)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l3, ARCH_CONVERT))
-#endif	/* BMBT_USE_64 */
 		);
 }
 

@@ -1122,7 +1122,7 @@ xfs_dir2_sf_replace(
 		 */
 		if (i == sfp->hdr.count) {
 			ASSERT(args->oknoent);
-#if XFS_BIG_FILESYSTEMS || defined(DEBUG)
+#if XFS_BIG_FILESYSTEMS
 			if (i8elevated)
 				xfs_dir2_sf_toino4(args);
 #endif

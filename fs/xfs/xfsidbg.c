@@ -2506,11 +2506,7 @@ xfs_dastate_path(xfs_da_state_path_t *p)
 
 	kdb_printf("active %d\n", p->active);
 	for (i = 0; i < XFS_DA_NODE_MAXDEPTH; i++) {
-#if XFS_BIG_FILES
 		kdb_printf(" blk %d bp 0x%p blkno 0x%x",
-#else
-		kdb_printf(" blk %d bp 0x%p blkno 0x%Lx",
-#endif
 			i, p->blk[i].bp, p->blk[i].blkno);
 		kdb_printf(" index %d hashval 0x%x ",
 			p->blk[i].index, (uint_t)p->blk[i].hashval);
@@ -3583,11 +3579,7 @@ xfsidbg_xdastate(xfs_da_state_t *s)
 
 	eblk = &s->extrablk;
 	kdb_printf("extra: valid %d, after %d\n", s->extravalid, s->extraafter);
-#if XFS_BIG_FILES
 	kdb_printf(" bp 0x%p blkno 0x%x ", eblk->bp, eblk->blkno);
-#else
-	kdb_printf(" bp 0x%x blkno 0x%x ", eblk->bp, eblk->blkno);
-#endif
 	kdb_printf("index %d hashval 0x%x\n", eblk->index, (uint_t)eblk->hashval);
 }
 

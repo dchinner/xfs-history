@@ -343,6 +343,8 @@ xfs_bmbt_delrec(
 	int			rrecs=0;	/* right record count */
 	xfs_bmbt_rec_t		*rrp;		/* right record pointer */
 	xfs_btree_cur_t		*tcur;		/* temporary btree cursor */
+	int			numrecs;	/* temporary numrec count */
+	int			numlrecs, numrrecs;
 
 	XFS_BMBT_TRACE_CURSOR(cur, ENTRY);
 	XFS_BMBT_TRACE_ARGI(cur, level);
@@ -354,13 +356,14 @@ xfs_bmbt_delrec(
 		return 0;
 	}
 	block = xfs_bmbt_get_block(cur, level, &bp);
+	numrecs = INT_GET(block->bb_numrecs, ARCH_CONVERT);
 #ifdef DEBUG
 	if ((error = xfs_btree_check_lblock(cur, block, level, bp))) {
 		XFS_BMBT_TRACE_CURSOR(cur, ERROR);
 		goto error0;
 	}
 #endif
-	if (ptr > INT_GET(block->bb_numrecs, ARCH_CONVERT)) {
+	if (ptr > numrecs) {
 		XFS_BMBT_TRACE_CURSOR(cur, EXIT);
 		*stat = 0;
 		return 0;
@@ -370,34 +373,35 @@ xfs_bmbt_delrec(
 		kp = XFS_BMAP_KEY_IADDR(block, 1, cur);
 		pp = XFS_BMAP_PTR_IADDR(block, 1, cur);
 #ifdef DEBUG
-		for (i = ptr; i < INT_GET(block->bb_numrecs, ARCH_CONVERT); i++) {
+		for (i = ptr; i < numrecs; i++) {
 			if ((error = xfs_btree_check_lptr(cur, INT_GET(pp[i], ARCH_CONVERT), level))) {
 				XFS_BMBT_TRACE_CURSOR(cur, ERROR);
 				goto error0;
 			}
 		}
 #endif
-		if (ptr < INT_GET(block->bb_numrecs, ARCH_CONVERT)) {
+		if (ptr < numrecs) {
 			ovbcopy(&kp[ptr], &kp[ptr - 1],
-				(INT_GET(block->bb_numrecs, ARCH_CONVERT) - ptr) * sizeof(*kp));
+				(numrecs - ptr) * sizeof(*kp));
 			ovbcopy(&pp[ptr], &pp[ptr - 1], /* INT_: direct copy */
-				(INT_GET(block->bb_numrecs, ARCH_CONVERT) - ptr) * sizeof(*pp));
-			xfs_bmbt_log_ptrs(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_CONVERT) - 1);
-			xfs_bmbt_log_keys(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_CONVERT) - 1);
+				(numrecs - ptr) * sizeof(*pp));
+			xfs_bmbt_log_ptrs(cur, bp, ptr, numrecs - 1);
+			xfs_bmbt_log_keys(cur, bp, ptr, numrecs - 1);
 		}
 	} else {
 		rp = XFS_BMAP_REC_IADDR(block, 1, cur);
-		if (ptr < INT_GET(block->bb_numrecs, ARCH_CONVERT)) {
+		if (ptr < numrecs) {
 			ovbcopy(&rp[ptr], &rp[ptr - 1],
-				(INT_GET(block->bb_numrecs, ARCH_CONVERT) - ptr) * sizeof(*rp));
-			xfs_bmbt_log_recs(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_CONVERT) - 1);
+				(numrecs - ptr) * sizeof(*rp));
+			xfs_bmbt_log_recs(cur, bp, ptr, numrecs - 1);
 		}
 		if (ptr == 1) {
 			INT_SET(key.br_startoff, ARCH_CONVERT, xfs_bmbt_get_startoff(rp));
 			kp = &key;
 		}
 	}
-	INT_MOD(block->bb_numrecs, ARCH_CONVERT, -1);
+	numrecs--;
+	INT_SET(block->bb_numrecs, ARCH_CONVERT, numrecs);
 	xfs_bmbt_log_block(cur, bp, XFS_BB_NUMRECS);
 	/*
 	 * We're at the root level.
@@ -424,7 +428,7 @@ xfs_bmbt_delrec(
 		XFS_BMBT_TRACE_CURSOR(cur, ERROR);
 		goto error0;
 	}
-	if (INT_GET(block->bb_numrecs, ARCH_CONVERT) >= XFS_BMAP_BLOCK_IMINRECS(level, cur)) {
+	if (numrecs >= XFS_BMAP_BLOCK_IMINRECS(level, cur)) {
 		if (level > 0 && (error = xfs_bmbt_decrement(cur, level, &j))) {
 			XFS_BMBT_TRACE_CURSOR(cur, ERROR);
 			goto error0;
@@ -486,7 +490,7 @@ xfs_bmbt_delrec(
 				goto error0;
 			}
 			if (i) {
-				ASSERT(INT_GET(block->bb_numrecs, ARCH_CONVERT) >=
+				ASSERT(numrecs >=
 				       XFS_BMAP_BLOCK_IMINRECS(level, tcur));
 				xfs_btree_del_cursor(tcur, XFS_BTREE_NOERROR);
 				tcur = NULL;
@@ -542,7 +546,7 @@ xfs_bmbt_delrec(
 				goto error0;
 			}
 			if (i) {
-				ASSERT(INT_GET(block->bb_numrecs, ARCH_CONVERT) >=
+				ASSERT(numrecs >=
 				       XFS_BMAP_BLOCK_IMINRECS(level, tcur));
 				xfs_btree_del_cursor(tcur, XFS_BTREE_NOERROR);
 				tcur = NULL;
@@ -560,7 +564,7 @@ xfs_bmbt_delrec(
 	mp = cur->bc_mp;
 	ASSERT(bno != NULLFSBLOCK);
 	if (lbno != NULLFSBLOCK &&
-	    lrecs + INT_GET(block->bb_numrecs, ARCH_CONVERT) <= XFS_BMAP_BLOCK_IMAXRECS(level, cur)) {
+	    lrecs + numrecs <= XFS_BMAP_BLOCK_IMAXRECS(level, cur)) {
 		rbno = bno;
 		right = block;
 		rbp = bp;
@@ -575,8 +579,7 @@ xfs_bmbt_delrec(
 			goto error0;
 		}
 	} else if (rbno != NULLFSBLOCK &&
-		   rrecs + INT_GET(block->bb_numrecs, ARCH_CONVERT) <=
-		   XFS_BMAP_BLOCK_IMAXRECS(level, cur)) {
+		   rrecs + numrecs <= XFS_BMAP_BLOCK_IMAXRECS(level, cur)) {
 		lbno = bno;
 		left = block;
 		lbp = bp;
@@ -600,33 +603,32 @@ xfs_bmbt_delrec(
 		*stat = 1;
 		return 0;
 	}
+	numlrecs = INT_GET(left->bb_numrecs, ARCH_CONVERT);
+	numrrecs = INT_GET(right->bb_numrecs, ARCH_CONVERT);
 	if (level > 0) {
-		lkp = XFS_BMAP_KEY_IADDR(left, INT_GET(left->bb_numrecs, ARCH_CONVERT) + 1, cur);
-		lpp = XFS_BMAP_PTR_IADDR(left, INT_GET(left->bb_numrecs, ARCH_CONVERT) + 1, cur);
+		lkp = XFS_BMAP_KEY_IADDR(left, numlrecs + 1, cur);
+		lpp = XFS_BMAP_PTR_IADDR(left, numlrecs + 1, cur);
 		rkp = XFS_BMAP_KEY_IADDR(right, 1, cur);
 		rpp = XFS_BMAP_PTR_IADDR(right, 1, cur);
 #ifdef DEBUG
-		for (i = 0; i < INT_GET(right->bb_numrecs, ARCH_CONVERT); i++) {
+		for (i = 0; i < numrrecs; i++) {
 			if ((error = xfs_btree_check_lptr(cur, INT_GET(rpp[i], ARCH_CONVERT), level))) {
 				XFS_BMBT_TRACE_CURSOR(cur, ERROR);
 				goto error0;
 			}
 		}
 #endif
-		bcopy(rkp, lkp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*lkp));
-		bcopy(rpp, lpp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*lpp));
-		xfs_bmbt_log_keys(cur, lbp, INT_GET(left->bb_numrecs, ARCH_CONVERT) + 1,
-			INT_GET(left->bb_numrecs, ARCH_CONVERT) + INT_GET(right->bb_numrecs, ARCH_CONVERT));
-		xfs_bmbt_log_ptrs(cur, lbp, INT_GET(left->bb_numrecs, ARCH_CONVERT) + 1,
-			INT_GET(left->bb_numrecs, ARCH_CONVERT) + INT_GET(right->bb_numrecs, ARCH_CONVERT));
+		bcopy(rkp, lkp, numrrecs * sizeof(*lkp));
+		bcopy(rpp, lpp, numrrecs * sizeof(*lpp));
+		xfs_bmbt_log_keys(cur, lbp, numlrecs + 1, numlrecs + numrrecs);
+		xfs_bmbt_log_ptrs(cur, lbp, numlrecs + 1, numlrecs + numrrecs);
 	} else {
-		lrp = XFS_BMAP_REC_IADDR(left, INT_GET(left->bb_numrecs, ARCH_CONVERT) + 1, cur);
+		lrp = XFS_BMAP_REC_IADDR(left, numlrecs + 1, cur);
 		rrp = XFS_BMAP_REC_IADDR(right, 1, cur);
-		bcopy(rrp, lrp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*lrp));
-		xfs_bmbt_log_recs(cur, lbp, INT_GET(left->bb_numrecs, ARCH_CONVERT) + 1,
-			INT_GET(left->bb_numrecs, ARCH_CONVERT) + INT_GET(right->bb_numrecs, ARCH_CONVERT));
+		bcopy(rrp, lrp, numrrecs * sizeof(*lrp));
+		xfs_bmbt_log_recs(cur, lbp, numlrecs + 1, numlrecs + numrrecs);
 	}
-	INT_MOD(left->bb_numrecs, ARCH_CONVERT, INT_GET(right->bb_numrecs, ARCH_CONVERT));
+	INT_MOD(left->bb_numrecs, ARCH_CONVERT, numrrecs);
 	left->bb_rightsib = right->bb_rightsib; /* INT_: direct copy */
 	xfs_bmbt_log_block(cur, lbp, XFS_BB_RIGHTSIB | XFS_BB_NUMRECS);
 	if (INT_GET(left->bb_rightsib, ARCH_CONVERT) != NULLDFSBNO) {
@@ -748,6 +750,7 @@ xfs_bmbt_insrec(
 	xfs_bmbt_ptr_t		*pp;		/* pointer to bmap block addr */
 	int			ptr;		/* key/record index */
 	xfs_bmbt_rec_t		*rp=NULL;	/* pointer to bmap btree rec */
+	int			numrecs;
 
 	ASSERT(level < cur->bc_nlevels);
 	XFS_BMBT_TRACE_CURSOR(cur, ENTRY);
@@ -762,12 +765,13 @@ xfs_bmbt_insrec(
 	}
 	XFS_STATS_INC(xfsstats.xs_bmbt_insrec);
 	block = xfs_bmbt_get_block(cur, level, &bp);
+	numrecs = INT_GET(block->bb_numrecs, ARCH_CONVERT);
 #ifdef DEBUG
 	if ((error = xfs_btree_check_lblock(cur, block, level, bp))) {
 		XFS_BMBT_TRACE_CURSOR(cur, ERROR);
 		return error;
 	}
-	if (ptr <= INT_GET(block->bb_numrecs, ARCH_CONVERT)) {
+	if (ptr <= numrecs) {
 		if (level == 0) {
 			rp = XFS_BMAP_REC_IADDR(block, ptr, cur);
 			xfs_btree_check_rec(XFS_BTNUM_BMAP, recp, rp);
@@ -778,8 +782,8 @@ xfs_bmbt_insrec(
 	}
 #endif
 	nbno = NULLFSBLOCK;
-	if (INT_GET(block->bb_numrecs, ARCH_CONVERT) == XFS_BMAP_BLOCK_IMAXRECS(level, cur)) {
-		if (INT_GET(block->bb_numrecs, ARCH_CONVERT) < XFS_BMAP_BLOCK_DMAXRECS(level, cur)) {
+	if (numrecs == XFS_BMAP_BLOCK_IMAXRECS(level, cur)) {
+		if (numrecs < XFS_BMAP_BLOCK_DMAXRECS(level, cur)) {
 			/*
 			 * A root block, that can be made bigger.
 			 */
@@ -843,11 +847,12 @@ xfs_bmbt_insrec(
 			}
 		}
 	}
+	numrecs = INT_GET(block->bb_numrecs, ARCH_CONVERT);
 	if (level > 0) {
 		kp = XFS_BMAP_KEY_IADDR(block, 1, cur);
 		pp = XFS_BMAP_PTR_IADDR(block, 1, cur);
 #ifdef DEBUG
-		for (i = INT_GET(block->bb_numrecs, ARCH_CONVERT); i >= ptr; i--) {
+		for (i = numrecs; i >= ptr; i--) {
 			if ((error = xfs_btree_check_lptr(cur, INT_GET(pp[i - 1], ARCH_CONVERT),
 					level))) {
 				XFS_BMBT_TRACE_CURSOR(cur, ERROR);
@@ -856,9 +861,9 @@ xfs_bmbt_insrec(
 		}
 #endif
 		ovbcopy(&kp[ptr - 1], &kp[ptr],
-			(INT_GET(block->bb_numrecs, ARCH_CONVERT) - ptr + 1) * sizeof(*kp));
+			(numrecs - ptr + 1) * sizeof(*kp));
 		ovbcopy(&pp[ptr - 1], &pp[ptr], /* INT_: direct copy */
-			(INT_GET(block->bb_numrecs, ARCH_CONVERT) - ptr + 1) * sizeof(*pp));
+			(numrecs - ptr + 1) * sizeof(*pp));
 #ifdef DEBUG
 		if ((error = xfs_btree_check_lptr(cur, (xfs_bmbt_ptr_t)*bnop,
 				level))) {
@@ -868,20 +873,22 @@ xfs_bmbt_insrec(
 #endif
 		kp[ptr - 1] = key;
 		INT_SET(pp[ptr - 1], ARCH_CONVERT, *bnop);
-		INT_MOD(block->bb_numrecs, ARCH_CONVERT, +1);
-		xfs_bmbt_log_keys(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_CONVERT));
-		xfs_bmbt_log_ptrs(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_CONVERT));
+		numrecs++;
+		INT_SET(block->bb_numrecs, ARCH_CONVERT, numrecs);
+		xfs_bmbt_log_keys(cur, bp, ptr, numrecs);
+		xfs_bmbt_log_ptrs(cur, bp, ptr, numrecs);
 	} else {
 		rp = XFS_BMAP_REC_IADDR(block, 1, cur);
 		ovbcopy(&rp[ptr - 1], &rp[ptr],
-			(INT_GET(block->bb_numrecs, ARCH_CONVERT) - ptr + 1) * sizeof(*rp));
+			(numrecs - ptr + 1) * sizeof(*rp));
 		rp[ptr - 1] = *recp;
-		INT_MOD(block->bb_numrecs, ARCH_CONVERT, +1);
-		xfs_bmbt_log_recs(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_CONVERT));
+		numrecs++;
+		INT_SET(block->bb_numrecs, ARCH_CONVERT, numrecs);
+		xfs_bmbt_log_recs(cur, bp, ptr, numrecs);
 	}
 	xfs_bmbt_log_block(cur, bp, XFS_BB_NUMRECS);
 #ifdef DEBUG
-	if (ptr < INT_GET(block->bb_numrecs, ARCH_CONVERT)) {
+	if (ptr < numrecs) {
 		if (level == 0)
 			xfs_btree_check_rec(XFS_BTNUM_BMAP, rp + ptr - 1,
 				rp + ptr);
@@ -1255,6 +1262,7 @@ xfs_bmbt_lshift(
 	xfs_bmbt_key_t		*rkp=NULL;	/* right btree key */
 	xfs_bmbt_ptr_t		*rpp=NULL;	/* right address pointer */
 	xfs_bmbt_rec_t		*rrp=NULL;	/* right record pointer */
+	int			rrecs;		/* right record count */
 
 	XFS_BMBT_TRACE_CURSOR(cur, ENTRY);
 	XFS_BMBT_TRACE_ARGI(cur, level);
@@ -1299,11 +1307,11 @@ xfs_bmbt_lshift(
 	}
 	lrecs = INT_GET(left->bb_numrecs, ARCH_CONVERT) + 1;
 	if (level > 0) {
-		lkp = XFS_BMAP_KEY_IADDR(left, INT_GET(left->bb_numrecs, ARCH_CONVERT) + 1, cur);
+		lkp = XFS_BMAP_KEY_IADDR(left, lrecs, cur);
 		rkp = XFS_BMAP_KEY_IADDR(right, 1, cur);
 		*lkp = *rkp;
 		xfs_bmbt_log_keys(cur, lbp, lrecs, lrecs);
-		lpp = XFS_BMAP_PTR_IADDR(left, INT_GET(left->bb_numrecs, ARCH_CONVERT) + 1, cur);
+		lpp = XFS_BMAP_PTR_IADDR(left, lrecs, cur);
 		rpp = XFS_BMAP_PTR_IADDR(right, 1, cur);
 #ifdef DEBUG
 		if ((error = xfs_btree_check_lptr(cur, INT_GET(*rpp, ARCH_CONVERT), level))) {
@@ -1314,12 +1322,12 @@ xfs_bmbt_lshift(
 		*lpp = *rpp; /* INT_: direct copy */
 		xfs_bmbt_log_ptrs(cur, lbp, lrecs, lrecs);
 	} else {
-		lrp = XFS_BMAP_REC_IADDR(left, INT_GET(left->bb_numrecs, ARCH_CONVERT) + 1, cur);
+		lrp = XFS_BMAP_REC_IADDR(left, lrecs, cur);
 		rrp = XFS_BMAP_REC_IADDR(right, 1, cur);
 		*lrp = *rrp;
 		xfs_bmbt_log_recs(cur, lbp, lrecs, lrecs);
 	}
-	INT_MOD(left->bb_numrecs, ARCH_CONVERT, +1);
+	INT_SET(left->bb_numrecs, ARCH_CONVERT, lrecs);
 	xfs_bmbt_log_block(cur, lbp, XFS_BB_NUMRECS);
 #ifdef DEBUG
 	if (level > 0)
@@ -1327,11 +1335,12 @@ xfs_bmbt_lshift(
 	else
 		xfs_btree_check_rec(XFS_BTNUM_BMAP, lrp - 1, lrp);
 #endif
-	INT_MOD(right->bb_numrecs, ARCH_CONVERT, -1);
+	rrecs = INT_GET(right->bb_numrecs, ARCH_CONVERT) - 1;
+	INT_SET(right->bb_numrecs, ARCH_CONVERT, rrecs);
 	xfs_bmbt_log_block(cur, rbp, XFS_BB_NUMRECS);
 	if (level > 0) {
 #ifdef DEBUG
-		for (i = 0; i < INT_GET(right->bb_numrecs, ARCH_CONVERT); i++) {
+		for (i = 0; i < rrecs; i++) {
 			if ((error = xfs_btree_check_lptr(cur, INT_GET(rpp[i + 1], ARCH_CONVERT),
 					level))) {
 				XFS_BMBT_TRACE_CURSOR(cur, ERROR);
@@ -1339,13 +1348,13 @@ xfs_bmbt_lshift(
 			}
 		}
 #endif
-		ovbcopy(rkp + 1, rkp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rkp));
-		ovbcopy(rpp + 1, rpp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rpp));
-		xfs_bmbt_log_keys(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_CONVERT));
-		xfs_bmbt_log_ptrs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_CONVERT));
+		ovbcopy(rkp + 1, rkp, rrecs * sizeof(*rkp));
+		ovbcopy(rpp + 1, rpp, rrecs * sizeof(*rpp));
+		xfs_bmbt_log_keys(cur, rbp, 1, rrecs);
+		xfs_bmbt_log_ptrs(cur, rbp, 1, rrecs);
 	} else {
-		ovbcopy(rrp + 1, rrp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rrp));
-		xfs_bmbt_log_recs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_CONVERT));
+		ovbcopy(rrp + 1, rrp, rrecs * sizeof(*rrp));
+		xfs_bmbt_log_recs(cur, rbp, 1, rrecs);
 		INT_SET(key.br_startoff, ARCH_CONVERT, xfs_bmbt_get_startoff(rrp));
 		rkp = &key;
 	}
@@ -1871,86 +1880,31 @@ xfs_bmbt_get_all(
 {
 	int	ext_flag;
 	xfs_exntst_t st;
+	__uint64_t	l0, l1;
 
-#if BMBT_USE_64
-	ext_flag = (int)((INT_GET(r->l0, ARCH_CONVERT)) >> (64 - BMBT_EXNTFLAG_BITLEN));
-#if XFS_BIG_FILES
-	s->br_startoff = ((xfs_fileoff_t)INT_GET(r->l0, ARCH_CONVERT) &
+	l0 = INT_GET(r->l0, ARCH_CONVERT);
+	l1 = INT_GET(r->l1, ARCH_CONVERT);
+	ext_flag = (int)(l0 >> (64 - BMBT_EXNTFLAG_BITLEN));
+	s->br_startoff = ((xfs_fileoff_t)l0 &
 			   XFS_MASK64LO(64 - BMBT_EXNTFLAG_BITLEN)) >> 9;
-#else	/* !XFS_BIG_FILES */
-	{
-		xfs_dfiloff_t	o;
-
-		o = ((xfs_dfiloff_t)INT_GET(r->l0, ARCH_CONVERT) &
-		      XFS_MASK64LO(64 - BMBT_EXNTFLAG_BITLEN)) >> 9;
-		ASSERT((o >> 32) == 0);
-		s->br_startoff = (xfs_fileoff_t)o;
-	}
-#endif	/* XFS_BIG_FILES */
 #if XFS_BIG_FILESYSTEMS
-	s->br_startblock = (((xfs_fsblock_t)INT_GET(r->l0, ARCH_CONVERT) & XFS_MASK64LO(9)) << 43) |
-			   (((xfs_fsblock_t)INT_GET(r->l1, ARCH_CONVERT)) >> 21);
+	s->br_startblock = (((xfs_fsblock_t)l0 & XFS_MASK64LO(9)) << 43) |
+			   (((xfs_fsblock_t)l1) >> 21);
 #else
 #ifdef DEBUG
 	{
 		xfs_dfsbno_t	b;
 
-		b = (((xfs_dfsbno_t)INT_GET(r->l0, ARCH_CONVERT) & XFS_MASK64LO(9)) << 43) |
-		    (((xfs_dfsbno_t)INT_GET(r->l1, ARCH_CONVERT)) >> 21);
+		b = (((xfs_dfsbno_t)l0 & XFS_MASK64LO(9)) << 43) |
+		    (((xfs_dfsbno_t)l1) >> 21);
 		ASSERT((b >> 32) == 0 || ISNULLDSTARTBLOCK(b));
 		s->br_startblock = (xfs_fsblock_t)b;
 	}
 #else	/* !DEBUG */
-	s->br_startblock = (xfs_fsblock_t)(((xfs_dfsbno_t)INT_GET(r->l1, ARCH_CONVERT)) >> 21);
+	s->br_startblock = (xfs_fsblock_t)(((xfs_dfsbno_t)l1) >> 21);
 #endif	/* DEBUG */
 #endif	/* XFS_BIG_FILESYSTEMS */
-	s->br_blockcount = (xfs_filblks_t)(INT_GET(r->l1, ARCH_CONVERT) & XFS_MASK64LO(21));
-#else	/* !BMBT_USE_64 */
-	ext_flag = (INT_GET(r->l0, ARCH_CONVERT) >> (32 - BMBT_EXNTFLAG_BITLEN));
-#if XFS_BIG_FILES
-	s->br_startoff = (((xfs_fileoff_t)INT_GET(r->l0, ARCH_CONVERT) &
-			    XFS_MASK32LO(32 - BMBT_EXNTFLAG_BITLEN)) << 23) |
-			 (((xfs_fileoff_t)INT_GET(r->l1, ARCH_CONVERT)) >> 9);
-#else	/* !XFS_BIG_FILES */
-#ifdef DEBUG
-	{
-		xfs_dfiloff_t	o;
-
-		o = (((xfs_dfiloff_t)INT_GET(r->l0, ARCH_CONVERT) &
-		       XFS_MASK32LO(32 - BMBT_EXNTFLAG_BITLEN)) << 23) |
-		    (((xfs_dfiloff_t)INT_GET(r->l1, ARCH_CONVERT)) >> 9);
-		ASSERT((o >> 32) == 0);
-		s->br_startoff = (xfs_fileoff_t)o;
-	}
-#else	/* !DEBUG */
-	s->br_startoff = (((xfs_fileoff_t)INT_GET(r->l0, ARCH_CONVERT) &
-			    XFS_MASK32LO(32 - BMBT_EXNTFLAG_BITLEN)) << 23) |
-			 (((xfs_fileoff_t)INT_GET(r->l1, ARCH_CONVERT)) >> 9);
-#endif	/* DEBUG */
-#endif	/* XFS_BIG_FILES */
-#if XFS_BIG_FILESYSTEMS
-	s->br_startblock =
-		(((xfs_fsblock_t)(INT_GET(r->l1, ARCH_CONVERT) & XFS_MASK32LO(9))) << 43) |
-		(((xfs_fsblock_t)INT_GET(r->l2, ARCH_CONVERT)) << 11) |
-		(((xfs_fsblock_t)INT_GET(r->l3, ARCH_CONVERT)) >> 21);
-#else
-#ifdef DEBUG
-	{
-		xfs_dfsbno_t	b;
-
-		b = (((xfs_dfsbno_t)(INT_GET(r->l1, ARCH_CONVERT) & XFS_MASK32LO(9))) << 43) |
-		    (((xfs_dfsbno_t)INT_GET(r->l2, ARCH_CONVERT)) << 11) |
-		    (((xfs_dfsbno_t)INT_GET(r->l3, ARCH_CONVERT)) >> 21);
-		ASSERT((b >> 32) == 0 || ISNULLDSTARTBLOCK(b));
-		s->br_startblock = (xfs_fsblock_t)b;
-	}
-#else	/* !DEBUG */
-	s->br_startblock = (((xfs_fsblock_t)INT_GET(r->l2, ARCH_CONVERT)) << 11) |
-			   (((xfs_fsblock_t)INT_GET(r->l3, ARCH_CONVERT)) >> 21);
-#endif	/* DEBUG */
-#endif	/* XFS_BIG_FILESYSTEMS */
-	s->br_blockcount = (xfs_filblks_t)(INT_GET(r->l3, ARCH_CONVERT) & XFS_MASK32LO(21));
-#endif	/* BMBT_USE_64 */
+	s->br_blockcount = (xfs_filblks_t)(l1 & XFS_MASK64LO(21));
 	/* This is xfs_extent_state() in-line */
 	if (ext_flag) {
 		ASSERT(s->br_blockcount != 0);	/* saved for DMIG */
@@ -1992,11 +1946,7 @@ xfs_filblks_t
 xfs_bmbt_get_blockcount(
 	xfs_bmbt_rec_t	*r)
 {
-#if BMBT_USE_64
 	return (xfs_filblks_t)(INT_GET(r->l1, ARCH_CONVERT) & XFS_MASK64LO(21));
-#else	/* !BMBT_USE_64 */
-	return (xfs_filblks_t)(INT_GET(r->l3, ARCH_CONVERT) & XFS_MASK32LO(21));
-#endif	/* BMBT_USE_64 */
 }
 
 /*
@@ -2006,7 +1956,6 @@ xfs_fsblock_t
 xfs_bmbt_get_startblock(
 	xfs_bmbt_rec_t	*r)
 {
-#if BMBT_USE_64
 #if XFS_BIG_FILESYSTEMS
 	return (((xfs_fsblock_t)INT_GET(r->l0, ARCH_CONVERT) & XFS_MASK64LO(9)) << 43) |
 	       (((xfs_fsblock_t)INT_GET(r->l1, ARCH_CONVERT)) >> 21);
@@ -2022,26 +1971,6 @@ xfs_bmbt_get_startblock(
 	return (xfs_fsblock_t)(((xfs_dfsbno_t)INT_GET(r->l1, ARCH_CONVERT)) >> 21);
 #endif	/* DEBUG */
 #endif	/* XFS_BIG_FILESYSTEMS */
-#else	/* !BMBT_USE_64 */
-#if XFS_BIG_FILESYSTEMS
-	return (((xfs_fsblock_t)(INT_GET(r->l1, ARCH_CONVERT) & XFS_MASK32LO(9))) << 43) |
-	       (((xfs_fsblock_t)INT_GET(r->l2, ARCH_CONVERT)) << 11) |
-	       (((xfs_fsblock_t)INT_GET(r->l3, ARCH_CONVERT)) >> 21);
-#else
-#ifdef DEBUG
-	xfs_dfsbno_t	b;
-
-	b = (((xfs_dfsbno_t)(INT_GET(r->l1, ARCH_CONVERT) & XFS_MASK32LO(9))) << 43) |
-	    (((xfs_dfsbno_t)INT_GET(r->l2, ARCH_CONVERT)) << 11) |
-	    (((xfs_dfsbno_t)INT_GET(r->l3, ARCH_CONVERT)) >> 21);
-	ASSERT((b >> 32) == 0 || ISNULLDSTARTBLOCK(b));
-	return (xfs_fsblock_t)b;
-#else	/* !DEBUG */
-	return (((xfs_fsblock_t)INT_GET(r->l2, ARCH_CONVERT)) << 11) |
-	       (((xfs_fsblock_t)INT_GET(r->l3, ARCH_CONVERT)) >> 21);
-#endif	/* DEBUG */
-#endif	/* XFS_BIG_FILESYSTEMS */
-#endif	/* BMBT_USE_64 */
 }
 
 /*
@@ -2051,39 +1980,8 @@ xfs_fileoff_t
 xfs_bmbt_get_startoff(
 	xfs_bmbt_rec_t	*r)
 {
-#if BMBT_USE_64
-#if XFS_BIG_FILES
 	return ((xfs_fileoff_t)INT_GET(r->l0, ARCH_CONVERT) &
 		 XFS_MASK64LO(64 - BMBT_EXNTFLAG_BITLEN)) >> 9;
-#else	/* !XFS_BIG_FILES */
-	xfs_dfiloff_t	o;
-
-	o = ((xfs_dfiloff_t)INT_GET(r->l0, ARCH_CONVERT) &
-	      XFS_MASK64LO(64 - BMBT_EXNTFLAG_BITLEN)) >> 9;
-	ASSERT((o >> 32) == 0);
-	return (xfs_fileoff_t)o;
-#endif	/* XFS_BIG_FILES */
-#else	/* !BMBT_USE_64 */
-#if XFS_BIG_FILES
-	return (((xfs_fileoff_t)INT_GET(r->l0, ARCH_CONVERT) &
-		  XFS_MASK32LO(32 - BMBT_EXNTFLAG_BITLEN)) << 23) |
-	       (((xfs_fileoff_t)INT_GET(r->l1, ARCH_CONVERT)) >> 9);
-#else	/* !XFS_BIG_FILES */
-#ifdef DEBUG
-	xfs_dfiloff_t	o;
-
-	o = (((xfs_dfiloff_t)INT_GET(r->l0, ARCH_CONVERT) &
-	       XFS_MASK32LO(32 - BMBT_EXNTFLAG_BITLEN)) << 23) |
-	    (((xfs_dfiloff_t)INT_GET(r->l1, ARCH_CONVERT)) >> 9);
-	ASSERT((o >> 32) == 0);
-	return (xfs_fileoff_t)o;
-#else	/* !DEBUG */
-	return (((xfs_fileoff_t)INT_GET(r->l0, ARCH_CONVERT) &
-		  XFS_MASK32LO(32 - BMBT_EXNTFLAG_BITLEN)) << 23) |
-	       (((xfs_fileoff_t)INT_GET(r->l1, ARCH_CONVERT)) >> 9);
-#endif	/* DEBUG */
-#endif	/* XFS_BIG_FILES */
-#endif	/* BMBT_USE_64 */
 }
 
 xfs_exntst_t
@@ -2092,11 +1990,7 @@ xfs_bmbt_get_state(
 {
 	int	ext_flag;
 
-#if BMBT_USE_64
 	ext_flag = (int)((INT_GET(r->l0, ARCH_CONVERT)) >> (64 - BMBT_EXNTFLAG_BITLEN));
-#else	/* !BMBT_USE_64 */
-	ext_flag = (INT_GET(r->l0, ARCH_CONVERT) >> (32 - BMBT_EXNTFLAG_BITLEN));
-#endif	/* BMBT_USE_64 */
 	return xfs_extent_state(xfs_bmbt_get_blockcount(r),
 				ext_flag);
 }
@@ -2487,16 +2381,11 @@ xfs_bmbt_set_all(
 	ASSERT((s->br_state == XFS_EXT_NORM) ||
 		(s->br_state == XFS_EXT_UNWRITTEN));
 	extent_flag = (s->br_state == XFS_EXT_NORM) ? 0 : 1;
-#if XFS_BIG_FILES
 	ASSERT((s->br_startoff & XFS_MASK64HI(9)) == 0);
 	ASSERT((s->br_blockcount & XFS_MASK64HI(43)) == 0);
-#else	/* !XFS_BIG_FILES */
-	ASSERT((s->br_blockcount & XFS_MASK32HI(11)) == 0);
-#endif	/* XFS_BIG_FILES */
 #if XFS_BIG_FILESYSTEMS
 	ASSERT((s->br_startblock & XFS_MASK64HI(12)) == 0);
 #endif	/* XFS_BIG_FILESYSTEMS */
-#if BMBT_USE_64
 #if XFS_BIG_FILESYSTEMS
 	INT_SET(r->l0, ARCH_CONVERT, ((xfs_bmbt_rec_base_t)extent_flag << 63) |
 		  ((xfs_bmbt_rec_base_t)s->br_startoff << 9) |
@@ -2521,27 +2410,6 @@ xfs_bmbt_set_all(
 			   (xfs_bmbt_rec_base_t)XFS_MASK64LO(21)));
 	}
 #endif	/* XFS_BIG_FILESYSTEMS */
-#else	/* !BMBT_USE_64 */
-	INT_SET(r->l0, ARCH_CONVERT, ((xfs_bmbt_rec_base_t)extent_flag << 31) |
-		((xfs_bmbt_rec_base_t)(s->br_startoff >> 23)));
-	INT_SET(r->l3, ARCH_CONVERT, (((xfs_bmbt_rec_base_t)s->br_startblock) << 21) |
-		  ((xfs_bmbt_rec_base_t)(s->br_blockcount & XFS_MASK32LO(21))));
-#if XFS_BIG_FILESYSTEMS
-	INT_SET(r->l1, ARCH_CONVERT, (((xfs_bmbt_rec_base_t)s->br_startoff) << 9) |
-		  ((xfs_bmbt_rec_base_t)(s->br_startblock >> 43)));
-	INT_SET(r->l2, ARCH_CONVERT, (xfs_bmbt_rec_base_t)(s->br_startblock >> 11));
-#else	/* !XFS_BIG_FILESYSTEMS */
-	if (ISNULLSTARTBLOCK(s->br_startblock)) {
-		INT_SET(r->l1, ARCH_CONVERT, (xfs_bmbt_rec_base_t)(s->br_startoff << 9) |
-			  (xfs_bmbt_rec_base_t)XFS_MASK32LO(9));
-		INT_SET(r->l2, ARCH_CONVERT, (xfs_bmbt_rec_base_t)XFS_MASK32HI(11) |
-			  (xfs_bmbt_rec_base_t)(s->br_startblock >> 11));
-	} else {
-		INT_SET(r->l1, ARCH_CONVERT, (xfs_bmbt_rec_base_t)(s->br_startoff << 9));
-		INT_SET(r->l2, ARCH_CONVERT, (xfs_bmbt_rec_base_t)(s->br_startblock >> 11));
-	}
-#endif	/* XFS_BIG_FILESYSTEMS */
-#endif	/* BMBT_USE_64 */
 }
 
 /*
@@ -2559,16 +2427,11 @@ xfs_bmbt_set_allf(
 
 	ASSERT((v == XFS_EXT_NORM) || (v == XFS_EXT_UNWRITTEN));
 	extent_flag = (v == XFS_EXT_NORM) ? 0 : 1;
-#if XFS_BIG_FILES
 	ASSERT((o & XFS_MASK64HI(64-BMBT_STARTOFF_BITLEN)) == 0);
 	ASSERT((c & XFS_MASK64HI(64-BMBT_BLOCKCOUNT_BITLEN)) == 0);
-#else	/* !XFS_BIG_FILES */
-	ASSERT((c & XFS_MASK32HI(11)) == 0);
-#endif	/* XFS_BIG_FILES */
 #if XFS_BIG_FILESYSTEMS
 	ASSERT((b & XFS_MASK64HI(64-BMBT_STARTBLOCK_BITLEN)) == 0);
 #endif	/* XFS_BIG_FILESYSTEMS */
-#if BMBT_USE_64
 #if XFS_BIG_FILESYSTEMS
 	INT_SET(r->l0, ARCH_CONVERT, ((xfs_bmbt_rec_base_t)extent_flag << 63) |
 		((xfs_bmbt_rec_base_t)o << 9) |
@@ -2593,27 +2456,6 @@ xfs_bmbt_set_allf(
 			   (xfs_bmbt_rec_base_t)XFS_MASK64LO(21)));
 	}
 #endif	/* XFS_BIG_FILESYSTEMS */
-#else	/* !BMBT_USE_64 */
-	INT_SET(r->l0, ARCH_CONVERT, ((xfs_bmbt_rec_base_t)extent_flag << 31) |
-		((xfs_bmbt_rec_base_t)(o >> 23)));
-	INT_SET(r->l3, ARCH_CONVERT, (((xfs_bmbt_rec_base_t)b) << 21) |
-		  ((xfs_bmbt_rec_base_t)(c & XFS_MASK32LO(21))));
-#if XFS_BIG_FILESYSTEMS
-	INT_SET(r->l1, ARCH_CONVERT, (((xfs_bmbt_rec_base_t)o) << 9) |
-		  ((xfs_bmbt_rec_base_t)(b >> 43)));
-	INT_SET(r->l2, ARCH_CONVERT, (xfs_bmbt_rec_base_t)(b >> 11));
-#else	/* !XFS_BIG_FILESYSTEMS */
-	if (ISNULLSTARTBLOCK(b)) {
-		INT_SET(r->l1, ARCH_CONVERT, (xfs_bmbt_rec_base_t)(o << 9) |
-			  (xfs_bmbt_rec_base_t)XFS_MASK32LO(9));
-		INT_SET(r->l2, ARCH_CONVERT, (xfs_bmbt_rec_base_t)XFS_MASK32HI(11) |
-			  (xfs_bmbt_rec_base_t)(b >> 11));
-	} else {
-		INT_SET(r->l1, ARCH_CONVERT, (xfs_bmbt_rec_base_t)(o << 9));
-		INT_SET(r->l2, ARCH_CONVERT, (xfs_bmbt_rec_base_t)(b >> 11));
-	}
-#endif	/* XFS_BIG_FILESYSTEMS */
-#endif	/* BMBT_USE_64 */
 }
 
 /*
@@ -2624,18 +2466,9 @@ xfs_bmbt_set_blockcount(
 	xfs_bmbt_rec_t	*r,
 	xfs_filblks_t	v)
 {
-#if XFS_BIG_FILES
 	ASSERT((v & XFS_MASK64HI(43)) == 0);
-#else	/* !XFS_BIG_FILES */
-	ASSERT((v & XFS_MASK32HI(11)) == 0);
-#endif
-#if BMBT_USE_64
 	INT_SET(r->l1, ARCH_CONVERT, (INT_GET(r->l1, ARCH_CONVERT) & (xfs_bmbt_rec_base_t)XFS_MASK64HI(43)) |
 		  (xfs_bmbt_rec_base_t)(v & XFS_MASK64LO(21)));
-#else	/* !BMBT_USE_64 */
-	INT_SET(r->l3, ARCH_CONVERT, (INT_GET(r->l3, ARCH_CONVERT) & (xfs_bmbt_rec_base_t)XFS_MASK32HI(11)) |
-		  ((xfs_bmbt_rec_base_t)v & XFS_MASK32LO(21)));
-#endif	/* BMBT_USE_64 */
 }
 
 /*
@@ -2649,7 +2482,6 @@ xfs_bmbt_set_startblock(
 #if XFS_BIG_FILESYSTEMS
 	ASSERT((v & XFS_MASK64HI(12)) == 0);
 #endif	/* XFS_BIG_FILESYSTEMS */
-#if BMBT_USE_64
 #if XFS_BIG_FILESYSTEMS
 	INT_SET(r->l0, ARCH_CONVERT, (INT_GET(r->l0, ARCH_CONVERT) & (xfs_bmbt_rec_base_t)XFS_MASK64HI(55)) |
 		  (xfs_bmbt_rec_base_t)(v >> 43));
@@ -2667,22 +2499,6 @@ xfs_bmbt_set_startblock(
 			  (INT_GET(r->l1, ARCH_CONVERT) & (xfs_bmbt_rec_base_t)XFS_MASK64LO(21)));
 	}
 #endif	/* XFS_BIG_FILESYSTEMS */
-#else	/* !BMBT_USE_64 */
-#if XFS_BIG_FILESYSTEMS
-	INT_SET(r->l1, ARCH_CONVERT, (INT_GET(r->l1, ARCH_CONVERT) & XFS_MASK32HI(23)) | (xfs_bmbt_rec_base_t)(v >> 43));
-	INT_SET(r->l2, ARCH_CONVERT, (xfs_bmbt_rec_base_t)(v >> 11));
-#else	/* !XFS_BIG_FILESYSTEMS */
-	if (ISNULLSTARTBLOCK(v)) {
-		INT_SET(r->l1, ARCH_CONVERT, (INT_GET(r->l1, ARCH_CONVERT) | XFS_MASK32LO(9)));
-		INT_SET(r->l2, ARCH_CONVERT, XFS_MASK32HI(11) | (xfs_bmbt_rec_base_t)(v >> 11));
-	} else {
-		INT_SET(r->l1, ARCH_CONVERT, (INT_GET(r->l1, ARCH_CONVERT) & ~XFS_MASK32LO(9)));
-		INT_SET(r->l2, ARCH_CONVERT, (xfs_bmbt_rec_base_t)(v >> 11));
-	}
-#endif	/* XFS_BIG_FILESYSTEMS */
-	INT_SET(r->l3, ARCH_CONVERT, (INT_GET(r->l3, ARCH_CONVERT) & XFS_MASK32LO(21)) |
-		  (((xfs_bmbt_rec_base_t)v) << 21));
-#endif	/* BMBT_USE_64 */
 }
 
 /*
@@ -2693,19 +2509,10 @@ xfs_bmbt_set_startoff(
 	xfs_bmbt_rec_t	*r,
 	xfs_fileoff_t	v)
 {
-#if XFS_BIG_FILES
 	ASSERT((v & XFS_MASK64HI(9)) == 0);
-#endif	/* XFS_BIG_FILES */
-#if BMBT_USE_64
 	INT_SET(r->l0, ARCH_CONVERT, (INT_GET(r->l0, ARCH_CONVERT) & (xfs_bmbt_rec_base_t) XFS_MASK64HI(1)) |
 		((xfs_bmbt_rec_base_t)v << 9) |
 		  (INT_GET(r->l0, ARCH_CONVERT) & (xfs_bmbt_rec_base_t)XFS_MASK64LO(9)));
-#else	/* !BMBT_USE_64 */
-	INT_SET(r->l0, ARCH_CONVERT, (INT_GET(r->l0, ARCH_CONVERT) & (xfs_bmbt_rec_base_t) XFS_MASK32HI(1)) |
-		(xfs_bmbt_rec_base_t)(v >> 23));
-	INT_SET(r->l1, ARCH_CONVERT, ((xfs_bmbt_rec_base_t)v << 9) |
-		  (INT_GET(r->l1, ARCH_CONVERT) & (xfs_bmbt_rec_base_t)XFS_MASK32LO(9)));
-#endif	/* BMBT_USE_64 */
 }
 
 /*
@@ -2718,17 +2525,9 @@ xfs_bmbt_set_state(
 {
 	ASSERT(v == XFS_EXT_NORM || v == XFS_EXT_UNWRITTEN);
 	if (v == XFS_EXT_NORM)
-#if BMBT_USE_64
 		INT_SET(r->l0, ARCH_CONVERT, INT_GET(r->l0, ARCH_CONVERT) & XFS_MASK64LO(64 - BMBT_EXNTFLAG_BITLEN));
-#else	/* !BMBT_USE_64 */
-		INT_SET(r->l0, ARCH_CONVERT, INT_GET(r->l0, ARCH_CONVERT) & XFS_MASK32LO(32 - BMBT_EXNTFLAG_BITLEN));
-#endif	/* BMBT_USE_64 */
 	else
-#if BMBT_USE_64
 		INT_SET(r->l0, ARCH_CONVERT, INT_GET(r->l0, ARCH_CONVERT) | XFS_MASK64HI(BMBT_EXNTFLAG_BITLEN));
-#else	/* !BMBT_USE_64 */
-		INT_SET(r->l0, ARCH_CONVERT, INT_GET(r->l0, ARCH_CONVERT) | XFS_MASK32HI(BMBT_EXNTFLAG_BITLEN));
-#endif	/* BMBT_USE_64 */
 }
 
 /*
@@ -2824,13 +2623,8 @@ xfs_check_nostate_extents(
 	xfs_extnum_t		num)
 {
 	for (; num > 0; num--, ep++) {
-		if (
-#if BMBT_USE_64
-			((INT_GET(ep->l0, ARCH_CONVERT)) >> (64 - BMBT_EXNTFLAG_BITLEN)) != 0
-#else	/* !BMBT_USE_64 */
-			((INT_GET(ep->l0, ARCH_CONVERT)) >> (32 - BMBT_EXNTFLAG_BITLEN)) != 0
-#endif	/* BMBT_USE_64 */
-		) {
+		if (((INT_GET(ep->l0, ARCH_CONVERT)) >>
+		     (64 - BMBT_EXNTFLAG_BITLEN)) != 0) {
 			ASSERT(0);
 			return 1;
 		}
