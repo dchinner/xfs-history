@@ -44,14 +44,12 @@ typedef struct cred {
 	ushort	cr_ngroups;		/* number of groups in cr_groups */
 	uid_t	cr_uid;			/* effective user id */
 	gid_t	cr_gid;		 	/* effective group id */
-#if 0
 	uid_t	cr_ruid;		/* real user id */
 	gid_t	cr_rgid;		/* real group id */
 	uid_t	cr_suid;		/* "saved" user id (from exec) */
 	gid_t	cr_sgid;		/* "saved" group id (from exec) */
-	mac_label_t	*cr_mac;	/* MAC label for B1 and beyond */
-	cap_set_t	cr_cap;		/* capability (privilege) sets */
-#endif
+	xfs_mac_label_t	*cr_mac;	/* MAC label for B1 and beyond */
+	xfs_cap_set_t	cr_cap;		/* capability (privilege) sets */
 	gid_t	cr_groups[NGROUPS];	/* supplementary group list */
 } cred_t;
 
