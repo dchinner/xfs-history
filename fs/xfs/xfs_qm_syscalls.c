@@ -1035,25 +1035,25 @@ again:
 		return;
 	}
         do {		
-		/*
-		 * skip markers from xfs_sync
-		 */
-
+		/* Skip markers inserted by xfs_sync */
 		if (ip->i_mount == NULL) {
 			ip = ip->i_mnext;
 			continue;
 		}
-
-		/*
-		 * Rootinode, rbmip and rsumip have blocks associated with it.
-		 */
+		/* Root inode, rbmip and rsumip have associated blocks */
 		if (ip == XFS_QI_UQIP(mp) || ip == XFS_QI_GQIP(mp)) {
 			ASSERT(ip->i_udquot == NULL);
 			ASSERT(ip->i_gdquot == NULL);
 			ip = ip->i_mnext;
 			continue;
 		}
-		vp = XFS_ITOV(ip);
+		vp = XFS_ITOV_NULL(ip);
+		if (!vp) {
+			ASSERT(ip->i_udquot == NULL);
+			ASSERT(ip->i_gdquot == NULL);
+			ip = ip->i_mnext;
+			continue;
+		}
 		vnode_refd = B_FALSE;
 		if (xfs_ilock_nowait(ip, XFS_ILOCK_EXCL) == 0) {
 			/*
