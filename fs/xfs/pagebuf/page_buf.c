@@ -925,9 +925,6 @@ pagebuf_readahead(
 	size_t			isize,
 	page_buf_flags_t	flags)
 {
-	if (!start_aggressive_readahead(GFP_KERNEL))
-		return;
-
 	flags |= (PBF_TRYLOCK|PBF_READ|PBF_ASYNC|PBF_MAPPABLE|PBF_READ_AHEAD);
 	pagebuf_get(target, ioff, isize, flags);
 }
