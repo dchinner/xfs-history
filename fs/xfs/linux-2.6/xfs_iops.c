@@ -98,7 +98,6 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 	vnode_t		*dvp, *vp;
 	struct inode	*ip;
 	vattr_t		va;
-	cred_t		cred;		/* Temporary cred workaround */
 
 	dvp = LINVFS_GET_VP(dir);
 	ASSERT(dvp);
@@ -115,7 +114,7 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 
 	if (tp == VREG) {
 		VOP_CREATE(dvp, (char *)dentry->d_name.name, &va, 0, 0, &vp,
-							&cred, error);
+							NULL, error);
 	} else if (ISVDEV(tp)) {
 		/*
 		 * Get the real type from the mode
@@ -128,10 +127,10 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 			return -EINVAL;
 		}
 		VOP_CREATE(dvp, (char *)dentry->d_name.name, &va, 0, 0, &vp,
-			&cred, error);
+			NULL, error);
 	} else if (tp == VDIR) {
 		VOP_MKDIR(dvp, (char *)dentry->d_name.name, &va, &vp,
-			&cred, error);
+			NULL, error);
 	} else {
 		error = EINVAL;
 	}
@@ -168,7 +167,6 @@ struct dentry * linvfs_lookup(struct inode *dir, struct dentry *dentry)
 	struct inode	*ip = NULL;
 	/* should this be linux_ino_t ??? */
 	xfs_ino_t		ino;
-	cred_t		cred;		/* Temporary cred workaround */
 
 	vp = LINVFS_GET_VP(dir);
 	ASSERT(vp);
@@ -184,7 +182,7 @@ struct dentry * linvfs_lookup(struct inode *dir, struct dentry *dentry)
 	cvp = NULL;
 
 	VOP_LOOKUP(vp, (char *)dentry->d_name.name, &cvp, pnp, 0, NULL,
-						&cred, error);
+						NULL, error);
 	if (!error) {
 		ASSERT(cvp);
 		ip = LINVFS_GET_IP(cvp);
@@ -203,10 +201,13 @@ struct dentry * linvfs_lookup(struct inode *dir, struct dentry *dentry)
 int linvfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *dentry)
 {
 	int		error;
+	struct inode	*inode = old_dentry->d_inode;
 	vnode_t		*tdvp;	/* Target directory for new name/link */
 	vnode_t		*vp;	/* vp of name being linked */
 	struct inode	*ip;	/* inode of guy being linked to */
-	cred_t		cred;	/* Temporary cred workaround */
+
+	if (S_ISDIR(inode->i_mode))
+		return -EPERM;
 
 	tdvp = LINVFS_GET_VP(dir);
 	ASSERT(tdvp);
@@ -216,11 +217,12 @@ int linvfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *den
 	ASSERT(vp);
 
 	error = 0;
-	VOP_LINK(tdvp, vp, (char *)dentry->d_name.name, &cred, error);
+	VOP_LINK(tdvp, vp, (char *)dentry->d_name.name, NULL, error);
 	if (!error) {
 		ip->i_nlink++;
 		ip->i_ctime = CURRENT_TIME;
 		VN_HOLD(vp);
+		inode->i_count++;
 		d_instantiate(dentry, ip);
 	}
 	return -error;
@@ -233,7 +235,6 @@ int linvfs_unlink(struct inode *dir, struct dentry *dentry)
 	struct inode	*inode;
 	vnode_t		*dvp;	/* directory containing name to remove */
 	vnode_t		*vp;
-	cred_t		cred;	/* Temporary cred workaround */
 
 
 	inode = dentry->d_inode;
@@ -244,7 +245,7 @@ int linvfs_unlink(struct inode *dir, struct dentry *dentry)
 
 	error = 0;
 
-	VOP_REMOVE(dvp, vp, (char *)dentry->d_name.name, &cred, error);
+	VOP_REMOVE(dvp, vp, (char *)dentry->d_name.name, NULL, error);
 
 	if (!error) {
 		dir->i_ctime = dir->i_mtime = CURRENT_TIME;
@@ -271,7 +272,6 @@ int linvfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname
 	struct inode	*ip = NULL;
 	/* should be linux_ino_t ??? */
 	xfs_ino_t		ino;
-	cred_t		cred;		/* Temporary cred workaround */
 
 	dvp = LINVFS_GET_VP(dir);
 	ASSERT(dvp);
@@ -283,7 +283,7 @@ int linvfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname
 
 	error = 0;
 	VOP_SYMLINK(dvp, (char *)dentry->d_name.name, &va, (char *)symname,
-							&cvp, &cred, error);
+							&cvp, NULL, error);
 	if (!error) {
 		ASSERT(cvp);
 		ASSERT(ino && (cvp->v_type == VLNK));
@@ -312,7 +312,6 @@ int linvfs_rmdir(struct inode *dir, struct dentry *dentry)
 	int		error;
 	vnode_t		*dvp,		/* directory with name to remove */
 			*pwd_vp;	/* current working directory, vnode */
-	cred_t		cred;		/* Temporary cred workaround */
 	vnode_t		*vp;
 	struct inode *inode = dentry->d_inode;
 
@@ -328,7 +327,7 @@ int linvfs_rmdir(struct inode *dir, struct dentry *dentry)
 	 */
 
 	error = 0;
-	VOP_RMDIR(dvp, vp, (char *)dentry->d_name.name, pwd_vp, &cred, error);
+	VOP_RMDIR(dvp, vp, (char *)dentry->d_name.name, pwd_vp, NULL, error);
 	if (!error) {
 		inode->i_nlink = 0;
 		inode->i_size = 0;
@@ -375,7 +374,6 @@ int linvfs_rename(struct inode *odir, struct dentry *odentry,
 	pathname_t	pn;
 	pathname_t      *pnp = &pn;
 	struct inode	*new_inode = NULL;
-	cred_t		cred;		/* Temporary cred workaround */
 
 	bzero(pnp, sizeof(pathname_t));
 	pnp->pn_complen = ndentry->d_name.len;
@@ -391,7 +389,7 @@ int linvfs_rename(struct inode *odir, struct dentry *odentry,
 	new_inode = ndentry->d_inode;
 
 	VOP_RENAME(fvp, (char *)odentry->d_name.name, tvp,
-			   (char *)ndentry->d_name.name, pnp, &cred, error);
+			   (char *)ndentry->d_name.name, pnp, NULL, error);
 	if (error)
 		return -error;
 
@@ -413,7 +411,6 @@ int linvfs_readlink(struct dentry *dentry, char *buf, int size)
 	uio_t	uio;
 	iovec_t	iov;
 	int	error = 0;
-	cred_t	cred;		/* Temporary cred workaround */
 
 	vp = LINVFS_GET_VP(dentry->d_inode);
 	ASSERT(vp);
@@ -426,8 +423,7 @@ int linvfs_readlink(struct dentry *dentry, char *buf, int size)
 	uio.uio_segflg = UIO_USERSPACE;
 	uio.uio_resid = size;
 
-	UPDATE_ATIME(dentry->d_inode);
-	VOP_READLINK(vp, &uio, &cred, error);
+	VOP_READLINK(vp, &uio, NULL, error);
 	if (error)
 		return -error;
 
@@ -435,16 +431,14 @@ int linvfs_readlink(struct dentry *dentry, char *buf, int size)
 }
 
 
-struct dentry * linvfs_follow_link(struct dentry *dentry,
-				   struct dentry *base,
-				   unsigned int follow)
+int linvfs_follow_link(struct dentry *dentry,
+				   struct nameidata *nd)
 {
 	vnode_t	*vp;
 	uio_t	uio;
 	iovec_t	iov;
 	int	error = 0;
 	char	*link = kmalloc(MAXNAMELEN+1, GFP_KERNEL); 
-	cred_t	cred;		/* Temporary cred workaround */
 
 	vp = LINVFS_GET_VP(dentry->d_inode);
 	ASSERT(vp);
@@ -457,24 +451,21 @@ struct dentry * linvfs_follow_link(struct dentry *dentry,
 	uio.uio_segflg = UIO_SYSSPACE;
 	uio.uio_resid = MAXNAMELEN;
 
-	VOP_READLINK(vp, &uio, &cred, error);
+	VOP_READLINK(vp, &uio, NULL, error);
 	if (error) {
 		kfree_s(link, MAXNAMELEN);
-		dput(base);
-		return NULL;
+		return error;
 	}
 
 	link[MAXNAMELEN - uio.uio_resid] = '\0';
 
-	UPDATE_ATIME(dentry->d_inode);
-	base = lookup_dentry(link, base, follow);
+        error = vfs_follow_link(nd, link);
 	kfree_s(link, MAXNAMELEN);
-	return base;
+	return error;
 }
 
 int linvfs_permission(struct inode *ip, int mode)
 {
-	cred_t	cred;		/* Temporary cred workaround */
         vnode_t *vp;
 	int	error;
 
@@ -483,7 +474,7 @@ int linvfs_permission(struct inode *ip, int mode)
         vp = LINVFS_GET_VP(ip);
 	ASSERT(vp);
 
-	VOP_ACCESS(vp, mode, &cred, error);
+	VOP_ACCESS(vp, mode, NULL, error);
 
 	return -error;
 }
@@ -497,13 +488,12 @@ int linvfs_revalidate_core(struct inode *inode)
         vnode_t *vp;
         vattr_t va;
         int     error;
-	cred_t	cred;		/* Temporary cred workaround */
 
         vp = LINVFS_GET_VP(inode);
 	ASSERT(vp);
 
         va.va_mask = AT_STAT;
-        VOP_GETATTR(vp, &va, 0, &cred, error);
+        VOP_GETATTR(vp, &va, 0, NULL, error);
 
 	if (!error) {
 		inode->i_mode = VTTOIF(va.va_type) | va.va_mode;
@@ -617,7 +607,6 @@ linvfs_pb_bmap(struct inode *inode,
 
 	*retpbbm = maxpbbm;
 
-#ifdef XFS_DELALLOC
 	if (flags & PBF_BMAP_TRY_ILOCK) {
 		bhv_desc_t	*bdp;
 
@@ -630,16 +619,12 @@ linvfs_pb_bmap(struct inode *inode,
 		if (!xfs_ilock_nowait(ip, XFS_IOLOCK_EXCL))
 			return EAGAIN;
 	}
-#endif
 
 	VOP_BMAP(vp, offset, count, flags,
 			(struct page_buf_bmap_s *) pbmapp, retpbbm, error);
 
-#ifdef XFS_DELALLOC
 	if (flags & PBF_BMAP_TRY_ILOCK)
 		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
-#endif
-
 
 	return error;
 }
@@ -650,11 +635,11 @@ int xfs_hit_full_page, xfs_hit_nowait, xfs_hit_nowait_done;
 
 int
 linvfs_read_full_page(
-	struct dentry *dentry,
+	struct file *filp,
 	mem_map_t *page)
 {
 	vnode_t		*vp;
-	struct inode	*inode = dentry->d_inode;
+	struct inode	*inode = (struct inode*)page->mapping->host;
 	int		error;
 	bhv_desc_t	*bdp;
 	xfs_inode_t	*ip;
@@ -683,18 +668,18 @@ linvfs_read_full_page(
 			return 0;
 		}
 	}
-	error = pagebuf_read_full_page(dentry, page);
+	error = pagebuf_read_full_page(filp, page);
 	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 	return error;
 }
 
 int
 linvfs_write_full_page(
-	struct dentry *dentry,
+	struct file *filp,
 	struct page *page)
 {
 	vnode_t		*vp;
-	struct inode	*inode = dentry->d_inode;
+	struct inode	*inode = (struct inode*)page->mapping->host;
 	int		error;
 	bhv_desc_t	*bdp;
 	xfs_inode_t	*ip;
@@ -719,7 +704,7 @@ linvfs_write_full_page(
 			return 0;
 		}
 	}
-	error = pagebuf_write_full_page(dentry, page);
+	error = pagebuf_write_full_page(filp, page);
 	xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 	return error;
 }
@@ -800,6 +785,7 @@ int linvfs_bmap(struct address_space *mapping, long block)
 struct address_space_operations linvfs_aops = {
   readpage:		linvfs_read_full_page,
   writepage:		linvfs_write_full_page,
+  sync_page:		block_sync_page,
   bmap:			linvfs_bmap,
 	/* prepare_write: ext2_prepare_write,   */
 	/* commit_write: generic_commit_write,  */

@@ -16,8 +16,7 @@ HPATH   	= $(TOPDIR)/include
 FINDHPATH	= $(HPATH)/asm $(HPATH)/linux $(HPATH)/scsi $(HPATH)/net
 
 HOSTCC  	= gcc
-HOSTCFLAGS	= -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer \
-			-DPAGEBUF_TRACE -DPAGEBUF_DEBUG
+HOSTCFLAGS	= -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer
 
 CROSS_COMPILE 	=
 
@@ -34,7 +33,6 @@ NM		= $(CROSS_COMPILE)nm
 STRIP		= $(CROSS_COMPILE)strip
 OBJCOPY		= $(CROSS_COMPILE)objcopy
 OBJDUMP		= $(CROSS_COMPILE)objdump
-AWK		= awk
 MAKEFILES	= $(TOPDIR)/.config
 GENKSYMS	= /sbin/genksyms
 KALLSYMS	= /sbin/kallsyms
@@ -43,8 +41,7 @@ PERL		= perl
 
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
 	CONFIG_SHELL TOPDIR HPATH HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
-	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE MAKEFILES GENKSYMS MODFLAGS PERL 
-AWK	=awk
+	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE MAKEFILES GENKSYMS MODFLAGS PERL
 
 all:	do-it-all
 
@@ -87,21 +84,13 @@ endif
 CPPFLAGS := -D__KERNEL__ -I$(HPATH)
 
 CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes -O2
+ifndef CONFIG_FRAME_POINTER
+CFLAGS += -fomit-frame-pointer
+endif
 AFLAGS := -D__ASSEMBLY__ $(CPPFLAGS)
 
 # use '-fno-strict-aliasing', but only if the compiler can take it
 CFLAGS += $(shell if $(CC) -fno-strict-aliasing -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-fno-strict-aliasing"; fi)
-
-# Turn on -pg to instrument the kernel with calls to mcount().
-# Unfortunately, gcc won't allow -pg without frame pointers.
-ifdef CONFIG_MCOUNT
-  PROF_FLAGS = -pg
-endif
-
-CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes -O2
-ifndef CONFIG_FRAME_POINTER
-CFLAGS += -fomit-frame-pointer
-endif
 
 export	CPPFLAGS CFLAGS AFLAGS
 
@@ -245,7 +234,7 @@ symlinks:
 	@if [ ! -d include/linux/modules ]; then \
 		mkdir include/linux/modules; \
 	fi
-	
+
 oldconfig: symlinks
 	$(CONFIG_SHELL) scripts/Configure -d arch/$(ARCH)/config.in
 

@@ -154,9 +154,6 @@ linvfs_read_super(
 	void		*data,
 	int		silent)
 {
-	extern	int	page_cleaner_daemon_started; 
-	extern  void	page_cleaner_daemon_start(void);
-
 	vfsops_t	*vfsops;
 	extern vfsops_t xfs_vfsops;
 	vfs_t		*vfsp;
@@ -178,11 +175,6 @@ linvfs_read_super(
 	if (pagebuf_daemon_start() < 0) {
 		goto fail_vnrele;
 	}
-
-#ifdef XFS_DELALLOC
-	if (!page_cleaner_daemon_started)
-		page_cleaner_daemon_start();
-#endif
 
 	/*  Setup the uap structure  */
 
