@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.81 $"
+#ident	"$Revision: 1.82 $"
 
 /*
  * High level interface routines for log manager
@@ -142,7 +142,7 @@ int xlog_debug = 1;
 
 #if defined(DEBUG) && !defined(SIM)
 void
-xlog_trace_loggrant(xlog_t *log, xlog_ticket_t *tic)
+xlog_trace_loggrant(xlog_t *log, xlog_ticket_t *tic, caddr_t string)
 {
 	if (! log->l_grant_trace)
 		log->l_grant_trace = ktrace_alloc(100);
@@ -151,11 +151,11 @@ xlog_trace_loggrant(xlog_t *log, xlog_ticket_t *tic)
 		     (void *)tic,
 		     (void *)log->l_reserve_headq,
 		     (void *)log->l_write_headq,
-		     (void *)log->l_grant_reserve_cycle,		     
+		     (void *)log->l_grant_reserve_cycle,     
 		     (void *)log->l_grant_reserve_bytes,
 		     (void *)log->l_grant_write_cycle,
 		     (void *)log->l_grant_write_bytes,
-		     (void *)8,
+		     (void *)string,
 		     (void *)9,
 		     (void *)10,
 		     (void *)11,
@@ -1466,7 +1466,7 @@ xlog_grant_log_space(xlog_t	   *log,
 
 	/* Is there space or do we need to sleep? */
 	spl = GRANT_LOCK(log);
-	xlog_trace_loggrant(log, tic);
+	xlog_trace_loggrant(log, tic, "xlog_grant_log_space: enter");
 
 	/* something is already sleeping; insert new transaction at end */
 	if (head = log->l_reserve_headq) {
@@ -1476,20 +1476,14 @@ xlog_grant_log_space(xlog_t	   *log,
 		head->t_prev  = tic;
 		tic->t_flags |= XLOG_TIC_IN_Q;
 		spunlockspl_psema(log->l_grant_lock, spl, &tic->t_sema, PINOD);
-		xlog_trace_loggrant(log, tic);
+		xlog_trace_loggrant(log, tic,
+				    "xlog_grant_log_space: wake 1");
 		spl = GRANT_LOCK(log);
-#if 0
-cmn_err(CE_NOTE, "waking up (0x%x) from initial sleep", tic);
-#endif
 	}
 	if (tic->t_flags & XFS_LOG_PERM_RESERV)
 		need_bytes = tic->t_unit_res*tic->t_ocnt;
 	else
 		need_bytes = tic->t_unit_res;
-
-#if 0
-cmn_err(CE_NOTE, "(0x%x) asking for %d", tic, need_bytes);
-#endif
 
 redo:
 	/* figure out if there is enough room */
@@ -1509,11 +1503,9 @@ redo:
 			tic->t_flags |= XLOG_TIC_IN_Q;
 		}
 		spunlockspl_psema(log->l_grant_lock, spl, &tic->t_sema, PINOD);
-		xlog_trace_loggrant(log, tic);
+		xlog_trace_loggrant(log, tic,
+				    "xlog_grant_log_space: wake 2");
 		xlog_grant_push_ail(log->l_mp);
-#if 0
-cmn_err(CE_NOTE, "waking up 0x%x", tic);
-#endif
 		spl = GRANT_LOCK(log);
 		goto redo;
 	} else if (tic->t_flags & XLOG_TIC_IN_Q) {
@@ -1526,9 +1518,6 @@ cmn_err(CE_NOTE, "waking up 0x%x", tic);
 		}
 		tic->t_next = tic->t_prev = NULL;
 	}
-#if 0
-cmn_err(CE_NOTE, "Grabbing %d bytes for (0x%x)", need_bytes, tic);
-#endif
 
 	/* we've got enough space; use it. */
 	log->l_grant_write_bytes += need_bytes;
@@ -1541,8 +1530,8 @@ cmn_err(CE_NOTE, "Grabbing %d bytes for (0x%x)", need_bytes, tic);
 		log->l_grant_reserve_bytes -= log->l_logsize;
 		log->l_grant_reserve_cycle++;
 	}
+	xlog_trace_loggrant(log, tic, "xlog_grant_log_space: exit");
 	xlog_verify_grant_head(log, 1);
-	xlog_trace_loggrant(log, tic);
 	GRANT_UNLOCK(log, spl);
 	return;
 }	/* xlog_grant_log_space */
@@ -1567,7 +1556,7 @@ xlog_regrant_write_log_space(xlog_t	   *log,
 		return;
 
 	spl = GRANT_LOCK(log);
-	xlog_trace_loggrant(log, tic);
+	xlog_trace_loggrant(log, tic, "xlog_regrant_write_log_space: enter");
 
 	need_bytes = tic->t_unit_res;
 redo:
@@ -1587,7 +1576,8 @@ redo:
 			tic->t_flags |= XLOG_TIC_IN_Q;
 		}
 		spunlockspl_psema(log->l_grant_lock, spl, &tic->t_sema, PINOD);
-		xlog_trace_loggrant(log, tic);
+		xlog_trace_loggrant(log, tic,
+				    "xlog_regrant_write_log_space: wake 1");
 		xlog_grant_push_ail(log->l_mp);
 		spl = GRANT_LOCK(log);
 		goto redo;
@@ -1601,9 +1591,7 @@ redo:
 		}
 		tic->t_next = tic->t_prev = NULL;
 	}
-#if 0
-cmn_err(CE_NOTE, "regranting %d write bytes for (0x%x)", need_bytes, tic);
-#endif
+
 	/* we've got enough space */
 	log->l_grant_write_bytes += need_bytes;
 	if (log->l_grant_write_bytes > log->l_logsize) {
@@ -1611,8 +1599,8 @@ cmn_err(CE_NOTE, "regranting %d write bytes for (0x%x)", need_bytes, tic);
 		log->l_grant_write_cycle++;
 	}
 
+	xlog_trace_loggrant(log, tic, "xlog_regrant_write_log_space: exit");
 	xlog_verify_grant_head(log, 1);
-	xlog_trace_loggrant(log, tic);
 	GRANT_UNLOCK(log, spl);
 }	/* xlog_regrant_write_log_space */
 
@@ -1630,12 +1618,12 @@ xlog_regrant_reserve_log_space(xlog_t	     *log,
 {
 	int spl;
 
+	xlog_trace_loggrant(log, ticket,
+			    "xlog_regrant_reserve_log_space: enter");
 	if (ticket->t_cnt > 0)
 		ticket->t_cnt--;
 
-#if 0
-cmn_err(CE_NOTE, "(0x%x) free %d bytes", ticket, ticket->t_curr_res);
-#endif
+	spl = GRANT_LOCK(log);
 	log->l_grant_write_bytes -= ticket->t_curr_res;
 	if (log->l_grant_write_bytes < 0) {
 		log->l_grant_write_bytes += log->l_logsize;
@@ -1647,24 +1635,24 @@ cmn_err(CE_NOTE, "(0x%x) free %d bytes", ticket, ticket->t_curr_res);
 		log->l_grant_reserve_cycle--;
 	}
 	ticket->t_curr_res = ticket->t_unit_res;
+	xlog_trace_loggrant(log, ticket,
+			    "xlog_regrant_reserve_log_space: sub current res");
+	xlog_verify_grant_head(log, 1);
 
 	/* just return if we still have some of the pre-reserved space */
-	if (ticket->t_cnt > 0)
+	if (ticket->t_cnt > 0) {
+		GRANT_UNLOCK(log, spl);
 		return;
+	}
 
-	spl = GRANT_LOCK(log);
-	xlog_trace_loggrant(log, ticket);
-#if 0
-cmn_err(CE_NOTE,
-	"regranting %d reserve bytes for (0x%x)", ticket->t_unit_res, ticket);
-#endif
 	log->l_grant_reserve_bytes += ticket->t_unit_res;
 	if (log->l_grant_reserve_bytes > log->l_logsize) {
 		log->l_grant_reserve_bytes -= log->l_logsize;
 		log->l_grant_reserve_cycle++;
 	}
+	xlog_trace_loggrant(log, ticket,
+			    "xlog_regrant_reserve_log_space: exit");
 	xlog_verify_grant_head(log, 0);
-	xlog_trace_loggrant(log, ticket);
 	GRANT_UNLOCK(log, spl);
 	ticket->t_curr_res = ticket->t_unit_res;
 }	/* xlog_regrant_reserve_log_space */
@@ -1683,11 +1671,7 @@ xlog_ungrant_log_space(xlog_t	     *log,
 		ticket->t_cnt--;
 
 	spl = GRANT_LOCK(log);
-	xlog_trace_loggrant(log, ticket);
-
-#if 0
-cmn_err(CE_NOTE, "(0x%x) freeing %d", ticket, ticket->t_curr_res);	
-#endif
+	xlog_trace_loggrant(log, ticket, "xlog_ungrant_log_space: enter");
 
 	log->l_grant_write_bytes -= ticket->t_curr_res;
 	if (log->l_grant_write_bytes < 0) {
@@ -1700,13 +1684,12 @@ cmn_err(CE_NOTE, "(0x%x) freeing %d", ticket, ticket->t_curr_res);
 		log->l_grant_reserve_cycle--;
 	}
 
+	xlog_trace_loggrant(log, ticket, "xlog_ungrant_log_space: sub current");
+
 	/* If this is a permanent reservation ticket, we can free up one
 	 * unit worth of space.
 	 */
 	if (perm_res) {
-#if 0
-cmn_err(CE_NOTE,"(0x%x) freeing %d perm bytes", ticket, ticket->t_unit_res*ticket->t_cnt);
-#endif
 		log->l_grant_write_bytes -= ticket->t_unit_res*ticket->t_cnt;
 		if (log->l_grant_write_bytes < 0) {
 			log->l_grant_write_bytes += log->l_logsize;
@@ -1718,8 +1701,8 @@ cmn_err(CE_NOTE,"(0x%x) freeing %d perm bytes", ticket, ticket->t_unit_res*ticke
 			log->l_grant_reserve_cycle--;
 		}
 	}
+	xlog_trace_loggrant(log, ticket, "xlog_ungrant_log_space: exit");
 	xlog_verify_grant_head(log, 1);
-	xlog_trace_loggrant(log, ticket);
 	GRANT_UNLOCK(log, spl);
 	xfs_log_move_tail(log->l_mp, 1);
 }	/* xlog_ungrant_log_space */
@@ -1968,8 +1951,8 @@ no_sleep:
  *		state and go to sleep or return.
  *	If it is in any other state, go to sleep or return.
  *
- * XXXmiken: if filesystem activity goes to zero, the iclog may never get
- *	pushed out.
+ * If filesystem activity goes to zero, the iclog will get flushed only by
+ * bdflush().
  */
 int
 xlog_state_sync(xlog_t	  *log,
