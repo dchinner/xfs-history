@@ -37,6 +37,7 @@
 #include "xfs_inode.h"
 #include "xfs_buf_item.h"
 #include "xfs_bio.h"
+#include "xfs_print.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -1017,6 +1018,10 @@ void
 xfs_iprint(xfs_inode_t *ip)
 {
 	xfs_dinode_core_t *dip;
+	xfs_bmbt_rec_t *ep;
+	xfs_extnum_t i;
+	xfs_extnum_t nextents;
+	xfs_sb_t *sbp;
 
 	printf("Inode %x\n", ip);
 	printf("    i_dev %x\n", (uint)ip->i_dev);
@@ -1032,6 +1037,19 @@ xfs_iprint(xfs_inode_t *ip)
 	printf("    i_mapcnt %x\n", ip->i_mapcnt);
 	printf("    i_bytes %d\n", ip->i_bytes);
 	printf("    i_u1.iu_extents/iu_data %x\n", ip->i_u1.iu_extents);
+	if (ip->i_flags & XFS_IEXTENTS) {
+		nextents = ip->i_bytes / sizeof(*ep);
+		sbp = &ip->i_mount->m_sb;
+		for (ep = ip->i_u1.iu_extents, i = 0; i < nextents; i++, ep++) {
+			xfs_bmbt_irec_t rec;
+
+			xfs_bmbt_get_all(ep, rec);
+			printf("\t%d: startoff %lld, startblock %s, blockcount %d\n",
+				i, rec.br_startoff,
+				xfs_print_startblock(sbp, rec.br_startblock),
+				rec.br_blockcount);
+		}
+	}
 	printf("    i_broot %x\n", ip->i_broot);
 	printf("    i_broot_bytes %x\n", ip->i_broot_bytes);
 
