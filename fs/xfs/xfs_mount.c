@@ -928,6 +928,30 @@ xfs_mountfs(
 
 	xfs_iunlock(rip, XFS_ILOCK_EXCL);
 
+	quotaondisk = XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
+		mp->m_sb.sb_qflags & (XFS_UQUOTA_ACCT|XFS_GQUOTA_ACCT);
+
+	/*
+	 * If the device itself is read-only, we can't allow
+	 * the user to change the state of quota on the mount -
+	 * this would generate a transaction on the ro device,
+	 * which would lead to an I/O error and shutdown
+	 */
+
+	if (((quotaondisk && !XFS_IS_QUOTA_ON(mp)) ||
+	      (!quotaondisk && XFS_IS_QUOTA_ON(mp))) &&
+	    (is_read_only(mp->m_dev) || is_read_only(mp->m_logdev))) {
+		cmn_err(CE_WARN,
+			"XFS: device %s is read-only, cannot change "
+			"quota state.  Please mount with%s quota option.",
+			mp->m_fsname, quotaondisk ? "" : "out");
+		rvp->v_flag |= VPURGE;
+		VN_RELE(rvp);
+		vn_remove(rvp);
+		error = XFS_ERROR(EPERM);
+		goto error3;
+	}
+
 	/*
 	 * Initialize realtime inode pointers in the mount structure
 	 */
@@ -952,47 +976,6 @@ xfs_mountfs(
 
 	quotaflags = 0;
 	needquotamount = B_FALSE;
-	quotaondisk = XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
-		mp->m_sb.sb_qflags & (XFS_UQUOTA_ACCT|XFS_GQUOTA_ACCT);
-
-	/*
-	 * If the device itself is read-only, we can't allow
-	 * the user to change the state of quota on the mount - 
-	 * this would generate a transaction on the ro device,
-	 * which would lead to I/O error and shutdown
-	 */
-
-	if (((quotaondisk && !XFS_IS_QUOTA_ON(mp)) ||
-	      (!quotaondisk && XFS_IS_QUOTA_ON(mp))) &&
-	    (is_read_only(mp->m_dev) || is_read_only(mp->m_logdev))) {
-		cmn_err(CE_WARN,
-			"XFS: device %s is read-only, cannot change "
-			"quota state.  Please mount with%s quota option.",
-			mp->m_fsname, quotaondisk ? "" : "out");
-		rvp->v_flag |= VPURGE;
-		VN_RELE(rvp);
-		vn_remove(rvp);
-		/*
-		 * Free the rt inodes if we have them
-		 * (from above, if we have m_rbmip we have m_rsumip)
-		 */
-		if (mp->m_rbmip) {
-			vnode_t	*vp;
-			vmap_t vmap;
-
-			vp = XFS_ITOV(mp->m_rbmip);
-			VMAP(vp, mp->m_rbmip, vmap);
-			VN_RELE(vp);
-			vn_remove(vp);
-
-			vp = XFS_ITOV(mp->m_rsumip);
-			VMAP(vp, mp->m_rsumip, vmap);
-			VN_RELE(vp);
-			vn_remove(vp);
-		}
-		error = XFS_ERROR(EPERM);
-		goto error3;
-	}
 
 	/*
 	 * Figure out if we'll need to do a quotacheck.
