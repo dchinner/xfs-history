@@ -185,6 +185,14 @@ typedef struct xfs_attr_list_context {
 	int				resynch;/* T/F: resynch with cursor */
 } xfs_attr_list_context_t;
 
+/*
+ * Used to keep a list of "remote value" extents when unlinking an inode.
+ */
+typedef struct xfs_attr_inactive_list {
+	xfs_dablk_t	valueblk;	/* block number of value bytes */
+	int		valuelen;	/* number of bytes in value */
+} xfs_attr_inactive_list_t;
+
 
 /*========================================================================
  * Function prototypes for the kernel.
@@ -193,29 +201,21 @@ typedef struct xfs_attr_list_context {
 /*
  * Internal routines when dirsize < XFS_LITINO(mp).
  */
-int	xfs_attr_shortform_create(struct xfs_trans *trans,
-					 struct xfs_inode *dp);
-int	xfs_attr_shortform_add(struct xfs_trans *trans,
-				      struct xfs_da_args *add);
-int	xfs_attr_shortform_lookup(struct xfs_trans *trans,
-					 struct xfs_da_args *args);
+int	xfs_attr_shortform_create(struct xfs_da_args *args);
+int	xfs_attr_shortform_add(struct xfs_da_args *add);
+int	xfs_attr_shortform_lookup(struct xfs_da_args *args);
 int	xfs_attr_shortform_getvalue(struct xfs_da_args *args);
-int	xfs_attr_shortform_to_leaf(struct xfs_trans *trans,
-					  struct xfs_da_args *args);
-int	xfs_attr_shortform_remove(xfs_trans_t *trans,
-					      struct xfs_da_args *remove);
+int	xfs_attr_shortform_to_leaf(struct xfs_da_args *args);
+int	xfs_attr_shortform_remove(struct xfs_da_args *remove);
 int	xfs_attr_shortform_list(struct xfs_attr_list_context *context);
-int	xfs_attr_shortform_replace(struct xfs_trans *trans,
-					  struct xfs_da_args *args);
+int	xfs_attr_shortform_replace(struct xfs_da_args *args);
 int	xfs_attr_shortform_allfit(struct buf *bp, struct xfs_inode *dp);
 
 /*
  * Internal routines when dirsize == XFS_LBSIZE(mp).
  */
-int	xfs_attr_leaf_to_node(struct xfs_trans *trans,
-				     struct xfs_da_args *args);
-int	xfs_attr_leaf_to_shortform(struct xfs_trans *trans, buf_t *bp,
-					  struct xfs_da_args *args);
+int	xfs_attr_leaf_to_node(struct xfs_da_args *args);
+int	xfs_attr_leaf_to_shortform(buf_t *bp, struct xfs_da_args *args);
 int	xfs_attr_leaf_clearflag(struct xfs_da_args *args);
 int	xfs_attr_leaf_setflag(struct xfs_da_args *args);
 int	xfs_attr_leaf_flipflags(xfs_da_args_t *args);
@@ -223,18 +223,15 @@ int	xfs_attr_leaf_flipflags(xfs_da_args_t *args);
 /*
  * Routines used for growing the Btree.
  */
-int	xfs_attr_leaf_create(struct xfs_trans *trans, struct xfs_inode *dp,
-				    xfs_dablk_t which_block,
+int	xfs_attr_leaf_create(struct xfs_da_args *args, xfs_dablk_t which_block,
 				    struct buf **bpp);
 int	xfs_attr_leaf_split(struct xfs_da_state *state,
 				   struct xfs_da_state_blk *oldblk,
 				   struct xfs_da_state_blk *newblk);
 int	xfs_attr_leaf_lookup_int(struct buf *leaf, struct xfs_da_args *args);
 int	xfs_attr_leaf_getvalue(struct buf *bp, struct xfs_da_args *args);
-int	xfs_attr_leaf_add(struct xfs_trans *trans, struct buf *leaf_buffer,
-				 struct xfs_da_args *args);
-int	xfs_attr_leaf_remove(struct xfs_trans *trans, struct buf *leaf_buffer,
-				    struct xfs_da_args *args);
+int	xfs_attr_leaf_add(struct buf *leaf_buffer, struct xfs_da_args *args);
+int	xfs_attr_leaf_remove(struct buf *leaf_buffer, struct xfs_da_args *args);
 int	xfs_attr_leaf_list_int(struct buf *bp,
 				      struct xfs_attr_list_context *context);
 
@@ -245,11 +242,13 @@ int	xfs_attr_leaf_toosmall(struct xfs_da_state *state, int *retval);
 void	xfs_attr_leaf_unbalance(struct xfs_da_state *state,
 				       struct xfs_da_state_blk *drop_blk,
 				       struct xfs_da_state_blk *save_blk);
-int	xfs_attr_root_inactive(struct xfs_inode *dp);
-int	xfs_attr_node_inactive(struct xfs_inode *dp, struct buf *bp, int level);
-int	xfs_attr_leaf_inactive(struct xfs_inode *dp, struct buf *bp);
-int	xfs_attr_leaf_freextent(struct xfs_inode *dp, xfs_dablk_t blkno,
-				       int blkcnt);
+int	xfs_attr_root_inactive(struct xfs_trans **trans, struct xfs_inode *dp);
+int	xfs_attr_node_inactive(struct xfs_trans **trans, struct xfs_inode *dp,
+				      struct buf *bp, int level);
+int	xfs_attr_leaf_inactive(struct xfs_trans **trans, struct xfs_inode *dp,
+				      struct buf *bp);
+int	xfs_attr_leaf_freextent(struct xfs_trans **trans, struct xfs_inode *dp,
+				       xfs_dablk_t blkno, int blkcnt);
 
 /*
  * Utility routines.
@@ -261,5 +260,6 @@ int	xfs_attr_leaf_newentsize(struct xfs_da_args *args, int blocksize,
 int	xfs_attr_leaf_entsize(struct xfs_attr_leafblock *leaf, int index);
 int	xfs_attr_put_listent(struct xfs_attr_list_context *context,
 				    char *name, int namelen, int valuelen);
+void	xfs_attr_rolltrans(struct xfs_trans **transp, struct xfs_inode *dp);
 
 #endif	/* !FS_XFS_ATTR_LEAE_H */
