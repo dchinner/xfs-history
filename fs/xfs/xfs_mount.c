@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.13 $"
+#ident	"$Revision: 1.15 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -60,8 +60,12 @@ xfs_mount_init(void)
 	initnlock(&mp->m_ilock, "xfs_ilock");
 	initnlock(&mp->m_ipinlock, "xfs_ipin");
 	initnlock(&mp->m_sb_lock, "xfs_sb");
+	/*
+	 * Initialize the AIL.
+	 */
+	xfs_trans_ail_init(mp);
 
-	return (mp);
+	return mp;
 }
 	
 xfs_mount_t *
