@@ -63,14 +63,18 @@
 #define XLOG_CONTINUE_TRANS	0x04	/* Cont this trans into new region */
 #define XLOG_WAS_CONT_TRANS	0x08	/* Cont this trans into new region */
 #define XLOG_END_TRANS		0x10	/* End a continued transaction */
+#define XLOG_UNMOUNT_TRANS	0x20	/* Unmount a filesystem transaction */
 #define XLOG_SKIP_TRANS		(XLOG_COMMIT_TRANS | XLOG_CONTINUE_TRANS | \
-				 XLOG_WAS_CONT_TRANS | XLOG_END_TRANS)
+				 XLOG_WAS_CONT_TRANS | XLOG_END_TRANS | \
+				 XLOG_UNMOUNT_TRANS)
 
 /*
  * Flags to log ticket
  */
 #define XLOG_TIC_INITED		0x1	/* has been initialized */
 #define XLOG_TIC_PERM_RESERV	0x2	/* permanent reservation */
+
+#define XLOG_UNMOUNT_TYPE	0x556e	/* Un for Unmount */
 
 typedef void * xlog_tid_t;
 
@@ -169,6 +173,7 @@ typedef struct log {
 	sema_t		l_flushsema;  /* iclog flushing semaphore	  : 20*/
 	lock_t		l_icloglock;  /* grab to change iclog state	  :  4*/
 	xfs_lsn_t	l_tail_lsn;   /* lsn of 1st LR w/ unflushed buffers: 8*/
+	xfs_lsn_t	l_my_tail_lsn;/* lsn of last LR on disk		   : 8*/
 	xfs_mount_t	*l_mp;	      /* mount point			   : 4*/
 	buf_t		*l_xbuf;      /* extra buffer for log wrapping	   : 4*/
 	dev_t		l_dev;	      /* dev_t of log			   : 4*/
