@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_LEAF_H
 #define	_FS_XFS_DIR_LEAF_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.17 $"
 
 /*
  * xfs_dir_leaf.h
@@ -108,7 +108,7 @@ typedef union {
 
 #define	XFS_PUT_COOKIE(c,mp,bno,entry,hash)	\
 	((c).s.be = XFS_DA_MAKE_BNOENTRY(mp, bno, entry), (c).s.h = (hash))
-
+#if 0
 #define	XFS_DI_LO(di)	\
 	(((di).i[4] << 24) | ((di).i[5] << 16) | ((di).i[6] << 8) | ((di).i[7]))
 /*
@@ -116,6 +116,16 @@ typedef union {
  */
 #define	XFS_DI_HI(di)	\
 	(((di).i[1] << 16) | ((di).i[2] << 8) | ((di).i[3]))
+#else
+#define	XFS_DI_LO(di)	\
+	(((di).i[3] << 24) | ((di).i[2] << 16) | ((di).i[1] << 8) | ((di).i[0]))
+/*
+ * Upper 8 bits of an inode number are always 0, see XFS_MAXINUMBER.
+ */
+#define	XFS_DI_HI(di)	\
+	(((di).i[6] << 16) | ((di).i[5] << 8) | ((di).i[4]))
+#endif
+
 
 #if XFS_BIG_FILESYSTEMS
 #define	XFS_GET_DIR_INO(mp,di) \
