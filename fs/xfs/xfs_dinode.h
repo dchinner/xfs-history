@@ -102,7 +102,7 @@ typedef enum xfs_dinode_fmt
 /*
  * Inode minimum and maximum sizes.
  */
-#define	XFS_DINODE_MIN_LOG	8
+#define	XFS_DINODE_MIN_LOG	7
 #define	XFS_DINODE_MAX_LOG	11
 #define	XFS_DINODE_MIN_SIZE	(1 << XFS_DINODE_MIN_LOG)
 #define	XFS_DINODE_MAX_SIZE	(1 << XFS_DINODE_MAX_LOG)
