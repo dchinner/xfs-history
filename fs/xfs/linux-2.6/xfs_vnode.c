@@ -399,14 +399,9 @@ vn_alloc(struct vfs *vfsp, enum vtype type, dev_t dev)
 
 	VOPINFO.vn_alloc++;
 
-	if (vfreelistmask) {
-		ASSERT(vfreelistmask == 0);
-	} else {
-		LOCK_VFP(vfreelist);
-		list = 0;
-	}
+	s = LOCK_VFP(vfreelist);
+	list = 0;
 
-	s = LOCK_VFREELIST(list);
 	vlist = VFREELIST(list);
 	vp = vlist->vl_next;
 
