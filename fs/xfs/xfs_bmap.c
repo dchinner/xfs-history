@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.204 $"
+#ident	"$Revision: 1.205 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -2688,37 +2688,22 @@ xfs_bmap_local_to_extents(
 	return 0;
 }
 
-/*
- * Search the extents list for the inode, for the extent containing bno.
- * If bno lies in a hole, point to the next entry.  If bno lies past eof,
- * *eofp will be set, and *prevp will contain the last entry (null if none).
- * Else, *lastxp will be set to the index of the found
- * entry; *gotp will contain the entry.
- */
-STATIC xfs_bmbt_rec_t *			/* pointer to found extent entry */
-xfs_bmap_search_extents(
-	xfs_inode_t	*ip,		/* incore inode pointer */
+xfs_bmbt_rec_t *			/* pointer to found extent entry */
+xfs_bmap_do_search_extents(
+	xfs_bmbt_rec_t	*base,		/* base of extent list */
+	xfs_extnum_t	lastx,		/* last extent index used */
+	xfs_extnum_t	nextents,	/* extent list size */
 	xfs_fileoff_t	bno,		/* block number searched for */
-	int		whichfork,	/* data or attr fork */
 	int		*eofp,		/* out: end of file found */
 	xfs_extnum_t	*lastxp,	/* out: last extent index */
 	xfs_bmbt_irec_t	*gotp,		/* out: extent entry found */
 	xfs_bmbt_irec_t	*prevp)		/* out: previous extent entry found */
 {
-	xfs_bmbt_rec_t	*base;		/* base of extent list */
 	xfs_bmbt_rec_t	*ep;		/* extent list entry pointer */
 	xfs_bmbt_irec_t	got;		/* extent list entry, decoded */
 	int		high;		/* high index of binary search */
-	xfs_ifork_t	*ifp;		/* inode fork pointer */
-	xfs_extnum_t	lastx;		/* last extent index used */
 	int		low;		/* low index of binary search */
-	xfs_extnum_t	nextents;	/* extent list size */
 
-	XFSSTATS.xs_look_exlist++;
-	ifp = XFS_IFORK_PTR(ip, whichfork);
-	lastx = ifp->if_lastex;
-	nextents = ifp->if_bytes / sizeof(xfs_bmbt_rec_t);
-	base = &ifp->if_u1.if_extents[0];
 	if (lastx != NULLEXTNUM && lastx < nextents)
 		ep = base + lastx;
 	else
@@ -2791,6 +2776,39 @@ xfs_bmap_search_extents(
 	*gotp = got;
 	return ep;
 }
+
+/*
+ * Search the extents list for the inode, for the extent containing bno.
+ * If bno lies in a hole, point to the next entry.  If bno lies past eof,
+ * *eofp will be set, and *prevp will contain the last entry (null if none).
+ * Else, *lastxp will be set to the index of the found
+ * entry; *gotp will contain the entry.
+ */
+STATIC xfs_bmbt_rec_t *                 /* pointer to found extent entry */
+xfs_bmap_search_extents(
+        xfs_inode_t     *ip,            /* incore inode pointer */
+        xfs_fileoff_t   bno,            /* block number searched for */
+        int             whichfork,      /* data or attr fork */
+        int             *eofp,          /* out: end of file found */
+        xfs_extnum_t    *lastxp,        /* out: last extent index */
+        xfs_bmbt_irec_t *gotp,          /* out: extent entry found */
+        xfs_bmbt_irec_t *prevp)         /* out: previous extent entry found */
+{ 
+	xfs_ifork_t	*ifp;		/* inode fork pointer */
+	xfs_bmbt_rec_t  *base;          /* base of extent list */
+	xfs_extnum_t    lastx;          /* last extent index used */
+        xfs_extnum_t    nextents;       /* extent list size */
+
+	XFSSTATS.xs_look_exlist++;
+	ifp = XFS_IFORK_PTR(ip, whichfork);
+	lastx = ifp->if_lastex;
+	nextents = ifp->if_bytes / sizeof(xfs_bmbt_rec_t);
+	base = &ifp->if_u1.if_extents[0];
+
+	return(xfs_bmap_do_search_extents(base, lastx, nextents, bno, eofp,
+					  lastxp, gotp, prevp));
+}
+
 
 #ifdef XFS_BMAP_TRACE
 /*
