@@ -31,7 +31,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident  "$Revision: 1.274 $"
+#ident  "$Revision: 1.276 $"
 
 #include <xfs_os_defs.h>
 
@@ -1649,6 +1649,7 @@ xfs_syncsub(
 					ip = ip->i_mnext;
 					continue;
 				}
+				ip->i_flags |= XFS_IRECLAIM;
 				IPOINTER_INSERT(ip, mp);
 
 				xfs_finish_reclaim(ip, 1);
@@ -1666,7 +1667,7 @@ xfs_syncsub(
 		 * We don't mess with swap files from here since it is
 		 * too easy to deadlock on memory.
 		 */
-		if (vp->v_flag & VISSWAP) {
+		if (vp && (vp->v_flag & VISSWAP)) {
 			ip = ip->i_mnext;
 			continue;
 		}
@@ -1694,7 +1695,7 @@ xfs_syncsub(
 				continue;
 			    }
 		} else if (flags & SYNC_PDFLUSH) {
-			if (vp->v_dpages == NULL) {
+			if (!vp || (vp->v_dpages == NULL)) {
 				ip = ip->i_mnext;
 				continue;
 			}
@@ -1719,7 +1720,7 @@ xfs_syncsub(
 		 */
 		if (xfs_ilock_nowait(ip, lock_flags) == 0) {
 
-			if (flags & SYNC_BDFLUSH) {
+			if ((flags & SYNC_BDFLUSH) || (vp == NULL)) {
 				ip = ip->i_mnext;
 				continue;
 			}
@@ -1768,7 +1769,7 @@ xfs_syncsub(
 		 * in the inode list.
 		 */
 
-		if (flags & SYNC_CLOSE) {
+		if ((flags & SYNC_CLOSE)  && (vp != NULL)) {
 			/*
 			 * This is the shutdown case.  We just need to
 			 * flush and invalidate all the pages associated
@@ -1804,7 +1805,7 @@ xfs_syncsub(
 
 			xfs_ilock(ip, XFS_ILOCK_SHARED);
 
-		} else if (flags & SYNC_DELWRI) {
+		} else if ((flags & SYNC_DELWRI) && (vp != NULL)) {
 			if (VN_DIRTY(vp) || ip->i_delayed_blks) {
 				/* We need to have dropped the lock here,
 				 * so insert a marker if we have not already
@@ -1827,7 +1828,7 @@ xfs_syncsub(
 
 		}
 
-		if (flags & SYNC_PDFLUSH) {
+		if ((flags & SYNC_PDFLUSH) && (vp != NULL)) {
 			if (vp->v_dpages) {
 				/* Insert marker and drop lock if not already
 				 * done.
