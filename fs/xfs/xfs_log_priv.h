@@ -1,6 +1,6 @@
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision: 1.38 $"
+#ident	"$Revision: 1.40 $"
 
 #include <sys/cmn_err.h>
 
@@ -152,7 +152,7 @@
 #define	XLOG_RECOVERY_NEEDED	0x4	/* log was recovered */     
 
 
-typedef void * xlog_tid_t;
+typedef __uint32_t xlog_tid_t;
 
 typedef struct xlog_ticket {
 	sema_t		   t_sema;	 /* sleep on this semaphore	 :20 */
