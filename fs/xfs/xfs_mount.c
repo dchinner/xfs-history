@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.26 $"
+#ident	"$Revision: 1.27 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -177,7 +177,7 @@ xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 	 * Call the log's mount-time initialization.
 	 */
 	if (logdev)
-		xfs_log_mount(mp, logdev, 0);
+		xfs_log_mount(mp, logdev, xfs_btod(sbp, sbp->sb_logstart), xfs_btod(sbp, sbp->sb_logblocks), 0);
 
 	return mp;
 }
