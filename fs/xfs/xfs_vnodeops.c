@@ -3974,6 +3974,11 @@ xfs_fcntl(vnode_t	*vp,
 			break;
 		}
 		da.d_mem = BBSIZE;
+		
+		/* this only really needs to be BBSIZE.
+		 * it is set to the file system block size to
+		 * avoid having to do block zeroing on short writes.
+		 */
 		da.d_miniosz = mp->m_sb.sb_blocksize;
 		da.d_maxiosz = XFS_FSB_TO_B( mp,
 			XFS_B_TO_FSBT( mp, ctob(v.v_maxdmasz) ) );
