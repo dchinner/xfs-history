@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.102 $"
+#ident "$Revision: 1.103 $"
 
 struct bhv_desc;
 struct buf;
@@ -17,6 +17,7 @@ struct xfs_inode_log_item;
 struct xfs_mount;
 struct xfs_trans;
 struct zone;
+struct xfs_dquot;
 
 /*
  * This is the type used in the xfs inode hash table.
@@ -107,6 +108,8 @@ typedef struct xfs_inode {
 	struct xfs_inode	*i_mnext;	/* next inode in mount list */
 	struct xfs_inode	*i_mprev;	/* ptr to prev inode */
 	struct bhv_desc		i_bhv_desc;	/* inode behavior descriptor*/
+	struct xfs_dquot	*i_udquot;	/* user dquot */
+	struct xfs_dquot	*i_pdquot;	/* project dquot */
 
 	/* Extent information. */
 	xfs_ifork_t		*i_afp;		/* attribute fork pointer */
@@ -380,8 +383,8 @@ int		xfs_iread(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
 			  xfs_inode_t **, daddr_t);
 int		xfs_iread_extents(struct xfs_trans *, xfs_inode_t *, int);
 int		xfs_ialloc(struct xfs_trans *, xfs_inode_t *, mode_t, nlink_t,
-		           dev_t, struct cred *, struct buf **, boolean_t *,
-			   xfs_inode_t **);
+		           dev_t, struct cred *, xfs_prid_t, struct buf **, 
+			   boolean_t *, xfs_inode_t **);
 #ifndef SIM
 int		xfs_ifree(struct xfs_trans *, xfs_inode_t *);
 int		xfs_atruncate_start(xfs_inode_t *);
