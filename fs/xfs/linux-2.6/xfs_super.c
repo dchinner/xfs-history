@@ -85,6 +85,9 @@ void vfsinit(void);
 /* xfs_vfs.c */
 int xfs_init(int fstype);
 
+void dmapi_init(void );
+void dmapi_uninit(void );
+
 extern struct super_operations linvfs_sops;
 
 
@@ -615,7 +618,7 @@ int __init init_xfs_fs(void)
 #ifdef CONFIG_XFS_GRIO
         xfs_grio_init();
 #endif
-        
+	dmapi_init();
 	return register_filesystem(&xfs_fs_type);
 }
 
@@ -633,6 +636,7 @@ void cleanup_module(void)
 {
 	extern void xfs_cleanup(void);
 
+        dmapi_uninit();
 #ifdef CONFIG_XFS_GRIO
         xfs_grio_uninit();
 #endif
