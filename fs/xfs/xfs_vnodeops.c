@@ -1,4 +1,4 @@
-#ident "$Revision: 1.200 $"
+#ident "$Revision: 1.201 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -263,6 +263,13 @@ STATIC int 	xfs_change_file_space( vnode_t *,
 			flock_t *,
 			off_t,
 			cred_t *);
+
+STATIC int	xfs_ioctl(vnode_t *vp,
+			  int cmd,
+			  void *arg,
+			  int flag,
+			  cred_t *cr,
+			  int *rvalp);
 #endif	/* !SIM */
 
 STATIC void	xfs_itruncate_cleanup(xfs_trans_t	**tpp,
@@ -5628,6 +5635,19 @@ xfs_change_file_space(
 	return error;
 }
 
+/*ARGSUSED*/
+STATIC int
+xfs_ioctl(
+	vnode_t *vp,
+	int cmd,
+	void *arg,
+	int flag,
+	cred_t *cr,
+	int *rvalp)
+{
+	return ENOTTY;
+}
+
 /*
  * print out error describing the problem with the fs
  *
@@ -5713,7 +5733,7 @@ struct vnodeops xfs_vnodeops = {
 	xfs_close,
 	xfs_read,
 	xfs_write,
-	fs_nosys,	/* ioctl */
+	xfs_ioctl,
 	fs_noerr,
 	xfs_getattr,
 	xfs_setattr,
