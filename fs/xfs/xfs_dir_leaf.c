@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision$"
+#ident "$Revision: 1.86 $"
 
 /*
  * xfs_dir_leaf.c
@@ -1771,8 +1771,7 @@ xfs_dir_leaf_lookup_int(xfs_dabuf_t *bp, xfs_da_args_t *args, int *index)
 
 	leaf = bp->data;
 	ASSERT(INT_GET(leaf->hdr.info.magic, ARCH_CONVERT) == XFS_DIR_LEAF_MAGIC);
-	ASSERT((((int)INT_GET(leaf->hdr.count, ARCH_CONVERT)) >= 0) && \
-	       (INT_GET(leaf->hdr.count, ARCH_CONVERT) < (XFS_LBSIZE(args->dp->i_mount)/8)));
+	ASSERT(INT_GET(leaf->hdr.count, ARCH_CONVERT) < (XFS_LBSIZE(args->dp->i_mount)/8));
 
 	/*
 	 * Binary search.  (note: small blocks will skip this loop)
@@ -1865,8 +1864,7 @@ xfs_dir_leaf_moveents(xfs_dir_leafblock_t *leaf_s, int start_s,
 	ASSERT((INT_GET(hdr_s->count, ARCH_CONVERT) > 0) && (INT_GET(hdr_s->count, ARCH_CONVERT) < (XFS_LBSIZE(mp)/8)));
 	ASSERT(INT_GET(hdr_s->firstused, ARCH_CONVERT) >= 
 		((INT_GET(hdr_s->count, ARCH_CONVERT)*sizeof(*entry_s))+sizeof(*hdr_s)));
-	ASSERT(((int)(INT_GET(hdr_d->count, ARCH_CONVERT)) >= 0) && 
-		(INT_GET(hdr_d->count, ARCH_CONVERT) < (XFS_LBSIZE(mp)/8)));
+	ASSERT(INT_GET(hdr_d->count, ARCH_CONVERT) < (XFS_LBSIZE(mp)/8));
 	ASSERT(INT_GET(hdr_d->firstused, ARCH_CONVERT) >= 
 		((INT_GET(hdr_d->count, ARCH_CONVERT)*sizeof(*entry_d))+sizeof(*hdr_d)));
 
