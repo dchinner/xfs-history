@@ -490,28 +490,13 @@ xfs_setattr(vnode_t	*vp,
          * need to be done within a transaction.
          */
         if (mask & AT_UPDTIMES) {
-                /*
-                 * NOTE: Although we set all 64 bits of the timestamp,
-                 * the underlying code will ignore the low order 32
-                 * bits.  The low order 32 bits will always be zero
-                 * on disk.
-                 */
-                ASSERT((mask & ~AT_UPDTIMES) == 0);
-                nanotime(&tv);
+		int f = 0;
 
-                if (mask & AT_UPDATIME) {
-                        ip->i_d.di_atime.t_sec = tv.tv_sec;
-                        ip->i_d.di_atime.t_nsec = tv.tv_nsec;
-                }
-                if (mask & AT_UPDCTIME) {
-                        ip->i_d.di_ctime.t_sec = tv.tv_sec;
-                        ip->i_d.di_ctime.t_nsec = tv.tv_nsec;
-                }
-                if (mask & AT_UPDMTIME) {
-                        ip->i_d.di_mtime.t_sec = tv.tv_sec;
-                        ip->i_d.di_mtime.t_nsec = tv.tv_nsec;
-                }
-		ip->i_update_core = 1;
+                ASSERT((mask & ~AT_UPDTIMES) == 0);
+		f = ((mask & AT_UPDATIME) ? XFS_ICHGTIME_ACC : 0) |
+		    ((mask & AT_UPDCTIME) ? XFS_ICHGTIME_CHG : 0) |
+		    ((mask & AT_UPDMTIME) ? XFS_ICHGTIME_MOD : 0);
+		xfs_ichgtime(ip, f);
 		return 0;
         }
 
@@ -728,6 +713,10 @@ xfs_setattr(vnode_t	*vp,
 					      (xfs_fsize_t)vap->va_size);
 			ip_held = B_TRUE;
 		}
+		/*
+		 * Have to do this even if the file's size doesn't change.
+		 */
+		xfs_ichgtime(ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
         }
 
         /*
@@ -781,23 +770,14 @@ xfs_setattr(vnode_t	*vp,
          * Change file access or modified times.
          */
         if (mask & (AT_ATIME|AT_MTIME)) {
-                /*
-                 * since utime() always updates both mtime and atime
-                 * ctime will always be set, as it need to be so there
-                 * no reason to set ICHG
-                 */
                 if (mask & AT_ATIME) {
                         ip->i_d.di_atime.t_sec = vap->va_atime.tv_sec;
-			ip->i_d.di_atime.t_nsec = vap->va_atime.tv_nsec;
-                }
+			ip->i_update_core = 1;
+		}
                 if (mask & AT_MTIME) {
-                        nanotime(&tv);
 			ip->i_d.di_mtime.t_sec = vap->va_mtime.tv_sec;
-			ip->i_d.di_mtime.t_nsec = vap->va_mtime.tv_nsec;
-			ip->i_d.di_ctime.t_sec = tv.tv_sec;
-			ip->i_d.di_ctime.t_nsec = tv.tv_nsec;
+			xfs_ichgtime(ip, XFS_ICHGTIME_CHG);
                 }
-		ip->i_update_core = 1;
         }
 
 	/*
@@ -1704,7 +1684,7 @@ try_again:
 					       MAX_EXT_NEEDED)) {
 			ASSERT (0);	/* we've reserved the space. */
 		}
-		xfs_ichgtime(dp, XFS_ICHGTIME_MOD);
+		xfs_ichgtime(dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
 		dp->i_gen++;
 		dnlc_enter_fast(dir_vp, &fastdata, XFS_ITOV(ip), NOCRED);
@@ -2343,7 +2323,7 @@ xfs_remove(vnode_t	*dir_vp,
 	XFS_BMAP_INIT(&free_list, &first_block);
 	error = xfs_dir_removename (tp, dp, name, &first_block, &free_list, 0);
 	ASSERT (error == 0);
-	xfs_ichgtime(dp, XFS_ICHGTIME_MOD);
+	xfs_ichgtime(dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
 	dnlc_remove (dir_vp, name);
 
@@ -2455,7 +2435,7 @@ xfs_link(vnode_t	*target_dir_vp,
 					MAX_EXT_NEEDED)) {
 		goto error_return;
 	}
-	xfs_ichgtime(tdp, XFS_ICHGTIME_MOD);
+	xfs_ichgtime(tdp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 	tdp->i_gen++;
 	xfs_trans_log_inode (tp, tdp, XFS_ILOG_CORE);
 
@@ -2896,7 +2876,7 @@ start_over:
 						&free_list, MAX_EXT_NEEDED)) {
 			goto error_return;
 		}
-		xfs_ichgtime(target_dp, XFS_ICHGTIME_MOD);
+		xfs_ichgtime(target_dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
 		if (new_parent && src_is_directory)
 			xfs_bumplink(tp, target_dp);
@@ -2961,7 +2941,7 @@ start_over:
 			((target_pnp != NULL) ? target_pnp->pn_complen :
 			 strlen(target_name)), src_ip->i_ino);
 		ASSERT (!error);
-		xfs_ichgtime(target_dp, XFS_ICHGTIME_MOD);
+		xfs_ichgtime(target_dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
 		dnlc_enter (target_dir_vp, target_name,
 			    XFS_ITOV(src_ip), credp);
@@ -2995,7 +2975,7 @@ start_over:
 		 */
 		error = xfs_dir_replace (tp, src_ip, "..", 2,
 					     target_dp->i_ino);
-		xfs_ichgtime(src_ip, XFS_ICHGTIME_MOD);
+		xfs_ichgtime(src_ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
 		dnlc_remove (XFS_ITOV(src_ip), "..");
 		
@@ -3012,7 +2992,7 @@ start_over:
 	error = xfs_dir_removename (tp, src_dp, src_name, &first_block,
 				    &free_list, MAX_EXT_NEEDED);
 	ASSERT (! error);
-	xfs_ichgtime(src_dp, XFS_ICHGTIME_MOD);
+	xfs_ichgtime(src_dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
 	dnlc_remove (src_dir_vp, src_name);
 
@@ -3155,7 +3135,7 @@ xfs_mkdir(vnode_t	*dir_vp,
 				       MAX_EXT_NEEDED)) {
  		ASSERT (0);
 	}
-	xfs_ichgtime(dp, XFS_ICHGTIME_MOD);
+	xfs_ichgtime(dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
 	dnlc_enter_fast (dir_vp, &fastdata, XFS_ITOV(cdp), NOCRED);
 	
@@ -3277,7 +3257,7 @@ xfs_rmdir(vnode_t	*dir_vp,
 
         error = xfs_dir_removename (tp, dp, name, &first_block, &free_list, 0);
         ASSERT (! error);
-	xfs_ichgtime(dp, XFS_ICHGTIME_MOD);
+	xfs_ichgtime(dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
 	dnlc_remove_fast (dir_vp, &fastdata);
 
@@ -3546,7 +3526,7 @@ xfs_symlink(vnode_t	*dir_vp,
 					MAX_EXT_NEEDED)) {
                 ASSERT (0);
 	}
-	xfs_ichgtime(dp, XFS_ICHGTIME_MOD);
+	xfs_ichgtime(dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
         dnlc_enter_fast (dir_vp, &fastdata, XFS_ITOV(ip), NOCRED);
 
