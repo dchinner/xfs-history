@@ -1100,7 +1100,7 @@ xfs_ialloc(
 	 * cleared.
 	 */
 	if (ip->i_d.di_mode & ISGID) {
-		if (!in_group_p((gid_t)ip->i_d.di_gid)) {
+		if (!in_group_p((gid_t)ip->i_d.di_gid) && !capable(CAP_FSETID)){
 			ip->i_d.di_mode &= ~ISGID;
 		}
 	}
