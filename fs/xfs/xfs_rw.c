@@ -2209,6 +2209,8 @@ xfs_strat_read(
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t   map_start_fsb;
 	xfs_fileoff_t	imap_offset;
+	xfs_fsblock_t	last_bp_bb;
+	xfs_fsblock_t	last_map_bb;
 	xfs_extlen_t	count_fsb;
 	xfs_extlen_t	imap_blocks;
 	xfs_fsize_t	isize;
@@ -2219,6 +2221,8 @@ xfs_strat_read(
 	buf_t		*rbp;
 	xfs_mount_t	*mp;
 	xfs_inode_t	*ip;
+	int		count;
+	int		block_off;
 	int		data_bytes;
 	int		data_offset;
 	int		data_len;
@@ -2237,10 +2241,17 @@ xfs_strat_read(
 	offset = BBTOB(bp->b_offset);
 	end_offset = offset + bp->b_bcount;
 	if ((offset < isize) && (end_offset > isize)) {
-		count_fsb = XFS_B_TO_FSB(mp, isize - offset);
+		count = isize - offset;
 	} else {
-		count_fsb = XFS_B_TO_FSB(mp, bp->b_bcount);
+		count = bp->b_bcount;
 	}
+	/*
+	 * Since the buffer may not be file system block aligned, we
+	 * can't do a simple shift to find the number of blocks underlying
+	 * it.  Instead we subtract the last block it sits on from the first.
+	 */
+	count_fsb = XFS_B_TO_FSB(mp, (offset + count)) -
+		    XFS_B_TO_FSBT(mp, offset);
 	map_start_fsb = offset_fsb;
 	imap = (xfs_bmbt_irec_t *)kmem_zone_alloc(xfs_irec_zone, KM_SLEEP);
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
@@ -2255,6 +2266,80 @@ xfs_strat_read(
 			ASSERT(imap_offset == map_start_fsb);
 			imap_blocks = imap[x].br_blockcount;
 			ASSERT(imap_blocks <= count_fsb);
+			/*
+			 * Calculate the offset of this mapping in the
+			 * buffer and the number of bytes of this mapping
+			 * that are in the buffer.  If the block size is
+			 * greater than the page size, then the buffer may
+			 * not line up on file system block boundaries
+			 * (e.g. pages being read in from chunk_patch()).
+			 * In that case we need to account for the space
+			 * in the file system blocks underlying the buffer
+			 * that is not actually a part of the buffer.  This
+			 * space is the space in the first block before the
+			 * start of the buffer and the space in the last
+			 * block after the end of the buffer.
+			 */
+			data_offset = XFS_FSB_TO_B(mp,
+						   imap_offset - offset_fsb);
+			data_bytes = XFS_FSB_TO_B(mp, imap_blocks);
+			block_off = 0;
+
+			if (mp->m_sb.sb_blocksize > NBPP) {
+				/*
+				 * If the buffer is actually fsb
+				 * aligned then this will simply
+				 * subtract 0 and do no harm.
+				 */
+				data_offset -= BBTOB(XFS_BB_FSB_OFFSET(mp,
+							      bp->b_offset));
+
+				if (map_start_fsb == offset_fsb) {
+					/*
+					 * This is on the first block
+					 * mapped, so it must be the start
+					 * of the buffer.  Subtract out from
+					 * the number of bytes the bytes
+					 * between the start of the block
+					 * and the start of the buffer.
+					 */
+					data_bytes -=
+						BBTOB(XFS_BB_FSB_OFFSET(
+							mp, bp->b_offset));
+
+					/*
+					 * Set block_off to the number of
+					 * BBs that the buffer is offset
+					 * from the start of this mapping.
+					 */
+					block_off = XFS_BB_FSB_OFFSET(mp,
+							    bp->b_offset);
+					ASSERT(block_off >= 0);
+				}
+
+				if (imap_blocks == count_fsb) {
+					/*
+					 * This mapping includes the last
+					 * block to be mapped.  Subtract out
+					 * from the number of bytes the bytes
+					 * between the end of the buffer and
+					 * the end of the block.
+					 */
+					last_bp_bb = bp->b_offset +
+						BTOBB(bp->b_bcount);
+					last_map_bb =
+						XFS_FSB_TO_BB(mp,
+							      (imap_offset +
+							       imap_blocks));
+					ASSERT(last_map_bb >= last_bp_bb);
+					data_bytes -=
+						BBTOB(last_map_bb -
+						      last_bp_bb);
+
+				}
+			}
+			ASSERT(data_bytes > 0);
+			ASSERT(data_offset >= 0);
 			if ((imap[x].br_startblock == DELAYSTARTBLOCK) ||
 			    (imap[x].br_startblock == HOLESTARTBLOCK)) {
 				/*
@@ -2262,38 +2347,27 @@ xfs_strat_read(
 				 * alloc extent.  Either way, just fill
 				 * it with zeroes.
 				 */
-#ifndef SIM
 				datap = bp_mapin(bp);
-				datap += XFS_FSB_TO_B(mp, imap_offset -
-						      offset_fsb);
-				data_bytes = XFS_FSB_TO_B(mp, imap_blocks);
-
+				datap += data_offset;
 				bzero(datap, data_bytes);
 				if (!dpoff(bp->b_offset)) {
 					bp_mapout(bp);
 				}
-#else /* SIM */
-				ASSERT(bp->b_flags & B_PAGEIO);
-				data_offset = XFS_FSB_TO_B(mp, imap_offset -
-							   offset_fsb);
-				data_len = XFS_FSB_TO_B(mp, imap_blocks);
-				xfs_zero_bp(bp, data_offset, data_len);
-#endif /* SIM */
+
 			} else {
 				/*
 				 * The extent really exists on disk, so
 				 * read it in.
 				 */
 				rbp = getrbuf(KM_SLEEP);
-				data_offset = XFS_FSB_TO_B(mp, imap_offset -
-							  offset_fsb);
-				data_len = XFS_FSB_TO_B(mp, imap_blocks);
 				xfs_overlap_bp(bp, rbp, data_offset,
-					       data_len);
+					       data_bytes);
 				rbp->b_blkno = XFS_FSB_TO_DADDR(mp,
-						imap[x].br_startblock);
+						imap[x].br_startblock) +
+					       block_off;
 				rbp->b_offset = XFS_FSB_TO_BB(mp,
-							      imap_offset);
+							      imap_offset) +
+						block_off;
 				rbp->b_flags |= B_READ;
 				rbp->b_flags &= ~B_ASYNC;
 
@@ -2306,11 +2380,11 @@ xfs_strat_read(
 					bp->b_error = XFS_ERROR(rbp->b_error);
 					ASSERT(bp->b_error != EINVAL);
 				}
-#ifndef SIM
+
 				if (BP_ISMAPPED(rbp)) {
 					bp_mapout(rbp);
 				}
-#endif
+
 				freerbuf(rbp);
 			}
 			count_fsb -= imap_blocks;
@@ -2568,10 +2642,9 @@ xfs_check_rbp(
 	pfd_t		*pfdp;
 
 	mp = ip->i_mount;
-	rbp_offset_fsb = XFS_BB_TO_FSB(mp, rbp->b_offset);
-	ASSERT(XFS_FSB_TO_BB(mp, rbp_offset_fsb) == rbp->b_offset);
-	rbp_len_fsb = XFS_B_TO_FSBT(mp, rbp->b_bcount);
-	ASSERT(XFS_FSB_TO_B(mp, rbp_len_fsb) == rbp->b_bcount);
+	rbp_offset_fsb = XFS_BB_TO_FSBT(mp, rbp->b_offset);
+	rbp_len_fsb = XFS_BB_TO_FSB(mp, rbp->b_offset+BTOBB(rbp->b_bcount)) -
+		      XFS_BB_TO_FSBT(mp, rbp->b_offset);
 	nimaps = 1;
 	if (!locked) {
 		xfs_ilock(ip, XFS_ILOCK_SHARED);
@@ -2584,7 +2657,9 @@ xfs_check_rbp(
 
 	ASSERT(imap.br_startoff == rbp_offset_fsb);
 	ASSERT(imap.br_blockcount == rbp_len_fsb);
-	ASSERT(XFS_FSB_TO_DADDR(mp, imap.br_startblock) == rbp->b_blkno);
+	ASSERT((XFS_FSB_TO_DADDR(mp, imap.br_startblock) +
+		XFS_BB_FSB_OFFSET(mp, rbp->b_offset)) ==
+	       rbp->b_blkno);
 
 	if (rbp->b_flags & B_PAGEIO) {
 		pfdp = NULL;
@@ -2638,10 +2713,10 @@ xfs_check_bp(
 		       dpoff(bp->b_offset));
 	}
 
-	bp_offset_fsb = XFS_BB_TO_FSB(mp, bp->b_offset);
-	ASSERT(XFS_FSB_TO_BB(mp, bp_offset_fsb) == bp->b_offset);
-	bp_len_fsb = XFS_B_TO_FSBT(mp, bp->b_bcount);
-	ASSERT(XFS_FSB_TO_B(mp, bp_len_fsb) == bp->b_bcount);
+	bp_offset_fsb = XFS_BB_TO_FSBT(mp, bp->b_offset);
+	bp_len_fsb = XFS_BB_TO_FSB(mp, bp->b_offset + BTOBB(bp->b_bcount)) -
+		     XFS_BB_TO_FSBT(mp, bp->b_offset);
+	ASSERT(bp_len_fsb > 0);
 	nimaps = 1;
 
 	locked = xfs_ilock_nowait(ip, XFS_ILOCK_SHARED);
@@ -2652,9 +2727,12 @@ xfs_check_bp(
 			 NULLFSBLOCK, 0, &imap, &nimaps, NULL);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
+	ASSERT(nimaps == 1);
 	ASSERT(imap.br_startoff == bp_offset_fsb);
 	ASSERT(imap.br_blockcount == bp_len_fsb);
-	ASSERT(XFS_FSB_TO_DADDR(mp, imap.br_startblock) == bp->b_blkno);
+	ASSERT((XFS_FSB_TO_DADDR(mp, imap.br_startblock) +
+		XFS_BB_FSB_OFFSET(mp, bp->b_offset)) ==
+	       bp->b_blkno);
 }
 #endif /* DEBUG */
 
