@@ -1,4 +1,4 @@
-#ident "$Revision: 1.88 $"
+#ident "$Revision: 1.87 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -17,6 +17,7 @@
 #include <sys/debug.h>
 #include <sys/imon.h>
 #include <sys/cred.h>
+
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -53,11 +54,8 @@ extern vnodeops_t xfs_vnodeops;
 /*
  * Inode hashing and hash bucket locking.
  */
-#define XFS_BUCKETS 256
-#define XFS_IHASH(mp,ino)	((mp)->m_ihash + (ino % XFS_BUCKETS))
-#define	XFS_IHLOCK(ih)		mp_mutex_lock(&(ih)->ih_lock, PINOD)
-#define	XFS_IHUNLOCK(ih)	mp_mutex_unlock(&(ih)->ih_lock)
-
+#define XFS_BUCKETS(mp) (37*(mp)->m_sb.sb_agcount-1)
+#define XFS_IHASH(mp,ino) ((mp)->m_ihash + (ino % (mp)->m_ihsize))
 
 /*
  * Initialize the inode hash table for the newly mounted file system.
@@ -70,12 +68,12 @@ xfs_ihash_init(xfs_mount_t *mp)
 {
 	int	i;
 
-	mp->m_ihash = (xfs_ihash_t *)kmem_zalloc(XFS_BUCKETS
-			       * sizeof(xfs_ihash_t), KM_SLEEP);
+	mp->m_ihsize = XFS_BUCKETS(mp);
+	mp->m_ihash = (xfs_ihash_t *)kmem_zalloc(mp->m_ihsize
+				      * sizeof(xfs_ihash_t), KM_SLEEP);
 	ASSERT(mp->m_ihash != NULL);
-	for (i = 0; i < XFS_BUCKETS; i++) {
-		init_mutex(&(mp->m_ihash[i].ih_lock), MUTEX_DEFAULT,
-			   "xihash", i);
+	for (i = 0; i < mp->m_ihsize; i++) {
+		mrinit(&(mp->m_ihash[i].ih_lock),"xfshash");
 	}
 }
 
@@ -87,9 +85,9 @@ xfs_ihash_free(xfs_mount_t *mp)
 {
 	int	i;
 
-	for (i = 0; i < XFS_BUCKETS; i++)
-		mutex_destroy(&mp->m_ihash[i].ih_lock);
-	kmem_free(mp->m_ihash, XFS_BUCKETS * sizeof(xfs_ihash_t));
+	for (i = 0; i < mp->m_ihsize; i++)
+		mrfree(&mp->m_ihash[i].ih_lock);
+	kmem_free(mp->m_ihash, mp->m_ihsize*sizeof(xfs_ihash_t));
 	mp->m_ihash = NULL;
 }
 
@@ -148,13 +146,32 @@ xfs_iget(
 
 	ih = XFS_IHASH(mp, ino);
 again:
-	XFS_IHLOCK(ih);
+	mraccess(&ih->ih_lock);
 	for (ip = ih->ih_next; ip != NULL; ip = ip->i_next) {
+#pragma mips_frequency_hint FREQUENT
 		if (ip->i_ino == ino) {
-			XFSSTATS.xs_ig_found++;
 			vp = XFS_ITOV(ip);
 			VMAP(vp, vmap);
-			XFS_IHUNLOCK(ih);
+			/*
+			 * Inode cache hit: if ip is not at the front of
+			 * its hash chain, move it there now.
+			 * Do this with the lock held for update, but
+			 * do statistics after releasing the lock.
+			 */
+			if (ip->i_prevp != &ih->ih_next &&
+			    mrtrypromote(&ih->ih_lock)) {
+				if (iq = ip->i_next) {
+					iq->i_prevp = ip->i_prevp;
+				}
+				*ip->i_prevp = iq;
+				iq = ih->ih_next;
+				iq->i_prevp = &ip->i_next;
+				ip->i_next = iq;
+				ip->i_prevp = &ih->ih_next;
+				ih->ih_next = ip;
+			}
+			mrunlock(&ih->ih_lock);
+			XFSSTATS.xs_ig_found++;
 			/*
 			 * Get a reference to the vnode/inode.
 			 * vn_get() takes care of coordination with
@@ -167,27 +184,11 @@ again:
 			 * least look.
 			 */
 			if (!(vp = vn_get(vp, &vmap, 0))) {
+#pragma mips_frequency_hint NEVER
 				XFSSTATS.xs_ig_frecycle++;
 				goto again;
 			}
 
-			/*
-			 * Inode cache hit: if ip is not at the front of
-			 * its hash chain, move it there now.
-			 */
-			XFS_IHLOCK(ih);
-			if (ip->i_prevp != &ih->ih_next) {
-				if (iq = ip->i_next) {
-					iq->i_prevp = ip->i_prevp;
-				}
-				*ip->i_prevp = iq;
-				iq = ih->ih_next;
-				iq->i_prevp = &ip->i_next;
-				ip->i_next = iq;
-				ip->i_prevp = &ih->ih_next;
-				ih->ih_next = ip;
-			}
-			XFS_IHUNLOCK(ih);
 			if (lock_flags != 0) {
 				xfs_ilock(ip, lock_flags);
 			}
@@ -203,7 +204,7 @@ again:
 	 */
 	XFSSTATS.xs_ig_missed++;
 	version = ih->ih_version;
-	XFS_IHUNLOCK(ih);
+	mrunlock(&ih->ih_lock);
 
 	/*
 	 * Read the disk inode attributes into a new inode structure and get
@@ -237,11 +238,11 @@ again:
 	 * Put ip on its hash chain, unless someone else hashed a duplicate
 	 * after we released the hash lock.
 	 */
-	XFS_IHLOCK(ih);
+	mrupdate(&ih->ih_lock);
 	if (ih->ih_version != version) {
 		for (iq = ih->ih_next; iq != NULL; iq = iq->i_next) {
 			if (iq->i_ino == ino) {
-				XFS_IHUNLOCK(ih);
+				mrunlock(&ih->ih_lock);
 				vn_bhv_remove(VN_BHV_HEAD(vp), 
 					      &(ip->i_bhv_desc));
 				vn_free(vp);
@@ -264,7 +265,7 @@ again:
 	ih->ih_next = ip;
 	ip->i_udquot = ip->i_pdquot = NULL;
 	ih->ih_version++;
-	XFS_IHUNLOCK(ih);
+	mrunlock(&ih->ih_lock);
 
 	/*
 	 * Link ip to its mount and thread it on the mount's inode list.
@@ -316,8 +317,9 @@ xfs_inode_incore(xfs_mount_t	*mp,
 	xfs_inode_t	*iq;
 
 	ih = XFS_IHASH(mp, ino);
-	XFS_IHLOCK(ih);
+	mraccess(&ih->ih_lock);
 	for (ip = ih->ih_next; ip != NULL; ip = ip->i_next) {
+#pragma mips_frequency_hint FREQUENT
 		if (ip->i_ino == ino) {
 			/*
 			 * If we find it and tp matches, return it.
@@ -327,7 +329,8 @@ xfs_inode_incore(xfs_mount_t	*mp,
 			 * NULL.
 			 */
 			if (ip->i_transp == tp) {
-				if (ip->i_prevp != &ih->ih_next) {
+				if (ip->i_prevp != &ih->ih_next &&
+				    mrtrypromote(&ih->ih_lock)) {
 					if (iq = ip->i_next) {
 						iq->i_prevp = ip->i_prevp;
 					}
@@ -338,13 +341,13 @@ xfs_inode_incore(xfs_mount_t	*mp,
 					ip->i_prevp = &ih->ih_next;
 					ih->ih_next = ip;
 				}
-				XFS_IHUNLOCK(ih);
+				mrunlock(&ih->ih_lock);
 				return (ip);
 			}
 			break;
 		}
 	}	
-	XFS_IHUNLOCK(ih);
+	mrunlock(&ih->ih_lock);
 	return (NULL);
 }
 
@@ -384,12 +387,12 @@ xfs_ireclaim(xfs_inode_t *ip)
 	 */
 	XFSSTATS.xs_ig_reclaims++;
 	ih = ip->i_hash;
-	XFS_IHLOCK(ih);
+	mrupdate(&ih->ih_lock);
 	if (iq = ip->i_next) {
 		iq->i_prevp = ip->i_prevp;
 	}
 	*ip->i_prevp = iq;
-	XFS_IHUNLOCK(ih);
+	mrunlock(&ih->ih_lock);
 
 	/*
 	 * Remove from mount's inode list.
