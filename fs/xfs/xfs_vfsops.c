@@ -68,9 +68,10 @@
 #include <sys/xlate.h>
 #include <sys/capability.h>
 
-#include "xfs_clnt.h"
+#include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
+#include "xfs_clnt.h"
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
