@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.88 $"
+#ident	"$Revision: 1.89 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1351,8 +1351,8 @@ xlog_recover_print_buffer(xlog_recover_item_t *item)
 		   agf->agf_roots[XFS_BTNUM_BNOi],
 		   agf->agf_roots[XFS_BTNUM_CNTi]);
 	    printf("		level BNO:%d  CNT:%d\n",
-		   agf->agf_roots[XFS_BTNUM_BNOi],
-		   agf->agf_roots[XFS_BTNUM_CNTi]);
+		   agf->agf_levels[XFS_BTNUM_BNOi],
+		   agf->agf_levels[XFS_BTNUM_CNTi]);
 	    printf("		1st:%d  last:%d  cnt:%d  freeblks:%d  longest:%d\n",
 		   agf->agf_flfirst, agf->agf_fllast, agf->agf_flcount,
 		   agf->agf_freeblks, agf->agf_longest);
