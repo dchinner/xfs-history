@@ -1,4 +1,4 @@
-#ident "$Revision: 1.327 $"
+#ident "$Revision: 1.328 $"
 
 
 #ifdef SIM
@@ -500,7 +500,7 @@ xfs_getattr(
 			 * is in bytes.
 			 */
 			vap->va_blksize = 1 << (int) MAX(ip->i_readio_log,
-							 ip->i_writeio_log);;
+							 ip->i_writeio_log);
 		}
 		break;
         }
@@ -1350,7 +1350,7 @@ xfs_fsync(
 		ASSERT(start >= 0);
 		if (start == 0)
 			error = -1;
-		stop = (off_t) xfs_file_last_byte(ip);
+		stop = xfs_file_last_byte(ip);
 	} else
 		error = 0;
 
@@ -1375,8 +1375,6 @@ xfs_fsync(
 			pflushinvalvp(vp, start, stop);
 			VN_FLAGCLR(vp, VREMAPPING);
 		}
-
-
 		ASSERT(error == 0 || ((vp->v_pgcnt == 0) && (vp->v_buf == 0)));
 	} else if (VN_DIRTY(vp)) {
 		/*
@@ -1789,8 +1787,8 @@ xfs_inactive_symlink_rmt(
 		goto error1;
 
 	ASSERT(done);
-	error = xfs_bmap_finish(&tp, &free_list,
-				first_block, &committed);
+
+	error = xfs_bmap_finish(&tp, &free_list, first_block, &committed);
 	/*
 	 * We don't have the inode added to the new transaction.
 	 * So trans_cancel won't do the unlocking for us.
@@ -2170,11 +2168,23 @@ xfs_inactive(
 	 * someone might be in xfs_sync() where we play with
 	 * inodes without taking references.  Of course, this is only
 	 * necessary if it is a regular file since no other inodes
-	 * use the read ahead state.
+	 * use the read ahead state.  Also reset the read/writ io
+	 * sizes.  Like read-ahead, only regular files override the
+	 * default read/write io sizes.
 	 */
 	if (vp->v_type == VREG) {
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
+
 		XFS_INODE_CLEAR_READ_AHEAD(ip);
+
+		ASSERT(mp->m_readio_log <= 0xff);
+		ASSERT(mp->m_writeio_log <= 0xff);
+		ip->i_readio_log = (uchar_t) mp->m_readio_log;
+		ip->i_writeio_log = (uchar_t) mp->m_writeio_log;
+		ip->i_max_io_log = (uchar_t) mp->m_writeio_log;
+		ip->i_readio_blocks = mp->m_readio_blocks;
+		ip->i_writeio_blocks = mp->m_writeio_blocks;
+
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	}
 
@@ -5439,8 +5449,7 @@ xfs_alloc_file_space(
 		/*
 		 * complete the transaction
 		 */
-		error = xfs_bmap_finish(&tp, &free_list, firstfsb,
-					&committed);
+		error = xfs_bmap_finish(&tp, &free_list, firstfsb, &committed);
 		if (error) {
 			goto error0;
 		}
