@@ -306,7 +306,6 @@ extern void pagebuf_lock_disable(	/* disable buffer locking	*/
 
 extern struct pb_target *pagebuf_lock_enable(
 		dev_t,
-		struct super_block *,
 		int);			/* do blkdev_get?		*/
 
 extern void pagebuf_target_blocksize(

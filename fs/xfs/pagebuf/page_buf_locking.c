@@ -153,7 +153,6 @@ pagebuf_lock_disable(
 pb_target_t *
 pagebuf_lock_enable(
 	dev_t			dev,
-	struct super_block	*sb,
 	int			do_blkdev_get)
 {
 	struct block_device	*bdev;
