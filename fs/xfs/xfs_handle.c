@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.12 $"
+#ident "$Revision: 1.13 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -358,7 +358,8 @@ vp_to_handle (
 	if (fidp == NULL)
 		return EIO;		/* FIX: what real errno? */
 	bcopy (vp->v_vfsp->vfs_altfsid, &handlep->ha_fsid, sizeof (fsid_t));
-	bcopy (fidp, &handlep->ha_fid, sizeof *fidp);
+	/* Copy only the currently used part of the fid struct */
+	bcopy (fidp, &handlep->ha_fid, fidp->fid_len + sizeof fidp->fid_len);
 	hsize = HSIZE (*handlep);
 	bzero ((char *) handlep + hsize, sizeof *handlep - hsize);
 	freefid (fidp);
