@@ -844,6 +844,7 @@ init_xfs_fs( void )
 	error = register_filesystem(&xfs_fs_type);
 	if (error)
 		goto undo_register;
+	XFS_DM_INIT(&xfs_fs_type);
 	return 0;
 
 undo_register:
@@ -859,6 +860,7 @@ undo_inodecache:
 STATIC void __exit
 exit_xfs_fs( void )
 {
+	XFS_DM_EXIT(&xfs_fs_type);
 	unregister_filesystem(&xfs_fs_type);
 	xfs_cleanup();
 	pagebuf_terminate();
