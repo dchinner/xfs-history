@@ -1,4 +1,4 @@
-#ident "$Revision: 1.89 $"
+#ident "$Revision: 1.90 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -94,6 +94,9 @@ xfs_trans_init(
 	resp->tr_attrset = XFS_CALC_ATTRSET_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
 	resp->tr_attrrm = XFS_CALC_ATTRRM_LOG_RES(mp) + XFS_DQUOT_LOGRES(mp);
 	resp->tr_clearagi = XFS_CALC_CLEAR_AGI_BUCKET_LOG_RES(mp);
+	resp->tr_growrtalloc = XFS_CALC_GROWRTALLOC_LOG_RES(mp);
+	resp->tr_growrtzero = XFS_CALC_GROWRTZERO_LOG_RES(mp);
+	resp->tr_growrtfree = XFS_CALC_GROWRTFREE_LOG_RES(mp);
 }
 
 /*
@@ -387,6 +390,21 @@ xfs_trans_mod_sb(
 	case XFS_TRANS_SB_IMAXPCT:
 		tp->t_imaxpct_delta += delta;
 		break;
+	case XFS_TRANS_SB_REXTSIZE:
+		tp->t_rextsize_delta += delta;
+		break;
+	case XFS_TRANS_SB_RBMBLOCKS:
+		tp->t_rbmblocks_delta += delta;
+		break;
+	case XFS_TRANS_SB_RBLOCKS:
+		tp->t_rblocks_delta += delta;
+		break;
+	case XFS_TRANS_SB_REXTENTS:
+		tp->t_rextents_delta += delta;
+		break;
+	case XFS_TRANS_SB_REXTSLOG:
+		tp->t_rextslog_delta += delta;
+		break;
 	default:
 		ASSERT(0);
 		return;
@@ -448,6 +466,26 @@ xfs_trans_apply_sb_deltas(
 		sbp->sb_imax_pct += tp->t_imaxpct_delta;
 		whole = 1;
 	}
+	if (tp->t_rextsize_delta != 0) {
+		sbp->sb_rextsize += tp->t_rextsize_delta;
+		whole = 1;
+	}
+	if (tp->t_rbmblocks_delta != 0) {
+		sbp->sb_rbmblocks += tp->t_rbmblocks_delta;
+		whole = 1;
+	}
+	if (tp->t_rblocks_delta != 0) {
+		sbp->sb_rblocks += tp->t_rblocks_delta;
+		whole = 1;
+	}
+	if (tp->t_rextents_delta != 0) {
+		sbp->sb_rextents += tp->t_rextents_delta;
+		whole = 1;
+	}
+	if (tp->t_rextslog_delta != 0) {
+		sbp->sb_rextslog += tp->t_rextslog_delta;
+		whole = 1;
+	}
 
 	if (whole)
 		/*
@@ -475,7 +513,7 @@ void
 xfs_trans_unreserve_and_mod_sb(
 	xfs_trans_t	*tp)
 {
-	xfs_mod_sb_t	msb[9];		/* If you add cases, add entries */
+	xfs_mod_sb_t	msb[14];	/* If you add cases, add entries */
 	xfs_mod_sb_t	*msbp;
 	/* REFERENCED */
 	int		error;
@@ -542,6 +580,31 @@ xfs_trans_unreserve_and_mod_sb(
 		if (tp->t_imaxpct_delta != 0) {
 			msbp->msb_field = XFS_SBS_IMAX_PCT;
 			msbp->msb_delta = tp->t_imaxpct_delta;
+			msbp++;
+		}
+		if (tp->t_rextsize_delta != 0) {
+			msbp->msb_field = XFS_SBS_REXTSIZE;
+			msbp->msb_delta = tp->t_rextsize_delta;
+			msbp++;
+		}
+		if (tp->t_rbmblocks_delta != 0) {
+			msbp->msb_field = XFS_SBS_RBMBLOCKS;
+			msbp->msb_delta = tp->t_rbmblocks_delta;
+			msbp++;
+		}
+		if (tp->t_rblocks_delta != 0) {
+			msbp->msb_field = XFS_SBS_RBLOCKS;
+			msbp->msb_delta = tp->t_rblocks_delta;
+			msbp++;
+		}
+		if (tp->t_rextents_delta != 0) {
+			msbp->msb_field = XFS_SBS_REXTENTS;
+			msbp->msb_delta = tp->t_rextents_delta;
+			msbp++;
+		}
+		if (tp->t_rextslog_delta != 0) {
+			msbp->msb_field = XFS_SBS_REXTSLOG;
+			msbp->msb_delta = tp->t_rextslog_delta;
 			msbp++;
 		}
 	}

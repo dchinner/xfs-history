@@ -109,6 +109,9 @@ typedef struct xfs_log_item {
 #define XFS_TRANS_QM_QUOTAOFF_END	34
 #define XFS_TRANS_SB_UNIT		35
 #define XFS_TRANS_FSYNC_TS		36
+#define	XFS_TRANS_GROWFSRT_ALLOC	37
+#define	XFS_TRANS_GROWFSRT_ZERO		38
+#define	XFS_TRANS_GROWFSRT_FREE		39
 
 typedef struct xfs_item_ops {
 	uint (*iop_size)(xfs_log_item_t *);
@@ -322,6 +325,11 @@ typedef struct xfs_trans {
 	long			t_dblocks_delta;/* superblock dblocks change */
 	long			t_agcount_delta;/* superblock agcount change */
 	long			t_imaxpct_delta;/* superblock imaxpct change */
+	long			t_rextsize_delta;/* superblock rextsize chg */
+	long			t_rbmblocks_delta;/* superblock rbmblocks chg */
+	long			t_rblocks_delta;/* superblock rblocks change */
+	long			t_rextents_delta;/* superblocks rextents chg */
+	long			t_rextslog_delta;/* superblocks rextslog chg */
 	unsigned int		t_items_free;	/* log item descs free */
 	xfs_log_item_chunk_t	t_items;	/* first log item desc chunk */
 	xfs_trans_header_t	t_header;	/* header for in-log trans */
@@ -357,6 +365,11 @@ typedef struct xfs_trans {
 #define	XFS_TRANS_SB_DBLOCKS		0x00000040
 #define	XFS_TRANS_SB_AGCOUNT		0x00000080
 #define	XFS_TRANS_SB_IMAXPCT		0x00000100
+#define	XFS_TRANS_SB_REXTSIZE		0x00000200
+#define	XFS_TRANS_SB_RBMBLOCKS		0x00000400
+#define	XFS_TRANS_SB_RBLOCKS		0x00000800
+#define	XFS_TRANS_SB_REXTENTS		0x00001000
+#define	XFS_TRANS_SB_REXTSLOG		0x00002000
 
 /*
  * Various log reservation values.
@@ -380,7 +393,7 @@ typedef struct xfs_trans {
  * extents.  This gives:
  *    the inode getting the new extents: inode size
  *    the inode\'s bmap btree: max depth * block size
- *    the agfs of the ags from which the extents are allocate: 2 * sector
+ *    the agfs of the ags from which the extents are allocated: 2 * sector
  *    the superblock free block counter: sector size
  *    the allocation btrees: 2 * 2 * max depth * block size
  * And the bmap_finish transaction can free bmap blocks in a join:
@@ -608,7 +621,57 @@ typedef struct xfs_trans {
 	 (128 * (3 + (2 * XFS_AG_MAXLEVELS(mp)))))
 
 #define	XFS_GROWDATA_LOG_RES(mp)    ((mp)->m_reservations.tr_growdata)
-     
+
+/*
+ * Growing the rt section of the filesystem.
+ * In the first set of transactions (ALLOC) we allocate space to the
+ * bitmap or summary files.
+ *	superblock: sector size
+ *	agf of the ag from which the extent is allocated: sector size
+ *	bmap btree for bitmap/summary inode: max depth * blocksize
+ *	bitmap/summary inode: inode size
+ *	allocation btrees for 1 block allocation: 2 * maxdepth * blocksize
+ */
+#define	XFS_CALC_GROWRTALLOC_LOG_RES(mp) \
+	(2 * (mp)->m_sb.sb_sectsize + \
+	 XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK)) + \
+	 (mp)->m_sb.sb_inodesize + \
+	 (2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp))) + \
+	 (128 * \
+	  (3 + XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) + \
+	   2 * XFS_AG_MAXLEVELS(mp))))
+
+#define	XFS_GROWRTALLOC_LOG_RES(mp)	((mp)->m_reservations.tr_growrtalloc)
+
+/*
+ * Growing the rt section of the filesystem.
+ * In the second set of transactions (ZERO) we zero the new metadata blocks.
+ *	one bitmap/summary block: blocksize	
+ */
+#define	XFS_CALC_GROWRTZERO_LOG_RES(mp) \
+	((mp)->m_sb.sb_blocksize + 128)
+
+#define	XFS_GROWRTZERO_LOG_RES(mp)	((mp)->m_reservations.tr_growrtzero)
+
+/*
+ * Growing the rt section of the filesystem.
+ * In the third set of transactions (FREE) we update metadata without
+ * allocating any new blocks.
+ *	superblock: sector size
+ *	bitmap inode: inode size
+ *	summary inode: inode size
+ *	one bitmap block: blocksize	
+ *	summary blocks: new summary size
+ */
+#define	XFS_CALC_GROWRTFREE_LOG_RES(mp) \
+	((mp)->m_sb.sb_sectsize + \
+	 2 * (mp)->m_sb.sb_inodesize + \
+	 (mp)->m_sb.sb_blocksize + \
+	 (mp)->m_rsumsize + \
+	 (128 * 5))
+
+#define	XFS_GROWRTFREE_LOG_RES(mp)	((mp)->m_reservations.tr_growrtfree)
+
 /*
  * Logging the inode modification timestamp on a synchronous write.
  *	inode
