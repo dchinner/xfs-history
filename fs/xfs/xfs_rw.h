@@ -35,7 +35,8 @@ xfs_bmap(vnode_t	*vp,
 void
 xfs_zero_eof(xfs_inode_t	*ip,
 	     off_t		offset,
-	     __int64_t		isize);
+	     __int64_t		isize,
+	     cred_t		*credp);
 
 
 
