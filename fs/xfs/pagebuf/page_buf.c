@@ -169,7 +169,7 @@ struct buffer_head		*pb_resv_bh = NULL;	/* list of bh */
 int				pb_resv_bh_cnt = 0;	/* # of bh available */
 
 STATIC void pagebuf_daemon_wakeup(int);
-STATIC void _pagebuf_ioapply(page_buf_t *);
+STATIC int  _pagebuf_ioapply(page_buf_t *);
 STATIC void pagebuf_delwri_queue(page_buf_t *, int);
 STATIC void pagebuf_runall_queues(struct list_head[]);
 
@@ -518,12 +518,12 @@ _pagebuf_lookup_pages(
 	if (rval)
 		return rval;
 
-	rval = pi = 0;
+	all_mapped = 1;
 	blocksize = pb->pb_target->pbr_bsize;
 
 	/* Enter the pages in the page list */
 	index = (pb->pb_file_offset - pb->pb_offset) >> PAGE_CACHE_SHIFT;
-	for (all_mapped = 1; pi < page_count; pi++, index++) {
+	for (pi = 0; pi < page_count; pi++, index++) {
 		if (pb->pb_pages[pi] == 0) {
 		      retry:
 			page = find_or_create_page(aspace, index, gfp_mask);
@@ -1390,28 +1390,25 @@ _pagebuf_iolocked(
 	page_buf_t		*pb)
 {
 	ASSERT(pb->pb_flags & (PBF_READ|PBF_WRITE));
+	if (pb->pb_target->pbr_bsize < PAGE_CACHE_SIZE)
+		return pb->pb_locked;
 	if (pb->pb_flags & PBF_READ)
 		return pb->pb_locked;
-	return ((pb->pb_flags & _PBF_LOCKABLE) == 0);
+	return (!(pb->pb_flags & _PBF_LOCKABLE));
 }
 
 STATIC void
 _pagebuf_iodone(
 	page_buf_t		*pb,
-	int			fullpage,
+	int			unlock,
 	int			schedule)
 {
 	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
-		struct page	*page;
 		int		i;
 
-		for (i = 0; i < pb->pb_page_count; i++) {
-			page = pb->pb_pages[i];
-			if (fullpage && !PageError(page))
-				SetPageUptodate(page);
-			if (_pagebuf_iolocked(pb))
-				unlock_page(page);
-		}
+		if (unlock && _pagebuf_iolocked(pb))
+			for (i = 0; i < pb->pb_page_count; i++)
+				unlock_page(pb->pb_pages[i]);
 		pb->pb_locked = 0;
 		pagebuf_iodone(pb, (pb->pb_flags & PBF_FS_DATAIOD), schedule);
 	}
@@ -1437,11 +1434,14 @@ _end_io_pagebuf(
 	if (fullpage) {
 		unlock_buffer(bh);
 		_pagebuf_free_bh(bh);
+		if (!PageError(page))
+			SetPageUptodate(page);
 	} else {
 		static spinlock_t page_uptodate_lock = SPIN_LOCK_UNLOCKED;
 		struct buffer_head *bp;
 		unsigned long flags;
 
+		ASSERT(PageLocked(page));
 		spin_lock_irqsave(&page_uptodate_lock, flags);
 		clear_bit(BH_Async, &bh->b_state);
 		unlock_buffer(bh);
@@ -1457,7 +1457,7 @@ _end_io_pagebuf(
 			SetPageUptodate(page);
 	}
 
-	_pagebuf_iodone(pb, fullpage, 1);
+	_pagebuf_iodone(pb, 1, 1);
 }
 
 STATIC void
@@ -1480,7 +1480,7 @@ _pagebuf_end_io_partial_pages(
 /*
  * Initiate I/O on part of a page we are interested in
  */
-STATIC void
+STATIC int
 _pagebuf_page_io(
 	struct page		*page,	/* Page structure we are dealing with */
 	pb_target_t		*pbr,	/* device parameters (bsz, ssz, dev) */
@@ -1508,18 +1508,11 @@ _pagebuf_page_io(
 		public_bh = multi_ok = 1;
 		sector = 1 << sector_shift;
 
-		if (!page_has_buffers(page)) {
-			if (!locking) {
-				lock_page(page);
-				if (!page_has_buffers(page))
-					create_empty_buffers(page,
-							pbr->pbr_kdev, sector);
-				unlock_page(page);
-			} else {
-				create_empty_buffers(page,
-						pbr->pbr_kdev, sector);
-			}
-		}
+		ASSERT(locking);
+		ASSERT(PageLocked(page));
+
+		if (!page_has_buffers(page))
+			create_empty_buffers(page, pbr->pbr_kdev, sector);
 
 		i = sector >> BBSHIFT;
 		bn -= (pg_offset >> BBSHIFT);
@@ -1634,13 +1627,17 @@ request:
 				set_bit(BH_Uptodate, &bh->b_state);
 			generic_make_request(rw, bh);
 		}
-	} else {
-		if (locking)
-			unlock_page(page);
+		return 0;
 	}
+
+	/*
+	 * We have no I/O to submit, let the caller know that
+	 * we have skipped over this page entirely.
+	 */
+	return 1;
 }
 
-STATIC void
+STATIC int
 _pagebuf_page_apply(
 	page_buf_t		*pb,
 	loff_t			offset,
@@ -1652,7 +1649,7 @@ _pagebuf_page_apply(
 	page_buf_daddr_t	bn = pb->pb_bn;
 	pb_target_t		*pbr = pb->pb_target;
 	loff_t			pb_offset;
-	int			locking;
+	int			status, locking;
 
 	ASSERT(page);
 	ASSERT(pb->pb_flags & (PBF_READ|PBF_WRITE));
@@ -1672,15 +1669,18 @@ _pagebuf_page_apply(
 
 	locking = _pagebuf_iolocked(pb);
 	if (pb->pb_flags & PBF_WRITE) {
-		if (locking && (pb->pb_locked == 0))
+		if (locking && !pb->pb_locked)
 			lock_page(page);
-		_pagebuf_page_io(page, pbr, pb, bn,
+		status = _pagebuf_page_io(page, pbr, pb, bn,
 				pg_offset, pg_length, locking, WRITE,
 				last && (pb->pb_flags & PBF_FLUSH));
 	} else {
-		_pagebuf_page_io(page, pbr, pb, bn,
+		status = _pagebuf_page_io(page, pbr, pb, bn,
 				pg_offset, pg_length, locking, READ, 0);
 	}
+	if (status && locking)
+		unlock_page(page);
+	return status;
 }
 
 /*
@@ -1705,6 +1705,8 @@ int
 pagebuf_iorequest(			/* start real I/O		*/
 	page_buf_t		*pb)	/* buffer to convey to device	*/
 {
+	int			unlock;
+
 	PB_TRACE(pb, PB_TRACE_REC(ioreq), 0);
 
 	if (pb->pb_flags & PBF_DELWRI) {
@@ -1723,8 +1725,8 @@ pagebuf_iorequest(			/* start real I/O		*/
 	 * all the I/O from calling pagebuf_iodone too early.
 	 */
 	atomic_set(&pb->pb_io_remaining, 1);
-	_pagebuf_ioapply(pb);
-	_pagebuf_iodone(pb, 0, 0);
+	unlock = _pagebuf_ioapply(pb);
+	_pagebuf_iodone(pb, unlock, 0);
 
 	pagebuf_rele(pb);
 	return 0;
@@ -1829,11 +1831,11 @@ pagebuf_iomove(
  *
  *	Applies _pagebuf_page_apply to each page of the page_buf_t.
  */
-STATIC void
+STATIC int
 _pagebuf_ioapply(			/* apply function to pages	*/
 	page_buf_t		*pb)	/* buffer to examine		*/
 {
-	int			buf_index;
+	int			index, skipped = 0;
 	loff_t			buffer_offset = pb->pb_file_offset;
 	size_t			buffer_len = pb->pb_count_desired;
 	size_t			page_offset, len;
@@ -1842,11 +1844,19 @@ _pagebuf_ioapply(			/* apply function to pages	*/
 	cur_offset = pb->pb_offset;
 	cur_len = buffer_len;
 
-	for (buf_index = 0; buf_index < pb->pb_page_count; buf_index++) {
+	if (!pb->pb_locked &&
+	    (pb->pb_target->pbr_bsize < PAGE_CACHE_SIZE)) {
+		for (index = 0; index < pb->pb_page_count; index++)
+			lock_page(pb->pb_pages[index]);
+		pb->pb_locked = 1;
+	}
+
+	for (index = 0; index < pb->pb_page_count; index++) {
 		if (cur_len == 0)
 			break;
 		if (cur_offset >= PAGE_CACHE_SIZE) {
 			cur_offset -= PAGE_CACHE_SIZE;
+			skipped++;
 			continue;
 		}
 
@@ -1858,18 +1868,28 @@ _pagebuf_ioapply(			/* apply function to pages	*/
 			len = cur_len;
 		cur_len -= len;
 
-		_pagebuf_page_apply(pb, buffer_offset,
-				pb->pb_pages[buf_index], page_offset, len,
-				buf_index+1 == pb->pb_page_count);
+		skipped += _pagebuf_page_apply(pb, buffer_offset,
+				pb->pb_pages[index], page_offset, len,
+				index + 1 == pb->pb_page_count);
 		buffer_offset += len;
 		buffer_len -= len;
 	}
 
+	/*
+	 * Run the block device task queue here, while we have
+	 * a hold on the pagebuf (important to have that hold).
+	 */
 	if (pb->pb_flags & PBF_RUN_QUEUES) {
 		pb->pb_flags &= ~PBF_RUN_QUEUES;
 		if (atomic_read(&pb->pb_io_remaining) > 1)
 			blk_run_queues();
 	}
+
+	/*
+	 * If we issued no I/O, noone is going to clear "pb_locked".
+	 * Let the caller know and handle it higher up.
+	 */
+	return (skipped != pb->pb_page_count);
 }
 
 
