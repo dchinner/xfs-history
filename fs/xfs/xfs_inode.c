@@ -1,4 +1,4 @@
-#ident "$Revision: 1.203 $"
+#ident "$Revision: 1.204 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -3401,6 +3401,12 @@ xfs_iroundup(
  * Change the requested timestamp in the given inode.
  * We don't lock across timestamp updates, and we don't log them but
  * we do record the fact that there is dirty information in core.
+ *
+ * NOTE -- callers MUST combine XFS_ICHGTIME_MOD or XFS_ICHGTIME_CHG
+ * 		with XFS_ICHGTIME_ACC to be sure that access time
+ *		update will take.  Calling first with XFS_ICHGTIME_ACC
+ *		and then XFS_ICHGTIME_MOD may fail to modify the access
+ *		timestamp if the filesystem is mounted noacctm.
  */
 void
 xfs_ichgtime(xfs_inode_t *ip,
@@ -3413,6 +3419,14 @@ xfs_ichgtime(xfs_inode_t *ip,
 	 * filesystems.  Throw it away if anyone asks us.
 	 */
 	if (XFS_ITOV(ip)->v_vfsp->vfs_flag & VFS_RDONLY)
+		return;
+
+	/*
+	 * Don't update access timestamps on reads if mounted "noacctm"
+	 * Throw it away if anyone asks us.
+	 */
+	if (ip->i_mount->m_flags & XFS_MOUNT_NOATIME &&
+	    (flags & XFS_ICHGTIME_ACC) == XFS_ICHGTIME_ACC)
 		return;
 
 	nanotime(&tv);
