@@ -69,8 +69,9 @@ extern ushort           vttoif_tab[];
 #define	VINACTIVE_TEARDOWN  0x2000	/* vnode torn down at inactive time */
 #define VSEMAPHORE	    0x4000	/* vnode ::= a Posix named semaphore */
 #define VUSYNC		    0x8000	/* vnode aspace ::= usync objects */
-
-#define VMODIFIED	   0x10000	/* xfs inode state possibly different
+#define VHASLABEL	   0x10000	/* vnode has a label and acl from VOP */
+#define VEXTATTR	   0x20000 /* atomic creation of vnode and setting MAC label */
+#define VMODIFIED	   0x40000	/* xfs inode state possibly different
 					 * from linux inode state.
 					 */
 
@@ -663,15 +664,6 @@ typedef struct vattr {
 #define MANDLOCK(vp, mode)	\
 	((vp)->v_type == VREG && ((mode) & (VSGID|(VEXEC>>3))) == VSGID)
 
-/*
- * This macro determines if a write is actually allowed
- * on the node.  This macro is used to check if a file's
- * access time can be modified.
- */
-#define	WRITEALLOWED(vp) \
- 	(((vp)->v_vfsp && ((vp)->v_vfsp->vfs_flag & VFS_RDONLY) == 0) || \
-	 (((vp)->v_type != VREG ) && ((vp)->v_type != VDIR) && ((vp)->v_type != VLNK)))
-
 extern void	vn_init(void);
 extern int	vn_wait(struct vnode *);
 extern vnode_t  *vn_initialize(struct vfs *, struct inode *);
@@ -744,8 +736,6 @@ extern void	vn_rele(struct vnode *);
 /*
  * Vnode spinlock manipulation.
  */
-#define	VN_LOCK(vp)		spin_lock(&(vp)->v_lock)
-#define	VN_UNLOCK(vp)		spin_unlock(&(vp)->v_lock)
 #define VN_FLAGSET(vp,b)	vn_flagset(vp,b)
 #define VN_FLAGCLR(vp,b)	vn_flagclr(vp,b)
 

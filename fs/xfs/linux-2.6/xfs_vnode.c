@@ -59,6 +59,10 @@ u_short vttoif_tab[] = {
 	0, S_IFREG, S_IFDIR, S_IFBLK, S_IFCHR, S_IFLNK, S_IFIFO, 0, S_IFSOCK
 };
 
+#define VN_LOCK(vp)             spin_lock(&(vp)->v_lock)
+#define VN_UNLOCK(vp)           spin_unlock(&(vp)->v_lock)
+
+
 void
 vn_init(void)
 {
@@ -133,7 +137,6 @@ vn_wait(struct vnode *vp)
 	VN_UNLOCK(vp);
 	return 0;
 }
-
 
 struct vnode *
 vn_initialize(vfs_t *vfsp, struct inode *inode)
