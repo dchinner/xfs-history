@@ -1,4 +1,4 @@
-#ident "$Revision: 1.218 $"
+#ident "$Revision: 1.219 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1034,8 +1034,7 @@ xfs_ialloc(
 	else
 		vp->v_flag &= ~VENF_LOCKING;	
 
-	ASSERT(!(vp->v_flag & (VNOMAP |
-			       VNOSWAP |
+	ASSERT(!(vp->v_flag & (VNOSWAP |
 			       VISSWAP |
 			       VREPLICABLE |
 			   /*  VNONREPLICABLE | XXX uncomment this */
