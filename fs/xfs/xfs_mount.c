@@ -264,7 +264,7 @@ xfs_mount_validate_sb(
 	}
 
 	/*
-	 * Until this is fixed only page-sized data blocks work.
+	 * Until this is fixed only page-sized or smaller data blocks work.
 	 */
 	if (sbp->sb_blocksize > PAGE_SIZE) {
 		cmn_err(CE_WARN,
