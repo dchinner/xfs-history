@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DINODE_H
 #define	_FS_XFS_DINODE_H
 
-#ident "$Revision: 1.24 $"
+#ident "$Revision: 1.25 $"
 
 #define	XFS_DINODE_VERSION	1
 #define	XFS_DINODE_MAGIC	0x494e	/* 'IN' */
@@ -17,6 +17,10 @@ typedef struct xfs_timestamp {
 	__int32_t	t_nsec;		/* timestamp nanoseconds */
 } xfs_timestamp_t;
 
+/*
+ * Note: Coordinate changes to this structure with the XFS_DI_* #defines
+ * below and the offsets table in xfs_ialloc_log_di().
+ */
 typedef struct xfs_dinode_core
 {
 	__uint16_t	di_magic;	/* inode magic # = XFS_DINODE_MAGIC */
@@ -27,8 +31,6 @@ typedef struct xfs_dinode_core
 	__uint32_t	di_uid;		/* owner's user id */
 	__uint32_t	di_gid;		/* owner's group id */
 	uuid_t		di_uuid;	/* file unique id */
-	xfs_fsize_t	di_size;	/* number of bytes in file */
-	xfs_extnum_t	di_nextents;	/* number of extents in file */
 	/*
 	 * While these fields hold 64 bit values, we will only
 	 * be using the upper 32 bits for now.  The t_nsec
@@ -38,10 +40,17 @@ typedef struct xfs_dinode_core
 	xfs_timestamp_t	di_atime;	/* time last accessed */
 	xfs_timestamp_t	di_mtime;	/* time last modified */
 	xfs_timestamp_t	di_ctime;	/* time created/inode modified */
-	__uint32_t	di_gen;		/* generation number */
-	xfs_extlen_t	di_extsize;	/* basic/minimum extent size for file */
-	__uint32_t	di_flags;	/* random flags, XFS_DIFLAG_... */
+	xfs_fsize_t	di_size;	/* number of bytes in file */
 	xfs_drfsbno_t	di_nblocks;	/* # of direct & btree blocks used */
+	xfs_extlen_t	di_extsize;	/* basic/minimum extent size for file */
+	xfs_extnum_t	di_nextents;	/* number of extents in file */
+	xfs_attrextnm_t di_nattrextents;/* number of extents in attribute fork*/
+	__uint8_t	di_forkoff;	/* 2nd fork offs, shift for 64b align */
+	__uint8_t	di_pad1;
+	__uint32_t	di_dmevmask;	/* DMIG event mask */
+	__uint16_t	di_dmstate;	/* DMIG state info */
+	__uint16_t	di_flags;	/* random flags, XFS_DIFLAG_... */
+	__uint32_t	di_gen;		/* generation number */
 } xfs_dinode_core_t;
 
 typedef struct xfs_dinode
@@ -65,26 +74,31 @@ typedef struct xfs_dinode
 /*
  * Bit names for logging disk inodes only
  */
-#define	XFS_DI_MAGIC		0x00001
-#define	XFS_DI_MODE		0x00002
-#define	XFS_DI_VERSION		0x00004
-#define	XFS_DI_FORMAT		0x00008
-#define	XFS_DI_NLINK		0x00010
-#define	XFS_DI_UID		0x00020
-#define	XFS_DI_GID		0x00040
-#define	XFS_DI_UUID		0x00080
-#define	XFS_DI_SIZE		0x00100
-#define	XFS_DI_NEXTENTS		0x00200
-#define	XFS_DI_ATIME		0x00400
-#define	XFS_DI_MTIME		0x00800
-#define	XFS_DI_CTIME		0x01000
-#define	XFS_DI_GEN		0x02000
-#define	XFS_DI_EXTSIZE		0x04000
-#define	XFS_DI_FLAGS		0x08000
-#define	XFS_DI_NBLOCKS		0x10000
-#define	XFS_DI_NEXT_UNLINKED	0x20000
-#define	XFS_DI_U		0x40000
-#define	XFS_DI_NUM_BITS		19
+#define	XFS_DI_MAGIC		0x000001
+#define	XFS_DI_MODE		0x000002
+#define	XFS_DI_VERSION		0x000004
+#define	XFS_DI_FORMAT		0x000008
+#define	XFS_DI_NLINK		0x000010
+#define	XFS_DI_UID		0x000020
+#define	XFS_DI_GID		0x000040
+#define	XFS_DI_UUID		0x000080
+#define	XFS_DI_ATIME		0x000100
+#define	XFS_DI_MTIME		0x000200
+#define	XFS_DI_CTIME		0x000400
+#define	XFS_DI_SIZE		0x000800
+#define	XFS_DI_NBLOCKS		0x001000
+#define	XFS_DI_EXTSIZE		0x002000
+#define	XFS_DI_NEXTENTS		0x004000
+#define	XFS_DI_NATTREXTENTS	0x008000
+#define	XFS_DI_FORKOFF		0x010000
+#define	XFS_DI_PAD1		0x020000
+#define	XFS_DI_DMEVMASK		0x040000
+#define	XFS_DI_DMSTATE		0x080000
+#define	XFS_DI_FLAGS		0x100000
+#define	XFS_DI_GEN		0x200000
+#define	XFS_DI_NEXT_UNLINKED	0x400000
+#define	XFS_DI_U		0x800000
+#define	XFS_DI_NUM_BITS		24
 #define	XFS_DI_ALL_BITS		((1 << XFS_DI_NUM_BITS) - 1)
 #define	XFS_DI_CORE_BITS	(XFS_DI_ALL_BITS & ~XFS_DI_U)
 
@@ -103,7 +117,7 @@ typedef enum xfs_dinode_fmt
 /*
  * Inode minimum and maximum sizes.
  */
-#define	XFS_DINODE_MIN_LOG	7
+#define	XFS_DINODE_MIN_LOG	8
 #define	XFS_DINODE_MAX_LOG	11
 #define	XFS_DINODE_MIN_SIZE	(1 << XFS_DINODE_MIN_LOG)
 #define	XFS_DINODE_MAX_SIZE	(1 << XFS_DINODE_MAX_LOG)
