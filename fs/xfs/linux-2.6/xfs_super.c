@@ -44,8 +44,10 @@ extern void vfsinit(void);
 extern int  xfs_init(int fstype);
 extern void xfs_cleanup(void);
 
+#ifdef CONFIG_XFS_DMAPI
 extern void dmapi_init(void);
 extern void dmapi_uninit(void);
+#endif
 
 static struct super_operations linvfs_sops;
 
@@ -860,7 +862,9 @@ static int __init init_xfs_fs(void)
 #ifdef CONFIG_XFS_GRIO
         xfs_grio_init();
 #endif
+#ifdef CONFIG_XFS_DMAPI
 	dmapi_init();
+#endif
 	printk(KERN_INFO 
 		"XFS filesystem Copyright (c) 2001 Silicon Graphics, Inc.\n");
 	return register_filesystem(&xfs_fs_type);
@@ -870,7 +874,9 @@ static int __init init_xfs_fs(void)
 
 static void __exit exit_xfs_fs(void)
 {
+#ifdef CONFIG_XFS_DMAPI
         dmapi_uninit();
+#endif
 #ifdef CONFIG_XFS_GRIO
         xfs_grio_uninit();
 #endif
