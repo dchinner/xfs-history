@@ -237,6 +237,7 @@ xfs_symlink(
 	char		*link_name,
 	vattr_t		*vap,
 	char		*target_path,
+	vnode_t		**vpp,
 	cred_t		*credp);
 
 STATIC int
@@ -2293,6 +2294,11 @@ xfs_lookup(
 		vp = newvp;
 	}
 
+#if XFS_BIG_FILESYSTEMS
+	vp->v_nodeid = ip->i_ino + ip->i_mount->m_inoadd;
+#else
+	vp->v_nodeid = ip->i_ino;
+#endif
 	*vpp = vp;
 
 	return 0;
@@ -2328,69 +2334,17 @@ xfs_ctrunc_trace(
 }
 #endif /* XFS_RW_TRACE */
 
-STATIC int xfs_create_exists(bhv_desc_t *, bhv_desc_t *, vattr_t *, int,
-	int, vnode_t **, cred_t *);
-STATIC int xfs_create_new(bhv_desc_t *, char *, vattr_t *, int, int,
-	vnode_t **, cred_t *);
 STATIC void xfs_create_broken(xfs_mount_t *, xfs_inode_t *, xfs_ino_t, uint);
-
-
-/*
- * xfs_create (Just call exists or new based on vpp).
- *	new might still find that name exists because
- *	of two creates racing.
- */
-STATIC int
-xfs_create(
-	bhv_desc_t	*dir_bdp,
-	char		*name,
-	vattr_t		*vap,
-	int		flags,
-	int		I_mode,
-	vnode_t		**vpp,
-	cred_t		*credp)
-{
-	vnode_t		*vp;
-	bhv_desc_t	*bdp;
-
-
-	if (vp = *vpp) {
-		/*
-		 * Convert the passed in vnode to an xfs inode.
-		 * We need to get the behavior first.
-		 */
-
-		bdp = VNODE_TO_FIRST_BHV(vp);
-		if (!BHV_IS_XFS(bdp)) {
-			bdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(vp),
-				&xfs_vnodeops);
-			/*
-			 * If we don't have an XFS vnode, drop through to
-			 * the old case.
-			 */
-			if (!bdp) {
-				VN_RELE(vp);
-				*vpp = NULL;
-			}
-		}
-		if (bdp)
-			return(xfs_create_exists(dir_bdp, bdp, vap, flags,
-					I_mode, vpp, credp));
-	}
-	
-	return(xfs_create_new(dir_bdp, name, vap, flags,
-			I_mode, vpp, credp));
-}
 
 #define	XFS_CREATE_NEW_MAXTRIES	10000
 
 /*
- * xfs_create_new (create a new file).
+ * xfs_create (create a new file).
  *   It might still find name exists out there, though.
  *	But vpp, doens't point at a vnode.
  */
 STATIC int
-xfs_create_new(
+xfs_create(
 	bhv_desc_t	*dir_bdp,
 	char		*name,
 	vattr_t		*vap,
@@ -2426,9 +2380,10 @@ xfs_create_new(
 	xfs_ino_t		e_inum_saved;	/* for retry trap code */
 	int			namelen;
 
+	ASSERT(!*vpp);
 	dir_vp = BHV_TO_VNODE(dir_bdp);
         dp = XFS_BHVTOI(dir_bdp);
-	vn_trace_entry(dir_vp, "xfs_create_new", (inst_t *)__return_address);
+	vn_trace_entry(dir_vp, "xfs_create", (inst_t *)__return_address);
 	dm_di_mode = vap->va_mode|VTTOIF(vap->va_type);
 	namelen = strlen(name);
 	if (namelen >= MAXNAMELEN)
@@ -2860,6 +2815,7 @@ xfs_create_new(
          */
         if (ISVDEV(vp->v_type)) {
                 newvp = (vnode_t *)spec_vp(vp, vp->v_rdev, vp->v_type, credp);
+		ASSERT(vp == newvp); /* On linux this better be equal*/
                 VN_RELE(vp);
                 if (newvp == NULL) {
 			error = XFS_ERROR(ENOSYS);
@@ -2867,6 +2823,12 @@ xfs_create_new(
 		}
                 vp = newvp;
         }
+
+#if XFS_BIG_FILESYSTEMS
+	vp->v_nodeid = ip->i_ino + mp->m_inoadd;
+#else
+	vp->v_nodeid = ip->i_ino;
+#endif
 
         *vpp = vp;
 
@@ -2949,236 +2911,6 @@ xfs_create_broken(
 #endif	/* DEBUG */
 #endif
 #endif
-}
-
-
-/*
- * xfs_create_exists (create on top of an existing vnode).
- * 	*vpp has vnode found by a lookup and the caller must
- *	have a reference on the vnode.
- */
-/* ARGSUSED */
-STATIC int
-xfs_create_exists(
-	bhv_desc_t	*dir_bdp,
-	bhv_desc_t	*bdp,
-	vattr_t		*vap,
-	int		flags,
-	int		I_mode,
-	vnode_t		**vpp,
-	cred_t		*credp)
-{
-#ifdef VNODE_TRACING
-	vnode_t 		*dir_vp = BHV_TO_VNODE(dir_bdp);
-#endif
-	xfs_inode_t      	*dp, *ip;
-        vnode_t		        *vp, *newvp;
-	xfs_trans_t      	*tp = NULL;
-        xfs_mount_t	        *mp;
-        int                     error = 0;
-	uint			cancel_flags;
-	void			oplock_fs_create(vnode_t *);
-
-        dp = XFS_BHVTOI(dir_bdp);
-	vp = *vpp;
-
-	vn_trace_entry(dir_vp, "xfs_create_exists", (inst_t *)__return_address);
-
-	mp = dp->i_mount;
-
-	if (XFS_FORCED_SHUTDOWN(mp)) {
-		error = XFS_ERROR(EIO);
-		goto error_out;
-	}
-
-	ip = XFS_BHVTOI(bdp);
-	ITRACE(ip);
-
-	/*
-	 * Since we're at a good, clean point, check for any
-	 * obvious problems and get out if they occur.
-	 */
-
-	ASSERT(!(flags & VEXCL));
-	if (vp->v_type == VDIR) {
-		error = XFS_ERROR(EISDIR);
-	}
-
-	if (!error && XFS_IS_QUOTA_ON(mp)) {
-		if (XFS_NOT_DQATTACHED(mp, ip)) 
-			error = xfs_qm_dqattach(ip, 0);
-	}
-
-#if 0
-	/*
-	 * Check permissions if needed.
-	 */
-	if (I_mode && !error) {
-		/*
-		 * Now lock inode and check permissions.
-		 */
-			
-		xfs_ilock(ip, XFS_ILOCK_EXCL);
-		error = xfs_iaccess(ip, I_mode);
-		xfs_iunlock(ip, XFS_ILOCK_EXCL);
-	}
-#endif
-
-	if (error)
-		goto error_return;
-
-	/*
-	 * if the create will lead to a truncate of a regular file,
-	 * have to check to see if an oplock is set.
-	 */
-	if (vp->v_type == VREG && vap->va_mask & AT_SIZE &&
-	    vp->v_flag & VOPLOCK) {
-#pragma mips_frequency_hint NEVER
-		oplock_fs_create(vp);
-	}
-
-	/*
-	 * All that is left is a possible truncate.
-	 * Truncates are only done on VREG's and if the user
-	 * requested it with AT_SIZE.
-	 */
-
-	if (vp->v_type == VREG && (vap->va_mask & AT_SIZE)) {
-
-#ifndef SIM
-		if (DM_EVENT_ENABLED (vp->v_vfsp, ip, DM_EVENT_TRUNCATE)) {
-
-			error = xfs_dm_send_data_event (DM_EVENT_TRUNCATE,
-				bdp, vap->va_size, 0, 0, NULL);
-			if (error)
-				goto error_return;
-		}
-#endif
-		/* Need the behaviour lock before the iolock as we are
-		 * potentially going to make a VOP call on vp
-		 */
-		VN_BHV_READ_LOCK(&(vp)->v_bh);
-
-		/*
-		 * We need to do the xfs_itruncate_start call before
-		 * reserving any log space in the transaction.
-		 */
-		xfs_ilock(ip, XFS_IOLOCK_EXCL);
-		xfs_ctrunc_trace(XFS_CTRUNC1, ip);
-
-		/*
-		 * Truncate the file.  The timestamps must
-		 * be updated whether the file is changed
-		 * or not. But the timestamps don't need
-		 * a transaction.
-		 */
-
-		if ((ip->i_d.di_size != 0) || (ip->i_d.di_nextents != 0)) {
-			ASSERT(vap->va_size == 0);
-			xfs_itruncate_start(ip, XFS_ITRUNC_DEFINITE, 0);
-
-			/* Done with behaviour lock */
-			VN_BHV_READ_UNLOCK(&(vp)->v_bh);
-
-			tp = xfs_trans_alloc(mp, XFS_TRANS_SETATTR_SIZE);
-			if (error = xfs_trans_reserve(tp, 0,
-						      XFS_ITRUNCATE_LOG_RES(mp), 0,
-						      XFS_TRANS_PERM_LOG_RES,
-						      XFS_ITRUNCATE_LOG_COUNT)) {
-				xfs_iunlock(ip, XFS_IOLOCK_EXCL);
-				cancel_flags = 0;
-				xfs_ctrunc_trace(XFS_CTRUNC2, ip);
-				goto error_return;
-			}
-			
-			xfs_ilock(ip, XFS_ILOCK_EXCL);
-			xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
-			xfs_ctrunc_trace(XFS_CTRUNC5, ip);
-			xfs_trans_ihold(tp, ip);
-			/*
-			 * always signal sync xaction.  We're
-			 * truncating an existing file so the
-			 * xaction must be sync regardless
-			 * of whether the filesystem is wsync
-			 * to make the truncate persistent
-			 * in the face of a crash.
-			 */
-			error = xfs_itruncate_finish(&tp, ip,
-						     (xfs_fsize_t)0,
-						     XFS_DATA_FORK, 1);
-			if (error) {
-				ASSERT(ip->i_transp == tp);
-				xfs_trans_ihold_release(tp, ip);
-				goto abort_return;
-			}
-			xfs_ichgtime(ip,
-				XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
-			xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
-
-			/*
-			 * xfs_trans_commit normally decrements the vnode
-			 * ref count when it unlocks the inode. Since we
-			 * want to return the vnode to the caller, we bump
-			 * the vnode ref count now.
-			 */
-
-			IHOLD(ip);
-			error = xfs_trans_commit(tp,
-					XFS_TRANS_RELEASE_LOG_RES,
-					NULL);
-			/*
-			 * If we truncated the file, then the inode will
-			 * have been held within the transaction and must
-			 * be unlocked now.
-			 */
-			xfs_iunlock(ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
-			ASSERT(vp->v_count >= 2);
-			IRELE(ip);
-			if (error) { /* commit failed. */
-				tp = NULL;
-				goto error_return;
-			}
-		} else {
-			xfs_ichgtime(ip,
-				XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
-			xfs_iunlock(ip, XFS_IOLOCK_EXCL);
-			VN_BHV_READ_UNLOCK(&(vp)->v_bh);
-		}
-		CELL_ONLY(VOP_VNODE_CHANGE(vp, VCHANGE_FLAGS_TRUNCATED, 0));
-
-		xfs_ctrunc_trace(XFS_CTRUNC6, ip);
-
-	}
-
-	ASSERT(*vpp == vp);
-	/*
-	 * If vnode is a device, return special vnode instead.
-	 */
-	if (ISVDEV(vp->v_type)) {
-		newvp = (vnode_t *)spec_vp(vp, vp->v_rdev, vp->v_type, credp);
-
-		VN_RELE(vp);
-		if (newvp == NULL)
-			return XFS_ERROR(ENOSYS);
-
-		vp = newvp;
-	}
-
-	*vpp = vp;
-	return 0;
-
- abort_return:
-	cancel_flags |= XFS_TRANS_ABORT;
-	/* FALLTHROUGH */
- error_return:
-	if (tp != NULL)
-		xfs_trans_cancel(tp, cancel_flags);
-
- error_out:
-	ASSERT(*vpp);
-	VN_RELE(*vpp);
-	*vpp = NULL;
-	return error;
 }
 
 
@@ -4138,6 +3870,7 @@ xfs_mkdir(
 {
         xfs_inode_t             *dp;
 	xfs_inode_t		*cdp;	/* inode of created dir */
+	vnode_t			*cvp;	/* vnode of created dir */
         xfs_trans_t             *tp;
         xfs_ino_t               e_inum;
 	dev_t			rdev;
@@ -4336,10 +4069,16 @@ xfs_mkdir(
 		goto error2;
 	}
 
-	dnlc_remove(XFS_ITOV(cdp), "..");
+	cvp = XFS_ITOV(cdp);
+	dnlc_remove(cvp, "..");
 
 	created = B_TRUE;
-	*vpp = XFS_ITOV(cdp);
+#if XFS_BIG_FILESYSTEMS
+	cvp->v_nodeid = cdp->i_ino + mp->m_inoadd;
+#else
+	cvp->v_nodeid = cdp->i_ino;
+#endif
+	*vpp = cvp;
 	IHOLD(cdp);
 		
 	/*
@@ -4778,6 +4517,7 @@ xfs_symlink(
 	char	       	*link_name,
 	vattr_t		*vap,
 	char		*target_path,
+	vnode_t		**vpp,
 	cred_t		*credp)
 {
 	xfs_trans_t		*tp;
@@ -4808,10 +4548,12 @@ xfs_symlink(
 	uint			resblks;
 	int			link_namelen;
 
+	*vpp = NULL;
 	dir_vp = BHV_TO_VNODE(dir_bdp);
         dp = XFS_BHVTOI(dir_bdp);
 	dp_joined_to_trans = B_FALSE;
 	error = 0;
+	ip = NULL;
 	tp = NULL;
 
 	vn_trace_entry(dir_vp, "xfs_symlink", (inst_t *)__return_address);
@@ -5098,6 +4840,19 @@ std_return:
 						0, error, 0);
 	}
 #endif
+
+	if (!error) {
+		vnode_t *vp;
+
+		ASSERT(ip);
+		vp = XFS_ITOV(ip);
+#if XFS_BIG_FILESYSTEMS
+		vp->v_nodeid = ip->i_ino + mp->m_inoadd;
+#else
+		vp->v_nodeid = ip->i_ino;
+#endif
+		*vpp = vp;
+	}
 	return error;
 
  error2:

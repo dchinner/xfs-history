@@ -113,18 +113,13 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 	} else if (tp == VDIR) {
 		VOP_MKDIR(dvp, (char *)dentry->d_name.name, &va, &vp,
 			&cred, error);
+	} else {
+		error = -EINVAL;
 	}
 
 	if (!error) {
 		ASSERT(vp);
-		bzero(&va, sizeof(va));
-		va.va_mask = AT_NODEID;
-		VOP_GETATTR(vp, &va, 0, &cred, error);
-		if (error) {
-			VN_RELE(vp);
-			return -error;
-		}
-		ino = va.va_nodeid;
+		ino = vp->v_nodeid;
 		ASSERT(ino);
 		ip = iget(dir->i_sb, ino);
 		if (!ip) {
@@ -152,7 +147,6 @@ struct dentry * linvfs_lookup(struct inode *dir, struct dentry *dentry)
 	pathname_t	pn;
 	pathname_t      *pnp = &pn;
 	struct inode	*ip = NULL;
-	vattr_t		va;
 	ino_t		ino;
 	cred_t		cred;		/* Temporary cred workaround */
 
@@ -173,14 +167,7 @@ struct dentry * linvfs_lookup(struct inode *dir, struct dentry *dentry)
 						&cred, error);
 	if (!error) {
 		ASSERT(cvp);
-		bzero(&va, sizeof(va));
-		va.va_mask = AT_NODEID;
-		VOP_GETATTR(cvp, &va, 0, &cred, error);
-		if (error) {
-			VN_RELE(cvp);
-			return ERR_PTR(-error);
-		}
-		ino = va.va_nodeid;
+		ino = cvp->v_nodeid;
 		ASSERT(ino);
 		ip = iget(dir->i_sb, ino);
 		if (!ip) {
@@ -255,7 +242,7 @@ int linvfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname
 	int		error;
 	vnode_t		*dvp;	/* directory containing name to remove */
 	vnode_t		*cvp;	/* used to lookup symlink to put in dentry */
-	vattr_t		va;
+        vattr_t va;
 	pathname_t	pn;
 	pathname_t      *pnp = &pn;
 	struct inode	*ip = NULL;
@@ -272,41 +259,17 @@ int linvfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname
 
 	error = 0;
 	VOP_SYMLINK(dvp, (char *)dentry->d_name.name, &va, (char *)symname,
-							&cred, error);
+							&cvp, &cred, error);
 	if (!error) {
-		/* Now need to lookup the name since we didn't get the vp back */
-		/* Maybe modify VOP_SYMLINK to return *vpp? */
-		/* But, lookup should hit DNLC, anyway */
-
-		/*
-		 * Initialize a pathname_t to pass down.
-		 */
-		bzero(pnp, sizeof(pathname_t));
-		pnp->pn_complen = dentry->d_name.len;
-		pnp->pn_hash = dentry->d_name.hash;
-		pnp->pn_path = (char *)dentry->d_name.name;
-
-		cvp = NULL;
-		VOP_LOOKUP(dvp, (char *)dentry->d_name.name, &cvp, pnp, 0, NULL,
-					&cred, error);
-		if (!error) {
-			ASSERT(cvp);
-			bzero(&va, sizeof(va));
-			va.va_mask = AT_NODEID;
-			VOP_GETATTR(cvp, &va, 0, &cred, error);
-			if (error) {
-				VN_RELE(cvp);
-				return error;
-			}
-			ino = va.va_nodeid;
-			ASSERT(ino && (cvp->v_type == VLNK));
-			ip = iget(dir->i_sb, ino);
-			if (!ip) {
-				error = -ENOMEM;
-				VN_RELE(cvp);
-			} else {
-				d_instantiate(dentry, ip);
-			}
+		ASSERT(cvp);
+		ino = cvp->v_nodeid;
+		ASSERT(ino && (cvp->v_type == VLNK));
+		ip = iget(dir->i_sb, ino);
+		if (!ip) {
+			error = -ENOMEM;
+			VN_RELE(cvp);
+		} else {
+			d_instantiate(dentry, ip);
 		}
 	}
 	return -error;
@@ -356,7 +319,22 @@ int linvfs_rmdir(struct inode *dir, struct dentry *dentry)
 
 int linvfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
 {
-	return(linvfs_common_cr(dir, dentry, mode, VBLK, rdev));
+	int error = 0;
+	enum vtype tp;
+
+	if (S_ISCHR(mode)) {
+		tp = VCHR;
+	} else if (S_ISBLK(mode)) {
+		tp = VBLK;
+	} else {
+		error = -EINVAL;
+	}
+
+	if (!error) {
+		error = linvfs_common_cr(dir, dentry, mode, tp, rdev);
+	}
+
+	return(error);
 }
 
 
