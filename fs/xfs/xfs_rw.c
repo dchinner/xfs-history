@@ -1,4 +1,4 @@
-#ident "$Revision: 1.225 $"
+#ident "$Revision: 1.226 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -678,6 +678,9 @@ xfs_iomap_extra(
  * The inode's I/O lock may be held SHARED here, but the inode lock
  * must be held EXCL because it protects the read ahead state variables
  * in the inode.
+ * Bug 516806: The readahead state is now maintained by i_rlock therefore,
+ * the inode lock can be held in SHARED mode. The only time we need it 
+ * in EXCL mode is when it is being read in the first time.  
  */
 int					/* error */
 xfs_iomap_read(
@@ -686,7 +689,9 @@ xfs_iomap_read(
 	size_t		count,
 	struct bmapval	*bmapp,
 	int		*nbmaps,
-	struct pm	*pmp)
+	struct pm	*pmp,
+	int		*unlocked,
+	unsigned int	lockmode)
 {
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t	ioalign;
@@ -718,7 +723,7 @@ xfs_iomap_read(
 	xfs_bmbt_irec_t	*last_imapp;
 	xfs_bmbt_irec_t	imap[XFS_MAX_RW_NBMAPS];
 
-	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE) != 0);
+	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE | MR_ACCESS) != 0);
 	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE | MR_ACCESS) != 0);
 	xfs_iomap_enter_trace(XFS_IOMAP_READ_ENTER, ip, offset, count);
 
@@ -759,6 +764,9 @@ xfs_iomap_read(
 		return error;
 	}
 
+	xfs_iunlock_map_shared(ip, lockmode);
+	*unlocked = 1;
+	mutex_lock(&ip->i_rlock, PINOD);
 	if ((offset == ip->i_next_offset) &&
 	    (count <= ip->i_last_req_sz)) {
 		/*
@@ -1014,6 +1022,8 @@ xfs_iomap_read(
 		 */
 		ip->i_next_offset = offset + total_retrieved_bytes;
 	}
+	mutex_unlock(&ip->i_rlock);
+
 	*nbmaps = filled_bmaps;
 	for (x = 0; x < filled_bmaps; x++) {
 		curr_bmapp = &bmapp[x];
@@ -1056,6 +1066,8 @@ xfs_vop_readbuf(bhv_desc_t 	*bdp,
 	int		nmaps;
 	buf_t		*bp;
 	extern void	chunkrelse(buf_t *bp);
+	int		unlocked;
+	int		lockmode;
 
 	vp = BHV_TO_VNODE(bdp);
 	ip = XFS_BHVTOI(bdp);
@@ -1081,10 +1093,11 @@ xfs_vop_readbuf(bhv_desc_t 	*bdp,
 		goto out;
 #endif
 
-	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	unlocked = 0;
+	lockmode = xfs_ilock_map_shared(ip);
 
 	if (offset >= ip->i_d.di_size) {
-		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+		xfs_iunlock_map_shared(ip, lockmode);
 		goto out;
 	}
 
@@ -1096,8 +1109,10 @@ xfs_vop_readbuf(bhv_desc_t 	*bdp,
 	 */
 	nmaps = (ioflags & IO_NFS) ? 1 : 2;
 
-	error = xfs_iomap_read(ip, offset, len, bmaps, &nmaps, NULL);
-	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	error = xfs_iomap_read(ip, offset, len, bmaps, &nmaps, NULL, &unlocked,
+				lockmode);
+	if (!unlocked)
+		xfs_iunlock_map_shared(ip, lockmode);
 
 	/*
 	 * if the first bmap doesn't match the I/O request, forget it.
@@ -1162,6 +1177,8 @@ xfs_read_file(
 	int		buffer_bytes_ok;
 	xfs_inode_t	*ip;
 	int		error;
+	int		unlocked;
+	unsigned int	lockmode;
 
 	vp = BHV_TO_VNODE(bdp);
 	ip = XFS_BHVTOI(bdp);
@@ -1178,9 +1195,13 @@ xfs_read_file(
 	 * call to xfs_iomap_read tries to map as much of the request
 	 * plus read-ahead as it can.  We must hold the inode lock
 	 * exclusively when calling xfs_iomap_read.
+	 * Bug 516806: Introduced i_rlock to protect the readahead state
+	 * therefore do not need to hold the inode lock in exclusive
+	 * mode except when we first read in the file and the extents
+	 * are in btree format - xfs_ilock_map_shared takes care of it.
 	 */
 	do {
-		xfs_ilock(ip, XFS_ILOCK_EXCL);
+		lockmode = xfs_ilock_map_shared(ip);
 		xfs_rw_enter_trace(XFS_READ_ENTER, ip, uiop, ioflag);
 
 		/*
@@ -1188,16 +1209,18 @@ xfs_read_file(
 		 * just return with what we've done so far.
 		 */
 		if (uiop->uio_offset >= ip->i_d.di_size) {
-			xfs_iunlock(ip, XFS_ILOCK_EXCL);
+			xfs_iunlock_map_shared(ip, lockmode);
 			break;
 		}
  
+		unlocked = 0;
 		nbmaps = ip->i_mount->m_nreadaheads ;
 		ASSERT(nbmaps <= sizeof(bmaps) / sizeof(bmaps[0]));
 		error = xfs_iomap_read(ip, uiop->uio_offset, uiop->uio_resid,
-				       bmaps, &nbmaps, uiop->uio_pmp);
+			bmaps, &nbmaps, uiop->uio_pmp, &unlocked, lockmode);
 
-		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+		if (!unlocked)
+			xfs_iunlock_map_shared(ip, lockmode);
 
 		if (error || (bmaps[0].pbsize == 0)) {
 			break;
@@ -2272,11 +2295,6 @@ xfs_iomap_write(
 		curr_bmapp->pmp = pmp;
 	}
 
-	/*
-	 * Clear out any read-ahead info since the write may
-	 * have made it invalid.
-	 */
-	XFS_INODE_CLEAR_READ_AHEAD(ip);
 	return 0;
 }
 
@@ -2435,6 +2453,13 @@ xfs_write_file(
 		error = xfs_iomap_write(ip, offset, count, bmaps, &nbmaps,
 					ioflag, uiop->uio_pmp);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+
+		/*
+	 	 * Clear out any read-ahead info since the write may
+	 	 * have made it invalid.
+	 	 */
+		if (!error)
+			XFS_INODE_CLEAR_READ_AHEAD(ip);
 
 		if (error == ENOSPC) {
 			switch (fsynced) {
@@ -3113,6 +3138,8 @@ xfs_bmap(
 {
 	xfs_inode_t	*ip;
 	int		error;
+	int		unlocked;
+	int		lockmode;
 
 	ip = XFS_BHVTOI(bdp);
 	ASSERT((ip->i_d.di_mode & IFMT) == IFREG);
@@ -3120,14 +3147,17 @@ xfs_bmap(
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
 		return (EIO);
 
-	xfs_ilock(ip, XFS_ILOCK_EXCL);
-
 	if (flags == B_READ) {
 		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
+		unlocked = 0;
+		lockmode = xfs_ilock_map_shared(ip);
 		error = xfs_iomap_read(ip, offset, count, bmapp,
-				       nbmaps, NULL);
+				 nbmaps, NULL, &unlocked, lockmode);
+		if (!unlocked)
+			xfs_iunlock_map_shared(ip, lockmode);
 	} else {
 		ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
+		xfs_ilock(ip, XFS_ILOCK_EXCL);
 		ASSERT(ip->i_d.di_size >= (offset + count));
 
 		/* 
@@ -3137,17 +3167,21 @@ xfs_bmap(
 		if (XFS_IS_QUOTA_ON(ip->i_mount)) {
 			if (XFS_NOT_DQATTACHED(ip->i_mount, ip)) {
 				if (error = xfs_qm_dqattach(ip,
-							    XFS_QMOPT_ILOCKED))
+							    XFS_QMOPT_ILOCKED)){
+					xfs_iunlock(ip, XFS_ILOCK_EXCL);
 					goto error0;
+				}
 			}
 		}
 
 		error = xfs_iomap_write(ip, offset, count, bmapp,
 					nbmaps, 0, NULL);
+
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+		if (!error)
+			XFS_INODE_CLEAR_READ_AHEAD(ip);
 	}
  error0:
-	xfs_iunlock(ip, XFS_ILOCK_EXCL);
-
 	return error;
 }
 
@@ -4450,8 +4484,8 @@ xfs_strat_write(
 			 * state since in allocating space here we may have
 			 * made it invalid.
 			 */
-			XFS_INODE_CLEAR_READ_AHEAD(ip);
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
+			XFS_INODE_CLEAR_READ_AHEAD(ip);
 		}
 
 		/*
