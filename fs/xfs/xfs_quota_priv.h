@@ -66,8 +66,9 @@
 
 #define XQMLCK(h)			(mutex_lock(&((h)->qh_lock), PINOD))
 #define XQMUNLCK(h)			(mutex_unlock(&((h)->qh_lock)))
-/*#define XQMISLCKD(h)			(mutex_mine(&((h)->qh_lock)))*/
-#define XQMISLCKD(h)			((h)->qh_lock.state)
+#ifdef DEBUG
+#define XQMISLCKD(h)			((h)->qh_lock.state < 1)
+#endif
 
 #define XFS_DQ_HASH_LOCK(h)		XQMLCK(h)
 #define XFS_DQ_HASH_UNLOCK(h)		XQMUNLCK(h)
@@ -173,8 +174,9 @@ for ((dqp) = (qlist)->qh_next; (dqp) != (xfs_dquot_t *)(qlist); \
 	  dqvp = XFS_ITOV(ip);		\
 	  VMAP(dqvp, ip, dqvmap);	\
 	  VN_RELE(dqvp);		\
+	  dqvp->v_flag |= VPURGE;	\
 	  vn_purge(dqvp, &dqvmap);	\
-        }
+	}
 
 #define DQFLAGTO_TYPESTR(d) 	(((d)->dq_flags & XFS_DQ_USER) ? "USR" : \
 				 (((d)->dq_flags & XFS_DQ_PROJ) ? "PRJ" : "???"))

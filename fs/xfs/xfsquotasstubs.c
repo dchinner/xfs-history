@@ -46,8 +46,6 @@ void 	xfs_qm_destroy(struct xfs_qm *a) { return; }
 int	xfs_qm_dqflush_all(struct xfs_mount *a, int b)
 		{ return nopkg(); }
 int	xfs_qm_dqattach(struct xfs_inode *a, uint b) { return nopkg(); }
-int	xfs_quotactl(struct bhv_desc *a, int b, int c, xfs_caddr_t d)
-		{ return nopkg(); }
 int	xfs_qm_dqpurge_all(struct xfs_mount *a, uint b) { return nopkg(); }
 void	xfs_qm_mount_quotainit(struct xfs_mount *a, uint b) { return; }
 void	xfs_qm_unmount_quotadestroy(struct xfs_mount *a) { return; }
@@ -55,6 +53,12 @@ int	xfs_qm_mount_quotas(struct xfs_mount *a) { return nopkg(); }
 int 	xfs_qm_unmount_quotas(struct xfs_mount *a) { return nopkg(); }
 void	xfs_qm_dqdettach_inode(struct xfs_inode *a) { return; }
 int 	xfs_qm_sync(struct xfs_mount *a, short b) { return nopkg(); }
+
+/*
+ * quotactl(2) system call interface
+ */
+int	xfs_quotactl(xfs_mount_t *a, struct vfs *b, int c, int d,
+		int e, xfs_caddr_t f) { return nopkg(); };
 
 /*
  * dquot interface

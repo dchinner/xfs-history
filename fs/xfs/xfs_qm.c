@@ -277,9 +277,7 @@ xfs_qm_rele_quotafs_ref(
 /*
  * This is called at mount time from xfs_cmountfs in vfsops.c to initialize the
  * quotainfo structure and start the global quotamanager (xfs_Gqm) if it hasn't
- * already.
- * Note that the superblock has not been read in yet. This is before
- * xfs_mount_int() gets called.
+ * already.  Note that the superblock has not been read in yet.
  */
 void
 xfs_qm_mount_quotainit(
@@ -370,7 +368,7 @@ xfs_qm_mount_quotas(
 		mp->m_qflags = 0;
 		goto write_changes;
 	}
-	    
+
 	/*
 	 * If quotas on realtime volumes is not supported, we disable
 	 * quotas immediately.
@@ -1563,7 +1561,8 @@ xfs_qm_reset_dqcounts(
 	 */
 #ifdef DEBUG
 	j = XFS_FSB_TO_B(mp, XFS_DQUOT_CLUSTER_SIZE_FSB);
-	ASSERT(XFS_QM_DQPERBLK(mp) == do_div(j, sizeof(xfs_dqblk_t)));
+	do_div(j, sizeof(xfs_dqblk_t));
+	ASSERT(XFS_QM_DQPERBLK(mp) == j);
 #endif
 	ddq = (xfs_disk_dquot_t *)XFS_BUF_PTR(bp);
 	for (j = 0; j < XFS_QM_DQPERBLK(mp); j++) {

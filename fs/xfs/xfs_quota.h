@@ -188,7 +188,6 @@ extern struct xfs_qm   *xfs_qm_init(void);
 extern void 		xfs_qm_destroy(struct xfs_qm *);
 extern int		xfs_qm_dqflush_all(struct xfs_mount *, int);
 extern int		xfs_qm_dqattach(struct xfs_inode *, uint);
-extern int		xfs_quotactl(struct bhv_desc *, int, int, xfs_caddr_t);
 extern int		xfs_qm_dqpurge_all(struct xfs_mount *, uint);
 extern void		xfs_qm_mount_quotainit(struct xfs_mount *, uint);
 extern void		xfs_qm_unmount_quotadestroy(struct xfs_mount *);
@@ -196,6 +195,13 @@ extern int		xfs_qm_mount_quotas(struct xfs_mount *);
 extern int 		xfs_qm_unmount_quotas(struct xfs_mount *);
 extern void		xfs_qm_dqdettach_inode(struct xfs_inode *);
 extern int 		xfs_qm_sync(struct xfs_mount *, short);
+
+
+/*
+ * system call interface
+ */
+extern int		xfs_quotactl(xfs_mount_t *, struct vfs *, int, int,
+				     int, xfs_caddr_t);
 
 /*
  * dquot interface.

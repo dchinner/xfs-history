@@ -56,161 +56,87 @@ STATIC void	xfs_qm_export_dquot(xfs_mount_t *, xfs_disk_dquot_t *,
  */
 int
 xfs_quotactl(
-	struct bhv_desc *bdp,
+	xfs_mount_t	*mp,
+	struct vfs	*vfsp,
 	int		cmd,
 	int		id,
-	xfs_caddr_t		addr)
+	int		type,
+	xfs_caddr_t	addr)
 {
-	xfs_mount_t	*mp;
 	int 		error;
-	struct vfs	*vfsp;
 
-        mp = XFS_BHVTOM(bdp);
-	vfsp = bhvtovfs(bdp);
-
-#ifdef DEBUG		
-	/*
-	 * Internal quota accounting check for debugging
-	 */
-	if (cmd == 50) 
-		return (xfs_qm_internalqcheck(mp));
+#ifdef QUOTADEBUG
+	static int count = 0;
+	if (count++ == 50)
+		return xfs_qm_internalqcheck(mp);
 #endif
-	if (addr == NULL && cmd != Q_SYNC)
-		return XFS_ERROR(EINVAL);
-	if (id < 0 && cmd != Q_SYNC)
+
+	if (addr == NULL && cmd != Q_XQUOTAOFF)
 		return XFS_ERROR(EINVAL);
 
 	/*
 	 * The following commands are valid even when quotaoff.
 	 */
 	switch (cmd) {
-	      	/* 
-		 * truncate quota files. quota must be off.
-		 */
-	      case Q_QUOTARM:
-		if (XFS_IS_QUOTA_ON(mp) || addr == NULL)
+	case Q_XQUOTARM:
+		/* truncate quota files. quota must be off. */
+		if (XFS_IS_QUOTA_ON(mp))
 			return XFS_ERROR(EINVAL);
 		if (vfsp->vfs_flag & VFS_RDONLY)
 			return XFS_ERROR(EROFS);
-		return (xfs_qm_scall_trunc_qfiles(mp, 
-				       xfs_qm_import_qtype_flags((uint *)addr)));
-		/*
-		 * Get quota status information.
-		 */
-	      case Q_GETQSTAT:
+		return xfs_qm_scall_trunc_qfiles(mp, 
+				xfs_qm_import_qtype_flags((uint *)addr));
 
-		return (xfs_qm_scall_getqstat(mp, addr));
+	case Q_XGETQSTAT:
+		/* Get quota status information. */
+		return xfs_qm_scall_getqstat(mp, addr);
 
+	case Q_XQUOTAON:
 		/*
 		 * QUOTAON for root f/s and quota enforcement on others..
 		 * Quota accounting for non-root f/s's must be turned on
 		 * at mount time.
 		 */
-	      case Q_QUOTAON:
-		if (addr == NULL)
-			return XFS_ERROR(EINVAL);
 		if (vfsp->vfs_flag & VFS_RDONLY)
 			return XFS_ERROR(EROFS);
-		return (xfs_qm_scall_quotaon(mp,
-					  xfs_qm_import_flags((uint *)addr)));
-	      case Q_QUOTAOFF:
+		return xfs_qm_scall_quotaon(mp,
+				xfs_qm_import_flags((uint *)addr));
+
+	case Q_XQUOTAOFF:
 		if (vfsp->vfs_flag & VFS_RDONLY)
 			return XFS_ERROR(EROFS);
-		if (mp->m_dev == rootdev) {
-			return (xfs_qm_scall_quotaoff(mp,
-					    xfs_qm_import_flags((uint *)addr),
-					    B_FALSE));
-		}
-		break;
-		
-	      default:
+		if (mp->m_dev == rootdev)
+			return xfs_qm_scall_quotaoff(mp,
+				xfs_qm_import_flags((uint *)addr), B_FALSE);
 		break;
 	}
 
-	if (! XFS_IS_QUOTA_ON(mp))
+	if (!XFS_IS_QUOTA_ON(mp))
 		return XFS_ERROR(ESRCH);
 
 	switch (cmd) {
-	      case Q_QUOTAOFF:
+	case Q_XQUOTAOFF:
 		if (vfsp->vfs_flag & VFS_RDONLY)
 			return XFS_ERROR(EROFS);
-		error = xfs_qm_scall_quotaoff(mp,
-					    xfs_qm_import_flags((uint *)addr),
-					    B_FALSE);
-		break;
+		return xfs_qm_scall_quotaoff(mp,
+				    xfs_qm_import_flags((uint *)addr), B_FALSE);
 
-		/* 
-		 * Defaults to XFS_GETUQUOTA. 
-		 */
-	      case Q_XGETQUOTA:
-		error = xfs_qm_scall_getquota(mp, (xfs_dqid_t)id, XFS_DQ_USER, 
-					addr);
-		break;
-		/*
-		 * Set limits, both hard and soft. Defaults to Q_SETUQLIM.
-		 */
-	      case Q_XSETQLIM:
+	case Q_XGETQUOTA:
+		return xfs_qm_scall_getquota(mp, (xfs_dqid_t)id, type, addr);
+
+	case Q_XSETQLIM:
+		/* Set limits, both hard and soft. */
 		if (vfsp->vfs_flag & VFS_RDONLY)
 			return XFS_ERROR(EROFS);
-		error = xfs_qm_scall_setqlim(mp, (xfs_dqid_t)id, XFS_DQ_USER,
-					     addr);
-		break;
-#ifndef _NOPROJQUOTAS
-	       case Q_XSETPQLIM:
-		if (vfsp->vfs_flag & VFS_RDONLY)
-			return XFS_ERROR(EROFS);
-		error = xfs_qm_scall_setqlim(mp, (xfs_dqid_t)id, XFS_DQ_PROJ,
-					     addr);
-		break;
-
-	      		
-	      case Q_XGETPQUOTA:
-		error = xfs_qm_scall_getquota(mp, (xfs_dqid_t)id, XFS_DQ_PROJ, 
-					addr);
-		break;
-#else	
-	      case Q_XSETPQLIM:
-	      case Q_XGETPQUOTA:
-		error = XFS_ERROR(ENOTSUP);
-		break;
-#endif
-		/*
-		 * Add a warning to the User/Project.
-		 */
-	      case Q_WARN:
-		/*
-		 * XXX when this is supported, is it a readonly op?
-		 */
-		error = xfs_qm_scall_qwarn(mp, (xfs_dqid_t)id, addr);
-		break;
-
-		/*
-		 * Quotas are entirely undefined after quotaoff in XFS quotas.
-		 * For instance, there's no way to set limits when quotaoff.
-		 */
-	      case Q_ACTIVATE:
-	      case Q_SETQUOTA:
-	      case Q_GETQUOTA:
-	      case Q_GETPQUOTA:
-	      case Q_SETQLIM:
-	      case Q_SETPQLIM:
-	      case Q_SYNC:
-		error = XFS_ERROR(ENOTSUP);
-		break;
-
-	      default:
-		error = XFS_ERROR(EINVAL);
-		break;
+		return xfs_qm_scall_setqlim(mp, (xfs_dqid_t)id, type, addr);
 	}
-	return (error);
-
+	return XFS_ERROR(EINVAL);
 }
-
 
 
 /*
  * Turn off quota accounting and/or enforcement for all udquots and/or
- * pdquots. Called only at mount time.
+ * pdquots. Called only at unmount time.
  *
  * This assumes that there are no dquots of this file system cached 
  * incore, and modifies the ondisk dquot directly. Therefore, for example,
@@ -241,11 +167,8 @@ xfs_qm_scall_quotaoff(
 		return XFS_ERROR(EEXIST);
 	error = 0;
 
-#ifdef _NOPROJQUOTAS
-	flags &= (XFS_UQUOTA_ACCT | XFS_UQUOTA_ENFD);
-#else
 	flags &= (XFS_ALL_QUOTA_ACCT | XFS_ALL_QUOTA_ENFD);
-#endif	
+
 	/* 
 	 * We don't want to deal with two quotaoffs messing up each other,
 	 * so we're going to serialize it. quotaoff isn't exactly a performance
@@ -490,11 +413,7 @@ xfs_qm_scall_quotaon(
 
 	rootfs = (boolean_t) (mp->m_dev == rootdev);
 
-#ifdef _NOPROJQUOTAS
-	flags &= (XFS_UQUOTA_ACCT | XFS_UQUOTA_ENFD);
-#else
 	flags &= (XFS_ALL_QUOTA_ACCT | XFS_ALL_QUOTA_ENFD);
-#endif	
 	/*
 	 * If caller wants to turn on accounting on /, but accounting
 	 * is already turned on, ignore ACCTing flags.
@@ -553,7 +472,7 @@ xfs_qm_scall_quotaon(
 		mp->m_sb.sb_qflags = 0;
 		XFS_SB_UNLOCK(mp, s);
 #ifdef DEBUG
-		cmn_err(CE_NOTE, 
+		printk(KERN_INFO
 			"Old superblock version %x, converting to %x.",
 			oldv, mp->m_sb.sb_versionnum);
 #endif
@@ -822,11 +741,10 @@ xfs_qm_scall_setqlim(
 	} else /* if (XFS_IS_QUOTA_ENFORCED(mp)) */ {
 		/*
 		 * If the user is now over quota, start the timelimit.
-		 * The user will not be 'warned'. Warnings increase only
-		 * by request via Q_WARN.
+		 * The user will not be 'warned'.
 		 * Note that we keep the timers ticking, whether enforcement
 		 * is on or off. We don't really want to bother with iterating
-		 * over all ondisk dquots are turning the timers on/off.
+		 * over all ondisk dquots and turning the timers on/off.
 		 */
 		xfs_qm_adjust_dqtimers(mp, ddq);
 	}
@@ -842,21 +760,6 @@ xfs_qm_scall_setqlim(
 	return (0);
 }
 
-/* ARGSUSED */
-STATIC int
-xfs_qm_scall_qwarn(
-	xfs_mount_t 	*mp,
-	xfs_dqid_t 	id,
-	xfs_caddr_t 	addr)
-{
-	/*
-	 * XXX when this is supported, if it's a write operation
-	 * (changes the filesystem), it shouldn't work in a read-only
-	 * filesystem.  That has to be enforced in xfs_qm_sysent().
-	 */
-	return XFS_ERROR(ENOTSUP);
-}
-	   
 STATIC int
 xfs_qm_scall_getquota(
 	xfs_mount_t 	*mp,
@@ -924,8 +827,8 @@ xfs_qm_log_quotaoff_end(
 	xfs_trans_log_quotaoff_item(tp, qoffi);
 
 	/*
-	 * We have to make sure that the transaction is secure on disk before
-	 * we return and actually stop quota accounting. So, make it synchronous.
+	 * We have to make sure that the transaction is secure on disk before we
+	 * return and actually stop quota accounting. So, make it synchronous.
 	 * We don't care about quotoff's performance.
 	 */
 	xfs_trans_set_sync(tp);
@@ -966,8 +869,8 @@ xfs_qm_log_quotaoff(
 	xfs_mod_sb(tp, XFS_SB_QFLAGS);
 
 	/*
-	 * We have to make sure that the transaction is secure on disk before
-	 * we return and actually stop quota accounting. So, make it synchronous.
+	 * We have to make sure that the transaction is secure on disk before we
+	 * return and actually stop quota accounting. So, make it synchronous.
 	 * We don't care about quotoff's performance.
 	 */
 	xfs_trans_set_sync(tp);
@@ -1190,14 +1093,8 @@ again:
 			XFS_MOUNT_IUNLOCK(mp);
 			
 			/* XXX restart limit ? */
-#ifndef _IRIX62_XFS_ONLY
 			if ( ! (vp = vn_get(vp, &vmap, 0)))
 				goto again;
-#else
-			if ( ! (vp = vn_get(vp, vmap)))
-				goto again;
-			ASSERT(ip == XFS_VTOI(vp));
-#endif
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
 			vnode_refd = B_TRUE;
 		} else {
@@ -1283,7 +1180,7 @@ mutex_t	      qcheck_lock;
 typedef struct dqtest {
 	xfs_dqmarker_t	q_lists;
 	xfs_dqhash_t	*q_hash;        /* the hashchain header */
-	struct xfs_mount *q_mount;	/* filesystem this relates to */
+	xfs_mount_t	*q_mount;	/* filesystem this relates to */
 	xfs_dqid_t	d_id;		/* user id or proj id */
 	xfs_qcnt_t	d_bcount;	/* # disk blocks owned by the user */
 	xfs_qcnt_t	d_icount;	/* # inodes owned by the user */
@@ -1463,7 +1360,7 @@ xfs_qm_internalqcheck_adjust(
         xfs_trans_t     *tp,            /* transaction pointer */
         xfs_ino_t       ino,            /* inode number to get data for */
         void            *buffer,        /* not used */
-        xfs_daddr_t         bno,            /* starting block of inode cluster */	
+        xfs_daddr_t	bno,            /* starting block of inode cluster */	
 	void		*dip,		/* not used */
 	int		*res)		/* bulkstat result code */
 {

@@ -208,6 +208,7 @@ linvfs_read_super(
 	set_blocksize(sb->s_dev, 512);
 
 	sb->s_op = &linvfs_sops;
+	sb->dq_op = NULL;
 
 	LINVFS_SET_VFS(sb, vfsp);
 

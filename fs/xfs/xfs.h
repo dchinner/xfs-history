@@ -48,13 +48,13 @@
 #include <linux/file.h>
 
 #include <xfs_buf.h>
+#include <linux/xqm.h>
 #include <linux/xfs_random.h>
 #include <linux/xfs_behavior.h>
 #include <linux/xfs_vfs.h>
 #include <linux/xfs_vnode.h>
 #include <linux/xfs_fs_subr.h>
 #include <linux/xfs_move.h>
-#include <pseudo-inc/sys/quota.h>
 #include <pseudo-inc/sys/dirent.h>
 #include <pseudo-inc/sys/attributes.h>
 #include <pseudo-inc/sys/acl.h>

@@ -85,7 +85,7 @@ typedef struct xfs_dquot {
 	struct xfs_mount*q_mount;	/* filesystem this relates to */
 	struct xfs_trans*q_transp;	/* trans this belongs to currently */
 	uint		 q_nrefs;       /* # active refs from inodes */
-	xfs_daddr_t		 q_blkno;	/* blkno of dquot buffer */
+	xfs_daddr_t	 q_blkno;	/* blkno of dquot buffer */
 	dev_t		 q_dev;		/* dev for this dquot */
 	int		 q_bufoffset;	/* off of dq in buffer (# dquots) */
 	xfs_fileoff_t    q_fileoffset;	/* offset in quotas file */
@@ -93,9 +93,9 @@ typedef struct xfs_dquot {
 	struct xfs_dquot*q_pdquot; 	/* proj dquot, hint only */
 	xfs_disk_dquot_t q_core;	/* actual usage & quotas */
 	xfs_dq_logitem_t q_logitem;	/* dquot log item */
-	xfs_qcnt_t	 q_res_bcount;	/* total regular nblks used + reserved */
-	xfs_qcnt_t	 q_res_icount;	/* total inos allocd + reserved */
-	xfs_qcnt_t	 q_res_rtbcount;/* total realtime blks used + reserved */
+	xfs_qcnt_t	 q_res_bcount;	/* total regular nblks used+reserved */
+	xfs_qcnt_t	 q_res_icount;	/* total inos allocd+reserved */
+	xfs_qcnt_t	 q_res_rtbcount;/* total realtime blks used+reserved */
 	mutex_t 	 q_qlock;       /* quota lock */
 	sema_t           q_flock;       /* flush lock */
 	uint             q_pincount;    /* pin count for this dquot */
@@ -135,8 +135,9 @@ typedef struct xfs_dquot {
 #define XFS_IS_UQUOTA_ENFORCED(mp)	((mp)->m_qflags & XFS_UQUOTA_ENFD)
 #define XFS_IS_PQUOTA_ENFORCED(mp)	((mp)->m_qflags & XFS_PQUOTA_ENFD)
 
-/*#define XFS_DQ_IS_LOCKED(dqp)	(mutex_mine(&(dqp)->q_qlock))*/
-#define XFS_DQ_IS_LOCKED(dqp)	((dqp)->q_qlock.state)
+#ifdef DEBUG
+#define XFS_DQ_IS_LOCKED(dqp)		((dqp)->q_qlock.state < 1)
+#endif
 
 /*
  * The following three routines simply manage the q_flock
