@@ -467,7 +467,7 @@ xfs_dir_leaf_to_shortform(xfs_trans_t *trans, xfs_da_args_t *iargs)
 	tmpbuffer = kmem_alloc(XFS_LBSIZE(dp->i_mount), KM_SLEEP);
 	ASSERT(tmpbuffer != NULL);
 
-	retval = xfs_da_read_buf(trans, dp, 0, &bp, XFS_DATA_FORK);
+	retval = xfs_da_read_buf(trans, dp, 0, -1, &bp, XFS_DATA_FORK);
 	if (retval)
 		return(retval);
 	ASSERT(bp != NULL);
@@ -544,7 +544,7 @@ xfs_dir_leaf_to_node(xfs_trans_t *trans, xfs_da_args_t *args)
 	ASSERT(blkno == 1);
 	if (retval)
 		return(retval);
-	retval = xfs_da_read_buf(trans, dp, 0, &bp1, XFS_DATA_FORK);
+	retval = xfs_da_read_buf(trans, dp, 0, -1, &bp1, XFS_DATA_FORK);
 	if (retval)
 		return(retval);
 	ASSERT(bp1 != NULL);
@@ -1149,7 +1149,7 @@ xfs_dir_leaf_toosmall(xfs_da_state_t *state, int *action)
 		if (blkno == 0)
 			continue;
 		error = xfs_da_read_buf(state->trans, state->args->dp, blkno,
-						      &bp, XFS_DATA_FORK);
+						      -1, &bp, XFS_DATA_FORK);
 		if (error)
 			return(error);
 		ASSERT(bp != NULL);
@@ -1760,11 +1760,7 @@ xfs_dir_put_dirent(xfs_mount_t *mp, dirent_t *dbp, xfs_ino_t ino,
 		target_abi = ABI_IRIX5_64;
 	}
 
-#ifdef REDWOOD
-	if (ABI_IS_IRIX5_64(target_abi)) {
-#else
 	if (ABI_IS(ABI_IRIX5_64 | ABI_IRIX5_N32, target_abi)) {
-#endif
 		reclen = DIRENTSIZE(namelen);
 		if (reclen > uio->uio_resid) {
 			*done = 0;
