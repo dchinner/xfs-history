@@ -2911,7 +2911,9 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 			 * a problem for xfs since the file system isn't
 			 * mounted yet.  It is a problem for cxfs.
 			 */
-			ip->i_d.di_dmevmask = 0;
+			if (!error) {
+				ip->i_d.di_dmevmask = 0;
+			}
 #endif /* CONFIG_XFS_DMAPI */
 
 			/*
