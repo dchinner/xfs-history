@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.5 1994/03/16 17:38:28 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.6 1994/03/18 16:46:21 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -40,6 +40,7 @@
 #ifdef SIM
 #include "sim.h"
 #include "stdio.h"
+/* extern xfs_mount_t *mountp; */
 #endif
 
 
@@ -107,9 +108,9 @@ xfs_get_inode(  dev_t fs_dev, int ino)
 		 * Verify that this is an xfs file system.
 		 */
 		if (strncmp(vfssw[vfsp->vfs_fstype].vsw_name, "xfs", 3) == 0) {
-                	ip = xfs_iget( XFS_VFSTOM( vfsp ), NULL, ino, 0);
+                	ip = xfs_iget( XFS_VFSTOM( vfsp ), NULL, ino, XFS_ILOCK_EXCL);
 #else
-                	ip = xfs_iget( NULL, NULL, ino, 0);
+/*BUGLY 		ip = xfs_iget( mountp, NULL, ino, XFS_ILOCK_EXCL); */
 #endif
 
 #ifdef DEBUG
@@ -662,9 +663,13 @@ xfs_get_file_extents(dev_t fsdev,
 xfs_get_block_size(dev_t fsdev, int *fs_size)
 {
 	int ret = 0;
-	struct vfs *vfsp;
+	struct vfs *vfsp = NULL;
 
+#ifndef SIM
 	vfsp = vfs_devsearch( fsdev );
+#else
+/*	vfsp = mountp->m_vfsp; */
+#endif
 	if ( vfsp ) {
 		if (copyout(&(vfsp->vfs_bsize), fs_size, sizeof(*fs_size))) {
 			ret = EFAULT;
