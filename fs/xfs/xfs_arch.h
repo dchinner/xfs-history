@@ -132,12 +132,14 @@
 
 /* check for no defines */
 
+#if defined(CONFIG_XFS)
 #if (!defined(CONFIG_XFS_ARCH_MIPS) \
     && !defined(CONFIG_XFS_ARCH_NATIVE) \
     && !defined(CONFIG_XFS_ARCH_MULTI))
 
 #error no xfs architecture selected
 
+#endif
 #endif
 
 #ifdef CONFIG_XFS_ARCH_MIPS
