@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_SB_H
 #define	_FS_XFS_SB_H
 
-#ident	"$Revision: 1.18 $"
+#ident	"$Revision: 1.19 $"
 
 /*
  * Super block
@@ -111,7 +111,8 @@ typedef struct xfs_sb
 /*
  * File system block to byte conversions.
  */
-#define	XFS_FSB_TO_B(mp,fsbno)	((fsbno) << (mp)->m_sb.sb_blocklog)
+#define	XFS_FSB_TO_B(mp,fsbno)	((xfs_fsize_t)(fsbno) << \
+				 (mp)->m_sb.sb_blocklog)
 #define	XFS_B_TO_FSB(mp,b)	\
 	(((b) + (mp)->m_blockmask) >> (mp)->m_sb.sb_blocklog)
 #define	XFS_B_TO_FSBT(mp,b)	((b) >> (mp)->m_sb.sb_blocklog)

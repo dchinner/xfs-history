@@ -604,7 +604,7 @@ xfs_itruncate_start(
 	timestruc_t	tv;
 
 	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
-	ASSERT(new_size < ip->i_d.di_size);
+	ASSERT((new_size == 0) || (new_size < ip->i_d.di_size));
 	ASSERT((flags == XFS_ITRUNC_DEFINITE) ||
 	       (flags == XFS_ITRUNC_MAYBE));
 
@@ -690,7 +690,7 @@ xfs_itruncate_finish(
 
 	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE) != 0);
-	ASSERT(new_size < ip->i_d.di_size);
+	ASSERT((new_size == 0) || (new_size < ip->i_d.di_size));
 	ASSERT(*tp != NULL);
 	ASSERT((*tp)->t_flags & XFS_TRANS_PERM_LOG_RES);
 	ASSERT(ip->i_transp == *tp);
