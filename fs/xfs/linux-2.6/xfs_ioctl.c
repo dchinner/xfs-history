@@ -84,9 +84,7 @@ xfs_find_handle(
 			return PTR_ERR(path);
 
 		/* traverse the path */
-		error = 0;
-		if (path_init(path, LOOKUP_POSITIVE, &nd))
-			error = path_walk(path, &nd);
+		error = path_lookup(path, 0, &nd);
 		putname(path);
 		if (error)
 			return error;

@@ -291,18 +291,12 @@ spectodev(
 	kdev_t		*dev)
 {
 	struct nameidata nd;
-	int		rval = 0;
+	int	rval = path_lookup(name, LOOKUP_FOLLOW, &nd);
 
-	if (path_init(name, LOOKUP_FOLLOW, &nd))
-		rval = path_walk(name, &nd);
-	/* Watch out for negative dentries */
-	if (!nd.dentry->d_inode)
-		rval = -ENOENT;
-	if (rval)
-		printk("XFS: Invalid %s device [%s], err=%d\n", id, name, rval);
-	else
+	if (!rval) {
 		*dev = nd.dentry->d_inode->i_rdev;
-	path_release(&nd);
+		path_release(&nd);
+	}
 	return rval;
 }
 
