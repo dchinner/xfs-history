@@ -7,10 +7,6 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-# Ensure that none of the new files for XFS try to include files from outside
-# the kernel.  These overrides are not required for kbuild 2.5.  KAO
-EXTRA_CFLAGS += $(kbuild_2_2_4ostdinc)
-
 # Debug options:
 #	-DCONFIG_AVL_DEBUG
 #	-DPAGEBUF_TRACKING

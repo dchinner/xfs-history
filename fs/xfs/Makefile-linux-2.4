@@ -270,14 +270,14 @@ MRPROPER_DIRS = \
 
 include arch/$(ARCH)/Makefile
 
-# Optional cflags for kbuild 2.4, to prevent individual files or an entire
-# directory including files from outside the kernel.  To control an individual
-# file, use CFLAGS_foo.o += $(kbuild_2_4_nostdinc), to control an entire
-# directory use EXTRA_CFLAGS += $(kbuild_2_4_nostdinc).  In kbuild 2.5 the
-# default is to forbid includes from outside the kernel tree, you can use this
-# variable in kbuild 2.4 to ensure that your code is clean before 2.5.  KAO.
+# Extra cflags for kbuild 2.4.  The default is to forbid includes by kernel code
+# from user space headers.  Some UML code requires user space headers, in the
+# UML Makefiles add 'kbuild_2_4_nostdinc :=' before include Rules.make.  No
+# other kernel code should include user space headers, if you need
+# 'kbuild_2_4_nostdinc :=' or -I/usr/include for kernel code and you are not UML
+# then your code is broken!  KAO.
 
-kbuild_2_4_nostdinc     := -nostdinc $(shell $(CC) -print-search-dirs | sed -ne 's/install: \(.*\)/-I \1include/gp')
+kbuild_2_4_nostdinc	:= -nostdinc $(shell $(CC) -print-search-dirs | sed -ne 's/install: \(.*\)/-I \1include/gp')
 export kbuild_2_4_nostdinc
 
 export	CPPFLAGS CFLAGS CFLAGS_KERNEL AFLAGS AFLAGS_KERNEL
