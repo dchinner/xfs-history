@@ -1,4 +1,4 @@
-#ident "$Revision: 1.315 $"
+#ident "$Revision: 1.316 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -513,12 +513,13 @@ xfs_getattr(
                         vap->va_blksize = mp->m_swidth << mp->m_sb.sb_blocklog;
                 } else {
 			/*
-			 * We use the read buffer size as a recommended I/O
-			 * size.  This should always be larger than the
-			 * write buffer size, so it should be OK.
-			 * The value returned is in bytes.
+			 * Return the largest of the preferred buffer sizes
+			 * since doing small I/Os into larger buffers causes
+			 * buffers to be decommissioned.  The value returned
+			 * is in bytes.
 			 */
-			vap->va_blksize = 1 << mp->m_readio_log;
+			vap->va_blksize = 1 << (int) MAX(ip->i_readio_log,
+							 ip->i_writeio_log);;
 		}
 		break;
         }
