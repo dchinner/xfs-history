@@ -87,13 +87,6 @@ linvfs_set_inode_ops(
 	struct inode	*inode);
 
 extern int
-fs_dounmount(
-	bhv_desc_t	*bdp,
-	int		flags,
-	vnode_t		*rootvp,
-	cred_t		*cr);
-
-extern int
 spectodevs(
 	struct super_block *sb,
 	struct xfs_mount_args *args,
