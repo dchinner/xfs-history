@@ -29,6 +29,7 @@
 #include <sys/conf.h>
 #endif /* SIM */
 #include <stddef.h>
+#include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -225,6 +226,9 @@ xfs_mountfs_int(vfs_t *vfsp, dev_t dev, int read_rootinos)
 	mp->m_blkbit_log = sbp->sb_blocklog + XFS_NBBYLOG;
 	mp->m_blkbb_log = sbp->sb_blocklog - BBSHIFT;
 	mp->m_agno_log = xfs_highbit32(sbp->sb_agcount - 1) + 1;
+	mp->m_agino_log = sbp->sb_inopblog + sbp->sb_agblklog;
+	mp->m_litino = sbp->sb_inodesize -
+		(sizeof(xfs_dinode_core_t) + sizeof(xfs_agino_t));
 	mp->m_blockmask = sbp->sb_blocksize - 1;
 	mp->m_blockwsize = sbp->sb_blocksize >> XFS_WORDLOG;
 	mp->m_blockwmask = mp->m_blockwsize - 1;
@@ -234,8 +238,8 @@ xfs_mountfs_int(vfs_t *vfsp, dev_t dev, int read_rootinos)
 	 * This value is for inodes getting attributes for the first time,
 	 * the per-inode value is for old attribute values.
 	 */
-	ASSERT(mp->m_sb.sb_inodesize >= 256 && mp->m_sb.sb_inodesize <= 2048);
-	switch (mp->m_sb.sb_inodesize) {
+	ASSERT(sbp->sb_inodesize >= 256 && sbp->sb_inodesize <= 2048);
+	switch (sbp->sb_inodesize) {
 	case 256:
 		mp->m_attroffset = XFS_LITINO(mp) - XFS_BMDR_SPACE_CALC(2);
 		break;
@@ -273,6 +277,8 @@ xfs_mountfs_int(vfs_t *vfsp, dev_t dev, int read_rootinos)
 	xfs_ialloc_compute_maxlevels(mp);
 	mp->m_bsize = XFS_FSB_TO_BB(mp, 1);
 	vfsp->vfs_bsize = XFS_FSB_TO_B(mp, 1);
+	mp->m_ialloc_inos = MAX(XFS_INODES_PER_CHUNK, sbp->sb_inopblock);
+	mp->m_ialloc_blks = mp->m_ialloc_inos >> sbp->sb_inopblog;
 
 	/*
 	 * XFS uses the uuid from the superblock as the unique
