@@ -49,7 +49,8 @@ void
 xfs_bmap_add_free(
 	xfs_fsblock_t		bno,		/* fs block number of extent */
 	xfs_extlen_t		len,		/* length of extent */
-	xfs_bmap_free_t		*flist);	/* list of extents */
+	xfs_bmap_free_t		*flist,		/* list of extents */
+	xfs_mount_t		*mp);		/* mount point structure */
 
 /*
  * Routine to be called at transaction's end by xfs_bmapi, xfs_bunmapi 
