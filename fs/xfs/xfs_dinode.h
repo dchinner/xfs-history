@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DINODE_H
 #define	_FS_XFS_DINODE_H
 
-#ident "$Revision: 1.28 $"
+#ident "$Revision: 1.29 $"
 
 #define	XFS_DINODE_VERSION	1
 #define	XFS_DINODE_MAGIC	0x494e	/* 'IN' */
@@ -161,6 +161,7 @@ typedef enum xfs_dinode_fmt
  * XFS_XFLAG_s.
  */
 #define XFS_DIFLAG_REALTIME     0x1     /* file's blocks come from rt area */
+#define XFS_DIFLAG_PREALLOC	0x2	/* file space has been preallocated */
 #define XFS_DIFLAG_ALL  (XFS_DIFLAG_REALTIME)
 
 #endif	/* _FS_XFS_DINODE_H */
