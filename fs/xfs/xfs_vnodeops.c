@@ -716,7 +716,8 @@ xfs_setattr(vnode_t	*vp,
 
 	XFS_IGETINFO.ig_attrchg++;
 
-	IHOLD (ip);
+	if (!ip_held)
+		IHOLD (ip);
 	xfs_trans_commit (tp, XFS_TRANS_RELEASE_LOG_RES);
 	if (ip_held) {
 		xfs_iunlock (ip, lock_flags);
@@ -3150,20 +3151,14 @@ xfs_frlock(vnode_t	*vp,
 	   off_t	offset,
 	   cred_t	*credp)
 {
-	return 0;
-}
+	xfs_inode_t	*ip;
+	int		error;
 
-
-/*
- * xfs_realvp
- *
- * This is a stub.
- */
-STATIC int
-xfs_realvp(vnode_t	*vp,
-	   vnode_t	**vpp)
-{
-	return -1;
+	ip = XFS_VTOI(vp);
+	xfs_ilock(ip, XFS_IOLOCK_EXCL);
+	error = fs_frlock(vp, cmd, flockp, flag, offset, credp);
+	xfs_iunlock(ip, XFS_IOLOCK_EXCL);
+	return error;
 }
 
 
