@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.457 $"
+#ident "$Revision: 1.458 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -45,7 +45,6 @@
 #include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <sys/systm.h>
-#include <sys/dnlc.h>
 #include <sys/sysmacros.h>
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
@@ -2266,7 +2265,6 @@ xfs_lookup(
 	uint			lock_mode;
 	uint			lookup_flags;
 	uint			dir_unlocked;
-	struct ncfastdata	fastdata;
 	vnode_t 		*dir_vp;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
@@ -2307,7 +2305,7 @@ xfs_lookup(
 		lookup_flags |= DLF_LOCK_SHARED;
 	}
 	error = xfs_dir_lookup_int(NULL, dir_bdp, lookup_flags, name, pnp,
-				  &e_inum, &ip, &fastdata, &dir_unlocked);
+				  &e_inum, &ip, &dir_unlocked);
 	if (error) {
 		xfs_iunlock_map_shared(dp, lock_mode);
 		return error;
@@ -2403,7 +2401,6 @@ xfs_create(
 	uint			cancel_flags;
 	int			committed;
 	uint			dir_unlocked;
-	struct ncfastdata	fastdata;
 	xfs_prid_t		prid;
 	struct xfs_dquot	*udqp, *pdqp;
 	uint			resblks;
@@ -2508,7 +2505,7 @@ xfs_create(
 	 * dropping our transaction.
 	 */
 	error = xfs_dir_lookup_int(NULL, dir_bdp, DLF_NODNLC, name,
-				   NULL, &e_inum, NULL, NULL, NULL);
+				   NULL, &e_inum, NULL, NULL);
 	if (error && (error != ENOENT)) {
 		goto error_return;
 	}
@@ -2631,8 +2628,7 @@ xfs_create(
 		 * the entry is removed, then just start over.
 		 */
 		error = xfs_dir_lookup_int(NULL, dir_bdp, DLF_IGET, name,
-					   NULL, &e_inum, &ip, &fastdata,
-					   &dir_unlocked);
+					   NULL, &e_inum, &ip, &dir_unlocked);
 		if (error) {
 			if (error == ENOENT) {
 				if (++xfs_create_retries >
@@ -2940,7 +2936,6 @@ xfs_get_dir_entry(
 	xfs_ino_t		e_inum;
 	int			error;
 	uint			dir_unlocked;
-	struct ncfastdata	fastdata;
 
         xfs_ilock(dp, XFS_ILOCK_EXCL);
 
@@ -2956,7 +2951,7 @@ xfs_get_dir_entry(
 
 	if (*ipp == NULL) {
 		error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(dp), DLF_IGET,
-					   name, NULL, &e_inum, &ip, &fastdata,
+					   name, NULL, &e_inum, &ip, 
 					   &dir_unlocked);
 		if (error) {
 			xfs_iunlock(dp, XFS_ILOCK_EXCL);
@@ -3029,7 +3024,6 @@ xfs_lock_dir_and_entry(
 	xfs_ino_t		e_inum;
 	int			error;
 	int			new_dir_gen;
-	struct ncfastdata	fastdata;
 	xfs_inode_t		*ips[2];
 	xfs_log_item_t		*lp;
 
@@ -3054,14 +3048,10 @@ again:
 		/*
 		 * The directory has changed somehow, so do the lookup
 		 * for the entry again.  If it is changed we'll have to
-		 * give up and return to our caller.  We can't allow this
-		 * lookup to use the dnlc, because that could call vn_get
-		 * and we could deadlock if the vnode we're after is in
-		 * the inactive routine waiting for a log reservation that
-		 * we hold.
+		 * give up and return to our caller.
 		 */
 		error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(dp), DLF_NODNLC,
-				name, NULL, &e_inum, NULL, &fastdata, NULL);
+				name, NULL, &e_inum, NULL, NULL);
 		if (error) {
 			xfs_iunlock(dp, XFS_ILOCK_EXCL);
 			return error;
@@ -3150,15 +3140,9 @@ again:
 			 * The directory has changed somehow, so do the
 			 * lookup for the entry again.  If it is changed
 			 * we'll have to give up and return to our caller.
-			 * We can't allow this lookup to use the dnlc,
-			 * because that could call vn_get and we could
-			 * deadlock if the vnode we're after is in
-			 * the inactive routine waiting for a log
-			 * reservation that we hold.
 			 */
 			error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(dp),
-				   DLF_NODNLC, name, NULL, &e_inum, NULL,
-				   &fastdata, NULL);
+				   DLF_NODNLC, name, NULL, &e_inum, NULL, NULL);
 
                         if (error) {
 				xfs_iunlock(dp, XFS_ILOCK_EXCL);
@@ -3525,8 +3509,6 @@ xfs_remove(
 	}
 	xfs_ichgtime(dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
-	dnlc_remove(dir_vp, name);
-
 	dp->i_gen++;
 	xfs_trans_log_inode(tp, dp, XFS_ILOG_CORE);
 
@@ -3778,13 +3760,10 @@ xfs_link(
 
 	/*
 	 * Make sure that nothing with the given name exists in the
-	 * target directory.  We can't allow the lookup to use the
-	 * dnlc, because doing so could cause deadlock if it has to
-	 * do a vn_get for the vnode and the vnode is inactive and
-	 * waiting for a log reservation in xfs_inactive.
+	 * target directory.
 	 */
 	error = xfs_dir_lookup_int(NULL, target_dir_bdp, DLF_NODNLC,
-			target_name, NULL, &e_inum, NULL, NULL, NULL);
+			target_name, NULL, &e_inum, NULL, NULL);
 	if (error != ENOENT) {
 		if (error == 0) {
 			error = XFS_ERROR(EEXIST);
@@ -3976,13 +3955,10 @@ xfs_mkdir(
 
 	/*
 	 * Make sure that nothing with the given name exists in the
-	 * target directory.  We can't allow the lookup to use the
-	 * dnlc, because doing so could cause deadlock if it has to
-	 * do a vn_get for the vnode and the vnode is inactive and
-	 * waiting for a log reservation in xfs_inactive.
+	 * target directory.
 	 */
         error = xfs_dir_lookup_int(NULL, dir_bdp, DLF_NODNLC, dir_name,
-				   NULL, &e_inum, NULL, NULL, NULL);
+				   NULL, &e_inum, NULL, NULL);
         if (error != ENOENT) {
 		if (error == 0)
 			error = XFS_ERROR(EEXIST);
@@ -4065,7 +4041,6 @@ xfs_mkdir(
 	}
 
 	cvp = XFS_ITOV(cdp);
-	dnlc_remove(cvp, "..");
 
 	created = B_TRUE;
 
@@ -4101,7 +4076,6 @@ xfs_mkdir(
 		 xfs_qm_dqrele(pdqp);
 
 	if (error) {
-		dnlc_remove(dir_vp, dir_name);
 		IRELE(cdp);
 	}
 
@@ -4124,7 +4098,6 @@ std_return:
 	return error;
 
  error2:
-	dnlc_remove(dir_vp, dir_name);
  error1:
 	xfs_bmap_cancel(&free_list);
  abort_return:
@@ -4348,8 +4321,6 @@ xfs_rmdir(
 	}
 
 	xfs_ichgtime(dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
-
-	dnlc_remove(dir_vp, name);
 
 	/*
 	 * Bump the in memory generation count on the parent
@@ -4665,13 +4636,10 @@ xfs_symlink(
 
 	/*
 	 * Since we've already started a transaction, we cannot allow
-	 * the lookup to do a vn_get().  Thus, stay out of the dnlc
-	 * in doing the lookup.  Doing a vn_get could cause us to deadlock
-	 * if the inode we are doing the get for is in inactive waiting
-	 * for a log reservation.
+	 * the lookup to do a vn_get().
 	 */
         error = xfs_dir_lookup_int(NULL, dir_bdp, DLF_NODNLC, link_name,
-				   NULL, &e_inum, NULL, NULL, NULL);
+				   NULL, &e_inum, NULL, NULL);
 	if (error != ENOENT) {
 		if (!error) {
 			error = XFS_ERROR(EEXIST);
@@ -4823,8 +4791,6 @@ xfs_symlink(
 		xfs_qm_dqrele(udqp);
 	if (pdqp)
 		xfs_qm_dqrele(pdqp);
-	if (error)
-		dnlc_remove(dir_vp, link_name);
 	
 	/* Fall through to std_return with error = 0 or errno from
 	 * xfs_trans_commit	*/
@@ -4852,7 +4818,6 @@ std_return:
 
  error2:
 	IRELE(ip);
-	dnlc_remove(dir_vp, link_name);
  error1:
 	xfs_bmap_cancel(&free_list);
 	cancel_flags |= XFS_TRANS_ABORT;
@@ -5588,15 +5553,15 @@ xfs_finish_reclaim(
 int
 xfs_alloc_file_space( 
 	xfs_inode_t		*ip,
-	xfs_off_t 			offset,
-	xfs_off_t			len,
+	xfs_off_t 		offset,
+	xfs_off_t		len,
 	int			alloc_type,
 	int			attr_flags)
 {
 	xfs_filblks_t		allocated_fsb;
 	xfs_filblks_t		allocatesize_fsb;
 	int			committed;
-	xfs_off_t			count;
+	xfs_off_t		count;
 	xfs_filblks_t		datablocks;
 	int			error;
 	xfs_fsblock_t		firstfsb;
@@ -5806,16 +5771,16 @@ dmapi_enospc_check:
 STATIC int
 xfs_zero_remaining_bytes(
 	xfs_inode_t		*ip,
-	xfs_off_t			startoff,
-	xfs_off_t			endoff)
+	xfs_off_t		startoff,
+	xfs_off_t		endoff)
 {
-	xfs_buf_t			*bp;
+	xfs_buf_t		*bp;
 	int			error;
 	xfs_bmbt_irec_t		imap;
-	xfs_off_t			lastoffset;
+	xfs_off_t		lastoffset;
 	xfs_mount_t		*mp;
 	int			nimap;
-	xfs_off_t			offset;
+	xfs_off_t		offset;
 	xfs_fileoff_t		offset_fsb;
 
 	mp = ip->i_mount;
@@ -5881,8 +5846,8 @@ xfs_zero_remaining_bytes(
 STATIC int
 xfs_free_file_space( 
 	xfs_inode_t		*ip,
-	xfs_off_t 			offset,
-	xfs_off_t			len,
+	xfs_off_t 		offset,
+	xfs_off_t		len,
 	int			attr_flags)
 {
 	int			committed;
@@ -5892,9 +5857,9 @@ xfs_free_file_space(
 	int			error;
 	xfs_fsblock_t		firstfsb;
 	xfs_bmap_free_t		free_list;
-	xfs_off_t			ilen;
+	xfs_off_t		ilen;
 	xfs_bmbt_irec_t		imap;
-	xfs_off_t			ioffset;
+	xfs_off_t		ioffset;
 	xfs_extlen_t		mod;
 	xfs_mount_t		*mp;
 	int			nimap;
@@ -6089,7 +6054,7 @@ xfs_change_file_space(
 	bhv_desc_t	*bdp,
 	int		cmd,
 	xfs_flock64_t 	*bf,
-	xfs_off_t 		offset,
+	xfs_off_t 	offset,
 	cred_t  	*credp,
 	int		attr_flags)
 {

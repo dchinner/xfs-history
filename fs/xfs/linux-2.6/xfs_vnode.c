@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.29 $"
+#ident	"$Revision: 1.30 $"
 
 #include <xfs_os_defs.h>
 
@@ -48,6 +48,7 @@
 #include <sys/kmem.h>
 #include <sys/pathname.h>
 #include <linux/xfs_sema.h>
+#include <linux/xfs_cred.h>
 #include <sys/systm.h>
 #include <sys/uio.h>
 #ifdef SIM
@@ -55,7 +56,6 @@
 #endif
 #include <sys/vfs.h>
 #include <sys/vnode_private.h>
-#include <sys/dnlc.h>
 #include <sys/mode.h>
 #include <sys/sysmacros.h>
 #include <sys/imon.h>

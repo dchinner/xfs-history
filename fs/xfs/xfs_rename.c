@@ -38,7 +38,7 @@
 #include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <sys/systm.h>
-#include <sys/dnlc.h>
+// #include <linux/xfs_cred.h>
 #include <sys/param.h>
 #include <sys/pathname.h>
 #include <sys/dmi.h>
@@ -190,8 +190,7 @@ xfs_rename_check_ok(
 	 */
 
         error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(dp1), DLF_NODNLC,
-				   name1, NULL, &inum1, NULL,
-				   NULL, NULL);
+				   name1, NULL, &inum1, NULL, NULL);
 
 	if (error) {	/* name1 must be gone or .... */
 		return(0);
@@ -212,8 +211,7 @@ xfs_rename_check_ok(
 	 */
 
         error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(dp2), DLF_NODNLC,
-				   name2, NULL, &inum2, NULL,
-				   NULL, NULL);
+				   name2, NULL, &inum2, NULL, NULL);
 
 	/*
 	 * If we have an unsuccessful lookup and ip2 was passed in, the dest is
@@ -271,7 +269,6 @@ xfs_lock_for_rename(
 	uint			lock_mode;
 	uint			dir_unlocked;
 	uint			lookup_flags;
-	struct ncfastdata	fastdata;
 	int			diff_dirs = (dp1 != dp2);
 
 	ip2 = NULL;
@@ -297,8 +294,7 @@ xfs_lock_for_rename(
 		lookup_flags |= DLF_LOCK_SHARED;
 	}
         error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(dp1), lookup_flags,
-				   name1, NULL, &inum1, &ip1,
-				   &fastdata, &dir_unlocked);
+				   name1, NULL, &inum1, &ip1, &dir_unlocked);
 
 	/*
 	 * Save the current generation so that we can detect if it's
@@ -337,8 +333,7 @@ xfs_lock_for_rename(
 		lookup_flags |= DLF_LOCK_SHARED;
 	}
         error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(dp2), lookup_flags,
-				   name2, NULL, &inum2, &ip2, &fastdata,
-				   &dir_unlocked);
+				   name2, NULL, &inum2, &ip2, &dir_unlocked);
 	dir_gen2 = dp2->i_gen;
 	if (error == ENOENT) {		/* target does not need to exist. */
 		inum2 = 0;
@@ -484,7 +479,6 @@ xfs_rename_ancestor_check(
 	xfs_ino_t		parent_ino;
 	xfs_ino_t		root_ino;
 	int			error = 0;
-	struct ncfastdata	fastdata;
 
 	mp = src_dp->i_mount;
 	root_ino = mp->m_sb.sb_rootino;
@@ -536,7 +530,7 @@ xfs_rename_ancestor_check(
 			break;
 		}
 		error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(ip), 0, "..",
-				NULL, &parent_ino, NULL, &fastdata, NULL);
+				NULL, &parent_ino, NULL, NULL);
 		if (error) {
 			break;
 		}
@@ -1120,11 +1114,6 @@ xfs_rename(
 		}
 
 		/*
-		 * Purge all dnlc references to the old target.
-		 */
-		dnlc_purge_vp(XFS_ITOV(target_ip));
-
-		/*
 		 * Link the source inode under the target name.
 		 * If the source inode is a directory and we are moving
 		 * it across directories, its ".." entry will be 
@@ -1142,9 +1131,6 @@ xfs_rename(
 			goto abort_return;
 		}
 		xfs_ichgtime(target_dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
-
-		dnlc_enter(target_dir_vp, target_name, XFS_ITOBHV(src_ip),
-			   credp);
 
 		/*
 		 * Decrement the link count on the target since the target
@@ -1192,7 +1178,6 @@ xfs_rename(
 		}
 		xfs_ichgtime(src_ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
-		dnlc_remove(XFS_ITOV(src_ip), "..");
 	} else {
 		/*
 		 * We always want to hit the ctime on the source inode.
@@ -1231,8 +1216,6 @@ xfs_rename(
 		goto abort_return;
 	}
 	xfs_ichgtime(src_dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
-
-	dnlc_remove(src_dir_vp, src_name);
 
 	/*
 	 * Update the generation counts on all the directory inodes

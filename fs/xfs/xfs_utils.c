@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision$"
+#ident "$Revision: 1.28 $"
 
 #include <xfs_os_defs.h>
 #include <linux/errno.h>
@@ -40,7 +40,7 @@
 #include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <sys/systm.h>
-#include <sys/dnlc.h>
+#include <linux/xfs_cred.h>
 #include <sys/param.h>
 #include <sys/pathname.h>
 #include <sys/dmi.h>
@@ -100,8 +100,7 @@ xfs_stickytest(
 }
 
 /*
- * Wrapper around xfs_dir_lookup. This routine will first look in
- * the dnlc.
+ * Wrapper around xfs_dir_lookup.
  *
  * If DLF_IGET is set, then this routine will also return the inode.
  * Note that the inode will not be locked. Note, however, that the
@@ -116,7 +115,6 @@ xfs_dir_lookup_int(
 	struct pathname		*pnp,
 	xfs_ino_t    		*inum,
 	xfs_inode_t  		**ipp,
-	struct ncfastdata	*fd,
 	uint			*dir_unlocked)
 {
 	vnode_t		*vp;
@@ -157,76 +155,10 @@ xfs_dir_lookup_int(
 	} else {
 		lock_mode = XFS_ILOCK_EXCL;
 	}
+
 	dp = XFS_BHVTOI(dir_bdp);
 
-	/*
-	 * On Linux we have already done lookups into the dcache at
-	 * this point, no need to dive into a non-existent DNLC
-	 * implementation.
-	 */
-
-#ifndef __linux__
-        /*
-         * Try the directory name lookup cache.  We can't wait on
-	 * inactive/reclaim in the inode we're looking for because
-	 * we're holding the directory lock.
-         */
-        if (!(flags & DLF_NODNLC)) {
-retry_dnlc:
-		dir_gen = dp->i_gen;
-		bdp = dnlc_lookup_fast(dir_vp, name, pnp, fd, NOCRED,
-			VN_GET_NOWAIT);
-		if (!bdp && fd->vnowait) {
-			if (dir_unlocked != NULL)
-				*dir_unlocked = 1;
-			xfs_iunlock(dp, lock_mode);
-			bdp = dnlc_lookup_fast(dir_vp, name, pnp, fd,
-				NOCRED, 0);
-			xfs_ilock(dp, lock_mode);
-		}
-		if (bdp && dir_gen == dp->i_gen) {
-			ITRACE(XFS_BHVTOI(bdp));
-			*inum = XFS_BHVTOI(bdp)->i_ino;
-			if (do_iget) {
-				*ipp = XFS_BHVTOI(bdp);
-				ASSERT((*ipp)->i_d.di_mode != 0);
-			} else {
-				/*
-				 * This is only safe for directory
-				 * inodes that have not been unlinked.
-				 * Otherwise we could deadlock because
-				 * the inactive call could start a
-				 * transaction while we hold the directory
-				 * lock here.
-				 */
-#ifdef DEBUG
-				vp = BHV_TO_VNODE(bdp);
-				ASSERT(vp->v_type == VDIR);
-				ASSERT(XFS_BHVTOI(bdp)->i_d.di_nlink > 0);
-#endif
-				VN_RELE(BHV_TO_VNODE(bdp));
-			}
-			return 0;
-		}
-		/*
-		 * If we get here with bdp set then we need to VN_RELE it
-		 * because the directory generation number changed. It's not
-		 * safe to do this until the directory is unlocked. If we
-		 * are not going to get the actual inode then do this here
-		 * and check the dnlc for the name again. If we are going to
-		 * read the inode then let that code do the work for us.
-		 */
-		if (!do_iget && bdp) {
-			if (dir_unlocked != NULL)
-				*dir_unlocked = 1;
-			xfs_iunlock(dp, lock_mode);
-			VN_RELE(BHV_TO_VNODE(bdp));
-			xfs_ilock(dp, lock_mode);
-			goto retry_dnlc;
-		}
-        } else
-#endif /* !__linux__ */
-		bdp = NULL;
+	bdp = NULL;
 
 	/*
 	 * If all else fails, call the directory code.
@@ -342,10 +274,6 @@ retry_dnlc:
 			error = XFS_ERROR(ENOENT);
 		} else {
 			bdp = XFS_ITOBHV(*ipp);
-#ifndef __linux__
-			ASSERT(!(flags & DLF_NODNLC));
-			dnlc_enter_fast(dir_vp, fd, bdp, NOCRED);
-#endif /* !__linux__ */
 			bdp = NULL;
 		}
 	}

@@ -43,7 +43,6 @@
 
 struct bhv_desc;
 struct cred;
-struct ncfastdata;
 struct pathname;
 struct vnode;
 struct xfs_inode;
@@ -94,7 +93,6 @@ xfs_dir_lookup_int(
 	struct pathname   	*pnp,
 	xfs_ino_t    		*inum,
 	struct xfs_inode	**ipp,
-	struct ncfastdata	*fd,
 	uint			*dir_unlocked);
 
 extern int
