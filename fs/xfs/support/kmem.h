@@ -65,7 +65,6 @@ typedef unsigned long xfs_pflags_t;
 
 #define PFLAGS_DUP(OSTATEP, NSTATEP) do { \
 	*(NSTATEP) = *(OSTATEP);	\
-	*(OSTATEP) = current->flags;	\
 } while (0);
 
 static __inline unsigned int kmem_flags_convert(int flags)

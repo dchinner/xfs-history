@@ -735,13 +735,13 @@ shut_us_down:
 			if (commit_lsn == -1 && !shutdown)
 				shutdown = XFS_ERROR(EIO);
 		}
+                PFLAGS_RESTORE(&tp->t_pflags);
 		xfs_trans_free_items(tp, shutdown? XFS_TRANS_ABORT : 0);
 		xfs_trans_free_busy(tp);
 		xfs_trans_free(tp);
 		XFS_STATS_INC(xfsstats.xs_trans_empty);
 		if (commit_lsn_p)
 			*commit_lsn_p = commit_lsn;
-                PFLAGS_RESTORE(&tp->t_pflags);
 		return (shutdown);
 	}
 #if defined(XLOG_NOLOG) || defined(DEBUG)
@@ -824,8 +824,8 @@ shut_us_down:
 	 * had pinned, clean up, free trans structure, and return error.
 	 */
 	if (error || commit_lsn == -1) {
-		xfs_trans_uncommit(tp, flags|XFS_TRANS_ABORT);
                 PFLAGS_RESTORE(&tp->t_pflags);
+		xfs_trans_uncommit(tp, flags|XFS_TRANS_ABORT);
 		return XFS_ERROR(EIO);
 	}
 
@@ -862,6 +862,9 @@ shut_us_down:
 	 */
 	error = xfs_log_notify(mp, commit_iclog, &(tp->t_logcb));
 
+	/* mark this thread as no longer being in a transaction */
+        PFLAGS_RESTORE(&tp->t_pflags);
+
 	/*
 	 * Once all the items of the transaction have been copied
 	 * to the in core log and the callback is attached, the
@@ -896,9 +899,6 @@ shut_us_down:
 	} else {
 		XFS_STATS_INC(xfsstats.xs_trans_async);
 	}
-
-	/* mark this thread as no longer being in a transaction */
-        PFLAGS_RESTORE(&tp->t_pflags);
 
 	return (error);
 }
@@ -1099,12 +1099,13 @@ xfs_trans_cancel(
 		}
 		xfs_log_done(tp->t_mountp, tp->t_ticket, NULL, log_flags);
 	}
-	xfs_trans_free_items(tp, flags);
-	xfs_trans_free_busy(tp);
-	xfs_trans_free(tp);
 
 	/* mark this thread as no longer being in a transaction */
         PFLAGS_RESTORE(&tp->t_pflags);
+
+	xfs_trans_free_items(tp, flags);
+	xfs_trans_free_busy(tp);
+	xfs_trans_free(tp);
 }
 
 
