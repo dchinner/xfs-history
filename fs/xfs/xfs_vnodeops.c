@@ -2850,6 +2850,7 @@ xfs_create_new(
  *   *vpp has vnode found by a lookup.
  *	But *vpp might go away.
  */
+/* ARGSUSED */
 STATIC int
 xfs_create_exists(
 	bhv_desc_t	*dir_bdp,
