@@ -531,8 +531,9 @@ linvfs_fill_super(
 	 */
 	if (args.flags & XFSMNT_DMAPI) {
 		vfsp->vfs_flag |= VFS_DMI;
-		VFSOPS_DMAPI_MOUNT(vfsops, vfsp, NULL, args.mtpt, args.fsname,
-				   NULL, error);
+		VFSOPS_DMAPI_MOUNT(vfsops, vfsp, args.mtpt, args.fsname,
+				   error);
+
 		if (error) {
 			if (atomic_read(&sb->s_active) == 1)
 				vfsp->vfs_flag &= ~VFS_DMI;
@@ -756,31 +757,6 @@ linvfs_unfreeze_fs(
 	VN_RELE(vp);
 }
 
-int
-linvfs_dmapi_mount(
-	struct vfsmount *mnt,
-	char		*dir_name)
-{
-	struct super_block *sb = mnt->mnt_sb;
-	vfsops_t	*vfsops;
-	vfs_t		*vfsp; /* mounted vfs */
-	int		error;
-
-	vfsp = LINVFS_GET_VFS(sb);
-	if ( ! (vfsp->vfs_flag & VFS_DMI) )
-		return 0;
-
-	/*  Kludge in XFS until we have other VFS/VNODE FSs  */
-	vfsops = &xfs_vfsops;
-
-	VFSOPS_DMAPI_MOUNT(vfsops, vfsp, NULL, dir_name, sb->s_id, mnt, error);
-	if (error) {
-		if (atomic_read(&sb->s_active) == 1)
-			vfsp->vfs_flag &= ~VFS_DMI;
-		return -error;
-	}
-	return 0;
-}
 
 struct dentry *linvfs_get_parent(struct dentry *child)
 {

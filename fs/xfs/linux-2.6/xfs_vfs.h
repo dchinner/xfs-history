@@ -136,8 +136,7 @@ typedef struct vfsops {
                                         /* flush files */
 	int	(*vfs_vget)(bhv_desc_t *, struct vnode **, struct fid *);
 					/* get vnode from fid */
-	int	(*vfs_dmapi_mount)(struct vfs *, struct vnode *,
-				   char *, char *, struct vfsmount *);
+	int	(*vfs_dmapi_mount)(struct vfs *, char *, char *);
 					/* send dmapi mount event */
 	int	(*vfs_dmapi_fsys_vector)(bhv_desc_t *,
 					 struct dm_fcntl_vector *);
@@ -192,8 +191,8 @@ typedef struct vfsops {
 }
 
 
-#define VFSOPS_DMAPI_MOUNT(vfs_op, vfsp, mvp, dir_name, fsname, mnt, rv) \
-        rv = (*(vfs_op)->vfs_dmapi_mount)(vfsp, mvp, dir_name, fsname, mnt)
+#define VFSOPS_DMAPI_MOUNT(vfs_op, vfsp, dir_name, fsname, rv) \
+        rv = (*(vfs_op)->vfs_dmapi_mount)(vfsp, dir_name, fsname)
 #define VFSOPS_MOUNT(vfs_op, vfsp, mvp, uap, attrs, cr, rv) \
         rv = (*(vfs_op)->vfs_mount)(vfsp, mvp, uap, attrs, cr)
 
