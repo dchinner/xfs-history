@@ -33,6 +33,7 @@
 #ifndef __XFS_SUPPORT_SPIN_H__
 #define __XFS_SUPPORT_SPIN_H__
 
+#include <linux/sched.h> /* preempt needs this */
 #include <linux/spinlock.h>
 
 /*
