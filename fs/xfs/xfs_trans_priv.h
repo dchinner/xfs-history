@@ -29,12 +29,13 @@ void			xfs_trans_unlock_items(xfs_trans_t *);
 /*
  * From xfs_trans_ail.c
  */
-void		xfs_trans_push_ail(xfs_mount_t *);
+xfs_lsn_t	xfs_trans_push_ail(xfs_mount_t *, xfs_lsn_t);
 void		xfs_trans_update_ail(xfs_mount_t *, xfs_log_item_t *,
 				     xfs_lsn_t);
 void		xfs_trans_delete_ail(xfs_mount_t *, xfs_log_item_t *);
 xfs_log_item_t	*xfs_trans_first_ail(xfs_mount_t *, int *);
-xfs_log_item_t	*xfs_trans_next_ail(xfs_mount_t *, xfs_log_item_t *, int *);
+xfs_log_item_t	*xfs_trans_next_ail(xfs_mount_t *, xfs_log_item_t *,
+				    int *, int *);
 
 
 #endif	/* _XFS_TRANS_PRIV_H */
