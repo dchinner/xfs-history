@@ -204,4 +204,8 @@ typedef enum {
 
 extern struct bhv_vfsops xfs_dmops;
 
+#define HAVE_XFS_DM_MM
+int xfs_dm_mm_get(struct vm_area_struct *vma);
+void xfs_dm_mm_put(struct vm_area_struct *vma);
+
 #endif  /* __XFS_DMAPI_H__ */
