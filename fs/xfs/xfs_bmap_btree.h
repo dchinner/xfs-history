@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_BTREE_H
 #define	_FS_XFS_BMAP_BTREE_H
 
-#ident "$Revision: 1.35 $"
+#ident "$Revision: 1.36 $"
 
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 
@@ -98,6 +98,15 @@ xfs_filblks_t startblockval(xfs_fsblock_t x);
 #define	STARTBLOCKVAL(x)	((xfs_filblks_t)((x) & ~STARTBLOCKMASK))
 #endif
 #define	ISUNWRITTEN(x)		((x) == XFS_EXT_UNWRITTEN)
+
+/*
+ * Possible extent states.
+ */
+typedef	enum {
+	XFS_EXT_NORM, XFS_EXT_UNWRITTEN,
+	XFS_EXT_DMAPI_OFFLINE
+} xfs_exntst_t;
+
 
 /*
  * Incore version of above.
