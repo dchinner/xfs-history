@@ -36,7 +36,7 @@
  */
 
 #include <xfs_os_defs.h>
-
+#include <endian.h>
 #include <sys/param.h>
 
 #ifdef SIM
@@ -3330,7 +3330,7 @@ xlog_verify_iclog(xlog_t	 *log,
 			clientid = ophead->oh_clientid;
 		} else {
 			idx = BTOBB(&ophead->oh_clientid - iclog->ic_data);
-#ifdef __LITTLE_ENDIAN
+#if __BYTE_ORDER == __LITTLE_ENDIAN
 			clientid = iclog->ic_header.h_cycle_data[idx] & 0xff;
 #else
 			clientid = iclog->ic_header.h_cycle_data[idx] >> 24;

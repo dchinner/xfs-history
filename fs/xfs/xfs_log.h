@@ -32,9 +32,11 @@
 #ifndef	_XFS_LOG_H
 #define _XFS_LOG_H
 
+#include <endian.h>
+
 #ident	"$Revision$"
 
-#ifdef __LITTLE_ENDIAN
+#if __BYTE_ORDER == __LITTLE_ENDIAN
 /* Since the lsn comes out with the cycle number in the least significant
  * part of the lsn as a 64 bit quantity we need to do the comparison
  * of cycle and block numbers explicitly. On 32 bit machines this is
