@@ -1,4 +1,4 @@
-#ident "$Revision: 1.196 $"
+#ident "$Revision: 1.197 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -146,15 +146,69 @@ xfs_inobp_check(
 	buf_t		*bp)
 {
 	int		i;
+	int		j;
 	xfs_dinode_t	*dip;
 
-	for (i = 0; i < mp->m_sb.sb_inopblock; i++) {
+	j = mp->m_inode_cluster_size >> mp->m_sb.sb_inodelog;
+
+	for (i = 0; i < j; i++) {
 		dip = (xfs_dinode_t *)((char *)bp->b_un.b_addr +
 				       (i * mp->m_sb.sb_inodesize));
 		ASSERT(dip->di_next_unlinked != 0);
 	}
 }
 #endif /* DEBUG && !XFS_REPAIR_SIM */
+
+#ifndef NO_XFS_PARANOIA
+/*
+ * called from bwrite on xfs inode buffers
+ */
+void
+xfs_inobp_bwcheck(buf_t *bp)
+{
+	xfs_mount_t	*mp;
+	int		i;
+	int		j;
+	int		clear;
+	xfs_dinode_t	*dip;
+
+	ASSERT(bp->b_flags2 & B_XFS_INO);
+	ASSERT(bp->b_fsprivate2 != NULL);
+
+	if (((xfs_trans_t *) bp->b_fsprivate2)->t_magic ==
+					XFS_TRANS_HEADER_MAGIC)  {
+		mp = ((xfs_trans_t *) bp->b_fsprivate2)->t_mountp;
+		clear = 0;
+	} else  {
+		mp = bp->b_fsprivate2;
+		clear = 1;
+	}
+
+	j = mp->m_inode_cluster_size >> mp->m_sb.sb_inodelog;
+	dip = (xfs_dinode_t *) bp->b_un.b_addr;
+
+	for (i = 0; i < j; i++)  {
+		if (dip->di_core.di_magic != XFS_DINODE_MAGIC)
+			cmn_err(CE_PANIC,
+		"Bad magic 0x%x in XFS inode buffer 0x%x, offset 0x%x\n",
+				dip->di_core.di_magic, bp, (__psint_t) dip -
+							(__psint_t) bp);
+		if (dip->di_next_unlinked == 0)
+			cmn_err(CE_PANIC,
+	"Bad next_unlinked field (0) in XFS inode buffer 0x%x, offset 0x%x\n",
+				bp, (__psint_t) dip - (__psint_t) bp);
+		
+		dip = (xfs_dinode_t *)((__psint_t) dip + mp->m_sb.sb_inodesize);
+	}
+
+	if (clear)
+		bp->b_fsprivate2 = NULL;
+
+	bp->b_flags2 &= ~B_XFS_INO;
+
+	return;
+}
+#endif /* NO_XFS_PARANOIA */
 
 /*
  * This routine is called to map an inode number within a file
@@ -262,11 +316,13 @@ xfs_itobp(
 	buf_t		**bpp,
 	daddr_t		bno)
 {
-	xfs_imap_t	imap;
 	buf_t		*bp;
 	dev_t		dev;
-	int		error;
 	xfs_dinode_t	*dip;
+	int		error;
+	int		i;
+	xfs_imap_t	imap;
+	int		ni;
 
 	if (ip->i_blkno == (daddr_t)0) {
 		/*
@@ -319,12 +375,28 @@ xfs_itobp(
 	if (error) {
 		return error;
 	}
-	dip = (xfs_dinode_t *)(bp->b_un.b_addr);
-	if ((dip->di_core.di_magic != XFS_DINODE_MAGIC) ||
-	    !XFS_DINODE_GOOD_VERSION(dip->di_core.di_version)) {
-		bp->b_flags |= B_ERROR;
-		xfs_trans_brelse(tp, bp);
-		return XFS_ERROR(EIO);
+	/*
+	 * Validate the magic number and version of every inode in the buffer
+	 * (if DEBUG kernel) or the first inode in the buffer, otherwise.
+	 */
+#ifdef DEBUG
+	ni = BBTOB(imap.im_len) >> mp->m_sb.sb_inodelog;
+#else
+	ni = 1;
+#endif
+	for (i = 0; i < ni; i++) {
+		 dip = (xfs_dinode_t *)(bp->b_un.b_addr +
+					(i << mp->m_sb.sb_inodelog));
+		 if (dip->di_core.di_magic != XFS_DINODE_MAGIC ||
+		     !XFS_DINODE_GOOD_VERSION(dip->di_core.di_version)) {
+#ifdef DEBUG
+			prdev("bad inode magic/vsn daddr %lld #%d", dev,
+				(long long)imap.im_blkno, i);
+#endif
+			bp->b_flags |= B_ERROR;
+			xfs_trans_brelse(tp, bp);
+			return XFS_ERROR(EIO);
+		}
 	}
 
 	xfs_inobp_check(mp, bp);
@@ -2997,6 +3069,22 @@ xfs_iflush(
 #ifdef SIM
 	error = bwrite(bp);
 #else
+#ifndef NO_XFS_PARANOIA
+	/*
+	 * NO_XFS_PARANOIA - XXX rcc - make buffer cache consistency
+	 * check buffer before writing delayed or async buffers
+	 */
+	if (!(bp->b_flags2 & B_XFS_INO))  {
+		if (bp->b_fsprivate2 == NULL)
+			bp->b_fsprivate2 = mp;
+		else if (((xfs_trans_t *) bp->b_fsprivate2)->t_magic ==
+				XFS_TRANS_HEADER_MAGIC)  {
+			cmn_err(CE_PANIC,
+			"Bad fsprivate2 ptr, bp = 0x%x\n", bp);
+		}
+		bp->b_flags2 |= B_XFS_INO;
+	}
+#endif /* !NO_XFS_PARANOIA */
 	if (flags & B_DELWRI) {
 		bdwrite(bp);
 	} else if (flags & B_ASYNC) {
@@ -3004,7 +3092,7 @@ xfs_iflush(
 	} else {
 		error = bwrite(bp);
 	}
-#endif
+#endif /* SIM */
 
 	return error;
 }
