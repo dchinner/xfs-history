@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.128 $"
+#ident  "$Revision: 1.129 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -242,6 +242,7 @@ xfs_init(
 	extern lock_t	xfsd_lock;
 	extern sv_t	xfsd_wait;
 	extern mutex_t	xfs_ancestormon;
+	extern mutex_t	xfs_uuidtabmon;
 	extern zone_t	*xfs_gap_zone;
 #ifdef DEBUG
 	extern ktrace_t	*xfs_alloc_trace_buf;
@@ -258,6 +259,7 @@ xfs_init(
 #ifndef SIM
 	spinlock_init(&xfs_strat_lock, "xfsstrat");
 	mutex_init(&xfs_ancestormon, MUTEX_DEFAULT, "xfs_ancestor");
+	mutex_init(&xfs_uuidtabmon, MUTEX_DEFAULT, "xfs_uuidtab");
 	spinlock_init(&xfsd_lock, "xfsd");
 	sv_init(&xfsd_wait, SV_DEFAULT, "xfsd");
 
