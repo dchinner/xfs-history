@@ -428,16 +428,20 @@ xfs_bmap_add_attrfork_btree(
 		cur->bc_private.b.firstblock = *firstblock;
 		error = xfs_bmbt_lookup_ge(cur, 0, 0, 0, &stat);
 		if (error) {
-			xfs_btree_del_cursor(cur);
+			xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 			return error;
 		}
 		error = xfs_bmbt_newroot(cur, flags, &stat);
-		if (error || stat == 0) {
-			xfs_btree_del_cursor(cur);
-			return error ? error : XFS_ERROR(ENOSPC);
+		if (error) {
+			xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
+			return error;
+		}
+		if (stat == 0) {
+			xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
+			return XFS_ERROR(ENOSPC);
 		}
 		*firstblock = cur->bc_private.b.firstblock;
-		xfs_btree_del_cursor(cur);
+		xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
 	}
 	return 0;
 }
@@ -462,7 +466,8 @@ xfs_bmap_add_attrfork_extents(
 		flags, XFS_DATA_FORK);
 	if (cur) {
 		cur->bc_private.b.allocated = 0;
-		xfs_btree_del_cursor(cur);
+		xfs_btree_del_cursor(cur, (error ? XFS_BTREE_ERROR :
+					   XFS_BTREE_NOERROR));
 	}
 	return error;
 }
@@ -3658,7 +3663,8 @@ xfs_bmapi(
 				error = xfs_bmap_alloc(&bma);
 				if (error) {
 					if (cur) {
-						xfs_btree_del_cursor(cur);
+						xfs_btree_del_cursor(cur,
+							XFS_BTREE_ERROR);
 					}
 					/*
 					 * XXXajs
@@ -3881,7 +3887,7 @@ xfs_bmapi(
 			XFS_FSB_TO_AGNO(ip->i_mount,
 				cur->bc_private.b.firstblock)));
 		*firstblock = cur->bc_private.b.firstblock;
-		xfs_btree_del_cursor(cur);
+		xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
 	}
 	xfs_bmap_validate_ret(orig_bno, orig_len, orig_flags, orig_mval,
 		orig_nmap, *nmap);
@@ -4156,7 +4162,7 @@ xfs_bunmapi(
 	if (cur) {
 		*firstblock = cur->bc_private.b.firstblock;
 		cur->bc_private.b.allocated = 0;
-		xfs_btree_del_cursor(cur);
+		xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
 	}
 	kmem_check();
 	return 0;
