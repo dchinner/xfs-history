@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.67 $"
+#ident	"$Revision: 1.69 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2474,6 +2474,52 @@ xlog_recover_process_efis(xlog_t	*log)
 
 
 /*
+ * This routine performs a transaction to null out a bad inode pointer
+ * in an agi unlinked inode hash bucket.
+ */
+STATIC void
+xlog_recover_clear_agi_bucket(
+	xfs_mount_t	*mp,
+	xfs_agnumber_t	agno,			      
+	int		bucket)
+{
+	xfs_trans_t	*tp;
+	xfs_agi_t	*agi;
+	daddr_t		agidaddr;
+	buf_t		*agibp;
+	int		offset;
+	int		error;
+
+#ifdef SIM
+	ASSERT(0);
+#else
+	tp = xfs_trans_alloc(mp, XFS_TRANS_CLEAR_AGI_BUCKET);
+	xfs_trans_reserve(tp, 0, XFS_CLEAR_AGI_BUCKET_LOG_RES(mp), 0, 0, 0);
+
+	agidaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
+	error = xfs_trans_read_buf(tp, mp->m_dev, agidaddr, 1, 0, &agibp);
+	if (error) {
+		xfs_trans_cancel(tp, XFS_TRANS_ABORT);
+		return;
+	}
+	agi = XFS_BUF_TO_AGI(agibp);
+	if (agi->agi_magicnum != XFS_AGI_MAGIC) {
+		xfs_trans_cancel(tp, 0);
+		return;
+	}
+	ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
+
+	agi->agi_unlinked[bucket] = NULLAGINO;
+	offset = offsetof(xfs_agi_t, agi_unlinked) +
+		 (sizeof(xfs_agino_t) * bucket);
+	xfs_trans_log_buf(tp, agibp, offset,
+			  (offset + sizeof(xfs_agino_t) - 1));
+
+	xfs_trans_commit(tp, 0);
+#endif	/* SIM */
+}	/* xlog_recover_clear_agi_bucket */
+
+/*
  * xlog_iunlink_recover
  *
  * This is called during recovery to process any inodes which
@@ -2498,8 +2544,10 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 	xfs_ino_t	ino;
 	int		bucket;
 	int		error;
+	ino_t		last_ino;
 
 	mp = log->l_mp;
+	last_ino = 0;
 	for (agno = 0; agno < mp->m_sb.sb_agcount; agno++) {
 		/*
 		 * Find the agi for this ag.
@@ -2530,7 +2578,17 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 
 			ino = XFS_AGINO_TO_INO(mp, agno, agino);
 			error = xfs_iget(mp, NULL, ino, 0, &ip, 0);
-			if (!error) {
+
+			/*
+			 * This inode is messed up.  Just
+			 * ditch this bucket of inodes.  We
+			 * will lose some inodes and space,
+			 * but at least we won't hang.
+			 */
+			if (!error &&
+			    (ino != last_ino) &&
+			    (ip->i_d.di_nlink == 0) &&
+			    (ip->i_d.di_mode != 0)) {
 				ASSERT(ip != NULL);
 				ASSERT(ip->i_d.di_nlink == 0);
 				ASSERT(ip->i_d.di_mode != 0);
@@ -2546,13 +2604,16 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 			} else {
 				/*
 				 * Skip this bucket if we can't read in
-				 * the inode it points to.
-				 *
-				 * XXXajs
-				 * We need to actuall fix up the bucket
-				 * to point at NULLAGINO.  That will
-				 * require a transaction.
+				 * the inode it points to.  Call
+				 * xlog_recover_clear_agi_bucket()
+				 * to perform a transaction to clear
+				 * the inode pointer in the bucket.
 				 */
+				if (!error) {
+					VN_RELE(ip->i_vnode);
+				}
+				xlog_recover_clear_agi_bucket(mp, agno,
+							      bucket);
 				bucket++;
 			}
 
