@@ -11,6 +11,7 @@
 #include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <sys/cmn_err.h>
+#include <sys/uuid.h>
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
