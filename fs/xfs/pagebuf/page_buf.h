@@ -385,4 +385,37 @@ extern void pagebuf_delwri_dequeue(
 extern int pagebuf_init(void);
 extern void pagebuf_terminate(void);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,17)
+/*
+ * macro tricks to expand the set_buffer_foo() and clear_buffer_foo()
+ * functions.
+ */
+#define BUFFER_FNS(bit, name)						\
+static inline void set_buffer_##name(struct buffer_head *bh)		\
+{									\
+	set_bit(BH_##bit, &(bh)->b_state);				\
+}									\
+static inline void clear_buffer_##name(struct buffer_head *bh)		\
+{									\
+	clear_bit(BH_##bit, &(bh)->b_state);				\
+}									\
+
+/*
+ * Emit the buffer bitops functions.   Note that there are also functions
+ * of the form "mark_buffer_foo()".  These are higher-level functions which
+ * do something in addition to setting a b_state bit.
+ */
+BUFFER_FNS(Uptodate, uptodate)
+BUFFER_FNS(Dirty, dirty)
+BUFFER_FNS(Lock, locked)
+BUFFER_FNS(Req, req)
+BUFFER_FNS(Mapped, mapped)
+BUFFER_FNS(New, new)
+BUFFER_FNS(Async, async)
+BUFFER_FNS(Wait_IO, wait_io)
+BUFFER_FNS(Launder, launder)
+BUFFER_FNS(Sync, sync)
+BUFFER_FNS(Delay, delay)
+#endif /* kernel < 2.5.17 */
+
 #endif /* __PAGE_BUF_H__ */

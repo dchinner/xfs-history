@@ -1443,7 +1443,7 @@ _end_io_pagebuf(
 
 		ASSERT(PageLocked(page));
 		spin_lock_irqsave(&page_uptodate_lock, flags);
-		clear_bit(BH_Async, &bh->b_state);
+		clear_buffer_async(bh);
 		unlock_buffer(bh);
 		for (bp = bh->b_this_page; bp != bh; bp = bp->b_this_page) {
 			if (buffer_locked(bp)) {
@@ -1589,7 +1589,7 @@ _pagebuf_page_io(
 		bh->b_blocknr = bn;
 		bh->b_size = sector;
 		bh->b_dev = pbr->pbr_kdev;
-		set_bit(BH_Lock, &bh->b_state);
+		set_buffer_locked(bh);
 		set_bh_page(bh, page, pg_offset);
 		init_waitqueue_head(&bh->b_wait);
 		atomic_set(&bh->b_count, 1);
@@ -1617,11 +1617,11 @@ request:
 			init_buffer(bh, callback, pb);
 			bh->b_rdev = bh->b_dev;
 			bh->b_rsector = bh->b_blocknr;
-			set_bit(BH_Mapped, &bh->b_state);
-			set_bit(BH_Async, &bh->b_state);
-			set_bit(BH_Req, &bh->b_state);
+			set_buffer_mapped(bh);
+			set_buffer_async(bh);
+			set_buffer_req(bh);
 			if (rw == WRITE)
-				set_bit(BH_Uptodate, &bh->b_state);
+				set_buffer_uptodate(bh);
 			generic_make_request(rw, bh);
 		}
 		return 0;
