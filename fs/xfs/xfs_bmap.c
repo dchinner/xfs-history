@@ -1545,15 +1545,17 @@ xfs_bmap_alloc(
 	xfs_bmalloca_t	*ap)		/* bmap alloc argument struct */
 {
 	xfs_fsblock_t	adjust;		/* adjustment to block numbers */
+	xfs_alloctype_t	atype;		/* type for allocation routines */
 	int		error;		/* error return value */
 	xfs_agnumber_t	fb_agno;	/* ag number of ap->firstblock */
 	xfs_mount_t	*mp;		/* mount point structure */
 	int		nullfb;		/* true if ap->firstblock isn't set */
-	/* REFERENCED */
-	xfs_extlen_t	prod;		/* product factor for allocators */
 	int		rt;		/* true if inode is realtime */
-	/* REFERENCED */
+#ifndef SIM
+	xfs_extlen_t	prod;		/* product factor for allocators */
+	xfs_extlen_t	ralen;		/* realtime allocation length */
 	xfs_rtblock_t	rtx;		/* realtime extent number */
+#endif
 
 #define	ISLEGAL(x,y)	\
 	(rt ? \
@@ -1570,15 +1572,45 @@ xfs_bmap_alloc(
 	rt = (ap->ip->i_d.di_flags & XFS_DIFLAG_REALTIME) && ap->userdata;
 	fb_agno = nullfb ? NULLAGNUMBER : XFS_FSB_TO_AGNO(mp, ap->firstblock);
 #ifndef SIM
-	if (rt && ap->eof && ap->off == 0) {
-		error = xfs_rtpick_extent(mp, ap->tp, &rtx);
-		if (error)
-			return error;
-		ap->rval = rtx * mp->m_sb.sb_rextsize;
-	} else
-#endif	/* !SIM */
+	if (rt) {
+		/*
+		 * Set prod to match the realtime extent size,
+		 * and ralen to be the actual requested length in rtextents.
+		 */
+		if (ap->ip->i_d.di_extsize) {
+			prod = ap->ip->i_d.di_extsize / mp->m_sb.sb_rextsize;
+			ralen = (ap->alen + ap->ip->i_d.di_extsize - 1) /
+				mp->m_sb.sb_rextsize;
+		} else {
+			prod = 1;
+			ralen = (ap->alen + mp->m_sb.sb_rextsize - 1) /
+				mp->m_sb.sb_rextsize;
+		}
+		/*
+		 * If the old value was close enough to MAXEXTLEN that
+		 * we rounded up to it, cut it back so it's legal again.
+		 * Note that if it's a really large request (bigger than
+		 * MAXEXTLEN), we don't hear about that number, and can't
+		 * adjust the starting point to match it.
+		 */
+		if (ralen * mp->m_sb.sb_rextsize >= MAXEXTLEN)
+			ralen = MAXEXTLEN / mp->m_sb.sb_rextsize;
+		/*
+		 * If it's an allocation to an empty file at offset 0,
+		 * pick an extent that will space things out in the rt area.
+		 */
+		if (ap->eof && ap->off == 0) {
+			error = xfs_rtpick_extent(mp, ap->tp, ralen, &rtx);
+			if (error)
+				return error;
+			ap->rval = rtx * mp->m_sb.sb_rextsize;
+		} else
+			ap->rval = 0;
+	}
+#else
 	if (rt)
 		ap->rval = 0;
+#endif	/* !SIM */
 	else if (nullfb)
 		ap->rval = XFS_INO_TO_FSB(mp, ap->ip->i_ino);
 	else
@@ -1722,29 +1754,12 @@ xfs_bmap_alloc(
 #ifdef SIM
 		ASSERT(0);
 #else
-		xfs_extlen_t	ralen;
-		xfs_alloctype_t	type;		/* allocation type flag */
-
-		type = ap->rval == 0 ?
+		atype = ap->rval == 0 ?
 			XFS_ALLOCTYPE_ANY_AG : XFS_ALLOCTYPE_NEAR_BNO;
-		if (ap->ip->i_d.di_extsize) {
-			prod = ap->ip->i_d.di_extsize / mp->m_sb.sb_rextsize;
-			ap->alen = (ap->alen + ap->ip->i_d.di_extsize - 1) /
-				mp->m_sb.sb_rextsize;
-		} else {
-			prod = 1;
-			ap->alen = (ap->alen + mp->m_sb.sb_rextsize - 1) /
-				mp->m_sb.sb_rextsize;
-		}
-		/*
-		 * If the old value was close enough to MAXEXTLEN that
-		 * we rounded up to it, cut it back so it's legal again.
-		 */
-		if (ap->alen * mp->m_sb.sb_rextsize >= MAXEXTLEN)
-			ap->alen = MAXEXTLEN / mp->m_sb.sb_rextsize;
 		ap->rval /= mp->m_sb.sb_rextsize;
+		ap->alen = ralen;
 		if (error = xfs_rtallocate_extent(ap->tp, ap->rval, 1, ap->alen,
-				&ralen, type, ap->wasdel, prod, &ap->rval))
+				&ralen, atype, ap->wasdel, prod, &ap->rval))
 			return error;
 		if (ap->rval != NULLFSBLOCK) {
 			ap->rval *= mp->m_sb.sb_rextsize;
@@ -1776,7 +1791,6 @@ xfs_bmap_alloc(
 	else {
 		xfs_agnumber_t	ag;
 		xfs_alloc_arg_t	args;
-		xfs_alloctype_t	atype;
 		xfs_extlen_t	blen;
 		int		isaligned;
 		xfs_extlen_t	longest;
