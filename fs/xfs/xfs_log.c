@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.50 $"
+#ident	"$Revision: 1.53 $"
 
 /*
  * High level interface routines for log manager
@@ -289,7 +289,7 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 		return XFS_ENOLOGSPACE;
 
 	if (flags & XFS_LOG_PERM_RESERV)
-		((xlog_ticket_t *)ticket)->t_flags |= XLOG_TIC_PERM_RESERV;
+		((xlog_ticket_t *)(*ticket))->t_flags |= XLOG_TIC_PERM_RESERV;
 
 	return 0;
 }	/* xfs_log_reserve */
