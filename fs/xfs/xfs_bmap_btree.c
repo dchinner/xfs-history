@@ -58,7 +58,9 @@
 #define	kmem_check()	/* dummy for memory-allocation checking */
 #endif
 
+#if defined(DEBUG) && !defined(SIM)
 ktrace_t	*xfs_bmbt_trace_buf;
+#endif
 
 /*
  * Prototypes for internal btree functions.
@@ -2395,7 +2397,7 @@ xfs_bmbt_log_block(
 	int			first;
 	int			last;
 	xfs_trans_t		*tp;
-	static const int	offsets[] = {
+	static const short	offsets[] = {
 		offsetof(xfs_bmbt_block_t, bb_magic),
 		offsetof(xfs_bmbt_block_t, bb_level),
 		offsetof(xfs_bmbt_block_t, bb_numrecs),

@@ -97,7 +97,7 @@ xfs_ialloc_log_di(
 	int			ioffset;	/* off in bytes */
 	int			last;		/* last byte number */
 	xfs_mount_t		*mp;		/* mount point structure */
-	static const int	offsets[] = {	/* field offsets */
+	static const short	offsets[] = {	/* field offsets */
 						/* keep in sync with bits */
 		offsetof(xfs_dinode_core_t, di_magic),
 		offsetof(xfs_dinode_core_t, di_mode),
@@ -1101,7 +1101,7 @@ xfs_ialloc_log_agi(
 {
 	int			first;		/* first byte number */
 	int			last;		/* last byte number */
-	static const int	offsets[] = {	/* field starting offsets */
+	static const short	offsets[] = {	/* field starting offsets */
 					/* keep in sync with bit definitions */
 		offsetof(xfs_agi_t, agi_magicnum),
 		offsetof(xfs_agi_t, agi_versionnum),

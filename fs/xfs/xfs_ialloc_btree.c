@@ -1026,7 +1026,7 @@ xfs_inobt_log_block(
 {
 	int			first;	/* first byte offset logged */
 	int			last;	/* last byte offset logged */
-	static const int	offsets[] = {	/* table of offsets */
+	static const short	offsets[] = {	/* table of offsets */
 		offsetof(xfs_inobt_block_t, bb_magic),
 		offsetof(xfs_inobt_block_t, bb_level),
 		offsetof(xfs_inobt_block_t, bb_numrecs),
