@@ -753,7 +753,15 @@ STATIC int linvfs_read_full_page(struct file *filp, struct page *page)
 
 STATIC int linvfs_write_full_page(struct page *page)
 {
+	if ((current->flags & PF_FSTRANS) && DelallocPage(page))
+		goto out_fail;
+
 	return pagebuf_write_full_page(page, linvfs_pb_bmap);
+
+out_fail:
+	SetPageDirty(page);
+	UnlockPage(page);
+	return 0;
 }
 
 STATIC int linvfs_prepare_write(
