@@ -252,7 +252,7 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
 
 #define xfs_biomove(pb, off, len, data, rw) \
 	    pagebuf_iomove((pb), (off), (len), (data), \
-		((rw) == XFS_B_WRITE) ? PBRW_READ : PBRW_WRITE)
+		((rw) == XFS_B_WRITE) ? PBRW_WRITE : PBRW_READ)
 
 #define xfs_biozero(pb, off, len) \
 	    pagebuf_iomove((pb), (off), (len), NULL, PBRW_ZERO)
