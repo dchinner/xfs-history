@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.100 $"
+#ident  "$Revision: 1.101 $"
 
 #include <strings.h>
 #include <limits.h>
@@ -218,6 +218,9 @@ xfs_init(
 	extern zone_t	*xfs_inode_zone;
 	extern zone_t	*xfs_trans_zone;
 	extern zone_t	*xfs_buf_item_zone;
+#if XFS_BIG_FILESYSTEMS
+	extern zone_t	*xfs_buf_item64_zone;
+#endif
 	extern zone_t	*xfs_efd_zone;
 	extern zone_t	*xfs_efi_zone;
 
@@ -287,6 +290,13 @@ xfs_init(
 				(((XFS_MAX_BLOCKSIZE / XFS_BLI_CHUNK) /
                                   NBWORD) * sizeof(int))),
 			       "xfs_buf_item");
+#if XFS_BIG_FILESYSTEMS
+	xfs_buf_item64_zone =
+		kmem_zone_init((sizeof(xfs_buf_log_format64_t) +
+				(((XFS_MAX_BLOCKSIZE / XFS_BLI_CHUNK) /
+                                  NBWORD) * sizeof(int))),
+			       "xfs_buf_item64");
+#endif
 	xfs_efd_zone = kmem_zone_init((sizeof(xfs_efd_log_item_t) +
 				       (15 * sizeof(xfs_extent_t))),
 				      "xfs_efd_item");
