@@ -421,6 +421,8 @@ finish_inode:
 		xfs_ilock(ip, lock_flags);
 	}
 
+#ifndef __linux__
+	/* meaningless on Linux */
 	/*
 	 * Make sure the vnode's VENF_LOCKING flag corresponds with
 	 * the inode's mode. 
@@ -437,6 +439,7 @@ finish_inode:
 	if (mp->m_cxfstype != XFS_CXFS_NOT) {
 		VN_FLAGSET(vp, VNOSWAP);
 	}
+#endif
 
 	/*
 	 * Put ip on its hash chain, unless someone else hashed a duplicate
