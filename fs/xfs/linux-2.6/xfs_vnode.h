@@ -244,6 +244,7 @@ typedef struct vnodeops {
 	vop_close_t		vop_close;
 	vop_read_t		vop_read;
 	vop_write_t		vop_write;
+	vop_ioctl_t		vop_ioctl;
 	vop_getattr_t		vop_getattr;
 	vop_setattr_t		vop_setattr;
 	vop_access_t		vop_access;
@@ -260,7 +261,10 @@ typedef struct vnodeops {
 	vop_fsync_t		vop_fsync;
 	vop_inactive_t		vop_inactive;
 	vop_fid2_t		vop_fid2;
+#ifndef CELL_CAPABLE
+        /* XXX - we don't have this on irix so undefine it if we're CELL_CAPABLE */
 	vop_release_t		vop_release;
+#endif
 	vop_rwlock_t		vop_rwlock;
 	vop_rwunlock_t		vop_rwunlock;
 	vop_seek_t		vop_seek;
@@ -281,7 +285,6 @@ typedef struct vnodeops {
 	vop_pflushinvalvp_t	vop_flushinval_pages;
 	vop_pflushvp_t		vop_flush_pages;
 	vop_sethole_t		vop_pages_sethole;
-	vop_ioctl_t		vop_ioctl;
 } vnodeops_t;
 
 /*

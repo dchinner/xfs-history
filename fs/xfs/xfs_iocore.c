@@ -106,6 +106,9 @@ xfs_ioops_t	xfs_iocore_xfs = {
 	(xfs_size_t) xfs_size_fn,
 	(xfs_setsize_t) xfs_setsize_fn,
 	(xfs_lastbyte_t) xfs_file_last_byte,
+#ifdef CELL_CAPABLE
+        (xfs_checklock_t) fs_nosys, /* (xfs_checklock_t) xfs_checklock */
+#endif
 };
 
 void

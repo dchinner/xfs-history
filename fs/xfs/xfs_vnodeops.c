@@ -6089,6 +6089,7 @@ vnodeops_t xfs_vnodeops = {
 	xfs_close,
 	(vop_read_t)xfs_read,
 	(vop_write_t)xfs_write,
+	xfs_ioctl,
 	xfs_getattr,
 	xfs_setattr,
 	xfs_access,
@@ -6126,5 +6127,4 @@ vnodeops_t xfs_vnodeops = {
 	fs_flushinval_pages,
 	fs_flush_pages,
 	fs_pages_sethole,
-	xfs_ioctl,
 };
