@@ -1226,6 +1226,12 @@ xfs_iomap_write(
 				XFS_FSB_TO_DADDR(mp, curr_bmapp->bn);
 		}
 	}
+
+	/*
+	 * Clear out any read-ahead info since the write may
+	 * have made it invalid.
+	 */
+	XFS_INODE_CLEAR_READ_AHEAD(ip);
 }
 
 
@@ -1972,6 +1978,13 @@ xfs_strat_write(
 		(void) xfs_bmap_finish(&tp, &free_list, first_block, 0);
 
 		xfs_trans_commit(tp, 0);
+
+		/*
+		 * Before dropping the lock, clear any read-ahead state
+		 * since in allocating space here we may have made it
+		 * invalid.
+		 */
+		XFS_INODE_CLEAR_READ_AHEAD(ip);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
 		/*
