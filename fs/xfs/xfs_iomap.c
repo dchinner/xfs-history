@@ -248,13 +248,11 @@ xfs_flush_space(
 	int		*fsynced,
 	int		*ioflags)
 {
-	struct inode	*inode = LINVFS_GET_IP(XFS_ITOV(ip));
-
 	switch (*fsynced) {
 	case 0:
 		if (ip->i_delayed_blks) {
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
-			filemap_fdatawrite(inode->i_mapping);
+			xfs_flush_inode(ip);
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
 			*fsynced = 1;
 		} else {
@@ -268,9 +266,7 @@ xfs_flush_space(
 		return 0;
 	case 2:
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
-		fsync_no_super(inode->i_dev);
-		xfs_log_force(ip->i_mount, (xfs_lsn_t)0,
-						XFS_LOG_FORCE|XFS_LOG_SYNC);
+		xfs_flush_device(ip);
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 		*fsynced = 3;
 		return 0;
