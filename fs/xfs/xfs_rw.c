@@ -1152,9 +1152,10 @@ xfs_read(
 	size_t		resid;
 
 	ip = XFS_VTOI(vp);
-	ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
-
 	type = ip->i_d.di_mode & IFMT;
+	ASSERT(type == IFDIR ||
+	       ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
+
 	ASSERT(type == IFREG || type == IFDIR ||
 	       type == IFLNK || type == IFSOCK);
 
@@ -2311,11 +2312,12 @@ xfs_write(
 	ASSERT(!(vp->v_vfsp->vfs_flag & VFS_RDONLY));
 
 	ip = XFS_VTOI(vp);
-	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) ||
+	type = ip->i_d.di_mode & IFMT;
+	ASSERT(type == IFDIR ||
+	       ismrlocked(&ip->i_iolock, MR_UPDATE) ||
 	       (ismrlocked(&ip->i_iolock, MR_ACCESS) &&
 		(ioflag & IO_DIRECT)));
 
-	type = ip->i_d.di_mode & IFMT;
 	ASSERT(type == IFREG || type == IFDIR ||
 	       type == IFLNK || type == IFSOCK);
 
