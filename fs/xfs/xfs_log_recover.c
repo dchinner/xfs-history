@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.118 $"
+#ident	"$Revision: 1.123 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1496,7 +1496,7 @@ xlog_recover_do_buffer_pass2(xlog_t			*log,
  * the buffer will not be marked as an inode buffer and so will be
  * sent to xlog_recover_do_reg_buffer() below during recovery.
  */
-STATIC void
+STATIC int
 xlog_recover_do_inode_buffer(xfs_mount_t		*mp,
 			     xlog_recover_item_t	*item,
 			     buf_t			*bp,
@@ -1559,7 +1559,7 @@ xlog_recover_do_inode_buffer(xfs_mount_t		*mp,
 			 * buffer, then we're done.
 			 */
 			if (bit == -1) {
-				return;
+				return 0;
 			}
 
 			nbits = xfs_buf_item_contig_bits(data_map, map_size,
@@ -1590,15 +1590,19 @@ xlog_recover_do_inode_buffer(xfs_mount_t		*mp,
 		logged_nextp = (xfs_agino_t *)
 			       ((char *)(item->ri_buf[item_index].i_addr) +
 				(next_unlinked_offset - reg_buf_offset));
-#ifndef NO_XFS_PARANOIA
-		if (*logged_nextp == 0)
-			cmn_err(CE_PANIC,
-		"XFS trying to replay bad (0) inode di_next_unlinked field\n");
-#endif
+		if (*logged_nextp == 0)  {
+			cmn_err(CE_ALERT,
+				"filesystem \"%s\" - bad inode buffer log record (ptr = 0x%x, bp = 0x%x).  XFS trying to replay bad (0) inode di_next_unlinked field",
+				mp->m_fsname, item, bp);
+			return XFS_ERROR(EFSCORRUPTED);
+		}
+
 		buffer_nextp = (xfs_agino_t *)((char *)(bp->b_un.b_addr) +
 					      next_unlinked_offset);
 		*buffer_nextp = *logged_nextp;
 	}
+
+	return 0;
 }	/* xlog_recover_do_inode_buffer */
 
 /*
@@ -1791,8 +1795,7 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 		cmn_err(CE_ALERT,
 			"xfs_log_recover: unknown buffer type 0x%x, dev 0x%x", 
 			buf_f->blf_type, log->l_dev);
-		ASSERT(0);
-		break;
+		return XFS_ERROR(EFSCORRUPTED);
 	}
 
 	mp = log->l_mp;
@@ -1805,13 +1808,16 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 		return error;
 	}
 
+	error = 0;
 	if (flags & XFS_BLI_INODE_BUF) {
-		xlog_recover_do_inode_buffer(mp, item, bp, buf_f);
+		error = xlog_recover_do_inode_buffer(mp, item, bp, buf_f);
 	} else if (flags & (XFS_BLI_UDQUOT_BUF | XFS_BLI_PDQUOT_BUF)) {
 		xlog_recover_do_dquot_buffer(mp, log, item, bp, buf_f);
 	} else {
 		xlog_recover_do_reg_buffer(mp, item, bp, buf_f);
 	}
+	if (error)
+		return XFS_ERROR(error);
 
 	/*
 	 * Perform delayed write on the buffer.  Asynchronous writes will be
@@ -1854,6 +1860,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	buf_t			*bp;
 	xfs_imap_t		imap;
 	xfs_dinode_t		*dip;
+	xfs_ino_t		ino;
 	int			len;
 	caddr_t			src;
 	caddr_t			dest;
@@ -1867,6 +1874,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	}
 
 	in_f = (xfs_inode_log_format_t *)item->ri_buf[0].i_addr;
+	ino = in_f->ilf_ino;
 	mp = log->l_mp;
 	if (ITEM_TYPE(item) == XFS_LI_INODE) {
 		imap.im_blkno = (daddr_t)in_f->ilf_blkno;
@@ -1884,7 +1892,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		 * invalidate the buffer when we write it out below.
 		 */
 		imap.im_blkno = 0;
-		xfs_imap(log->l_mp, 0, in_f->ilf_ino, &imap, 0);
+		xfs_imap(log->l_mp, 0, ino, &imap, 0);
 	}
 	bp = bread(mp->m_dev, imap.im_blkno, imap.im_len);
 	if (bp->b_flags & B_ERROR) {
@@ -1904,46 +1912,62 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	 * like an inode!
 	 */
 	if (dip->di_core.di_magic != XFS_DINODE_MAGIC) {
-		cmn_err(CE_PANIC,
-			"xfs_inode_recover: Bad inode pointer 0x%x",
-			dip);
+		brelse(bp);
+		cmn_err(CE_ALERT,
+			"xfs_inode_recover - filesystem \"%s\": Bad inode magic number, dino ptr = 0x%x, dino bp = 0x%x, ino = %lld",
+			mp->m_fsname, dip, bp, ino);
+		return XFS_ERROR(EFSCORRUPTED);
 	}
 	dicp = (xfs_dinode_core_t*)(item->ri_buf[1].i_addr);
 	if (dicp->di_magic != XFS_DINODE_MAGIC) {
-		cmn_err(CE_PANIC,
-			"xfs_inode_recover: Bad inode record 0x%x",
-			item);
+		brelse(bp);
+		cmn_err(CE_ALERT,
+			"xfs_inode_recover - filesystem \"%s\": Bad inode log record, rec ptr 0x%x, ino %lld, filesystem \"%s\"",
+			mp->m_fsname, item, ino);
+		return XFS_ERROR(EFSCORRUPTED);
 	}
 	if ((dicp->di_mode & IFMT) == IFREG) {
 		if ((dicp->di_format != XFS_DINODE_FMT_EXTENTS) &&
 		    (dicp->di_format != XFS_DINODE_FMT_BTREE)) {
-			cmn_err(CE_PANIC,
-				"xfs_inode_recover: Bad reg inode 0x%x",
-				item);
+			brelse(bp);
+			cmn_err(CE_ALERT,
+				"xfs_inode_recover - filesystem \"%s\": Bad regular inode log record, rec ptr 0x%x, ino ptr = 0x%x, ino bp = 0x%x, ino %lld, filesystem \"%s\"",
+				mp->m_fsname, item, dip, bp, ino);
+			return XFS_ERROR(EFSCORRUPTED);
 		}
 	} else if ((dicp->di_mode & IFMT) == IFDIR) {
 		if ((dicp->di_format != XFS_DINODE_FMT_EXTENTS) &&
 		    (dicp->di_format != XFS_DINODE_FMT_BTREE) &&
 		    (dicp->di_format != XFS_DINODE_FMT_LOCAL)) {
-			cmn_err(CE_PANIC,
-				"xfs_inode_recover: Bad dir inode 0x%x",
-				item);
+			brelse(bp);
+			cmn_err(CE_ALERT,
+				"xfs_inode_recover - filesystem \"%s\": Bad dir inode log record, rec ptr 0x%x, ino ptr = 0x%x, ino bp = 0x%x, ino %lld, filesystem \"%s\"",
+				mp->m_fsname, item, dip, bp, ino);
+			return XFS_ERROR(EFSCORRUPTED);
 		}
 	}
-	if (dicp->di_nextents > dicp->di_nblocks) {
-		cmn_err(CE_PANIC,
-			"xfs_inode_recover: Bad inode nblocks 0x%x",
-			item);
+	if (dicp->di_nextents + dicp->di_anextents > dicp->di_nblocks) {
+		brelse(bp);
+		cmn_err(CE_ALERT,
+			"xfs_inode_recover - filesystem \"%s\": Bad inode log record, rec ptr 0x%x, dino ptr 0x%x, dino bp 0x%x, ino %lld, total extents = %d, nblocks = %d",
+			mp->m_fsname, item, dip, bp, ino,
+			dicp->di_nextents + dicp->di_anextents,
+			dicp->di_nblocks);
+		return XFS_ERROR(EFSCORRUPTED);
 	}
 	if (dicp->di_forkoff > mp->m_sb.sb_inodesize) {
-		cmn_err(CE_PANIC,
-			"xfs_inode_recover: Bad inode forkoff 0x%x",
-			item);
+		brelse(bp);
+		cmn_err(CE_ALERT,
+			"xfs_inode_recover - filesystem \"%s\": Bad inode log rec ptr 0x%x, dino ptr 0x%x, dino bp 0x%x, ino %lld, forkoff 0x%x",
+			mp->m_fsname, item, dip, bp, ino, dicp->di_forkoff);
+		return XFS_ERROR(EFSCORRUPTED);
 	}
 	if (item->ri_buf[1].i_len > sizeof(xfs_dinode_core_t)) {
-		cmn_err(CE_PANIC,
-			"xfs_inode_recover: Bad inode record length 0x%x",
-			item);
+		brelse(bp);
+		cmn_err(CE_ALERT,
+			"xfs_inode_recover - filesystem \"%s\": Bad inode log record length %d, rec ptr 0x%x",
+			item->ri_buf[1].i_len, item);
+		return XFS_ERROR(EFSCORRUPTED);
 	}
 
 	ASSERT((caddr_t)dip+item->ri_buf[1].i_len <= bp->b_dmaaddr+bp->b_bcount);
