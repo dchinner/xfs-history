@@ -1,4 +1,4 @@
-#ident "$Revision: 1.40 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -925,7 +925,7 @@ xfs_trans_buf_item_match(
 	len = BBTOB(len);
 	licp = &tp->t_items;
 	if (!XFS_LIC_ARE_ALL_FREE(licp)) {
-		for (i = 0; i <= XFS_LIC_MAX_SLOT; i++) {
+		for (i = 0; i < licp->lic_unused; i++) {
 			/*
 			 * Skip unoccupied slots.
 			 */
