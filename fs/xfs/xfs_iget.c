@@ -1,4 +1,4 @@
-#ident "$Revision: 1.48 $"
+#ident "$Revision: 1.49 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -223,7 +223,6 @@ again:
 
 	mrinit(&ip->i_lock, makesname(name, "xino", (int)vp->v_number));
 	mrinit(&ip->i_iolock, makesname(name, "xio", (int)vp->v_number));
-	initnlock(&ip->i_ticketlock, "xtck");
 #ifdef NOTYET
 	initnlock(&ip->i_range_lock.r_splock, "xrange");
 #endif /* NOTYET */
