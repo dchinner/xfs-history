@@ -250,7 +250,8 @@ int						/* error code */
 xfs_getbmap(
 	vnode_t			*vp,		/* vnode pointer */
 	struct getbmap		*bmv,		/* user bmap structure */
-	void			*ap);		/* pointer to user's array */
+	void			*ap,		/* pointer to user's array */
+	int			whichfork);	/* data or attr fork */
 #endif	/* !SIM */
 
 #endif	/* _FS_XFS_BMAP_H */
