@@ -8,13 +8,13 @@
  * Macros, structures, prototypes for internal log manager use.
  */
 
-#define XLOG_NUM_ICLOGS		4
+#define XLOG_NUM_ICLOGS		2
 #define XLOG_MAX_ICLOGS		8
 #define XLOG_CALLBACK_SIZE	10
 #define XLOG_HEADER_MAGIC_NUM	0xFEEDbabe	/* Illegal cycle number */
-#define XLOG_RECORD_BSIZE	(8*1024)	/* eventually 32k */
+#define XLOG_RECORD_BSIZE	(16*1024)	/* eventually 32k */
 #define XLOG_MAX_RECORD_BSIZE	(32*1024)
-#define XLOG_RECORD_BSHIFT	13		/* 8192 == 1 << 13 */
+#define XLOG_RECORD_BSHIFT	14		/* 16384 == 1 << 14 */
 #define XLOG_MAX_RECORD_BSHIFT	15		/* 32k == 1 << 15 */
 #define XLOG_BTOLRBB(b)		((b)+XLOG_RECORD_BSIZE-1 >> XLOG_RECORD_BSHIFT)
 
@@ -240,6 +240,7 @@ typedef struct xlog_in_core {
 typedef struct log {
     /* The following block of fields are changed while holding icloglock */
     sema_t		l_flushsema;    /* iclog flushing semaphore */
+    int			l_flushcnt;	/* # of procs waiting on this sema */
     int			l_ticket_cnt;	/* free ticket count */
     int			l_ticket_tcnt;	/* total ticket count */
     xlog_ticket_t	*l_freelist;    /* free list of tickets */
