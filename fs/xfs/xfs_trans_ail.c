@@ -69,68 +69,48 @@ xfs_trans_tail_ail(xfs_mount_t *mp)
 
 
 /*
- * This will be called from xfs_trans_do_commit() after a transaction
- * has been committed to the incore log to see if any items at the
- * tail of the log need to be pushed out and to push on them if
- * necessary.  For efficiency, it makes an approximate comparison
- * of the locations of the head and tail of the log to see if it looks
- * like there is anything to do before finding out for sure.  This
- * should allow the routine to return quickly in the common case without
- * doing anything.
+ * xfs_trans_push_ail
+ *
+ * This routine is called to try to move the tail of the AIL
+ * forward.  It does this by trying to flush items in the AIL
+ * whose lsns are below the given threshold_lsn.  While this
+ * routine makes an attempt to flush out the items in the AIL,
+ * it makes no guarantees that the tail has moved forward upon
+ * return from the call.  It is an asynchronous push, and the
+ * caller must wait somehow independent of this routine.
+ *
+ * The routine returns the lsn of the tail of the log.
  */
-#ifdef NOTYET
-void
-xfs_trans_push_ail(struct xfs_mount *mp)
+xfs_lsn_t
+xfs_trans_push_ail(struct xfs_mount	*mp,
+		   xfs_lsn_t		threshold_lsn)
 {
-	xfs_lsn_t		tail_lsn;
-	xfs_lsn_t		head_lsn;
+	xfs_lsn_t		lsn;
 	xfs_log_item_t		*lip;
-	long			diff;
 	int			s;
 	int			gen;
+	int			restarts;
+#define	XFS_TRANS_PUSH_AIL_RESTARTS	10
 
-	/*
-	 * m_ail_lsn will only be written holding the AIL lock.
-	 * By reading it without the lock, we may read an inconsistent
-	 * value.  It will be inconsistent in that one of the two 32 bit
-	 * values in an lsn will have its old value with respect to
-	 * the concurrent write.  This can make us check for work
-	 * unnecessarily or not check at all, but neither case will
-	 * kill us.
-	 */
-	tail_lsn = mp->m_ail_lsn;
-	head_lsn = xfs_log_lsn(mp);
-
-	/*
-	 * If the head is far enough from the tail of the log,
-	 * then return without doing anything.
-	 */
-	diff = (long)(XFS_LSN_DIFF(head_lsn, tail_lsn));
-	if (diff > mp->m_log_thresh) {
-		return;
-	}
-
-	/*
-	 * We've determined that there might be some things to
-	 * flush, so check now while holding the AIL lock.
-	 * If we can't get the AIL lock, then someone else should
-	 * be taking care of it.  In that case just get out.
-	 */
-	if (!(s = AIL_TRYLOCK(mp))) {
-		return;
-	}
+	s = AIL_LOCK(mp);
 	lip = xfs_trans_first_ail(mp, &gen);
 	if (lip == NULL) {
+		/*
+		 * Just return if the AIL is empty.
+		 */
 		AIL_UNLOCK(mp, s);
-		return;
+		return (xfs_lsn_t)0;
 	}
 
 	/*
-	 * While the item we are looking at is too close to the head
-	 * of the log, try to flush it out.
+	 * While the item we are looking at is below the given threshold
+	 * try to flush it out.  Make sure to limit the number of times
+	 * we allow xfs_trans_next_ail() to restart scanning from the
+	 * beginning of the list.
 	 */
-	diff = (long)(XFS_LSN_DIFF(head_lsn, lip->li_lsn));
-	while (diff < mp->m_log_thresh) {
+	restarts = 0;
+	while ((restarts < XFS_TRANS_PUSH_AIL_RESTARTS) &&
+	       (XFS_LSN_CMP(lip->li_lsn, threshold_lsn) < 0)) {
 		/*
 		 * If we can lock the item without sleeping, unlock
 		 * the AIL lock and flush the item.  Then re-grab the
@@ -150,16 +130,24 @@ xfs_trans_push_ail(struct xfs_mount *mp)
 			IOP_PUSH(lip);
 			s = AIL_LOCK(mp);
 		}
-		lip = xfs_trans_next_ail(mp, lip, &gen);
+		lip = xfs_trans_next_ail(mp, lip, &gen, &restarts);
 		if (lip == NULL) {
 			break;
 		}
-		diff = (long)(XFS_LSN_DIFF(head_lsn, lip->li_lsn));
+	}
+
+	/*
+	 * Return the lsn of the current tail.
+	 */
+	lip = xfs_ail_min(&(mp->m_ail));
+	if (lip == NULL) {
+		lsn = (xfs_lsn_t)0;
+	} else {
+		lsn = lip->li_lsn;
 	}
 	AIL_UNLOCK(mp, s);
-	return;
+	return lsn;
 }
-#endif
 
 
 /*
@@ -242,12 +230,14 @@ xfs_trans_first_ail(xfs_mount_t	*mp,
  * If the generation count of the tree has not changed since the
  * caller last took something from the AIL, then return the elmt
  * in the tree which follows the one given.  If the count has changed,
- * then return the minimum elmt of the AIL.
+ * then return the minimum elmt of the AIL and bump the restarts counter
+ * if one is given.
  */
 xfs_log_item_t *
 xfs_trans_next_ail(xfs_mount_t		*mp,
 		   xfs_log_item_t	*lip,
-		   int			*gen)
+		   int			*gen,
+		   int			*restarts)
 {
 	xfs_log_item_t	*nlip;
 
@@ -255,6 +245,9 @@ xfs_trans_next_ail(xfs_mount_t		*mp,
 		nlip = xfs_ail_next(&(mp->m_ail), lip);
 	} else {
 		nlip = xfs_ail_min(&(mp->m_ail));
+		if (restarts != NULL) {
+			*restarts++;
+		}
 	}
 
 	return (nlip);
