@@ -64,12 +64,13 @@ STATIC xfs_lsn_t xlog_commit_record(xfs_mount_t *mp, xlog_ticket_t *ticket);
 STATIC int	 xlog_find_zeroed(xlog_t *log, daddr_t* blk_no);
 STATIC xlog_t *  xlog_init_log(xfs_mount_t *mp, dev_t log_dev,
 			       daddr_t blk_offset, int num_bblks);
+STATIC void	 xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog);
 STATIC void	 xlog_push_buffers_to_disk(xfs_mount_t *mp, xlog_t *log);
 STATIC void	 xlog_sync(xlog_t *log, xlog_in_core_t *iclog, uint flags);
 STATIC void	 xlog_unalloc(void);
 STATIC int	 xlog_write(xfs_mount_t *mp, xfs_log_iovec_t region[],
 			    int nentries, xfs_log_ticket_t tic,
-			    xfs_lsn_t *start_lsn, int commit);
+			    xfs_lsn_t *start_lsn, uint flags);
 
 /* local state machine functions */
 STATIC void		xlog_state_done_syncing(xlog_in_core_t *iclog);
@@ -218,7 +219,7 @@ xfs_log_notify(xfs_mount_t	  *mp,		/* mount of partition */
 	       xfs_log_callback_t *cb)
 {
 	xlog_t *log = mp->m_log;
-	
+
 	cb->cb_next = 0;
 	if (xlog_state_lsn_is_synced(log, lsn, cb))
 		cb->cb_func(cb->cb_arg);
@@ -260,7 +261,7 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 	if (! xlog_debug)
 		return 0;
 
-	if (client != XFS_TRANSACTION)
+	if (client != XFS_TRANSACTION && client != XFS_LOG)
 		return -1;
 	
 	if (flags & XFS_LOG_SLEEP) {
@@ -358,6 +359,41 @@ xfs_log_mount(xfs_mount_t	*mp,
 int
 xfs_log_unmount(xfs_mount_t *mp)
 {
+	xlog_t		 *log = mp->m_log;
+	xlog_in_core_t	 *iclog, *first_iclog;
+	xfs_log_iovec_t  reg[1];
+	xfs_log_ticket_t tic;
+	xfs_lsn_t	 lsn;
+	int		 error;
+	int		 spl;
+
+#ifdef XFSDEBUG
+	first_iclog = iclog = log->l_iclog;
+	do {
+		ASSERT(iclog->ic_state == XLOG_STATE_ACTIVE);
+		ASSERT(iclog->ic_offset == 0);
+		iclog = iclog->ic_next;
+	} while (iclog != first_iclog);
+#endif
+	reg[0].i_addr = "Unmount filesystem--";
+	reg[0].i_len  = 20;
+	if (xfs_log_reserve(mp, 64, &tic, XFS_LOG, 0) == -1)
+		xlog_panic("xfs_log_unmount: xfs_log_reserve failed");
+	((xlog_ticket_t *)tic)->t_flags = 0;	/* remove inited flag */
+	error = xlog_write(mp, reg, 1, tic, &lsn, XLOG_UNMOUNT_TRANS);
+	if (error)
+		xlog_panic("xfs_log_unmount: HELP!");
+	spl = splockspl(log->l_icloglock, splhi);
+	iclog = log->l_iclog;
+	iclog->ic_refcnt++;
+	spunlockspl(log->l_icloglock, spl);
+	xlog_state_want_sync(log, iclog);
+	xlog_state_release_iclog(log, iclog);
+	spl = splockspl(log->l_icloglock, splhi);
+	if (!(iclog->ic_state == XLOG_STATE_ACTIVE ||
+	      iclog->ic_state == XLOG_STATE_DIRTY))
+		spunlockspl_psema(log->l_icloglock, spl,	/* sleep */
+				  &iclog->ic_forcesema, 0);
 	xlog_unalloc();
 
 	return 0;
@@ -427,6 +463,12 @@ xlog_init_log(xfs_mount_t	*mp,
 	log->l_logsize     = BBTOB(num_bblks);
 	log->l_logBBstart  = blk_offset;
 	log->l_logBBsize   = num_bblks;
+
+	log->l_prev_block  = -1;
+	log->l_tail_lsn    = 0x100000000LL;  /* cycle = 1; current block = 0 */
+	log->l_curr_cycle  = 1;	      /* 0 is bad since this is initial value */
+	log->l_logreserved = 0;
+	log->l_curr_block  = 0;		/* filled in by xlog_recover */
 }	/* xlog_init */
 
 
@@ -453,15 +495,9 @@ xlog_alloc(xlog_t *log)
 
 	xlog_alloc_tickets(log);
 	
-	log->l_logreserved = 0;
-	log->l_prev_block  = -1;
-	log->l_tail_lsn    = 0x100000000LL;  /* cycle = 1; current block = 0 */
-	log->l_curr_cycle  = 1;	      /* 0 is bad since this is initial value */
-
 	bp = log->l_xbuf   = getrbuf(0);	/* get my locked buffer */
 	bp->b_edev	   = log_dev;
 	bp->b_iodone	   = xlog_iodone;
-	log->l_curr_block  = xlog_find_head(log);
 	ASSERT(log->l_xbuf->b_flags & B_BUSY);
 	ASSERT(valusema(&log->l_xbuf->b_lock) <= 0);
 	initnlock(&log->l_icloglock, "iclog");
@@ -480,7 +516,7 @@ xlog_alloc(xlog_t *log)
 		head->h_magicno = XLOG_HEADER_MAGIC_NUM;
 		head->h_version = 1;
 /*		head->h_lsn = 0;*/
-		head->h_tail_lsn = 0x100000000LL;
+		head->h_tail_lsn = 0;
 
 /* XXXmiken: Need to make the size of an iclog at least 2x the size of
  *		a filesystem block.  This means some code will not be
@@ -490,9 +526,9 @@ xlog_alloc(xlog_t *log)
 		iclog->ic_size = XLOG_RECORD_BSIZE - XLOG_HEADER_SIZE;
 		iclog->ic_state = XLOG_STATE_ACTIVE;
 		iclog->ic_log = log;
-/*		iclog->ic_refcnt = 0;	*/
+		iclog->ic_refcnt = 0;
 		iclog->ic_bwritecnt = 0;
-/*		iclog->ic_callback = 0; */
+		iclog->ic_callback = 0;
 		iclog->ic_callback_tail = &(iclog->ic_callback);
 		bp = iclog->ic_bp = getrbuf(0);		/* my locked buffer */
 		bp->b_edev = log_dev;
@@ -524,7 +560,7 @@ xlog_commit_record(xfs_mount_t  *mp,
 	reg[0].i_addr = 0;
 	reg[0].i_len = 0;
 
-	error = xlog_write(mp, reg, 1, ticket, &commit_lsn, 1);
+	error = xlog_write(mp, reg, 1, ticket, &commit_lsn, XLOG_COMMIT_TRANS);
 	if (error)
 		xlog_panic("xlog_commit_record: Can't commit transaction");
 
@@ -671,11 +707,14 @@ xlog_find_verify_log_record(caddr_t	ba,	/* update ptr as we go */
 
 /*
  * Head is defined to be the point of the log where the next log write
- * write would go.  This means that incomplete writes at the end are eliminated
- * when calculating the head.
+ * write could go.  This means that incomplete LR writes at the end are
+ * eliminated when calculating the head.  We aren't guaranteed that previous
+ * LR have complete transactions.  We only know that a cycle number of 
+ * current cycle number -1 won't be present in the log if we start writing
+ * from our current block number.
  */
 daddr_t
-xlog_find_head(xlog_t	*log)
+xlog_find_head(xlog_t *log)
 {
 	buf_t	*bp, *big_bp;
 	daddr_t	first_blk, mid_blk, last_blk, num_scan_bblks;
@@ -793,9 +832,6 @@ xlog_print_find_oldest(xlog_t *log)
  * lsn.  The entire log record does not need to be valid.  We only care
  * that the header is valid.
  *
- * NOTE: we also scan the log sequentially.  this will need to be changed
- * to a binary search.
- *
  * We could speed up search by using current head_blk buffer, but it is not
  * available.
  */
@@ -804,19 +840,21 @@ xlog_find_tail(xlog_t  *log,
 	       daddr_t *head_blk)
 {
 	xlog_rec_header_t *rhead;
+	xlog_op_header_t  *op_head;
 	daddr_t		  tail_blk;
 	buf_t		  *bp;
 	int		  i, found = 0;
 	int		  zeroed_log = 0;
 	
-
 	/* find previous log record */
 	*head_blk = xlog_find_head(log);
+
 	bp = xlog_get_bp(1);
 	if (*head_blk == 0) {
 		xlog_bread(log, 0, 1, bp);
-		if (*(uint *)(bp->b_dmaaddr) == 0) {
+		if (GET_CYCLE(bp->b_dmaaddr) == 0) {
 			tail_blk = 0;
+			/* leave all other log inited values alone */
 			goto exit;
 		}
 	}
@@ -825,12 +863,15 @@ xlog_find_tail(xlog_t  *log,
 		if (*(uint *)(bp->b_dmaaddr) == XLOG_HEADER_MAGIC_NUM) {
 			found = 1;
 			break;
-		} else if (*(uint *)(bp->b_dmaaddr == 0)) {
+		}
+#if 0
+ else if (*(uint *)(bp->b_dmaaddr == 0)) {
 			if (zeroed_log)
 				goto exit;
 			zeroed_log = 1;
 			tail_blk = i;
 		}
+#endif
 	}
 	if (!found) {		/* search from end of log */
 		for (i=log->l_logBBsize-1; i>=(*head_blk); i--) {
@@ -838,12 +879,15 @@ xlog_find_tail(xlog_t  *log,
 			if (*(uint *)(bp->b_dmaaddr) == XLOG_HEADER_MAGIC_NUM) {
 				found = 1;
 				break;
-			} else if (*(uint *)(bp->b_dmaaddr == 0)) {
+			}
+#if 0
+ else if (*(uint *)(bp->b_dmaaddr == 0)) {
 				if (zeroed_log)
 					goto exit;
 				zeroed_log = 1;
 				tail_blk = i;
 			}
+#endif
 		}
 	}
 	if (!found)
@@ -852,11 +896,24 @@ xlog_find_tail(xlog_t  *log,
 	/* find blk_no of tail of log */
 	rhead = (xlog_rec_header_t *)bp->b_dmaaddr;
 	tail_blk = BLOCK_LSN(rhead->h_tail_lsn);
+
+	log->l_prev_block = i;
+	log->l_curr_block = *head_blk;
+	log->l_curr_cycle = rhead->h_cycle;
+	log->l_tail_lsn = rhead->h_tail_lsn;
+	if (*head_blk == i+2 && rhead->h_num_logops == 1) {
+		xlog_bread(log, i+1, 1, bp);
+		op_head = (xlog_op_header_t *)bp->b_dmaaddr;
+		if ((op_head->oh_flags & XLOG_UNMOUNT_TRANS) != 0) {
+			log->l_tail_lsn =
+			     ((long long)log->l_curr_cycle << 32)|((uint)(i+2));
+		}
+	}
 exit:
 	xlog_put_bp(bp);
 
 	return tail_blk;
-}	/* xlog_find_sync */
+}	/* xlog_find_tail */
 
 
 /*
@@ -865,6 +922,10 @@ exit:
  * The last binary search should be changed to perform an X block read
  * once X becomes small enough.  You can then search linearly through
  * the X blocks.  This will cut down on the number of reads we need to do.
+ *
+ * If the log is partially zeroed, this routine will pass back the blkno
+ * of the first block with cycle number 0.  It won't have a complete LR
+ * preceding it.
  */
 int
 xlog_find_zeroed(xlog_t	 *log,
@@ -992,17 +1053,10 @@ xlog_sync(xlog_t		*log,
 	
 	ASSERT(iclog->ic_refcnt == 0);
 
-	if (flags != 0 && ((flags & XFS_LOG_SYNC) != XFS_LOG_SYNC))
+	if (flags != 0 && ((flags & XFS_LOG_SYNC) != 0))
 		xlog_panic("xlog_sync: illegal flag");
 	
-	/* put cycle number in every block */
-	for (i = 0,
-	     dptr = iclog->ic_data;
-	     dptr < iclog->ic_data + iclog->ic_offset;
-	     dptr += BBSIZE, i++) {
-		iclog->ic_header.h_cycle_data[i] = *(uint *)dptr;
-		*(uint *)dptr = log->l_curr_cycle;
-	}
+	xlog_pack_data(log, iclog);       /* put cycle number in every block */
 	iclog->ic_header.h_len = iclog->ic_offset;	/* real byte length */
 
 	bp	    = iclog->ic_bp;
@@ -1028,8 +1082,9 @@ xlog_sync(xlog_t		*log,
 	ASSERT(bp->b_blkno <= log->l_logBBsize-1);
 	ASSERT(bp->b_blkno + BTOBB(count) <= log->l_logBBsize);
 
-	if (xlog_debug > 1)
-		xlog_verify_iclog(log, iclog, count, B_TRUE);
+#ifdef XFSDEBUG
+	xlog_verify_iclog(log, iclog, count, B_TRUE);
+#endif
 
 	/* account for log which don't start at block #0 */
 	bp->b_blkno += log->l_logBBstart;
@@ -1051,29 +1106,26 @@ xlog_sync(xlog_t		*log,
 			bp->b_flags |= (B_BUSY | B_ASYNC);
 		dptr = bp->b_dmaaddr;
 		for (i=0; i<split; i += BBSIZE) {
-			*dptr = (*(uint *)dptr + 1);
+			*(uint *)dptr += 1;
 			dptr += BBSIZE;
 		}
 
 		ASSERT(bp->b_blkno <= log->l_logBBsize-1);
 		ASSERT(bp->b_blkno + BTOBB(count) <= log->l_logBBsize);
 
-		/* account for log which don't start at block #0 */
+		/* account for internal log which does't start at block #0 */
 		bp->b_blkno += log->l_logBBstart;
 
 		bwrite(bp);
 
-		if (bp->b_flags & B_ERROR == B_ERROR)
+		if ((bp->b_flags & B_ERROR) != 0)
 			xlog_panic("xlog_sync: buffer error");
-
 	}
 }	/* xlog_sync */
 
 
 /*
  * Unallocate a log
- *
- * What to do... sigh.
  */
 void
 xlog_unalloc(void)
@@ -1127,7 +1179,7 @@ xlog_write(xfs_mount_t *	mp,
 	   int			nentries,
 	   xfs_log_ticket_t	tic,
 	   xfs_lsn_t		*start_lsn,
-	   int			commit)
+	   uint			flags)
 {
     xlog_t	     *log    = mp->m_log;
     xlog_ticket_t    *ticket = (xlog_ticket_t *)tic;
@@ -1210,8 +1262,8 @@ xlog_write(xfs_mount_t *	mp,
 	    /* header copied directly */
 	    xlog_write_adv_cnt(ptr, len, log_offset, sizeof(xlog_op_header_t));
 	    
-	    /* are we copying a commit record? */
-	    logop_head->oh_flags = (commit ? XLOG_COMMIT_TRANS : 0);
+	    /* are we copying a commit or unmount record? */
+	    logop_head->oh_flags = flags;
 	    
 	    /* Partial write last time? => (partial_copy != 0)
 	     * need_copy is the amount we'd like to copy if everything could
@@ -1348,6 +1400,7 @@ xlog_state_do_callback(xlog_t *log)
 
 		spl = splockspl(log->l_icloglock, splhi);
 		iclog->ic_state = XLOG_STATE_DIRTY;
+		log->l_my_tail_lsn = iclog->ic_header.h_lsn;
 
 		/* wake up threads waiting in xfs_log_force() */
 		while (cvsema(&iclog->ic_forcesema));
@@ -2104,6 +2157,24 @@ xlog_recover_process_data(xlog_recover_t    *rhash[],
 }	/* xlog_recover_process_data */
 
 
+/*
+ * Stamp cycle number in every block.
+ */
+static void
+xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog)
+{
+	int	i;
+	caddr_t dp;
+
+	dp = iclog->ic_data;
+	for (i = 0; i<BTOBB(iclog->ic_offset); i++) {
+		iclog->ic_header.h_cycle_data[i] = *(uint *)dp;
+		*(uint *)dp = log->l_curr_cycle;
+		dp += BBSIZE;
+	}
+}	/* xlog_unpack_data */
+
+
 static void
 xlog_unpack_data(xlog_rec_header_t *rhead,
 		 caddr_t	   dp)
@@ -2256,7 +2327,7 @@ xlog_verify_iclog(xlog_t	 *log,
 			clientid = ophead->oh_clientid;
 		else
 			clientid = iclog->ic_header.h_cycle_data[BTOBB(&ophead->oh_clientid - iclog->ic_data)]>>24;
-		if (clientid != XFS_TRANSACTION)
+		if (clientid != XFS_TRANSACTION && clientid != XFS_LOG)
 			xlog_panic("xlog_verify_iclog: illegal client");
 
 		/* check tids */
