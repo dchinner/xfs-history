@@ -10,68 +10,74 @@
 #define	DLF_NODNLC	0x02	/* don't use the dnlc */
 #define	DLF_LOCK_SHARED	0x04	/* directory locked shared */
 
-#ifndef SIM
+struct bhv_desc;
+struct cred;
+struct ncfastdata;
+struct pathname;
+struct vnode;
+struct xfs_inode;
+struct xfs_mount;
+struct xfs_trans;
+
 extern int
 xfs_rename(
-	bhv_desc_t	*src_dir_bdp,
+	struct bhv_desc	*src_dir_bdp,
 	char		*src_name,
-	vnode_t		*target_dir_vp,
+	struct vnode	*target_dir_vp,
 	char		*target_name,
 	struct pathname	*target_pnp,
-	cred_t		*credp);
+	struct cred	*credp);
 
 extern int
 xfs_dir_lookup_int(
-	xfs_trans_t  		*tp,
-	bhv_desc_t     		*dir_bdp,
+	struct xfs_trans	*tp,
+	struct bhv_desc		*dir_bdp,
 	int		 	flags,
 	char         		*name,
 	struct pathname   	*pnp,
 	xfs_ino_t    		*inum,
-	xfs_inode_t  		**ipp,
+	struct xfs_inode	**ipp,
 	struct ncfastdata	*fd,
 	uint			*dir_unlocked);
 
 extern int
 xfs_truncate_file(
-	xfs_mount_t	*mp,
-	xfs_inode_t	*ip);
+	struct xfs_mount	*mp,
+	struct xfs_inode	*ip);
 
 extern int 	
 xfs_dir_ialloc(
-	xfs_trans_t 	**tpp, 
-	xfs_inode_t 	*dp, 
-	mode_t 		mode, 
-	nlink_t 	nlink, 
-	dev_t 		rdev,
-	cred_t 		*credp,
-	prid_t 		prid,
-	int		okalloc,
-	xfs_inode_t	**ipp,
-	int 		*committed);
+	struct xfs_trans 	**tpp, 
+	struct xfs_inode 	*dp, 
+	mode_t 			mode, 
+	nlink_t 		nlink, 
+	dev_t 			rdev,
+	struct cred 		*credp,
+	prid_t 			prid,
+	int			okalloc,
+	struct xfs_inode	**ipp,
+	int 			*committed);
 
 extern int
 xfs_stickytest(
-	xfs_inode_t	*dp,
-	xfs_inode_t	*ip,
-	cred_t		*cr);
+	struct xfs_inode	*dp,
+	struct xfs_inode	*ip,
+	struct cred		*cr);
 
 extern int
 xfs_droplink(
-	xfs_trans_t	*tp,
-	xfs_inode_t	*ip);
+	struct xfs_trans	*tp,
+	struct xfs_inode	*ip);
 
 extern int
 xfs_bumplink(
-	xfs_trans_t	*tp,
-	xfs_inode_t	*ip);
+	struct xfs_trans	*tp,
+	struct xfs_inode	*ip);
 
 extern void
 xfs_bump_ino_vers2(
-	xfs_trans_t	*tp,
-	xfs_inode_t	*ip);
-
-#endif /* !SIM */
+	struct xfs_trans	*tp,
+	struct xfs_inode	*ip);
 
 #endif /* XFS_UTILS_H */
 
