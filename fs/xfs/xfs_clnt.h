@@ -12,7 +12,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident "$Revision: 1.11 $"
+#ident "$Revision: 1.12 $"
 
 /*
  * XFS arguments to the mount system call.
@@ -67,5 +67,7 @@ struct xfs_args_ver_2 {
 #define XFSMNT_NOATIME		0x0100  /* don't modify access times on reads */
 #define XFSMNT_NOALIGN		0x0200	/* don't allocate at stripe boundaries*/
 #define XFSMNT_RETERR		0x0400	/* return error to user */
+#define XFSMNT_NORECOVERY	0x0800	/* no recovery, implies ro mount */
+#define XFSMNT_SHARED		0x1000	/* shared XFS mount */
 
 #endif /* !__SYS_XFS_CLNT_H__ */
