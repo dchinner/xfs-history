@@ -402,7 +402,7 @@ linvfs_file_mmap(
 	if (vp->v_vfsp->vfs_flag & VFS_DMI) {
 		xfs_mount_t	*mp = XFS_VFSTOM(vp->v_vfsp);
 
-		error = -XFS_SEND_MMAP(mp, vma, 0);
+		error = XFS_SEND_MMAP(mp, vma, 0);
 		if (error)
 			return error;
 	}
