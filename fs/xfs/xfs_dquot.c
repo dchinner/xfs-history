@@ -1,4 +1,4 @@
-#ident "$Revision: 1.7 $"
+#ident "$Revision: 1.8 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -902,19 +902,16 @@ xfs_qm_dqget(
 	int		error;
 
 	ASSERT(XFS_IS_QUOTA_RUNNING(mp));
-	if ((! XFS_IS_UQUOTA_ON(mp) &&
-	    type == XFS_DQ_USER) ||
-	    (! XFS_IS_PQUOTA_ON(mp) &&
-	    type == XFS_DQ_PROJ)) {
+	if ((! XFS_IS_UQUOTA_ON(mp) && type == XFS_DQ_USER) ||
+	    (! XFS_IS_PQUOTA_ON(mp) && type == XFS_DQ_PROJ)) {
 		return (ESRCH);
 	}
 	h = XFS_DQ_HASH(mp, id, type);
 	
  again:
 
-#ifdef QUOTADEBUG
-	ASSERT(type == XFS_DQ_USER ||
-	       type == XFS_DQ_PROJ);
+#ifdef DEBUG
+	ASSERT(type == XFS_DQ_USER || type == XFS_DQ_PROJ);
 	if (ip) {
 		ASSERT(XFS_ISLOCKED_INODE_EXCL(ip));
 		if (type == XFS_DQ_USER)
@@ -950,8 +947,10 @@ xfs_qm_dqget(
 
 	/* 
 	 * Dquot cache miss. We don't want to keep the inode lock across 
-	 * a (potential) disk read. However, dropping it here means dealing
-	 * with a chown that can happen before we re-acquire the lock.
+	 * a (potential) disk read. Also we don't want to deal with the lock
+	 * ordering between quotainode and this inode. OTOH, dropping the inode
+	 * lock here means dealing with a chown that can happen before 
+	 * we re-acquire the lock.
 	 */
 	if (ip)
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
@@ -1075,6 +1074,7 @@ xfs_qm_dqget(
 	xfs_qm_mplist_unlock(mp);
 	XFS_DQ_HASH_UNLOCK(h);
  dqret:		
+	ASSERT((ip == NULL) || XFS_ISLOCKED_INODE_EXCL(ip));
 	xfs_dqtrace_entry(dqp, "DQGET DONE");
 	*O_dqpp = dqp;
 	return (0);
