@@ -41,6 +41,7 @@
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
+#include "xfs_imap.h"
 #ifdef SIM
 #include "sim.h"
 #endif
@@ -302,21 +303,23 @@ xfs_inode_item_unpin(
 
 /*
  * This is called to attempt to lock the inode associated with this
- * inode log item.  Don't sleep on the inode lock.  If we can't get
- * the lock right away, return 0.  We know that we have a reference
- * for the vnode associated with our inode since we took one when
- * this inode was first logged.
- *
- * We only have 1 reference, though, so we need to make sure that only
- * one process tries to flush the inode.  This is because the reference
- * will be released when the flush completes and the inode can then be
- * freed.  We use the i_flock for this synchronization.
+ * inode log item.  Don't sleep on the inode lock or the flush lock.
+ * If the flush lock is already held, indicating that the inode has
+ * been or is in the process of being flushed, then see if we can
+ * find the inode's buffer in the buffer cache without sleeping.  If
+ * we can and it is marked delayed write, then we want to send it out.
+ * We delay doing so until the push routine, though, to avoid sleeping
+ * in any device strategy routines.
  */
 uint
 xfs_inode_item_trylock(
 	xfs_inode_log_item_t	*iip)
 {
 	register xfs_inode_t	*ip;
+	xfs_mount_t		*mp;
+	xfs_imap_t		imap;
+	buf_t			*bp;
+	int			flushed;
 
 	ip = iip->ili_inode;
 
@@ -330,12 +333,44 @@ xfs_inode_item_trylock(
 
 	if (!xfs_iflock_nowait(ip)) {
 		/*
+		 * The inode is already being flushed.  It may have been
+		 * flushed delayed write, however, and we don't want to
+		 * get stuck waiting for that to complete.  So, we check
+		 * to see if we can lock the inode's buffer without sleeping.
+		 * If we can and it is marked for delayed write, then we
+		 * hold it and send it out from the push routine.  We don't
+		 * want to do that now since we might sleep in the device
+		 * strategy routine.  Make sure to only return success
+		 * if we set iip->ili_bp ourselves.  If someone else is
+		 * doing it then we don't want to go to the push routine
+		 * and duplicate their efforts.
+		 */
+		flushed = 0;
+		if (iip->ili_bp == NULL) {
+			mp = ip->i_mount;
+			xfs_imap(mp, NULL, ip->i_ino, &imap);
+			bp = incore(mp->m_dev, imap.im_blkno,
+				    (int)imap.im_len, INCORE_TRYLOCK);
+			if (bp != NULL) {
+				if (bp->b_flags & B_DELWRI) {
+					iip->ili_bp = bp;
+					flushed = 1;
+				} else {
+					brelse(bp);
+				}
+			}
+		}
+		/*
 		 * Make sure to set the no notify flag so iunlock
 		 * doesn't call back into the AIL code on the unlock.
 		 * That would double trip on the AIL lock.
 		 */
 		xfs_iunlock(ip, (XFS_ILOCK_SHARED | XFS_IUNLOCK_NONOTIFY));
-		return XFS_ITEM_FLUSHING;
+		if (flushed) {
+			return XFS_ITEM_SUCCESS;
+		} else {
+			return XFS_ITEM_FLUSHING;
+		}
 	}
 
 	return XFS_ITEM_SUCCESS;
@@ -447,8 +482,25 @@ xfs_inode_item_push(
 	xfs_dinode_t	*dip;
 	xfs_inode_t	*ip;
 
-	ASSERT(ismrlocked(&(iip->ili_inode->i_lock), MR_ACCESS));
-	ASSERT(valusema(&(iip->ili_inode->i_flock)) <= 0);
+	ASSERT((iip->ili_bp != NULL) ||
+	       (ismrlocked(&(iip->ili_inode->i_lock), MR_ACCESS)));
+	ASSERT((iip->ili_bp != NULL) ||
+	       (valusema(&(iip->ili_inode->i_flock)) <= 0));
+
+	/*
+	 * If the inode item's buffer pointer is non-NULL, then we were
+	 * unable to lock the inode in the trylock routine but we were
+	 * able to lock the inode's buffer and it was marked delayed write.
+	 * We didn't want to write it out from the trylock routine, because
+	 * the device strategy routine might sleep.  Instead we stored it
+	 * and write it out here.
+	 */
+	if (iip->ili_bp != NULL) {
+		ASSERT(iip->ili_bp->b_flags & B_BUSY);
+		bawrite(iip->ili_bp);
+		iip->ili_bp = NULL;
+		return;
+	}
 
 	/*
 	 * Since we were able to lock the inode's flush lock and
@@ -467,7 +519,7 @@ xfs_inode_item_push(
 	 * pull it from the AIL, mark it clean, and xfs_iput()
 	 * the inode.
 	 */
-	xfs_iflush(ip, XFS_IFLUSH_ASYNC);
+	xfs_iflush(ip, XFS_IFLUSH_DELWRI);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 }
 
@@ -503,6 +555,7 @@ xfs_inode_item_init(
 	iip->ili_item.li_mountp = mp;
 	iip->ili_inode = ip;
 	iip->ili_extents_buf = NULL;
+	iip->ili_bp = NULL;
 	iip->ili_format.ilf_type = XFS_LI_INODE;
 	iip->ili_format.ilf_ino = ip->i_ino;
 }
