@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.172 $"
+#ident	"$Revision$"
 
 /*
  * High level interface routines for log manager
@@ -1902,7 +1902,7 @@ xlog_state_do_callback(
 	int		aborted,
 	xlog_in_core_t	*ciclog)
 {
-	xlog_in_core_t	   *iclog, *first_iclog;
+	xlog_in_core_t	   *iclog, *first_iclog, *prev_iclog;
 	xfs_log_callback_t *cb, *cb_next;
 	int		   spl;
 	int		   flushcnt = 0;
@@ -1910,7 +1910,7 @@ xlog_state_do_callback(
 	xfs_lsn_t	   lowest_lsn;
 
 	spl = LOG_LOCK(log);
-	first_iclog = iclog = log->l_iclog;
+	first_iclog = prev_iclog = iclog = log->l_iclog;
 
 retry:
 	do {
@@ -2008,7 +2008,7 @@ retry:
 		/* wake up threads waiting in xfs_log_force() */
 		sv_broadcast(&iclog->ic_forcesema);
 
-		first_iclog = iclog;
+		prev_iclog = iclog;
 		iclog = iclog->ic_next;
 	} while (first_iclog != iclog);
 
@@ -2017,16 +2017,16 @@ retry:
 	 */
 
 clean:
-	iclog = first_iclog;
+	iclog = prev_iclog;
 
 	if (!done) {
 		done = 1;
 		do {
-		    if (iclog->ic_state == XLOG_STATE_DO_CALLBACK) {
-			iclog = first_iclog;
-			goto retry;
-		    }
-		    iclog = iclog->ic_next;
+			if (iclog->ic_state == XLOG_STATE_DO_CALLBACK) {
+				iclog = prev_iclog;
+				goto retry;
+			}
+			iclog = iclog->ic_next;
 		} while (first_iclog != iclog);
 	}	
 
