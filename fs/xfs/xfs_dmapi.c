@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.6 $"
+#ident "$Revision: 1.7 $"
 
 #include <sys/types.h>
 #include <sys/sysinfo.h>
@@ -504,6 +504,7 @@ xfs_ip_to_stat(
  * Given a inumber, it igets the inode and fills the given buffer
  * with the dm_stat structure for the file.
  */
+/* ARGSUSED */
 STATIC int
 xfs_bulkstat_one(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
@@ -511,6 +512,7 @@ xfs_bulkstat_one(
 	xfs_ino_t	ino,		/* inode number to get data for */
 	void		*buffer,	/* buffer to place output in */
 	daddr_t		bno,		/* starting block of inode cluster */
+	void		*dip,		/* on-disk inode pointer */
 	int		*res)		/* bulkstat result code */
 {
 	xfs_inode_t	*ip;
@@ -665,7 +667,7 @@ xfs_dirents_to_stats(
 
 		statp = (dm_stat_t *) bufp;
 
-		(void)xfs_bulkstat_one(mp, NULL, (xfs_ino_t)p->d_ino, statp, 0, &res);
+		(void)xfs_bulkstat_one(mp, NULL, (xfs_ino_t)p->d_ino, statp, 0, 0, &res);
 		if (res != BULKSTAT_RV_DIDONE)
 			continue;
 		
@@ -1275,6 +1277,7 @@ xfs_dm_get_bulkattr_rvp(
 			     xfs_bulkstat_one,
 			     statstruct_sz,
 			     bufp, 
+			     BULKSTAT_FG_IGET,
 			     &done);
 	if (error)
 		return(error);
