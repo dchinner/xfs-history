@@ -1635,9 +1635,11 @@ xfs_dir_leaf_moveents(xfs_dir_leafblock_t *leaf_s, int start_s,
 	/*
 	 * Fill in the freemap information
 	 */
-	hdr_d->freemap[0].base = hdr_d->count*sizeof(xfs_dir_leaf_entry_t);
-	hdr_d->freemap[0].base += sizeof(xfs_dir_leaf_hdr_t);
+	hdr_d->freemap[0].base = sizeof(xfs_dir_leaf_hdr_t);
+	hdr_d->freemap[0].base += hdr_d->count * sizeof(xfs_dir_leaf_entry_t);
 	hdr_d->freemap[0].size = hdr_d->firstused - hdr_d->freemap[0].base;
+	hdr_d->freemap[1].base = hdr_d->freemap[2].base = 0;
+	hdr_d->freemap[1].size = hdr_d->freemap[2].size = 0;
 	hdr_s->holes = 1;	/* leaf may not be compact */
 }
 
