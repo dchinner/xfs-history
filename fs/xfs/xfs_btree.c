@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.15 $"
+#ident	"$Revision: 1.20 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -17,6 +17,7 @@
 #endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
+#include <sys/grio.h>
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
