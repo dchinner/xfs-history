@@ -560,15 +560,16 @@ linvfs_remount(
 		int error;
 		int save = sb->s_flags;
 		sb->s_flags |= MS_RDONLY;
-		printk("XFS: Flushing for read-only remount\n");
 		
 		PVFS_SYNC(vfsp->vfs_fbhv,
 				  SYNC_ATTR|SYNC_WAIT|SYNC_CLOSE,
 				  sys_cred, error);
+		PVFS_SYNC(vfsp->vfs_fbhv,
+				  SYNC_ATTR|SYNC_WAIT|SYNC_CLOSE,
+				  sys_cred, error);
 		if (error) {
-		  sb->s_flags=save;
-		  printk("XFS: Failed to sync for read-only remount\n");
-		  return 1;
+			sb->s_flags=save;
+			return 1;
 		}
 		
 		XFS_log_write_unmount_ro(vfsp->vfs_fbhv);
