@@ -1020,7 +1020,7 @@ xfs_buf_item_next_bit(
         if (start_bit) {
                 tmp = *p++;
                 /* set to zero first offset bits */
-                tmp &= ~(~0UL >> (NBWORD-start_bit));
+                tmp &= (~0U << start_bit);
                 if (size < NBWORD)
                         goto found_first;
                 if (tmp != 0U)
