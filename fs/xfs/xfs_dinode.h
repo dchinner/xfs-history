@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DINODE_H
 #define	_FS_XFS_DINODE_H
 
-#ident "$Revision: 1.41 $"
+#ident "$Revision: 1.42 $"
 
 struct buf;
 struct xfs_mount;
@@ -87,10 +87,10 @@ typedef struct xfs_dinode
 
 /*
  * The 32 bit link count in the inode theoretically maxes out at UINT_MAX.
- * We stop at UINT_MAX - 2 just to be safe.  The old inode format had a
- * 16 bit link count, so its maximum is USHRT_MAX.
+ * Since the pathconf interface is signed, we use 2^31 - 1 instead.
+ * The old inode format had a 16 bit link count, so its maximum is USHRT_MAX.
  */
-#define	XFS_MAXLINK		(4294967295U - 2)
+#define	XFS_MAXLINK		((1U << 31) - 1U)
 #define	XFS_MAXLINK_1		65535U
 
 /*
