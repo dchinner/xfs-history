@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.121 $"
+#ident	"$Revision: 1.122 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -61,6 +61,14 @@
 
 STATIC int	xfs_mod_incore_sb_unlocked(xfs_mount_t *, xfs_sb_field_t, int);
 STATIC void	xfs_sb_relse(buf_t *);
+#ifndef SIM
+STATIC void	xfs_uuid_mount(xfs_mount_t *);
+STATIC void	xfs_uuid_unmount(xfs_mount_t *);
+
+mutex_t		xfs_uuidtabmon;		/* monitor for uuidtab */
+STATIC int	xfs_uuidtab_size;
+STATIC uuid_t	*xfs_uuidtab;
+#endif	/* !SIM */
 
 /*
  * Return a pointer to an initialized xfs_mount structure.
@@ -294,6 +302,7 @@ xfs_mountfs_int(vfs_t *vfsp, dev_t dev, int read_rootinos)
 	 * partition volume/filesystem.
 	 */
 #ifndef SIM
+	xfs_uuid_mount(mp);	/* make sure it's really unique */
 	ret64 = uuid_hash64(&sbp->sb_uuid, (uint *)&i);
 	bcopy(&ret64, &vfsp->vfs_fsid, sizeof(ret64));
 #endif
@@ -714,6 +723,9 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	 */
 	ASSERT(mp->m_inodes == NULL);
 
+#ifndef SIM
+	xfs_uuid_unmount(mp);
+#endif
 	xfs_mount_free(mp);
 	return 0;
 }	/* xfs_unmountfs */
@@ -1011,3 +1023,61 @@ xfs_sb_relse(buf_t *bp)
 	bp->av_back = NULL;
 	vsema(&bp->b_lock);
 }
+
+#ifndef SIM
+/*
+ * See if the uuid is unique among mounted xfs filesystems.
+ * If it's not, allocate a new one so it is.
+ */
+STATIC void
+xfs_uuid_mount(xfs_mount_t *mp)
+{
+	int	hole;
+	int	i;
+	uint_t	status;
+
+	mutex_lock(&xfs_uuidtabmon, PVFS);
+	for (i = 0, hole = -1; i < xfs_uuidtab_size; i++) {
+		if (uuid_is_nil(&xfs_uuidtab[i], &status)) {
+			hole = i;
+			continue;
+		}
+		if (!uuid_equal(&mp->m_sb.sb_uuid, &xfs_uuidtab[i], &status))
+			continue;
+		uuid_create(&mp->m_sb.sb_uuid, &status);
+		XFS_BUF_TO_SBP(mp->m_sb_bp)->sb_uuid = mp->m_sb.sb_uuid;
+		i = -1;
+		/* restart loop from the top */
+	}
+	if (hole < 0) {
+		xfs_uuidtab = kmem_realloc(xfs_uuidtab,
+			(xfs_uuidtab_size + 1) * sizeof(*xfs_uuidtab),
+			KM_SLEEP);
+		hole = xfs_uuidtab_size++;
+	}
+	xfs_uuidtab[hole] = mp->m_sb.sb_uuid;
+	mutex_unlock(&xfs_uuidtabmon);
+}
+
+/*
+ * Remove filesystem from the uuid table.
+ */
+STATIC void
+xfs_uuid_unmount(xfs_mount_t *mp)
+{
+	int	i;
+	uint_t	status;
+
+	mutex_lock(&xfs_uuidtabmon, PVFS);
+	for (i = 0; i < xfs_uuidtab_size; i++) {
+		if (uuid_is_nil(&xfs_uuidtab[i], &status))
+			continue;
+		if (!uuid_equal(&mp->m_sb.sb_uuid, &xfs_uuidtab[i], &status))
+			continue;
+		uuid_create_nil(&xfs_uuidtab[i], &status);
+		break;
+	}
+	ASSERT(i < xfs_uuidtab_size);
+	mutex_unlock(&xfs_uuidtabmon);
+}
+#endif /* !SIM */
