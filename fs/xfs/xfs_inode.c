@@ -1569,7 +1569,7 @@ xfs_igrow_start(
 		 * xfs_write_file() beyond the end of the file
 		 * and any blocks between the old and new file sizes.
 		 */
-		error = xfs_zero_eof(ip, new_size, isize, credp);
+		error = xfs_zero_eof(ip, new_size, isize, credp, NULL);
 	}
 	return error;
 }
