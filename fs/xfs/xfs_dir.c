@@ -10,6 +10,8 @@
 #define _KERNEL 1
 #endif /* SIM */
 #include <sys/dirent.h>
+#include <sys/user.h>
+#include <sys/proc.h>
 #ifdef SIM
 #undef _KERNEL
 #include <bstring.h>
@@ -1457,23 +1459,66 @@ xfs_dir_log2_roundup(uint i)
 	return(rval);
 }
 
+/*
+ * Format a dirent structure and copy it out the the user's buffer.
+ * A 32-bit process has a differently sized dirent structure than
+ * the kernel does, so do the translation here based on the process'
+ * abi.
+ */
 int
-xfs_dir_put_dirent(xfs_mount_t *mp, dirent_t *dbp, xfs_ino_t ino, char *name,
-			int namelen, __uint32_t bno, int entry, uio_t *uio,
-			int *done)
+xfs_dir_put_dirent(
+	xfs_mount_t	*mp,
+	dirent_t	*dbp,
+	xfs_ino_t	ino,
+	char		*name,
+	int		namelen,
+	__uint32_t	bno,
+	int		entry,
+	uio_t		*uio,
+	int		*done)
 {
-	int retval;
+	irix5_dirent_t	*i5_dbp;
+	int		retval;
+	int		target_abi;
 
-	if ((dbp->d_reclen = DIRENTSIZE(namelen)) > uio->uio_resid) {
-		*done = 0;
-		retval = 0;
+	/*
+	 * If it's a kernel request, then the target abi is
+	 * IRIX5_64.
+	 */
+	if (uio->uio_segflg == UIO_USERSPACE) {
+		target_abi = u.u_procp->p_abi;
 	} else {
-		dbp->d_ino = ino;
-		bcopy(name, dbp->d_name, namelen);
-		dbp->d_name[namelen] = '\0';
-		dbp->d_off = XFS_DIR_MAKE_COOKIE(mp, bno, entry);
-		retval = uiomove((caddr_t)dbp, dbp->d_reclen, UIO_READ, uio);
-		*done = retval == 0;
+		target_abi = ABI_IRIX5_64;
+	}
+
+	if (ABI_IS_IRIX5_64(target_abi)) {
+		if ((dbp->d_reclen = DIRENTSIZE(namelen)) > uio->uio_resid) {
+			*done = 0;
+			retval = 0;
+		} else {
+			dbp->d_ino = ino;
+			bcopy(name, dbp->d_name, namelen);
+			dbp->d_name[namelen] = '\0';
+			dbp->d_off = XFS_DIR_MAKE_COOKIE(mp, bno, entry);
+			retval = uiomove((caddr_t)dbp, dbp->d_reclen,
+					 UIO_READ, uio);
+			*done = (retval == 0);
+		}
+	} else {
+		i5_dbp = (irix5_dirent_t *)dbp;
+		if ((i5_dbp->d_reclen = IRIX5_DIRENTSIZE(namelen)) >
+		    uio->uio_resid) {
+			*done = 0;
+			retval = 0;
+		} else {
+			i5_dbp->d_ino = ino;
+			bcopy(name, i5_dbp->d_name, namelen);
+			i5_dbp->d_name[namelen] = '\0';
+			i5_dbp->d_off = XFS_DIR_MAKE_COOKIE(mp, bno, entry);
+			retval = uiomove((caddr_t)i5_dbp, i5_dbp->d_reclen,
+					 UIO_READ, uio);
+			*done = (retval == 0);
+		}
 	}
 	return(retval);
 }
