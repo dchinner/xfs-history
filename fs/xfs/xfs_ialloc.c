@@ -270,6 +270,11 @@ xfs_ialloc_ag_alloc(
 	INT_SET(dic.di_magic, ARCH_CONVERT, XFS_DINODE_MAGIC);
 	INT_SET(dic.di_version, ARCH_CONVERT, version);
 
+	/*
+	 * Start at generation 1 because the NFS code uses 0 as wildcard.
+	 */
+	INT_SET(dic.di_gen, ARCH_CONVERT, 1);
+
 	for (j = 0; j < nbufs; j++) {
 		/*
 		 * Get the block.
