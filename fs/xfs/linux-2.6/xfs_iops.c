@@ -133,6 +133,7 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 
         if (!error && have_default_acl) {
 	    error = _ACL_INHERIT(vp, &va, &pdacl);
+	    VMODIFY(vp);
         }
 
 	return -error;
@@ -201,6 +202,7 @@ int linvfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *den
 	error = 0;
 	VOP_LINK(tdvp, vp, (char *)dentry->d_name.name, NULL, error);
 	if (!error) {
+		VMODIFY(tdvp);
 		ip->i_ctime = CURRENT_TIME;
 		VN_HOLD(vp);
 		validate_fields(ip);
@@ -267,6 +269,7 @@ int linvfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname
 			/* linvfs_revalidate_core returns (-) errors */
 			error = -linvfs_revalidate_core(ip, ATTR_COMM);
 			d_instantiate(dentry, ip);
+			validate_fields(dir);
 		}
 	}
 	return -error;
@@ -499,6 +502,7 @@ int linvfs_attrctl(
 				     ops[i].flags,
 				     (struct cred *) NULL,
 				     ops[i].error);
+			VMODIFY(vp);
 			break;
 
 		case ATTR_OP_REMOVE:
@@ -507,6 +511,7 @@ int linvfs_attrctl(
 					ops[i].flags,
 					(struct cred *) NULL,
 					ops[i].error);
+			VMODIFY(vp);
 			break;
 					
 		case ATTR_OP_IRIX_LIST:
@@ -558,6 +563,7 @@ int linvfs_acl_set(
 	vp = LINVFS_GET_VN_ADDRESS(dentry->d_inode);
 
 	VOP_ACL_SET(vp, acl, dacl, error);
+	VMODIFY(vp);
 
 	return -error;
 }
@@ -588,14 +594,19 @@ int linvfs_revalidate_core(struct inode *inode, int flags)
 
         vp = LINVFS_GET_VP(inode);
 	ASSERT(vp);
-
 	/* vn_revalidate returns (-) error so this is ok */
 	return vn_revalidate(vp, flags);
 }
 
 STATIC int linvfs_revalidate(struct dentry *dentry)
 {
-	return linvfs_revalidate_core(dentry->d_inode, 0);
+        vnode_t *vp;
+
+        vp = LINVFS_GET_VP(dentry->d_inode);
+	if (vp->v_flag & VMODIFIED) {
+		return linvfs_revalidate_core(dentry->d_inode, 0);
+	}
+	return 0;
 }
 
 
@@ -687,6 +698,8 @@ linvfs_pb_bmap(struct inode *inode,
 		VOP_BMAP(vp, offset, count, flags, NULL,
 			(struct page_buf_bmap_s *) pbmapp, retpbbm, error);
 	}
+	if (flags & PBF_WRITE)
+		VMODIFY(vp);
 
 	return -error;
 }

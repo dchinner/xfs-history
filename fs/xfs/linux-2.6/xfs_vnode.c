@@ -126,7 +126,7 @@ vn_wakeup(struct vnode *vp)
 	if (vp->v_flag & VWAIT) {
 		sv_broadcast(vptosync(vp));
 	}
-	vp->v_flag &= ~(VRECLM|VWAIT);
+	vp->v_flag &= ~(VRECLM|VWAIT|VMODIFIED);
 	VN_UNLOCK(vp, s);
 }
 
@@ -166,7 +166,7 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 
 	vp->v_inode = inode;
 
-	vp->v_flag = 0;
+	vp->v_flag = VMODIFIED;
 
 	atomic_inc(&vn_vnumber);
 
@@ -415,6 +415,7 @@ vn_revalidate(struct vnode *vp, int flags)
 		vn_trace_exit(vp, "vn_revalidate.error",
 					(inst_t *)__return_address);
 	}
+	VUNMODIFY(vp);
 
 	return -error;
 }
@@ -567,7 +568,7 @@ vn_put(struct vnode *vp)
 
 		s = VN_LOCK(vp);
 
-		vp->v_flag &= ~(VINACT|VWAIT|VRECLM|VGONE);
+		vp->v_flag &= ~(VINACT|VWAIT|VRECLM|VGONE|VMODIFIED);
 
 	}
 

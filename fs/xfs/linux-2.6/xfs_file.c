@@ -378,6 +378,7 @@ STATIC int linvfs_ioctl(
 	ASSERT(vp);
 
 	VOP_IOCTL(vp, inode, filp, cmd, arg, error);
+	VMODIFY(vp);
 
 	/* NOTE:  some of the ioctl's return positive #'s as a
 	 *	  byte count indicating success, such as

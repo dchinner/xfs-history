@@ -87,6 +87,10 @@ typedef struct vfile {
 #define VSEMAPHORE	    0x4000	/* vnode ::= a Posix named semaphore */
 #define VUSYNC		    0x8000	/* vnode aspace ::= usync objects */
 
+#define VMODIFIED	   0x10000	/* xfs inode state possibly different
+					 * from linux inode state.
+					 */
+
 /* Single system image flags */
 #define VROOT		  0x100000	/* root of its file system	*/
 #define VNOSWAP		  0x200000	/* cannot be used as virt swap device */
@@ -840,6 +844,8 @@ static __inline__ void vn_flagclr(struct vnode *vp, uint flag)
 #define	VN_MAPPED(vp)	(LINVFS_GET_IP(vp)->i_data.i_mmap != NULL)
 #define	VN_CACHED(vp)	(LINVFS_GET_IP(vp)->i_data.nrpages)
 #define VN_DIRTY(vp)	(!list_empty(&(LINVFS_GET_IP(vp)->i_dirty_buffers)))
+#define VMODIFY(vp)	VN_FLAGSET(vp, VMODIFIED)
+#define VUNMODIFY(vp)	VN_FLAGCLR(vp, VMODIFIED)
 
 /*
  * Flags to VOP_SETATTR/VOP_GETATTR.

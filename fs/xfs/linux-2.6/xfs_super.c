@@ -423,6 +423,7 @@ linvfs_read_super(
 	ip = LINVFS_GET_IP(rootvp);
 
 	linvfs_set_inode_ops(ip);
+	linvfs_revalidate_core(ip, ATTR_COMM);
 
 	sb->s_root = d_alloc_root(ip);
 
