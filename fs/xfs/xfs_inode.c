@@ -731,19 +731,26 @@ xfs_iroot_realloc(xfs_inode_t *ip, int rec_diff)
 	/*
 	 * rec_diff is less than 0.  In this case, we are shrinking the
 	 * i_broot buffer.  It must already exist.  If we go to zero
-	 * records, just eliminate the space for the records and pointers
-	 * but leave space for the btree block header.
+	 * records, just get rid of the root and clear the status bit.
 	 */
 	ASSERT((ip->i_broot != NULL) && (ip->i_broot_bytes > 0));
 	cur_max = XFS_BMAP_BROOT_MAXRECS(ip->i_broot_bytes);
 	new_max = cur_max + rec_diff;
-	new_size = (size_t)XFS_BMAP_BROOT_SPACE_CALC(new_max);
 	ASSERT(new_max >= 0);
-	new_broot = (xfs_bmbt_block_t *)kmem_alloc(new_size, KM_SLEEP);
-	/*
-	 * First copy over the btree block header.
-	 */
-	bcopy(ip->i_broot, new_broot, sizeof(xfs_bmbt_block_t));
+	if (new_max > 0)
+		new_size = (size_t)XFS_BMAP_BROOT_SPACE_CALC(new_max);
+	else
+		new_size = 0;
+	if (new_size > 0) {
+		new_broot = (xfs_bmbt_block_t *)kmem_alloc(new_size, KM_SLEEP);
+		/*
+		 * First copy over the btree block header.
+		 */
+		bcopy(ip->i_broot, new_broot, sizeof(xfs_bmbt_block_t));
+	} else {
+		new_broot = NULL;
+		ip->i_flags &= ~XFS_IBROOT;
+	}
 
 	/*
 	 * Only copy the records and pointers if there are any.
@@ -793,6 +800,7 @@ xfs_iext_realloc(xfs_inode_t	*ip,
 {
 	int	byte_diff;
 	int	new_size;
+	uint	rnew_size;
 
 	if (ext_diff == 0) {
 		return;
@@ -804,7 +812,7 @@ xfs_iext_realloc(xfs_inode_t	*ip,
 
 	if (new_size == 0) {
 		if (ip->i_u1.iu_extents != ip->i_u2.iu_inline_ext) {
-			kmem_free(ip->i_u1.iu_extents, ip->i_bytes);
+			kmem_free(ip->i_u1.iu_extents, ip->i_real_bytes);
 		}
 		ip->i_u1.iu_extents = NULL;
 	} else if (new_size <= sizeof(ip->i_u2.iu_inline_ext)) {
@@ -820,24 +828,29 @@ xfs_iext_realloc(xfs_inode_t	*ip,
 			if (ip->i_u1.iu_extents) {
 				bcopy(ip->i_u1.iu_extents,
 				      ip->i_u2.iu_inline_ext, new_size);
-				kmem_free(ip->i_u1.iu_extents, ip->i_bytes);
+				kmem_free(ip->i_u1.iu_extents,
+					  ip->i_real_bytes);
 			}
 			ip->i_u1.iu_extents = ip->i_u2.iu_inline_ext;
 		}
 	} else {
+		rnew_size = new_size;
+		if ((rnew_size & (rnew_size - 1)) != 0)
+			rnew_size = xfs_iroundup(rnew_size);
 		/*
 		 * Stuck with malloc/realloc.
 		 */
-		if (ip->i_u1.iu_extents != ip->i_u2.iu_inline_ext) {
+		if (ip->i_u1.iu_extents == ip->i_u2.iu_inline_ext) {
 			ip->i_u1.iu_extents = (xfs_bmbt_rec_t *)
-					      kmem_realloc(ip->i_u1.iu_extents,
-							   new_size, KM_SLEEP);
-		} else {
-			ip->i_u1.iu_extents = (xfs_bmbt_rec_t *)
-					      kmem_alloc(new_size, KM_SLEEP);
+				kmem_alloc(rnew_size, KM_SLEEP);
 			bcopy(ip->i_u2.iu_inline_ext, ip->i_u1.iu_extents,
 			      sizeof(ip->i_u2.iu_inline_ext));
+		} else if (rnew_size != ip->i_real_bytes) {
+			ip->i_u1.iu_extents = (xfs_bmbt_rec_t *)
+				kmem_realloc(ip->i_u1.iu_extents,
+					     rnew_size, KM_SLEEP);
 		}
+		ip->i_real_bytes = rnew_size;
 	}
 	ip->i_bytes = new_size;
 }
@@ -1303,6 +1316,7 @@ xfs_iflush_all(xfs_mount_t *mp, int flag)
 	return !busy;
 }
 
+#ifdef SIM
 void
 xfs_iprint(xfs_inode_t *ip)
 {
@@ -1371,6 +1385,7 @@ xfs_iprint(xfs_inode_t *ip)
 	printf("   di_flags %x\n", dip->di_flags);
 	printf("   di_nblocks %lld\n", dip->di_nblocks);
 }
+#endif	/* SIM */
 
 /*
  * xfs_iaccess: check accessibility of inode/cred for mode.
@@ -1398,4 +1413,28 @@ xfs_iaccess(xfs_inode_t *ip, mode_t mode, cred_t *cr)
 	if ((ip->i_d.di_mode & mode) != mode)
 		return EACCES;
 	return 0;
+}
+
+/*
+ * xfs_iroundup: round up argument to next power of two
+ */
+uint
+xfs_iroundup(uint v)
+{
+	int i;
+	uint m;
+
+	if ((v & (v - 1)) == 0)
+		return v;
+	ASSERT((v & 0x80000000) == 0);
+	if ((v & (v + 1)) == 0)
+		return v + 1;
+	for (i = 0, m = 1; i < 31; i++, m <<= 1) {
+		if (v & m)
+			continue;
+		v |= m;
+		if ((v & (v + 1)) == 0)
+			return v + 1;
+	}
+	ASSERT(0);
 }
