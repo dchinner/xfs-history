@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.67 $"
+#ident  "$Revision: 1.68 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -508,6 +508,8 @@ xfs_vfsmount(vfs_t		*vfsp,
 	if (((uap->flags & MS_REMOUNT) == 0) &&
 	    ((mvp->v_count != 1) || (mvp->v_flag & VROOT)))
 		return XFS_ERROR(EBUSY);
+	if (uap->flags & MS_DMI)
+		vfsp->vfs_flag |= VFS_DMI;
 
 	/*
 	 * Copy in XFS-specific arguments.

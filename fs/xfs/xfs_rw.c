@@ -1094,7 +1094,8 @@ xfs_read(
 		id.pid = MAKE_REQ_PID(u.u_procp->p_pid, 0);
 #endif
 		id.ino = ip->i_ino;
-		if (!(ioflag & IO_INVIS) && DM_EVENT_ENABLED(ip, DM_READ)) {
+		if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_READ) &&
+				!(ioflag & IO_INVIS)) {
 			if (error = dm_data_event(vp, DM_READ, offset, count))
 				return error;
 		}
@@ -2070,7 +2071,7 @@ start:
 #endif
 		id.ino = ip->i_ino;
 
-		if (DM_EVENT_ENABLED(ip, DM_WRITE) &&
+		if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_WRITE) &&
 				!(ioflag & IO_INVIS) &&
 				!eventsent) {
 			if (error = dm_data_event(vp, DM_WRITE, offset, count))
@@ -2090,7 +2091,8 @@ retry:
 		error = xfs_grio_req(ip, &id, uiop, ioflag, credp, offset,
 				     UIO_WRITE);
 
-		if (error == ENOSPC && DM_EVENT_ENABLED(ip, DM_NOSPACE) &&
+		if (error == ENOSPC &&
+				DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_NOSPACE) &&
 				!(ioflag & IO_INVIS)) {
 			error = dm_data_event(vp, DM_NOSPACE, 0, 0);
 			if (error)
@@ -2135,11 +2137,6 @@ retry:
 		if (ioflag & IO_SYNC) {
 			xfs_log_force(ip->i_mount, (xfs_lsn_t)0,
 				      XFS_LOG_FORCE | XFS_LOG_SYNC);
-		}
-		if (!(ioflag & IO_INVIS) && !error &&
-		    DM_EVENT_ENABLED(ip, DM_POSTWRITE)) {
-			(void) dm_data_event(vp, DM_POSTWRITE, offset,
-					     count - uiop->uio_resid);
 		}
 		break;
 
