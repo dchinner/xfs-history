@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision: 1.75 $"
+#ident "$Revision: 1.76 $"
 
 struct buf;
 struct xfs_efd_log_item;
@@ -550,14 +550,14 @@ typedef struct xfs_trans {
  *    the super block free inode counter: sector size
  *    the agi hash list and counters: sector size
  *    the inode btree entry: block size
- *    the on disk inode before ours in the agi hash list: block size
+ *    the on disk inode before ours in the agi hash list: inode cluster size
  */
 #define	XFS_CALC_IFREE_LOG_RES(mp) \
 	((mp)->m_sb.sb_inodesize + \
 	 (mp)->m_sb.sb_sectsize + \
 	 (mp)->m_sb.sb_sectsize + \
 	 XFS_FSB_TO_B((mp), 1) + \
-	 XFS_FSB_TO_B((mp), 1) + \
+	 MAX(XFS_FSB_TO_B((mp), 1), XFS_INODE_CLUSTER_SIZE) + \
 	 (128 * 5))
 
 #define	XFS_IFREE_LOG_RES(mp)	((mp)->m_reservations.tr_ifree)
