@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_SB_H
 #define	_FS_XFS_SB_H
 
-#ident	"$Revision: 1.23 $"
+#ident	"$Revision$"
 
 /*
  * Super block
@@ -15,10 +15,12 @@ struct xfs_mount;
 #define	XFS_SB_MAGIC		0x58465342	/* 'XFSB' */
 #define	XFS_SB_VERSION_1	1		/* 5.3, 6.0.1, 6.1 */
 #define	XFS_SB_VERSION_2	2		/* 6.2 - attributes */
+#define	XFS_SB_VERSION_3	3		/* 6.2 - new inode version */
 #define	XFS_SB_VERSION_LOW	XFS_SB_VERSION_1
-#define	XFS_SB_VERSION_HIGH	XFS_SB_VERSION_2
+#define	XFS_SB_VERSION_HIGH	XFS_SB_VERSION_3
 #define	XFS_SB_VERSION_HASATTR	XFS_SB_VERSION_2
-#define	XFS_SB_VERSION		XFS_SB_VERSION_2
+#define	XFS_SB_VERSION_HASNLINK	XFS_SB_VERSION_3
+#define	XFS_SB_VERSION		XFS_SB_VERSION_3
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_SB_GOOD_VERSION)
 int xfs_sb_good_version(unsigned v);
 #define	XFS_SB_GOOD_VERSION(v)	xfs_sb_good_version(v)
@@ -57,7 +59,7 @@ typedef struct xfs_sb
 	__uint8_t	sb_agblklog;	/* log2 of sb_agblocks (rounded up) */
 	__uint8_t	sb_rextslog;	/* log2 of sb_rextents */
 	__uint8_t	sb_inprogress;	/* mkfs is in progress, don't mount */
-	__uint8_t	sb_pad1;	/* free byte */
+	__uint8_t	sb_imax_pct;	/* max % of fs for inode space */
 					/* statistics */
 	/*
 	 * These fields must remain contiguous.  If you really
@@ -99,7 +101,7 @@ typedef struct xfs_sb
 #define	XFS_SB_AGBLKLOG		0x002000000LL
 #define	XFS_SB_REXTSLOG		0x004000000LL
 #define	XFS_SB_INPROGRESS	0x008000000LL
-#define	XFS_SB_PAD1		0x010000000LL
+#define	XFS_SB_IMAX_PCT		0x010000000LL
 #define	XFS_SB_ICOUNT		0x020000000LL
 #define	XFS_SB_IFREE		0x040000000LL
 #define	XFS_SB_FDBLOCKS		0x080000000LL
