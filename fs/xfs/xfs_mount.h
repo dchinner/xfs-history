@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.71 $"
+#ident	"$Revision: 1.72 $"
 
 struct buf;
 struct cred;
@@ -12,6 +12,22 @@ struct xfs_inode;
 struct xfs_perag;
 struct xfs_qm;
 struct xfs_quotainfo;
+
+#ifdef INTR_KTHREADS
+#define	SPLDECL(s)	       
+#define	AIL_LOCK_T		mutex_t
+#define	AIL_LOCKINIT(x,y)	mutex_init(x,MUTEX_DEFAULT, y)
+#define	AIL_LOCK_DESTROY(x)	mutex_destroy(x)
+#define	AIL_LOCK(mp,s)		mutex_lock(&(mp)->m_ail_lock, PZERO)
+#define	AIL_UNLOCK(mp,s)	mutex_unlock(&(mp)->m_ail_lock)
+#else	/* !INTR_KTHREADS */
+#define	SPLDECL(s)		int s
+#define	AIL_LOCK_T		lock_t
+#define	AIL_LOCKINIT(x,y)	spinlock_init(x,y)
+#define	AIL_LOCK_DESTROY(x)	spinlock_destroy(x)
+#define	AIL_LOCK(mp,s)		s=mutex_spinlock(&(mp)->m_ail_lock)
+#define	AIL_UNLOCK(mp,s)	mutex_spinunlock(&(mp)->m_ail_lock, s)
+#endif /* !INTR_KTHREADS */
 
 typedef struct xfs_trans_reservations {
 	uint	tr_write;	/* extent alloc trans */
@@ -37,7 +53,7 @@ typedef struct xfs_trans_reservations {
 typedef struct xfs_mount {
 	bhv_desc_t		m_bhv;		/* vfs xfs behavior */
 	xfs_tid_t		m_tid;		/* next unused tid for fs */
-	lock_t			m_ail_lock;	/* fs AIL mutex */
+	AIL_LOCK_T		m_ail_lock;	/* fs AIL mutex */
 	xfs_ail_entry_t		m_ail;		/* fs active log item list */
 	uint			m_ail_gen;	/* fs AIL generation count */
 	xfs_sb_t		m_sb;		/* copy of fs superblock */
@@ -165,8 +181,6 @@ typedef struct xfs_mod_sb {
 #define	XFS_SB_LOCK(mp)		mutex_spinlock(&(mp)->m_sb_lock)
 #define	XFS_SB_UNLOCK(mp,s)	mutex_spinunlock(&(mp)->m_sb_lock,(s))
 
-#define	AIL_LOCK(mp)		mutex_spinlock(&(mp)->m_ail_lock)
-#define	AIL_UNLOCK(mp,s)	mutex_spinunlock(&(mp)->m_ail_lock, s)
 
 #ifdef SIM
 xfs_mount_t	*xfs_mount(dev_t, dev_t, dev_t);

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.64 $"
+#ident "$Revision: 1.65 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -818,7 +818,7 @@ xfs_iflush_done(
 	xfs_inode_log_item_t	*iip)
 {
 	xfs_inode_t	*ip;
-	int		s;
+	SPLDECL(s);
 
 	ip = iip->ili_inode;
 
@@ -833,7 +833,7 @@ xfs_iflush_done(
 	 */
 	if (iip->ili_logged &&
 	    (iip->ili_item.li_lsn == iip->ili_flush_lsn)) {
-		s = AIL_LOCK(ip->i_mount);
+		AIL_LOCK(ip->i_mount, s);
 		if (iip->ili_item.li_lsn == iip->ili_flush_lsn) {
 			/*
 			 * xfs_trans_delete_ail() drops the AIL lock.

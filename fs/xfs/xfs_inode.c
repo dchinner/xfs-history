@@ -1,4 +1,4 @@
-#ident "$Revision: 1.185 $"
+#ident "$Revision: 1.189 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -2722,11 +2722,11 @@ xfs_iflush(
 	buf_t			*bp;
 	xfs_dinode_t		*dip;
 	xfs_mount_t		*mp;
-	int			s;
 	int			error;
 #ifdef XFS_TRANS_DEBUG
 	int			first;
 #endif
+	SPLDECL(s);
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE|MR_ACCESS));
 	ASSERT(valusema(&ip->i_flock) <= 0);
@@ -2898,7 +2898,7 @@ xfs_iflush(
 		iip->ili_logged = 1;
 
 		ASSERT(sizeof(xfs_lsn_t) == 8);	/* don't lock if it shrinks */
-		s = AIL_LOCK(mp);
+		AIL_LOCK(mp,s);
 		iip->ili_flush_lsn = iip->ili_item.li_lsn;
 		AIL_UNLOCK(mp, s);
 

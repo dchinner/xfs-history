@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.100 $"
+#ident	"$Revision: 1.101 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2640,7 +2640,7 @@ xlog_recover_do_efi_trans(xlog_t		*log,
 	xfs_mount_t		*mp;
 	xfs_efi_log_item_t	*efip;
 	xfs_efi_log_format_t	*efi_formatp;
-	int			spl;
+	SPLDECL(spl);
 
 	if (pass == XLOG_RECOVER_PASS1) {
 		return;
@@ -2659,7 +2659,7 @@ xlog_recover_do_efi_trans(xlog_t		*log,
 	efip->efi_next_extent = efi_formatp->efi_nextents;
 	efip->efi_flags |= XFS_EFI_COMMITTED;
 
-	spl = AIL_LOCK(mp);
+	AIL_LOCK(mp,spl);
 	/*
 	 * xfs_trans_update_ail() drops the AIL lock.
 	 */
@@ -2684,10 +2684,10 @@ xlog_recover_do_efd_trans(xlog_t		*log,
 	xfs_efd_log_format_t	*efd_formatp;
 	xfs_efi_log_item_t	*efip;
 	xfs_log_item_t		*lip;
-	int			spl;
 	int			gen;
 	int			nexts;
 	__uint64_t		efi_id;
+	SPLDECL(spl);
 
 	if (pass == XLOG_RECOVER_PASS1) {
 		return;
@@ -2704,7 +2704,7 @@ xlog_recover_do_efd_trans(xlog_t		*log,
 	 * in the AIL.
 	 */
 	mp = log->l_mp;
-	spl = AIL_LOCK(mp);
+	AIL_LOCK(mp,spl);
 	lip = xfs_trans_first_ail(mp, &gen);
 	while (lip != NULL) {
 		if (lip->li_type == XFS_LI_EFI) {
@@ -3081,10 +3081,10 @@ xlog_recover_process_efis(xlog_t	*log)
 	xfs_efi_log_item_t	*efip;
 	int			gen;
 	xfs_mount_t		*mp;
-	int			spl;
+	SPLDECL(spl);
 
 	mp = log->l_mp;
-	spl = AIL_LOCK(mp);
+	AIL_LOCK(mp,spl);
 
 	lip = xfs_trans_first_ail(mp, &gen);
 	while (lip != NULL) {
@@ -3107,7 +3107,7 @@ xlog_recover_process_efis(xlog_t	*log)
 
 		AIL_UNLOCK(mp, spl);
 		xlog_recover_process_efi(mp, efip);
-		spl = AIL_LOCK(mp);
+		AIL_LOCK(mp,spl);
 		lip = xfs_trans_next_ail(mp, lip, &gen, NULL);
 	}
 	AIL_UNLOCK(mp, spl);

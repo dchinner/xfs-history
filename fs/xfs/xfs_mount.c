@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.137 $"
+#ident	"$Revision: 1.138 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -83,7 +83,7 @@ xfs_mount_init(void)
 
 	mp = kmem_zalloc(sizeof(*mp), 0);
 
-	spinlock_init(&mp->m_ail_lock, "xfs_ail");
+	AIL_LOCKINIT(&mp->m_ail_lock, "xfs_ail");
 	spinlock_init(&mp->m_ipinlock, "xfs_ipin");
 	spinlock_init(&mp->m_sb_lock, "xfs_sb");
 	mutex_init(&mp->m_ilock, MUTEX_DEFAULT, "xfs_ilock");
@@ -113,7 +113,7 @@ xfs_mount_free(xfs_mount_t *mp)
 			  sizeof(xfs_perag_t) * mp->m_sb.sb_agcount);
 	}
 	
-	spinlock_destroy(&mp->m_ail_lock);
+	AIL_LOCK_DESTROY(&mp->m_ail_lock);
 	spinlock_destroy(&mp->m_ipinlock);
 	spinlock_destroy(&mp->m_sb_lock);
 	mutex_destroy(&mp->m_ilock);

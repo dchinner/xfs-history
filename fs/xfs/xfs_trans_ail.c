@@ -1,4 +1,4 @@
-#ident "$Revision: 1.29 $"
+#ident "$Revision: 1.30 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -68,11 +68,11 @@ xfs_lsn_t
 xfs_trans_tail_ail(
 	xfs_mount_t	*mp)
 {
-	int		s;
 	xfs_lsn_t	lsn;
 	xfs_log_item_t	*lip;
+	SPLDECL(s);
 
-	s = AIL_LOCK(mp);
+	AIL_LOCK(mp,s);
 	lip = xfs_ail_min(&(mp->m_ail));
 	if (lip == NULL) {
 		lsn = (xfs_lsn_t)0;
@@ -102,14 +102,14 @@ xfs_trans_push_ail(
 {
 	xfs_lsn_t		lsn;
 	xfs_log_item_t		*lip;
-	int			s;
 	int			gen;
 	int			restarts;
 	int			lock_result;
 	int			flush_log;
+	SPLDECL(s);
 #define	XFS_TRANS_PUSH_AIL_RESTARTS	10
 
-	s = AIL_LOCK(mp);
+	AIL_LOCK(mp,s);
 	lip = xfs_trans_first_ail(mp, &gen);
 	if (lip == NULL) {
 		/*
@@ -150,7 +150,7 @@ xfs_trans_push_ail(
 		case XFS_ITEM_SUCCESS:
 			AIL_UNLOCK(mp, s);
 			IOP_PUSH(lip);
-			s = AIL_LOCK(mp);
+			AIL_LOCK(mp,s);
 			break;
 		case XFS_ITEM_PINNED:
 			flush_log = 1;
@@ -186,7 +186,7 @@ xfs_trans_push_ail(
 		 */
 		AIL_UNLOCK(mp, s);
 		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
-		s = AIL_LOCK(mp);
+		AIL_LOCK(mp, s);
 	}
 
 	lip = xfs_ail_min(&(mp->m_ail));
@@ -213,14 +213,14 @@ xfs_trans_unlocked_item(
 	xfs_mount_t	*mp,
 	xfs_log_item_t	*lip)
 {
-	int		s;
 	xfs_log_item_t	*min_lip;
+	SPLDECL(s);
 
 	if (!(lip->li_flags & XFS_LI_IN_AIL)) {
 		return;
 	}
 
-	s = AIL_LOCK(mp);
+	AIL_LOCK(mp, s);
 	min_lip = xfs_ail_min(&mp->m_ail);
 	AIL_UNLOCK(mp, s);
 
@@ -246,11 +246,14 @@ xfs_trans_unlocked_item(
  * cookie returned by AIL_LOCK.
  */
 void
-xfs_trans_update_ail(
+_xfs_trans_update_ail(
 	xfs_mount_t	*mp,
 	xfs_log_item_t	*lip,
-	xfs_lsn_t	lsn,
-	int		s)
+	xfs_lsn_t	lsn
+#ifndef INTR_KTHREADS
+	,	int	s
+#endif
+	)
 {
 	xfs_ail_entry_t		*ailp;
 	xfs_log_item_t		*dlip;
@@ -299,10 +302,13 @@ xfs_trans_update_ail(
  * cookie returned by AIL_LOCK.
  */
 void
-xfs_trans_delete_ail(
+_xfs_trans_delete_ail(
 	xfs_mount_t	*mp,
-	xfs_log_item_t	*lip,
-	int		s)
+	xfs_log_item_t	*lip
+#ifndef INTR_KTHREADS
+	, int		s
+#endif
+	)
 
 {
 	xfs_ail_entry_t		*ailp;

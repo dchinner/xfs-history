@@ -1,4 +1,4 @@
-#ident "$Revision: 1.49 $"
+#ident "$Revision: 1.50 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -280,8 +280,8 @@ xfs_buf_item_unpin(
 {
 	xfs_mount_t	*mp;
 	buf_t		*bp;
-	int		s;
 	int		refcount;
+	SPLDECL(s);
 
 	bp = bip->bli_buf;
 	ASSERT(bp != NULL);
@@ -299,7 +299,7 @@ xfs_buf_item_unpin(
 		ASSERT(bip->bli_format.blf_flags & XFS_BLI_CANCEL);
 		xfs_buf_item_trace("UNPIN STALE", bip);
 		mp = bip->bli_item.li_mountp;
-		s = AIL_LOCK(mp);
+		AIL_LOCK(mp,s);
 		/*
 		 * xfs_trans_delete_ail() drops the AIL lock.
 		 */
@@ -1220,12 +1220,12 @@ xfs_buf_iodone(
 	xfs_buf_log_item_t	*bip)
 {
 	struct xfs_mount	*mp;
-	int			s;
+	SPLDECL(s);
 
 	ASSERT(bip->bli_buf == bp);
 
 	mp = bip->bli_item.li_mountp;
-	s = AIL_LOCK(mp);
+	AIL_LOCK(mp,s);
 	/*
 	 * xfs_trans_delete_ail() drops the AIL lock.
 	 */

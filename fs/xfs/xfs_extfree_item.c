@@ -1,4 +1,4 @@
-#ident "$Revision: 1.23 $"
+#ident "$Revision: 1.24 $"
 
 /*
  * This file contains the implementation of the xfs_efi_log_item
@@ -125,13 +125,13 @@ xfs_efi_item_pin(xfs_efi_log_item_t *efip)
 STATIC void
 xfs_efi_item_unpin(xfs_efi_log_item_t *efip)
 {
-	int		s;
 	int		nexts;
 	int		size;
 	xfs_mount_t	*mp;
+	SPLDECL(s);
 
 	mp = efip->efi_item.li_mountp;
-	s = AIL_LOCK(mp);
+	AIL_LOCK(mp, s);
 	if (efip->efi_flags & XFS_EFI_CANCELED) {
 		/*
 		 * xfs_trans_delete_ail() drops the AIL lock.
@@ -286,16 +286,16 @@ xfs_efi_release(xfs_efi_log_item_t	*efip,
 		uint			nextents)
 {
 	xfs_mount_t	*mp;
-	int		s;
 	int		extents_left;
 	uint		size;
 	int		nexts;
+	SPLDECL(s);
 
 	ASSERT(efip->efi_next_extent > 0);
 	ASSERT(efip->efi_flags & XFS_EFI_COMMITTED);
 
 	mp = efip->efi_item.li_mountp;
-	s = AIL_LOCK(mp);
+	AIL_LOCK(mp, s);
 	ASSERT(efip->efi_next_extent >= nextents);
 	efip->efi_next_extent -= nextents;
 	extents_left = efip->efi_next_extent;
@@ -330,13 +330,13 @@ STATIC void
 xfs_efi_cancel(
 	xfs_efi_log_item_t	*efip)
 {
-	int		s;
 	int		nexts;
 	int		size;
 	xfs_mount_t	*mp;
+	SPLDECL(s);
 
 	mp = efip->efi_item.li_mountp;
-	s = AIL_LOCK(mp);
+	AIL_LOCK(mp, s);
 	if (efip->efi_flags & XFS_EFI_COMMITTED) {
 		/*
 		 * xfs_trans_delete_ail() drops the AIL lock.

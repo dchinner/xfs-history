@@ -1,4 +1,4 @@
-#ident "$Revision: 1.80 $"
+#ident "$Revision: 1.81 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -959,7 +959,7 @@ xfs_trans_chunk_committed(
 	xfs_lsn_t		item_lsn;
 	struct xfs_mount	*mp;
 	int			i;
-	int			s;
+	SPLDECL(s);
 
 	lidp = licp->lic_descs;
 	for (i = 0; i < licp->lic_unused; i++, lidp++) {
@@ -997,7 +997,7 @@ xfs_trans_chunk_committed(
 		 * the test below.
 		 */ 
 		mp = lip->li_mountp;
-		s = AIL_LOCK(mp);
+		AIL_LOCK(mp,s);
 		if (XFS_LSN_CMP(item_lsn, lip->li_lsn) > 0) {
 			/*
 			 * This will set the item's lsn to item_lsn
