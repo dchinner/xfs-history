@@ -13,6 +13,7 @@
 #include <sys/pfdat.h>
 #include <sys/proc.h>
 #include <sys/user.h>
+#include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/pda.h>
 #ifdef SIM
@@ -71,7 +72,6 @@
 #include "sim.h"
 #endif
 
-
 /*
  * This lock is used by xfs_strat_write().
  * The xfs_strat_lock is initialized in xfs_init().
@@ -112,17 +112,17 @@ zone_t		*xfs_strat_write_zone;
  */
 zone_t		*xfs_gap_zone;
 
-#if defined(DEBUG) && !defined(SIM)
+#ifdef DEBUG
 /*
  * Global trace buffer for xfs_strat_write() tracing.
  */
 ktrace_t	*xfs_strat_trace_buf;
 #endif
 
-#ifndef DEBUG 
+#if !defined(XFS_STRAT_TRACE)
 #define	xfs_strat_write_bp_trace(tag, ip, bp)
 #define	xfs_strat_write_subbp_trace(tag, ip, bp, rbp, loff, lcnt, lblk)
-#endif	/* !DEBUG */
+#endif	/* !XFS_STRAT_TRACE */
 
 STATIC int
 xfs_zero_last_block(
@@ -247,7 +247,7 @@ xfs_delalloc_cleanup(
 #define	XFS_WRITEIO_ALIGN(mp,off)	(((off) >> mp->m_writeio_log) \
 					        << mp->m_writeio_log)
 
-#if !defined(DEBUG) || defined(SIM)
+#if !defined(XFS_RW_TRACE)
 #define	xfs_rw_enter_trace(tag, ip, uiop, ioflags)
 #define	xfs_iomap_enter_trace(tag, ip, offset, count);
 #define	xfs_iomap_map_trace(tag, ip, offset, count, bmapp, imapp)
@@ -271,17 +271,20 @@ xfs_rw_enter_trace(
 		     (void*)ip, 
 		     (void*)((ip->i_d.di_size >> 32) & 0xffffffff),
 		     (void*)(ip->i_d.di_size & 0xffffffff),
-		     (void*)(((__uint64_t)uiop->uio_offset >> 32) & 0xffffffff),
+		     (void*)(((__uint64_t)uiop->uio_offset >> 32) &
+			     0xffffffff),
 		     (void*)(uiop->uio_offset & 0xffffffff),
 		     (void*)uiop->uio_resid,
 		     (void*)((unsigned long)ioflags),
 		     (void*)((ip->i_next_offset >> 32) & 0xffffffff),
 		     (void*)(ip->i_next_offset & 0xffffffff),
-		     (void*)((unsigned long)((ip->i_io_offset >> 32) & 0xffffffff)),
+		     (void*)((unsigned long)((ip->i_io_offset >> 32) &
+					     0xffffffff)),
 		     (void*)(ip->i_io_offset & 0xffffffff),
 		     (void*)((unsigned long)(ip->i_io_size)),
 		     (void*)((unsigned long)(ip->i_last_req_sz)),
-		     (void*)((unsigned long)((ip->i_new_size >> 32) & 0xffffffff)),
+		     (void*)((unsigned long)((ip->i_new_size >> 32) &
+					     0xffffffff)),
 		     (void*)(ip->i_new_size & 0xffffffff));
 }
 
@@ -346,7 +349,7 @@ xfs_iomap_map_trace(
 		     (void*)((unsigned long)(imapp->br_blockcount)),
 		     (void*)(__psint_t)(imapp->br_startblock));
 }
-#endif	/* DEBUG && !SIM*/
+#endif	/* XFS_RW_TRACE */
 	     
 /*
  * Fill in the bmap structure to indicate how the next bp
@@ -3247,7 +3250,7 @@ xfs_strat_read(
 }
 
 
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_STRAT_TRACE)
 
 void
 xfs_strat_write_bp_trace(
@@ -3262,10 +3265,12 @@ xfs_strat_write_bp_trace(
 	ktrace_enter(ip->i_strat_trace,
 		     (void*)((unsigned long)tag),
 		     (void*)ip,
-		     (void*)((unsigned long)((ip->i_d.di_size > 32) & 0xffffffff)),
+		     (void*)((unsigned long)((ip->i_d.di_size > 32) &
+					     0xffffffff)),
 		     (void*)(ip->i_d.di_size & 0xffffffff),
 		     (void*)bp,
-		     (void*)((unsigned long)((bp->b_offset > 32) & 0xffffffff)),
+		     (void*)((unsigned long)((bp->b_offset > 32) &
+					     0xffffffff)),
 		     (void*)(bp->b_offset & 0xffffffff),
 		     (void*)((unsigned long)(bp->b_bcount)),
 		     (void*)((unsigned long)(bp->b_bufsize)),
@@ -3280,10 +3285,12 @@ xfs_strat_write_bp_trace(
 	ktrace_enter(xfs_strat_trace_buf,
 		     (void*)((unsigned long)tag),
 		     (void*)ip,
-		     (void*)((unsigned long)((ip->i_d.di_size > 32) & 0xffffffff)),
+		     (void*)((unsigned long)((ip->i_d.di_size > 32) &
+					     0xffffffff)),
 		     (void*)(ip->i_d.di_size & 0xffffffff),
 		     (void*)bp,
-		     (void*)((unsigned long)((bp->b_offset > 32) & 0xffffffff)),
+		     (void*)((unsigned long)((bp->b_offset > 32) &
+					     0xffffffff)),
 		     (void*)(bp->b_offset & 0xffffffff),
 		     (void*)((unsigned long)(bp->b_bcount)),
 		     (void*)((unsigned long)(bp->b_bufsize)),
@@ -3314,11 +3321,13 @@ xfs_strat_write_subbp_trace(
 	ktrace_enter(ip->i_strat_trace,
 		     (void*)((unsigned long)tag),
 		     (void*)ip,
-		     (void*)((unsigned long)((ip->i_d.di_size > 32) & 0xffffffff)),
+		     (void*)((unsigned long)((ip->i_d.di_size > 32) &
+					     0xffffffff)),
 		     (void*)(ip->i_d.di_size & 0xffffffff),
 		     (void*)bp,
 		     (void*)rbp,
-		     (void*)((unsigned long)((rbp->b_offset > 32) & 0xffffffff)),
+		     (void*)((unsigned long)((rbp->b_offset > 32) &
+					     0xffffffff)),
 		     (void*)(rbp->b_offset & 0xffffffff),
 		     (void*)((unsigned long)(rbp->b_bcount)),
 		     (void*)(rbp->b_blkno),
@@ -3332,11 +3341,13 @@ xfs_strat_write_subbp_trace(
 	ktrace_enter(xfs_strat_trace_buf,
 		     (void*)((unsigned long)tag),
 		     (void*)ip,
-		     (void*)((unsigned long)((ip->i_d.di_size > 32) & 0xffffffff)),
+		     (void*)((unsigned long)((ip->i_d.di_size > 32) &
+					     0xffffffff)),
 		     (void*)(ip->i_d.di_size & 0xffffffff),
 		     (void*)bp,
 		     (void*)rbp,
-		     (void*)((unsigned long)((rbp->b_offset > 32) & 0xffffffff)),
+		     (void*)((unsigned long)((rbp->b_offset > 32) &
+					     0xffffffff)),
 		     (void*)(rbp->b_offset & 0xffffffff),
 		     (void*)((unsigned long)(rbp->b_bcount)),
 		     (void*)(rbp->b_blkno),
@@ -3347,7 +3358,7 @@ xfs_strat_write_subbp_trace(
 		     (void*)((unsigned long)(last_bcount)),
 		     (void*)(last_blkno));
 }
-#endif /* DEBUG && !SIM */
+#endif /* XFS_STRAT_TRACE */
 
 #ifdef DEBUG
 /*
