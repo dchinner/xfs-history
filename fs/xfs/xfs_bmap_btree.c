@@ -492,7 +492,8 @@ xfs_bmbt_delrec(
 			if (i) {
 				ASSERT(block->bb_numrecs >=
 					XFS_BMAP_BLOCK_IMINRECS(level, tcur));
-				xfs_btree_del_cursor(tcur);
+				xfs_btree_del_cursor(tcur,
+						     XFS_BTREE_NOERROR);
 				if (level > 0) {
 					error = xfs_bmbt_decrement(cur,
 							   level, &i);
@@ -536,7 +537,8 @@ xfs_bmbt_delrec(
 			if (i) {
 				ASSERT(block->bb_numrecs >=
 					XFS_BMAP_BLOCK_IMINRECS(level, tcur));
-				xfs_btree_del_cursor(tcur);
+				xfs_btree_del_cursor(tcur,
+						     XFS_BTREE_NOERROR);
 				if (level == 0)
 					cur->bc_ptrs[0]++;
 				xfs_bmbt_rcheck(cur);
@@ -548,7 +550,7 @@ xfs_bmbt_delrec(
 		}
 		lrecs = left->bb_numrecs;
 	}
-	xfs_btree_del_cursor(tcur);
+	xfs_btree_del_cursor(tcur, XFS_BTREE_NOERROR);
 	mp = cur->bc_mp;
 	ASSERT(bno != NULLFSBLOCK);
 	if (lbno != NULLFSBLOCK &&
@@ -647,7 +649,7 @@ xfs_bmbt_delrec(
 	return 0;
 
  error0:
-	xfs_btree_del_cursor(tcur);
+	xfs_btree_del_cursor(tcur, XFS_BTREE_ERROR);
 	return error;
 }
 
@@ -1527,11 +1529,11 @@ xfs_bmbt_rshift(
 	xfs_btree_lastrec(tcur, level);
 	error = xfs_bmbt_increment(tcur, level, &i);
 	if (error) {
-		xfs_btree_del_cursor(tcur);
+		xfs_btree_del_cursor(tcur, XFS_BTREE_ERROR);
 		return error;
 	}
 	xfs_bmbt_updkey(tcur, rkp, level + 1);
-	xfs_btree_del_cursor(tcur);
+	xfs_btree_del_cursor(tcur, XFS_BTREE_NOERROR);
 	xfs_bmbt_rcheck(cur);
 	xfs_bmbt_trace_cursor("xfs_bmbt_rshift exit4", cur);
 	*stat = 1;
@@ -2330,7 +2332,7 @@ xfs_bmbt_insert(
 		error = xfs_bmbt_insrec(pcur, level++, &nbno, &nrec, &ncur, &i);
 		if (error) {
 			if (pcur != cur) {
-				xfs_btree_del_cursor(pcur);
+				xfs_btree_del_cursor(pcur, XFS_BTREE_ERROR);
 			}
 			return error;
 		}
@@ -2347,7 +2349,7 @@ xfs_bmbt_insert(
 				pcur->bc_private.b.firstblock;
 			ASSERT(cur->bc_private.b.flist ==
 			       pcur->bc_private.b.flist);
-			xfs_btree_del_cursor(pcur);
+			xfs_btree_del_cursor(pcur, XFS_BTREE_NOERROR);
 		}
 		if (ncur) {
 			pcur = ncur;
