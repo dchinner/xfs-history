@@ -1,4 +1,4 @@
-#ident	"$Revision$"
+#ident	"$Revision: 1.9 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1670,10 +1670,7 @@ xfs_alloc_ag_vextent(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xfs_agb
 		agp = xfs_buf_to_agp(agbuf);
 		agp->ag_freeblks -= *len;
 		xfs_btree_log_ag(tp, agbuf, XFS_AG_FREEBLKS);
-		mp = tp->t_mountp;
-		sbp = &mp->m_sb;
-		sbp->sb_fdblocks -= *len;
-		xfs_mod_sb(tp, XFS_SB_FDBLOCKS);
+		xfs_trans_mod_sb(tp, XFS_SB_FDBLOCKS, -(*len));
 	}
 	return r;
 }
@@ -1764,6 +1761,11 @@ xfs_free_ag_extent(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xfs_agblo
 		xfs_alloc_delete(cnt_cur);
 		xfs_alloc_delete(bno_cur);
 		xfs_alloc_decrement(bno_cur, 0);
+		{ xfs_agblock_t xxbno; xfs_extlen_t xxlen;
+		  xfs_alloc_get_rec(bno_cur, &xxbno, &xxlen);
+		  ASSERT(xxbno == ltbno);
+		  ASSERT(xxlen == ltlen);
+		}
 		bno = ltbno;
 		len += ltlen + gtlen;
 		xfs_alloc_update(bno_cur, bno, len);
@@ -1794,9 +1796,7 @@ xfs_free_ag_extent(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xfs_agblo
 	agp->ag_freeblks += flen;
 	xfs_btree_log_ag(tp, agbuf, XFS_AG_FREEBLKS);
 	xfs_btree_del_cursor(cnt_cur);
-	sbp = &mp->m_sb;
-	sbp->sb_fdblocks += flen;
-	xfs_mod_sb(tp, XFS_SB_FDBLOCKS);
+	xfs_trans_mod_sb(tp, XFS_SB_FDBLOCKS, flen);
 	return 1;
 }
 

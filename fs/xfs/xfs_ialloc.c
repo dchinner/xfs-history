@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.9 $"
+#ident	"$Revision: 1.12 $"
 
 #include <sys/param.h>
 #include <sys/stat.h>		/* should really? */
@@ -164,9 +164,8 @@ xfs_ialloc_ag_alloc(xfs_trans_t *tp, buf_t *agbuf)
 	agp->ag_icount += newlen;
 	agp->ag_ifcount += newlen;
 	xfs_btree_log_ag(tp, agbuf, flag);
-	sbp->sb_icount += newlen;
-	sbp->sb_ifree += newlen;
-	xfs_mod_sb(tp, XFS_SB_ICOUNT | XFS_SB_IFREE);
+	xfs_trans_mod_sb(tp, XFS_SB_ICOUNT, newlen);
+	xfs_trans_mod_sb(tp, XFS_SB_IFREE, newlen);
 	return 1;
 }
 
@@ -281,8 +280,7 @@ xfs_dialloc(xfs_trans_t *tp, xfs_ino_t parent, int sameag, mode_t mode)
 	agp->ag_iflist = free->di_u.di_next;
 	agp->ag_ifcount--;
 	xfs_btree_log_ag(tp, agbuf, XFS_AG_IFCOUNT | XFS_AG_IFLIST);
-	sbp->sb_ifree--;
-	xfs_mod_sb(tp, XFS_SB_IFREE);
+	xfs_trans_mod_sb(tp, XFS_SB_IFREE, -1);
 	ino = xfs_agino_to_ino(sbp, agno, agino);
 	return ino;
 }
@@ -354,8 +352,7 @@ xfs_difree(xfs_trans_t *tp, xfs_ino_t inode)
 	agp->ag_iflist = agino;
 	agp->ag_ifcount++;
 	xfs_btree_log_ag(tp, agbuf, XFS_AG_IFLIST | XFS_AG_IFCOUNT);
-	sbp->sb_ifree++;
-	xfs_mod_sb(tp, XFS_SB_IFREE);
+	xfs_trans_mod_sb(tp, XFS_SB_IFREE, 1);
 	return 1;
 }
 
