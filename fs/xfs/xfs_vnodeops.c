@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.387 $"
 
 
 #ifdef SIM
@@ -63,7 +63,6 @@
 #include <string.h>
 #include <sys/dirent.h>
 #include <sys/attributes.h>
-#include <ksys/vpag.h>
 #include <sys/major.h>
 #include <ksys/fdt.h>
 #include "xfs_macros.h"
