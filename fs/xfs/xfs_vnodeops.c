@@ -1,4 +1,4 @@
-#ident "$Revision: 1.285 $"
+#ident "$Revision: 1.286 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -374,6 +374,7 @@ xfs_open(
 	mode_t		flag,
 	cred_t		*credp)
 {
+	int		mode;
 	int		rval = 0;
 	vnode_t		*vp;
 	xfs_inode_t	*ip;
@@ -381,7 +382,9 @@ xfs_open(
 	vp = BHV_TO_VNODE(bdp);
 	ip = XFS_BHVTOI(bdp);
 
-	xfs_ilock(ip, XFS_ILOCK_SHARED);
+	mode = vp->v_type == VDIR && ip->i_d.di_nextents ?
+		XFS_ILOCK_EXCL : XFS_ILOCK_SHARED;
+	xfs_ilock(ip, mode);
 #if XFS_BIG_FILES == 0
 	if (ip->i_d.di_size > XFS_MAX_FILE_OFFSET)
 		rval = XFS_ERROR(EFBIG);
@@ -392,7 +395,7 @@ xfs_open(
 	 */
 	if (vp->v_type == VDIR && ip->i_d.di_nextents)
 		(void)xfs_da_reada_buf(NULL, ip, 0, XFS_DATA_FORK);
-	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+	xfs_iunlock(ip, mode);
 	return rval;
 }
 
@@ -1780,11 +1783,9 @@ xfs_inactive(
 			}
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
-			/*
-			 * The return value is ignored cause we don't know
-			 * what to do about it.
-			 */
-			(void)xfs_attr_inactive(ip);	
+			error = xfs_attr_inactive(ip);	
+			if (error)
+				goto out;
 
 			tp = xfs_trans_alloc(mp, XFS_TRANS_INACTIVE);
 			error = xfs_trans_reserve(tp, 0,
@@ -1801,18 +1802,7 @@ xfs_inactive(
 
 			xfs_idestroy_fork(ip, XFS_ATTR_FORK);
 
-			/*
-			 * XXX - turn this assert back on once
-			 * xfs_attr_inactive() is rewritten
-			 * to always succeed
-			 */
-#if 0
 			ASSERT(error || ip->i_d.di_anextents == 0);
-#else
-			if (ip->i_d.di_anextents != 0)
-				cmn_err(CE_WARN,
-					"File system lost track of some space\n");
-#endif
 		} else if (ip->i_afp)
 			xfs_idestroy_fork(ip, XFS_ATTR_FORK);
 
@@ -6286,11 +6276,13 @@ xfs_fcntl(
 
 	case F_RESVSP64:
 	case F_UNRESVSP64:
-		cmd = cmd;
+		/* cmd = cmd; XXX */
 		if ((flags & FWRITE) == 0) {
 			error = XFS_ERROR(EBADF);
 		} else if (vp->v_type != VREG) {
 			error = XFS_ERROR(EINVAL);
+		} else if (vp->v_flag & VISSWAP) {
+			error = XFS_ERROR(EACCES);
 #if _MIPS_SIM == _ABI64
 		} else if (ABI_IS_IRIX5_64(get_current_abi())) {
 			if (copyin((caddr_t)arg, &bf, sizeof bf)) {
@@ -6515,93 +6507,6 @@ xfs_reclaim(
 }
 
 #ifndef SIM
-
-/*
- * xfs_free_file_space()
- *      This routine frees disk space for the given file.
- *
- * RETURNS:
- *       0 on success
- *      errno on error
- *
- */
-STATIC int
-xfs_free_file_space( 
-	bhv_desc_t	*bdp,
-	off_t 		offset,
-	off_t		len)
-{
-
-        int             error;
-	xfs_inode_t	*ip;
-        xfs_trans_t     *tp;
-	xfs_mount_t	*mp;
-
-	vn_trace_entry(BHV_TO_VNODE(bdp), "xfs_free_file_space",
-		       (inst_t *)__return_address);
-
-	/*
-	 * Currently, can only free to eof
-	 */
-	if (len) {
-		return( XFS_ERROR(EINVAL) );
-	}
-
-	ip = XFS_BHVTOI(bdp);
-	mp = ip->i_mount;
-
-        /*
-         * Make the call to xfs_itruncate_start before starting the
-         * transaction, because we cannot make the call while we're
-         * in a transaction.
-         */
-        xfs_ilock(ip, XFS_IOLOCK_EXCL);
-        xfs_itruncate_start(ip, XFS_ITRUNC_DEFINITE, (xfs_fsize_t)offset);
-
-        tp = xfs_trans_alloc(mp, XFS_TRANS_TRUNCATE_FILE);
-        if (error = xfs_trans_reserve(tp, 0, XFS_ITRUNCATE_LOG_RES(mp), 0,
-                                      XFS_TRANS_PERM_LOG_RES,
-                                      XFS_ITRUNCATE_LOG_COUNT)) {
-                xfs_trans_cancel(tp, 0);
-		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
-                return error;
-        }
-
-        /*
-         * Follow the normal truncate locking protocol.  Since we
-         * hold the inode in the transaction, we know that it's number
-         * of references will stay constant.
-         */
-        xfs_ilock(ip, XFS_ILOCK_EXCL);
-	
-	if (XFS_IS_QUOTA_ON(mp)) {
-		if (XFS_NOT_DQATTACHED(mp, ip)) {
-			if (error = xfs_qm_dqattach(ip, XFS_QMOPT_ILOCKED)) {
-				xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES);
-				xfs_iunlock(ip, XFS_ILOCK_EXCL|XFS_IOLOCK_EXCL);
-				return (error);
-			}
-		}
-	}	
-
-        xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
-        xfs_trans_ihold(tp, ip);
-	ip->i_d.di_flags &= ~XFS_DIFLAG_PREALLOC;
-	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
-        error = xfs_itruncate_finish(&tp, ip, (xfs_fsize_t)offset,
-				     XFS_DATA_FORK, 0);
-	if (error) {
-		xfs_trans_cancel(tp, (XFS_TRANS_RELEASE_LOG_RES |
-				 XFS_TRANS_ABORT));
-	} else {
-		xfs_ichgtime(ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
-		error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
-	}
-        xfs_iunlock(ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
-
-        return error;
-}
-
 /*
  * xfs_alloc_file_space()
  *      This routine allocates disk space for the given file.
@@ -6613,52 +6518,46 @@ xfs_free_file_space(
  */
 STATIC int
 xfs_alloc_file_space( 
-	bhv_desc_t	*bdp,
-	off_t 		offset,
-	off_t		len)
+	xfs_inode_t		*ip,
+	off_t 			offset,
+	off_t			len)
 {
-	int			error;
-	int			reccount;
-	int			rt; 
-	int			rtextsize;
-	int			numrtextents;
-	int			prealloc_set;
+	xfs_filblks_t		allocated_fsb;
+	xfs_filblks_t		allocatesize_fsb;
 	int			committed;
 	off_t			count;
-	xfs_trans_t		*tp;
-	xfs_inode_t		*ip;
-	xfs_mount_t		*mp;
-	xfs_fileoff_t		startoffset_fsb;
-	xfs_filblks_t		allocatesize_fsb;
-	xfs_filblks_t		allocated_fsb;
 	xfs_filblks_t		datablocks;
+	int			error;
 	xfs_fsblock_t		firstfsb;
-	xfs_bmbt_irec_t		imaps[1];
-	xfs_bmbt_irec_t		*imapp;
 	xfs_bmap_free_t		free_list;
+	xfs_bmbt_irec_t		*imapp;
+	xfs_bmbt_irec_t		imaps[1];
+	xfs_mount_t		*mp;
+	int			numrtextents;
+	int			reccount;
 	uint			resblks;
+	int			rt; 
+	int			rtextsize;
+	xfs_fileoff_t		startoffset_fsb;
+	xfs_trans_t		*tp;
 
-	vn_trace_entry(BHV_TO_VNODE(bdp), "xfs_alloc_file_space",
+	vn_trace_entry(XFS_ITOV(ip), "xfs_alloc_file_space",
 		       (inst_t *)__return_address);
 	
-	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
 
 	/*
 	 * determine if this is a realtime file
 	 */
-        if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
-                rt = 1;
+        if (rt = (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0)
                 rtextsize = mp->m_sb.sb_rextsize;
-        } else {
-                rt = 0;
+        else
                 rtextsize = 0;
-        }
 
 	if (XFS_IS_QUOTA_ON(mp)) {
 		if (XFS_NOT_DQATTACHED(mp, ip)) {
 			if (error = xfs_qm_dqattach(ip, 0))
-				return (error);
+				return error;
 		}
 	}
 	
@@ -6668,12 +6567,11 @@ xfs_alloc_file_space(
 	reccount = 1;
 	startoffset_fsb	= XFS_B_TO_FSBT(mp, offset);
 	allocatesize_fsb = XFS_B_TO_FSB(mp, count);
-	prealloc_set = 0;
 
 	/*
 	 * allocate file space until done or until there is an error	
  	 */
-	while (allocatesize_fsb && (!error)) {
+	while (allocatesize_fsb && !error) {
 		/*
 		 * determine if reserving space on
 		 * the data or realtime partition.
@@ -6709,25 +6607,20 @@ xfs_alloc_file_space(
 			ASSERT(error == ENOSPC);
 			xfs_trans_cancel(tp, 0);
 			break;
-		} else {
-			xfs_ilock(ip, XFS_ILOCK_EXCL);
-			if (XFS_IS_QUOTA_ON(mp)) {
-				if (xfs_trans_reserve_quota(tp, 
-							    ip->i_udquot, 
-							    ip->i_pdquot,
-							    resblks, 0, 0)) {
-					error = EDQUOT;
-					goto error1;
-				}
-			}	
-
-			xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
-			xfs_trans_ihold(tp, ip);
-			if (!prealloc_set) {
-				ip->i_d.di_flags |= XFS_DIFLAG_PREALLOC;
-				xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
-			}
 		}
+		xfs_ilock(ip, XFS_ILOCK_EXCL);
+		if (XFS_IS_QUOTA_ON(mp)) {
+			if (xfs_trans_reserve_quota(tp, 
+						    ip->i_udquot, 
+						    ip->i_pdquot,
+						    resblks, 0, 0)) {
+				error = XFS_ERROR(EDQUOT);
+				goto error1;
+			}
+		}	
+
+		xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
+		xfs_trans_ihold(tp, ip);
 
 		/*
 		 * issue the bmapi() call to allocate the blocks
@@ -6749,7 +6642,8 @@ xfs_alloc_file_space(
 			goto error0;
 		}
 
-		error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES );
+		error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
+		XFS_INODE_CLEAR_READ_AHEAD(ip);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		if (error) {
 			break;
@@ -6762,7 +6656,7 @@ xfs_alloc_file_space(
 			break;
 		}
 
-		startoffset_fsb	+= allocated_fsb;
+		startoffset_fsb += allocated_fsb;
 		allocatesize_fsb -= allocated_fsb;
 	}
 
@@ -6776,6 +6670,217 @@ xfs_alloc_file_space(
 	return error;
 }
 
+/*
+ * Zero file bytes between startoff and endoff inclusive.
+ * The iolock is held exclusive and no blocks are buffered.
+ */
+STATIC int
+xfs_zero_remaining_bytes(
+	xfs_inode_t		*ip,
+	off_t			startoff,
+	off_t			endoff)
+{
+	buf_t			*bp;
+	int			error;
+	xfs_bmbt_irec_t		imap[1];
+	off_t			lastoffset;
+	xfs_mount_t		*mp;
+	struct bdevsw		*my_bdevsw;
+	int			nimap;
+	off_t			offset;
+	xfs_fileoff_t		offset_fsb;
+
+	mp = ip->i_mount;
+	bp = ngetrbuf(mp->m_sb.sb_blocksize);
+	bp->b_edev = mp->m_dev;
+	my_bdevsw = get_bdevsw(bp->b_edev);
+	ASSERT(my_bdevsw != NULL);
+	for (offset = startoff; offset <= endoff; offset = lastoffset + 1) {
+		offset_fsb = XFS_B_TO_FSBT(mp, offset);
+		nimap = 1;
+		error = xfs_bmapi(NULL, ip, offset_fsb, 1, 0, NULL, 0, imap,
+			&nimap, NULL);
+		if (error || nimap < 1)
+			break;
+		ASSERT(imap[0].br_blockcount >= 1);
+		ASSERT(imap[0].br_startoff == offset_fsb);
+		lastoffset = XFS_FSB_TO_B(mp, imap[0].br_startoff + 1) - 1;
+		if (lastoffset > endoff)
+			lastoffset = endoff;
+		if (imap[0].br_startblock == HOLESTARTBLOCK)
+			continue;
+		ASSERT(imap[0].br_startblock != DELAYSTARTBLOCK);
+		bp->b_flags &= ~(B_DONE | B_WRITE);
+		bp->b_flags |= B_READ;
+		bp->b_blkno = XFS_FSB_TO_DADDR(mp, imap[0].br_startblock);
+		bp_dcache_wbinval(bp);
+		bdstrat(my_bdevsw, bp);
+		if (error = iowait(bp))
+			break;
+		bzero(bp->b_un.b_addr +
+		       (offset - XFS_FSB_TO_B(mp, imap[0].br_startoff)),
+		      lastoffset - offset + 1);
+		bp->b_flags &= ~(B_DONE | B_READ);
+		bp->b_flags |= B_WRITE;
+		bdstrat(my_bdevsw, bp);
+		if (error = iowait(bp))
+			break;
+	}
+	nfreerbuf(bp);
+	return error;
+}
+
+/*
+ * xfs_free_file_space()
+ *      This routine frees disk space for the given file.
+ *
+ * RETURNS:
+ *       0 on success
+ *      errno on error
+ *
+ */
+STATIC int
+xfs_free_file_space( 
+	xfs_inode_t		*ip,
+	off_t 			offset,
+	off_t			len)
+{
+	int			committed;
+	int			done;
+	xfs_fileoff_t		endoffset_fsb;
+	int			error;
+	xfs_fsblock_t		firstfsb;
+	xfs_bmap_free_t		free_list;
+	off_t			ilen;
+	off_t			ioffset;
+	xfs_mount_t		*mp;
+	uint			resblks;
+	int			rounding;
+	int			rt;
+	xfs_fileoff_t		startoffset_fsb;
+	xfs_trans_t		*tp;
+
+	vn_trace_entry(XFS_ITOV(ip), "xfs_free_file_space",
+		       (inst_t *)__return_address);
+	
+	mp = ip->i_mount;
+
+	if (XFS_IS_QUOTA_ON(mp)) {
+		if (XFS_NOT_DQATTACHED(mp, ip)) {
+			if (error = xfs_qm_dqattach(ip, 0))
+				return error;
+		}
+	}
+	
+	error = 0;
+	startoffset_fsb	= XFS_B_TO_FSB(mp, offset);
+	endoffset_fsb = XFS_B_TO_FSBT(mp, offset + len);
+	xfs_ilock(ip, XFS_IOLOCK_EXCL);
+	rt = (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0;
+	rounding = MAX((rt ? mp->m_sb.sb_rextsize : 1) << mp->m_sb.sb_blocklog,
+		       NBPP);
+	ilen = len + (offset & (rounding - 1));
+	ioffset = offset & ~(rounding - 1);
+	if (ilen & (rounding - 1))
+		ilen = (ilen + rounding) & ~(rounding - 1);
+	xfs_inval_cached_pages(ip, ioffset, ilen);
+	/* need to zero the stuff we're not freeing, on disk */
+	if (done = endoffset_fsb <= startoffset_fsb)
+		/*
+		 * No full blocks, one contiguous piece to clear
+		 */
+		error = xfs_zero_remaining_bytes(ip, offset, offset + len - 1);
+	else {
+		/*
+		 * Some full blocks, possibly two pieces to clear
+		 */
+		if (offset < XFS_FSB_TO_B(mp, startoffset_fsb))
+			error = xfs_zero_remaining_bytes(ip, offset,
+				XFS_FSB_TO_B(mp, startoffset_fsb) - 1);
+		if (!error && !done &&
+		    XFS_FSB_TO_B(mp, endoffset_fsb) < offset + len)
+			error = xfs_zero_remaining_bytes(ip,
+				XFS_FSB_TO_B(mp, endoffset_fsb),
+				offset + len - 1);
+	}
+
+	/*
+	 * free file space until done or until there is an error	
+ 	 */
+	resblks = XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK);
+	while (!error && !done) {
+
+		/*
+		 * allocate and setup the transaction
+		 */
+		tp = xfs_trans_alloc(mp, XFS_TRANS_DIOSTRAT);
+		error = xfs_trans_reserve(tp,
+					  resblks,
+					  XFS_WRITE_LOG_RES(mp),
+					  0,
+					  XFS_TRANS_PERM_LOG_RES,
+					  XFS_WRITE_LOG_COUNT);
+
+		/*
+		 * check for running out of space
+		 */
+		if (error) {
+			/*
+			 * Free the transaction structure.
+			 */
+			ASSERT(error == ENOSPC);
+			xfs_trans_cancel(tp, 0);
+			break;
+		}
+		xfs_ilock(ip, XFS_ILOCK_EXCL);
+		if (XFS_IS_QUOTA_ON(mp)) {
+			if (xfs_trans_reserve_quota(tp, 
+						    ip->i_udquot, 
+						    ip->i_pdquot,
+						    resblks, 0, 0)) {
+				error = XFS_ERROR(EDQUOT);
+				goto error1;
+			}
+		}	
+
+		xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
+		xfs_trans_ihold(tp, ip);
+
+		/*
+		 * issue the bunmapi() call to free the blocks
+	 	 */
+		XFS_BMAP_INIT(&free_list, &firstfsb);
+		error = xfs_bunmapi(tp, ip, startoffset_fsb, 
+				  endoffset_fsb - startoffset_fsb,
+				  XFS_BMAPI_METADATA, 2, &firstfsb, &free_list,
+				  &done);
+		if (error) {
+			goto error0;
+		}
+
+		/*
+		 * complete the transaction
+		 */
+		error = xfs_bmap_finish(&tp, &free_list, firstfsb, &committed);
+		if (error) {
+			goto error0;
+		}
+
+		error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
+		XFS_INODE_CLEAR_READ_AHEAD(ip);
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	}
+
+	xfs_iunlock(ip, XFS_IOLOCK_EXCL);
+	return error;
+
+ error0:
+	xfs_bmap_cancel(&free_list);
+ error1:
+	xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES | XFS_TRANS_ABORT);
+	xfs_iunlock(ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
+	return error;
+}
 
 /*
  * xfs_change_file_space()
@@ -6796,27 +6901,27 @@ xfs_change_file_space(
 	off_t 		offset,
 	cred_t  	*credp)
 {
+	int		clrprealloc;
 	int		error;
-	int		allocspace;
-	int		resvspace;
-	off_t		startoffset;
-	off_t		len;
-	vattr_t		va;
+	xfs_fsize_t	fsize;
 	xfs_inode_t	*ip;
+	xfs_mount_t	*mp;
+	int		setprealloc;
+	off_t		startoffset;
+	xfs_trans_t	*tp;
+	vattr_t		va;
 	vnode_t		*vp;
 
 	vp = BHV_TO_VNODE(bdp);
 	vn_trace_entry(vp, "xfs_change_file_space", (inst_t *)__return_address);
 	
-	len = bf->l_len;
-	resvspace = 0;
 	ip = XFS_BHVTOI(bdp);
 
 	/*
 	 * must be a regular file and have write permission
 	 */
 	if (vp->v_type != VREG) {
-		return(XFS_ERROR(EINVAL));
+		return XFS_ERROR(EINVAL);
 	}
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
@@ -6826,28 +6931,7 @@ xfs_change_file_space(
 	}
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
-	switch (cmd) {
-	case F_RESVSP:
-	case F_RESVSP64:
-		resvspace = 1;
-	case F_ALLOCSP:
-	case F_ALLOCSP64:
-		allocspace = 1;
-		break;
-		
-	case F_UNRESVSP:
-	case F_UNRESVSP64:
-		resvspace = 1;
-	case F_FREESP:
-	case F_FREESP64:
-		allocspace = 0;
-		break;
-	default:
-		ASSERT(0);
-		return (XFS_ERROR(EINVAL));
-	}
-
-
+	fsize = ip->i_d.di_size;
 	/*
 	 * determine how much to allocate/free starting from where
 	 */
@@ -6860,7 +6944,7 @@ xfs_change_file_space(
 		/*
 		 * relative to end of file
 		 */
-		startoffset = bf->l_start + ip->i_d.di_size;
+		startoffset = bf->l_start + fsize;
 	} else if (bf->l_whence == 0) {
 		/*
 		 * relative to start of file. 
@@ -6879,62 +6963,69 @@ xfs_change_file_space(
 	 * these calls cause the new file data to be zeroed and the file
 	 * size to be changed.
 	 */
-	if (allocspace) {
-		error = xfs_alloc_file_space(bdp, startoffset, len);
-		if ((!error) && (!resvspace)) {
-			/*
-			 * zero pages, and change file size
-			 */
-			va.va_mask = AT_SIZE;
-			va.va_size = startoffset + len;
-			error = xfs_setattr(bdp, &va, 0, credp);
+	setprealloc = clrprealloc = 0;
+	switch (cmd) {
+	case F_RESVSP:
+	case F_RESVSP64:
+		error = xfs_alloc_file_space(ip, startoffset, bf->l_len);
+		if (error)
+			return error;
+		setprealloc = 1;
+		break;
+	case F_UNRESVSP:
+	case F_UNRESVSP64:
+		error = xfs_free_file_space(ip, startoffset, bf->l_len);
+		if (error)
+			return error;
+		break;
+	case F_ALLOCSP:
+	case F_ALLOCSP64:
+	case F_FREESP:
+	case F_FREESP64:
+		if (startoffset > fsize) {
+			error = xfs_alloc_file_space(ip, fsize,
+					startoffset - fsize);
+			if (error)
+				break;
 		}
-	} else {
-		/*
-		 * len is currently assumed to be zero,
-		 * which means to free to end-of-file
-		 */
-		if (startoffset > ip->i_d.di_size) {
-			/*
-			 * freeing after end-of-file means to extend the file.
-			 */
-			error = xfs_alloc_file_space(bdp, ip->i_d.di_size,
-					(startoffset - ip->i_d.di_size));
-
-			if ((!error) && (!resvspace)) {
-				/*
-				 * zero pages and change file size
-				 */
-				va.va_mask = AT_SIZE;
-				va.va_size = startoffset;
-				error = xfs_setattr(bdp, &va, 0, credp);
-			}
-
-		} else {
-			/*
-			 * free from startoffset to end-of-file
-			 */
-			error = xfs_free_file_space(bdp, startoffset, 0);
-		}
+		va.va_mask = AT_SIZE;
+		va.va_size = startoffset;
+		error = xfs_setattr(bdp, &va, 0, credp);
+		if (error)
+			return error;
+		clrprealloc = 1;
+		break;
+	default:
+		ASSERT(0);
+		return XFS_ERROR(EINVAL);
 	}
-
 
 	/*
-	 *  update the inode timestamp 
+	 * update the inode timestamp, mode, and prealloc flag bits
 	 */
-	if (!error) {
-		xfs_ilock(ip, XFS_ILOCK_EXCL);
-
-		if ((ip->i_d.di_mode & (ISUID|ISGID)) && credp->cr_uid != 0) {
-			ip->i_d.di_mode &= ~ISUID;
-			if (ip->i_d.di_mode & (IEXEC >> 3))
-				ip->i_d.di_mode &= ~ISGID;
-		}
-		xfs_ichgtime(ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
-
-		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	mp = ip->i_mount;
+	tp = xfs_trans_alloc(mp, XFS_TRANS_WRITEID);
+	if (error = xfs_trans_reserve(tp, 0, XFS_WRITEID_LOG_RES(mp),
+				      0, 0, 0)) {
+		ASSERT(0);
+		xfs_trans_cancel(tp, 0);
+		return error;
 	}
-
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
+	xfs_trans_ihold(tp, ip);
+	ip->i_d.di_mode &= ~ISUID;
+	if (ip->i_d.di_mode & (IEXEC >> 3))
+		ip->i_d.di_mode &= ~ISGID;
+	xfs_ichgtime(ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
+	if (setprealloc)
+		ip->i_d.di_flags |= XFS_DIFLAG_PREALLOC;
+	else if (clrprealloc)
+		ip->i_d.di_flags &= ~XFS_DIFLAG_PREALLOC;
+	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+	xfs_trans_set_sync(tp);
+	error = xfs_trans_commit(tp, 0);
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	return error;
 }
 
@@ -7029,7 +7120,8 @@ vnodeops_t xfs_vnodeops = {
 	fs_nosys,	/* attr_set */
 	fs_nosys,	/* attr_remove */
 	fs_nosys,	/* attr_list */
-	(int (*)(bhv_desc_t *, struct mounta *, char *, struct cred *))fs_noval,	/* link_removed */
+	fs_nosys,	/* mount */
+	(void (*)(bhv_desc_t *, vnode_t *, int))fs_nosys, /* link_removed */
 };
 
 #else
@@ -7076,10 +7168,10 @@ vnodeops_t xfs_vnodeops = {
 	xfs_allocstore,
 	xfs_fcntl,
 	xfs_reclaim,
-	xfs_attr_get,	/* attr_get */
-	xfs_attr_set,	/* attr_set */
-	xfs_attr_remove,/* attr_remove */
-	xfs_attr_list,	/* attr_list */
+	xfs_attr_get,
+	xfs_attr_set,
+	xfs_attr_remove,
+	xfs_attr_list,
 	fs_mount,
 	fs_noval,	/* link_removed */
 };
