@@ -664,7 +664,8 @@ xfs_attr_leaf_create(xfs_da_args_t *args, xfs_dablk_t blkno, buf_t **bpp)
 	hdr->info.magic = XFS_ATTR_LEAF_MAGIC;
 	hdr->firstused = XFS_LBSIZE(dp->i_mount);
 	if (hdr->firstused == 0)
-		hdr->firstused = XFS_LBSIZE(dp->i_mount) - 1;
+		hdr->firstused =
+			XFS_LBSIZE(dp->i_mount) - XFS_ATTR_LEAF_NAME_ALIGN;
 	hdr->freemap[0].base = sizeof(xfs_attr_leaf_hdr_t);
 	hdr->freemap[0].size = hdr->firstused - hdr->freemap[0].base;
 
@@ -933,7 +934,7 @@ xfs_attr_leaf_compact(xfs_trans_t *trans, buf_t *bp)
 	hdr_d->info = hdr_s->info;	/* struct copy */
 	hdr_d->firstused = XFS_LBSIZE(mp);
 	if (hdr_d->firstused == 0)	/* handle truncation gracefully */
-		hdr_d->firstused = XFS_LBSIZE(mp) - 1;
+		hdr_d->firstused = XFS_LBSIZE(mp) - XFS_ATTR_LEAF_NAME_ALIGN;
 	hdr_d->usedbytes = 0;
 	hdr_d->count = 0;
 	hdr_d->holes = 0;
@@ -1475,7 +1476,7 @@ xfs_attr_leaf_remove(buf_t *bp, xfs_da_args_t *args)
 		}
 		hdr->firstused = tmp;
 		if (hdr->firstused == 0)
-			hdr->firstused = tmp - 1;
+			hdr->firstused = tmp - XFS_ATTR_LEAF_NAME_ALIGN;
 	} else {
 		hdr->holes = 1;		/* mark as needing compaction */
 	}
@@ -1553,7 +1554,8 @@ xfs_attr_leaf_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 		tmp_hdr->count = 0;
 		tmp_hdr->firstused = state->blocksize;
 		if (tmp_hdr->firstused == 0)
-			tmp_hdr->firstused = state->blocksize - 1;
+			tmp_hdr->firstused =
+				state->blocksize - XFS_ATTR_LEAF_NAME_ALIGN;
 		tmp_hdr->usedbytes = 0;
 		if (xfs_attr_leaf_order(save_blk->bp, drop_blk->bp)) {
 			xfs_attr_leaf_moveents(drop_leaf, 0, tmp_leaf, 0,

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ATTR_LEAF_H
 #define	_FS_XFS_ATTR_LEAF_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.17 $"
 
 /*
  * xfs_attr_leaf.h
@@ -108,6 +108,12 @@ typedef struct xfs_attr_leaf_name_remote xfs_attr_leaf_name_remote_t;
 #define XFS_ATTR_INCOMPLETE	(1 << XFS_ATTR_INCOMPLETE_BIT)
 
 /*
+ * Alignment for namelist and valuelist entries (since they are mixed
+ * there can be only one alignment value)
+ */
+#define	XFS_ATTR_LEAF_NAME_ALIGN	sizeof(xfs_dablk_t)
+
+/*
  * Cast typed pointers for "local" and "remote" name/value structs.
  */
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_ATTR_LEAF_NAME_REMOTE)
@@ -149,7 +155,8 @@ int xfs_attr_leaf_entsize_remote(int nlen);
 	xfs_attr_leaf_entsize_remote(nlen)
 #else
 #define XFS_ATTR_LEAF_ENTSIZE_REMOTE(nlen)	/* space for remote struct */ \
-	(((sizeof(xfs_attr_leaf_name_remote_t)-1 + (nlen)) +3)&~0x3)
+	((sizeof(xfs_attr_leaf_name_remote_t) - 1 + (nlen) + \
+	  XFS_ATTR_LEAF_NAME_ALIGN - 1) & ~(XFS_ATTR_LEAF_NAME_ALIGN - 1))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_ATTR_LEAF_ENTSIZE_LOCAL)
 int xfs_attr_leaf_entsize_local(int nlen, int vlen);
@@ -157,7 +164,8 @@ int xfs_attr_leaf_entsize_local(int nlen, int vlen);
 	xfs_attr_leaf_entsize_local(nlen,vlen)
 #else
 #define XFS_ATTR_LEAF_ENTSIZE_LOCAL(nlen,vlen)	/* space for local struct */ \
-	(((sizeof(xfs_attr_leaf_name_local_t)-1 + (nlen)+(vlen)) +3)&~0x3)
+	((sizeof(xfs_attr_leaf_name_local_t) - 1 + (nlen) + (vlen) + \
+	  XFS_ATTR_LEAF_NAME_ALIGN - 1) & ~(XFS_ATTR_LEAF_NAME_ALIGN - 1))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_ATTR_LEAF_ENTSIZE_LOCAL_MAX)
 int xfs_attr_leaf_entsize_local_max(int bsize);
