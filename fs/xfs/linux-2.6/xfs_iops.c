@@ -429,15 +429,32 @@ int linvfs_readlink(struct dentry *dentry, char *buf, int size)
 	return (size - uio.uio_resid);
 }
 
+/*
+ * careful here - this function can get called recusively up
+ * to 32 times, hence we need to be very careful about how much
+ * stack we use. uio is kmalloced for this reason...
+ */
 
 int linvfs_follow_link(struct dentry *dentry,
 				   struct nameidata *nd)
 {
 	vnode_t	*vp;
-	uio_t	uio;
+	uio_t	*uio;
 	iovec_t	iov;
 	int	error = 0;
-	char	*link = kmalloc(MAXNAMELEN+1, GFP_KERNEL); 
+	char	*link;
+                
+        ASSERT(dentry);
+        ASSERT(nd);
+        
+        link = (char *)kmalloc(MAXNAMELEN+1, GFP_KERNEL);
+        if (!link) return -ENOMEM;
+        
+        uio = (uio_t*)kmalloc(sizeof(uio_t), GFP_KERNEL);
+        if (!uio) {
+	        kfree_s(link, MAXNAMELEN+1);
+                return -ENOMEM;
+        }
 
 	vp = LINVFS_GET_VP(dentry->d_inode);
 	ASSERT(vp);
@@ -445,21 +462,23 @@ int linvfs_follow_link(struct dentry *dentry,
 	iov.iov_base = link;
 	iov.iov_len = MAXNAMELEN;
 
-	uio.uio_iov = &iov;
-	uio.uio_offset = 0;
-	uio.uio_segflg = UIO_SYSSPACE;
-	uio.uio_resid = MAXNAMELEN;
+	uio->uio_iov = &iov;
+	uio->uio_offset = 0;
+	uio->uio_segflg = UIO_SYSSPACE;
+	uio->uio_resid = MAXNAMELEN;
 
-	VOP_READLINK(vp, &uio, NULL, error);
+	VOP_READLINK(vp, uio, NULL, error);
 	if (error) {
-		kfree_s(link, MAXNAMELEN);
+		kfree_s(uio, sizeof(uio_t));
+		kfree_s(link, MAXNAMELEN+1);
 		return error;
 	}
 
-	link[MAXNAMELEN - uio.uio_resid] = '\0';
+	link[MAXNAMELEN - uio->uio_resid] = '\0';
+	kfree_s(uio, sizeof(uio_t));
 
         error = vfs_follow_link(nd, link);
-	kfree_s(link, MAXNAMELEN);
+	kfree_s(link, MAXNAMELEN+1);
 	return error;
 }
 
