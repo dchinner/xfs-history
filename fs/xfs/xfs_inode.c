@@ -1173,6 +1173,11 @@ xfs_iunpin_wait(
 	}
 
 	mp = ip->i_mount;
+	/*
+	 * Give the log a push so we don't wait here too long.
+	 */
+	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
+
 	s = splockspl(mp->m_ipinlock, splhi);
 	if (ip->i_pincount == 0) {
 		spunlockspl(mp->m_ipinlock, s);
@@ -1202,12 +1207,14 @@ xfs_iflush(
 	xfs_inode_log_item_t	*iip;
 	buf_t			*bp;
 	xfs_dinode_t		*dip;
+	xfs_mount_t		*mp;
 	int			s;
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE|MR_ACCESS));
 	ASSERT(valusema(&ip->i_flock) <= 0);
 
 	iip = &ip->i_item;
+	mp = ip->i_mount;
 
 	/*
 	 * If the inode isn't dirty, then just release the inode
@@ -1230,7 +1237,7 @@ xfs_iflush(
 	/*
 	 * Get the buffer containing the on-disk inode.
 	 */
-	bp = xfs_itobp(ip->i_mount, NULL, ip, &dip);
+	bp = xfs_itobp(mp, NULL, ip, &dip);
 
 	/*
 	 * Clear i_update_core before copying out the data.
@@ -1267,7 +1274,7 @@ xfs_iflush(
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_DATA) &&
 		    (ip->i_bytes > 0)) {
 			ASSERT(ip->i_u1.iu_data != NULL);
-			ASSERT(ip->i_bytes <= XFS_LITINO(ip->i_mount));
+			ASSERT(ip->i_bytes <= XFS_LITINO(mp));
 			bcopy(ip->i_u1.iu_data, dip->di_u.di_c, ip->i_bytes);
 		}
 		break;
@@ -1278,7 +1285,7 @@ xfs_iflush(
 		ASSERT((ip->i_u1.iu_extents == NULL) || (ip->i_bytes > 0));
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_EXT) &&
 		    (ip->i_bytes > 0)) {
-			ASSERT(ip->i_bytes <= XFS_LITINO(ip->i_mount));
+			ASSERT(ip->i_bytes <= XFS_LITINO(mp));
 			bcopy(ip->i_u1.iu_extents, dip->di_u.di_bmx,
 			      ip->i_bytes);
 		}
@@ -1287,10 +1294,10 @@ xfs_iflush(
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_BROOT) &&
 		    (ip->i_broot_bytes > 0)) {
 			ASSERT(ip->i_broot != NULL);
-			ASSERT(ip->i_broot_bytes <= XFS_LITINO(ip->i_mount));
+			ASSERT(ip->i_broot_bytes <= XFS_LITINO(mp));
 			xfs_bmbt_to_bmdr(ip->i_broot, ip->i_broot_bytes,
 			   &(dip->di_u.di_bmbt),
-			   XFS_BMAP_BROOT_SIZE(ip->i_mount->m_sb.sb_inodesize));
+			   XFS_BMAP_BROOT_SIZE(mp->m_sb.sb_inodesize));
 		}
 		break;
 
@@ -1335,9 +1342,9 @@ xfs_iflush(
 		iip->ili_logged = 1;
 	}
 	ASSERT(sizeof(xfs_lsn_t) == 8);	/* don't need lock if it shrinks */
-	s = AIL_LOCK(ip->i_mount);
+	s = AIL_LOCK(mp);
 	iip->ili_flush_lsn = iip->ili_item.li_lsn;
-	AIL_UNLOCK(ip->i_mount, s);
+	AIL_UNLOCK(mp, s);
 
 	/*
 	 * Attach the function xfs_iflush_done to the inode's
@@ -1347,6 +1354,14 @@ xfs_iflush(
 	 */
 	xfs_buf_attach_iodone(bp, (void(*)(buf_t*,xfs_log_item_t*))
 			      xfs_iflush_done, (xfs_log_item_t *)iip);
+
+	/*
+	 * If the buffer is pinned then push on the log so we won't
+	 * get stuck waiting in the write for too long.
+	 */
+	if (bp->b_pincount > 0) {
+		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
+	}
 
 	if (flags & B_DELWRI) {
 		xfs_bdwrite(bp);
