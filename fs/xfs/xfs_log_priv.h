@@ -1,6 +1,6 @@
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision: 1.57 $"
+#ident	"$Revision: 1.58 $"
 
 #include <sys/cmn_err.h>
 
@@ -190,6 +190,82 @@ void xlog_grant_add_space(struct log *log, int bytes, int type);
 #define XLOG_IO_ERROR		0x8	/* log hit an I/O error, and being
 					   shutdown */
 
+/*
+ * Below are states for covering allocation transactions.
+ * By covering, we mean changing the h_tail_lsn in the last on-disk
+ * log write such that no allocation transactions will be re-done during
+ * recovery after a system crash. Recovery starts at the last on-disk
+ * log write.
+ *
+ * These states are used to insert dummy log entries to cover
+ * space allocation transactions which can undo non-transactional changes
+ * after a crash. Writes to a file with space
+ * already allocated do not result in any transactions. Allocations
+ * might include space beyond the EOF. So if we just push the EOF a
+ * little, the last transaction for the file could contain the wrong
+ * size. If there is no file system activity, after an allocation
+ * transaction, and the system crashes, the allocation transaction
+ * will get replayed and the file will be truncated. This could
+ * be hours/days/... after the allocation occurred.
+ *
+ * The fix for this is to do two dummy transactions when the
+ * system is idle. We need two dummy transaction because the h_tail_lsn
+ * in the log record header needs to point beyond the last possible
+ * non-dummy transaction. The first dummy changes the h_tail_lsn to
+ * the first transaction before the dummy. The second dummy causes
+ * h_tail_lsn to point to the first dummy. Recovery starts at h_tail_lsn.
+ * 
+ * These dummy transactions get committed when everything
+ * is idle (after there has been some activity).
+ *
+ * There are 5 states used to control this.
+ *
+ *  IDLE -- no logging has been done on the file system or
+ *		we are done covering previous transactions.
+ *  NEED -- logging has occurred and we need a dummy transaction
+ *		when the log becomes idle.
+ *  DONE -- we were in the NEED state and have committed a dummy
+ *		transaction.
+ *  NEED2 -- we detected that a dummy transaction has gone to the
+ *		on disk log with no other transactions.
+ *  DONE2 -- we committed a dummy transaction when in the NEED2 state.
+ *
+ * There are two places where we switch states:
+ *
+ * 1.) In xfs_sync, when we detect an idle log and are in NEED or NEED2.
+ *	We commit the dummy transaction and switch to DONE or DONE2,
+ * 	respectively. In all other states, we don't do anything.
+ *
+ * 2.) When we finish writing the on-disk log (xlog_state_clean_log).
+ *
+ *	No matter what state we are in, if this isn't the dummy
+ *	transaction going out, the next state is NEED.
+ *	So, if we aren't in the DONE or DONE2 states, the next state
+ *	is NEED. We can't be finishing a write of the dummy record
+ *	unless it was committed and the state switched to DONE or DONE2.
+ *	
+ *	If we are in the DONE state and this was a write of the
+ *		dummy transaction, we move to NEED2.
+ *
+ *	If we are in the DONE2 state and this was a write of the
+ *		dummy transaction, we move to IDLE.
+ *
+ *
+ * Writing only one dummy transaction can get appended to
+ * one file space allocation. When this happens, the log recovery
+ * code replays the space allocation and a file could be truncated.
+ * This is why we have the NEED2 and DONE2 states before going idle.
+ */
+
+#define XLOG_STATE_COVER_IDLE	0
+#define XLOG_STATE_COVER_NEED	1
+#define XLOG_STATE_COVER_DONE	2
+#define XLOG_STATE_COVER_NEED2	3
+#define XLOG_STATE_COVER_DONE2	4
+
+#define XLOG_COVER_OPS		5
+
+
 typedef __uint32_t xlog_tid_t;
 
 typedef struct xlog_ticket {
@@ -307,6 +383,7 @@ typedef struct log {
     int			l_flushcnt;	/* # of procs waiting on this sema */
     int			l_ticket_cnt;	/* free ticket count */
     int			l_ticket_tcnt;	/* total ticket count */
+    int			l_covered_state;/* state of "covering disk log entries" */
     xlog_ticket_t	*l_freelist;    /* free list of tickets */
     xlog_ticket_t	*l_unmount_free;/* kmem_free these addresses */
     xlog_ticket_t	*l_tail;        /* free list of tickets */
