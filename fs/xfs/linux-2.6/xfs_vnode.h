@@ -703,8 +703,8 @@ typedef struct vattr {
  * access time can be modified.
  */
 #define	WRITEALLOWED(vp) \
- 	((vp)->v_vfsp && ((vp)->v_vfsp->vfs_flag & VFS_RDONLY) == 0)
-
+ 	(((vp)->v_vfsp && ((vp)->v_vfsp->vfs_flag & VFS_RDONLY) == 0) || \
+	 ((vp)->v_type != VREG ) && ((vp)->v_type != VDIR) && ((vp)->v_type != VLNK))
 /*
  * Global vnode allocation:
  *
