@@ -14,14 +14,13 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished - 
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident	"$Revision: 1.2 $"
+#ident	"$Revision: 1.3 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/vnode.h>
 #include <sys/errno.h>
 #include <sys/debug.h>
-#include <sys/cmn_err.h>
 #include <sys/mac_label.h>
 #include <sys/systm.h>
 #include <sys/attributes.h>
@@ -57,27 +56,17 @@ mac_xfs_iaccess( xfs_inode_t *ip, mode_t mode, struct cred *cr )
 {
 	struct mac_label mac;
 	struct mac_label *mp = mac_high_low_lp;
-	int error = 0;
 
 	if (cr == NULL || sys_cred == NULL ) {
-		cmn_err(CE_NOTE,
-			"mac_xfs_iaccess: %s(%d) cr=0x%08x, sys=0x%08x",
-				__FILE__, __LINE__, cr, sys_cred);
 		return EACCES;
 	}
 
 	if (xfs_attr_fetch(ip, SGI_MAC_FILE, (char *)&mac,
-	    			sizeof(struct mac_label)) == 0) {
+			   sizeof(struct mac_label)) == 0) {
 		if ((mp = mac_add_label(&mac)) == NULL) {
-			cmn_err(CE_NOTE, "mac_xfs_iaccess: %s(%d) add label",
-                                __FILE__, __LINE__);
 			return EACCES;
 		}
 	}
 
-	if ((error = mac_access(mp, cr, mode))) {
-		cmn_err(CE_NOTE, "mac_xfs_iaccess: %s(%d) mac_access = %d",
-                                __FILE__, __LINE__, error);
-	}
-	return error;
+	return mac_access(mp, cr, mode);
 }
