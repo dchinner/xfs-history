@@ -1861,6 +1861,10 @@ xfs_dir_put_dirent(xfs_mount_t *mp, dirent_t *dbp, xfs_ino_t ino,
 			idbp = (irix5_dirent_t *)iovp->iov_base;
 		idbp->d_reclen = reclen;
 		idbp->d_ino = ino;
+		if (idbp->d_ino != ino) {		/* truncated */
+			*done = 1;
+			return XFS_ERROR(EOVERFLOW);
+		}
 		bcopy(name, idbp->d_name, namelen);
 		idbp->d_name[namelen] = '\0';
 		idbp->d_off = doff;
