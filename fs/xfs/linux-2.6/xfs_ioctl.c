@@ -73,6 +73,8 @@
 #include <xfs_fsops.h>
 #include <xfs_error.h>
 #include <xfs_itable.h>
+#include <linux/dmapi_kern.h>
+#include <xfs_dmapi.h>
 
 #include <linux/smp_lock.h>
 
