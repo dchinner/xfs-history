@@ -172,7 +172,8 @@ xfs_next_bmap(xfs_mount_t	*mp,
 		}
 
 	}
-	if (imapp->br_startblock != NULLSTARTBLOCK) {
+	if ((imapp->br_startblock != DELAYSTARTBLOCK) &&
+	    (imapp->br_startblock != HOLESTARTBLOCK)) {
 		bmapp->bn = imapp->br_startblock + ext_offset;
 		bmapp->eof = 0;
 	} else {
@@ -261,21 +262,17 @@ xfs_iomap_read(xfs_inode_t	*ip,
 	xfs_fsblock_t	last_required_offset;
 	xfs_fsblock_t	last_fsb;
 	xfs_fsblock_t	next_offset;
-	__int64_t	isize;
 	__int64_t	nisize;
-	off_t		last_page;
 	off_t		offset_page;
-	unsigned int	request_size;
 	int		nimaps;
 	unsigned int	iosize;
 	unsigned int	retrieved_bytes;
 	unsigned int	total_retrieved_bytes;
-	int		filled_bmaps;
-	int		read_aheads;
+	short		filled_bmaps;
+	short		read_aheads;
 	int		x;
 	xfs_mount_t	*mp;
 	xfs_sb_t	*sbp;
-	xfs_extlen_t	blocks;
 	struct bmapval	*curr_bmapp;
 	struct bmapval	*next_bmapp;
 	struct bmapval	*last_bmapp;
@@ -288,24 +285,22 @@ xfs_iomap_read(xfs_inode_t	*ip,
 
 	mp = XFS_VFSTOM(XFS_ITOV(ip)->v_vfsp);
 	sbp = &mp->m_sb;
-	isize = ip->i_d.di_size;
 	nisize = ip->i_new_size;
-	if (nisize < isize) {
-		nisize = isize;
+	if (nisize < ip->i_d.di_size) {
+		nisize = ip->i_d.di_size;
 	}
 	offset_fsb = xfs_b_to_fsbt(sbp, offset);
-	request_size = count;
 	nimaps = XFS_READ_IMAPS;
-	ASSERT(offset + count < nisize);
+	ASSERT(offset + count <= nisize);
 	last_fsb = xfs_b_to_fsb(sbp, nisize);
-	blocks = (xfs_extlen_t)(last_fsb - offset_fsb);
-	(void)xfs_bmapi(NULL, ip, offset_fsb, blocks,
+	(void)xfs_bmapi(NULL, ip, offset_fsb,
+			(xfs_extlen_t)(last_fsb - offset_fsb),
 			XFS_BMAPI_ENTIRE, NULLFSBLOCK, 0, imap,
 			&nimaps, NULL);
 
 
 	if ((offset == ip->i_next_offset) &&
-	    (request_size <= ip->i_last_req_sz)) {
+	    (count <= ip->i_last_req_sz)) {
 		/*
 		 * Sequential I/O of same size as last time.
 	 	 */
@@ -318,7 +313,7 @@ xfs_iomap_read(xfs_inode_t	*ip,
 		 * The I/O size for the file has not yet been
 		 * determined, so figure it out.
 		 */
-		if (xfs_b_to_fsb(sbp, request_size) < mp->m_readio_blocks) {
+		if (xfs_b_to_fsb(sbp, count) < mp->m_readio_blocks) {
 			/*
 			 * The request is smaller than our
 			 * minimum I/O size, so default to
@@ -352,8 +347,8 @@ xfs_iomap_read(xfs_inode_t	*ip,
 			 */
 			offset_page = ctob(btoct(xfs_fsb_to_b(sbp,
 							      offset_fsb)));
-			last_page = ctob(btoc(offset + count));
-			last_fsb = xfs_b_to_fsb(sbp, last_page);
+			last_fsb = xfs_b_to_fsb(sbp,
+						ctob(btoc(offset + count)));
 			iosize = last_fsb - xfs_b_to_fsbt(sbp, offset_page);
 			ioalign = xfs_b_to_fsb(sbp, offset_page);
 		}
@@ -508,7 +503,7 @@ xfs_iomap_read(xfs_inode_t	*ip,
 
 	ip->i_io_size = iosize;
 	ip->i_io_offset = last_required_offset;
-	if (request_size > ip->i_last_req_sz) {
+	if (count > ip->i_last_req_sz) {
 		/*
 		 * Record the "last request size" for the file.
 		 * We don't let it shrink so that big requests
@@ -516,7 +511,7 @@ xfs_iomap_read(xfs_inode_t	*ip,
 		 * record the full request size (not the smaller
 		 * one that comes in to finish mapping the request).
 		 */
-		ip->i_last_req_sz = request_size;
+		ip->i_last_req_sz = count;
 	}
 	if (total_retrieved_bytes >= count) {
 		/*
@@ -755,7 +750,8 @@ xfs_write_bmap(xfs_mount_t	*mp,
 		ext_offset = ioalign - imapp->br_startoff;
 		bmapp->offset = ioalign;
 	}
-	if (imapp->br_startblock != NULLSTARTBLOCK) {
+	ASSERT(imapp->br_startblock != HOLESTARTBLOCK);
+	if (imapp->br_startblock != DELAYSTARTBLOCK) {
 		bmapp->bn = imapp->br_startblock + ext_offset;
 		bmapp->eof = 0;
 	} else {
@@ -1209,7 +1205,7 @@ xfs_write_file(vnode_t	*vp,
 			}
 			if ((bmapp->pbsize != bmapp->bsize) &&
 			    !((bmapp->pboff == 0) &&
-			      (uiop->uio_offset == isize))) {
+			      (uiop->uio_offset >= isize))) {
 
 				bp = read_chunk(vp, bmapp, 1, delalloc,
 						credp);
@@ -1532,7 +1528,8 @@ xfs_strat_read(vnode_t	*vp,
 			       map_start_fsb);
 			imap_blocks = imap[x].br_blockcount;
 			ASSERT(imap_blocks <= count_fsb);
-			if (imap[x].br_startblock == NULLSTARTBLOCK) {
+			if ((imap[x].br_startblock == DELAYSTARTBLOCK) ||
+			    (imap[x].br_startblock == HOLESTARTBLOCK)) {
 				/*
 				 * This is either a hole or a delayed
 				 * alloc extent.  Either way, just fill
