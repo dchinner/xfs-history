@@ -32,6 +32,8 @@
 
 #ifdef SIM
 #include "sim.h"
+#include <stdio.h>
+#include <stdlib.h>
 #endif
 
 STATIC void	xfs_trans_apply_sb_deltas(xfs_trans_t *);
@@ -136,8 +138,15 @@ xfs_trans_reserve(xfs_trans_t	*tp,
 	 * Reserve the log space needed for this transaction.
 	 */
 	if (logspace > 0) {
-		(void) xfs_log_reserve(tp->t_mountp, logspace, &tp->t_ticket,
-				       XFS_TRANSACTION_MANAGER, flags);
+		status = xfs_log_reserve(tp->t_mountp, logspace,
+					 &tp->t_ticket,
+					 XFS_TRANSACTION_MANAGER, flags);
+#ifdef SIM
+		if (status != 0) {
+			printf("Log reservation failed\n");
+			abort();
+		}
+#endif
 		tp->t_log_res = logspace;
 	}
 
@@ -402,7 +411,7 @@ xfs_trans_commit_async(xfs_mount_t *mp)
 	}
 }
 
-#ifdef NOTYET
+#ifdef _LOG_DEBUG
 STATIC void
 xfs_trans_do_commit(xfs_trans_t	*tp,
 		    uint	flags)
@@ -454,9 +463,9 @@ xfs_trans_do_commit(xfs_trans_t	*tp,
 	 * then write the transaction to the log.
 	 */
 	xfs_trans_fill_vecs(tp, log_vector);
-	error = xfs_log_write(tp->t_mountp, log_vector, nvec, tp->t_ticket);
+	error = xfs_log_write(tp->t_mountp, log_vector, nvec, tp->t_ticket,
+			      &(tp->t_lsn));
 	ASSERT(error == 0);
-	tp->t_lsn = log_vector[0].i_lsn;
 	commit_lsn = xfs_log_done(tp->t_mountp, tp->t_ticket, 0);
 
 	kmem_free(log_vector, nvec * sizeof(xfs_log_iovec_t));
@@ -485,18 +494,13 @@ xfs_trans_do_commit(xfs_trans_t	*tp,
 	 * After this call we cannot reference tp, because the call
 	 * can happen at any time and tp can be freed.
 	 */
-	xfs_log_notify(mp, commit_lsn, (void(*)(void*))xfs_trans_committed, tp);
-}
-#endif
-#ifndef SIM
-STATIC void
-xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
-/* ARGSUSED */
-{
-	return;
+	tp->t_logcb.cb_func = (void(*)(void*))xfs_trans_committed;
+	tp->t_logcb.cb_arg = tp;
+	xfs_log_notify(tp->t_mountp, commit_lsn, &(tp->t_logcb));
 }
 
-#else
+#else /* _LOG_DEBUG */
+
 
 STATIC void
 xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
@@ -543,11 +547,9 @@ xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
 	 * then write the transaction to the log.
 	 */
 	xfs_trans_fill_vecs(tp, log_vector);
-	error = xfs_log_write(tp->t_mountp, log_vector, nvec, tp->t_ticket);
+	error = xfs_log_write(tp->t_mountp, log_vector, nvec, tp->t_ticket,
+			      &(tp->t_lsn));
 	ASSERT(error == 0);
-/*
-	tp->t_lsn = log_vector[0].i_lsn;
-*/
 	tp->t_lsn = trans_lsn++;
 /*
 	commit_lsn = xfs_log_done(tp->t_mountp, tp->t_ticket, 0);
@@ -578,7 +580,7 @@ xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
 	 */
 	xfs_trans_committed(tp);
 }
-#endif
+#endif /* _LOG_DEBUG */
 
 /*
  * Total up the number of log iovecs needed to commit this
