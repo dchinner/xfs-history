@@ -519,7 +519,7 @@ xfs_cmountfs(
 			 */
 			mp->m_logbufs = -1;
 			mp->m_logbsize = -1;
-			mp->m_fsname_len = ap ? 2 : 11;
+			mp->m_fsname_len = ap ? 11 : 2;
 			mp->m_fsname = kmem_alloc(mp->m_fsname_len, KM_SLEEP);
 			if (ap)
 				sprintf(mp->m_fsname, "0x%x", ddev);
