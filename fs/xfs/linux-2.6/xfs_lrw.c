@@ -146,19 +146,7 @@ xfs_rdwr(
 		/* if (!(ioflag & IO_INVIS)) add this somehow with DMAPI */
 			xfs_ichgtime(xip, XFS_ICHGTIME_ACC);
 	} else {
-		/* last zero eof */
-#ifdef XFS_DELALLOC
-		if ((filp->f_flags & O_SYNC) || (delay_alloc == 0)) {
-			ret = pagebuf_generic_file_write(filp,
-						buf, size, offsetp);
-		} else {
-			ret = pagebuf_generic_file_write_async(filp,
-						buf, size, offsetp);
-		}
-#else
 		ret = pagebuf_generic_file_write(filp, buf, size, offsetp);
-#endif
-	
 	}
 out:
 	return(ret);
@@ -333,12 +321,8 @@ xfs_zero_last_block(
 	 * If the block underlying isize is just a hole, then there
 	 * is nothing to zero.
 	 */
-#ifdef XFS_DELALLOC
-	if (imap.br_startblock == HOLESTARTBLOCK ||
-		imap.br_startblock == DELAYSTARTBLOCK)
-#else
-	if (imap.br_startblock == HOLESTARTBLOCK)
-#endif
+	if ((imap.br_startblock == HOLESTARTBLOCK) ||
+	    (imap.br_startblock == DELAYSTARTBLOCK))
 	{
 		return 0;
 	}
@@ -356,6 +340,9 @@ xfs_zero_last_block(
 	      ("zlb: pbget ip 0x%p loff 0x%Lx lsize 0x%x last_fsb 0x%Lx\n",
 		ip, loff, lsize, last_fsb));
 
+	zero_offset = isize_fsb_offset;
+	zero_len = mp->m_sb.sb_blocksize - isize_fsb_offset;
+
 	/*
 	 * JIMJIM what about the real-time device
 	 */
@@ -365,14 +352,15 @@ xfs_zero_last_block(
 		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
 		return error;
 	}
-	if (imap.br_startblock > 0) {
+	if ((imap.br_startblock > 0) ||
+	    (imap.br_startblock != DELAYSTARTBLOCK)) {
 		pb->pb_bn = XFS_FSB_TO_DB_IO(io, imap.br_startblock);
 		if (imap.br_state == XFS_EXT_UNWRITTEN) {
 			printk("xfs_zero_last_block: unwritten?\n");
 		}
 	} else {
-		printk("xfs_zero_last_block: delay alloc???\n");
-		error = -ENOSYS;
+		error = pagebuf_iozero(pb, zero_offset, zero_len);
+		pagebuf_rele(pb);
 		goto out_lock;
 	}
 
@@ -382,9 +370,6 @@ xfs_zero_last_block(
 			goto out_lock;
 		}
 	}
-
-	zero_offset = isize_fsb_offset;
-	zero_len = mp->m_sb.sb_blocksize - isize_fsb_offset;
 
 	dprintk(xfs_zlb_debug,
 	      ("zlb: pb_iozero pb 0x%p zf 0x%x zl 0x%x\n",
@@ -738,7 +723,6 @@ xfs_bmap(bhv_desc_t	*bdp,
 	int		unlocked;
 	int		lockmode;
 	int		fsynced;
-	int		ioflag = 0;	/* Needs to be passed in */
 	vnode_t		*vp;
 
 	ip = XFS_BHVTOI(bdp);
@@ -746,7 +730,6 @@ xfs_bmap(bhv_desc_t	*bdp,
 	ASSERT(((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0) ==
 	       ((ip->i_iocore.io_flags & XFS_IOCORE_RT) != 0));
 	ASSERT((flags & PBF_READ) || (flags & PBF_WRITE));
-
 
 	if (XFS_FORCED_SHUTDOWN(ip->i_iocore.io_mount))
 		return (EIO);
@@ -794,8 +777,8 @@ retry:
 				goto retry;
 			case 1:
 				fsynced = 2;
-				if (!(ioflag & O_SYNC)) {
-					ioflag |= O_SYNC;
+				if (!(flags & PBF_SYNC)) {
+					flags |= PBF_SYNC;
 					error = 0;
 					xfs_ilock(ip, XFS_ILOCK_EXCL);
 					goto retry;
@@ -1251,7 +1234,7 @@ xfs_iomap_write_delay(
 	 * We don't bother with this for sync writes, because we need
 	 * to minimize the amount we write for good performance.
 	 */
-	if (!(ioflag & IO_SYNC) && ((offset + count) > XFS_SIZE(mp, io))) {
+	if (!(ioflag & PBF_SYNC) && ((offset + count) > XFS_SIZE(mp, io))) {
 		start_fsb = XFS_B_TO_FSBT(mp,
 				  ((xfs_ufsize_t)(offset + count - 1)));
 		count_fsb = io->io_writeio_blocks;
@@ -1277,8 +1260,6 @@ xfs_iomap_write_delay(
 		iosize = io->io_writeio_blocks;
 		aligned_offset = XFS_WRITEIO_ALIGN(io, (offset + count - 1));
 		ioalign = XFS_B_TO_FSBT(mp, aligned_offset);
-		printk("xfs_iomap_write_delay change last_fsb %Ld to %Ld\n",
-			last_fsb, ioalign + iosize);
 		last_fsb = ioalign + iosize;
 		aeof = 1;
 	}
@@ -1328,7 +1309,7 @@ xfs_iomap_write_delay(
 		return XFS_ERROR(ENOSPC);
 	}
 
-	if (!(ioflag & IO_SYNC) ||
+	if (!(ioflag & PBF_SYNC) ||
 	    ((last_fsb - offset_fsb) >= io->io_writeio_blocks)) {
 		/*
 		 * For normal or large sync writes, align everything
