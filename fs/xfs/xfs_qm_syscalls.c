@@ -1,4 +1,4 @@
-#ident "$Revision: 1.27 $"
+#ident "$Revision: 1.28 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -1503,6 +1503,7 @@ xfs_qm_internalqcheck_adjust(
         xfs_ino_t       ino,            /* inode number to get data for */
         void            *buffer,        /* not used */
         daddr_t         bno,            /* starting block of inode cluster */	
+	void		*dip,		/* not used */
 	int		*res)		/* bulkstat result code */
 {
 	xfs_inode_t     	*ip;
@@ -1605,7 +1606,7 @@ xfs_qm_internalqcheck(
 		 */
 		if (error = xfs_bulkstat(mp, NULL, &lastino, &count, 
 				 xfs_qm_internalqcheck_adjust,
-				 0, NULL, &done)) {
+				 0, NULL, BULKSTAT_FG_IGET, &done)) {
 			break;
 		}
 	} while (! done);
