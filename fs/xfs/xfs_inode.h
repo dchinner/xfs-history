@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.106 $"
+#ident "$Revision: 1.107 $"
 
 struct bhv_desc;
 struct buf;
@@ -148,7 +148,8 @@ typedef struct xfs_inode {
 
 	/* Miscellaneous state. */
 	unsigned short		i_flags;	/* see defined flags below */
-	unsigned short		i_update_core;	/* timestamps are dirty */
+	unsigned short		i_update_core;	/* timestamps/size is dirty */
+	unsigned short		i_update_size;	/* di_size field is dirty */
 	int			i_queued_bufs;	/* count of xfsd queued bufs*/
 	unsigned int		i_gen;		/* generation count */
 	unsigned int		i_delayed_blks;	/* count of delay alloc blks */
@@ -404,6 +405,7 @@ void		xfs_iext_realloc(xfs_inode_t *, int, int);
 void		xfs_iroot_realloc(xfs_inode_t *, int, int);
 void		xfs_ipin(xfs_inode_t *);
 void		xfs_iunpin(xfs_inode_t *);
+unsigned int	xfs_ipincount(xfs_inode_t *);
 int		xfs_iextents_copy(xfs_inode_t *, xfs_bmbt_rec_32_t *, int);
 int		xfs_iflush(xfs_inode_t *, uint);
 int		xfs_iflush_all(struct xfs_mount *, int);
