@@ -42,6 +42,7 @@
 #include <linux/locks.h>
 #include <linux/xfs_iops.h>
 #include <linux/xfs_file.h>
+#include <linux/attributes.h>
 
 
 /*
@@ -453,106 +454,85 @@ int linvfs_follow_link(struct dentry *dentry,
 	return error;
 }
 
-
-int linvfs_attr_get(
-		struct dentry	*dentry,
-		char		*attr_name,
-		char		*attr_val,
-		int		*attr_val_len,
-		int		flags)
+/*
+ * Implement attrctl(2) functions.
+ * Returns -ve on error (ie -ENOMEM).
+ * Updates ops[?].error fields with a +ve errno (ie +ENOMEM).
+ */
+int linvfs_attrctl(
+		   struct inode	*inode,
+		   attr_op_t	*ops,
+		   int		count)
 {
+	int	i;
 	int	error = 0;
 	vnode_t	*vp;
 
-	if ((flags & (ATTR_ROOT|ATTR_DONTFOLLOW)) != flags)
-		return -EINVAL;
+	for (i = 0; i < count; i++) {
+		int flags = ops[i].flags;
+		/* common flags */
+		flags &= ~(ATTR_ROOT | ATTR_DONTFOLLOW);
+		/* command specific */
+		if (ops[i].opcode == ATTR_OP_SET)
+			flags &= ~(ATTR_CREATE | ATTR_REPLACE);
+		if (flags != 0x0)
+			return -EINVAL;
 
-	if ((flags & ATTR_ROOT) && (!capable(CAP_SYS_ADMIN)))
-		return -EPERM;
+		/* permissions */
+		if ((ops[i].flags & ATTR_ROOT) && ! capable(CAP_SYS_ADMIN))
+			return -EPERM;
 
-	vp = LINVFS_GET_VP(dentry->d_inode);
-	ASSERT(vp);
+		vp = LINVFS_GET_VP(inode);
+		ASSERT(vp);
 
-	VOP_ATTR_GET(vp, attr_name, attr_val, attr_val_len,
-						flags, NULL, error);
-	return -error;
-}
+		switch (ops[i].opcode) {
+		case ATTR_OP_GET:
+			VOP_ATTR_GET(vp,
+				     ops[i].name,
+				     ops[i].value,
+				     &ops[i].length,
+				     ops[i].flags,
+				     (struct cred *) NULL,
+				     ops[i].error);	/* +ve return val */
+			break;
 
+		case ATTR_OP_SET:
+			VOP_ATTR_SET(vp,
+				     ops[i].name,
+				     ops[i].value,
+				     ops[i].length,
+				     ops[i].flags,
+				     (struct cred *) NULL,
+				     ops[i].error);
+			break;
 
-int linvfs_attr_set(
-		struct dentry	*dentry,
-		char		*attr_name,
-		char		*attr_val,
-		int		attr_val_len,
-		int		flags)
-{
-	int	error = 0;
-	vnode_t	*vp;
+		case ATTR_OP_REMOVE:
+			VOP_ATTR_REMOVE(vp,
+					ops[i].name,
+					ops[i].flags,
+					(struct cred *) NULL,
+					ops[i].error);
+			break;
+					
+		case ATTR_OP_IRIX_LIST:
+			VOP_ATTR_LIST(vp,
+				      ops[i].value,
+				      ops[i].length,
+				      ops[i].flags,
+				      ops[i].aux,
+				      (struct cred *) NULL,
+				      ops[i].error);
+			break;
 
-	if ((flags & (ATTR_ROOT|ATTR_DONTFOLLOW|ATTR_CREATE|ATTR_REPLACE))
-								!= flags) {
-		return -EINVAL;
+		case ATTR_OP_LIST:
+		default:
+			error = ENOSYS;
+		}
+
 	}
-
-	if ((flags & ATTR_ROOT) && (!capable(CAP_SYS_ADMIN)))
-		return -EPERM;
-
-	vp = LINVFS_GET_VP(dentry->d_inode);
-	ASSERT(vp);
-
-	VOP_ATTR_SET(vp, attr_name, attr_val, attr_val_len,
-						flags, NULL, error);
+			
 	return -error;
 }
-
-
-int linvfs_attr_remove(
-		struct dentry	*dentry,
-		char		*attr_name,
-		int		flags)
-{
-	int	error = 0;
-	vnode_t	*vp;
-
-	if ((flags & (ATTR_ROOT|ATTR_DONTFOLLOW)) != flags)
-		return -EINVAL;
-
-	if ((flags & ATTR_ROOT) && (!capable(CAP_SYS_ADMIN)))
-		return -EPERM;
-
-	vp = LINVFS_GET_VP(dentry->d_inode);
-	ASSERT(vp);
-
-	VOP_ATTR_REMOVE(vp, attr_name, flags, NULL, error);
-
-	return -error;
-}
-
-
-int linvfs_attr_list(
-		struct dentry	*dentry,
-		char		*buffer,
-		int		buffer_size,
-		int		flags,
-		void		*cursor)
-{
-	int	error = 0;
-	vnode_t	*vp;
-
-	if ((flags & (ATTR_ROOT|ATTR_DONTFOLLOW)) != flags)
-		return -EINVAL;
-
-	if ((flags & ATTR_ROOT) && (!capable(CAP_SYS_ADMIN)))
-		return -EPERM;
-
-	vp = LINVFS_GET_VP(dentry->d_inode);
-	ASSERT(vp);
-
-	VOP_ATTR_LIST(vp, buffer, buffer_size, flags, cursor, NULL, error);
-
-	return -error;
-}
-
 
 int linvfs_permission(struct inode *ip, int mode)
 {
@@ -838,10 +818,7 @@ struct inode_operations linvfs_file_inode_operations =
   setattr:		linvfs_notify_change,
   pagebuf_bmap:		linvfs_pb_bmap,
   pagebuf_fileread:	linvfs_file_read,
-  attr_get:		linvfs_attr_get,
-  attr_set:		linvfs_attr_set,
-  attr_remove:		linvfs_attr_remove,
-  attr_list:		linvfs_attr_list,
+  attrctl:		linvfs_attrctl,
 };
 
 struct inode_operations linvfs_dir_inode_operations =
@@ -858,10 +835,7 @@ struct inode_operations linvfs_dir_inode_operations =
   permission:		linvfs_permission,
   revalidate:		linvfs_revalidate,
   setattr:		linvfs_notify_change,
-  attr_get:		linvfs_attr_get,
-  attr_set:		linvfs_attr_set,
-  attr_remove:		linvfs_attr_remove,
-  attr_list:		linvfs_attr_list,
+  attrctl:		linvfs_attrctl,
 };
 
 struct inode_operations linvfs_symlink_inode_operations =
@@ -871,9 +845,6 @@ struct inode_operations linvfs_symlink_inode_operations =
   permission:		linvfs_permission,
   revalidate:		linvfs_revalidate,
   setattr:		linvfs_notify_change,
-  attr_get:		linvfs_attr_get,
-  attr_set:		linvfs_attr_set,
-  attr_remove:		linvfs_attr_remove,
-  attr_list:		linvfs_attr_list,
+  attrctl:		linvfs_attrctl,
 };
 
