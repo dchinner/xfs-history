@@ -36,6 +36,9 @@ ifeq ($(CONFIG_XFS_DEBUG),y)
 	EXTRA_CFLAGS += -g -DDEBUG -DXFSDEBUG
 	#EXTRA_CFLAGS += -DQUOTADEBUG
 endif
+ifeq ($(CONFIG_XFS_TRACE),y)
+	EXTRA_CFLAGS += -DXFS_DQUOT_TRACE
+endif
 
 O_TARGET			:= xfs_quota.o
 ifneq ($(MAKECMDGOALS),modules_install)
