@@ -272,7 +272,7 @@ prohibited_mr_events(
 	spin_unlock(&mapping->i_mmap_lock);
 #else
 	spin_lock(&mapping->i_shared_lock);
-	for (vma = mapping->i_mmap_shared; vma; vma = vma->vm_next) {
+	for (vma = mapping->i_mmap_shared; vma; vma = vma->vm_next_share) {
 		if (!(vma->vm_flags & VM_DENYWRITE)) {
 			prohibited |= (1 << DM_EVENT_WRITE);
 			break;
