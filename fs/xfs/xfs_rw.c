@@ -583,7 +583,7 @@ xfs_iomap_extra(
 		 * something to keep the chunk cache happy.
 		 */
 		ASSERT(count <= NBPP);
-		end_fsb = XFS_B_TO_FSB(mp, (offset + count));
+		end_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)(offset + count)));
 		nimaps = 1;
 		(void) xfs_bmapi(NULL, ip, offset_fsb,
 				 (xfs_filblks_t)(end_fsb - offset_fsb),
@@ -680,7 +680,7 @@ xfs_iomap_read(
 	}
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	nimaps = XFS_READ_IMAPS;
-	last_fsb = XFS_B_TO_FSB(mp, nisize);
+	last_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)nisize));
 	if (offset >= nisize) {
 		/*
 		 * The VM/chunk code is trying to map a page or part
@@ -700,7 +700,7 @@ xfs_iomap_read(
 	 * created in xfs_iomap_write() which extend beyond the end of
 	 * the file.
 	 */
-	max_fsb = XFS_B_TO_FSBT(mp, XFS_MAX_FILE_OFFSET);
+	max_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)XFS_MAX_FILE_OFFSET);
 	(void)xfs_bmapi(NULL, ip, offset_fsb,
 			(xfs_filblks_t)(max_fsb - offset_fsb),
 			XFS_BMAPI_ENTIRE, NULLFSBLOCK, 0, imap,
@@ -1114,8 +1114,10 @@ xfs_read(
 	xfs_inode_t	*ip;
 	int		type;
 	off_t		offset;
+	off_t		n;
 	size_t		count;
 	int		error;
+	size_t		resid;
 
 
 	ip = XFS_VTOI(vp);
@@ -1143,6 +1145,23 @@ xfs_read(
 	switch (type) {
 	case IFREG:
 		/*
+		 * Don't allow reads to pass down counts which could
+		 * overflow.  Be careful to record the part that we
+		 * refuse so that we can add it back into uio_resid
+		 * so that the caller will see a short read.
+		 */
+		n = XFS_MAX_FILE_OFFSET - offset;
+		if (n <= 0) {
+			return 0;
+		}
+		if (n < uiop->uio_resid) {
+			resid = uiop->uio_resid - n;
+			uiop->uio_resid = n;
+		} else {
+			resid = 0;
+		}
+			    
+		/*
 		 * Not ready for in-line files yet.
 		 */
 		ASSERT((ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS) ||
@@ -1159,7 +1178,7 @@ xfs_read(
 #endif
 		id.ino = ip->i_ino;
 		if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_READ) &&
-				!(ioflag & IO_INVIS)) {
+		    !(ioflag & IO_INVIS)) {
 			if (error = dm_data_event(vp, DM_READ, offset, count))
 				return error;
 		}
@@ -1169,6 +1188,13 @@ xfs_read(
 		/* don't update timestamps if doing invisible I/O */
 		if (!(ioflag & IO_INVIS))
 			xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
+
+		/*
+		 * Add back whatever we refused to do because of file
+		 * size limitations.
+		 */
+		uiop->uio_resid += resid;
+
 		break;
 
 	case IFDIR:
@@ -1420,7 +1446,7 @@ xfs_zero_eof(
 	 * exactly on a block boundary.
 	 */
 	last_fsb = XFS_B_TO_FSBT(mp, isize - 1);
-	start_zero_fsb = XFS_B_TO_FSB(mp, isize);
+	start_zero_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)isize));
 	end_zero_fsb = XFS_B_TO_FSBT(mp, offset - 1);
 	ASSERT(last_fsb < start_zero_fsb);
 	if (last_fsb == end_zero_fsb) {
@@ -1537,7 +1563,7 @@ xfs_iomap_write(
 	}
 
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
-	last_fsb = XFS_B_TO_FSB(mp, offset + count);
+	last_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)(offset + count)));
 	/*
 	 * If the caller is doing a write at the end of the file,
 	 * then extend the allocation (and the buffer used for the write)
@@ -1620,7 +1646,7 @@ xfs_iomap_write(
 	 * request.  We do this until we run out of bmaps, imaps,
 	 * or bytes to write.
 	 */
-	last_file_fsb = XFS_B_TO_FSB(mp, isize);
+	last_file_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)isize));
 	filled_bmaps = 1;
 	if ((*nbmaps > 1) &&
 	    ((nimaps > 1) || (bmapp->offset + bmapp->length <
@@ -1728,7 +1754,8 @@ xfs_iomap_write(
 			 */
 			bmap_end_fsb = curr_bmapp->offset +
 				       curr_bmapp->length;
-			if (XFS_FSB_TO_B(mp, bmap_end_fsb) >= isize) {
+			if (((xfs_ufsize_t)XFS_FSB_TO_B(mp, bmap_end_fsb)) >=
+			    (xfs_ufsize_t)isize) {
 				curr_bmapp->eof |= BMAP_EOF;
 			}
 			xfs_iomap_map_trace(XFS_IOMAP_WRITE_MAP, ip, offset,
@@ -1791,8 +1818,8 @@ xfs_write_file(
 	 * buffered I/O cannot be performed.
 	 * This check will be removed in the future.
 	 */
-	if ( 	(ip->i_d.di_extsize) || 
-		(ip->i_d.di_flags & XFS_DIFLAG_REALTIME))  {
+	if ((ip->i_d.di_extsize) || 
+	    (ip->i_d.di_flags & XFS_DIFLAG_REALTIME))  {
 		return( EINVAL );
 	}
 
@@ -2078,6 +2105,7 @@ xfs_write(
 	off_t		n;
 	int		resid;
 	off_t		savedsize;
+	xfs_fsize_t	limit;
 	int		eventsent = 0;
 
 
@@ -2110,7 +2138,7 @@ start:
 	}
 #endif
 
-	if ((offset < 0) || ((offset + count) > XFS_MAX_FILE_OFFSET)) {
+	if (offset < 0) {
 		return XFS_ERROR(EINVAL);
 	}
 	if (count <= 0) {
@@ -2119,7 +2147,9 @@ start:
 
 	switch (type) {
 	case IFREG:
-		n = uiop->uio_limit - uiop->uio_offset;
+		limit = ((uiop->uio_limit > XFS_MAX_FILE_OFFSET) ?
+			 uiop->uio_limit : XFS_MAX_FILE_OFFSET);
+		n = limit - uiop->uio_offset;
 		if (n <= 0) {
 			return XFS_ERROR(EFBIG);
 		}
@@ -2461,7 +2491,7 @@ xfs_build_gap_list(
 
 	mp = ip->i_mount;
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
-	last_fsb = XFS_B_TO_FSB(mp, (offset + count));
+	last_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)(offset + count)));
 	count_fsb = (xfs_filblks_t)(last_fsb - offset_fsb);
 	ASSERT(count_fsb > 0);
 
@@ -2809,7 +2839,7 @@ xfs_strat_read(
 	 * can't do a simple shift to find the number of blocks underlying
 	 * it.  Instead we subtract the last block it sits on from the first.
 	 */
-	count_fsb = XFS_B_TO_FSB(mp, (offset + count)) -
+	count_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)(offset + count))) -
 		    XFS_B_TO_FSBT(mp, offset);
 	map_start_fsb = offset_fsb;
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
