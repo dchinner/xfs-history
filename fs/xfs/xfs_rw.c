@@ -1,4 +1,4 @@
-#ident "$Revision: 1.235 $"
+#ident "$Revision: 1.236 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -5998,7 +5998,6 @@ xfs_diordwr(
 	/*
  	 * Free local buf structure.
  	 */
-	bp->b_flags = 0;
 
 	if (BUF_IS_GRIO(bp) || BUF_IS_PRIO(bp)) {
 
@@ -6012,6 +6011,8 @@ xfs_diordwr(
 		bp->b_flags &= ~(B_GR_BUF|B_PRIO_BUF);
 	}
 
+	ASSERT((bp->b_flags & B_MAPPED) == 0);
+	bp->b_flags = 0;
 #ifdef SIM
 	bp->b_un.b_addr = 0;
 #endif
