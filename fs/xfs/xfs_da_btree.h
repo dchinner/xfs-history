@@ -90,7 +90,7 @@ struct zone;
 /*
  * Structure to ease passing around component names.
  */
-typedef struct xfs_da_name {
+typedef struct xfs_da_args {
 	char		*name;		/* string (maybe not NULL terminated) */
 	int		namelen;	/* length of string (maybe no NULL) */
 	char		*value;		/* set of bytes (maybe contain NULLs) */
@@ -103,7 +103,10 @@ typedef struct xfs_da_name {
 	struct xfs_bmap_free *flist;	/* ptr to freelist for bmap_finish */
 	xfs_extlen_t	total;		/* total blocks needed, for 1st bmap */
 	int		whichfork;	/* data or attribute fork */
-} xfs_da_name_t;
+	int		aleaf_blkno;	/* blkno of attr leaf of interest */
+	int		aleaf_index;	/* index of attr of interest in blk */
+	int		aleaf_rmtblkno;	/* remote attr value starting blkno */
+} xfs_da_args_t;
 
 /*
  * Storage for holding state during Btree searches and split/join ops.
@@ -124,7 +127,7 @@ typedef struct xfs_da_state_path {
 	struct xfs_da_state_blk	blk[XFS_DA_NODE_MAXDEPTH];
 } xfs_da_state_path_t;
 typedef struct xfs_da_state {
-	struct xfs_da_name	 *args;		/* filename arguments */
+	struct xfs_da_args	 *args;		/* filename arguments */
 	struct xfs_mount	 *mp;		/* filesystem mount point */
 	struct xfs_trans	 *trans;	/* transaction context */
 	int			 blocksize;	/* logical block size */
@@ -182,7 +185,7 @@ int	xfs_da_blk_link(struct xfs_da_state *state,
 /*
  * Utility routines.
  */
-int	xfs_da_grow_inode(struct xfs_trans *trans, struct xfs_da_name *args,
+int	xfs_da_grow_inode(struct xfs_trans *trans, struct xfs_da_args *args,
 				 int length, xfs_fileoff_t *new_blkno);
 int	xfs_da_get_buf(struct xfs_trans *trans, struct xfs_inode *dp,
 			      xfs_fileoff_t bno, struct buf **bp,
@@ -191,7 +194,7 @@ int	xfs_da_read_buf(struct xfs_trans *trans, struct xfs_inode *dp,
 			       xfs_fileoff_t bno, struct buf **bpp,
 			       int whichfork);
 #ifndef SIM
-int	xfs_da_shrink_inode(struct xfs_trans *trans, struct xfs_da_name *args,
+int	xfs_da_shrink_inode(struct xfs_trans *trans, struct xfs_da_args *args,
 				   xfs_fileoff_t dead_blkno,
 				   int length, struct buf *dead_buf);
 #endif	/* !SIM */
