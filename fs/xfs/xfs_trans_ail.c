@@ -1,4 +1,4 @@
-#ident "$Revision: 1.31 $"
+#ident "$Revision: 1.32 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -85,7 +85,6 @@ xfs_trans_tail_ail(
 }
 
 
-
 /*
  * xfs_trans_push_ail
  *
@@ -106,8 +105,12 @@ xfs_trans_push_ail(
 	int			restarts;
 	int			lock_result;
 	int			flush_log;
+	int			ntries;
 	SPLDECL(s);
+
 #define	XFS_TRANS_PUSH_AIL_RESTARTS	10
+#define XFS_TRANS_PUSH_AIL_NTRIES	200
+#define XFS_TRANS_ITEM_FLUSH_INCRS	10
 
 	AIL_LOCK(mp,s);
 	lip = xfs_trans_first_ail(mp, &gen);
@@ -123,12 +126,15 @@ xfs_trans_push_ail(
 	 * While the item we are looking at is below the given threshold
 	 * try to flush it out.  Make sure to limit the number of times
 	 * we allow xfs_trans_next_ail() to restart scanning from the
-	 * beginning of the list.  We can't stop until we've at least
+	 * beginning of the list.  We'd like not to stop until we've at least
 	 * tried to push on everything in the AIL with an LSN less than
-	 * the given threshold.
+	 * the given threshold. However, we may give up before that if
+	 * we realize that we've been holding the AIL_LOCK for 'too long',
+	 * blocking interrupts. Currently, too long is < 500us roughly.
 	 */
 	flush_log = 0;
 	restarts = 0;
+	ntries = 0;
 	while (((restarts < XFS_TRANS_PUSH_AIL_RESTARTS) &&
 		(XFS_LSN_CMP(lip->li_lsn, threshold_lsn) < 0))) {
 		/*
@@ -147,16 +153,23 @@ xfs_trans_push_ail(
 		 */
 		lock_result = IOP_TRYLOCK(lip);
 		switch (lock_result) {
-		case XFS_ITEM_SUCCESS:
+		      case XFS_ITEM_SUCCESS:
 			AIL_UNLOCK(mp, s);
 			IOP_PUSH(lip);
+			ntries = 0;
 			AIL_LOCK(mp,s);
 			break;
-		case XFS_ITEM_PINNED:
+
+		      case XFS_ITEM_PINNED:
 			flush_log = 1;
+			ntries++;
 			break;
-		case XFS_ITEM_LOCKED:
-		case XFS_ITEM_FLUSHING:
+
+		      case XFS_ITEM_LOCKED:
+			ntries += 2;
+			break;
+
+		      case XFS_ITEM_FLUSHING:
 #ifdef NOTYET
 			/*
 			 * Flush the log in this case just in case the
@@ -166,9 +179,29 @@ xfs_trans_push_ail(
 			 */
 			flush_log = 1;
 #endif
+			/*
+			 * We may have spent a long time in buffercache 
+			 * trying to figure out if this item is being 
+			 * flushed or not. The relatively larger increment
+			 * here 'heuristically' compensates for that.
+			 */
+			ntries += XFS_TRANS_ITEM_FLUSH_INCRS;
 			break;
-		default:
+
+		      default:
 			ASSERT(0);
+			break;
+		}
+
+		/*
+		 * If we have been holding the AIL_LOCK (thereby holding off
+		 * interrupts) for 'too long', let go. The other alternative
+		 * was to drop the lock, re-aquire it and keep going; 
+		 * but, there wasn't enough justification for that, except
+		 * under some 'unreasonably' heavy log-bound traffic. This seems
+		 * to perform fine in most 'regular loads'.
+		 */
+		if (ntries > XFS_TRANS_PUSH_AIL_NTRIES) {
 			break;
 		}
 
