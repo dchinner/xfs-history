@@ -1,7 +1,7 @@
 #ifndef _XFS_DQUOT__H_
 #define _XFS_DQUOT__H_
 
-#ident "$Revision: 1.1 $"
+#ident "$Revision: 1.2 $"
 
 /* 
  * Dquots are structures that hold quota information about a user or a project,
@@ -237,8 +237,7 @@ extern void 		xfs_qm_dqprint(xfs_dquot_t *);
 extern xfs_dquot_t 	*xfs_qm_dqinit(xfs_mount_t *, xfs_dqid_t, uint);
 extern void		xfs_qm_dqdestroy(xfs_dquot_t *);
 extern int		xfs_qm_dqflush(xfs_dquot_t *, uint);
-extern xfs_dquot_t *	xfs_qm_dqpurge(xfs_dquot_t *, uint);
-extern void		xfs_qm_dettach_pdquot(xfs_dquot_t *);
+extern xfs_dquot_t *	xfs_qm_dqpurge(xfs_dquot_t *);
 extern void		xfs_qm_dqpin(xfs_dquot_t *);
 extern void		xfs_qm_dqunpin(xfs_dquot_t *);
 extern void		xfs_qm_dqunpin_wait(xfs_dquot_t *);
