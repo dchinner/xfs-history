@@ -2780,12 +2780,12 @@ xfsidbg_xdanode(struct xfs_da_intnode *node)
 	h = &node->hdr;
 	i = &h->info;
 	printk("hdr info forw 0x%x back 0x%x magic 0x%x\n",
-		i->forw, i->back, i->magic);
+		INT_GET(i->forw, ARCH_UNKNOWN), INT_GET(i->back, ARCH_UNKNOWN), INT_GET(i->magic, ARCH_UNKNOWN));
 	printk("hdr count %d level %d\n",
-		h->count, h->level);
-	for (j = 0, e = node->btree; j < h->count; j++, e++) {
+		INT_GET(h->count, ARCH_UNKNOWN), INT_GET(h->level, ARCH_UNKNOWN));
+	for (j = 0, e = node->btree; j < INT_GET(h->count, ARCH_UNKNOWN); j++, e++) {
 		printk("btree %d hashval 0x%x before 0x%x\n",
-			j, (uint_t)e->hashval, e->before);
+			j, (uint_t)INT_GET(e->hashval, ARCH_UNKNOWN), INT_GET(e->before, ARCH_UNKNOWN));
 	}
 }
 
@@ -2835,18 +2835,18 @@ xfsidbg_xdirleaf(xfs_dir_leafblock_t *leaf)
 	h = &leaf->hdr;
 	i = &h->info;
 	printk("hdr info forw 0x%x back 0x%x magic 0x%x\n",
-		i->forw, i->back, i->magic);
+		INT_GET(i->forw, ARCH_UNKNOWN), INT_GET(i->back, ARCH_UNKNOWN), INT_GET(i->magic, ARCH_UNKNOWN));
 	printk("hdr count %d namebytes %d firstused %d holes %d\n",
-		h->count, h->namebytes, h->firstused, h->holes);
+		INT_GET(h->count, ARCH_UNKNOWN), INT_GET(h->namebytes, ARCH_UNKNOWN), INT_GET(h->firstused, ARCH_UNKNOWN), h->holes);
 	for (j = 0, m = h->freemap; j < XFS_DIR_LEAF_MAPSIZE; j++, m++) {
 		printk("hdr freemap %d base %d size %d\n",
-			j, m->base, m->size);
+			j, INT_GET(m->base, ARCH_UNKNOWN), INT_GET(m->size, ARCH_UNKNOWN));
 	}
-	for (j = 0, e = leaf->entries; j < h->count; j++, e++) {
-		n = XFS_DIR_LEAF_NAMESTRUCT(leaf, e->nameidx);
-		XFS_DIR_SF_GET_DIRINO(&n->inumber, &ino);
+	for (j = 0, e = leaf->entries; j < INT_GET(h->count, ARCH_UNKNOWN); j++, e++) {
+		n = XFS_DIR_LEAF_NAMESTRUCT(leaf, INT_GET(e->nameidx, ARCH_UNKNOWN));
+		XFS_DIR_SF_GET_DIRINO_ARCH(&n->inumber, &ino, ARCH_UNKNOWN);
 		printk("leaf %d hashval 0x%x nameidx %d inumber %Ld ",
-			j, (uint_t)e->hashval, e->nameidx, ino);
+			j, (uint_t)INT_GET(e->hashval, ARCH_UNKNOWN), INT_GET(e->nameidx, ARCH_UNKNOWN), ino);
 		printk("namelen %d name \"", e->namelen);
 		for (k = 0; k < e->namelen; k++)
 			printk("%c", n->name[k]);
@@ -2875,11 +2875,11 @@ xfs_dir2data(void *addr, int size)
 	db = (xfs_dir2_data_t *)addr;
 	bb = (xfs_dir2_block_t *)addr;
 	h = &db->hdr;
-	printk("hdr magic 0x%x (%s)\nhdr bestfree", h->magic,
+	printk("hdr magic 0x%x (%s)\nhdr bestfree", INT_GET(h->magic, ARCH_UNKNOWN),
 		INT_GET(h->magic, ARCH_UNKNOWN) == XFS_DIR2_DATA_MAGIC ? "DATA" :
 			(INT_GET(h->magic, ARCH_UNKNOWN) == XFS_DIR2_BLOCK_MAGIC ? "BLOCK" : ""));
 	for (j = 0, m = h->bestfree; j < XFS_DIR2_DATA_FD_COUNT; j++, m++) {
-		printk(" %d: 0x%x@0x%x", j, m->length, m->offset);
+		printk(" %d: 0x%x@0x%x", j, INT_GET(m->length, ARCH_UNKNOWN), INT_GET(m->offset, ARCH_UNKNOWN));
 	}
 	printk("\n");
 	if (INT_GET(h->magic, ARCH_UNKNOWN) == XFS_DIR2_DATA_MAGIC)
@@ -2895,14 +2895,14 @@ xfs_dir2data(void *addr, int size)
 		u = (xfs_dir2_data_unused_t *)p;
 		if (u->freetag == XFS_DIR2_DATA_FREE_TAG) {
 			printk("0x%x unused freetag 0x%x length 0x%x tag 0x%x\n",
-				p - (char *)addr, u->freetag, u->length,
+				p - (char *)addr, INT_GET(u->freetag, ARCH_UNKNOWN), INT_GET(u->length, ARCH_UNKNOWN),
 				*XFS_DIR2_DATA_UNUSED_TAG_P_ARCH(u, ARCH_UNKNOWN));
-			p += u->length;
+			p += INT_GET(u->length, ARCH_UNKNOWN);
 			continue;
 		}
 		e = (xfs_dir2_data_entry_t *)p;
 		printk("0x%x entry inumber %Ld namelen %d name \"",
-			p - (char *)addr, e->inumber, e->namelen);
+			p - (char *)addr, INT_GET(e->inumber, ARCH_UNKNOWN), e->namelen);
 		for (k = 0; k < e->namelen; k++)
 			printk("%c", e->name[k]);
 		printk("\" tag 0x%x\n", *XFS_DIR2_DATA_ENTRY_TAG_P(e));
@@ -2913,12 +2913,12 @@ xfs_dir2data(void *addr, int size)
 	for (j = 0; j < tail->count; j++, l++) {
 		printk("0x%x leaf %d hashval 0x%x address 0x%x (byte 0x%x)\n",
 			(char *)l - (char *)addr, j,
-			(uint_t)l->hashval, l->address,
+			(uint_t)INT_GET(l->hashval, ARCH_UNKNOWN), INT_GET(l->address, ARCH_UNKNOWN),
 			/* XFS_DIR2_DATAPTR_TO_BYTE */
 			l->address << XFS_DIR2_DATA_ALIGN_LOG);
 	}
 	printk("0x%x tail count %d\n",
-		(char *)tail - (char *)addr, tail->count);
+		(char *)tail - (char *)addr, INT_GET(tail->count, ARCH_UNKNOWN));
 }
 
 static void
@@ -2935,25 +2935,25 @@ xfs_dir2leaf(xfs_dir2_leaf_t *leaf, int size)
 	i = &h->info;
 	e = leaf->ents;
 	printk("hdr info forw 0x%x back 0x%x magic 0x%x\n",
-		i->forw, i->back, i->magic);
-	printk("hdr count %d stale %d\n", h->count, h->stale);
-	for (j = 0; j < h->count; j++, e++) {
+		INT_GET(i->forw, ARCH_UNKNOWN), INT_GET(i->back, ARCH_UNKNOWN), INT_GET(i->magic, ARCH_UNKNOWN));
+	printk("hdr count %d stale %d\n", INT_GET(h->count, ARCH_UNKNOWN), INT_GET(h->stale, ARCH_UNKNOWN));
+	for (j = 0; j < INT_GET(h->count, ARCH_UNKNOWN); j++, e++) {
 		printk("0x%x ent %d hashval 0x%x address 0x%x (byte 0x%x)\n",
 			(char *)e - (char *)leaf, j,
-			(uint_t)e->hashval, e->address,
+			(uint_t)INT_GET(e->hashval, ARCH_UNKNOWN), INT_GET(e->address, ARCH_UNKNOWN),
 			/* XFS_DIR2_DATAPTR_TO_BYTE */
-			e->address << XFS_DIR2_DATA_ALIGN_LOG);
+			INT_GET(e->address, ARCH_UNKNOWN) << XFS_DIR2_DATA_ALIGN_LOG);
 	}
 	if (INT_GET(i->magic, ARCH_UNKNOWN) == XFS_DIR2_LEAFN_MAGIC)
 		return;
 	/* XFS_DIR2_LEAF_TAIL_P */
 	t = (xfs_dir2_leaf_tail_t *)((char *)leaf + size - sizeof(*t));
 	b = XFS_DIR2_LEAF_BESTS_P_ARCH(t, ARCH_UNKNOWN);
-	for (j = 0; j < t->bestcount; j++, b++) {
+	for (j = 0; j < INT_GET(t->bestcount, ARCH_UNKNOWN); j++, b++) {
 		printk("0x%x best %d 0x%x\n",
-			(char *)b - (char *)leaf, j, *b);
+			(char *)b - (char *)leaf, j, INT_GET(*b, ARCH_UNKNOWN));
 	}
-	printk("tail bestcount %d\n", t->bestcount);
+	printk("tail bestcount %d\n", INT_GET(t->bestcount, ARCH_UNKNOWN));
 }
 
 /*
@@ -2972,7 +2972,7 @@ xfsidbg_xdirsf(xfs_dir_shortform_t *s)
 	printk("hdr parent %Ld", ino);
 	printk(" count %d\n", sfh->count);
 	for (i = 0, sfe = s->list; i < sfh->count; i++) {
-		XFS_DIR_SF_GET_DIRINO(&sfe->inumber, &ino);
+		XFS_DIR_SF_GET_DIRINO_ARCH(&sfe->inumber, &ino, ARCH_UNKNOWN);
 		printk("entry %d inumber %Ld", i, ino);
 		printk(" namelen %d name \"", sfe->namelen);
 		for (j = 0; j < sfe->namelen; j++)
@@ -3017,10 +3017,10 @@ xfsidbg_xdir2free(xfs_dir2_free_t *f)
 	int	i;
 
 	printk("hdr magic 0x%x firstdb %d nvalid %d nused %d\n",
-		f->hdr.magic, f->hdr.firstdb, f->hdr.nvalid, f->hdr.nused);
-	for (i = 0; i < f->hdr.nvalid; i++) {
+		INT_GET(f->hdr.magic, ARCH_UNKNOWN), INT_GET(f->hdr.firstdb, ARCH_UNKNOWN), INT_GET(f->hdr.nvalid, ARCH_UNKNOWN), INT_GET(f->hdr.nused, ARCH_UNKNOWN));
+	for (i = 0; i < INT_GET(f->hdr.nvalid, ARCH_UNKNOWN); i++) {
 		printk("entry %d db %d count %d\n",
-			i, i + f->hdr.firstdb, f->bests[i]);
+			i, i + INT_GET(f->hdr.firstdb, ARCH_UNKNOWN), INT_GET(f->bests[i], ARCH_UNKNOWN));
 	}
 }
 

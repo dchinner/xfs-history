@@ -2542,6 +2542,7 @@ xfs_da_buf_clean(xfs_dabuf_t *dabuf)
 void
 xfs_da_buf_done(xfs_dabuf_t *dabuf)
 {
+        ASSERT(dabuf);
 	ASSERT(dabuf->nbuf && dabuf->data && dabuf->bbcount && dabuf->bps[0]);
 	if (dabuf->dirty)
 		xfs_da_buf_clean(dabuf);
