@@ -3176,7 +3176,7 @@ xfs_bmap_first_unused(
 	nextents = ifp->if_bytes / sizeof(xfs_bmbt_rec_t);
 	base = &ifp->if_u1.if_extents[0];
 	for (lastaddr = 0, ep = base; ep < &base[nextents]; ep++) {
-		if ((lastaddr + len) < (off = xfs_bmbt_get_startoff(ep))) {
+		if ((lastaddr + len) <= (off = xfs_bmbt_get_startoff(ep))) {
 			*first_unused = lastaddr;
 			return 0;
 		}
