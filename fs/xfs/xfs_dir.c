@@ -150,6 +150,7 @@ xfs_dir_mount(xfs_mount_t *mp)
 	mp->m_da_node_ents =
 		(XFS_LBSIZE(mp) - sizeof(xfs_da_node_hdr_t)) /
 		sizeof(xfs_da_node_entry_t);
+	mp->m_da_magicpct = (XFS_LBSIZE(mp) * 37) / 100;
 }
 
 /*
