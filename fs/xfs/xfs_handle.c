@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.8 $"
+#ident "$Revision: 1.9 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -205,6 +205,7 @@ open_by_handle (
 	int		fd;
 	int		error;
 	handle_t	handle;
+	int		sat_flags = filemode;	/* what was requested */
 
 	filemode -= FOPEN;
 	filemode &= (FREAD|FWRITE);
@@ -253,8 +254,10 @@ open_by_handle (
 	u.u_openfp = fp;
 #endif
 
-	if ((u.u_satrec = _SAT_PNALLOC (SAT_OPEN)) == NULL)
-		u.u_satrec = _SAT_PNALLOC (SAT_OPEN_RO);
+	if ((filemode & FWRITE) == 0)
+		_SAT_PNALLOC(SAT_OPEN_RO);
+	else
+		_SAT_PNALLOC(SAT_OPEN);
 
 	error = vp_open (vp, filemode);
 
@@ -285,7 +288,7 @@ out:
 
 	if (error)
 		VN_RELE (vp);
-	_SAT_OPEN (rvp->r_val1, (filemode&FCREAT), filemode, u.u_satrec, error);
+	_SAT_OPEN (rvp->r_val1, (filemode&FCREAT), sat_flags, error);
 	return error;
 }
 
