@@ -42,7 +42,6 @@
 #include <sys/conf.h>
 #include <sys/cred.h>
 #include <sys/debug.h>
-#include <sys/dnlc.h>
 #include <sys/errno.h>
 #include <ksys/vfile.h>
 #include <ksys/fdt.h>
@@ -64,6 +63,7 @@
 #include <string.h>
 #include <sys/imon.h>
 #include <sys/sat.h>
+#include <sys/dnlc.h>
 
 
 /*
@@ -428,6 +428,22 @@ vfs_devsearch(dev_t dev, int fstype)
 	vfsp = vfs_devsearch_nolock(dev, fstype);
 	vfs_spinunlock(s);
 	return vfsp;
+}
+
+/*
+ * Same as vfs_devsearch without locking the list.
+ * Useful for debugging code, but put it here anyway.
+ */
+struct vfs *
+vfs_devsearch_nolock(dev_t dev, int fstype)
+{
+        register struct vfs *vfsp;
+
+        for (vfsp = rootvfs; vfsp != NULL; vfsp = vfsp->vfs_next)
+                if ((vfsp->vfs_dev == dev) &&
+                    (fstype == VFS_FSTYPE_ANY || fstype == vfsp->vfs_fstype))
+                        break;
+        return vfsp;
 }
 
 /*

@@ -14,7 +14,8 @@
 
 #include <linux/fs.h>
 #include <linux/sched.h>
-
+#include <linux/locks.h>
+#include <linux/slab.h>
 
 #include <sys/capability.h>
 #include <sys/cred.h>
@@ -36,7 +37,6 @@
 #include <sys/uuid.h>
 #include <sys/pvfs.h>
 #include <xfs_sb.h>
-
 /*
  * Global system credential structure.
  */
@@ -249,7 +249,7 @@ linvfs_read_super(
 		goto fail_vnrele;
 
 
-	unlock_super();
+	unlock_super(sb);
 
 	return(NULL);
 
@@ -266,8 +266,8 @@ linvfs_read_super(
 	fail_vfsop:
 		kfree(vfsp);
 
-	fail:
-		unlock_super();
+	/* fail: */
+		unlock_super(sb);
 		MOD_DEC_USE_COUNT;
 
 		return(NULL);
@@ -283,7 +283,7 @@ linvfs_read_inode(
 	int		error;
 
 
-	VOP_GET_VNODE(vfsp, &vp, inode->i_ino, error);
+	VFS_GET_VNODE(vfsp, &vp, inode->i_ino, error);
 	if (error) {
 		make_bad_inode(inode);
 		return;
