@@ -12,6 +12,7 @@ struct vnode;
 struct xfs_inode;
 struct xfs_mount;
 struct xfs_trans;
+struct pm;
 
 /*
  * This structure is used to communicate which extents of a file
@@ -145,7 +146,8 @@ int
 xfs_zero_eof(struct xfs_inode	*ip,
 	     off_t		offset,
 	     xfs_fsize_t	isize,
-	     struct cred	*credp);
+	     struct cred	*credp,
+	     struct pm		*pmp);
 
 void
 xfs_refcache_insert(
