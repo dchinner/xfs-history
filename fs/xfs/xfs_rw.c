@@ -11,8 +11,6 @@
 #include <sys/cred.h>
 #include <sys/sysmacros.h>
 #include <sys/pfdat.h>
-#include <sys/proc.h>
-#include <sys/user.h>
 #include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/pda.h>
@@ -37,12 +35,12 @@
 #include <sys/flock.h>
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
-#include <sys/runq.h>
 #include <sys/schedctl.h>
 #include <sys/atomic_ops.h>
 #include <sys/ktrace.h>
 #include <sys/sysinfo.h>
 #include <sys/ksa.h>
+#include <ksys/sthread.h>
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -4099,7 +4097,7 @@ xfs_strategy(
 #ifndef SIM
 
 /*
- * This is called from main() to start the xfs daemons.
+ * This is called from xfs_init() to start the xfs daemons.
  * We'll start with a minimum of 4 of them, and add 1
  * for each 128 MB of memory up to 1 GB.  That should
  * be enough.
@@ -4133,21 +4131,8 @@ xfs_start_daemons(void)
 	ASSERT(num_daemons <= 13);
 
 	for (i = 0; i < num_daemons; i++) {
-		if (newproc(NP_SYSPROC, 0)) {
-#if !STAT_TIME
-			ASSERT(private.p_activetimer ==
-			       &u.u_ptimer[PTIMER_INDEX(AS_SYS_RUN)]);
-			/* u_utime, u_stime are evaluated on exit */
-			/* u_cutime, u_cstime are accumulated during wait() */
-			timerclear(&u.u_cutime);
-			timerclear(&u.u_cstime);
-#else
-			u.u_cstime = u.u_stime = u.u_cutime = u.u_utime = 0;
-#endif
-			bcopy("xfsd", u.u_psargs, 5);
-			bcopy("xfsd", u.u_comm, 4);
-			xfsd();
-		}
+		sthread_create("xfsd", 0, 0, 0, NDPHIMIN,
+				(st_func_t *)xfsd, 0, 0, 0, 0);
 	}
 	return;
 }
@@ -4166,12 +4151,6 @@ xfsd(void)
 	buf_t	*bp;
 	buf_t	*forw;
 	buf_t	*back;
-
-	/*
-	 * Make us a high non-degrading priority process like bdflush(),
-	 * since that is who we're relieving of work.
-	 */
-	setinfoRunq(curprocp, RQRTPRI, NDPHIMIN);
 
 	s = mp_mutex_spinlock(&xfsd_lock);
 	xfsd_count++;
