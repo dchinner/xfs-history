@@ -445,6 +445,18 @@ xfs_buf_item_committed(xfs_buf_log_item_t	*bip,
 	return (lsn);
 }
 
+/*
+ * This is called when the transaction holding the buffer is aborted.
+ * The buffer must not have been dirtied within this transaction.  Just
+ * behave as if the transaction had been cancelled.
+ */
+void
+xfs_buf_item_abort(
+	xfs_buf_log_item_t	*bip)
+{
+	xfs_buf_item_unlock(bip);
+	return;
+}
 
 /*
  * This is called to asynchronously write the buffer associated with this
@@ -480,7 +492,8 @@ struct xfs_item_ops xfs_buf_item_ops = {
 	(uint(*)(xfs_log_item_t*))xfs_buf_item_trylock,
 	(void(*)(xfs_log_item_t*))xfs_buf_item_unlock,
 	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_buf_item_committed,
-	(void(*)(xfs_log_item_t*))xfs_buf_item_push
+	(void(*)(xfs_log_item_t*))xfs_buf_item_push,
+	(void(*)(xfs_log_item_t*))xfs_buf_item_abort
 };
 
 

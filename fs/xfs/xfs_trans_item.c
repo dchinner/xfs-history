@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.12 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -17,7 +17,7 @@
 #include "sim.h"
 #endif
 
-STATIC int	xfs_trans_unlock_chunk(xfs_log_item_chunk_t *, int);
+STATIC int	xfs_trans_unlock_chunk(xfs_log_item_chunk_t *, int, int);
 
 /*
  * This is called to add the given log item to the transaction's
@@ -271,17 +271,21 @@ xfs_trans_next_item(xfs_trans_t *tp, xfs_log_item_desc_t *lidp)
  * each chunk except that embedded in the transaction as it goes along.
  */
 void
-xfs_trans_free_items(xfs_trans_t *tp)
+xfs_trans_free_items(
+	xfs_trans_t	*tp,
+	int		flags)
 {
 	xfs_log_item_chunk_t	*licp;
 	xfs_log_item_chunk_t	*next_licp;
+	int			abort;
 
+	abort = flags & XFS_TRANS_ABORT;
 	licp = &tp->t_items;
 	/*
 	 * Special case the embedded chunk so we don't free it below.
 	 */
 	if (!XFS_LIC_ARE_ALL_FREE(licp)) {
-		(void) xfs_trans_unlock_chunk(licp, 0);
+		(void) xfs_trans_unlock_chunk(licp, 1, abort);
 		XFS_LIC_ALL_FREE(licp);
 	}
 	licp = licp->lic_next;
@@ -291,7 +295,7 @@ xfs_trans_free_items(xfs_trans_t *tp)
 	 */
 	while (licp != NULL) {
 		ASSERT(!XFS_LIC_ARE_ALL_FREE(licp));
-		(void) xfs_trans_unlock_chunk(licp, 1);
+		(void) xfs_trans_unlock_chunk(licp, 1, abort);
 		next_licp = licp->lic_next;
 		kmem_free(licp, sizeof(xfs_log_item_chunk_t));
 		licp = next_licp;
@@ -325,7 +329,7 @@ xfs_trans_unlock_items(xfs_trans_t *tp)
 	 * Special case the embedded chunk so we don't free.
 	 */
 	if (!XFS_LIC_ARE_ALL_FREE(licp)) {
-		freed = xfs_trans_unlock_chunk(licp, 0);
+		freed = xfs_trans_unlock_chunk(licp, 0, 0);
 	}
 	licp = licp->lic_next;
 
@@ -335,7 +339,7 @@ xfs_trans_unlock_items(xfs_trans_t *tp)
 	 */
 	while (licp != NULL) {
 		ASSERT(!XFS_LIC_ARE_ALL_FREE(licp));
-		freed += xfs_trans_unlock_chunk(licp, 0);
+		freed += xfs_trans_unlock_chunk(licp, 0, 0);
 		next_licp = licp->lic_next;
 		if (XFS_LIC_ARE_ALL_FREE(licp)) {
 			kmem_free(licp, sizeof(xfs_log_item_chunk_t));
@@ -358,7 +362,10 @@ xfs_trans_unlock_items(xfs_trans_t *tp)
  * Return the number of descriptors freed.
  */
 STATIC int
-xfs_trans_unlock_chunk(xfs_log_item_chunk_t *licp, int freeing_chunk)
+xfs_trans_unlock_chunk(
+	xfs_log_item_chunk_t	*licp,
+	int			freeing_chunk,
+	int			abort)
 {
 	xfs_log_item_desc_t	*lidp;
 	int			i;
@@ -374,8 +381,10 @@ xfs_trans_unlock_chunk(xfs_log_item_chunk_t *licp, int freeing_chunk)
 
 		lidp->lid_item->li_desc = NULL;
 
-		if (!(lidp->lid_flags & XFS_LID_SYNC_UNLOCK) ||
-		    freeing_chunk) {
+		if (abort) {
+			IOP_ABORT(lidp->lid_item);
+		} else if (!(lidp->lid_flags & XFS_LID_SYNC_UNLOCK) ||
+			   freeing_chunk) {
 			IOP_UNLOCK(lidp->lid_item);
 		}
 

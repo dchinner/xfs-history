@@ -1877,6 +1877,7 @@ xlog_recover_do_efi_trans(xlog_t		*log,
 	      sizeof(xfs_efi_log_format_t) +
 	      ((efi_formatp->efi_nextents - 1) * sizeof(xfs_extent_t)));
 	efip->efi_next_extent = efi_formatp->efi_nextents;
+	efip->efi_flags |= XFS_EFI_COMMITTED;
 
 	spl = AIL_LOCK(mp);
 	/*

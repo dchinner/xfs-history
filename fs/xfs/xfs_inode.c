@@ -1053,6 +1053,7 @@ xfs_itruncate_finish(
 		 */
 		error = xfs_bmap_finish(tp, &free_list,
 					first_block, &committed);
+		ntp = *tp;
 		if (error) {
 			/*
 			 * If the bmap finish  call encounters an error,
@@ -1085,7 +1086,6 @@ xfs_itruncate_finish(
 			return error;
 		}
 
-		ntp = *tp;
 		if (committed) {
 			/*
 			 * The first xact was committed,

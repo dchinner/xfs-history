@@ -90,7 +90,8 @@ typedef struct xfs_item_ops {
 	uint (*iop_trylock)(xfs_log_item_t *);
 	void (*iop_unlock)(xfs_log_item_t *);
 	xfs_lsn_t (*iop_committed)(xfs_log_item_t *, xfs_lsn_t);	
-	void (*iop_push)(xfs_log_item_t *);	
+	void (*iop_push)(xfs_log_item_t *);
+	void (*iop_abort)(xfs_log_item_t *);
 } xfs_item_ops_t;
 
 #define	IOP_SIZE(ip)		(*(ip)->li_ops->iop_size)(ip)
@@ -101,6 +102,7 @@ typedef struct xfs_item_ops {
 #define	IOP_UNLOCK(ip)		(*(ip)->li_ops->iop_unlock)(ip)
 #define	IOP_COMMITTED(ip, lsn)	(*(ip)->li_ops->iop_committed)(ip, lsn)
 #define	IOP_PUSH(ip)		(*(ip)->li_ops->iop_push)(ip)
+#define	IOP_ABORT(ip)		(*(ip)->li_ops->iop_abort)(ip)
 
 /*
  * Return values for the IOP_TRYLOCK() routines.
@@ -179,12 +181,6 @@ typedef struct xfs_log_item_chunk {
 					(((caddr_t)((dp) - (dp)->lid_index)) -\
 					(caddr_t)(((xfs_log_item_chunk_t*) \
 					0)->lic_descs)))
-/*
- * This is the unique transaction identifier.
- * 32 bits should be plenty given that transactions only
- * last so long.
- */
-typedef uint	xfs_trans_id_t;
 
 /*
  * This is the type of function which can be given to xfs_trans_callback()
@@ -204,7 +200,7 @@ typedef void (*xfs_trans_callback_t)(struct xfs_trans *, void *);
 typedef struct xfs_trans_header {
 	uint		th_magic;		/* magic number */
 	uint		th_type;		/* transaction type */
-	xfs_trans_id_t	th_tid;			/* transaction id */
+	__int32_t	th_tid;			/* transaction id (unused) */
 	uint		th_num_items;		/* num items logged by trans */
 } xfs_trans_header_t;
 
@@ -215,7 +211,6 @@ typedef struct xfs_trans_header {
  */
 typedef struct xfs_trans {
 	unsigned int		t_magic;	/* magic number */
-	xfs_trans_id_t		t_tid;		/* transaction id */
 	xfs_log_callback_t	t_logcb;	/* log callback struct */
 	struct xfs_trans	*t_forw;	/* async list pointers */
 	struct xfs_trans	*t_back;	/* async list pointers */
@@ -264,6 +259,7 @@ typedef struct xfs_trans {
 #define	XFS_TRANS_NOSLEEP		0x1
 #define	XFS_TRANS_WAIT			0x2
 #define	XFS_TRANS_RELEASE_LOG_RES	0x4
+#define	XFS_TRANS_ABORT			0x8
 
 /*
  * Field values for xfs_trans_mod_sb.
@@ -612,6 +608,7 @@ int		xfs_trans_iget(struct xfs_mount *, xfs_trans_t *,
 void		xfs_trans_iput(xfs_trans_t *, struct xfs_inode *, uint);
 void		xfs_trans_ijoin(xfs_trans_t *, struct xfs_inode *, uint);
 void		xfs_trans_ihold(xfs_trans_t *, struct xfs_inode *);
+void		xfs_trans_ihold_release(xfs_trans_t *, struct xfs_inode *);
 void		xfs_trans_log_buf(xfs_trans_t *, struct buf *, uint, uint);
 void		xfs_trans_log_inode(xfs_trans_t *, struct xfs_inode *, uint);
 struct xfs_efi_log_item	*xfs_trans_get_efi(xfs_trans_t *, uint);
@@ -626,9 +623,6 @@ void		xfs_trans_log_efd_extent(xfs_trans_t *,
 					 struct xfs_efd_log_item *,
 					 xfs_fsblock_t,
 					 xfs_extlen_t);
-void		xfs_trans_log_iui(xfs_trans_t *, struct xfs_inode *);
-void		xfs_trans_log_iui_done(xfs_trans_t *, struct xfs_inode *);
-xfs_trans_id_t	xfs_trans_id(xfs_trans_t *);
 int		xfs_trans_commit(xfs_trans_t *, uint flags);
 void		xfs_trans_commit_async(struct xfs_mount *);
 void		xfs_trans_cancel(xfs_trans_t *, int);

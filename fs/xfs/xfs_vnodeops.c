@@ -1,4 +1,4 @@
-#ident "$Revision: 1.168 $"
+#ident "$Revision: 1.169 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -297,9 +297,10 @@ int	xfs_do_fast_fid = 1;
  */
 /*ARGSUSED*/
 STATIC int
-xfs_open(vnode_t	**vpp,
-	 mode_t		flag,
-	 cred_t		*credp)
+xfs_open(
+	vnode_t		**vpp,
+	mode_t		flag,
+	cred_t		*credp)
 {
 	int		rval = 0;
 #if XFS_BIG_FILES == 0
@@ -320,11 +321,12 @@ xfs_open(vnode_t	**vpp,
  */
 /*ARGSUSED*/
 STATIC int
-xfs_close(vnode_t	*vp,
-	  int		flag,
-	  lastclose_t	lastclose,
-	  off_t		offset,
-	  cred_t	*credp)
+xfs_close(
+	vnode_t		*vp,
+	int		flag,
+	lastclose_t	lastclose,
+	off_t		offset,
+	cred_t		*credp)
 {
 	extern int	xfs_remove_grio_guarantee(xfs_inode_t *, pid_t);
 
@@ -423,10 +425,11 @@ xfs_close(vnode_t	*vp,
  */
 /*ARGSUSED*/
 STATIC int
-xfs_getattr(vnode_t	*vp,
-	    vattr_t	*vap,
-	    int		flags,
-	    cred_t	*credp)
+xfs_getattr(
+	vnode_t	*vp,
+	vattr_t	*vap,
+	int	flags,
+	cred_t	*credp)
 {
 	xfs_inode_t	*ip;
 	xfs_mount_t	*mp;
@@ -537,10 +540,11 @@ xfs_getattr(vnode_t	*vp,
  * xfs_setattr
  */
 STATIC int
-xfs_setattr(vnode_t	*vp,
-	    vattr_t	*vap,
-	    int		flags,
-	    cred_t	*credp)
+xfs_setattr(
+	vnode_t	*vp,
+	vattr_t	*vap,
+	int	flags,
+	cred_t	*credp)
 {
         xfs_inode_t     *ip;
 	xfs_trans_t	*tp = NULL;
@@ -805,7 +809,7 @@ xfs_setattr(vnode_t	*vp,
 					    (xfs_fsize_t)vap->va_size);
 			ip_held = B_TRUE;
 			if (code) {
-				goto error_return;
+				goto abort_return;
 			}
 		}
 		/*
@@ -938,7 +942,10 @@ xfs_setattr(vnode_t	*vp,
 	}
 	return 0;
 
-error_return:
+ abort_return:
+	commit_flags |= XFS_TRANS_ABORT;
+	/* FALLTHROUGH */
+ error_return:
 
 	if (tp) {
 		xfs_trans_cancel(tp, commit_flags);
@@ -957,10 +964,11 @@ error_return:
  */
 /*ARGSUSED*/
 STATIC int
-xfs_access(vnode_t	*vp,
-	   int		mode,
-	   int		flags,
-	   cred_t	*credp)
+xfs_access(
+	vnode_t	*vp,
+	int	mode,
+	int	flags,
+	cred_t	*credp)
 {
 	xfs_inode_t	*ip;
 	int		error;
@@ -987,9 +995,10 @@ xfs_access(vnode_t	*vp,
  */
 /*ARGSUSED*/
 STATIC int
-xfs_readlink(vnode_t	*vp,
-	     uio_t	*uiop,
-	     cred_t	*credp)
+xfs_readlink(
+	vnode_t	*vp,
+	uio_t	*uiop,
+	cred_t	*credp)
 {
         xfs_inode_t     *ip;
 	int		count;
@@ -1097,9 +1106,10 @@ error_return:
  */
 /*ARGSUSED*/
 STATIC int
-xfs_fsync(vnode_t	*vp,
-	  int		flag,
-	  cred_t	*credp)
+xfs_fsync(
+	vnode_t	*vp,
+	int	flag,
+	cred_t	*credp)
 {
 	xfs_inode_t	*ip;
 	xfs_fsize_t	last_byte;
@@ -1165,11 +1175,11 @@ xfs_itruncate_cleanup(
 	int		error;
 
 	mp = (*tpp)->t_mountp;
-	xfs_trans_cancel(*tpp, commit_flags);
+	xfs_trans_cancel(*tpp, commit_flags | XFS_TRANS_ABORT);
 	xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 	*tpp = xfs_trans_alloc(mp, XFS_TRANS_INACTIVE);
 	error = xfs_trans_reserve(*tpp, 0, XFS_IFREE_LOG_RES(mp), 0, 0,
-				   XFS_DEFAULT_LOG_COUNT);
+				  XFS_DEFAULT_LOG_COUNT);
 	ASSERT(error == 0);
 	
 	xfs_ilock(ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
@@ -1224,8 +1234,9 @@ xfs_itruncate_cleanup(
  */
 /*ARGSUSED*/
 STATIC void
-xfs_inactive(vnode_t	*vp,
-	     cred_t	*credp)
+xfs_inactive(
+	vnode_t	*vp,
+	cred_t	*credp)
 {
 	xfs_inode_t	*ip;
 	xfs_trans_t	*tp;
@@ -1311,6 +1322,7 @@ xfs_inactive(vnode_t	*vp,
 				 * transaction and just try to continue
 				 * by freeing the inode.
 				 */
+				commit_flags |= XFS_TRANS_ABORT;
 				xfs_itruncate_cleanup(&tp, ip, commit_flags);
 				commit_flags = 0;
 			}
@@ -1348,7 +1360,8 @@ xfs_inactive(vnode_t	*vp,
 				if (error) {
 					xfs_bmap_cancel(&free_list);
 					xfs_itruncate_cleanup(&tp, ip,
-						  XFS_TRANS_RELEASE_LOG_RES);
+						 (XFS_TRANS_RELEASE_LOG_RES |
+						  XFS_TRANS_ABORT));
 					goto free_inode;
 				}
 				ASSERT(done);
@@ -1357,7 +1370,8 @@ xfs_inactive(vnode_t	*vp,
 				if (error) {
 					xfs_bmap_cancel(&free_list);
 					xfs_itruncate_cleanup(&tp, ip,
-						  XFS_TRANS_RELEASE_LOG_RES);
+						(XFS_TRANS_RELEASE_LOG_RES |
+						 XFS_TRANS_ABORT));
 					goto free_inode;
 				}
 				if (committed) {
@@ -1442,7 +1456,7 @@ free_inode:
 			 * If we fail to free the inode, just do our best
 			 * to keep going.
 			 */
-			xfs_trans_cancel(tp, commit_flags);
+			xfs_trans_cancel(tp, commit_flags | XFS_TRANS_ABORT);
 		} else {
 			/*
 			 * Just ignore errors at this point.  There is
@@ -1510,7 +1524,8 @@ free_inode:
 				 */
 				if (error) {
 					xfs_trans_cancel(tp,
-						 XFS_TRANS_RELEASE_LOG_RES);
+						 (XFS_TRANS_RELEASE_LOG_RES |
+						  XFS_TRANS_ABORT));
 				} else {
 					(void) xfs_trans_commit(tp,
 						 XFS_TRANS_RELEASE_LOG_RES);
@@ -1541,12 +1556,15 @@ free_inode:
  * we own the directory, or the file is writable.
  */
 STATIC int
-xfs_stickytest(xfs_inode_t *dp, xfs_inode_t *ip, struct cred *cr)
+xfs_stickytest(
+	xfs_inode_t	*dp,
+	xfs_inode_t	*ip,
+	cred_t		*cr)
 {
-        if ((dp->i_d.di_mode & ISVTX)
-            && cr->cr_uid != 0
-            && cr->cr_uid != ip->i_d.di_uid
-            && cr->cr_uid != dp->i_d.di_uid) {
+        if ((dp->i_d.di_mode & ISVTX) &&
+	    cr->cr_uid != 0 &&
+	    cr->cr_uid != ip->i_d.di_uid &&
+	    cr->cr_uid != dp->i_d.di_uid) {
                 return xfs_iaccess(ip, IWRITE, cr);
         }
         return 0;
@@ -1573,14 +1591,15 @@ xfs_stickytest(xfs_inode_t *dp, xfs_inode_t *ip, struct cred *cr)
  * vnode will have an additional reference in this case.
  */
 STATIC int
-xfs_dir_lookup_int(xfs_trans_t  *tp,
-		   vnode_t      *dir_vp,
-		   int		 flag,
-		   char         *name,
-		   pathname_t   *pnp,
-		   xfs_ino_t    *inum,
-		   xfs_inode_t  **ipp,
-		   struct ncfastdata *fd)
+xfs_dir_lookup_int(
+	xfs_trans_t  		*tp,
+	vnode_t      		*dir_vp,
+	int		 	flag,
+	char         		*name,
+	pathname_t   		*pnp,
+	xfs_ino_t    		*inum,
+	xfs_inode_t  		**ipp,
+	struct ncfastdata	*fd)
 {
 	vnode_t	   *vp;
 	int	   name_len;
@@ -1654,8 +1673,9 @@ xfs_dir_lookup_int(xfs_trans_t  *tp,
 			*ipp = NULL;
 			VN_RELE (vp);
 			code = ENOENT;
-		} else
+		} else {
 			dnlc_enter_fast(dir_vp, fd, vp, NOCRED);
+		}
 	}
 
 	return (code);
@@ -1669,13 +1689,14 @@ xfs_dir_lookup_int(xfs_trans_t  *tp,
  */
 /*ARGSUSED*/
 STATIC int
-xfs_lookup(vnode_t	*dir_vp,
-	   char		*name,
-	   vnode_t	**vpp,
-	   pathname_t	*pnp,
-	   int		flags,
-	   vnode_t	*rdir, 
-	   cred_t	*credp)
+xfs_lookup(
+	vnode_t		*dir_vp,
+	char		*name,
+	vnode_t		**vpp,
+	pathname_t	*pnp,
+	int		flags,
+	vnode_t		*rdir, 
+	cred_t		*credp)
 {
 	xfs_inode_t		*dp, *ip;
 	struct vnode		*vp, *newvp;
@@ -1880,8 +1901,9 @@ xfs_dir_ialloc(
  * logging activity required to truncate a file.
  */
 STATIC int				/* error */
-xfs_droplink(xfs_trans_t *tp,
-	     xfs_inode_t *ip)
+xfs_droplink(
+	xfs_trans_t *tp,
+	xfs_inode_t *ip)
 {
 	int	error;
 
@@ -1908,8 +1930,9 @@ xfs_droplink(xfs_trans_t *tp,
  * Increment the link count on an inode & log the change.
  */
 STATIC void
-xfs_bumplink(xfs_trans_t *tp,
-             xfs_inode_t *ip)
+xfs_bumplink(
+	xfs_trans_t *tp,
+	xfs_inode_t *ip)
 {
 	xfs_ichgtime(ip, XFS_ICHGTIME_CHG);
 
@@ -1954,13 +1977,14 @@ xfs_ctrunc_trace(
  *
  */
 STATIC int
-xfs_create(vnode_t	*dir_vp,
-	   char		*name,
-	   vattr_t	*vap,
-	   enum vcexcl	excl,
-	   int		I_mode,
-	   vnode_t	**vpp,
-	   cred_t	*credp)
+xfs_create(
+	vnode_t		*dir_vp,
+	char		*name,
+	vattr_t		*vap,
+	enum vcexcl	excl,
+	int		I_mode,
+	vnode_t		**vpp,
+	cred_t		*credp)
 {
 	xfs_inode_t      	*dp, *ip;
         vnode_t		        *vp, *newvp;
@@ -1988,7 +2012,7 @@ xfs_create(vnode_t	*dir_vp,
 		if (error)
 			return error;
 	}
-try_again:
+ try_again:
 
 	ip = NULL;
 	dp_joined_to_trans = B_FALSE;
@@ -2030,7 +2054,6 @@ try_again:
 	error = xfs_dir_lookup_int(NULL, dir_vp, DLF_IGET, name, NULL, 
 				   &e_inum, &ip, &fastdata);
 	if (error && (error != ENOENT)) {
-		ASSERT(0);
 		goto error_return;
 	}
 
@@ -2050,7 +2073,7 @@ try_again:
 				       MAKEIMODE(vap->va_type,vap->va_mode), 
 				       1, rdev, credp, &ip, &committed);
 		if (error) {
-			goto error_return;
+			goto abort_return;
 		}
 		ITRACE(ip);
 
@@ -2081,7 +2104,7 @@ try_again:
 					   MAX_EXT_NEEDED);
 		if (error) {
 			ASSERT(error != ENOSPC);
-			goto error_return;
+			goto abort_return;
 		}
 		xfs_ichgtime(dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
@@ -2214,9 +2237,9 @@ try_again:
 				error = xfs_itruncate_finish(&tp, ip,
 							     (xfs_fsize_t)0);
 				if (error) {
-					xfs_iunlock(ip, XFS_ILOCK_EXCL |
-						    XFS_IOLOCK_EXCL);
-					goto error_return;
+					ASSERT(ip->i_transp == tp);
+					xfs_trans_ihold_release(tp, ip);
+					goto abort_return;
 				}
 				truncated = B_TRUE;
 			}
@@ -2242,15 +2265,14 @@ try_again:
 		if (truncated) {
 			/*
 			 * If we truncated the file, then the inode will
-			 * have been held within the transaction and must
-			 * be unlocked now.
+			 * have been held within the previous transaction
+			 * and must be unlocked now.
 			 */
 			xfs_iunlock(ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 			ASSERT(vp->v_count >= 2);
 			IRELE(ip);
 		}		
-		IRELE(ip);
-		goto error_return;
+		goto abort_rele;
 	}
 
 	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
@@ -2290,13 +2312,27 @@ try_again:
 	}
 	return 0;
 
-error_return:
+ abort_return:
+	cancel_flags |= XFS_TRANS_ABORT;
+	/* FALLTHROUGH */
+ error_return:
 
 	if (tp != NULL)
 		xfs_trans_cancel(tp, cancel_flags);
 
 	if (!dp_joined_to_trans && (dp != NULL))
 		xfs_iunlock(dp, XFS_ILOCK_EXCL);
+	return error;
+
+ abort_rele:
+	/*
+	 * Wait until after the current transaction is aborted to
+	 * release the inode.  This prevents recursive transactions
+	 * and deadlocks from xfs_inactive.
+	 */
+	cancel_flags |= XFS_TRANS_ABORT;
+	xfs_trans_cancel(tp, cancel_flags);
+	IRELE(ip);
 	return error;
 }
 
@@ -2313,9 +2349,10 @@ error_return:
  */
 
 STATIC int
-xfs_lock_dir_and_entry(xfs_inode_t	*dp,
-		       char		*name,
-		       xfs_inode_t	**ipp)	/* inode of entry 'name' */
+xfs_lock_dir_and_entry(
+	xfs_inode_t	*dp,
+	char		*name,
+	xfs_inode_t	**ipp)	/* inode of entry 'name' */
 {
 	xfs_inode_t		*ip, *new_ip;
 	xfs_ino_t		e_inum;
@@ -2323,7 +2360,7 @@ xfs_lock_dir_and_entry(xfs_inode_t	*dp,
 	int			error;
 	struct ncfastdata	fastdata;
 
-again:
+ again:
 
         xfs_ilock(dp, XFS_ILOCK_EXCL);
 
@@ -2359,8 +2396,8 @@ again:
 		 * lock on the inode of the entry.
 		 */
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
-	}
-        else if (e_inum < dp->i_ino) {
+
+	} else if (e_inum < dp->i_ino) {
                 dir_generation = dp->i_gen;
                 xfs_iunlock(dp, XFS_ILOCK_EXCL);
 
@@ -2636,7 +2673,8 @@ xfs_truncate_file(
 	xfs_trans_ihold(tp, ip);
 	error = xfs_itruncate_finish(&tp, ip, (xfs_fsize_t)0);
 	if (error) {
-		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES);
+		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES |
+				 XFS_TRANS_ABORT);
 	} else {
 		xfs_ichgtime(ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 		error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
@@ -2651,9 +2689,10 @@ xfs_truncate_file(
  *
  */
 STATIC int
-xfs_remove(vnode_t	*dir_vp,
-	   char		*name,
-	   cred_t	*credp)
+xfs_remove(
+	vnode_t	*dir_vp,
+	char	*name,
+	cred_t	*credp)
 {
         xfs_inode_t             *dp, *ip;
         xfs_trans_t             *tp = NULL;
@@ -2816,8 +2855,7 @@ xfs_remove(vnode_t	*dir_vp,
 
 	error = xfs_bmap_finish(&tp, &free_list, first_block, &committed);
 	if (error) {
-		IRELE(ip);
-		goto error1;
+		goto error_rele;
 	}
 
 	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
@@ -2836,10 +2874,24 @@ xfs_remove(vnode_t	*dir_vp,
 
  error1:
 	xfs_bmap_cancel(&free_list);
+	cancel_flags |= XFS_TRANS_ABORT;
 
  error_return:
 	xfs_trans_cancel(tp, cancel_flags);
 	return error;
+
+ error_rele:
+	/*
+	 * In this case make sure to not release the inode until after
+	 * the current transaction is aborted.  Releasing it beforehand
+	 * can cause us to go to xfs_inactive and start a recursive
+	 * transaction which can easily deadlock with the current one.
+	 */
+	xfs_bmap_cancel(&free_list);
+	cancel_flags |= XFS_TRANS_ABORT;
+	xfs_trans_cancel(tp, cancel_flags);
+	IRELE(ip);
+	return error;	
 }
 
 
@@ -2848,10 +2900,11 @@ xfs_remove(vnode_t	*dir_vp,
  *
  */
 STATIC int
-xfs_link(vnode_t	*target_dir_vp,
-	 vnode_t	*src_vp,
-	 char		*target_name,
-	 cred_t		*credp)
+xfs_link(
+	vnode_t	*target_dir_vp,
+	vnode_t	*src_vp,
+	char	*target_name,
+	cred_t	*credp)
 {
 	struct vnode		*realvp;
         xfs_inode_t		*tdp, *sip;
@@ -2869,11 +2922,13 @@ xfs_link(vnode_t	*target_dir_vp,
 	/*
 	 * Get the real vnode.
 	 */
-	if (VOP_REALVP(src_vp, &realvp) == 0)
+	if (VOP_REALVP(src_vp, &realvp) == 0) {
                 src_vp = realvp;
+	}
 	vn_trace_entry(src_vp, "xfs_link");
-        if (src_vp->v_type == VDIR)
+        if (src_vp->v_type == VDIR) {
                 return XFS_ERROR(EPERM);
+	}
 
 	sip = XFS_VTOI(src_vp);
 	tdp = XFS_VTOI(target_dir_vp);
@@ -2916,14 +2971,16 @@ xfs_link(vnode_t	*target_dir_vp,
 		goto error_return;
 	}
 
-	if (error = xfs_iaccess(tdp, IEXEC | IWRITE, credp))
+	if (error = xfs_iaccess(tdp, IEXEC | IWRITE, credp)) {
                 goto error_return;
+	}
 
 	error = xfs_dir_lookup_int(NULL, target_dir_vp, 0, target_name, 
 				   NULL, &e_inum, NULL, &fastdata);
 	if (error != ENOENT) {
-		if (error == 0) 
+		if (error == 0) {
 			error = XFS_ERROR(EEXIST);
+		}
 		goto error_return;
 	}
 
@@ -2932,7 +2989,7 @@ xfs_link(vnode_t	*target_dir_vp,
 	error = xfs_dir_createname(tp, tdp, target_name, sip->i_ino,
 				   &first_block, &free_list, MAX_EXT_NEEDED);
 	if (error) {
-		goto error_return;
+		goto abort_return;
 	}
 	xfs_ichgtime(tdp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 	tdp->i_gen++;
@@ -2953,7 +3010,7 @@ xfs_link(vnode_t	*target_dir_vp,
 	error = xfs_bmap_finish (&tp, &free_list, first_block, &committed);
 	if (error) {
 		xfs_bmap_cancel(&free_list);
-		goto error_return;
+		goto abort_return;
 	}
 
 	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
@@ -2969,7 +3026,10 @@ xfs_link(vnode_t	*target_dir_vp,
 	}
 	return 0;
 
-error_return:
+ abort_return:
+	cancel_flags |= XFS_TRANS_ABORT;
+	/* FALLTHROUGH */
+ error_return:
 	xfs_trans_cancel(tp, cancel_flags);
 
 	return error;
@@ -2996,11 +3056,12 @@ error_return:
  * operation again.
  */
 STATIC int
-xfs_ancestor_check(xfs_inode_t *src_dp, 
-		   xfs_inode_t *src_ip,
-		   xfs_inode_t *target_dp,
-		   xfs_inode_t *target_ip, 
-		   boolean_t   *state_has_changed)
+xfs_ancestor_check(
+	xfs_inode_t *src_dp, 
+	xfs_inode_t *src_ip,
+	xfs_inode_t *target_dp,
+	xfs_inode_t *target_ip, 
+	boolean_t   *state_has_changed)
 {
 	struct {
 		xfs_inode_t     *ip;
@@ -3198,12 +3259,13 @@ xfs_ancestor_check(xfs_inode_t *src_dp,
  *
  */
 STATIC int
-xfs_rename(vnode_t	*src_dir_vp,
-	  char		*src_name,
-	  vnode_t	*target_dir_vp,
-	  char		*target_name,
-	  pathname_t	*target_pnp,
-	  cred_t	*credp)
+xfs_rename(
+	vnode_t		*src_dir_vp,
+	char		*src_name,
+	vnode_t		*target_dir_vp,
+	char		*target_name,
+	pathname_t	*target_pnp,
+	cred_t		*credp)
 {
 	xfs_trans_t	*tp;
 	xfs_inode_t	*src_dp, *target_dp, *src_ip, *target_ip;
@@ -3228,7 +3290,7 @@ xfs_rename(vnode_t	*src_dir_vp,
 			return error;
 	}
 
-start_over:
+ start_over:
 	XFS_BMAP_INIT(&free_list, &first_block);
 	mp = XFS_VFSTOM(src_dir_vp->v_vfsp);
 	tp = xfs_trans_alloc(mp, XFS_TRANS_RENAME);
@@ -3412,7 +3474,7 @@ start_over:
 					   src_ip->i_ino, &first_block,
 					   &free_list, MAX_EXT_NEEDED);
 		if (error) {
-			goto error_return;
+			goto abort_return;
 		}
 		xfs_ichgtime(target_dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
@@ -3477,7 +3539,7 @@ start_over:
 			((target_pnp != NULL) ? target_pnp->pn_complen :
 			 strlen(target_name)), src_ip->i_ino);
 		if (error) {
-			goto error_return;
+			goto abort_return;
 		}
 		xfs_ichgtime(target_dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
@@ -3490,7 +3552,7 @@ start_over:
 		 */
 		error = xfs_droplink(tp, target_ip);
 		if (error) {
-			goto error_return;;
+			goto abort_return;;
 		}
 
 		if (src_is_directory) {
@@ -3499,7 +3561,7 @@ start_over:
 			 */
 			error = xfs_droplink(tp, target_ip);
 			if (error) {
-				goto error_return;
+				goto abort_return;
 			}
 		} 
 
@@ -3519,7 +3581,7 @@ start_over:
 		error = xfs_dir_replace(tp, src_ip, "..", 2,
 					target_dp->i_ino);
 		if (error) {
-			goto error_return;
+			goto abort_return;
 		}
 		xfs_ichgtime(src_ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
@@ -3531,7 +3593,7 @@ start_over:
 		 */
 		error = xfs_droplink(tp, src_dp);
 		if (error) {
-			goto error_return;
+			goto abort_return;
 		}
 	}
 
@@ -3539,7 +3601,7 @@ start_over:
 	error = xfs_dir_removename(tp, src_dp, src_name, &first_block,
 				   &free_list, MAX_EXT_NEEDED);
 	if (error) {
-		goto error_return;
+		goto abort_return;
 	}
 	xfs_ichgtime(src_dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
@@ -3579,7 +3641,8 @@ start_over:
 	error = xfs_bmap_finish(&tp, &free_list, first_block, &committed);
 	if (error) {
 		xfs_bmap_cancel(&free_list);
-		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES);
+		xfs_trans_cancel(tp, (XFS_TRANS_RELEASE_LOG_RES |
+				 XFS_TRANS_ABORT));
 		if (target_ip != NULL) {
 			IRELE(target_ip);
 		}
@@ -3605,7 +3668,10 @@ start_over:
 
 	return 0;
 
-error_return:
+ abort_return:
+	cancel_flags |= XFS_TRANS_ABORT;
+	/* FALLTHROUGH */
+ error_return:
 	xfs_bmap_cancel(&free_list);
 	xfs_trans_cancel(tp, cancel_flags);
 	return error;
@@ -3617,11 +3683,12 @@ error_return:
  *
  */
 STATIC int
-xfs_mkdir(vnode_t	*dir_vp,
-	  char		*dir_name,
-	  vattr_t	*vap,
-	  vnode_t	**vpp,
-	  cred_t	*credp)
+xfs_mkdir(
+	vnode_t		*dir_vp,
+	char		*dir_name,
+	vattr_t		*vap,
+	vnode_t		**vpp,
+	cred_t		*credp)
 {
         xfs_inode_t             *dp;
 	xfs_inode_t		*cdp;	/* inode of created dir */
@@ -3695,7 +3762,10 @@ xfs_mkdir(vnode_t	*dir_vp,
         mode = IFDIR | (vap->va_mode & ~IFMT);
 	error = xfs_dir_ialloc(&tp, dp, mode, 2, rdev, credp, &cdp, NULL);
 	if (error) {
-		goto error_return;
+		if (error == ENOSPC) {
+			goto error_return;
+		}
+		goto abort_return;
 	}
 	ITRACE(cdp);
 
@@ -3764,6 +3834,8 @@ xfs_mkdir(vnode_t	*dir_vp,
 	dnlc_remove_fast(dir_vp, &fastdata);
  error1:
 	xfs_bmap_cancel(&free_list);
+ abort_return:
+	cancel_flags |= XFS_TRANS_ABORT;
  error_return:
 	xfs_trans_cancel(tp, cancel_flags);
 
@@ -3780,10 +3852,11 @@ xfs_mkdir(vnode_t	*dir_vp,
  *
  */
 STATIC int
-xfs_rmdir(vnode_t	*dir_vp,
-	  char		*name,
-	  vnode_t	*current_dir_vp,
-	  cred_t	*credp)
+xfs_rmdir(
+	vnode_t		*dir_vp,
+	char		*name,
+	vnode_t		*current_dir_vp,
+	cred_t		*credp)
 {
         xfs_inode_t             *dp;
         xfs_inode_t             *cdp;   /* child directory */
@@ -3924,7 +3997,8 @@ xfs_rmdir(vnode_t	*dir_vp,
 	error = xfs_bmap_finish (&tp, &free_list, first_block, &committed);
 	if (error) {
 		xfs_bmap_cancel(&free_list);
-		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES);
+		xfs_trans_cancel(tp, (XFS_TRANS_RELEASE_LOG_RES |
+				 XFS_TRANS_ABORT));
 		IRELE(cdp);
 		return error;
 	}
@@ -3945,6 +4019,7 @@ xfs_rmdir(vnode_t	*dir_vp,
 
  error1:
 	xfs_bmap_cancel(&free_list);
+	cancel_flags |= XFS_TRANS_ABORT;
  error_return:
 	xfs_trans_cancel(tp, cancel_flags);
 	return error;
@@ -3959,10 +4034,11 @@ xfs_rmdir(vnode_t	*dir_vp,
  * bufsize bytes worth of struct dirents starting at bufbase.
  */
 STATIC int
-xfs_readdir(vnode_t	*dir_vp,
-	    uio_t	*uiop,
-	    cred_t	*credp,
-	    int		*eofp)
+xfs_readdir(
+	vnode_t		*dir_vp,
+	uio_t		*uiop,
+	cred_t		*credp,
+	int		*eofp)
 {
         xfs_inode_t             *dp;
         xfs_trans_t             *tp = NULL;
@@ -4004,21 +4080,22 @@ xfs_readdir(vnode_t	*dir_vp,
 
 
 /*
- * XXX The number of blocks that the directory code requires for
+ * The number of blocks that the directory code requires for
  * the createname operation.
  */
-#define dir_needs 7
+#define DIR_NEEDS 7
 
 /*
  * xfs_symlink
  *
  */
 STATIC int
-xfs_symlink(vnode_t	*dir_vp,
-	    char	*link_name,
-	    vattr_t	*vap,
-	    char	*target_path,
-	    cred_t	*credp)
+xfs_symlink(
+	vnode_t		*dir_vp,
+	char	       	*link_name,
+	vattr_t		*vap,
+	char		*target_path,
+	cred_t		*credp)
 {
 	xfs_trans_t		*tp = NULL;
 	xfs_mount_t		*mp;
@@ -4100,7 +4177,9 @@ xfs_symlink(vnode_t	*dir_vp,
         error = xfs_dir_lookup_int(NULL, dir_vp, 0, link_name, NULL,
 				   &e_inum, NULL, &fastdata);
 	if (error != ENOENT) {
-		error = XFS_ERROR(EEXIST);
+		if (!error) {
+			error = XFS_ERROR(EEXIST);
+		}
                 goto error_return;
 	}
 
@@ -4160,7 +4239,7 @@ xfs_symlink(vnode_t	*dir_vp,
 
 		error = xfs_bmapi(tp, ip, first_fsb, fs_blocks,
 				  XFS_BMAPI_WRITE | XFS_BMAPI_METADATA,
-				  &first_block, fs_blocks+dir_needs, mval,
+				  &first_block, fs_blocks+DIR_NEEDS, mval,
 				  &nmaps, &free_list);
 		if (error) {
 			goto error1;
@@ -4230,6 +4309,7 @@ xfs_symlink(vnode_t	*dir_vp,
 	dnlc_remove_fast(dir_vp, &fastdata);
  error1:
 	xfs_bmap_cancel(&free_list);
+	cancel_flags |= XFS_TRANS_ABORT;
  error_return:
 	xfs_trans_cancel(tp, cancel_flags);
 
@@ -4279,7 +4359,8 @@ xfs_fast_fid(
  *
  */
 STATIC int
-xfs_fid(vnode_t	*vp,
+xfs_fid(
+	vnode_t	*vp,
 	fid_t	**fidpp)
 {
 	xfs_fid_t	*fid;
@@ -4315,8 +4396,9 @@ xfs_fid(vnode_t	*vp,
  *
  */
 STATIC void
-xfs_rwlock(vnode_t	*vp,
-	   int		write_lock)
+xfs_rwlock(
+	vnode_t		*vp,
+	int		write_lock)
 {
 	xfs_inode_t	*ip;
 
@@ -4335,8 +4417,9 @@ xfs_rwlock(vnode_t	*vp,
  *
  */
 STATIC void
-xfs_rwunlock(vnode_t	*vp,
-	     int	write_lock)
+xfs_rwunlock(
+	vnode_t		*vp,
+	int		write_lock)
 {
         xfs_inode_t     *ip;
 
@@ -4360,9 +4443,10 @@ xfs_rwunlock(vnode_t	*vp,
  */
 /*ARGSUSED*/
 STATIC int
-xfs_seek(vnode_t	*vp,
-	 off_t		old_offset,
-	 off_t		*new_offsetp)
+xfs_seek(
+	vnode_t		*vp,
+	off_t		old_offset,
+	off_t		*new_offsetp)
 {
 	if ((*new_offsetp > XFS_MAX_FILE_OFFSET) ||
 	    (*new_offsetp < 0)) {
@@ -4380,12 +4464,13 @@ xfs_seek(vnode_t	*vp,
  * This is a stub.
  */
 STATIC int
-xfs_frlock(vnode_t	*vp,
-	   int		cmd,
-	   flock_t	*flockp,
-	   int		flag,
-	   off_t	offset,
-	   cred_t	*credp)
+xfs_frlock(
+	vnode_t		*vp,
+	int		cmd,
+	flock_t		*flockp,
+	int		flag,
+	off_t		offset,
+	cred_t		*credp)
 {
 	xfs_inode_t	*ip;
 	int		error;
@@ -4408,21 +4493,18 @@ xfs_frlock(vnode_t	*vp,
  * address space by making lots of VM specific calls.  These calls may
  * in turn call back to the xfs_addmap() routine, so we need to ensure
  * that we don't lock the inode across the call to fs_map_subr().
- *
- * XXXajs
- * This is a ridiculous layering of the code.  Why is all this VM
- * baggage embedded in the file system?
  */
 STATIC int
-xfs_map(vnode_t	*vp,
-	off_t	offset,
-	preg_t	*pregp,
-	addr_t	*addrp,
-	size_t	len,
-	uint	prot,
-	uint	max_prot,
-	uint	flags,
-	cred_t	*credp)
+xfs_map(
+	vnode_t		*vp,
+	off_t		offset,
+	preg_t		*pregp,
+	addr_t		*addrp,
+	size_t		len,
+	uint		prot,
+	uint		max_prot,
+	uint		flags,
+	cred_t		*credp)
 {
 	xfs_inode_t	*ip;
 	int		error;
@@ -4444,15 +4526,16 @@ xfs_map(vnode_t	*vp,
  */
 /*ARGSUSED*/
 STATIC int
-xfs_addmap(vnode_t	*vp,
-	   off_t	offset,
-	   preg_t	*pregp,
-	   addr_t	addr,
-	   size_t	len,
-	   uint		prot,
-	   uint		max_prot,
-	   uint		flags,
-	   cred_t	*credp)
+xfs_addmap(
+	vnode_t		*vp,
+	off_t		offset,
+	preg_t		*pregp,
+	addr_t		addr,
+	size_t		len,
+	uint		prot,
+	uint		max_prot,
+	uint		flags,
+	cred_t		*credp)
 {
 	xfs_inode_t	*ip;
 
@@ -4475,15 +4558,16 @@ xfs_addmap(vnode_t	*vp,
  */
 /*ARGSUSED*/
 STATIC int
-xfs_delmap(vnode_t	*vp,
-	   off_t	offset,
-	   preg_t	*pregp,
-	   addr_t	addr,
-	   size_t	len,
-	   uint		prot,
-	   uint		max_prot,
-	   uint		flags,
-	   cred_t	*credp)
+xfs_delmap(
+	vnode_t		*vp,
+	off_t		offset,
+	preg_t		*pregp,
+	addr_t		addr,
+	size_t		len,
+	uint		prot,
+	uint		max_prot,
+	uint		flags,
+	cred_t		*credp)
 {
 	xfs_inode_t	*ip;
 
@@ -4508,10 +4592,11 @@ xfs_delmap(vnode_t	*vp,
  */
 /*ARGSUSED*/
 STATIC int
-xfs_allocstore(vnode_t	*vp,
-	       off_t	offset,
-	       size_t	count,
-	       cred_t	*credp)
+xfs_allocstore(
+	vnode_t		*vp,
+	off_t		offset,
+	size_t		count,
+	cred_t		*credp)
 {
 	xfs_mount_t	*mp;
 	xfs_inode_t	*ip;
@@ -4652,13 +4737,14 @@ xfs_allocstore(vnode_t	*vp,
  */
 /*ARGSUSED*/
 STATIC int
-xfs_fcntl(vnode_t	*vp,
-	  int		cmd,
-	  void		*arg,
-	  int		flags,
-	  off_t		offset,
-	  cred_t	*credp,
-	  rval_t	*rvalp)
+xfs_fcntl(
+	vnode_t		*vp,
+	int		cmd,
+	void		*arg,
+	int		flags,
+	off_t		offset,
+	cred_t		*credp,
+	rval_t		*rvalp)
 {
 	int			error = 0;
 	xfs_mount_t		*mp;
@@ -4788,16 +4874,17 @@ xfs_fcntl(vnode_t	*vp,
 				break;
 			}
 #endif
-		} else if (cmd == F_ALLOCSP64 || cmd == F_FREESP64 || cmd == F_RESVSP64 ||
-			ABI_IS_IRIX5_N32(u.u_procp->p_abi)) {
+		} else if (cmd == F_ALLOCSP64 || cmd == F_FREESP64 ||
+			   cmd == F_RESVSP64 ||
+			   ABI_IS_IRIX5_N32(u.u_procp->p_abi)) {
 			/* 
 			 * The n32 flock structure is the same size as the
 			 * o32 flock64 structure. So the copyin_xlate
 			 * with irix5_n32_to_flock works here.
 			 */
 			if (copyin_xlate((caddr_t)arg, &bf, sizeof bf,
-					irix5_n32_to_flock,
-					u.u_procp->p_abi, 1)) {
+					 irix5_n32_to_flock,
+					 u.u_procp->p_abi, 1)) {
 				error = EFAULT;
 				break;
 			}
@@ -4821,8 +4908,8 @@ xfs_fcntl(vnode_t	*vp,
 		}
 
 		if (!error) {
-			error = xfs_change_file_space( vp, cmd, 
-					&bf, offset, u.u_cred );
+			error = xfs_change_file_space(vp, cmd, &bf, offset,
+						      u.u_cred );
 		}
 		break;
 
@@ -4874,8 +4961,9 @@ xfs_set_dmattrs (
  * xfs_reclaim
  */
 STATIC int
-xfs_reclaim(vnode_t	*vp,
-	    int		flag)
+xfs_reclaim(
+	vnode_t		*vp,
+	int		flag)
 {
 	xfs_inode_t	*ip;
 	xfs_fsize_t	last_byte;
@@ -5066,7 +5154,8 @@ xfs_free_file_space(
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
         error = xfs_itruncate_finish(&tp, ip, (xfs_fsize_t)offset);
 	if (error) {
-		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES);
+		xfs_trans_cancel(tp, (XFS_TRANS_RELEASE_LOG_RES |
+				 XFS_TRANS_ABORT));
 	} else {
 		xfs_ichgtime(ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 		error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
@@ -5217,7 +5306,7 @@ xfs_alloc_file_space(
 
  error0:
 	xfs_bmap_cancel(&free_list);
-	xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES);
+	xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES | XFS_TRANS_ABORT);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	return error;
 }

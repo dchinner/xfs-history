@@ -59,17 +59,6 @@ STATIC void	xfs_trans_free(xfs_trans_t *);
 
 zone_t		*xfs_trans_zone;
 
-xfs_tid_t	
-xfs_trans_id_alloc(
-	xfs_mount_t	*mp)
-{
-	/*
-	 * XXXajs
-	 * Do this.
-	 */
-	return (mp->m_tid++);
-}
-
 
 /*
  * Initialize the precomputed transaction reservation values
@@ -118,7 +107,6 @@ xfs_trans_alloc(
 	 * Initialize the transaction structure.
 	 */
 	tp->t_magic = XFS_TRANS_MAGIC;
-	tp->t_tid = xfs_trans_id_alloc(mp);
 	tp->t_type = type;
 	tp->t_mountp = mp;
 	tp->t_flags = 0;
@@ -148,7 +136,6 @@ xfs_trans_dup(
 	 * Initialize the new transaction structure.
 	 */
 	ntp->t_magic = XFS_TRANS_MAGIC;
-	ntp->t_tid = xfs_trans_id_alloc(tp->t_mountp);
 	ntp->t_type = tp->t_type;
 	ntp->t_mountp = tp->t_mountp;
 	ntp->t_items_free = XFS_LIC_NUM_SLOTS;
@@ -544,17 +531,6 @@ xfs_trans_unreserve_and_mod_sb(
 
 
 
-/*
- * Return the unique transaction id of the given transaction.
- */
-xfs_trans_id_t
-xfs_trans_id(
-	xfs_trans_t	*tp)
-{
-	return (tp->t_tid);
-}
-
-
 /*ARGSUSED*/
 int
 xfs_trans_commit(
@@ -596,7 +572,7 @@ xfs_trans_commit(
 		if (tp->t_ticket) {
 			xfs_log_done(mp, tp->t_ticket, log_flags);
 		}
-		xfs_trans_free_items(tp);
+		xfs_trans_free_items(tp, 0);
 		xfs_trans_free(tp);
 		XFSSTATS.xs_trans_empty++;
 		return 0;
@@ -777,7 +753,6 @@ xfs_trans_fill_vecs(
 	 */
 	tp->t_header.th_magic = XFS_TRANS_HEADER_MAGIC;
 	tp->t_header.th_type = tp->t_type;
-	tp->t_header.th_tid = tp->t_tid;
 	tp->t_header.th_num_items = nitems;
 	log_vector->i_addr = (caddr_t)&tp->t_header;
 	log_vector->i_len = sizeof(xfs_trans_header_t);
@@ -797,12 +772,36 @@ xfs_trans_cancel(
 	xfs_trans_t	*tp,
 	int		flags)
 {
-	int	log_flags;
+	int			log_flags;
+#ifdef DEBUG
+	xfs_log_item_chunk_t	*licp;
+	xfs_log_item_desc_t	*lidp;
+	xfs_log_item_t		*lip;
+	int			i;
+#endif
 
 	if (tp->t_flags & XFS_TRANS_DIRTY) {
 		cmn_err(CE_PANIC, "XFS aborting dirty transaction 0x%x\n",
 			tp);
 	}
+
+#ifdef DEBUG
+	if (!(flags & XFS_TRANS_ABORT)) {
+		licp = &(tp->t_items);
+		while (licp != NULL) {
+			lidp = licp->lic_descs;
+			for (i = 0; i <= XFS_LIC_MAX_SLOT; i++, lidp++) {
+				if (XFS_LIC_ISFREE(licp, i)) {
+					continue;
+				}
+
+				lip = lidp->lid_item;
+				ASSERT(!(lip->li_type == XFS_LI_EFD));
+			}
+			licp = licp->lic_next;
+		}
+	}
+#endif
 
 	xfs_trans_unreserve_and_mod_sb(tp);
 	if (tp->t_ticket) {
@@ -814,7 +813,7 @@ xfs_trans_cancel(
 		}
 		xfs_log_done(tp->t_mountp, tp->t_ticket, log_flags);
 	}
-	xfs_trans_free_items(tp);
+	xfs_trans_free_items(tp, flags);
 	xfs_trans_free(tp);
 }
 

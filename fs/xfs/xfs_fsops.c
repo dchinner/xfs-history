@@ -278,7 +278,7 @@ xfs_growfs_data(
 	return 0;
 
  error0:
-	xfs_trans_cancel(tp, 0);
+	xfs_trans_cancel(tp, XFS_TRANS_ABORT);
 	return error;
 }
 

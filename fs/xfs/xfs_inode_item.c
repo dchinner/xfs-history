@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.45 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -465,6 +465,19 @@ xfs_inode_item_committed(
 	return (lsn);
 }
 
+/*
+ * The transaction with the inode locked has aborted.  The inode
+ * must not be dirty within the transaction.  We simply unlock just
+ * as if the transaction had been cancelled.
+ */
+void
+xfs_inode_item_abort(
+	xfs_inode_log_item_t	*iip)
+{
+	xfs_inode_item_unlock(iip);
+	return;
+}
+
 
 /*
  * This is called to asynchronously write the inode associated with this
@@ -537,7 +550,8 @@ struct xfs_item_ops xfs_inode_item_ops = {
 	(uint(*)(xfs_log_item_t*))xfs_inode_item_trylock,
 	(void(*)(xfs_log_item_t*))xfs_inode_item_unlock,
 	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_inode_item_committed,
-	(void(*)(xfs_log_item_t*))xfs_inode_item_push
+	(void(*)(xfs_log_item_t*))xfs_inode_item_push,
+	(void(*)(xfs_log_item_t*))xfs_inode_item_abort
 };
 
 

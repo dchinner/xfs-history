@@ -1808,6 +1808,8 @@ xfs_dir_node_lookup_int(xfs_dir_state_t *state, int *stat)
 		blk->blkno = blkno;
 		error = xfs_dir_read_buf(state->trans, state->args->dp, blkno, &(blk->bp));
 		if (error) {
+			blk->blkno = 0;
+			state->path.active--;
 			return(error);
 		}
 		ASSERT(blk->bp != NULL);

@@ -303,7 +303,7 @@ xfs_trans_ijoin(
  * IOP_UNLOCK() routine is called.  The inode must already be locked
  * and associated with the given transaction.
  */
-/* ARGSUSED */
+/*ARGSUSED*/
 void
 xfs_trans_ihold(
 	xfs_trans_t	*tp,
@@ -313,6 +313,23 @@ xfs_trans_ihold(
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE));
 
 	ip->i_item.ili_flags |= XFS_ILI_HOLD;
+}
+
+/*
+ * Cancel the previous inode hold request made on this inode
+ * for this transaction.
+ */
+/*ARGSUSED*/
+void
+xfs_trans_ihold_release(
+	xfs_trans_t	*tp,
+	xfs_inode_t	*ip)
+{
+	ASSERT(ip->i_transp == tp);
+	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE));
+	ASSERT(ip->i_item.ili_flags & XFS_ILI_HOLD);
+
+	ip->i_item.ili_flags &= ~XFS_ILI_HOLD;
 }
 
 

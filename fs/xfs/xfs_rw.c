@@ -1,4 +1,4 @@
-#ident "$Revision: 1.126 $"
+#ident "$Revision: 1.127 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -220,6 +220,11 @@ extern void xfs_error(
 	xfs_mount_t *,
 	int);
 
+STATIC void
+xfs_delalloc_cleanup(
+	xfs_inode_t	*ip,
+	xfs_fileoff_t	start_fsb,
+	xfs_filblks_t	count_fsb);
 
 /*
  * Round the given file offset down to the nearest read/write
@@ -3520,6 +3525,73 @@ xfs_check_bp(
 }
 #endif /* DEBUG */
 
+
+/*
+ * This is called to convert all delayed allocation blocks in the given
+ * range back to 'holes' in the file.  It is used when a buffer will not
+ * be able to be written out due to disk errors in the allocation calls.
+ */
+STATIC void
+xfs_delalloc_cleanup(
+	xfs_inode_t	*ip,
+	xfs_fileoff_t	start_fsb,
+	xfs_filblks_t	count_fsb)
+{
+	xfs_fsblock_t	first_block;
+	int		nimaps;
+	int		done;
+	int		error;
+	int		n;
+#define	XFS_CLEANUP_MAPS	4
+	xfs_bmbt_irec_t	imap[XFS_CLEANUP_MAPS];
+
+	ASSERT(count_fsb < 0xffff000);
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	while (count_fsb != 0) {
+		first_block = NULLFSBLOCK;
+		nimaps = XFS_CLEANUP_MAPS;
+		error = xfs_bmapi(NULL, ip, start_fsb, count_fsb, 0,
+				  &first_block, 1, imap, &nimaps, NULL);
+		if (error) {
+			/*
+			 * We should never get errors in this case, but if
+			 * we do then just bail out.
+			 */
+			ASSERT(0);
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
+			return;
+		}
+
+		ASSERT(nimaps > 0);
+		n = 0;
+		while (n < nimaps) {
+			if (imap[n].br_startblock == DELAYSTARTBLOCK) {
+				error = xfs_bunmapi(NULL, ip,
+						    imap[n].br_startoff,
+						    imap[n].br_blockcount,
+						    0, 1, &first_block, NULL,
+						    &done);
+				if (error) {
+					/*
+					 * We should never get errors in
+					 * this case, but if
+					 * we do then just bail out.
+					 */
+					ASSERT(0);
+					xfs_iunlock(ip, XFS_ILOCK_EXCL);
+					return;
+				}
+				ASSERT(done);
+			}
+			start_fsb += imap[n].br_blockcount;
+			count_fsb -= imap[n].br_blockcount;
+			ASSERT(count_fsb < 0xffff000);
+			n++;
+		}
+	}
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+}		     
+
 STATIC int
 xfs_strat_write(
 	vnode_t	*vp,
@@ -3596,6 +3668,8 @@ xfs_strat_write(
 					0, XFS_TRANS_PERM_LOG_RES,
 					XFS_WRITE_LOG_COUNT);
 			if (error) {
+				xfs_trans_cancel(tp,
+						 XFS_TRANS_RELEASE_LOG_RES);
 				bp->b_flags |= B_ERROR;
 				bp->b_error = error;
 				goto error0;
@@ -3618,8 +3692,10 @@ xfs_strat_write(
 					  XFS_BMAPI_WRITE, &first_block, 1,
 					  imap, &(nimaps), &(free_list));
 			if (error) {
+				xfs_bmap_cancel(&free_list);
 				xfs_trans_cancel(tp,
-						 XFS_TRANS_RELEASE_LOG_RES);
+						 (XFS_TRANS_RELEASE_LOG_RES |
+						  XFS_TRANS_ABORT));
 				xfs_iunlock(ip, XFS_ILOCK_EXCL);
 				bp->b_flags |= B_ERROR;
 				bp->b_error = error;
@@ -3631,8 +3707,10 @@ xfs_strat_write(
 			error = xfs_bmap_finish(&(tp), &(free_list),
 						first_block, &committed);
 			if (error) {
+				xfs_bmap_cancel(&free_list);
 				xfs_trans_cancel(tp,
-						 XFS_TRANS_RELEASE_LOG_RES);
+						 (XFS_TRANS_RELEASE_LOG_RES |
+						  XFS_TRANS_ABORT));
 				xfs_iunlock(ip, XFS_ILOCK_EXCL);
 				bp->b_flags |= B_ERROR;
 				bp->b_error = error;
@@ -3795,28 +3873,44 @@ xfs_strat_write(
 	 * mark the buffer done.  Also, drop the count of queued buffers
 	 * now that we know that all the space underlying the buffer has
 	 * been allocated and it has really been sent out to disk.
+	 *
+	 * Use set_lead to tell whether we kicked off any partial I/Os
+	 * or whether we jumped here after an error before issuing any.
 	 */
  error0:
 	atomicAddInt(&(ip->i_queued_bufs), -1);
 	ASSERT(ip->i_queued_bufs >= 0);
-	s = splockspl(xfs_strat_lock, splhi);
-	ASSERT((bp->b_flags & (B_DONE | B_PARTIAL)) == B_PARTIAL);
-	ASSERT(bp->b_flags & B_LEADER);
-
-	if (bp->b_fsprivate2 == NULL) {
+	if (error) {
+		ASSERT(count_fsb != 0);
 		/*
-		 * All of the subordinate buffers have completed.
-		 * Call iodone() to note that the I/O has completed.
+		 * Since we're never going to convert the remaining
+		 * delalloc blocks beneath this buffer into real block,
+		 * get rid of them now.
 		 */
-		bp->b_flags &= ~(B_PARTIAL | B_LEADER);
-		spunlockspl(xfs_strat_lock, s);
-
-		iodone(bp);
-		return error;
+		xfs_delalloc_cleanup(ip, map_start_fsb, count_fsb);
 	}
+	if (set_lead) {
+		s = splockspl(xfs_strat_lock, splhi);
+		ASSERT((bp->b_flags & (B_DONE | B_PARTIAL)) == B_PARTIAL);
+		ASSERT(bp->b_flags & B_LEADER);
+		
+		if (bp->b_fsprivate2 == NULL) {
+			/*
+			 * All of the subordinate buffers have completed.
+			 * Call iodone() to note that the I/O has completed.
+			 */
+			bp->b_flags &= ~(B_PARTIAL | B_LEADER);
+			spunlockspl(xfs_strat_lock, s);
 
-	bp->b_flags &= ~B_PARTIAL;
-	spunlockspl(xfs_strat_lock, s);
+			iodone(bp);
+			return error;
+		}
+
+		bp->b_flags &= ~B_PARTIAL;
+		spunlockspl(xfs_strat_lock, s);
+	} else {
+		biodone(bp);
+	}
 	return error;
 }
 
@@ -4202,7 +4296,10 @@ xfs_diostrat( buf_t *bp)
 
 		if ( writeflag ) {
 			if (error) {
-				xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES);
+				xfs_bmap_cancel(&free_list);
+				xfs_trans_cancel(tp,
+						 (XFS_TRANS_RELEASE_LOG_RES |
+						  XFS_TRANS_ABORT));
 				xfs_iunlock( ip, XFS_ILOCK_EXCL );
 				break;
 			}
@@ -4213,8 +4310,10 @@ xfs_diostrat( buf_t *bp)
 			    error = xfs_bmap_finish( &tp, &free_list,
 						     firstfsb, &committed );
 			    if (error) {
+				    xfs_bmap_cancel(&free_list);
 				    xfs_trans_cancel(tp,
-						 XFS_TRANS_RELEASE_LOG_RES );
+						 (XFS_TRANS_RELEASE_LOG_RES |
+						  XFS_TRANS_ABORT));
 				    xfs_iunlock( ip, XFS_ILOCK_EXCL );
 				    break;
 			    }

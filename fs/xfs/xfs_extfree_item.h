@@ -1,7 +1,7 @@
 #ifndef	_XFS_EXTFREE_ITEM_H
 #define	_XFS_EXTFREE_ITEM_H
 
-#ident	"$Revision: 1.7 $"
+#ident	"$Revision: 1.8 $"
 
 struct xfs_mount;
 struct zone;
@@ -33,6 +33,8 @@ typedef struct xfs_efi_log_format {
  * Define EFI flags.
  */
 #define	XFS_EFI_RECOVERED	0x1
+#define	XFS_EFI_COMMITTED	0x2
+#define	XFS_EFI_CANCELED	0x4
 
 /*
  * This is the "extent free intention" log item.  It is used

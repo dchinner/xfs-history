@@ -11,6 +11,7 @@
 #endif
 #include <sys/vnode.h>
 #include <sys/debug.h>
+#include <sys/errno.h>
 #ifdef SIM
 #include <bstring.h>
 #else
@@ -239,6 +240,12 @@ xfs_trans_getsb(xfs_trans_t	*tp,
 	return (bp);
 }
 
+#ifdef DEBUG
+dev_t	xfs_error_dev = 0x2000027;
+int	xfs_do_error;
+int	xfs_req_num;
+int	xfs_error_mod = 33;
+#endif
 
 /*
  * Get and lock the buffer for the caller if it is not already
@@ -269,6 +276,7 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 	buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
 	int			s;
+	int			error;
 
 	/*
 	 * Default to a normal get_buf() call if the tp is NULL.
@@ -281,8 +289,21 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 		bp = read_buf(dev, blkno, len, flags | BUF_BUSY);
 		if ((bp != NULL) && (geterror(bp) != 0)) {
 			prdev("XFS read error in file system meta-data block %ld", bp->b_edev, bp->b_blkno);
-			return geterror(bp);
+			error = geterror(bp);
+			brelse(bp);
+			return error;
 		}
+#ifdef DEBUG
+		if (xfs_do_error && (bp != NULL)) {
+			if (xfs_error_dev == bp->b_edev) {
+				if (((xfs_req_num++) % xfs_error_mod) == 0) {
+					brelse(bp);
+					printf("Returning error!\n");
+					return EIO;
+				}
+			}
+		}
+#endif
 		*bpp = bp;
 		return 0;
 	}
@@ -304,6 +325,7 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 		ASSERT(bp->b_fsprivate2 == tp);
 		ASSERT(bp->b_fsprivate != NULL);
 		if (!(bp->b_flags & B_DONE)) {
+			ASSERT(0);
 #ifndef SIM
 			SYSINFO.lread += len;
 #endif
@@ -348,6 +370,17 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 	if (geterror(bp) != 0) {
 		cmn_err(CE_PANIC, "XFS dev 0x%x read error in file system meta-data", bp->b_edev);
 	}
+#ifdef DEBUG
+	if (xfs_do_error && !(tp->t_flags & XFS_TRANS_DIRTY)) {
+		if (xfs_error_dev == bp->b_edev) {
+			if (((xfs_req_num++) % xfs_error_mod) == 0) {
+				brelse(bp);
+				printf("Returning error in trans!\n");
+				return EIO;
+			}
+		}
+	}
+#endif
 
 	/*
 	 * The xfs_buf_log_item pointer is stored in b_fsprivate.  If
