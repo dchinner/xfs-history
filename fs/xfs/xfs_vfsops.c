@@ -77,6 +77,7 @@
 #include <sys/xlv_lock.h>
 #endif
 #include <sys/xlate.h>
+#include <sys/capability.h>
 
 #include "xfs_clnt.h"
 #include "xfs_types.h"
@@ -537,7 +538,7 @@ xfs_vfsmount(vfs_t		*vfsp,
 	dev_t		rtdev;
 	int		error;
 
-	if (!suser())
+	if (!_CAP_ABLE(CAP_MOUNT_MGT))
 		return XFS_ERROR(EPERM);
 	if (mvp->v_type != VDIR)
 		return XFS_ERROR(ENOTDIR);
@@ -924,7 +925,7 @@ xfs_unmount(vfs_t	*vfsp,
 	int		sendunmountevent = 0;
 	int		error;
 
-	if (!suser())
+	if (!_CAP_ABLE(CAP_MOUNT_MGT))
 		return XFS_ERROR(EPERM);
 
 	mp = XFS_VFSTOM(vfsp);

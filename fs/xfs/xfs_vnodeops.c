@@ -574,7 +574,8 @@ xfs_setattr(vnode_t	*vp,
 	 * Also check here for xflags, extsize.
          */
         if (mask & (AT_MODE|AT_XFLAGS|AT_EXTSIZE)) {
-                if (credp->cr_uid != ip->i_d.di_uid && !crsuser(credp)) {
+                if (credp->cr_uid != ip->i_d.di_uid &&
+		    !_CAP_CRABLE(credp, CAP_FOWNER)) {
                         code = XFS_ERROR(EPERM);
                         goto error_return;
                 }
@@ -591,7 +592,7 @@ xfs_setattr(vnode_t	*vp,
                 uid = (mask & AT_UID) ? vap->va_uid : ip->i_d.di_uid;
                 gid = (mask & AT_GID) ? vap->va_gid : ip->i_d.di_gid;
 
-                if (!crsuser(credp)) {
+                if (!_CAP_CRABLE(credp, CAP_FOWNER)) {
                         if (credp->cr_uid != ip->i_d.di_uid ||
                                 (restricted_chown &&
                                 (ip->i_d.di_uid != uid ||
@@ -624,7 +625,8 @@ xfs_setattr(vnode_t	*vp,
          * Change file access or modified times.
          */
         if (mask & (AT_ATIME|AT_MTIME)) {
-                if (credp->cr_uid != ip->i_d.di_uid && !crsuser(credp)) {
+                if (credp->cr_uid != ip->i_d.di_uid &&
+		    !_CAP_CRABLE(credp, CAP_FOWNER)) {
                         if (flags & ATTR_UTIME) {
                                 code = XFS_ERROR(EPERM);
                                 goto error_return;
@@ -773,7 +775,7 @@ xfs_setattr(vnode_t	*vp,
                  * A non-privileged user can set the sticky and sgid
                  * bits on a directory.
                  */
-                if (!crsuser(credp)) {
+                if (!_CAP_CRABLE(credp, CAP_DAC_OVERRIDE)) {
                         if (vp->v_type != VDIR && (ip->i_d.di_mode & ISVTX))
                                 ip->i_d.di_mode &= ~ISVTX;
                         if (!groupmember(ip->i_d.di_gid, credp) && 
@@ -795,7 +797,7 @@ xfs_setattr(vnode_t	*vp,
                 uid = (mask & AT_UID) ? vap->va_uid : ip->i_d.di_uid;
                 gid = (mask & AT_GID) ? vap->va_gid : ip->i_d.di_gid;
 
-                if (!crsuser(credp)) {
+                if (!_CAP_CRABLE(credp, CAP_FOWNER)) {
                         ip->i_d.di_mode &= ~(ISUID|ISGID);
                 }
                 if (ip->i_d.di_uid == uid) {
