@@ -1499,14 +1499,14 @@ xfs_dir_node_remove(struct xfs_dir_state *state,
 	int tmp;
 
 	node = (struct xfs_dir_intnode *)drop_blk->bp->b_un.b_addr;
-	ASSERT(drop_blk->index <= node->hdr.count);
+	ASSERT(drop_blk->index < node->hdr.count);
 	ASSERT(drop_blk->index >= 0);
 
 	/*
 	 * Copy over the offending entry, or just zero it out.
 	 */
 	btree = &node->btree[drop_blk->index];
-	if (drop_blk->index < node->hdr.count) {
+	if (drop_blk->index < (node->hdr.count-1)) {
 		tmp  = node->hdr.count - drop_blk->index - 1;
 		tmp *= sizeof(struct xfs_dir_node_entry);
 		bcopy((char *)(btree+1), (char *)btree, tmp);
