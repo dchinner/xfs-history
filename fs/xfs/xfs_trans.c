@@ -450,7 +450,8 @@ xfs_trans_do_commit(xfs_trans_t	*tp,
 	 */
 	if (!(tp->t_flags & XFS_TRANS_DIRTY)) {
 		xfs_trans_unreserve_and_mod_sb(tp);
-		xfs_log_done(tp->t_mountp, tp->t_ticket, 0);
+		if (tp->t_ticket)
+			xfs_log_done(tp->t_mountp, tp->t_ticket, 0);
 		xfs_trans_free_items(tp);
 		xfs_trans_free(tp);
 		return;
