@@ -147,7 +147,7 @@ xfs_init(void)
 	xfs_init_procfs();
 	xfs_sysctl_register();
 
-	xfs_refcache_size = xfs_params.xfs_un.refcache_size;
+	xfs_refcache_size = xfs_params.refcache_size;
 
 	/*
 	 * The inode hash table is created on a per mounted

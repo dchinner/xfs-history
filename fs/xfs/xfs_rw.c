@@ -623,7 +623,7 @@ xfs_refcache_purge_some(xfs_mount_t *mp)
 	}
 
 	iplist_index = 0;
-	purge_count = xfs_params.xfs_un.refcache_purge;
+	purge_count = xfs_params.refcache_purge;
 	iplist = (xfs_inode_t **)kmem_zalloc(purge_count *
 					  sizeof(xfs_inode_t *), KM_SLEEP);
 
