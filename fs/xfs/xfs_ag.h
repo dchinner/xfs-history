@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_AG_H
 #define	_FS_XFS_AG_H
 
-#ident	"$Revision: 1.25 $"
+#ident	"$Revision: 1.26 $"
 
 /*
  * Allocation group header
@@ -139,7 +139,7 @@ typedef struct xfs_perag
 {
 	char		pagf_init;	/* this agf's entry is initialized */
 	char		pagi_init;	/* this agi's entry is initialized */
-	char		pagf_levels[XFS_BTNUM_AGF];
+	__uint8_t	pagf_levels[XFS_BTNUM_AGF];
 					/* # of levels in bno & cnt btree */
 	__uint32_t	pagf_flcount;	/* count of blocks in freelist */
 	xfs_extlen_t	pagf_freeblks;	/* total free blocks */
