@@ -78,7 +78,9 @@ int		xlog_find_cycle_start(struct log *log,
 				      daddr_t	*last_blk,
 				      uint	cycle);
 
+#ifndef SIM
 STATIC int	xlog_clear_stale_blocks(xlog_t	*log, xfs_lsn_t tail_lsn);
+#endif /* !SIM */
 STATIC void	xlog_recover_insert_item_backq(xlog_recover_item_t **q,
 					       xlog_recover_item_t *item);
 STATIC void	xlog_recover_print_trans(xlog_recover_t	    *trans,
@@ -598,6 +600,9 @@ bp_err:
  * We could speed up search by using current head_blk buffer, but it is not
  * available.
  */
+#ifdef SIM
+/* ARGSUSED */
+#endif
 int
 xlog_find_tail(xlog_t  *log,
 	       daddr_t *head_blk,
@@ -607,9 +612,16 @@ xlog_find_tail(xlog_t  *log,
 	xlog_rec_header_t	*rhead;
 	xlog_op_header_t	*op_head;
 	buf_t			*bp;
-	int			error, i, found, clean;
+	int			error, i, found;
+#ifdef SIM
+	/* REFERENCED */
+#endif
+	int			clean;
 	daddr_t			umount_data_blk;
 	daddr_t			after_umount_blk;
+#ifdef SIM
+	/* REFERENCED */
+#endif
 	xfs_lsn_t		tail_lsn;
 	
 	clean = found = error = 0;
@@ -726,6 +738,7 @@ xlog_find_tail(xlog_t  *log,
 		}
 	}
 
+#ifndef SIM
 	/*
 	 * Make sure that there are no blocks in front of the head
 	 * with the same cycle number as the head.  This can happen
@@ -739,6 +752,7 @@ xlog_find_tail(xlog_t  *log,
 	 */
 	if (!clean || !readonly)
 		error = xlog_clear_stale_blocks(log, tail_lsn);
+#endif /* !SIM */
 
 bread_err:
 exit:
@@ -852,7 +866,7 @@ bp_err:
 	return -1;
 }	/* xlog_find_zeroed */
 
-
+#ifndef SIM
 /*
  * This is simply a subroutine used by xlog_clear_stale_blocks() below
  * to initialize a buffer full of empty log record headers and write
@@ -1033,6 +1047,7 @@ xlog_clear_stale_blocks(
 
 	return 0;
 }
+#endif /* !SIM */
 
 /******************************************************************************
  *
