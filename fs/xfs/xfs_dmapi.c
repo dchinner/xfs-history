@@ -230,20 +230,40 @@ prohibited_mr_events(
 {
 	struct address_space *mapping = LINVFS_GET_IP(vp)->i_mapping;
 	int prohibited = (1 << DM_EVENT_READ);
-	struct vm_area_struct *vma;
+	struct vm_area_struct *vma = NULL;
 
 	if (!VN_MAPPED(vp))
 		return 0;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-	down(&mapping->i_shared_sem);
-	list_for_each_entry(vma, &mapping->i_mmap_shared, shared) {
-		if (!(vma->vm_flags & VM_DENYWRITE)) {
-			prohibited |= (1 << DM_EVENT_WRITE);
-			break;
+	/*
+	 * This block copied from IBM's version, with slight adjustments.
+	 */
+	spin_lock(&mapping->i_mmap_lock);
+	if (!prio_tree_empty(&mapping->i_mmap)) {
+		struct inode *ip = LINVFS_GET_IP(vp);
+		struct prio_tree_iter iter;
+		while ((vma = vma_prio_tree_next(vma, &mapping->i_mmap,
+					&iter, 0, ip->i_size)) != NULL) {
+			/* SPECIAL CASE: all events prohibited if any mmap
+			 * areas with VM_EXEC
+			 */
+			if (vma->vm_flags & VM_EXEC) {
+				prohibited |= ((1 << DM_EVENT_READ) |
+					       (1 << DM_EVENT_WRITE) |
+					       (1 << DM_EVENT_TRUNCATE));
+				break;
+			}
+
+			if (vma->vm_flags & VM_READ) {
+				prohibited |= 1 << DM_EVENT_READ;
+			}
+			if (vma->vm_flags & VM_WRITE) {
+				prohibited |= 1 << DM_EVENT_WRITE;
+			}
 		}
 	}
-	up(&mapping->i_shared_sem);
+	spin_unlock(&mapping->i_mmap_lock);
 #else
 	spin_lock(&mapping->i_shared_lock);
 	for (vma = mapping->i_mmap_shared; vma; vma = vma->vm_next) {
