@@ -190,6 +190,9 @@ typedef struct xfs_da_state {
 	int			 inleaf;	/* insert into 1->lf, 0->splf */
 	struct xfs_da_state_path path;		/* search/split paths */
 	struct xfs_da_state_path altpath;	/* alternate path for join */
+	int			 extravalid;	/* T/F: extrablk is in use */
+	int			 extraafter;	/* T/F: extrablk is after new */
+	struct xfs_da_state_blk	 extrablk;	/* for double-splits on leafs */
 } xfs_da_state_t;
 
 /*
