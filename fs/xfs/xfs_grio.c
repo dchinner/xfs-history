@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.8 1994/03/29 23:06:01 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.9 1994/04/05 15:14:03 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -633,18 +633,30 @@ xfs_get_file_extents(dev_t fsdev,
 		return( 1 );
 	}
 
-	recsize = sizeof(xfs_bmbt_irec_t) * XFS_MAX_INCORE_EXTENTS;
-	rec = kmem_alloc(recsize, KM_SLEEP );
-	ASSERT(rec);
 	num_extents = ip->i_bytes / sizeof(*ep);
-	ep = ip->i_u1.iu_extents;
-
-
-	for (i = 0; i < num_extents; i++, ep++) {
+	if (num_extents) {
 		/*
- 		 * copy extent numbers;
- 		 */
-		xfs_bmbt_get_all( ep, rec[i]);
+		 * Copy the extents if they exist.
+		 */
+		ASSERT(num_extents <  XFS_MAX_INCORE_EXTENTS);
+
+		recsize = sizeof(xfs_bmbt_irec_t) * num_extents;
+		rec = kmem_alloc(recsize, KM_SLEEP );
+		ASSERT(rec);
+
+		ep = ip->i_u1.iu_extents;
+
+		for (i = 0; i < num_extents; i++, ep++) {
+			/*
+ 			 * copy extent numbers;
+ 			 */
+			xfs_bmbt_get_all( ep, rec[i]);
+		}
+
+		if (copyout(rec, extents, recsize )) {
+			ret = EFAULT;
+		}
+		kmem_free(rec, 0 );
 	}
 
 	/* 
@@ -653,11 +665,7 @@ xfs_get_file_extents(dev_t fsdev,
 	if (copyout( &num_extents, count, sizeof( num_extents))) {
 		ret = EFAULT;
 	}
-	if (copyout(rec, extents,recsize )) {
-		ret = EFAULT;
-	}
 
-	kmem_free(rec, 0 );
 	xfs_iunlock( ip, XFS_ILOCK_EXCL );
 	return( ret );
 }
