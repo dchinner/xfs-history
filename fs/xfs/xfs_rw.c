@@ -1,4 +1,4 @@
-#ident "$Revision: 1.157 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -87,24 +87,6 @@ static buf_t	*xfsd_list;
 static int	xfsd_bufcount;
 lock_t		xfsd_lock;
 sv_t		xfsd_wait;
-
-/*
- * Zone allocator for arrays of xfs_bmbt_irec_t used
- * for calls to xfs_bmapi().
- */
-zone_t		*xfs_irec_zone;
-
-/*
- * Zone allocator for arrays of bmapval structures
- * used in calls to xfs_iomap_XXX routines.
- */
-zone_t		*xfs_bmap_zone;
-
-/*
- * Zone allocator for local variables in xfs_strat_write().
- * This routine is a real problem so we take extreme measures.
- */
-zone_t		*xfs_strat_write_zone;
 
 /*
  * Zone allocator for xfs_gap_t structures.
@@ -698,8 +680,7 @@ xfs_iomap_read(
 	struct bmapval	*next_read_ahead_bmapp;
 	xfs_bmbt_irec_t	*curr_imapp;
 	xfs_bmbt_irec_t	*last_imapp;
-#define	XFS_READ_IMAPS	XFS_BMAP_MAX_NMAP
-	xfs_bmbt_irec_t	imap[XFS_READ_IMAPS];
+	xfs_bmbt_irec_t	imap[XFS_MAX_RW_NBMAPS];
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE) != 0);
 	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE | MR_ACCESS) != 0);
@@ -711,7 +692,7 @@ xfs_iomap_read(
 		nisize = ip->i_d.di_size;
 	}
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
-	nimaps = XFS_READ_IMAPS;
+	nimaps = sizeof(imap) / sizeof(imap[0]);
 	last_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)nisize));
 	if (offset >= nisize) {
 		/*
@@ -840,6 +821,7 @@ xfs_iomap_read(
 	first_read_ahead_bmapp = NULL;
 	if ((*nbmaps > 1) &&
 	    (((offset == ip->i_next_offset) &&
+	      (offset != 0) &&
 	      (offset_fsb >= ip->i_reada_blkno)) ||
 	     (retrieved_bytes < count))) {
 		curr_bmapp = &bmapp[0];
@@ -1026,8 +1008,7 @@ xfs_read_file(
 	int	ioflag,
 	cred_t	*credp)
 {
-#define	XFS_READ_BMAPS	XFS_ZONE_NBMAPS
-	struct bmapval	bmaps[XFS_ZONE_NBMAPS];
+	struct bmapval	bmaps[XFS_MAX_RW_NBMAPS];
 	struct bmapval	*bmapp;
 	int		nbmaps;
 	buf_t		*bp;
@@ -1062,7 +1043,8 @@ xfs_read_file(
 			break;
 		}
  
-		nbmaps = XFS_READ_BMAPS;
+		nbmaps = ip->i_mount->m_nreadaheads ;
+		ASSERT(nbmaps <= sizeof(bmaps) / sizeof(bmaps[0]));
 		error = xfs_iomap_read(ip, uiop->uio_offset, uiop->uio_resid,
 				       bmaps, &nbmaps);
 
@@ -1955,8 +1937,7 @@ xfs_write_file(
 	int	ioflag,
 	cred_t	*credp)
 {
-#define	XFS_WRITE_BMAPS	XFS_ZONE_NBMAPS
-	struct bmapval	bmaps[XFS_WRITE_BMAPS];
+	struct bmapval	bmaps[XFS_MAX_RW_NBMAPS];
 	struct bmapval	*bmapp;
 	int		nbmaps;
 	buf_t		*bp;
@@ -2062,7 +2043,7 @@ xfs_write_file(
 			eof_zeroed = 1;
 		}
 
-		nbmaps = XFS_WRITE_BMAPS;
+		nbmaps = sizeof(bmaps) / sizeof(bmaps[0]);
 		error = xfs_iomap_write(ip, uiop->uio_offset,
 					uiop->uio_resid, bmaps, &nbmaps,
 					ioflag);
