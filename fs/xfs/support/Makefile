@@ -30,6 +30,8 @@
 # http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
 #
 
+EXTRA_CFLAGS += -I..
+
 ifeq ($(CONFIG_XFS_DEBUG),y)
 	EXTRA_CFLAGS += -DDEBUG
 endif

@@ -40,7 +40,7 @@
 #include <linux/netdevice.h>
 #endif
 
-#include "types.h"
+#include <xfs_types.h>
 #include "time.h"
 #include "move.h"
 #include "arch.h"

@@ -36,7 +36,7 @@
 #include <linux/proc_fs.h>
 #include <linux/module.h>
 
-#include "types.h"
+#include <xfs_types.h>
 #include "kmem.h"
 #include "spin.h"
 #include "debug.h"

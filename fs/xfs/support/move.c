@@ -32,7 +32,7 @@
 
 #include <asm/uaccess.h>
 
-#include "types.h"
+#include <xfs_types.h>
 #include "debug.h"
 #include "move.h"
 

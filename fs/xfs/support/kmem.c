@@ -37,7 +37,6 @@
 #include <linux/slab.h>
 #include <linux/version.h>
 
-#include "types.h"
 #include "time.h"
 #include "kmem.h"
 

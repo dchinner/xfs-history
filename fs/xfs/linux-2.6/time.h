@@ -40,7 +40,7 @@ static inline void delay(long ticks)
 	schedule_timeout(ticks);
 }
 
-static inline void nanotime(timespec_t *tvp)
+static inline void nanotime(struct timespec *tvp)
 {
 	tvp->tv_sec = xtime.tv_sec;
 	tvp->tv_nsec = xtime.tv_usec * 1000;
