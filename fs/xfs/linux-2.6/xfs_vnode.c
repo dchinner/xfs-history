@@ -216,9 +216,8 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 			printk("vn_initialize: linvfs_revalidate_core "
 				"error %d\n",error);
 		}
-	}
-	if (from_readinode)
 		VN_UNLOCK(vp, s);
+	}
 
 	vn_trace_exit(vp, "vn_initialize", (inst_t *)__return_address);
 
