@@ -29,6 +29,7 @@
 #ifdef SIM
 #define _KERNEL
 #endif
+#include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/fcntl.h>
 #ifdef SIM
