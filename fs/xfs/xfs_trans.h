@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision: 1.90 $"
+#ident "$Revision: 1.92 $"
 
 struct buf;
 struct xfs_efd_log_item;
@@ -713,27 +713,74 @@ typedef struct xfs_trans {
 #define	XFS_ADDAFORK_LOG_RES(mp)	((mp)->m_reservations.tr_addafork)
 
 /*
- * Logging an invalidated buffer when truncating the attribute fork.
+ * Removing the attribute fork of a file
+ *    the inode being truncated: inode size
+ *    the inode\'s bmap btree: max depth * block size
+ * And the bmap_finish transaction can free the blocks and bmap blocks:
+ *    the agf for each of the ags: 4 * sector size
+ *    the flist block for each of the ags: 4 * sector size
+ *    the super block to reflect the freed blocks: sector size
+ *    worst case split in allocation btrees per extent assuming 4 extents:
+ *		4 exts * 2 trees * 2 * max depth * block size
  */
-#define	XFS_ATTRINVAL_MAX_BUFS	128     
-#define	XFS_CALC_ATTRINVAL_LOG_RES(mp)	128000	/* GROT */
+#define	XFS_CALC_ATTRINVAL_LOG_RES(mp)	\
+	(MAX( \
+	 ((mp)->m_sb.sb_inodesize + \
+	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp, XFS_ATTR_FORK)) + \
+	  (128 * (1 + XFS_BM_MAXLEVELS(mp, XFS_ATTR_FORK)))), \
+	 ((4 * (mp)->m_sb.sb_sectsize) + \
+	  (4 * (mp)->m_sb.sb_sectsize) + \
+	  (mp)->m_sb.sb_sectsize + \
+	  (4 * 2 * 2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp))) + \
+	  (128 * (5 + (4 * XFS_AG_MAXLEVELS(mp)))))))
 
 #define	XFS_ATTRINVAL_LOG_RES(mp)	((mp)->m_reservations.tr_attrinval)     
 
 /*
- * Setting an attribute is the same as creating a new file.
+ * Setting an attribute.
+ *	the inode getting the attribute
+ *	the superblock for allocations
+ *	the agfs extents are allocated from
+ *	the attribute btree * max depth
+ *	the inode allocation btree	
+ * Since attribute transaction space is dependent on the size of the attribute,
+ * the calculation is done partially at mount time and partially at runtime.
  */
-#define	XFS_CALC_ATTRSET_LOG_RES(mp)	128000 /* GROT? */
+#define	XFS_CALC_ATTRSET_LOG_RES(mp)	\
+	((mp)->m_sb.sb_inodesize + \
+	 (mp)->m_sb.sb_sectsize + \
+	  XFS_FSB_TO_B((mp), XFS_DA_NODE_MAXDEPTH) + \
+          (128 * (2 + XFS_DA_NODE_MAXDEPTH)))
 
-#define	XFS_ATTRSET_LOG_RES(mp)	((mp)->m_reservations.tr_attrset)
+#define	XFS_ATTRSET_LOG_RES(mp, ext)	\
+	((mp)->m_reservations.tr_attrset + \
+	 (ext * (mp)->m_sb.sb_sectsize) + \
+	 (ext * XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp, XFS_ATTR_FORK))) + \
+	 (128 * (ext + (ext * XFS_BM_MAXLEVELS(mp, XFS_ATTR_FORK)))))
 
 /*
- * Removing an attribute is the same as creating a new file.
+ * Removing an attribute.
+ *    the inode: inode size
+ *    the attribute btree could join: max depth * block size
+ *    the inode bmap btree could join or split : max depth * block size
+ * And the bmap_finish transaction can free the dir blocks freed giving:
+ *    the agf for the ag in which the blocks live
+ *    the superblock for the free block count: sector size
+ *    the allocation btrees: 2 * max depth * block size
  */
-#define	XFS_CALC_ATTRRM_LOG_RES(mp)	128000 /* GROT? */
+#define	XFS_CALC_ATTRRM_LOG_RES(mp)	\
+	(MAX( \
+ 	  ((mp)->m_sb.sb_inodesize + \
+	  XFS_FSB_TO_B((mp), XFS_DA_NODE_MAXDEPTH) + \
+	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp, XFS_ATTR_FORK)) + \
+	  (128 * (1 + XFS_DA_NODE_MAXDEPTH + XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK)))), \
+	 ((mp)->m_sb.sb_sectsize + \
+	  (mp)->m_sb.sb_sectsize + \
+	  (2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp)))) + \
+	  (128 * (2 + (2 * XFS_AG_MAXLEVELS(mp))))))
+
 
 #define	XFS_ATTRRM_LOG_RES(mp)	((mp)->m_reservations.tr_attrrm)
-
 /*
  * Clearing a bad agino number in an agi hash bucket.
  */
