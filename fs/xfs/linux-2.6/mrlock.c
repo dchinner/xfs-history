@@ -92,11 +92,15 @@ lock_wait(wait_queue_head_t *q, spinlock_t *lock, int rw)
 {
 	DECLARE_WAITQUEUE( wait, current );
 
+#if 0
 	if (rw) {
 		set_current_state(TASK_UNINTERRUPTIBLE | TASK_EXCLUSIVE);
 	} else {
 		set_current_state(TASK_UNINTERRUPTIBLE);
 	}
+#endif 
+	/* TASK_EXCLUSIVE has gone away in test11 RMC */
+	set_current_state(TASK_UNINTERRUPTIBLE);
 
 	wq_write_lock(&q->lock);
 	if (rw) {

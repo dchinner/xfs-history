@@ -57,10 +57,17 @@ void _sv_wait( sv_t *sv, spinlock_t *lock, int spl, int intr, struct timespec *t
 	/* Don't restore interrupts until we are done with both locks */
 	spin_unlock( lock );
 	add_wait_queue_exclusive( &sv->waiters, &wait );
+#if 0
 	if (intr) {
 		set_current_state(TASK_INTERRUPTIBLE | TASK_EXCLUSIVE);
 	} else {
 		set_current_state(TASK_UNINTERRUPTIBLE | TASK_EXCLUSIVE);
+	}
+#endif
+	if (intr) {
+		set_current_state(TASK_INTERRUPTIBLE );
+	} else {
+		set_current_state(TASK_UNINTERRUPTIBLE );
 	}
 	spin_unlock_irqrestore( & sv->lock, (long)spl );
         
