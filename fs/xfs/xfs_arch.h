@@ -135,14 +135,16 @@
 #endif
 
 #ifdef CONFIG_XFS_ARCH_MULTI
-#define XFS_ARCH_MODE XFS_ARCH_MODE_MULTI
-#define XFS_MODE "MULTI"
+#error xfs architecture mode "multi" not currently supported
+/* #define XFS_ARCH_MODE XFS_ARCH_MODE_MULTI */
+/* #define XFS_MODE "MULTI" */
 #endif
 
 #endif
 
 #if XFS_ARCH_MODE == XFS_ARCH_MODE_MULTI
-#error xfs architecture mode "multi" not currently supported
+#define ARCH_SUPPORTED(A) ((A)==ARCH_MIPS||(A)==ARCH_NOCONVERT)
+#define XFS_ARCH_DEFAULT (ARCH_NOCONVERT)
 #else
 #if XFS_ARCH_MODE == XFS_ARCH_MODE_NATIVE
 #define ARCH_SUPPORTED(A) ((A)==ARCH_NOCONVERT)
