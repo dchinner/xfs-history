@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ALLOC_BTREE_H
 #define	_FS_XFS_ALLOC_BTREE_H
 
-#ident	"$Revision: 1.1 $"
+#ident	"$Revision: 1.8 $"
 
 /*
  * Freespace on-disk structures
@@ -58,7 +58,6 @@ typedef	struct xfs_btree_sblock xfs_alloc_block_t;
  */
 #define	XFS_BNO_BLOCK(mp)	((xfs_agblock_t)(XFS_AGI_BLOCK(mp) + 1))
 #define	XFS_CNT_BLOCK(mp)	((xfs_agblock_t)(XFS_BNO_BLOCK(mp) + 1))
-#define	XFS_PREALLOC_BLOCKS(mp)	((xfs_agblock_t)(XFS_CNT_BLOCK(mp) + 1))
 
 /*
  * Record, key, and pointer address macros for btree blocks.
