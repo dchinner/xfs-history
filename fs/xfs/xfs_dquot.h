@@ -1,7 +1,7 @@
 #ifndef _XFS_DQUOT__H_
 #define _XFS_DQUOT__H_
 
-#ident "$Revision: 1.10 $"
+#ident "$Revision: 1.11 $"
 
 /* 
  * Dquots are structures that hold quota information about a user or a project,
@@ -28,32 +28,6 @@ typedef struct xfs_dqlink {
 	struct xfs_dquot  *ql_next; 	/* forward link */
 	struct xfs_dquot **ql_prevp;	/* pointer to prev ql_next */
 } xfs_dqlink_t;
-
-
-/*
- * log format struct for dquots.
- * The first two fields must be the type and size fitting into
- * 32 bits : log_recovery code assumes that.
- */
-typedef struct xfs_dq_logformat {
-	__uint16_t		qlf_type;      /* dquot log item type */
-	__uint16_t		qlf_size;      /* size of this item */
-	xfs_dqid_t		qlf_id;	       /* usr/proj id number : 32 bits */
-	__int64_t		qlf_blkno;     /* blkno of dquot buffer */
-	__int32_t		qlf_len;       /* len of dquot buffer */
-	__uint32_t		qlf_boffset;   /* off of dquot in buffer */
-} xfs_dq_logformat_t;
-
-typedef struct xfs_dq_logitem {
-	xfs_log_item_t		 qli_item;	   /* common portion */
-	struct xfs_dquot	*qli_dquot;	   /* dquot ptr */
-	xfs_lsn_t		 qli_flush_lsn;	   /* lsn at last flush */
-	unsigned short           qli_pushbuf_flag; /* one bit used in push_ail */
-#ifdef DEBUG
-	uint64_t                 qli_push_owner;
-#endif
-	xfs_dq_logformat_t	 qli_format;	   /* logged structure */
-} xfs_dq_logitem_t;
 
 struct xfs_mount;
 struct xfs_trans;

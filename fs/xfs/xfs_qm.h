@@ -1,7 +1,7 @@
 #ifndef __XFS_QM_H__
 #define __XFS_QM_H__
 
-#ident "$Revision: 1.6 $"
+#ident "$Revision: 1.7 $"
 
 #include "xfs_quota.h"
 
@@ -146,28 +146,6 @@ typedef struct xfs_dquot_acct {
 } xfs_dquot_acct_t;
 
 /*
- * log format struct for QUOTAOFF records.
- * The first two fields must be the type and size fitting into
- * 32 bits : log_recovery code assumes that.
- * We write two LI_QUOTAOFF logitems per quotaoff, the last one keeps a pointer
- * to the first and ensures that the first logitem is taken out of the AIL
- * only when the last one is securely committed.
- */	
-typedef struct xfs_qoff_logformat {
-	unsigned short		qf_type;	/* quotaoff log item type */
-	unsigned short		qf_size;	/* size of this item */
-	unsigned int		qf_flags;	/* USR and/or PRJ */
-	char			qf_pad[12];	/* padding for future */
-} xfs_qoff_logformat_t;
-
-typedef struct xfs_qoff_logitem {
-	xfs_log_item_t		 qql_item;	/* common portion */
-	struct xfs_qoff_logitem	*qql_start_lip;	/* qoff-start logitem, if any */
-	xfs_qoff_logformat_t	 qql_format;	/* logged structure */
-} xfs_qoff_logitem_t;
-
-
-/*
  * Users are allowed to have a usage exceeding their softlimit for
  * a period this long.
  */
@@ -192,15 +170,6 @@ extern void		xfs_qm_dqunlink(xfs_dquot_t *);
 extern boolean_t	xfs_qm_dqalloc_incore(xfs_dquot_t **);
 extern int 		xfs_qm_write_sb_changes(xfs_mount_t *, __int64_t);
 extern int		xfs_qm_scall_quotaoff(xfs_mount_t *, uint, boolean_t);
-
-/* logitem stuff */
-extern void		   xfs_qm_dquot_logitem_init(xfs_dquot_t *);
-extern xfs_qoff_logitem_t *xfs_qm_qoff_logitem_init(xfs_mount_t *, 
-						    xfs_qoff_logitem_t *, uint);
-extern xfs_qoff_logitem_t *xfs_trans_get_qoff_item(xfs_trans_t *, 
-						   xfs_qoff_logitem_t *, uint);
-extern void		   xfs_trans_log_quotaoff_item(xfs_trans_t *,
-						       xfs_qoff_logitem_t *);
 
 /* list stuff */
 extern void		xfs_qm_freelist_init(xfs_frlist_t *);
