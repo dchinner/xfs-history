@@ -34,7 +34,6 @@
 
 #include <linux/vnode.h>
 #include <linux/mm.h>
-#include <linux/xfs_fs.h>
 #include <linux/xfs_vfs.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -60,8 +59,6 @@
 #include <linux/xfs_behavior.h>
 #include <linux/xfs_fs_subr.h>
 #include <linux/xfs_xattr.h>
-#include <linux/dmapi.h>
-#include <linux/dmapi_kern.h>
 #include <linux/major.h>
 #include <linux/root_dev.h>
 
