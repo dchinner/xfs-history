@@ -1,4 +1,4 @@
-#ident "$Revision: 1.56 $"
+#ident "$Revision: 1.59 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -377,22 +377,7 @@ xfs_buf_item_unlock(
 	/*
 	 * Clear the buffer's association with this transaction.
 	 */
-#ifndef NO_XFS_PARANOIA
-	if (bp->b_flags2 & B_XFS_INO)  {
-		/*
-		 * put mount ptr in fsprivate2 if xaction pointer
-		 * is there, otherwise, leave it alone
-		 */
-		if (((xfs_trans_t *)(bp->b_fsprivate2))->t_magic ==
-				XFS_TRANS_HEADER_MAGIC)
-			bp->b_fsprivate2 =
-				((xfs_trans_t *) bp->b_fsprivate2)->t_mountp;
-	} else
-		bp->b_fsprivate2 = NULL;
-#else
 	bp->b_fsprivate2 = NULL;
-#endif
-
 
 	/*
 	 * If the buf item is marked stale, then don't do anything.
