@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.175 $"
+#ident	"$Revision: 1.177 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -1147,6 +1147,7 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, xfs_sb_field_t field,
 {
 	int		scounter;	/* short counter for 32 bit fields */
 	long long	lcounter;	/* long counter for 64 bit fields */
+	long long res_used, rem;
 
 	/*
 	 * With the in-core superblock spin lock held, switch
@@ -1174,26 +1175,40 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, xfs_sb_field_t field,
 		mp->m_sb.sb_ifree = lcounter;
 		return (0);
 	case XFS_SBS_FDBLOCKS:
+
 		lcounter = mp->m_sb.sb_fdblocks;
-		lcounter += delta;
+		res_used = mp->m_resblks - mp->m_resblks_avail;
+
+		if (delta > 0) {		/* Putting blocks back */
+			if (res_used > delta) {
+				mp->m_resblks_avail += delta;
+			} else {
+				rem = delta - res_used;
+				mp->m_resblks_avail = mp->m_resblks;
+				lcounter += rem;
+			}
+		} else {				/* Taking blocks away */
+
+			lcounter += delta;
 
 		/*
 		 * If were out of blocks, use any available reserved blocks if 
 		 * were allowed to.
 		 */
 
-		if (lcounter < 0) {
-			if (rsvd) {
-				lcounter = mp->m_resblks_avail + delta;
-				if (lcounter < 0) {
+			if (lcounter < 0) {
+				if (rsvd) {
+					lcounter = (long long)mp->m_resblks_avail + delta;
+					if (lcounter < 0) {
+						return (XFS_ERROR(ENOSPC));
+					}
+					mp->m_resblks_avail = lcounter;
+					return (0);
+				} else { 	/* not reserved */
 					return (XFS_ERROR(ENOSPC));
 				}
-				mp->m_resblks_avail = lcounter;
-				return (0);
-			} else { 	/* not reserved */
-				return (XFS_ERROR(ENOSPC));
-			}
-		} 
+			} 
+		}
 
 		mp->m_sb.sb_fdblocks = lcounter;
 		return (0);
