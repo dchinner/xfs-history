@@ -72,8 +72,13 @@ typedef struct xfs_inode {
 	struct vnode		*i_vnode;	/* ptr to associated vnode */
 	struct grio_ticket	*i_ticket;	/* grio ticket list */
 	lock_t			i_ticketlock;
+
+	/* Inode location stuff */
 	dev_t			i_dev;		/* dev for this inode */
 	xfs_ino_t		i_ino;		/* inode number (agno/agino)*/
+	daddr_t			i_blkno;	/* blkno of inode buffer */
+	int			i_len;		/* len of inode buffer */
+	short			i_boffset;	/* off of inode in buffer */
 
 	/* Transaction and locking information. */
 	xfs_trans_t		*i_transp;	/* ptr to owning transaction*/
@@ -189,6 +194,11 @@ typedef struct xfs_inode {
 #define	XFS_ICHGTIME_MOD	0x1	/* data fork modification timestamp */
 #define	XFS_ICHGTIME_ACC	0x2	/* data fork access timestamp */
 #define	XFS_ICHGTIME_CHG	0x4	/* inode field change timestamp */
+
+/*
+ * Flags for xfs_imap() and xfs_dilocate().
+ */
+#define	XFS_IMAP_LOOKUP		0x1
 
 /*
  * Maximum number of extent pointers in i_u1.iu_extents.
