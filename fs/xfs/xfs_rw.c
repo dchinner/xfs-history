@@ -1,4 +1,4 @@
-#ident "$Revision: 1.166 $"
+#ident "$Revision: 1.167 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -3687,6 +3687,7 @@ xfs_strat_write(
 	buf_t		*bp)
 {
 	xfs_fileoff_t	offset_fsb;
+	off_t		offset_fsb_bb;
 	xfs_fileoff_t   map_start_fsb;
 	xfs_fileoff_t	imap_offset;
 	xfs_fsblock_t	first_block;
@@ -3734,9 +3735,21 @@ xfs_strat_write(
 	error = 0;
 	bp->b_flags |= B_STALE;
 
+	/*
+	 * It is possible that the buffer does not start on a block
+	 * boundary in the case where the system page size is less
+	 * than the file system block size.  In this case, the buffer
+	 * is guaranteed to be only a single page long, so we know
+	 * that we will allocate the block for it in a single extent.
+	 * Thus, the looping code below does not have to worry about
+	 * this case.  It is only handled in the fast path code.
+	 */
+
 	ASSERT(bp->b_blkno == -1);
 	offset_fsb = XFS_BB_TO_FSBT(mp, bp->b_offset);
 	count_fsb = XFS_B_TO_FSB(mp, bp->b_bcount);
+	offset_fsb_bb = XFS_FSB_TO_BB(mp, offset_fsb);
+	ASSERT((offset_fsb_bb == bp->b_offset) || (count_fsb == 1));
 	xfs_strat_write_check(ip, offset_fsb,
 			      count_fsb, imap,
 			      XFS_STRAT_WRITE_IMAPS);
@@ -3834,9 +3847,18 @@ xfs_strat_write(
 		if ((map_start_fsb == offset_fsb) &&
 		    (imap[0].br_blockcount == count_fsb)) {
 			ASSERT(nimaps == 1);
-			bp->b_blkno = XFS_FSB_TO_DB(ip, imap[0].br_startblock);
-			bp->b_bcount = XFS_FSB_TO_B(mp,
-						    count_fsb);
+			/*
+			 * Set the buffer's block number to match
+			 * what we allocated.  If the buffer does
+			 * not start on a block boundary (can only
+			 * happen if the block size is larger than
+			 * the page size), then make sure to add in
+			 * the offset of the buffer into the file system
+			 * block to the disk block number to write.
+			 */
+			bp->b_blkno =
+				XFS_FSB_TO_DB(ip, imap[0].br_startblock) +
+				(bp->b_offset - offset_fsb_bb);
 			xfs_strat_write_bp_trace(XFS_STRAT_FAST,
 						 ip, bp);
 			xfs_check_bp(ip, bp);
