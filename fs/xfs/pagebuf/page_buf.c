@@ -1600,8 +1600,10 @@ request:
 
 		if (multi_ok) {
 			psync = kmalloc(sizeof(*psync), GFP_NOFS);
-			if (!psync)
-				return -ENOMEM;
+			if (unlikely(!psync)) {
+				err = -ENOMEM;
+				goto error;
+			}
 
 			psync->pb = pb;
 			psync->locking = locking;
