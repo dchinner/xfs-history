@@ -37,6 +37,8 @@
 #include <sys/schedctl.h>
 #include <sys/atomic_ops.h>
 #include <sys/ktrace.h>
+#include <sys/sysinfo.h>
+#include <sys/ksa.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -936,6 +938,8 @@ xfs_read_file(
 	error = 0;
 	buffer_bytes_ok = 0;
 	bmaps = (struct bmapval *)kmem_zone_alloc(xfs_bmap_zone, KM_SLEEP);
+	XFSSTATS.xs_read_calls++;
+	XFSSTATS.xs_read_bytes += uiop->uio_resid;
 
 	/*
 	 * Loop until uio->uio_resid, which is the number of bytes the
@@ -1012,6 +1016,7 @@ xfs_read_file(
 
 			brelse(bp);
 
+			XFSSTATS.xs_read_bufs++;
 			read_bmaps = 1;
 			nbmaps--;
 			bmapp++;
@@ -1730,7 +1735,8 @@ xfs_write_file(
 	eof_zeroed = 0;
 	gaps_mapped = 0;
 	bmaps = (struct bmapval *)kmem_zone_alloc(xfs_bmap_zone, KM_SLEEP);
-
+	XFSSTATS.xs_write_calls++;
+	XFSSTATS.xs_write_bytes += uiop->uio_resid;
 
 	/*
 	 * i_new_size is used by xfs_iomap_read() when the chunk
@@ -1962,6 +1968,7 @@ xfs_write_file(
 				bdwrite(bp);
 			}
 
+			XFSSTATS.xs_write_bufs++;
 			bmapp++;
 			nbmaps--;
 
@@ -3218,7 +3225,7 @@ xfs_strat_write(
 	 * allocated in a single transaction.
 	 */
 	 
-	
+	XFSSTATS.xs_xstrat_bytes += bp->b_bcount;
 	locals = (xfs_strat_write_locals_t *)
 		kmem_zone_alloc(xfs_strat_write_zone, KM_SLEEP);
 
@@ -3317,6 +3324,7 @@ xfs_strat_write(
 			atomicAddInt(&(locals->ip->i_queued_bufs), -1);
 			ASSERT(locals->ip->i_queued_bufs >= 0);
 			kmem_zone_free(xfs_strat_write_zone, (void *)locals);
+			XFSSTATS.xs_xstrat_quick++;
 			return;
 		}
 
@@ -3330,6 +3338,7 @@ xfs_strat_write(
 		 * deal with marking our bp as done when they have
 		 * ALL completed.
 		 */
+		XFSSTATS.xs_xstrat_split++;
 		locals->imap_index = 0;
 		if (!locals->set_lead) {
 			bp->b_flags |= B_LEADER | B_PARTIAL;
@@ -3636,6 +3645,7 @@ xfsd(void)
 
 		ASSERT((bp->b_flags & (B_BUSY | B_ASYNC | B_READ)) ==
 		       (B_BUSY | B_ASYNC));
+		XFSSTATS.xs_xfsd_bufs++;
 		xfs_strat_write(bp->b_vp, bp);
 
 		s = splock(xfsd_lock);
