@@ -899,7 +899,7 @@ xfs_setattr(
 							     &ip->i_udquot, 
 							     udqp);
 				/*
-				 * We'l dqrele olddquot at the end.
+				 * We'll dqrele olddquot at the end.
 				 */
 			}
 			ip->i_d.di_uid = uid;
@@ -913,6 +913,7 @@ xfs_setattr(
 							     &ip->i_gdquot, 
 							     gdqp);
 			}
+			ip->i_d.di_gid = gid;
 		}
 		if (iprojid != projid) {
 			ip->i_d.di_projid = projid;
