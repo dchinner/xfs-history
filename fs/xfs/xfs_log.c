@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.64 $"
+#ident	"$Revision: 1.65 $"
 
 /*
  * High level interface routines for log manager
@@ -27,7 +27,10 @@
 #endif
 
 #include <sys/kmem.h>
+#include <sys/ktrace.h>
 #include <sys/debug.h>
+#include <sys/proc.h>
+#include <sys/pda.h>		/* depends on proc.h */
 #include <sys/sema.h>
 #include <sys/uuid.h>
 #include <sys/vfs.h>
@@ -87,9 +90,10 @@ STATIC int		xlog_state_lsn_is_synced(xlog_t *log, xfs_lsn_t lsn,
 STATIC void		xlog_state_put_ticket(xlog_t *log, xlog_ticket_t *tic);
 STATIC void		xlog_state_release_iclog(xlog_t *log,
 						 xlog_in_core_t *iclog);
-static void		xlog_state_switch_iclogs(xlog_t *log,
+STATIC void		xlog_state_switch_iclogs(xlog_t *log,
 						 xlog_in_core_t *iclog,
-						 int eventual_size);
+						 int eventual_size,
+						 int *spl);
 STATIC int		xlog_state_sync(xlog_t *log, xfs_lsn_t lsn, uint flags);
 STATIC void		xlog_state_want_sync(xlog_t *log,
 					     xlog_in_core_t *iclog);
@@ -113,9 +117,74 @@ STATIC void		xlog_verify_iclog(xlog_t *log, xlog_in_core_t *iclog,
 int xlog_debug = 1;
 
 
+ktrace_t	*xlog_trace_buf = 0;
+
 #ifdef DEBUG
 int bytes_of_ticket_used;
-#endif
+
+void
+xlog_trace_log(xlog_t *log)
+{
+	if (!xlog_trace_buf)
+		xlog_trace_buf = ktrace_alloc(256);
+	ktrace_enter(xlog_trace_buf,
+		     (void *)1,
+		     (void *)2,
+		     (void *)3,
+		     (void *)4,
+		     (void *)5,
+		     (void *)6,
+		     (void *)7,
+		     (void *)8,
+		     (void *)9,
+		     (void *)10,
+		     (void *)11,
+		     (void *)12,
+		     (void *)13,
+		     (void *)14,
+		     (void *)15,
+		     (void *)16);
+}
+
+void
+xlog_trace_iclog(xlog_in_core_t *iclog, uint state)
+{
+	pid_t pid;
+
+	if (private.p_curproc)
+		pid = private.p_curproc->p_pid;
+
+	if (!iclog->ic_trace)
+		iclog->ic_trace = ktrace_alloc(256);
+	ktrace_enter(iclog->ic_trace,
+		     (void *)state,
+		     (void *)pid,
+		     (void *)0,
+		     (void *)0,
+		     (void *)0,
+		     (void *)0,
+		     (void *)0,
+		     (void *)0,
+		     (void *)0,
+		     (void *)0,
+		     (void *)0,
+		     (void *)0,
+		     (void *)0,
+		     (void *)0,
+		     (void *)0,
+		     (void *)0);
+}
+
+#else
+void
+xlog_trace_log(xlog_t *log)
+{
+}
+
+xlog_trace_iclog(xlog_in_core_t *iclog, uint state)
+{
+}
+#endif /* DEBUG */
 
 /*
  * NOTES:
@@ -400,7 +469,7 @@ xfs_log_unmount(xfs_mount_t *mp)
 	xlog_unalloc();
 
 	return 0;
-}
+}	/* xfs_log_unmount */
 
 
 /*
@@ -451,7 +520,7 @@ xlog_iodone(buf_t *bp)
 
 
 
-static xlog_t *
+STATIC xlog_t *
 xlog_init_log(xfs_mount_t	*mp,
 	      dev_t		log_dev,
 	      daddr_t		blk_offset,
@@ -483,7 +552,7 @@ xlog_init_log(xfs_mount_t	*mp,
  * Values passed down from xfs_log_mount() were placed in log structure
  * in xlog_init_log().
  */
-static void
+STATIC void
 xlog_alloc(xlog_t *log)
 {
 	xlog_rec_header_t	*head;
@@ -553,7 +622,7 @@ xlog_alloc(xlog_t *log)
  * Write out the commit record of a transaction associated with the given
  * ticket.  Return the lsn of the commit record.
  */
-static xfs_lsn_t
+STATIC xfs_lsn_t
 xlog_commit_record(xfs_mount_t  *mp,
 		   xlog_ticket_t *ticket)
 {
@@ -650,7 +719,7 @@ xlog_sync(xlog_t		*log,
 	
 	ASSERT(iclog->ic_refcnt == 0);
 
-	if (flags != 0 && ((flags & XFS_LOG_SYNC) != 0))
+	if (flags != 0 && (flags & XFS_LOG_SYNC) )
 		xlog_panic("xlog_sync: illegal flag");
 	
 	xlog_pack_data(log, iclog);       /* put cycle number in every block */
@@ -688,12 +757,12 @@ xlog_sync(xlog_t		*log,
 
 	bwrite(bp);
 
-	if (bp->b_flags & B_ERROR == B_ERROR)
+	if (bp->b_flags & B_ERROR)
 		xlog_panic("xlog_sync: buffer error");
 
 	if (split) {
 		bp		= iclog->ic_log->l_xbuf;
-		bp->b_blkno	= 0;			/* XXXmiken assumes 0 */
+		bp->b_blkno	= 0;		     /* logical 0 */
 		bp->b_bcount	= bp->b_bufsize = split;
 		bp->b_dmaaddr	= (caddr_t)((psint)iclog+(psint)count);
 		bp->b_fsprivate = iclog;
@@ -715,7 +784,7 @@ xlog_sync(xlog_t		*log,
 
 		bwrite(bp);
 
-		if ((bp->b_flags & B_ERROR) != 0)
+		if (bp->b_flags & B_ERROR)
 			xlog_panic("xlog_sync: buffer error");
 	}
 }	/* xlog_sync */
@@ -956,6 +1025,7 @@ xlog_state_clean_log(xlog_t *log)
 			bzero(iclog->ic_header.h_cycle_data,
 			      sizeof(iclog->ic_header.h_cycle_data));
 			iclog->ic_header.h_lsn = 0;
+			xlog_trace_iclog(iclog, XLOG_TRACE_REL_FLUSH);
 			vsema(&log->l_flushsema);
 		} else if (iclog->ic_state == XLOG_STATE_ACTIVE)
 			/* do nothing */;
@@ -966,7 +1036,7 @@ xlog_state_clean_log(xlog_t *log)
 }	/* xlog_state_clean_log */
 
 
-static void
+STATIC void
 xlog_state_do_callback(xlog_t *log)
 {
 	xlog_in_core_t	   *iclog, *first_iclog;
@@ -1111,7 +1181,9 @@ restart:
 	if (! (iclog->ic_state == XLOG_STATE_ACTIVE ||
 	       iclog->ic_state == XLOG_STATE_DIRTY) ) {
 		spunlockspl(log->l_icloglock, spl);
+		xlog_trace_iclog(iclog, XLOG_TRACE_SLEEP_FLUSH);
 		psema(&log->l_flushsema, PINOD);
+		xlog_trace_iclog(iclog, XLOG_TRACE_WAKE_FLUSH);
 		vsema(&log->l_flushsema);
 		goto restart;
 	}
@@ -1146,7 +1218,8 @@ restart:
 	 */
 	if (iclog->ic_size - iclog->ic_offset < 2*sizeof(xlog_op_header_t)) {
 		if (iclog->ic_state == XLOG_STATE_ACTIVE)
-			xlog_state_switch_iclogs(log, iclog, iclog->ic_size);
+			xlog_state_switch_iclogs(log, iclog, iclog->ic_size,
+						 &spl);
 
 		if (iclog->ic_refcnt == 1) {		/* I'm the only one */
 			spunlockspl(log->l_icloglock, spl);
@@ -1163,7 +1236,8 @@ restart:
 	} else {	/* take as much as possible and write rest in next LR */
 		*continued_write = 1;
 		if (iclog->ic_state == XLOG_STATE_ACTIVE)
-			xlog_state_switch_iclogs(log, iclog, iclog->ic_size);
+			xlog_state_switch_iclogs(log, iclog, iclog->ic_size,
+						 &spl);
 		/* this iclog releases in xlog_write() */
 	}
 	*iclogp = iclog;
@@ -1324,10 +1398,11 @@ xlog_state_release_iclog(xlog_t		*log,
  * exact size of the iclog has not yet been determined.  All we know is
  * that every data block.  We have run out of space in this log record.
  */
-static void
+STATIC void
 xlog_state_switch_iclogs(xlog_t		*log,
 			 xlog_in_core_t *iclog,
-			 int		eventual_size)
+			 int		eventual_size,
+			 int		*spl)
 {
 	if (!eventual_size)
 		eventual_size = iclog->ic_offset;
@@ -1344,8 +1419,9 @@ xlog_state_switch_iclogs(xlog_t		*log,
 		ASSERT(log->l_curr_block >= 0);
 	}
 	log->l_iclog = iclog->ic_next;
-	ASSERT(valusema(&log->l_flushsema) > 0);
-	psema(&log->l_flushsema, PINOD);
+	xlog_trace_iclog(iclog, XLOG_TRACE_GRAB_FLUSH);
+	spunlockspl_psema(log->l_icloglock, *spl, &log->l_flushsema, PINOD);
+	*spl = splockspl(log->l_icloglock, splhi);
 }	/* xlog_state_switch_iclogs */
 
 
@@ -1356,7 +1432,6 @@ xlog_state_sync_all(xlog_t *log, uint flags)
 	xfs_lsn_t	lsn;
 	int		spl;
 
-	xlog_push_buffers_to_disk(log->l_mp);
 	spl = splockspl(log->l_icloglock, splhi);
 
 	iclog = log->l_iclog;
@@ -1378,7 +1453,7 @@ xlog_state_sync_all(xlog_t *log, uint flags)
 	      iclog->ic_state == XLOG_STATE_DIRTY)	&&
 	    flags & XFS_LOG_SYNC)
 		spunlockspl_psema(log->l_icloglock, spl,	/* sleep */
-				  &iclog->ic_forcesema, 0);
+				  &iclog->ic_forcesema, PINOD);
 	else
 		spunlockspl(log->l_icloglock, spl);
 	return 0;
@@ -1416,7 +1491,7 @@ xlog_state_sync(xlog_t	  *log,
 			iclog = iclog->ic_next;
 		} else {
 		    if (iclog->ic_state == XLOG_STATE_ACTIVE) {
-			    xlog_state_switch_iclogs(log, iclog, 0);
+			    xlog_state_switch_iclogs(log, iclog, 0, &spl);
 		    } else if (iclog->ic_state == XLOG_STATE_DIRTY) {
 			    spunlockspl(log->l_icloglock, spl);
 			    return 0;
@@ -1447,7 +1522,7 @@ xlog_state_want_sync(xlog_t *log, xlog_in_core_t *iclog)
 	spl = splockspl(log->l_icloglock, splhi);
 	
 	if (iclog->ic_state == XLOG_STATE_ACTIVE)
-		xlog_state_switch_iclogs(log, iclog, 0);
+		xlog_state_switch_iclogs(log, iclog, 0, &spl);
 	else if (iclog->ic_state != XLOG_STATE_WANT_SYNC)
 		xlog_panic("xlog_state_want_sync: bad state");
 	
@@ -1466,7 +1541,7 @@ xlog_state_want_sync(xlog_t *log, xlog_in_core_t *iclog)
 /*
  *	Algorithm doesn't take into account page size. ;-(
  */
-static void
+STATIC void
 xlog_alloc_tickets(xlog_t *log)
 {
 	caddr_t buf;
@@ -1493,7 +1568,7 @@ xlog_alloc_tickets(xlog_t *log)
 /*
  * Put ticket into free list
  */
-static void
+STATIC void
 xlog_putticket(xlog_t		*log,
 	       xlog_ticket_t	*ticket)
 {
@@ -1567,8 +1642,8 @@ xlog_verify_dest_ptr(xlog_t *log,
 
 
 /* check split LR write */
-static void
-xlog_verify_disk_cycle_no(xlog_t	    *log,
+STATIC void
+xlog_verify_disk_cycle_no(xlog_t	 *log,
 			  xlog_in_core_t *iclog)
 {
     buf_t	*bp;
@@ -1589,7 +1664,7 @@ xlog_verify_disk_cycle_no(xlog_t	    *log,
 
 
 /* check if it will fit */
-static void
+STATIC void
 xlog_verify_tail_lsn(xlog_t	    *log,
 		     xlog_in_core_t *iclog,
 		     xfs_lsn_t	    tail_lsn)
@@ -1675,7 +1750,7 @@ xlog_verify_iclog(xlog_t	 *log,
 
 		/* clientid is only 1 byte */
 		if (syncing == B_FALSE ||
-		    ((psint)&ophead->oh_clientid & 0x1ff) != 0)
+		    ((psint)&ophead->oh_clientid & 0x1ff))
 			clientid = ophead->oh_clientid;
 		else
 			clientid = iclog->ic_header.h_cycle_data[BTOBB(&ophead->oh_clientid - iclog->ic_data)]>>24;
@@ -1684,7 +1759,7 @@ xlog_verify_iclog(xlog_t	 *log,
 
 		/* check tids */
 		if (syncing == B_FALSE ||
-		    ((psint)&ophead->oh_tid & 0x1ff) != 0)
+		    ((psint)&ophead->oh_tid & 0x1ff))
 			tid = ophead->oh_tid;
 		else
 			tid = (xlog_tid_t)iclog->ic_header.h_cycle_data[BTOBB((psint)&ophead->oh_tid - (psint)iclog->ic_data)];
@@ -1697,7 +1772,7 @@ xlog_verify_iclog(xlog_t	 *log,
 
 		/* check length */
 		if (syncing == B_FALSE ||
-		    ((psint)&ophead->oh_len & 0x1ff) != 0)
+		    ((psint)&ophead->oh_len & 0x1ff))
 			op_len = ophead->oh_len;
 		else
 			op_len = iclog->ic_header.h_cycle_data[BTOBB((psint)&ophead->oh_len - (psint)iclog->ic_data)];
