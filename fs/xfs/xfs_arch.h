@@ -47,6 +47,50 @@
 #define ARCH_SPARC	2
 #define ARCH_UNKNOWN    127
 
+/* select native architecture */
+  
+#ifdef CONFIG_X86
+#define ARCH_NOCONVERT ARCH_INTEL_IA32
+#elif defined(__sparc__)
+#define ARCH_NOCONVERT ARCH_SPARC
+#else
+#error attempt to define XFS native architecture on non-supported platform
+#endif
+
+/* supported modes */
+
+#define XFS_ARCH_MODE_MIPS 0
+#define XFS_ARCH_MODE_NATIVE 1
+#define XFS_ARCH_MODE_MULTI 2
+
+/*
+ * development hack:
+ * define one of:
+ *    OVERRIDE_ARCH_MIPS
+ *    OVERRIDE_ARCH_NATIVE
+ *    OVERRIDE_ARCH_MULTI
+ *
+ * to override the CONFIG_XFS_ARCH parameters
+ */
+
+#ifndef XFS_ARCH_MODE
+
+#ifdef OVERRIDE_ARCH_MIPS
+#define XFS_ARCH_MODE XFS_ARCH_MODE_MIPS
+#define XFS_MODE "O-MIPS"
+#endif
+
+#ifdef OVERRIDE_ARCH_MULTI
+#define XFS_ARCH_MODE XFS_ARCH_MODE_MULTI
+#define XFS_MODE "O-MULTI"
+#endif
+
+#ifdef OVERRIDE_ARCH_NATIVE
+#define XFS_ARCH_MODE XFS_ARCH_MODE_NATIVE
+#define XFS_MODE "O-NATIVE"
+#endif
+#endif
+
 /*
  * exactly one of these three options should be enabled:
  *
@@ -57,49 +101,8 @@
  *  #ifdef CONFIG_XFS_ARCH_MULTI
  *     - support other architectures
  */
-
-/* ugly hack for development purposes */
-
-#ifdef OVERRIDE_ARCH_INTEL
-#error define OVERRIDE_ARCH_NATIVE not OVERRIDE_ARCH_INTEL
-#endif
-
-#if defined(OVERRIDE_ARCH_MIPS) || defined(OVERRIDE_ARCH_MULTI) || \
-    defined(OVERRIDE_ARCH_NATIVE)
-    
-#undef CONFIG_XFS_ARCH_MIPS
-#undef CONFIG_XFS_ARCH_MULTI
-#undef CONFIG_XFS_ARCH_NATIVE
-
-#ifdef OVERRIDE_ARCH_MIPS
-#define CONFIG_XFS_ARCH_MIPS
-#endif
-
-#ifdef OVERRIDE_ARCH_MULTI
-#define CONFIG_XFS_ARCH_MULTI
-#endif
-
-#ifdef OVERRIDE_ARCH_NATIVE
-#define CONFIG_XFS_ARCH_NATIVE
-#endif
-
-#else
-
-#ifdef CONFIG_XFS_ARCH_MULTI
-#error xfs architecture mode "multi" not currently supported
-#endif
-
-#endif
-
-/* select native architecture */
-  
-#ifdef CONFIG_X86
-#define ARCH_NOCONVERT ARCH_INTEL_IA32
-#elif defined(__sparc__)
-#define ARCH_NOCONVERT ARCH_SPARC
-#else
-#error attempt to define XFS native architecture on non-supported platform
-#endif
+ 
+#ifndef XFS_ARCH_MODE
 
 /* check for multiple defines */
 
@@ -120,46 +123,41 @@
 #error no xfs architecture selected
 
 #endif
-   
-/* define supported architectures */
 
 #ifdef CONFIG_XFS_ARCH_MIPS
-#define ARCH_SUPPORTED(A) ((A)==ARCH_MIPS)
-#define XFS_ARCH_DEFAULT (ARCH_MIPS)
+#define XFS_ARCH_MODE XFS_ARCH_MODE_MIPS
 #define XFS_MODE "MIPS"
 #endif
 
 #ifdef CONFIG_XFS_ARCH_NATIVE
-#define ARCH_SUPPORTED(A) ((A)==ARCH_NOCONVERT)
-#define XFS_ARCH_DEFAULT (ARCH_NOCONVERT)
+#define XFS_ARCH_MODE XFS_ARCH_MODE_NATIVE
 #define XFS_MODE "NATIVE"
 #endif
 
 #ifdef CONFIG_XFS_ARCH_MULTI
-#define ARCH_SUPPORTED(A) ((A)==ARCH_MIPS || (A)==ARCH_INTEL_IA32)
-#define XFS_ARCH_DEFAULT (ARCH_NOCONVERT)
+#define XFS_ARCH_MODE XFS_ARCH_MODE_MULTI
 #define XFS_MODE "MULTI"
 #endif
 
-/* ugly hack for development purposes */
-
-#ifdef OVERRIDE_ARCH_MIPS
-#undef XFS_MODE
-#define XFS_MODE "O-MIPS"
 #endif
 
-#ifdef OVERRIDE_ARCH_MULTI
-#undef XFS_MODE
-#define XFS_MODE "O-MULTI"
+#if XFS_ARCH_MODE == XFS_ARCH_MODE_MULTI
+#error xfs architecture mode "multi" not currently supported
+#else
+#if XFS_ARCH_MODE == XFS_ARCH_MODE_NATIVE
+#define ARCH_SUPPORTED(A) ((A)==ARCH_NOCONVERT)
+#define XFS_ARCH_DEFAULT (ARCH_NOCONVERT)
+#else
+#if XFS_ARCH_MODE == XFS_ARCH_MODE_MIPS
+#define ARCH_SUPPORTED(A) ((A)==ARCH_MIPS)
+#define XFS_ARCH_DEFAULT (ARCH_MIPS)
+#else
+#error Error in XFS architecture mode selection
 #endif
-
-#ifdef OVERRIDE_ARCH_NATVE
-#undef XFS_MODE
-#define XFS_MODE "O-NATIVE"
 #endif
-
+#endif
+   
 /* generic swapping macros */
-
 
 #define INT_SWAP16(A) ((typeof(A))(__swab16((__u16)A)))
 #define INT_SWAP32(A) ((typeof(A))(__swab32((__u32)A)))
@@ -245,7 +243,7 @@
  *                specified architecture(s) require it.
  */
 
-#ifdef CONFIG_XFS_ARCH_NATIVE
+#if XFS_ARCH_MODE == XFS_ARCH_MODE_NATIVE
 
 /*
  *  case 1 - fast path - all macros support NATIVE MACHINE architecture only
@@ -306,13 +304,13 @@
  *
  */
  
-#if defined(CONFIG_XFS_ARCH_MIPS) || defined(CONFIG_XFS_ARCH_MULTI)
+#if XFS_ARCH_MODE == XFS_ARCH_MODE_MIPS || XFS_ARCH_MODE == XFS_ARCH_MODE_MULTI
 
-#ifdef CONFIG_XFS_ARCH_MIPS 
+#if XFS_ARCH_MODE == XFS_ARCH_MODE_MIPS
 #define ARCH_GET(REF) (ARCH_MIPS)
 #endif
     
-#ifdef CONFIG_XFS_ARCH_MULTI
+#if XFS_ARCH_MODE == XFS_ARCH_MODE_MULTI
 #define ARCH_GET(REF) (REF)
 #endif
  
