@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.67 1996/05/16 16:52:31 pjr Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.68 1996/06/25 23:52:06 sfc Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -26,7 +26,7 @@
 #include <sys/kmem.h>
 #include <sys/cred.h>
 #include <sys/ktime.h>
-#include <sys/proc.h>
+#include <ksys/vproc.h>
 #include <sys/fs/xfs_types.h>
 #include <sys/fs/xfs_log.h>
 #include <sys/fs/xfs_inum.h>
