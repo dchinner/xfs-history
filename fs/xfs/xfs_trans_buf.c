@@ -279,7 +279,7 @@ xfs_trans_read_buf(
 	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	buftarg_t	*target,
-	xfs_daddr_t		blkno,
+	xfs_daddr_t	blkno,
 	int		len,
 	uint		flags,
 	xfs_buf_t	**bpp)
@@ -501,7 +501,7 @@ shutdown_abort:
  */
 void
 xfs_trans_brelse(xfs_trans_t	*tp,
-		 xfs_buf_t		*bp)
+		 xfs_buf_t	*bp)
 {
 	xfs_buf_log_item_t	*bip;
 	xfs_log_item_t		*lip;
@@ -638,7 +638,7 @@ xfs_trans_brelse(xfs_trans_t	*tp,
  */
 void
 xfs_trans_bjoin(xfs_trans_t	*tp,
-		xfs_buf_t		*bp)
+		xfs_buf_t	*bp)
 {
 	xfs_buf_log_item_t	*bip;
 
@@ -683,7 +683,7 @@ xfs_trans_bjoin(xfs_trans_t	*tp,
 /* ARGSUSED */
 void
 xfs_trans_bhold(xfs_trans_t	*tp,
-		xfs_buf_t		*bp)
+		xfs_buf_t	*bp)
 {
 	xfs_buf_log_item_t	*bip;
 
@@ -711,7 +711,7 @@ xfs_trans_bhold(xfs_trans_t	*tp,
  */
 void
 xfs_trans_bhold_until_committed(xfs_trans_t	*tp,
-				xfs_buf_t		*bp)
+				xfs_buf_t	*bp)
 {
 	xfs_log_item_desc_t	*lidp;
 	xfs_buf_log_item_t	*bip;
@@ -823,7 +823,7 @@ xfs_trans_log_buf(xfs_trans_t	*tp,
 void
 xfs_trans_binval(
 	xfs_trans_t	*tp,
-	xfs_buf_t		*bp)
+	xfs_buf_t	*bp)
 {
 	xfs_log_item_desc_t	*lidp;
 	xfs_buf_log_item_t	*bip;
@@ -902,7 +902,7 @@ xfs_trans_binval(
 void
 xfs_trans_inode_buf(
 	xfs_trans_t	*tp,
-	xfs_buf_t		*bp)
+	xfs_buf_t	*bp)
 {
 	xfs_buf_log_item_t	*bip;
 
@@ -929,7 +929,7 @@ xfs_trans_inode_buf(
 void
 xfs_trans_inode_alloc_buf(
 	xfs_trans_t	*tp,
-	xfs_buf_t		*bp)
+	xfs_buf_t	*bp)
 {
 	xfs_buf_log_item_t	*bip;
 
@@ -985,13 +985,13 @@ STATIC xfs_buf_t *
 xfs_trans_buf_item_match(
 	xfs_trans_t	*tp,
 	buftarg_t	*target,
-	xfs_daddr_t		blkno,
+	xfs_daddr_t	blkno,
 	int		len)
 {
 	xfs_log_item_chunk_t	*licp;
 	xfs_log_item_desc_t	*lidp;
 	xfs_buf_log_item_t	*blip;
-	xfs_buf_t			*bp;
+	xfs_buf_t		*bp;
 	int			i;
 
 	bp = NULL;
@@ -1044,7 +1044,7 @@ xfs_trans_buf_item_match_all(
 	xfs_log_item_chunk_t	*licp;
 	xfs_log_item_desc_t	*lidp;
 	xfs_buf_log_item_t	*blip;
-	xfs_buf_t			*bp;
+	xfs_buf_t		*bp;
 	int			i;
 
 	bp = NULL;

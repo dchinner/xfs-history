@@ -399,6 +399,12 @@ xfs_cmountfs(
 	if ((error = xfs_readsb(mp, ddev)))
 		goto error3;
 
+	linvfs_bsize_buftarg(&mp->m_ddev_targ, mp->m_sb.sb_blocksize);
+	if (logdev && logdev != ddev)
+		linvfs_bsize_buftarg(&mp->m_logdev_targ, mp->m_sb.sb_blocksize);
+	if (rtdev != 0)
+		linvfs_bsize_buftarg(&mp->m_rtdev_targ, mp->m_sb.sb_blocksize);
+
 	/*
 	 * prohibit r/w mounts of read-only filesystems
 	 */

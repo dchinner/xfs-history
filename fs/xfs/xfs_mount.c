@@ -251,12 +251,13 @@ xfs_mount_validate_sb(
 		return XFS_ERROR(E2BIG);
 	}
 #endif
-        
+
 	if (sbp->sb_inprogress) {
 		cmn_err(CE_WARN, "XFS: file system busy");
 		return XFS_ERROR(EFSCORRUPTED);
-        }
+	}
 
+#ifndef PAGEBUF_DEBUG
 	/*
 	 * Until this is fixed only page-sized data blocks work.
 	 */
@@ -266,9 +267,10 @@ xfs_mount_validate_sb(
 			sbp->sb_blocksize);
 		cmn_err(CE_WARN,
 		"XFS: Only page-sized (%d bytes) blocksize currently works.",
-					PAGE_SIZE);
-                return XFS_ERROR(EWRONGFS);
-        }
+			PAGE_SIZE);
+		return XFS_ERROR(EWRONGFS);
+	}
+#endif
 	return (0);
 }
 
@@ -409,7 +411,7 @@ xfs_xlatesb(void *data, xfs_sb_t *sb, int dir, xfs_arch_t arch,
 int
 xfs_readsb(xfs_mount_t *mp, dev_t dev)
 {
-	xfs_buf_t		*bp;
+	xfs_buf_t	*bp;
 	xfs_sb_t	*sbp;
 	int		error = 0;
 

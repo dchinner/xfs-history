@@ -39,7 +39,7 @@
 #define XFS_B_DELWRI PBF_DELWRI
 #define XFS_B_READ   PBF_READ
 #define XFS_B_WRITE  PBF_WRITE
-#define XFS_B_STALE (1 << 31)
+#define XFS_B_STALE  PBF_FS_RESERVED_3
 #define XFS_BUF_TRYLOCK		PBF_TRYLOCK
 #define XFS_INCORE_TRYLOCK	PBF_TRYLOCK
 #define XFS_BUF_LOCK		PBF_LOCK
@@ -109,31 +109,14 @@ static inline void xfs_buf_undelay(page_buf_t *pb)
 #define XFS_BUF_UNWRITE(x)      ((x)->pb_flags &= ~PBF_WRITE)
 #define XFS_BUF_ISWRITE(x)      ((x)->pb_flags & PBF_WRITE)
 
-#define XFS_BUF_UNCACHED(x)      printk("XFS_BUF_UNCACHED not implemented yet\n")
-#define XFS_BUF_UNUNCACHED(x)    printk("XFS_BUF_UNUNCACHED not implemented yet\n")
-#define XFS_BUF_ISUNCACHED(x)    (0) 
-
 #define XFS_BUF_ISUNINITIAL(x)   ((x)->pb_flags & PBF_UNINITIAL)
 #define XFS_BUF_UNUNINITIAL(x)   ((x)->pb_flags &= ~PBF_UNINITIAL)
-
-#define XFS_BUF_AGE(x)           printk("XFS_BUF_AGE not implemented yet\n")
 
 #define XFS_BUF_BP_ISMAPPED(bp)  1
 #define XFS_BUF_IS_GRIO(bp)      ((bp)->pb_flags & PBF_GRIO)
 
-/* hmm what does the mean on linux? may go away */
-#define XFS_BUF_PAGEIO(x)        printk("XFS_BUF_PAGEIO not implemented yet\n") 
-/*
- * Flags for incore_match() and findchunk_match().
- */
-#define BUF_FSPRIV      0x1
-#define BUF_FSPRIV2     0x2  
-
 typedef struct page_buf_s xfs_buf_t;
 #define xfs_buf page_buf_s
-
-struct inode;
-struct xfs_mount;
 
 typedef struct buftarg {
 	struct pb_target	*pb_targ;
