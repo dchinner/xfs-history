@@ -142,12 +142,12 @@ xfs_inode_item_format(
 	xfs_inode_log_item_t	*iip,
 	xfs_log_iovec_t		*log_vector)
 {
-	uint		nvecs;
-	xfs_log_iovec_t	*vecp;
-	xfs_inode_t	*ip;
-	size_t		data_bytes;
-	char		*ext_buffer;
-	int		nrecs;
+	uint			nvecs;
+	xfs_log_iovec_t		*vecp;
+	xfs_inode_t		*ip;
+	size_t			data_bytes;
+	xfs_bmbt_rec_32_t	*ext_buffer;
+	int			nrecs;
 
 	ip = iip->ili_inode;
 	vecp = log_vector;
@@ -192,11 +192,9 @@ xfs_inode_item_format(
 				 * buffer in the unlock routine.
 				 */
 				ext_buffer = kmem_alloc(ip->i_bytes, KM_SLEEP);
-				iip->ili_extents_buf =
-					(xfs_bmbt_rec_32_t *)ext_buffer;
-				vecp->i_addr = ext_buffer;
-				vecp->i_len = xfs_iextents_copy(ip,
-								ext_buffer);
+				iip->ili_extents_buf = ext_buffer;
+				vecp->i_addr = (caddr_t)ext_buffer;
+				vecp->i_len = xfs_iextents_copy(ip, ext_buffer);
 			}
 			ASSERT(vecp->i_len <= ip->i_bytes);
 			iip->ili_format.ilf_dsize = vecp->i_len;

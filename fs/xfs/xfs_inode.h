@@ -6,7 +6,7 @@
 struct xfs_inode;
 struct ktrace;
 struct xfs_gap;
-	
+
 /*
  * This is the type used in the xfs inode hash table.
  * An array of these is allocated for each mounted
@@ -294,7 +294,7 @@ void		xfs_iext_realloc(xfs_inode_t *, int);
 void		xfs_iroot_realloc(xfs_inode_t *, int);
 void		xfs_ipin(xfs_inode_t *);
 void		xfs_iunpin(xfs_inode_t *);
-int		xfs_iextents_copy(xfs_inode_t *, char *);
+int		xfs_iextents_copy(xfs_inode_t *, xfs_bmbt_rec_32_t *);
 void		xfs_iflush(xfs_inode_t *, uint);
 int		xfs_iflush_all(xfs_mount_t *, int);
 #ifdef SIM

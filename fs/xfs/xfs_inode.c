@@ -1812,16 +1812,16 @@ xfs_validate_extents(
  */
 int
 xfs_iextents_copy(
-	xfs_inode_t	*ip,
-	char	 	*buffer)
+	xfs_inode_t		*ip,
+	xfs_bmbt_rec_32_t	*buffer)
 {
-	xfs_fsblock_t	start_block;
-	xfs_bmbt_rec_t	*ep;
-	xfs_bmbt_rec_t	*dest_ep;
-	xfs_mount_t	*mp;
-	int		nrecs;
-	int		i;
-	int		copied;
+	xfs_fsblock_t		start_block;
+	xfs_bmbt_rec_t		*ep;
+	xfs_bmbt_rec_32_t	*dest_ep;
+	xfs_mount_t		*mp;
+	int			nrecs;
+	int			i;
+	int			copied;
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE|MR_ACCESS));
 	ASSERT(ip->i_bytes > 0);
@@ -1839,7 +1839,7 @@ xfs_iextents_copy(
 		ASSERT(ip->i_bytes ==
 		       (ip->i_d.di_nextents * sizeof(xfs_bmbt_rec_t)));
 		bcopy(ip->i_u1.iu_extents, buffer, ip->i_bytes);
-		xfs_validate_extents((xfs_bmbt_rec_32_t *)buffer, nrecs);
+		xfs_validate_extents(buffer, nrecs);
 		return ip->i_bytes;
 	}
 
@@ -1850,8 +1850,8 @@ xfs_iextents_copy(
 	 * non-delayed extent.
 	 */
 	ASSERT(nrecs > ip->i_d.di_nextents);
-	ep = (xfs_bmbt_rec_t *)(ip->i_u1.iu_extents);
-	dest_ep = (xfs_bmbt_rec_t *)buffer;
+	ep = ip->i_u1.iu_extents;
+	dest_ep = buffer;
 	copied = 0;
 	for (i = 0; i < nrecs; i++) {
 		start_block = xfs_bmbt_get_startblock(ep);
@@ -1863,7 +1863,7 @@ xfs_iextents_copy(
 			continue;
 		}
 
-		*dest_ep = *ep;
+		*dest_ep = *(xfs_bmbt_rec_32_t *)ep;
 		dest_ep++;
 		ep++;
 		copied++;
@@ -1871,7 +1871,7 @@ xfs_iextents_copy(
 	ASSERT(copied != 0);
 	ASSERT(copied == ip->i_d.di_nextents);
 	ASSERT((copied * sizeof(xfs_bmbt_rec_t)) <= XFS_LITINO(mp));
-	xfs_validate_extents((xfs_bmbt_rec_32_t *)buffer, copied);
+	xfs_validate_extents(buffer, copied);
 
 	return (copied * sizeof(xfs_bmbt_rec_t));
 }		  
@@ -1972,8 +1972,7 @@ xfs_iflush(
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_EXT) &&
 		    (ip->i_bytes > 0)) {
 			ASSERT(ip->i_d.di_nextents > 0);
-			(void) xfs_iextents_copy(ip,
-						 (char *)dip->di_u.di_bmx);
+			(void) xfs_iextents_copy(ip, dip->di_u.di_bmx);
 		}
 		break;
 	case XFS_DINODE_FMT_BTREE:
