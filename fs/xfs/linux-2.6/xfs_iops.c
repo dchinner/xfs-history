@@ -750,7 +750,8 @@ STATIC int linvfs_write_full_page_unlock(struct page *page)
 
 STATIC int linvfs_write_full_page_nounlock(struct page *page)
 {
-	return pagebuf_write_full_page(page, linvfs_pb_bmap);
+	int ret = pagebuf_write_full_page(page, linvfs_pb_bmap);
+	return ret < 0 ? 0 : ret;
 }
 
 STATIC int linvfs_prepare_write(
