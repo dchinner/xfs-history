@@ -1,7 +1,7 @@
 #ifndef	_XFS_RW_H
 #define	_XFS_RW_H
 
-#ident "$Revision: 1.33 $"
+#ident "$Revision: 1.34 $"
 
 struct bhv_desc;
 struct bdevsw;
@@ -221,7 +221,7 @@ xfs_rwunlock(
 int
 xfs_read_buf(
 	struct xfs_mount *mp,
-	dev_t		 dev,
+	buftarg_t	 *target,
         daddr_t 	 blkno,
         int              len,
         uint             flags,
