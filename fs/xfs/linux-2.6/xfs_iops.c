@@ -796,26 +796,20 @@ int linvfs_bmap(struct address_space *mapping, long block)
 
 	vn_trace_entry(vp, "linvfs_bmap", (inst_t *)__return_address);
 
+	VOP_RWLOCK(vp, VRWLOCK_READ);
 	if (inode->i_data.nrpages) {
-		VOP_RWLOCK(vp, VRWLOCK_READ);
 		VOP_FLUSH_PAGES(vp, (xfs_off_t)0, -1, 0, FI_REMAPF, error);
-		VOP_RWUNLOCK(vp, VRWLOCK_READ);
-		if (error)
+		if (error) {
+			VOP_RWUNLOCK(vp, VRWLOCK_READ);
 			return -1;
+		}
 	}
 
-	VOP_BMAP(vp, block << 9, 1, PBF_READ|PBF_BMAP_TRY_ILOCK, NULL,
+	VOP_BMAP(vp, block << 9, 1, PBF_READ, NULL,
 		&bmap, &nbm, error);
+	VOP_RWUNLOCK(vp, VRWLOCK_READ);
 	if (error)
-	return -1;
-
-	/*        
-	printk("%Ld -> (%Ld,%Ld) %Ld\n", 
-	(long long)block, 
-	(long long)bmap.pbm_bn, (long long)(bmap.pbm_delta >> 9), 
-	(long long)(bmap.pbm_bn + (bmap.pbm_delta >> 9)));
-	*/
-
+		return -1;
 	return (int)(bmap.pbm_bn + (bmap.pbm_delta >> 9));
 }
  

@@ -122,7 +122,7 @@ fs_vnode_change(
         vchange_t 	cmd, 
         __psint_t 	val)
 {
-	printk("XFS: fs_vnode_change() NOT IMPLEMENTED\n");
+//	printk("XFS: fs_vnode_change() NOT IMPLEMENTED\n");
 }
 
 
