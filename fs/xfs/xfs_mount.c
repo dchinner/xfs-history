@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.233 $"
+#ident	"$Revision: 1.234 $"
 
 #include <xfs_os_defs.h>
 
@@ -1111,7 +1111,9 @@ xfs_mountfs_int(
 	mp->m_perag = NULL;
 	/* FALLTHROUGH */
  error1:
+#ifndef SIM
 	xfs_uuid_unmount(mp);
+#endif /* !SIM */
 	xfs_freesb(mp);
 	return error;
 }	/* xfs_mountfs_int */
