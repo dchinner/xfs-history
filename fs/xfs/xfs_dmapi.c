@@ -905,36 +905,6 @@ xfs_dm_direct_ok(
 }
 
 
-/* Get a well-connected dentry.  Borrowed from a version of nfsd_iget(),
- * and slightly modified.  The thread that calls this has to clean up
- * the dentry before going back to userspace.
- */
-static struct dentry *dmapi_dget(struct inode *inode)
-{
-	struct list_head *lp;
-	struct dentry *result;
-
-	spin_lock(&dcache_lock);
-	for (lp = inode->i_dentry.next; lp != &inode->i_dentry ; lp=lp->next) {
-		result = list_entry(lp,struct dentry, d_alias);
-		if (! (result->d_flags & DCACHE_NFSD_DISCONNECTED)) {
-			dget_locked(result);
-			result->d_vfs_flags |= DCACHE_REFERENCED;
-			spin_unlock(&dcache_lock);
-			return result;
-		}
-	}
-	spin_unlock(&dcache_lock);
-	result = d_alloc_root(inode);
-	if (result == NULL) {
-		return NULL;
-	}
-	result->d_flags |= DCACHE_NFSD_DISCONNECTED;
-	d_rehash(result); /* so a dput won't loose it */
-	return result;
-}
-
-
 /* We need to be able to select various combinations of FINVIS, O_NONBLOCK,
    O_DIRECT, and O_SYNC, yet we don't have a file descriptor and we don't have
    the file's pathname.  All we have is a handle.
@@ -959,6 +929,7 @@ xfs_dm_rdwr(
 	struct dentry	*dentry;
 	uio_t		uio;
 	iovec_t		iov;
+	struct list_head *lp;
 
 	if (off < 0 || vp->v_type != VREG)
 		return(EINVAL);
@@ -996,24 +967,53 @@ xfs_dm_rdwr(
 
 	ip = LINVFS_GET_IP(vp);
 	if( ip->i_fop == NULL ){
+		/* no iput; caller did get, and will do put */
 		return(EINVAL);
 	}
+	igrab(ip);
 
-	dentry = dmapi_dget(ip);
-	if( dentry == NULL ){
-		return(ENOMEM);
+	/* Find a dentry.  Get a well-connected one, if possible. */
+	spin_lock(&dcache_lock);
+	for (lp = ip->i_dentry.next; lp != &ip->i_dentry ; lp=lp->next) {
+		dentry = list_entry(lp,struct dentry, d_alias);
+		if (! (dentry->d_flags & DCACHE_NFSD_DISCONNECTED)) {
+			dget_locked(dentry);
+			dentry->d_vfs_flags |= DCACHE_REFERENCED;
+			spin_unlock(&dcache_lock);
+			iput(ip);
+			goto found;
+		}
 	}
+	spin_unlock(&dcache_lock);
+	dentry = d_alloc_root(ip);
+	if (dentry == NULL) {
+		iput(ip);
+		return ENOMEM;
+	}
+	dentry->d_flags |= DCACHE_NFSD_DISCONNECTED;
 
+found:
 	if( ip->i_ino != dentry->d_inode->i_ino ){
 		dput(dentry);
-		return(EINVAL);
+		return EINVAL;
+	}
+
+	if (fmode & FMODE_WRITE) {
+		error = get_write_access(ip);
+		if (error) {
+			dput(dentry);
+			return(-error);
+		}
 	}
 
 	error = init_private_file( &file, dentry, fmode );
 	if(error){
+		if (fmode & FMODE_WRITE)
+			put_write_access(ip);
 		dput(dentry);
 		return(EINVAL);
 	}
+
 	file.f_flags = oflags;
 
 	uio.uio_iov = &iov;
@@ -1029,8 +1029,6 @@ xfs_dm_rdwr(
 		VOP_WRITE(vp, &uio, file.f_flags, NULL, NULL, error);
 	}
 
-	dput(dentry);
-
 	if (!error)
 		linvfs_revalidate_core(ip, ATTR_COMM);
 
@@ -1042,6 +1040,11 @@ xfs_dm_rdwr(
 	        XFS_STATS_ADD(xfsstats.xs_write_bytes, xfer);
 	}
 
+	if (file.f_mode & FMODE_WRITE)
+		put_write_access(ip);
+	if (file.f_op->release)
+		file.f_op->release(ip, &file);
+	dput(dentry);
 	return error;
 }
 
