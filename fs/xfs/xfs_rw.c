@@ -1,4 +1,4 @@
-#ident "$Revision: 1.177 $"
+#ident "$Revision: 1.178 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -4720,7 +4720,7 @@ retry:
 				nbp->b_grio_private = bp->b_grio_private;
 
 	     			nbp->b_error     = 0;
-	     			nbp->b_proc      = bp->b_proc;
+	     			nbp->b_pid      = bp->b_pid;
 	     			nbp->b_edev      = bp->b_edev;
 				if (rt) {
 	     				nbp->b_blkno = XFS_FSB_TO_BB(mp,
