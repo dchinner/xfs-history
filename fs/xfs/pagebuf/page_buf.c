@@ -1599,10 +1599,10 @@ request:
 		void		(*callback)(struct buffer_head *, int);
 
 		if (multi_ok) {
-			size_t	size = sizeof(pagesync_t);
+			psync = kmalloc(sizeof(*psync), GFP_NOFS);
+			if (!psync)
+				return -ENOMEM;
 
-			psync = (pagesync_t *) kmalloc(size, GFP_NOFS);
-			BUG_ON(!psync);	/* Ugh - out of memory condition here */
 			psync->pb = pb;
 			psync->locking = locking;
 			atomic_set(&psync->remain, cnt);
@@ -1669,6 +1669,7 @@ _page_buf_page_apply(
 	pb_target_t		*pbr = pb->pb_target;
 	loff_t			pb_offset;
 	size_t			ret_len = pg_length;
+	int			err = 0;
 
 	ASSERT(page);
 
@@ -1686,7 +1687,7 @@ _page_buf_page_apply(
 	}
 
 	if (pb->pb_flags & PBF_READ) {
-		_pagebuf_page_io(page, pbr, pb, bn,
+		err = _pagebuf_page_io(page, pbr, pb, bn,
 			(off_t)pg_offset, pg_length, pb->pb_locked, READ, 0);
 	} else if (pb->pb_flags & PBF_WRITE) {
 		int locking = (pb->pb_flags & _PBF_LOCKABLE) == 0;
@@ -1694,12 +1695,12 @@ _page_buf_page_apply(
 		/* Check we need to lock pages */
 		if (locking && (pb->pb_locked == 0))
 			lock_page(page);
-		_pagebuf_page_io(page, pbr, pb, bn,
+		err = _pagebuf_page_io(page, pbr, pb, bn,
 			(off_t)pg_offset, pg_length, locking, WRITE,
 			last && (pb->pb_flags & PBF_FLUSH));
 	}
 
-	return ret_len;
+	return (err ? err : ret_len);
 }
 
 /*
