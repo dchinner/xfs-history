@@ -356,7 +356,7 @@ xfs_iomap_extra(
 	if (nisize < ip->i_d.di_size) {
 		nisize = ip->i_d.di_size;
 	}
-	ASSERT((offset == BBTOB(BTOBB(nisize))) && (count < NBPP));
+	ASSERT((offset == BBTOOFF(OFFTOBB(nisize))) && (count < NBPP));
 	ASSERT(ip->i_mount->m_sb.sb_blocksize < NBPP);
 
 	mp = ip->i_mount;
@@ -393,6 +393,7 @@ xfs_iomap_read(
 	xfs_fileoff_t	next_offset;
 	xfs_fsize_t	nisize;
 	off_t		offset_page;
+	off_t		aligned_offset;
 	int		nimaps;
 	unsigned int	iosize;
 	unsigned int	last_iosize;
@@ -464,8 +465,8 @@ xfs_iomap_read(
 			 * to XFS_READ_SIZE boundaries as well.
 			 */
 			iosize = mp->m_readio_blocks;
-			ioalign = XFS_READIO_ALIGN(mp, offset);
-			ioalign = XFS_B_TO_FSBT(mp, ioalign);
+			aligned_offset = XFS_READIO_ALIGN(mp, offset);
+			ioalign = XFS_B_TO_FSBT(mp, aligned_offset);
 		} else {
 			/*
 			 * The request is bigger than our
@@ -487,9 +488,10 @@ xfs_iomap_read(
 			 * then round that up to a file system block
 			 * boundary.
 			 */
-			offset_page = ctob(btoct(XFS_FSB_TO_B(mp, offset_fsb)));
+			offset_page = ctooff(offtoct(XFS_FSB_TO_B(mp,
+							 offset_fsb)));
 			last_fsb = XFS_B_TO_FSB(mp,
-						ctob(btoc(offset + count)));
+					ctooff(offtoc(offset + count)));
 			iosize = last_fsb - XFS_B_TO_FSBT(mp, offset_page);
 			ioalign = XFS_B_TO_FSB(mp, offset_page);
 		}
@@ -773,7 +775,7 @@ xfs_read_file(
 				break;
 			} else {
 				buffer_bytes_ok = 1;
-				ASSERT((BBTOB(bmapp->offset) + bmapp->pboff)
+				ASSERT((BBTOOFF(bmapp->offset) + bmapp->pboff)
 				       == uiop->uio_offset);
 				error = biomove(bp, bmapp->pboff,
 						bmapp->pbsize, UIO_READ,
@@ -1051,6 +1053,7 @@ xfs_iomap_write(
 	xfs_fileoff_t	last_fsb;
 	xfs_fileoff_t	bmap_end_fsb;
 	off_t		next_offset;
+	off_t		aligned_offset;
 	xfs_fsize_t	isize;
 	int		nimaps;
 	unsigned int	iosize;
@@ -1088,8 +1091,8 @@ xfs_iomap_write(
 	}
 	
 	iosize = mp->m_writeio_blocks;
-	ioalign = XFS_WRITEIO_ALIGN(mp, offset);
-	ioalign = XFS_B_TO_FSBT(mp, ioalign);
+	aligned_offset= XFS_WRITEIO_ALIGN(mp, offset);
+	ioalign = XFS_B_TO_FSBT(mp, aligned_offset);
 
 	/*
 	 * Now map our desired I/O size and alignment over the
@@ -1180,11 +1183,13 @@ xfs_iomap_write(
 					 * fsblocks would be good to reduce
 					 * the bit shifting here.
 					 */
-					ioalign = XFS_FSB_TO_B(mp,
+					aligned_offset = XFS_FSB_TO_B(mp,
 					                    next_offset_fsb);
-					ioalign = XFS_WRITEIO_ALIGN(mp,
-								    ioalign);
-					ioalign = XFS_B_TO_FSBT(mp, ioalign);
+					aligned_offset =
+						XFS_WRITEIO_ALIGN(mp,
+							aligned_offset);
+					ioalign = XFS_B_TO_FSBT(mp,
+							aligned_offset);
 					xfs_write_bmap(mp, curr_imapp,
 						       next_bmapp, iosize,
 						       ioalign, isize);
@@ -1379,7 +1384,7 @@ xfs_write_file(
 				break;
 			}
 
-			ASSERT((BBTOB(bmapp->offset) + bmapp->pboff) ==
+			ASSERT((BBTOOFF(bmapp->offset) + bmapp->pboff) ==
 			       uiop->uio_offset);
 			if (error = biomove(bp, bmapp->pboff, bmapp->pbsize,
 					    UIO_WRITE, uiop)) {
@@ -1448,7 +1453,7 @@ xfs_write(
 	off_t		offset;
 	size_t		count;
 	int		error;
-	int		n;
+	off_t		n;
 	int		resid;
 	timestruc_t	tv;
 
@@ -1630,7 +1635,7 @@ xfs_overlap_bp(
 		 * one containing the start of rbp.  Note that neither
 		 * bp nor rbp are required to start on page boundaries.
 		 */
-		bytes_off = rbp_offset + BBTOB(dpoff(bp->b_offset));
+		bytes_off = rbp_offset + BBTOOFF(dpoff(bp->b_offset));
 		pfdp = NULL;
 		pfdp = getnextpg(bp, pfdp);
 		ASSERT(pfdp != NULL);
@@ -1675,7 +1680,7 @@ xfs_zero_bp(
 	caddr_t	page_addr;
 	int	len;
 
-	data_offset += BBTOB(dpoff(bp->b_offset));
+	data_offset += BBTOOFF(dpoff(bp->b_offset));
 	pfdp = NULL;
 	pfdp = getnextpg(bp, pfdp);
 	ASSERT(pfdp != NULL);
@@ -2734,7 +2739,7 @@ xfs_diordwr(vnode_t	*vp,
 	/*
  	 * Do maxio check.
  	 */
-	if (uiop->uio_resid > ctob(v.v_maxdmasz)) {
+	if (uiop->uio_resid > ctooff(v.v_maxdmasz)) {
 #ifndef SIM
 		return XFS_ERROR(EINVAL);
 #endif
