@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.61 $"
+#ident	"$Revision: 1.62 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1406,7 +1406,7 @@ xfs_prdinode_core(xfs_dinode_core_t *dip)
 		dip->di_atime.t_sec, dip->di_atime.t_nsec,
 		dip->di_mtime.t_sec, dip->di_mtime.t_nsec,
 		dip->di_ctime.t_sec, dip->di_ctime.t_nsec);
-	qprintf("size %llx ", dip->di_size);
+	qprintf("size 0x%llx ", dip->di_size);
 	qprintf("nblocks %lld extsize 0x%x nextents 0x%x anextents 0x%x\n",
 		dip->di_nblocks, dip->di_extsize,
 		dip->di_nextents, dip->di_anextents);
