@@ -694,8 +694,9 @@ xfs_inode_item_committed(
 
 /*
  * The transaction with the inode locked has aborted.  The inode
- * must not be dirty within the transaction.  We simply unlock just
- * as if the transaction had been cancelled.
+ * must not be dirty within the transaction (unless we're forcibly
+ * shutting down).  We simply unlock just as if the transaction 
+ * had been cancelled.
  */
 STATIC void
 xfs_inode_item_abort(
@@ -774,10 +775,6 @@ xfs_inode_item_pushbuf(
 					      XFS_LOG_FORCE);
 			}
 			if (dopush) {
-#ifdef XFSRACEDEBUG
-				delay_for_intr();
-				delay(300);
-#endif						
 				xfs_bawrite(mp, bp);
 			} else {
 				brelse(bp);
