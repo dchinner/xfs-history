@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.15 $"
+#ident  "$Revision: 1.16 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -435,17 +435,17 @@ xfs_vfsmount(vfs_t		*vfsp,
 		xlv_tab_subvol_t *xlv_p;
 		xlv_tab_subvol_t *sv_p;
 
-		XLV_TAB_LOCK(minor(device), MR_ACCESS);
+		XLV_IO_LOCK(minor(device), MR_ACCESS);
 		xlv_p = &xlv_tab->subvolume[minor(device)];
 		if (! XLV_SUBVOL_EXISTS(xlv_p)) {
-			XLV_TAB_UNLOCK(minor(device));
+			XLV_IO_UNLOCK(minor(device));
 			return ENXIO;
 		}
 		ddev   = (sv_p = xlv_p->vol_p->data_subvol) ? sv_p->dev : 0;
 		logdev = (sv_p = xlv_p->vol_p->log_subvol) ? sv_p->dev : 0;
 		rtdev  = (sv_p = xlv_p->vol_p->rt_subvol) ? sv_p->dev : 0;
 		ASSERT(ddev && logdev);
-		XLV_TAB_UNLOCK(minor(device));
+		XLV_IO_UNLOCK(minor(device));
 
 	} else { /* block device */
 		ddev = logdev = device;
