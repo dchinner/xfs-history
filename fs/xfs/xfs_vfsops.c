@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.10 $"
+#ident  "$Revision: 1.11 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -677,8 +677,8 @@ xfs_statvfs(vfs_t	*vfsp,
 	s = XFS_SB_LOCK(mp);
 	statp->f_bsize = sbp->sb_blocksize;
 	statp->f_frsize = sbp->sb_blocksize;
-	statp->f_blocks = sbp->sb_dblocks;
-	statp->f_bfree = sbp->sb_fdblocks;
+	statp->f_blocks = sbp->sb_dblocks + sbp->sb_rextents * sbp->sb_rextsize;
+	statp->f_bfree = sbp->sb_fdblocks + sbp->sb_frextents * sbp->sb_rextsize;
 	statp->f_files = sbp->sb_icount;
 	statp->f_ffree = sbp->sb_ifree;
 	statp->f_flag = vf_to_stf(vfsp->vfs_flag);
