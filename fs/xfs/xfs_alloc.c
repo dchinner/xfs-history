@@ -2379,11 +2379,13 @@ xfs_alloc_fix_freelist(
 	if (!agbuf)
 		return agbuf;
 	agf = xfs_buf_to_agf(agbuf);
+	need = XFS_MIN_FREELIST(agf);
+	if (total && agf->agf_freecount < need)
+		total += need - agf->agf_freecount;
 	if (minlen > agf->agf_longest || total > agf->agf_freeblks) {
 		xfs_trans_brelse(tp, agbuf);
 		return NULL;
 	}
-	need = XFS_MIN_FREELIST(agf);
 	while (agf->agf_freecount > need) {
 		bno = xfs_alloc_get_freelist(tp, agbuf, &buf);
 		xfs_free_ag_extent(tp, agbuf, agno, bno, 1);
@@ -2544,6 +2546,7 @@ xfs_free_extent(
 	agbno = xfs_fsb_to_agbno(sbp, bno);
 	ASSERT(agbno < sbp->sb_agblocks);
 	agbuf = xfs_alloc_fix_freelist(tp, agno, 0, 0, 1);
+	ASSERT(agbuf != NULL);
 	i = xfs_free_ag_extent(tp, agbuf, agno, agbno, len);
 	return i;
 }
