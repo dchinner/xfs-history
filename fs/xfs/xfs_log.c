@@ -2026,16 +2026,28 @@ xlog_state_do_callback(
 	 * make one last gasp attempt to see if iclogs are being left in
 	 * limbo..
 	 */
+#ifdef DEBUG
 	if (funcdidcallbacks) {
 		first_iclog = iclog = log->l_iclog;
 		do {
 			ASSERT(iclog->ic_state != XLOG_STATE_DO_CALLBACK);
-			if (iclog->ic_state == XLOG_STATE_DO_CALLBACK) {
-				/* assert or something */
-			}
+			/*
+			 * Terminate the loop if iclogs are found in states
+			 * which will cause other threads to clean up iclogs.
+			 *
+			 * SYNCING - i/o completion will go through logs
+			 * DONE_SYNC - interrupt thread should be waiting for
+			 *              LOG_LOCK
+			 * IOERROR - give up hope all ye who enter here
+			 */
+			if (iclog->ic_state == XLOG_STATE_SYNCING ||
+			    iclog->ic_state == XLOG_STATE_DONE_SYNC ||
+			    iclog->ic_state == XLOG_STATE_IOERROR )
+				break;
 			iclog = iclog->ic_next;
 		} while (first_iclog != iclog);
 	}
+#endif
 
 	/*
 	 * Transition from DIRTY to ACTIVE if applicable. NOP if
