@@ -1,4 +1,4 @@
-#ident "$Revision: 1.234 $"
+#ident "$Revision: 1.235 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -4799,7 +4799,7 @@ xfs_force_shutdown(
 #ifdef XFSERRORDEBUG
 	{
 		int nbufs;
-		while (nbufs = incore_delwri_relse(mp->m_dev, 0)) {
+		while (nbufs = incore_relse(mp->m_dev, 1, 0)) {
 			printf("XFS: released 0x%x bufs\n", nbufs);
 			if (ntries >= XFS_MAX_DRELSE_RETRIES) {
 				printf("XFS: ntries 0x%x\n", ntries);
@@ -4810,7 +4810,7 @@ xfs_force_shutdown(
 		}
 	}
 #else
-	while (incore_delwri_relse(mp->m_dev, 0)) {
+	while (incore_relse(mp->m_dev, 1, 0)) {
 		if (ntries >= XFS_MAX_DRELSE_RETRIES)
 			break;
 		delay(++ntries * 5);

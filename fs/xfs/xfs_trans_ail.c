@@ -1,4 +1,4 @@
-#ident "$Revision: 1.38 $"
+#ident "$Revision: 1.39 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -183,6 +183,14 @@ xfs_trans_push_ail(
 		if (lip == NULL) {
 			break;
 		}
+		if (XFS_FORCED_SHUTDOWN(mp)) {
+			/*
+			 * Just return if we shut down during the last try.
+			 */
+			AIL_UNLOCK(mp, s);
+			return (xfs_lsn_t)0;
+		}
+
 	}
 
 	if (flush_log) {
