@@ -19,6 +19,7 @@
 #include <sys/pfdat.h>
 #include <sys/sysinfo.h>
 #include <sys/ksa.h>
+#include <io/dmi/dmi_kern.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -46,7 +47,6 @@
 #include <sys/mode.h>
 #include <sys/var.h>
 #include <sys/capability.h>
-#include <sys/dmi.h>
 #include <string.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"

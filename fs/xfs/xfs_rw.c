@@ -31,7 +31,7 @@
 #include <sys/kmem.h>
 #include <sys/sema.h>
 #include <sys/file.h>
-#include <sys/dmi.h>
+#include <io/dmi/dmi_kern.h>
 #include <sys/region.h>
 #include <sys/runq.h>
 #include <sys/schedctl.h>
