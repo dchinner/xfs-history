@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.10 $"
+#ident "$Revision: 1.11 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -39,6 +39,24 @@
 int	vp_open ( vnode_t *vp, int filemode );
 
 
+STATIC int
+copyout_handle (
+	handle_t	*handle,	/* handle data to copy out */
+	size_t		hsize,		/* amount of data in handle */
+	void		*hbuf,		/* user's data buffer */
+	size_t		*hlen)		/* user's data buffer's size */
+{
+	if (copyout (handle, hbuf, (int) hsize))
+		return EFAULT;
+#ifdef _K64U64
+	if (ABI_IS_64BIT(u.u_procp->p_abi))
+		return copyout (&hsize, hlen, sizeof *hlen);
+	else
+#endif
+		return suword (hlen, (int) hsize);
+}
+
+
 /*
  *  Return the handle for the object named by path.
  */
@@ -52,7 +70,6 @@ path_to_handle (
 	int		error;
 	vnode_t		*vp;
 	handle_t	handle;
-	int		hsize;	/* actual size of data in handle */
 
 	error = lookupname (path, UIO_USERSPACE, NO_FOLLOW, NULLVPP, &vp);
 	if (error)
@@ -61,12 +78,7 @@ path_to_handle (
 	VN_RELE (vp);
 	if (error)
 		return error;
-	hsize = HSIZE (handle);
-	if (copyout (&handle, hbuf, hsize))
-		return EFAULT;
-	if (suword (hlen, hsize))
-		return EFAULT;
-	return 0;
+	return copyout_handle (&handle, HSIZE (handle), hbuf, hlen);
 }
 
 
@@ -83,7 +95,6 @@ path_to_fshandle (
 	int		error;
 	vnode_t		*vp;
 	handle_t	handle;
-	int		hsize;	/* actual size of data in handle */
 
 	error = lookupname (path, UIO_USERSPACE, NO_FOLLOW, NULLVPP, &vp);
 	if (error)
@@ -92,12 +103,7 @@ path_to_fshandle (
 	VN_RELE (vp);
 	if (error)
 		return error;
-	hsize = sizeof (fsid_t);
-	if (copyout (&handle, hbuf, hsize))
-		return EFAULT;
-	if (suword (hlen, hsize))
-		return EFAULT;
-	return 0;
+	return copyout_handle (&handle, sizeof (fsid_t), hbuf, hlen);
 }
 
 
@@ -111,7 +117,6 @@ fd_to_handle (
 	vnode_t		*vp;
 	file_t		*fp;
 	handle_t	handle;
-	int		hsize;
 
 	error = getf (fd, &fp);
 	if (error)
@@ -120,12 +125,7 @@ fd_to_handle (
 	error = vp_to_handle (vp, &handle);
 	if (error)
 		return error;
-	hsize = HSIZE (handle);
-	if (copyout (&handle, hbuf, hsize))
-		return EFAULT;
-	if (suword (hlen, hsize))
-		return EFAULT;
-	return 0;
+	return copyout_handle (&handle, HSIZE (handle), hbuf, hlen);
 }
 
 
