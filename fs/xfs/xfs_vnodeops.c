@@ -1,4 +1,4 @@
-#ident "$Revision: 1.378 $"
+#ident "$Revision: 1.379 $"
 
 
 #ifdef SIM
@@ -375,20 +375,23 @@ xfs_open(
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
 		return XFS_ERROR(EIO);
 
-	mode = vp->v_type == VDIR && ip->i_d.di_nextents ?
-		XFS_ILOCK_EXCL : XFS_ILOCK_SHARED;
-	xfs_ilock(ip, mode);
-#if XFS_BIG_FILES == 0
-	if (ip->i_d.di_size > XFS_MAX_FILE_OFFSET)
-		rval = XFS_ERROR(EFBIG);
-#endif
 	/*
 	 * If it's a directory with any blocks, read-ahead block 0
 	 * as we're almost certain to have the next operation be a read there.
 	 */
-	if (vp->v_type == VDIR && ip->i_d.di_nextents)
+	if (vp->v_type == VDIR && ip->i_d.di_nextents > 0) {
+		mode = xfs_ilock_map_shared(ip);
 		(void)xfs_da_reada_buf(NULL, ip, 0, XFS_DATA_FORK);
-	xfs_iunlock(ip, mode);
+		xfs_iunlock(ip, mode);
+	}
+#if !XFS_BIG_FILES
+	else if (vp->v_type == VREG) {
+		xfs_ilock(ip, XFS_ILOCK_SHARED);
+		if (ip->i_d.di_size > XFS_MAX_FILE_OFFSET)
+			rval = XFS_ERROR(EFBIG);
+		xfs_iunlock(ip, XFS_ILOCK_SHARED);
+	}
+#endif
 	return rval;
 }
 
