@@ -79,20 +79,38 @@ typedef struct xfs_log_callback {
 
 /* Log manager interfaces */
 struct xfs_mount;
-xfs_lsn_t xfs_log_done(struct xfs_mount *mp, xfs_log_ticket_t ticket, uint flags);
-int	  xfs_log_force(struct xfs_mount *mp, xfs_lsn_t lsn, uint flags);
+xfs_lsn_t xfs_log_done(struct xfs_mount *mp,
+		       xfs_log_ticket_t ticket,
+		       uint		flags);
+int	  xfs_log_force(struct xfs_mount *mp,
+			xfs_lsn_t	 lsn,
+			uint		 flags);
 int	  xfs_log_init(void);
-int	  xfs_log_mount(struct xfs_mount *mp, dev_t log_dev, uint flags);
-void	  xfs_log_notify(struct xfs_mount *mp, xfs_lsn_t lsn,
+int	  xfs_log_mount(struct xfs_mount *mp,
+			dev_t		 log_dev,
+			int		 start_block,
+			int		 num_bblocks,
+			uint		 flags);
+void	  xfs_log_notify(struct xfs_mount   *mp,
+			 xfs_lsn_t	    lsn,
 			 xfs_log_callback_t *callback_entry);
-int	  xfs_log_reserve(struct xfs_mount *mp, uint length,
-			  xfs_log_ticket_t *ticket, char clientid, uint flags);
-int	  xfs_log_write(struct xfs_mount *mp, xfs_log_iovec_t region[],
-			int nentries, xfs_log_ticket_t ticket,
-			xfs_lsn_t *start_lsn);
+int	  xfs_log_reserve(struct xfs_mount *mp,
+			  uint		   length,
+			  xfs_log_ticket_t *ticket,
+			  char		   clientid,
+			  uint		   flags);
+int	  xfs_log_write(struct xfs_mount *mp,
+			xfs_log_iovec_t  region[],
+			int		 nentries,
+			xfs_log_ticket_t ticket,
+			xfs_lsn_t	 *start_lsn);
 
 /* Log manager utility interfaces */
-void xfs_log_print(struct xfs_mount *mp, dev_t log_dev, uint flags);
+void xfs_log_print(struct xfs_mount *mp,
+		   dev_t	    log_dev,
+		   int		    start_block,
+		   int		    num_bblocks,
+		   uint		    flags);
 
 #define XFS_ERECOVER	4	/* Failure to recover log */
 #define XFS_ELOGSTAT	2	/* Failure to stat log in user space */
