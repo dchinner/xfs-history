@@ -1,9 +1,10 @@
 #ifndef _FS_XFS_ITABLE_H
 #define	_FS_XFS_ITABLE_H
 
-#ident	"$Revision: 1.9 $"
+#ident	"$Revision: 1.10 $"
 
 struct xfs_mount;
+struct xfs_trans;
 
 /*
  * Structures returned from xfs_bulkstat syssgi routine.
@@ -86,6 +87,32 @@ xfs_itable(
 	int		icount,		/* count of entries in buffer */
 	caddr_t		ubuffer,	/* buffer with inode descriptions */
 	caddr_t		ocount);	/* output count */
+
+/* 
+ * xfs_bulkstat() is used to fill in xfs_bstat structures as well as dm_stat
+ * structures (by the dmi library). This is a pointer to a formatter function
+ * that will iget the inode and fill in the appropriate structure.
+ * see xfs_bulkstat_one() and dm_bulkstat_one() in dmi_xfs.c
+ */
+typedef int (*bulkstat_one_pf)(struct xfs_mount	*mp, 
+			       struct xfs_trans	*tp,
+			       xfs_ino_t   	ino,
+			       void	     	*buffer);
+
+/*
+ * Return stat information in bulk (by-inode) for the filesystem.
+ */
+int				/* error status */
+xfs_bulkstat(
+	struct xfs_mount	*mp,	/* mount point for filesystem */
+	struct xfs_trans	*tp,	/* transaction pointer */
+	ino64_t		*lastino,	/* last inode returned */
+	int		*count,		/* size of buffer/count returned */
+	bulkstat_one_pf formatter,	/* func that'd fill a single buf */
+	size_t		statstruct_size,/* sizeof struct that we're filling */
+	caddr_t		ubuffer,	/* buffer with inode stats */
+	int		*done);		/* 1 if there're more stats to get */
+
 #endif	/* _KERNEL */
 
 #endif	/* !_FS_XFS_ITABLE_H */
