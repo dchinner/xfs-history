@@ -830,6 +830,7 @@ pagebuf_lookup(
 	page_buf_t		*pb = NULL;
 	int			status;
 
+	flags |= _PBF_PRIVATE_BH;
 	pb = __pagebuf_allocate(flags);
 	if (pb) {
 		_pagebuf_initialize(pb, target, ioff, isize, flags);
@@ -918,7 +919,7 @@ pagebuf_associate_memory(
 	pb->pb_locked = 0;
 
 	pb->pb_count_desired = pb->pb_buffer_length = len;
-	pb->pb_flags |= PBF_MAPPED;
+	pb->pb_flags |= PBF_MAPPED | _PBF_PRIVATE_BH;
 
 	return 0;
 }
@@ -1325,7 +1326,7 @@ _end_pagebuf_page_io_multi(
 	struct page		*page;
 
 	mark_buffer_uptodate(bh, uptodate);
-	atomic_dec(&bh->b_count);
+	put_bh(bh);
 
 	page = bh->b_page;
 	if (!test_bit(BH_Uptodate, &bh->b_state)) {
@@ -1381,12 +1382,15 @@ _pagebuf_page_io(
 {
 	size_t			blk_length = 0;
 	struct buffer_head	*bh, *head, *bufferlist[MAX_BUF_PER_PAGE];
-	int			concat_ok, multi_ok, cache_ok;
+	int			concat_ok, multi_ok;
 	int			i = 0, cnt = 0, err = 0;
+	int			public_bh = 0;
 
-	if (blocksize < PAGE_CACHE_SIZE) {
+	if ((blocksize < PAGE_CACHE_SIZE) &&
+	    !(pb->pb_flags & _PBF_PRIVATE_BH)) {
+		int	cache_ok;
 		cache_ok = !((pb->pb_flags & PBF_FORCEIO) || (rw == WRITE));
-		multi_ok = 1;
+		public_bh = multi_ok = 1;
 
 		/* TODO XXX:nathans -[512 byte bh]-  We do not use blocksize
 		 * here because several buffers must be written in chunks of
@@ -1402,8 +1406,16 @@ _pagebuf_page_io(
 		 * filesystems are 512 bytes long.
 		 */
 		sector = 1 << 9;
-		if (!page_has_buffers(page))
-			create_empty_buffers(page, dev, sector);
+		if (!page_has_buffers(page)) {
+			if (!locking) {
+				lock_page(page);
+				if (!page_has_buffers(page)) {
+					create_empty_buffers(page, dev, sector);				}
+				UnlockPage(page);
+			} else {
+				create_empty_buffers(page, dev, sector);
+			}
+		}
 
 		/* Find buffer_heads belonging to just this pagebuf */
 		bh = head = page_buffers(page);
@@ -1417,6 +1429,7 @@ _pagebuf_page_io(
 				break;
 
 			lock_buffer(bh);
+			get_bh(bh);
 			assert(!waitqueue_active(&bh->b_wait));
 
 			bh->b_size = sector;
@@ -1425,8 +1438,6 @@ _pagebuf_page_io(
 		} while (i++, (bh = bh->b_this_page) != head);
 		goto request;
 	}
-
-	assert(blocksize == PAGE_CACHE_SIZE);
 
 	/* This will attempt to make a request bigger than the sector
 	 * size if we are not running on the MD device - LVM need to be
@@ -1477,8 +1488,11 @@ _pagebuf_page_io(
 		memset(bh, 0, sizeof(*bh));
 		bh->b_size = sector;
 		bh->b_blocknr = bn++; 
+		bh->b_dev = dev;
 		set_bit(BH_Lock, &bh->b_state);
 		set_bh_page(bh, page, pg_offset);
+		init_waitqueue_head(&bh->b_wait);
+		atomic_set(&bh->b_count, 1);
 		bufferlist[cnt++] = bh;
 	}
 
@@ -1497,7 +1511,7 @@ request:
 			psync->locking = locking;
 			atomic_set(&psync->remain, 0);
 
-			callback = (blocksize < PAGE_CACHE_SIZE)?
+			callback = public_bh ?
 				   _end_io_multi_part : _end_io_multi_full;
 		} else {
 			callback = locking? _end_io_locked : _end_io_nolock;
@@ -1517,15 +1531,13 @@ request:
 				init_buffer(bh, callback, pb);
 			}
 
-			bh->b_rdev = bh->b_dev = dev;
+			bh->b_rdev = bh->b_dev;
 			bh->b_rsector = bh->b_blocknr;
 			set_bit(BH_Mapped, &bh->b_state);
-			init_waitqueue_head(&bh->b_wait);
-			atomic_set(&bh->b_count, 1);
+			set_bit(BH_Req, &bh->b_state);
 
 			if (rw == WRITE) {
 				set_bit(BH_Uptodate, &bh->b_state);
-				set_bit(BH_Dirty, &bh->b_state);
 			}
 			generic_make_request(rw, bh);
 		}

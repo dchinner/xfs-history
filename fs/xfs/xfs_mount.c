@@ -262,20 +262,18 @@ xfs_mount_validate_sb(
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
-#ifndef CONFIG_PAGEBUF_DEBUG
 	/*
 	 * Until this is fixed only page-sized data blocks work.
 	 */
-	if (sbp->sb_blocksize != PAGE_SIZE) {
+	if (sbp->sb_blocksize > PAGE_SIZE) {
 		cmn_err(CE_WARN,
 		"XFS: Trying to mount file system with blocksize %d bytes",
 			sbp->sb_blocksize);
 		cmn_err(CE_WARN,
-		"XFS: Only page-sized (%d bytes) blocksize currently works.",
+		"XFS: Only page-sized (%d bytes) or less blocksizes currently work.",
 			PAGE_SIZE);
 		return XFS_ERROR(EWRONGFS);
 	}
-#endif
 	return (0);
 }
 

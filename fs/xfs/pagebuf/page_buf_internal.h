@@ -48,11 +48,6 @@
 #define page_has_buffers(page)	((page)->buffers)
 #endif
 
-#define PAGE_CACHE_OFF_LL	((long long)(PAGE_CACHE_SIZE-1))
-#define PAGE_CACHE_MASK_LL	(~((long long)(PAGE_CACHE_SIZE-1)))
-#define PAGE_CACHE_ALIGN_LL(addr) \
-				(((addr)+PAGE_CACHE_SIZE-1)&PAGE_CACHE_MASK_LL)
-
 typedef struct page_buf_private_s {
 	page_buf_t		pb_common;	/* public part of structure */
 	struct semaphore	pb_sema;	/* semaphore for lockables  */

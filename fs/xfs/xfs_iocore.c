@@ -77,7 +77,10 @@ xfs_setsize_fn(
 
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	if (newsize  > ip->i_d.di_size) {
-		ip->i_d.di_size = newsize;
+		vnode_t		*vp = XFS_ITOV(ip);
+		struct inode	*inode = LINVFS_GET_IP(vp);
+
+		inode->i_size = ip->i_d.di_size = newsize;
 		ip->i_update_core = 1;
 		ip->i_update_size = 1;
 		isize = newsize;
