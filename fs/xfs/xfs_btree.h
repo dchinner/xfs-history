@@ -32,8 +32,8 @@ typedef struct xfs_btree_lblock
 	__uint32_t	bb_magic;	/* magic number for block type */
 	__uint16_t	bb_level;	/* 0 is a leaf */
 	__uint16_t	bb_numrecs;	/* current # of data records */
-	xfs_dfsbno_t	bb_leftsib;	/* left sibling block or NULLFSBLOCK */
-	xfs_dfsbno_t	bb_rightsib;	/* right sibling block or NULLFSBLOCK */
+	xfs_dfsbno_t	bb_leftsib;	/* left sibling block or NULLDFSBNO */
+	xfs_dfsbno_t	bb_rightsib;	/* right sibling block or NULLDFSBNO */
 } xfs_btree_lblock_t;
 
 /*
@@ -117,7 +117,7 @@ typedef struct xfs_btree_cur
 #define	xfs_buf_to_sblock(buf)	((xfs_btree_sblock_t *)((buf)->b_un.b_addr))
 #define	xfs_buf_to_lblock(buf)	((xfs_btree_lblock_t *)((buf)->b_un.b_addr))
 
-#ifdef XFSDEBUG
+#ifdef DEBUG
 void
 xfs_btree_check_block(
 	xfs_btree_cur_t		*cur,
@@ -172,7 +172,7 @@ xfs_btree_maxrecs(
 #define	xfs_btree_check_rec(a,b,c)
 #define	xfs_btree_check_sblock(a,b,c)
 #define	xfs_btree_check_sptr(a,b,c)
-#endif
+#endif	/* DEBUG */
 
 buf_t *
 xfs_btree_read_bufl(

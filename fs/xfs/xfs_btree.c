@@ -88,7 +88,7 @@ xfs_btree_read_bufs(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno,
 	return bp;
 }
 
-#ifdef XFSDEBUG
+#ifdef DEBUG
 /*
  * Debug routine: check that block header is ok.
  */
@@ -140,10 +140,10 @@ xfs_btree_check_lblock(xfs_btree_cur_t *cur, xfs_btree_lblock_t *block, int leve
 	ASSERT(block->bb_magic == xfs_magics[cur->bc_btnum]);
 	ASSERT(block->bb_level == level);
 	ASSERT(block->bb_numrecs <= xfs_btree_maxrecs(cur, (xfs_btree_block_t *)block));
-	ASSERT(block->bb_leftsib == NULLFSBLOCK || 
+	ASSERT(block->bb_leftsib == NULLDFSBNO || 
 	       (xfs_fsb_to_agno(mp, block->bb_leftsib) < mp->m_sb.sb_agcount &&
 		xfs_fsb_to_agbno(mp, block->bb_leftsib) < mp->m_sb.sb_agblocks));
-	ASSERT(block->bb_rightsib == NULLFSBLOCK || 
+	ASSERT(block->bb_rightsib == NULLDFSBNO || 
 	       (xfs_fsb_to_agno(mp, block->bb_rightsib) < mp->m_sb.sb_agcount &&
 		xfs_fsb_to_agbno(mp, block->bb_rightsib) < mp->m_sb.sb_agblocks));
 }
@@ -224,7 +224,7 @@ xfs_btree_check_sptr(xfs_btree_cur_t *cur, xfs_agblock_t ptr, int level)
 	agf = xfs_buf_to_agf(agbuf);
 	ASSERT(ptr != NULLAGBLOCK && ptr < agf->agf_length);
 }
-#endif
+#endif	/* DEBUG */
 
 /*
  * Delete the cursor.
@@ -393,7 +393,7 @@ xfs_btree_islastblock(xfs_btree_cur_t *cur, int level)
 	block = xfs_btree_get_block(cur, level);
 	xfs_btree_check_block(cur, block, level);
 	if (xfs_btree_long_ptrs(cur->bc_btnum))
-		return block->bb_u.l.bb_rightsib == NULLFSBLOCK;
+		return block->bb_u.l.bb_rightsib == NULLDFSBNO;
 	else
 		return block->bb_u.s.bb_rightsib == NULLAGBLOCK;
 }
@@ -414,7 +414,7 @@ xfs_btree_lastrec(xfs_btree_cur_t *cur, int level)
 	return 1;
 }
 
-#ifdef XFSDEBUG
+#ifdef DEBUG
 /*
  * Return maxrecs for the block.
  */
@@ -434,7 +434,7 @@ xfs_btree_maxrecs(xfs_btree_cur_t *cur, xfs_btree_block_t *block)
 	}
 	return maxrecs;
 }
-#endif	/* XFSDEBUG */
+#endif	/* DEBUG */
 
 /*
  * Compute byte offsets for the fields given.
