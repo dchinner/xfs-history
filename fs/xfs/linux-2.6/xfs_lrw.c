@@ -938,9 +938,8 @@ retry:
 					goto retry;
 				}
 			case 2:
-				VFS_SYNC(vp->v_vfsp,
-					SYNC_NOWAIT|SYNC_DELWRI|SYNC_BDFLUSH|SYNC_FSDATA,
-					NULL, error);
+				fsync_no_super(LINVFS_GET_IP(vp)->i_dev);
+
 				error = 0;
 /**
 				delay(HZ);
