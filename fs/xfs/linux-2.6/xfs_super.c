@@ -129,8 +129,6 @@ linvfs_read_super(
 	u_int		disk, partition;
 	struct		inode *ip, *cip;
 
-	MOD_INC_USE_COUNT;
-
 	/* first mount pagebuf delayed write daemon not running yet */
 	if (pagebuf_daemon_start() < 0) {
 		goto fail_daemon;
@@ -148,7 +146,6 @@ linvfs_read_super(
 
 	memset(args, 0, sizeof(struct xfs_args));
 	if (mountargs_xfs((char *)data, args) != 0) {
-		MOD_DEC_USE_COUNT;
 		return NULL;
 	}
 	/* check to see if kio is suppose to be on for this mount */
@@ -267,7 +264,6 @@ fail_vfsop:
 	kfree(cvp->v_inode);
         
 fail_daemon:
-	MOD_DEC_USE_COUNT;
 
 	return(NULL);
 }
@@ -449,7 +445,6 @@ linvfs_put_super(
 
 	set_blocksize(dev, sector_size);
 
-	MOD_DEC_USE_COUNT; 
 }
 
 
@@ -577,12 +572,7 @@ static struct super_operations linvfs_sops = {
 	remount_fs:		linvfs_remount
 };
 
-static struct file_system_type xfs_fs_type = {
-	"xfs", 
-	FS_REQUIRES_DEV,
-	linvfs_read_super, 
-	NULL
-};
+DECLARE_FSTYPE_DEV(xfs_fs_type, "xfs", linvfs_read_super);
 
 int __init init_xfs_fs(void)
 {
