@@ -59,6 +59,8 @@
 #ifndef SIM
 #include <linux/autoconf.h>
 #else
+#undef CONFIG_XFS_ARCH_NATIVE
+#undef CONFIG_XFS_ARCH_MIPS
 #define CONFIG_XFS_ARCH_MULTI
 #endif
 
