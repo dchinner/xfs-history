@@ -350,6 +350,12 @@ _pb_direct_io(
 	off_t		offset;
 	size_t		max_io = pb_params.p_un.max_dio << PAGE_SHIFT;
 
+	if (target->pbr_blocksize != PAGE_CACHE_SIZE) {
+		if (rdp)
+			rdp->io_error = -ENOSYS;
+		return 0;
+	}
+
 	pb_size = min(pb_size, max_io);
 
 	pb_flags = (rdwr ? PBF_WRITE : PBF_READ) | PBF_FORCEIO | _PBF_LOCKABLE;
@@ -1228,7 +1234,6 @@ _pagebuf_file_write(
 		} else {
 			int	io_size = (int)min(size, (unsigned long) len);
 
-			assert(maps_returned == 1);
 			status = _pb_direct_io(target, inode, rounded_offset,
 					io_size, map, buf, NULL, 1);
 			if (status > 0)
@@ -1596,17 +1601,15 @@ cluster_write(
 {
 	unsigned long		tindex, tlast;
 	struct page		*page;
-	loff_t			sz = 0;
+	loff_t			sz;
 	int			i, rval;
 
 	if (startpage->index != 0) {
 		size_t		delta = mp[0].pbm_delta;
 
-		/* nathans TODO -- must page align from pbm_offset
-		 * for multiple blocksizes */
-
 		mp[0].pbm_delta = 0;
-		tlast = mp[0].pbm_offset >> PAGE_CACHE_SHIFT;
+		sz = PAGE_CACHE_ALIGN_LL(mp[0].pbm_offset);
+		tlast = sz >> PAGE_CACHE_SHIFT;
 		for (tindex = startpage->index-1; tindex >= tlast; tindex--) {
 			if (!(page = probe_page(inode, tindex)))
 				break;
@@ -1623,15 +1626,15 @@ cluster_write(
 	if (rval)
 		return rval;
 
-	for (i = 0; i < nmaps; i++)
+	for (sz = 0, i = 0; i < nmaps; i++)
 		sz += mp[i].pbm_bsize;
-	tlast = PAGE_CACHE_ALIGN_LL(mp[0].pbm_offset + sz);
-	tlast >>= PAGE_CACHE_SHIFT;
+	sz = PAGE_CACHE_ALIGN_LL(mp[0].pbm_offset + sz);
+	tlast = sz >> PAGE_CACHE_SHIFT;
 	for (tindex = startpage->index + 1; tindex < tlast; tindex++) {
 		if (!(page = probe_page(inode, tindex)))
 			break;
 		rval = convert_page(target, inode, page,
-					mp, &nmaps, flags, NULL, 1);
+					mp, &nmaps, flags, bmap, 1);
 		if (rval)
 			return rval;
 	}
