@@ -360,7 +360,7 @@ xfs_fsoperations(
 	void		*inb;
 	xfs_mount_t	*mp;
 	void		*outb;
-	static int	cisize[XFS_FSOPS_COUNT] =
+	static const short	cisize[XFS_FSOPS_COUNT] =
 	{
 		0,				/* XFS_FS_GEOMETRY */
 		sizeof(xfs_growfs_data_t),	/* XFS_GROWFS_DATA */
@@ -368,7 +368,7 @@ xfs_fsoperations(
 		sizeof(xfs_growfs_rt_t),	/* XFS_GROWFS_RT */
 		0,				/* XFS_FS_COUNTS */
 	};
-	static int	cosize[XFS_FSOPS_COUNT] =
+	static const short	cosize[XFS_FSOPS_COUNT] =
 	{
 		sizeof(xfs_fsop_geom_t),	/* XFS_FS_GEOMETRY */
 		0,				/* XFS_GROWFS_DATA */
@@ -376,7 +376,7 @@ xfs_fsoperations(
 		0,				/* XFS_GROWFS_RT */
 		sizeof(xfs_fsop_counts_t),	/* XFS_FS_COUNTS */
 	};
-	static int	wperm[XFS_FSOPS_COUNT] =
+	static const short	wperm[XFS_FSOPS_COUNT] =
 	{
 		0,	/* XFS_FS_GEOMETRY */
 		1,	/* XFS_GROWFS_DATA */
