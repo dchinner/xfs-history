@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ITABLE_H
 #define	_FS_XFS_ITABLE_H
 
-#ident	"$Revision: 1.5 $"
+#ident	"$Revision: 1.7 $"
 
 struct xfs_mount;
 
@@ -68,5 +68,12 @@ xfs_itable(
 	caddr_t		ubuffer,	/* buffer with inode descriptions */
 	caddr_t		ocount);	/* output count */
 #endif	/* _KERNEL */
+
+/*
+ * Values for di_flags
+ */
+#define XFS_DIFLAG_REALTIME     0x1     /* file's blocks come from rt area */
+#define XFS_DIFLAG_ALL  (XFS_DIFLAG_REALTIME)
+
 
 #endif	/* !_FS_XFS_ITABLE_H */

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DINODE_H
 #define	_FS_XFS_DINODE_H
 
-#ident "$Revision: 1.25 $"
+#ident "$Revision: 1.26 $"
 
 #define	XFS_DINODE_VERSION	1
 #define	XFS_DINODE_MAGIC	0x494e	/* 'IN' */
@@ -152,13 +152,6 @@ typedef enum xfs_dinode_fmt
 #define	IREAD		0400		/* read, write, execute permissions */
 #define	IWRITE		0200
 #define	IEXEC		0100
-
-/*
- * Values for di_flags
- */
-#define	XFS_DIFLAG_REALTIME	0x1	/* file's blocks come from rt area */
-
-#define	XFS_DIFLAG_ALL	(XFS_DIFLAG_REALTIME)
 
 #define	XFS_BUF_TO_DINODE(bp)	((xfs_dinode_t *)(bp->b_un.b_addr))
 
