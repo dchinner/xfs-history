@@ -3,8 +3,11 @@
 
 #ident "$Revision: 1.34 $"
 
-struct xfs_inode;
 struct getbmap;
+struct xfs_bmbt_rec;
+struct xfs_btcur;
+struct xfs_inode;
+struct xfs_trans;
 
 /*
  * List of extents to be free "later".
@@ -77,6 +80,43 @@ typedef struct xfs_bmalloca {
 	int			low;	/* low on space, using seq'l ags */
 	xfs_fsblock_t		rval;	/* starting block of new extent */
 } xfs_bmalloca_t;
+
+/*
+ * Locals structure for xfs_bmapi.
+ * This would be hidden, but we want idbg to be able to see it.
+ */
+typedef struct xfs_bmapi_locals {
+	char			delay;	/* this request is for delayed alloc */
+	char			inhole;	/* current location is hole in file */
+	char			lowspace; /* using the low-space algorithm */
+	char			trim;	/* output trimmed to match range */
+	char			userdata; /* allocating non-metadata */
+	char			wasdelay; /* old extent was delayed */
+	char			wr;	/* this is a write request */
+	int			eof;	/* we've hit the end of extent list */
+	int			logflags; /* flags for transaction logging */
+	int			n;	/* current extent index */
+	int			orig_flags; /* original flags arg value */
+	int			orig_nmap; /* original value of *nmap */
+	struct xfs_bmbt_irec	*orig_mval; /* original value of mval */
+	struct xfs_bmbt_rec	*ep;	/* extent list entry pointer */
+	struct xfs_btree_cur	*cur;	/* bmap btree cursor */
+	xfs_alloctype_t		type;	/* allocation type chosen */
+	xfs_bmbt_irec_t		got;	/* current extent list record */
+	xfs_bmbt_irec_t		prev;	/* previous extent list record */
+	xfs_extlen_t		alen;	/* allocated extent length */
+	xfs_extlen_t		indlen;	/* indirect blocks length */
+	xfs_extlen_t		minleft; /* min blocks left after allocation */
+	xfs_extlen_t		minlen;	/* min allocation size */
+	xfs_extlen_t		orig_len; /* original value of len arg */
+	xfs_extnum_t		lastx;	/* last useful extent number */
+	xfs_extnum_t		nextents; /* number of extents in file */
+	xfs_fileoff_t		aoff;	/* allocated file offset */
+	xfs_fileoff_t		end;	/* end of mapped file region */
+	xfs_fileoff_t		obno;	/* old block number (offset) */
+	xfs_fileoff_t		orig_bno; /* original block number value */
+	xfs_fsblock_t		abno;	/* allocated block number */
+} xfs_bmapi_locals_t;
 
 /*
  * Add the extent to the list of extents to be free at transaction end.
