@@ -170,7 +170,8 @@ again:
 				ih->ih_next = ip;
 			}
 			XFS_IHUNLOCK(ih);
-			xfs_ilock(ip, lock_flags);
+			if (lock_flags != 0)
+				xfs_ilock(ip, lock_flags);
 			goto out;
 		}
 	}
