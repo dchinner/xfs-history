@@ -26,10 +26,9 @@ typedef struct xfs_trans_reservations {
 	uint	tr_swrite;	/* sync write inode trans */
 	uint	tr_addafork;	/* cvt inode to attributed trans */
 	uint	tr_writeid;	/* write setuid/setgid file */
-	uint	tr_ainval;	/* attr fork buffer invalidation */
-	uint	tr_setattr;	/* set/create an attribute */
-	uint	tr_rmattr;	/* remove an attribute */
-	uint	tr_attrflag;	/* set/clear attribute INCOMPLETE flag */
+	uint	tr_attrinval;	/* attr fork buffer invalidation */
+	uint	tr_attrset;	/* set/create an attribute */
+	uint	tr_attrrm;	/* remove an attribute */
 	uint	tr_clearagi;	/* clear bad agi unlinked ino bucket */
 } xfs_trans_reservations_t;
 
