@@ -1739,13 +1739,6 @@ xfs_release(
 		}
 	}
 
-        if (vp->v_type == VREG) {
-                XFS_INODE_CLEAR_READ_AHEAD(&ip->i_iocore);
-                xfs_ilock(ip, XFS_ILOCK_EXCL);
-                xfs_iocore_reset(&ip->i_iocore);
-                xfs_iunlock(ip, XFS_ILOCK_EXCL);
-        }
-
 	return 0;
 }
 
@@ -1976,27 +1969,6 @@ xfs_inactive(
 	xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 
  out:
-	/*
-	 * Clear all the inode's read-ahead state.  We need to take
-	 * the lock here even though the inode is inactive, because
-	 * someone might be in xfs_sync() where we play with
-	 * inodes without taking references.  Of course, this is only
-	 * necessary if it is a regular file since no other inodes
-	 * use the read ahead state.  Also reset the read/write io
-	 * sizes.  Like read-ahead, only regular files override the
-	 * default read/write io sizes.
-	 * Bug 516806: We do not need the ilock around the clearing
-	 * of the readahead state since it is protected by its own
-	 * mutex now. vfs_sync->buffer_cache->read path we also take 
-	 * this mutex so this is not dangerous.
-	 */
-	if (vp->v_type == VREG) {
-		XFS_INODE_CLEAR_READ_AHEAD(&ip->i_iocore);
-		xfs_ilock(ip, XFS_ILOCK_EXCL);
-		xfs_iocore_reset(&ip->i_iocore);
-		xfs_iunlock(ip, XFS_ILOCK_EXCL);
-	}
-
 	return VN_INACTIVE_CACHE;
 }
 
@@ -4773,12 +4745,6 @@ xfs_allocstore(
 		}
 	}
 
-	/*
-	 * Clear out any read-ahead info since the allocations may
-	 * have made it invalid.
-	 */
-	XFS_INODE_CLEAR_READ_AHEAD(&ip->i_iocore);
-	
 	if (count_fsb == 0) {
 		/*
 		 * We go it all, so get out of here.
@@ -5281,7 +5247,6 @@ retry:
 
 		error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
-		XFS_INODE_CLEAR_READ_AHEAD(&ip->i_iocore);
 		if (error) {
 			break;
 		}
@@ -5589,7 +5554,6 @@ xfs_free_file_space(
 
 		error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
-		XFS_INODE_CLEAR_READ_AHEAD(&ip->i_iocore);
 	}
 
 	xfs_iunlock(ip, XFS_IOLOCK_EXCL);

@@ -141,19 +141,9 @@ xfs_iocore_inode_init(
 	io->io_lock = &ip->i_lock;
 	io->io_iolock = &ip->i_iolock;
 
-	xfs_iocore_reset(io);
-
 	io->io_obj = (void *)ip;
 
 	xfs_iocore_inode_reinit(ip);
-}
-
-void
-xfs_iocore_reset(
-	xfs_iocore_t	*io)
-{
-	ASSERT(io->io_mount->m_readio_log <= 0xff);
-	ASSERT(io->io_mount->m_writeio_log <= 0xff);
 }
 
 void
