@@ -4399,7 +4399,23 @@ xfs_bmap_read_extents(
 			break;
 		pp = XFS_BTREE_PTR_ADDR(mp->m_sb.sb_blocksize, xfs_bmbt, block,
 			1, mp->m_bmap_dmxr[1]);
-		XFS_WANT_CORRUPTED_GOTO(XFS_FSB_SANITY_CHECK(mp, INT_GET(*pp, ARCH_CONVERT)), error0);
+
+		if (!(XFS_FSB_SANITY_CHECK(mp, INT_GET(*pp, ARCH_CONVERT)))) {
+			cmn_err(CE_NOTE,
+			"xfs_bmap_read_extents: FSB Sanity Check:\n");
+			if (!(XFS_FSB_TO_AGNO(mp, INT_GET(*pp, ARCH_CONVERT)) < mp->m_sb.sb_agcount))
+				cmn_err(CE_NOTE,
+					"bad AG count %d < agcount %d\n",
+					XFS_FSB_TO_AGNO(mp, INT_GET(*pp, ARCH_CONVERT)),
+					mp->m_sb.sb_agcount);
+			if (!(XFS_FSB_TO_AGBNO(mp, INT_GET(*pp, ARCH_CONVERT)) < mp->m_sb.sb_agblocks))
+				cmn_err(CE_NOTE,
+					"bad AG BNO %d < %d\n",
+					XFS_FSB_TO_AGBNO(mp, INT_GET(*pp, ARCH_CONVERT)),
+					mp->m_sb.sb_agblocks);
+			error = XFS_ERROR(EFSCORRUPTED);
+			goto error0;
+		}
 		bno = INT_GET(*pp, ARCH_CONVERT);
 		xfs_trans_brelse(tp, bp);
 	}
@@ -4426,9 +4442,33 @@ xfs_bmap_read_extents(
 			ip->i_ino);
 			goto error0;
 		}
-		XFS_WANT_CORRUPTED_GOTO(
+		/*XFS_WANT_CORRUPTED_GOTO(
 			XFS_BMAP_SANITY_CHECK(mp, block, 0),
-			error0);
+			error0);*/
+		if (!(XFS_BMAP_SANITY_CHECK(mp, block, 0))) {
+			cmn_err(CE_NOTE,
+			"xfs_bmap_read_extents: BMAP Sanity Check:\n");
+			if (!(block->bb_magic == XFS_BMAP_MAGIC))
+				cmn_err(CE_NOTE,
+					"bb_magic 0x%x\n",
+					block->bb_magic);
+			if (!(block->bb_level == level))
+				cmn_err(CE_NOTE,
+					"bb_level %d\n",
+					block->bb_level);
+			if (!(block->bb_numrecs > 0))
+				cmn_err(CE_NOTE,
+					"bb_numrecs %d\n",
+					block->bb_numrecs);
+			if (!(block->bb_numrecs <= (mp)->m_bmap_dmxr[(level) != 0]))
+				cmn_err(CE_NOTE,
+					"bb_numrecs %d < m_bmap_dmxr[] %d\n",
+					block->bb_numrecs,
+					(mp)->m_bmap_dmxr[(level) != 0]);
+			error = XFS_ERROR(EFSCORRUPTED);
+			goto error0;
+		}
+
 		/*
 		 * Read-ahead the next leaf block, if any.
 		 */
@@ -4627,8 +4667,12 @@ xfs_bmapi(
 		XFS_ATTR_FORK : XFS_DATA_FORK;
 	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS &&
 	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE &&
-	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_LOCAL)
+	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_LOCAL) {
+		cmn_err(CE_NOTE,
+			"EFSCORRUPTED returned from file %s line %d\n",
+			__FILE__, __LINE__);
 		return XFS_ERROR(EFSCORRUPTED);
+	}
 	mp = ip->i_mount;
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
@@ -5113,8 +5157,12 @@ xfs_bmapi_single(
 
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE &&
-	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS)
+	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS) {
+		cmn_err(CE_NOTE,
+			"EFSCORRUPTED returned from file %s line %d\n",
+			__FILE__, __LINE__);
 	       return XFS_ERROR(EFSCORRUPTED);
+	}
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
 		return XFS_ERROR(EIO);
 	XFS_STATS_INC(xfsstats.xs_blk_mapr);
@@ -5185,8 +5233,12 @@ xfs_bunmapi(
 		XFS_ATTR_FORK : XFS_DATA_FORK;
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS &&
-	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE)
+	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE) {
+		cmn_err(CE_NOTE,
+		    	"EFSCORRUPTED returned from file %s line %d\n",
+			__FILE__, __LINE__);
 		return XFS_ERROR(EFSCORRUPTED);
+	}
 	mp = ip->i_mount;
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
@@ -5573,8 +5625,12 @@ xfs_getbmap(
 			    ip->i_d.di_aformat != XFS_DINODE_FMT_LOCAL)
 				return XFS_ERROR(EINVAL);
 		} else if (ip->i_d.di_aformat != 0 &&
-			   ip->i_d.di_aformat != XFS_DINODE_FMT_EXTENTS)
+			   ip->i_d.di_aformat != XFS_DINODE_FMT_EXTENTS) {
+			cmn_err(CE_NOTE,
+			    	"EFSCORRUPTED returned from file %s line %d\n",
+				__FILE__, __LINE__);
 			return XFS_ERROR(EFSCORRUPTED);
+		}
 	} else if (ip->i_d.di_format != XFS_DINODE_FMT_EXTENTS &&
 		   ip->i_d.di_format != XFS_DINODE_FMT_BTREE &&
 		   ip->i_d.di_format != XFS_DINODE_FMT_LOCAL)
@@ -6142,8 +6198,12 @@ xfs_bmap_count_blocks(
 	if ( XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_EXTENTS ) {
 		if (xfs_bmap_count_leaves(ifp->if_u1.if_extents, 
 			ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t), 
-			count) < 0)
+			count) < 0) {
+				cmn_err(CE_NOTE,
+				    	"EFSCORRUPTED returned from file %s line %d\n",
+					__FILE__, __LINE__);
 			return XFS_ERROR(EFSCORRUPTED);
+		}
 		return 0;
 	}
 
@@ -6159,9 +6219,13 @@ xfs_bmap_count_blocks(
 	ASSERT(XFS_FSB_TO_AGBNO(mp, INT_GET(*pp, ARCH_CONVERT)) < mp->m_sb.sb_agblocks);
 	bno = INT_GET(*pp, ARCH_CONVERT);
 
-	if (xfs_bmap_count_tree(mp, tp, bno, level, count) < 0)
+	if (xfs_bmap_count_tree(mp, tp, bno, level, count) < 0) {
+		cmn_err(CE_NOTE,
+		    	"EFSCORRUPTED returned from file %s line %d\n",
+			__FILE__, __LINE__);
 		return XFS_ERROR(EFSCORRUPTED);
-
+	}
+	
 	return 0;
 }
 
@@ -6212,6 +6276,9 @@ xfs_bmap_count_tree(
 		if ((error = 
 		     xfs_bmap_count_tree(mp, tp, bno, level, count)) < 0) {
 			xfs_trans_brelse(tp, bp);
+			cmn_err(CE_NOTE,
+			    	"EFSCORRUPTED returned from file %s line %d\n",
+				__FILE__, __LINE__);
 			return XFS_ERROR(EFSCORRUPTED);
 		}
 		xfs_trans_brelse(tp, bp);
@@ -6224,6 +6291,9 @@ xfs_bmap_count_tree(
 				xfs_bmbt, block, 1, mp->m_bmap_dmxr[0]);
 			if (xfs_bmap_count_leaves(frp, numrecs, count) < 0) {
 				xfs_trans_brelse(tp, bp);
+				cmn_err(CE_NOTE,
+				    	"EFSCORRUPTED returned from file %s line %d\n",
+					__FILE__, __LINE__);
 				return XFS_ERROR(EFSCORRUPTED);
 			}
 			xfs_trans_brelse(tp, bp);
