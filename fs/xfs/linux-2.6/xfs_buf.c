@@ -1670,7 +1670,7 @@ pagebuf_daemon(
 	page_buf_t		*pb;
 	struct list_head	*curr, *next, tmp;
 	struct timer_list	pb_daemon_timer =
-		TIMER_INITIALIZER(pagebuf_daemon_wakeup, 0, 0);
+		TIMER_INITIALIZER((timeout_fn)pagebuf_daemon_wakeup, 0, 0);
 
 	/*  Set up the thread  */
 	daemonize();
