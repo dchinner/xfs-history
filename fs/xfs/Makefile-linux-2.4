@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 3
-SUBLEVEL = 30
+SUBLEVEL = 31
 EXTRAVERSION =
 
 ARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*/arm/ -e s/sa110/arm/)
@@ -116,6 +116,10 @@ DRIVERS		=drivers/block/block.a \
 	         drivers/parport/parport.a
 LIBS		=$(TOPDIR)/lib/lib.a
 SUBDIRS		=kernel drivers mm fs net ipc lib
+
+ifdef CONFIG_DRM
+DRIVERS += drivers/char/drm/drm.o
+endif
 
 ifdef CONFIG_NUBUS
 DRIVERS := $(DRIVERS) drivers/nubus/nubus.a
@@ -396,7 +400,7 @@ clean:	archclean
 	rm -f .tmp*
 	rm -f drivers/char/consolemap_deftbl.c drivers/video/promcon_tbl.c
 	rm -f drivers/char/conmakehash
-	rm -f drivers/pci/devlist.h drivers/pci/gen-devlist
+	rm -f drivers/pci/devlist.h drivers/pci/classlist.h drivers/pci/gen-devlist
 	rm -f drivers/sound/bin2hex drivers/sound/hex2hex
 	rm -f net/khttpd/make_times_h
 	rm -f net/khttpd/times.h
