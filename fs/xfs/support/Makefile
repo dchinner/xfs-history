@@ -39,6 +39,8 @@ ifneq ($(MAKECMDGOALS),modules_install)
   obj-m				:= $(O_TARGET)
 endif
 
+export-objs			:= ktrace.o
+
 obj-y				:= debug.o \
 				   kmem.o \
 				   ktrace.o \

@@ -34,6 +34,7 @@
 #include <linux/smp_lock.h>
 #include <linux/time.h>
 #include <linux/proc_fs.h>
+#include <linux/module.h>
 
 #include "types.h"
 #include "kmem.h"
@@ -308,6 +309,11 @@ ktrace_next(
 
         return ktep;
 }
+
+#if	(defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
+EXPORT_SYMBOL(ktrace_first);
+EXPORT_SYMBOL(ktrace_next);
+#endif
 
 /*
  * ktrace_skip()
