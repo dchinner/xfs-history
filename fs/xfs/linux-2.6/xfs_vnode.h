@@ -45,9 +45,7 @@ extern enum vtype       iftovt_tab[];
 extern ushort           vttoif_tab[];
 #define IFTOVT(M)       (iftovt_tab[((M) & S_IFMT) >> 12])
 #define VTTOIF(T)       (vttoif_tab[(int)(T)])
-#define MAKEIMODE
-/* XXXnathans MAKEIMODE looks dodgey - should be...? */
-/* #define MAKEIMODE(type,mode)	(mode)	- for Linux? */
+#define MAKEIMODE(T, M)	(VTTOIF(T) | ((M) & ~S_IFMT))
 
 /*
  * One file structure is allocated for each call to open/creat/pipe.
@@ -721,7 +719,7 @@ typedef struct vattr {
  */
 #define	WRITEALLOWED(vp) \
  	(((vp)->v_vfsp && ((vp)->v_vfsp->vfs_flag & VFS_RDONLY) == 0) || \
-	 ((vp)->v_type != VREG ) && ((vp)->v_type != VDIR) && ((vp)->v_type != VLNK))
+	 (((vp)->v_type != VREG ) && ((vp)->v_type != VDIR) && ((vp)->v_type != VLNK)))
 /*
  * Global vnode allocation:
  *
