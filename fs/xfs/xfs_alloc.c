@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.93 $"
+#ident	"$Revision: 1.94 $"
 
 /*
  * Free space allocation for XFS.
@@ -234,7 +234,6 @@ xfs_alloc_ag_vextent_small(
 	xfs_extlen_t	*flenp,	/* result length */
 	int		*stat);	/* status: 0-freelist, 1-normal/none */
 
-#ifndef SIM
 /*
  * Free the extent starting at agno/bno for length.
  */
@@ -246,7 +245,6 @@ xfs_free_ag_extent(
 	xfs_agblock_t	bno,	/* starting block number */
 	xfs_extlen_t	len,	/* length of extent */
 	int		isfl);	/* set if is freelist blocks - no sb acctg */
-#endif	/* !SIM */
 
 /*
  * Internal functions.
@@ -1718,7 +1716,6 @@ xfs_alloc_ag_vextent_small(
 	return 0;
 }
 
-#ifndef SIM
 /*
  * Free the extent starting at agno/bno for length.
  */
@@ -1964,7 +1961,6 @@ xfs_free_ag_extent(
 	xfs_alloc_trace_free(fname, "error1", mp, agno, bno, len, isfl);
 	return error;
 }
-#endif	/* !SIM */
 
 /* 
  * Visible (exported) allocation/free functions.
@@ -2576,7 +2572,6 @@ error0:
 	return error;
 }
 
-#ifndef SIM
 /*
  * Free an extent.
  * Just break up the extent address and hand off to xfs_free_ag_extent
@@ -2617,4 +2612,3 @@ error0:
 	mrunlock(&args.mp->m_peraglock);
 	return error;
 }
-#endif	/* !SIM */
