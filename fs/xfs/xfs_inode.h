@@ -548,7 +548,6 @@ void		xfs_iext_realloc(xfs_inode_t *, int, int);
 void		xfs_iroot_realloc(xfs_inode_t *, int, int);
 void		xfs_ipin(xfs_inode_t *);
 void		xfs_iunpin(xfs_inode_t *);
-unsigned int	xfs_ipincount(xfs_inode_t *);
 int		xfs_iextents_copy(xfs_inode_t *, xfs_bmbt_rec_32_t *, int);
 int		xfs_iflush(xfs_inode_t *, uint);
 int		xfs_iflush_all(struct xfs_mount *, int);
@@ -559,6 +558,9 @@ void		xfs_ichgtime(xfs_inode_t *, int);
 xfs_fsize_t	xfs_file_last_byte(xfs_inode_t *);
 xfs_inode_t	*xfs_get_inode(dev_t, xfs_ino_t);
 void		xfs_lock_inodes(xfs_inode_t **, int, int, uint);
+
+#define xfs_ipincount(ip)	((unsigned int) atomic_read(&ip->i_pincount))
+
 
 
 #ifdef DEBUG

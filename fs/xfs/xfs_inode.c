@@ -2577,17 +2577,6 @@ xfs_iunpin(
 }
 
 /*
- * Returns the pincount at this given moment.
- * Synchronizes with ipin/iunpin out of paranoia
- */
-unsigned int
-xfs_ipincount(
-	xfs_inode_t	*ip)
-{
-	return atomic_read(&ip->i_pincount);
-}
-
-/*
  * This is called to wait for the given inode to be unpinned.
  * It will sleep until this happens.  The caller must have the
  * inode locked in at least shared mode so that the buffer cannot

@@ -1153,18 +1153,6 @@ xfs_fsync(
 	}
 
 	/*
-	 * Make sure that we flushed everything in a full sync.
-	 * We used to assert that i_delayed_blks was 0 here,
-	 * but we can't do that since xfs_allocstore() could
-	 * come in and add more even though we have the I/O
-	 * lock here.  All it needs to do so is the inode lock,
-	 * and we don't want to force it to acquire the I/O
-	 * lock unnecessarily.
-	 */
-	ASSERT(!(flag & (FSYNC_INVAL | FSYNC_WAIT)) ||
-	       syncall == 0);
-
-	/*
 	 * We always need to make sure that the required inode state
 	 * is safe on disk.  The vnode might be clean but because
 	 * of committed transactions that haven't hit the disk yet.
