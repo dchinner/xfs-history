@@ -411,7 +411,7 @@ xfs_getattr(vnode_t	*vp,
 		vap->va_uuid = ip->i_d.di_uuid;
 	}
 
-	xfs_iunlock (ip, XFS_ILOCK_EXCL);
+	xfs_iunlock (ip, XFS_ILOCK_SHARED);
 
 	return 0;
 }
@@ -1199,19 +1199,21 @@ xfs_lookup(vnode_t	*dir_vp,
 	int			code = 0;
 
 	dp = XFS_VTOI(dir_vp);
-	xfs_ilock(dp, XFS_ILOCK_SHARED);
+	xfs_ilock(dp, XFS_ILOCK_EXCL);
 
-	if (code = xfs_iaccess(dp, IEXEC, credp))
+	if (code = xfs_iaccess(dp, IEXEC, credp)) {
+		xfs_iunlock(dp, XFS_ILOCK_EXCL);
 		return code;
+	}
 
 	code = xfs_dir_lookup_int (NULL, dir_vp, DLF_IGET, name, pnp, 
 				   &e_inum, &ip);
 	if (code) {
-		xfs_iunlock(dp, XFS_ILOCK_SHARED);
+		xfs_iunlock(dp, XFS_ILOCK_EXCL);
 		return code;
 	}
 
-	xfs_iunlock(dp, XFS_ILOCK_SHARED);
+	xfs_iunlock(dp, XFS_ILOCK_EXCL);
 
 	vp = XFS_ITOV (ip);
 
