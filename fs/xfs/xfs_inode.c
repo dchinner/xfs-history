@@ -312,6 +312,7 @@ xfs_iread(xfs_mount_t	*mp,
 		ip->i_d.di_magic = dip->di_core.di_magic;
 		ip->i_d.di_version = dip->di_core.di_version;
 		ip->i_d.di_gen = dip->di_core.di_gen;
+		ip->i_d.di_nexti = dip->di_core.di_nexti;
 	}	
 
 /*
