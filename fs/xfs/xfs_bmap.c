@@ -3827,7 +3827,7 @@ xfs_bmap_add_attrfork(
 		return error;
 	}
 	if (XFS_IFORK_Q(ip))
-		goto error0;
+		goto error1;
 	if (ip->i_d.di_aformat != XFS_DINODE_FMT_EXTENTS) {
 		/*
 		 * For inodes coming from pre-6.2 filesystems.
@@ -3854,7 +3854,7 @@ xfs_bmap_add_attrfork(
 	default:
 		ASSERT(0);
 		error = XFS_ERROR(EINVAL);
-		goto error0;
+		goto error1;
 	}
 	ip->i_df.if_ext_max =
 		XFS_IFORK_DSIZE(ip) / (uint)sizeof(xfs_bmbt_rec_t);
@@ -3903,6 +3903,9 @@ xfs_bmap_add_attrfork(
 	return error;
 error2:
 	xfs_bmap_cancel(&flist);
+error1:
+	ASSERT(ismrlocked(&ip->i_lock,MR_UPDATE));
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 error0:
 	xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES|XFS_TRANS_ABORT);
 	ASSERT(ip->i_df.if_ext_max ==
