@@ -746,18 +746,20 @@ xfs_dir_leaf_split(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 	} else {
 		error = xfs_dir_leaf_add(newblk->bp, args, newblk->index);
 	}
-	ASSERT(!error);
 
 	/*
 	 * Update last hashval in each block since we added the name.
 	 */
 	oldblk->hashval = xfs_dir_leaf_lasthash(oldblk->bp, NULL);
 	newblk->hashval = xfs_dir_leaf_lasthash(newblk->bp, NULL);
-	return(0);
+	return(error);
 }
 
 /*
  * Add a name to the leaf directory structure.
+ *
+ * Must take into account fragmented leaves and leaves where spacemap has
+ * lost some freespace information (ie: holes).
  */
 int
 xfs_dir_leaf_add(buf_t *bp, xfs_da_args_t *args, int index)
@@ -765,12 +767,13 @@ xfs_dir_leaf_add(buf_t *bp, xfs_da_args_t *args, int index)
 	xfs_dir_leafblock_t *leaf;
 	xfs_dir_leaf_hdr_t *hdr;
 	xfs_dir_leaf_map_t *map;
-	int tablesize, i, tmp;
+	int tablesize, entsize, sum, i, tmp;
 
 	leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
 	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
 	ASSERT((index >= 0) && (index <= leaf->hdr.count));
 	hdr = &leaf->hdr;
+	entsize = XFS_DIR_LEAF_ENTSIZE_BYNAME(args->namelen);
 
 	/*
 	 * Search through freemap for first-fit on new name length.
@@ -779,24 +782,29 @@ xfs_dir_leaf_add(buf_t *bp, xfs_da_args_t *args, int index)
 	tablesize = (hdr->count + 1) * sizeof(xfs_dir_leaf_entry_t)
 			+ sizeof(xfs_dir_leaf_hdr_t);
 	map = &hdr->freemap[XFS_DIR_LEAF_MAPSIZE-1];
-	for (i = XFS_DIR_LEAF_MAPSIZE-1; i >= 0; map--, i--) {
+	for (sum = 0, i = XFS_DIR_LEAF_MAPSIZE-1; i >= 0; map--, i--) {
+		if (tablesize > hdr->firstused) {
+			sum += map->size;
+			continue;
+		}
 		if (map->size == 0)
 			continue;	/* no space in this map */
-		tmp = XFS_DIR_LEAF_ENTSIZE_BYNAME(args->namelen);
-		if (map->base <= hdr->firstused)
+		tmp = entsize;
+		if (map->base < hdr->firstused)
 			tmp += sizeof(xfs_dir_leaf_entry_t);
-		if ((map->size >= tmp) && (tablesize <= hdr->firstused)) {
+		if (map->size >= tmp) {
 			xfs_dir_leaf_add_work(bp, args, index, i);
 			return(0);
 		}
+		sum += map->size;
 	}
 
 	/*
-	 * If there are no holes in the address space of the block
-	 * where we put names, then compaction will do us no good
-	 * and we should just give up.
+	 * If there are no holes in the address space of the block,
+	 * and we don't have enough freespace, then compaction will do us
+	 * no good and we should just give up.
 	 */
-	if (!hdr->holes)
+	if (!hdr->holes && (sum < entsize))
 		return(XFS_ERROR(ENOSPC));
 
 	/*
@@ -805,23 +813,14 @@ xfs_dir_leaf_add(buf_t *bp, xfs_da_args_t *args, int index)
 	xfs_dir_leaf_compact(args->trans, bp);
 
 	/*
-	 * Search through freemap for first-fit on new name length.
-	 * (this is an exact duplicate of the above code segment)
+	 * After compaction, the block is guaranteed to have only one
+	 * free region, in freemap[0].  If it is not big enough, give up.
 	 */
-	map = &hdr->freemap[XFS_DIR_LEAF_MAPSIZE-1];
-	for (i = XFS_DIR_LEAF_MAPSIZE-1; i >= 0; map--, i--) {
-		if (map->size == 0)
-			continue;	/* no space in this map */
-		tmp = XFS_DIR_LEAF_ENTSIZE_BYNAME(args->namelen);
-		if (map->base <= hdr->firstused)
-			tmp += sizeof(xfs_dir_leaf_entry_t);
-		if ((map->size >= tmp) && (tablesize <= hdr->firstused)) {
-			xfs_dir_leaf_add_work(bp, args, index, i);
-			return(0);
-		}
-	}
+	if (hdr->freemap[0].size < (entsize + sizeof(xfs_dir_leaf_entry_t)))
+		return(XFS_ERROR(ENOSPC));
 
-	return(XFS_ERROR(ENOSPC));
+	xfs_dir_leaf_add_work(bp, args, index, 0);
+	return(0);
 }
 
 /*
@@ -1775,9 +1774,10 @@ xfs_dir_leaf_lasthash(buf_t *bp, int *count)
 
 	leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
 	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
-	if (count) {
+	if (count)
 		*count = leaf->hdr.count;
-	}
+	if (leaf->hdr.count == 0)
+		return(0);
 	return(leaf->entries[ leaf->hdr.count-1 ].hashval);
 }
 
