@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.53 $"
+#ident	"$Revision: 1.54 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -30,27 +30,28 @@
 #include <sys/vfs.h>
 #include <stddef.h>
 
-#include "xfs_inum.h"
-#include "xfs_types.h"
-#include "xfs_log.h"
-#include "xfs_ag.h"		/* needed by xfs_sb.h */
-#include "xfs_sb.h"		/* depends on xfs_types.h & xfs_inum.h */
-#include "xfs_trans.h"
-#include "xfs_mount.h"		/* depends on xfs_trans.h & xfs_sb.h */
-#include "xfs_bmap_btree.h"
-#include "xfs_alloc.h"
-#include "xfs_dinode.h"
-#include "xfs_imap.h"
-#include "xfs_inode_item.h"
-#include "xfs_inode.h"
-#include "xfs_ialloc.h"
-#include "xfs_error.h"
-#include "xfs_log_priv.h"	/* depends on all above */
-#include "xfs_buf_item.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_log_recover.h"
-#include "xfs_extfree_item.h"
-#include "xfs_trans_priv.h"
+#include <sys/fs/xfs_types.h>
+#include <sys/fs/xfs_inum.h>
+#include <sys/fs/xfs_log.h>
+#include <sys/fs/xfs_ag.h>		/* needed by xfs_sb.h */
+#include <sys/fs/xfs_sb.h>		/* depends on xfs_types.h, xfs_inum.h */
+#include <sys/fs/xfs_trans.h>
+#include <sys/fs/xfs_mount.h>		/* depends on xfs_trans.h & xfs_sb.h */
+#include <sys/fs/xfs_bmap_btree.h>
+#include <sys/fs/xfs_alloc.h>
+#include <sys/fs/xfs_dir.h>
+#include <sys/fs/xfs_dinode.h>
+#include <sys/fs/xfs_imap.h>
+#include <sys/fs/xfs_inode_item.h>
+#include <sys/fs/xfs_inode.h>
+#include <sys/fs/xfs_ialloc.h>
+#include <sys/fs/xfs_error.h>
+#include <sys/fs/xfs_log_priv.h>	/* depends on all above */
+#include <sys/fs/xfs_buf_item.h>
+#include <sys/fs/xfs_alloc_btree.h>
+#include <sys/fs/xfs_log_recover.h>
+#include <sys/fs/xfs_extfree_item.h>
+#include <sys/fs/xfs_trans_priv.h>
 
 
 #ifdef SIM
