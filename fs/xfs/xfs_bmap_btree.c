@@ -480,6 +480,8 @@ xfs_bmbt_delrec(
 			if (xfs_bmbt_rshift(l->tcur, level)) {
 				ASSERT(l->block->bb_numrecs >= XFS_BMAP_BLOCK_IMINRECS(level, l->tcur));
 				xfs_btree_del_cursor(l->tcur);
+				if (level == 0)
+					cur->bc_ptrs[0]++;
 				xfs_bmbt_locals_free(l);
 				xfs_bmbt_rcheck(cur);
 				xfs_bmbt_trace_cursor("xfs_bmbt_delrec exit6",

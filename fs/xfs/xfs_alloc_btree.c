@@ -485,6 +485,8 @@ xfs_alloc_delrec(
 			ASSERT(block->bb_numrecs >=
 			       XFS_ALLOC_BLOCK_MINRECS(level, cur));
 			xfs_btree_del_cursor(tcur);
+			if (level == 0)
+				cur->bc_ptrs[0]++;
 			kmem_check();
 			return 1;
 		}
