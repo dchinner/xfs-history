@@ -1012,6 +1012,7 @@ xfs_idestroy(xfs_inode_t *ip)
 	}
 	mrfree(&ip->i_lock);
 	mrfree(&ip->i_iolock);
+	mrfree(&ip->i_ticketlock);
 	freesema(&ip->i_flock);
 	freesema(&ip->i_pinsema);
 	kmem_zone_free(xfs_inode_zone, ip);
