@@ -659,7 +659,7 @@ xfs_bmbt_insrec(
 					cur);
 				return 0;
 			}
-			ASSERT(i == 1);
+			ASSERT(args.len == 1);
 			cur->bc_private.b.firstblock = args.fsbno;
 			cur->bc_private.b.allocated++;
 			ip->i_d.di_nblocks++;
