@@ -413,8 +413,8 @@ xfs_ialloc(
 #ifndef SIM
 	ASSERT(pip != NULL);
 #endif
-	ino = xfs_dialloc(tp, pip ? pip->i_ino : 0, pip == NULL, mode,
-			  ialloc_context, call_again);
+	ino = xfs_dialloc(tp, pip ? pip->i_ino : 0, mode, ialloc_context,
+			  call_again);
 	if (*call_again || ino == NULLFSINO) {
                 return NULL;
         }

@@ -31,8 +31,6 @@
  * Allocate an inode on disk.
  * Mode is used to tell whether the new inode will need space, and whether
  * it is a directory.
- * The sameag flag is used by mkfs only, to force the root directory
- * inode into the first allocation group.
  *
  * To work within the constraint of one allocation per transaction,
  * xfs_dialloc() is designed to be called twice if it has to do an
@@ -55,7 +53,6 @@ xfs_ino_t				/* inode number allocated */
 xfs_dialloc(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	parent,		/* parent inode (directory) */
-	int		sameag,		/* 1 => must be in same a.g. */
 	mode_t		mode,		/* mode bits for new inode */
 	buf_t		**agbp,		/* buf for a.g. inode header */
 	boolean_t	*alloc_done);	/* an allocation was done to replenish
