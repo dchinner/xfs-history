@@ -873,7 +873,7 @@ xfs_bmap_alloc(
 	if (rt) {
 		type = askbno == 0 ?
 			XFS_ALLOCTYPE_ANY_AG : XFS_ALLOCTYPE_NEAR_BNO;
-		abno = xfs_rtallocate_extent(mp, tp, askbno, 1, asklen, alen, type, wasdel);
+		abno = xfs_rtallocate_extent(tp, askbno, 1, asklen, alen, type, wasdel);
 	} else {
 		type = nullfb ?
 			XFS_ALLOCTYPE_START_BNO : XFS_ALLOCTYPE_NEAR_BNO;
@@ -944,7 +944,7 @@ xfs_bmap_del_extent(
 	delay = got.br_startblock == NULLSTARTBLOCK;
 	if (!delay) {
 		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
-			xfs_rtfree_extent(ip->i_mount, ip->i_transp, del->br_startblock, del->br_blockcount);
+			xfs_rtfree_extent(ip->i_transp, del->br_startblock, del->br_blockcount);
 		else
 			xfs_bmap_add_free(del->br_startblock, del->br_blockcount, flist);
 		del_endblock = del->br_startblock + del->br_blockcount;
@@ -1105,9 +1105,14 @@ xfs_bmap_extents_to_btree(
 	 * Convert to a btree with two levels, one record in root.
 	 */
 	ip->i_d.di_format = XFS_DINODE_FMT_BTREE;
-	type = firstblock == NULLFSBLOCK ?
-		XFS_ALLOCTYPE_START_BNO : XFS_ALLOCTYPE_NEAR_BNO;
-	abno = xfs_alloc_extent(tp, firstblock, 1, type, 0, 0);
+	if (firstblock == NULLFSBLOCK) {
+		type = XFS_ALLOCTYPE_START_BNO;
+		abno = xfs_ino_to_fsb(sbp, ip->i_ino);
+	} else {
+		type = XFS_ALLOCTYPE_NEAR_BNO;
+		abno = firstblock;
+	}
+	abno = xfs_alloc_extent(tp, abno, 1, type, 0, 0);
 	/*
 	 * Allocation can't fail, the space was reserved.
 	 */
@@ -1411,6 +1416,8 @@ xfs_bmap_finish(
 		xfs_free_extent(ntp, free->xbf_startblock, free->xbf_blockcount);
 		xfs_bmap_del_free(flist, prev, free);
 	}
+	if (*flist == NULL)
+		return;
 	xfs_trans_commit(ntp, 0);
 	ntp = xfs_trans_alloc(mp, 0);
 	xfs_trans_reserve(ntp, 128, 128, 0, 0);
