@@ -1,4 +1,4 @@
-#ident "$Revision: 1.361 $"
+#ident "$Revision: 1.362 $"
 
 
 #ifdef SIM
@@ -2344,6 +2344,7 @@ STATIC int xfs_create_exists(bhv_desc_t *, bhv_desc_t *, vattr_t *, int,
 	int, vnode_t **, cred_t *);
 STATIC int xfs_create_new(bhv_desc_t *, char *, vattr_t *, int, int,
 	vnode_t **, cred_t *);
+STATIC void xfs_create_broken(xfs_mount_t *, xfs_inode_t *, xfs_ino_t, uint);
 
 
 /*
@@ -2393,6 +2394,7 @@ xfs_create(
 			I_mode, vpp, credp));
 }
 
+#define	XFS_CREATE_NEW_MAXTRIES	10000
 
 /*
  * xfs_create_new (create a new file).
@@ -2413,7 +2415,7 @@ xfs_create_new(
 	xfs_inode_t      	*dp, *ip;
         vnode_t		        *vp, *newvp;
 	xfs_trans_t      	*tp;
-        xfs_ino_t               e_inum;
+	xfs_ino_t		e_inum;
         xfs_mount_t	        *mp;
 	dev_t			rdev;
         int                     error;
@@ -2431,6 +2433,8 @@ xfs_create_new(
 	struct xfs_dquot	*udqp, *pdqp;
 	uint			resblks;
 	int			dm_di_mode;
+	int			xfs_create_retries = 0;
+	xfs_ino_t		e_inum_saved;	/* for retry trap code */
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
         dp = XFS_BHVTOI(dir_bdp);
@@ -2627,6 +2631,7 @@ xfs_create_new(
 							       pdqp);
 		created = B_TRUE;
 	} else {
+		e_inum_saved = e_inum;
 
 		/*
 		 * The file already exists, so we're in the wrong
@@ -2653,6 +2658,14 @@ xfs_create_new(
 					   &dir_unlocked);
 		if (error) {
 			if (error == ENOENT) {
+				if (++xfs_create_retries >
+					XFS_CREATE_NEW_MAXTRIES) {
+					xfs_create_broken(mp, dp,
+						e_inum_saved, dir_unlocked);
+					error = XFS_ERROR(EFSCORRUPTED);
+					goto error_return;
+				}
+
 				ASSERT(dir_unlocked);
 				xfs_iunlock(dp, XFS_ILOCK_EXCL);
 				goto try_again;
@@ -2891,6 +2904,34 @@ std_return:
 		xfs_qm_dqrele(pdqp);
 
 	goto std_return;
+}
+
+
+/*
+ * xfs_create_broken is a trap routine to isolate the cause of a infinite
+ *	loop condition reported in IRIX 6.4 by PV 522864. If no occurances
+ *	of this error recur (that is, the trap code isn't hit), this routine
+ *	should be removed in future releases.
+ */
+/* ARGSUSED */
+STATIC void
+xfs_create_broken(
+	xfs_mount_t *mp,
+	xfs_inode_t *dp,
+	xfs_ino_t e_inum_saved,
+	uint dir_unlocked)
+{
+	cmn_err(CE_WARN,
+		"xfs_create looping, dir ino 0x%llx, ino 0x%llx, %s\n",
+		dp->i_ino, e_inum_saved, mp->m_fsname);
+#ifdef SIM
+	abort();
+#else
+#ifdef	DEBUG
+	debug_stop_all_cpus((void *)-1LL);
+	debug("xfs");
+#endif	/* DEBUG */
+#endif
 }
 
 
@@ -5749,7 +5790,10 @@ xfs_alloc_file_space(
 				return error;
 		}
 	}
-	
+
+	if (len <= 0)
+		return error;
+
 	count = len;
 	error = 0;
 	imapp = &imaps[0];
@@ -5978,6 +6022,9 @@ xfs_free_file_space(
 	}
 	
 	error = 0;
+	if (len <= 0)	/* if nothing being freed */
+		return error;
+
 	startoffset_fsb	= XFS_B_TO_FSB(mp, offset);
 	end_dmi_offset = offset + len;
 	endoffset_fsb = XFS_B_TO_FSBT(mp, end_dmi_offset);
