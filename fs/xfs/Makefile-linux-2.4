@@ -27,9 +27,9 @@ CROSS_COMPILE 	=
 AS		= $(CROSS_COMPILE)as
 LD		= $(CROSS_COMPILE)ld
 #comment out this line if compiling on RH 7.0
-#CC		= $(CROSS_COMPILE)gcc -V egcs-2.91.66
+CC		= $(CROSS_COMPILE)gcc -V egcs-2.91.66
 # AND uncomment the following line
-CC		= $(CROSS_COMPILE)kgcc 
+#CC		= $(CROSS_COMPILE)kgcc 
 CPP		= $(CC) -E
 AR		= $(CROSS_COMPILE)ar
 NM		= $(CROSS_COMPILE)nm
