@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.84 $"
+#ident	"$Revision: 1.86 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3579,6 +3579,9 @@ xfsidbg_xmount(xfs_mount_t *mp)
 #else
 	qprintf("\n");
 #endif
+	qprintf("resblks %lld resblks_avail %lld\n", mp->m_resblks, 
+		mp->m_resblks_avail);
+
 	if (mp->m_quotainfo)
 		qprintf("quotainfo 0x%x (uqip = 0x%x, pqip = 0x%x)\n",
 			mp->m_quotainfo, 
