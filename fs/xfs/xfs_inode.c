@@ -297,6 +297,43 @@ xfs_iread(xfs_mount_t *mp, xfs_trans_t *tp, xfs_ino_t ino)
 	return (ip);
 }
 
+/*
+ * This is called free all the memory associated with an inode.
+ * It must free the inode itself and any buffers allocated for
+ * iu_extents/iu_data and i_broot.  It must also free the lock
+ * associated with the inode.
+ */
+void
+xfs_idestroy(xfs_inode_t *ip)
+{
+	switch (ip->i_d.di_mode & IFMT) {
+	case IFREG:
+	case IFDIR:
+	case IFLNK:
+		if (ip->i_flags & XFS_IBROOT) {
+			ASSERT(ip->i_broot != NULL);
+			kmem_free(ip->i_broot, ip->i_broot_bytes);
+		}
+		if (ip->i_flags & XFS_IEXTENTS) {
+			if (ip->i_u1.iu_extents != ip->i_u2.iu_inline_ext) {
+				kmem_free(ip->i_u1.iu_extents, ip->i_bytes);
+			}
+		} else if (ip->i_flags & XFS_IINLINE) {
+			if (ip->i_u1.iu_data != ip->i_u2.iu_inline_data) {
+				kmem_free(ip->i_u1.iu_data, ip->i_bytes);
+			}
+		}
+		break;
+	}
+	mrfree(&ip->i_lock);
+#ifndef SIM
+	kmem_zone_free(xfs_inode_zone, ip);
+#else
+	kmem_free(ip, sizeof(xfs_inode_t));
+#endif
+}
+		
+
 
 
 
