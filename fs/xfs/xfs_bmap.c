@@ -2868,14 +2868,28 @@ xfs_bmap_add_attrfork(
 		goto error1;
 	VN_HOLD(XFS_ITOV(ip));
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
-	ip->i_d.di_forkoff = mp->m_attroffset >> 3;
+	switch (ip->i_d.di_format) {
+	case XFS_DINODE_FMT_DEV:
+		ip->i_d.di_forkoff = roundup(sizeof(dev_t), 8) >> 3;
+		break;
+	case XFS_DINODE_FMT_UUID:
+		ip->i_d.di_forkoff = roundup(sizeof(uuid_t), 8) >> 3;
+		break;
+	case XFS_DINODE_FMT_LOCAL:
+	case XFS_DINODE_FMT_EXTENTS:
+	case XFS_DINODE_FMT_BTREE:
+		ip->i_d.di_forkoff = mp->m_attroffset >> 3;
+		break;
+	default:
+		ASSERT(0);
+		error = XFS_ERROR(EINVAL);
+		goto error1;
+	}
+	ip->i_df.if_ext_max = XFS_IFORK_DSIZE(ip) / sizeof(xfs_bmbt_rec_t);
 	ip->i_af.if_ext_max = XFS_IFORK_ASIZE(ip) / sizeof(xfs_bmbt_rec_t);
 	logflags = XFS_ILOG_CORE;
 	XFS_BMAP_INIT(&flist, &firstblock);
 	switch (ip->i_d.di_format) {
-	case XFS_DINODE_FMT_DEV:
-	case XFS_DINODE_FMT_UUID:
-		break;
 	case XFS_DINODE_FMT_LOCAL:
 		error = xfs_bmap_add_attrfork_local(tp, ip, &firstblock,
 			&flist, &logflags);
@@ -2894,10 +2908,6 @@ xfs_bmap_add_attrfork(
 		if (error)
 			goto error2;
 		break;
-	default:
-		ASSERT(0);
-		error = XFS_ERROR(EINVAL);
-		goto error2;
 	}
 	xfs_trans_log_inode(tp, ip, logflags);
 	if (mp->m_sb.sb_versionnum < XFS_SB_VERSION_HASATTR) {
