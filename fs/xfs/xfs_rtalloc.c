@@ -35,7 +35,6 @@
  */
 
 #include <xfs.h>
-#include <linux/grio.h>
 
 
 /*
