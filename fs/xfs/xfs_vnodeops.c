@@ -1,4 +1,4 @@
-#ident "$Revision: 1.170 $"
+#ident "$Revision: 1.171 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2790,6 +2790,16 @@ xfs_remove(
 		(void) dm_namesp_event(DM_POSTREMOVE, dir_vp, NULL,
 				       name, NULL, ip->i_d.di_mode, 0);
 	}
+
+	/*
+	 * Before we drop our extra reference to the inode, purge it
+	 * from the refcache if it is there.  By waiting until afterwards
+	 * to do the IRELE, we ensure that we won't go inactive in the
+	 * xfs_refcache_purge_ip routine (although that would be OK).
+	 */
+#ifndef SIM
+	xfs_refcache_purge_ip(ip);
+#endif
 	IRELE(ip);
 
 	return 0;
@@ -2812,6 +2822,15 @@ xfs_remove(
 	xfs_bmap_cancel(&free_list);
 	cancel_flags |= XFS_TRANS_ABORT;
 	xfs_trans_cancel(tp, cancel_flags);
+	/*
+	 * Before we drop our extra reference to the inode, purge it
+	 * from the refcache if it is there.  By waiting until afterwards
+	 * to do the IRELE, we ensure that we won't go inactive in the
+	 * xfs_refcache_purge_ip routine (although that would be OK).
+	 */
+#ifndef SIM
+	xfs_refcache_purge_ip(ip);
+#endif
 	IRELE(ip);
 	return error;	
 }
@@ -3576,6 +3595,9 @@ xfs_rename(
 	 */
 	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
 	if (target_ip != NULL) {
+#ifndef SIM
+		xfs_refcache_purge_ip(target_ip);
+#endif
 		IRELE(target_ip);
 	}
 	if (error) {
@@ -4344,10 +4366,24 @@ xfs_rwunlock(
 	int		write_lock)
 {
         xfs_inode_t     *ip;
+	xfs_inode_t	*release_ip;
 
         ip = XFS_VTOI(vp);
 	if (write_lock) {
-        	xfs_iunlock(ip, XFS_IOLOCK_EXCL);
+		/*
+		 * In the write case, we may have added a new entry to
+		 * the reference cache.  This might store a pointer to
+		 * an inode to be released in this inode.  If it is there,
+		 * clear the pointer and release the inode after unlocking
+		 * this one.
+		 */
+		release_ip = ip->i_release;
+		ip->i_release = NULL;
+        	xfs_iunlock (ip, XFS_IOLOCK_EXCL);
+		
+		if (release_ip != NULL) {
+			VN_RELE(XFS_ITOV(release_ip));
+		}
 	} else {
         	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 	}
