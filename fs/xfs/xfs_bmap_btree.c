@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.88 $"
+#ident	"$Revision: 1.89 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1611,7 +1611,7 @@ xfs_bmbt_split(
 		args.userdata = 0;
 	args.minlen = args.maxlen = args.prod = 1;
 	args.wasdel = cur->bc_private.b.flags & XFS_BTCUR_BPRV_WASDEL;
-	if (xfs_trans_get_block_res(args.tp) == 0) {
+	if (!args.wasdel && xfs_trans_get_block_res(args.tp) == 0) {
 		XFS_BMBT_TRACE_CURSOR(cur, ERROR);
 		return XFS_ERROR(ENOSPC);
 	}
