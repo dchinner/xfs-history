@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.59 $"
+#ident "$Revision: 1.60 $"
 
 struct getbmap;
 struct xfs_bmbt_irec;
@@ -257,7 +257,6 @@ xfs_bmapi_single(
 	xfs_fsblock_t		*fsb,		/* output: mapped block */
 	xfs_fileoff_t		bno);		/* starting file offs. mapped */
 
-#ifndef SIM
 /*
  * Unmap (remove) blocks from a file.
  * If nexts is nonzero then the number of extents to remove is limited to
@@ -277,6 +276,7 @@ xfs_bunmapi(
 	xfs_bmap_free_t		*flist,		/* i/o: list extents to free */
 	int			*done);		/* set if not done yet */
 
+#ifndef SIM
 /*
  * Fcntl interface to xfs_bmapi.
  */

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.84 $"
+#ident "$Revision: 1.85 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -72,7 +72,6 @@
  * Internal routines when dirsize == XFS_LBSIZE(mp).
  */
 STATIC int xfs_dir_leaf_lookup(xfs_da_args_t *args);
-#ifndef SIM
 STATIC int xfs_dir_leaf_removename(xfs_da_args_t *args, int *number_entries,
 						 int *total_namebytes);
 STATIC int xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
@@ -80,21 +79,18 @@ STATIC int xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					     dirent_t *dbp,
 					     xfs_dir_put_t put);
 STATIC int xfs_dir_leaf_replace(xfs_da_args_t *args);
-#endif	/* !SIM */
 
 /*
  * Internal routines when dirsize > XFS_LBSIZE(mp).
  */
 STATIC int xfs_dir_node_addname(xfs_da_args_t *args);
 STATIC int xfs_dir_node_lookup(xfs_da_args_t *args);
-#ifndef SIM
 STATIC int xfs_dir_node_removename(xfs_da_args_t *args);
 STATIC int xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					     uio_t *uio, int *eofp,
 					     dirent_t *dbp,
 					     xfs_dir_put_t put);
 STATIC int xfs_dir_node_replace(xfs_da_args_t *args);
-#endif	/* !SIM */
 
 /*
  * Utility routines.
@@ -239,7 +235,6 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	return(retval);
 }
 
-#ifndef SIM
 /*
  * Generic handler routine to remove a name from a directory.
  * Transitions directory from Btree to shortform as necessary.
@@ -291,7 +286,6 @@ xfs_dir_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	}
 	return(retval);
 }
-#endif	/* !SIM */
 
 int							/* error */
 xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
@@ -407,6 +401,7 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 		unuseracc(lockaddr, locklen, (B_READ|B_PHYS));
 	return(retval);
 }
+#endif	/* !SIM */
 
 int							/* error */
 xfs_dir_replace(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
@@ -447,7 +442,6 @@ xfs_dir_replace(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 
 	return(retval);
 }
-#endif	/* !SIM */
 
 
 /*========================================================================
@@ -478,7 +472,6 @@ xfs_dir_leaf_addname(xfs_da_args_t *args)
 	return(retval);
 }
 
-#ifndef SIM
 /*
  * Remove a name from the leaf directory structure
  * This is the external routine.
@@ -506,7 +499,6 @@ xfs_dir_leaf_removename(xfs_da_args_t *args, int *count, int *totallen)
 	*totallen = leaf->hdr.namebytes;
 	return(0);
 }
-#endif	/* !SIM */
 
 /*
  * Look up a name in a leaf directory structure.
@@ -548,6 +540,7 @@ xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	*eofp = (eob == 0);
 	return(retval);
 }
+#endif	/* !SIM */
 
 /*
  * Look up a name in a leaf directory structure, replace the inode number.
@@ -584,7 +577,6 @@ xfs_dir_leaf_replace(xfs_da_args_t *args)
 		xfs_trans_brelse(args->trans, bp);
 	return(retval);
 }
-#endif	/* !SIM */
 
 
 /*========================================================================
@@ -644,7 +636,6 @@ xfs_dir_node_addname(xfs_da_args_t *args)
 	return(retval);
 }
 
-#ifndef SIM
 /*
  * Remove a name from a B-tree directory.
  *
@@ -696,7 +687,6 @@ xfs_dir_node_removename(xfs_da_args_t *args)
 		return(error);
 	return(0);
 }
-#endif	/* !SIM */
 
 /*
  * Look up a filename in a int directory.
@@ -873,6 +863,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	xfs_dir_trace_g_du("node: E-O-F", dp, uio);
 	return(0);
 }
+#endif	/* !SIM */
 
 /*
  * Look up a filename in an int directory, replace the inode number.
@@ -928,7 +919,6 @@ xfs_dir_node_replace(xfs_da_args_t *args)
 	xfs_da_state_free(state);
 	return(retval);
 }
-#endif	/* !SIM */
 
 #if defined(XFS_DIR_TRACE)
 /*

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_LEAF_H
 #define	_FS_XFS_DIR_LEAF_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.9 $"
 
 /*
  * xfs_dir_leaf.h
@@ -163,21 +163,19 @@ int xfs_dir_shortform_create(struct xfs_da_args *args, xfs_ino_t parent);
 int xfs_dir_shortform_addname(struct xfs_da_args *args);
 int xfs_dir_shortform_lookup(struct xfs_da_args *args);
 int xfs_dir_shortform_to_leaf(struct xfs_da_args *args);
-#ifndef SIM
 int xfs_dir_shortform_removename(struct xfs_da_args *args);
+#ifndef SIM
 int xfs_dir_shortform_getdents(struct xfs_trans *trans, struct xfs_inode *dp,
 			       struct uio *uio, int *eofp, struct dirent *dbp,
 			       xfs_dir_put_t put);
-int xfs_dir_shortform_replace(struct xfs_da_args *args);
 #endif	/* !SIM */
+int xfs_dir_shortform_replace(struct xfs_da_args *args);
 
 /*
  * Internal routines when dirsize == XFS_LBSIZE(mp).
  */
 int xfs_dir_leaf_to_node(struct xfs_da_args *args);
-#ifndef SIM
 int xfs_dir_leaf_to_shortform(struct xfs_da_args *args);
-#endif	/* !SIM */
 
 /*
  * Routines used for growing the Btree.
@@ -193,13 +191,14 @@ int	xfs_dir_leaf_addname(struct xfs_da_args *args);
 int	xfs_dir_leaf_lookup_int(struct buf *leaf_buffer,
 				       struct xfs_da_args *args,
 				       int *index_found_at);
-#ifndef SIM
 int	xfs_dir_leaf_remove(struct xfs_trans *trans, struct buf *leaf_buffer,
 				   int index_to_remove);
+#ifndef SIM
 int	xfs_dir_leaf_getdents_int(struct buf *bp, struct xfs_inode *dp,
 					 xfs_dablk_t bno, struct uio *uio,
 					 int *eobp, struct dirent *dbp,
 					 xfs_dir_put_t put, daddr_t nextda);
+#endif	/* !SIM */
 
 /*
  * Routines used for shrinking the Btree.
@@ -208,7 +207,6 @@ int	xfs_dir_leaf_toosmall(struct xfs_da_state *state, int *retval);
 void	xfs_dir_leaf_unbalance(struct xfs_da_state *state,
 					     struct xfs_da_state_blk *drop_blk,
 					     struct xfs_da_state_blk *save_blk);
-#endif	/* !SIM */
 
 /*
  * Utility routines.

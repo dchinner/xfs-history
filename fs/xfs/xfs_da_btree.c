@@ -102,7 +102,6 @@ STATIC void xfs_da_node_add(xfs_da_state_t *state,
 				   xfs_da_state_blk_t *old_node_blk,
 				   xfs_da_state_blk_t *new_node_blk);
 
-#ifndef SIM
 /*
  * Routines used for shrinking the Btree.
  */
@@ -114,7 +113,6 @@ STATIC void xfs_da_node_remove(xfs_da_state_t *state,
 STATIC void xfs_da_node_unbalance(xfs_da_state_t *state,
 					 xfs_da_state_blk_t *src_node_blk,
 					 xfs_da_state_blk_t *dst_node_blk);
-#endif	/* !SIM */
 
 /*
  * Utility routines.
@@ -604,7 +602,6 @@ xfs_da_node_add(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
  * Routines used for shrinking the Btree.
  *========================================================================*/
 
-#ifndef SIM
 /*
  * Deallocate an empty leaf node, remove it from its parent,
  * possibly deallocating that block, etc...
@@ -885,7 +882,6 @@ xfs_da_node_toosmall(xfs_da_state_t *state, int *action)
 	*action = 1;
 	return(0);
 }
-#endif	/* !SIM */
 
 /*
  * Walk back up the tree adjusting hash values as necessary,
@@ -935,7 +931,6 @@ xfs_da_fixhashpath(xfs_da_state_t *state, xfs_da_state_path_t *path)
 	}
 }
 
-#ifndef SIM
 /*
  * Remove an entry from an intermediate node.
  */
@@ -1024,7 +1019,6 @@ xfs_da_node_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 	 */
 	save_blk->hashval = save_node->btree[ save_node->hdr.count-1 ].hashval;
 }
-#endif	/* !SIM */
 
 /*========================================================================
  * Routines used for finding things in the Btree.
@@ -1554,7 +1548,6 @@ xfs_da_grow_inode(xfs_da_args_t *args, int length, xfs_dablk_t *new_blkno)
 	return(0);
 }
 
-#ifndef SIM
 int
 xfs_da_shrink_inode(xfs_da_args_t *args, xfs_dablk_t dead_blkno, int length,
 				  buf_t *dead_buf)
@@ -1584,7 +1577,6 @@ xfs_da_shrink_inode(xfs_da_args_t *args, xfs_dablk_t dead_blkno, int length,
 
 	return(0);
 }
-#endif	/* !SIM */
 
 int
 xfs_da_get_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,

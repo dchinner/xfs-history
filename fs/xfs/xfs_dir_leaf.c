@@ -172,7 +172,6 @@ xfs_dir_shortform_addname(xfs_da_args_t *args)
 	return(0);
 }
 
-#ifndef SIM
 /*
  * Remove a name from the shortform directory structure.
  */
@@ -213,7 +212,6 @@ xfs_dir_shortform_removename(xfs_da_args_t *args)
 
 	return(0);
 }
-#endif	/* !SIM */
 
 /*
  * Look up a name in a shortform directory structure.
@@ -494,6 +492,7 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	xfs_dir_trace_g_du("sf: E-O-F", dp, uio);
 	return 0;
 }
+#endif	/* !SIM */
 
 /*
  * Look up a name in a shortform directory structure, replace the inode number.
@@ -613,7 +612,6 @@ out:
 	kmem_free(tmpbuffer, XFS_LBSIZE(dp->i_mount));
 	return(retval);
 }
-#endif	/* !SIM */
 
 /*
  * Convert from using a single leaf to a root node and a leaf.
@@ -1166,7 +1164,6 @@ xfs_dir_leaf_figure_balance(xfs_da_state_t *state,
  * Routines used for shrinking the Btree.
  *========================================================================*/
 
-#ifndef SIM
 /*
  * Check a leaf block and its neighbors to see if the block should be
  * collapsed into one or the other neighbor.  Always keep the block
@@ -1534,7 +1531,6 @@ xfs_dir_leaf_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 	 */
 	save_blk->hashval = save_leaf->entries[ save_leaf->hdr.count-1 ].hashval;
 }
-#endif	/* !SIM */
 
 /*========================================================================
  * Routines used for finding things in the Btree.

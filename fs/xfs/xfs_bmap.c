@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.171 $"
+#ident	"$Revision: 1.172 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -202,7 +202,6 @@ xfs_bmap_check_extents(
 #define	xfs_bmap_check_extents(ip,w)
 #endif
 
-#ifndef SIM
 /*
  * Called by xfs_bmapi to update extent list structure and the btree
  * after removing space (or undoing a delayed allocation).
@@ -218,7 +217,6 @@ xfs_bmap_del_extent(
 	int			iflags, /* input flags (meta-data or not) */
 	int			*logflagsp,/* inode logging flags */
 	int			whichfork);/* data or attr fork */
-#endif	/* !SIM */
 
 /*
  * Remove the entry "free" from the free item list.  Prev points to the
@@ -1988,7 +1986,6 @@ xfs_bmap_check_extents(
 }
 #endif
 
-#ifndef SIM
 /*
  * Called by xfs_bmapi to update extent list structure and the btree
  * after removing space (or undoing a delayed allocation).
@@ -2256,7 +2253,6 @@ xfs_bmap_del_extent(
 	*logflagsp = flags;
 	return 0;
 }
-#endif	/* !SIM */
 
 /*
  * Remove the entry "free" from the free item list.  Prev points to the
@@ -3956,7 +3952,6 @@ xfs_bmapi_single(
 	return 0;
 }
 
-#ifndef SIM
 /*
  * Unmap (remove) blocks from a file.
  * If nexts is nonzero then the number of extents to remove is limited to
@@ -4188,6 +4183,7 @@ xfs_bunmapi(
 	return 0;
 }
 
+#ifndef SIM
 /*
  * Fcntl interface to xfs_bmapi.
  */

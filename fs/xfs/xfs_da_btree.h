@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DA_BTREE_H
 #define	_FS_XFS_DA_BTREE_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.26 $"
 
 /*
  * xfs_da_btree.h
@@ -216,9 +216,7 @@ int	xfs_da_split(struct xfs_da_state *state);
 /*
  * Routines used for shrinking the Btree.
  */
-#ifndef SIM
 int	xfs_da_join(struct xfs_da_state *state);
-#endif	/* !SIM */
 void	xfs_da_fixhashpath(struct xfs_da_state *state,
 				  struct xfs_da_state_path *path_to_to_fix);
 
@@ -252,9 +250,9 @@ int	xfs_da_read_buf(struct xfs_trans *trans, struct xfs_inode *dp,
 #ifndef SIM
 daddr_t	xfs_da_reada_buf(struct xfs_trans *trans, struct xfs_inode *dp,
 				xfs_dablk_t bno, int whichfork);
+#endif	/* !SIM */
 int	xfs_da_shrink_inode(struct xfs_da_args *args, xfs_dablk_t dead_blkno,
 				   int length, struct buf *dead_buf);
-#endif	/* !SIM */
 
 uint xfs_da_hashname(char *name_string, int name_length);
 uint xfs_da_log2_roundup(uint i);
