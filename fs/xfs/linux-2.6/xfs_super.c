@@ -396,16 +396,11 @@ linvfs_release_buftarg(
 
 static kmem_cache_t * linvfs_inode_cachep;
 
-#define XFS_TRANS_MAGIC 0x5452414E
-
 static __inline__ unsigned int gfp_mask(void)
 {
         /* If we're not in a transaction, FS activity is ok */
-        if (!current->journal_info) return GFP_KERNEL;
-        /* could be set from some other filesystem */
-        if ((int)current->journal_info != XFS_TRANS_MAGIC)
-                return GFP_KERNEL;
-        return GFP_NOFS;
+        if (current->flags & PF_FSTRANS) return GFP_NOFS;
+	return GFP_KERNEL;
 }
 
 
