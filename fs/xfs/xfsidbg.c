@@ -3298,14 +3298,14 @@ xfsidbg_xiclog(xlog_in_core_t *iclog)
 
 	printk("xlog_in_core/header at 0x%p\n", iclog);
 	printk("magicno: %x  cycle: %d  version: %d  lsn: 0x%Lx\n",
-		iclog->ic_header.h_magicno, iclog->ic_header.h_cycle,
-		iclog->ic_header.h_version, iclog->ic_header.h_lsn);
+		INT_GET(iclog->ic_header.h_magicno, ARCH_UNKNOWN), INT_GET(iclog->ic_header.h_cycle, ARCH_UNKNOWN),
+		INT_GET(iclog->ic_header.h_version, ARCH_UNKNOWN), INT_GET(iclog->ic_header.h_lsn, ARCH_UNKNOWN));
 	printk("tail_lsn: 0x%Lx  len: %d  prev_block: %d  num_ops: %d\n",
-		iclog->ic_header.h_tail_lsn, iclog->ic_header.h_len,
-		iclog->ic_header.h_prev_block, iclog->ic_header.h_num_logops);
+		INT_GET(iclog->ic_header.h_tail_lsn, ARCH_UNKNOWN), INT_GET(iclog->ic_header.h_len, ARCH_UNKNOWN),
+		INT_GET(iclog->ic_header.h_prev_block, ARCH_UNKNOWN), INT_GET(iclog->ic_header.h_num_logops, ARCH_UNKNOWN));
 	printk("cycle_data: ");
 	for (i=0; i<(iclog->ic_size>>BBSHIFT); i++) {
-		printk("%x  ", iclog->ic_header.h_cycle_data[i]);
+		printk("%x  ", INT_GET(iclog->ic_header.h_cycle_data[i], ARCH_UNKNOWN));
 	}
 	printk("\n");
 	printk("--------------------------------------------------\n");

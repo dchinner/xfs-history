@@ -31,6 +31,7 @@
  */
 #ident "$Revision$"
 
+#include <xfs_os_defs.h>
 #include <linux/errno.h>
 
 #include <sys/types.h>

@@ -29,10 +29,13 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.6 $"
+#ident "$Revision: 1.7 $"
 /*
  * xfsrt stubs
  */
+ 
+#include <xfs_os_defs.h>
+
 #include <sys/types.h>
 #include <sys/uuid.h>
 #include <sys/vfs.h>
