@@ -6,7 +6,7 @@
 
 
 
-#define XLOG_NUM_ICLOGS		2
+#define XLOG_NUM_ICLOGS		8
 #define XLOG_CALLBACK_SIZE	10
 #define XLOG_HEADER_MAGIC_NUM	0xFEEDbabe	/* need to outlaw as cycle XXX*/
 #define XLOG_RECORD_BSIZE	(4*1024)	/* eventually 32k */
@@ -26,8 +26,10 @@
 
 #ifdef _KERNEL
 #define xlog_panic(s)		{panic(s); }
+#define xlog_exit(s)		{panic(s); }
 #else
 #define xlog_panic(s)		{printf("%s\n", s); abort();}
+#define xlog_exit(s)		{printf("%s\n", s); exit(1);}
 #endif
 
 
