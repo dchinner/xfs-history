@@ -43,7 +43,6 @@
 #include <sys/sysmacros.h>
 #include <sys/capability.h>
 #include <sys/cred.h>
-#include <sys/buf.h>
 #include <sys/vfs.h>
 #include <sys/pvfs.h>
 #include <sys/vnode.h>
@@ -54,6 +53,7 @@
 #include <linux/xfs_file.h>
 
 #include <linux/page_buf.h>
+#include <xfs_buf.h>
 
 #include <asm/uaccess.h> /* For copy_from_user */
 
@@ -460,7 +460,7 @@ int linvfs_get_block(struct inode *inode, long block, struct buffer_head *bh_res
 	vp = LINVFS_GET_VP(inode);
 
 	VOP_RWLOCK(vp, VRWLOCK_READ);
-	VOP_BMAP(vp, offset, count, B_READ,(struct page_buf_bmap_s *) &pbmap, &npbmaps, error);
+	VOP_BMAP(vp, offset, count, XFS_B_READ,(struct page_buf_bmap_s *) &pbmap, &npbmaps, error);
 	VOP_RWUNLOCK(vp, VRWLOCK_READ);
 	if (error)
 		return -EIO;
@@ -542,11 +542,11 @@ linvfs_pb_bmap(struct inode *inode,
 
 	switch(flags) {
 	case PBF_READ:
-		vop_flags = B_READ;
+		vop_flags = XFS_B_READ;
 		break;
 
 	case PBF_WRITE:
-		vop_flags = B_WRITE;
+		vop_flags = XFS_B_WRITE;
 		break;
 	
 	default:

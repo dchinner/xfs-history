@@ -242,7 +242,7 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	 */
 	bp = XFS_ngetrbuf(BBTOB(BTOBB(sizeof(xfs_sb_t))),mp);
 	ASSERT(bp != NULL);
-	ASSERT(XFS_BUF_ISBUSY(bp) && valusema(&bp->b_lock) <= 0);
+	ASSERT(XFS_BUF_ISBUSY(bp) && XFS_BUF_VALUSEMA(bp) <= 0);
 
 	/*
 	 * Initialize and read in the superblock buffer.
@@ -268,7 +268,7 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	mp->m_sb_bp = bp;
 	mp->m_sb = *sbp;				/* bcopy structure */
 	xfs_buf_relse(bp);
-	ASSERT(valusema(&bp->b_lock) > 0);
+	ASSERT(XFS_BUF_VALUSEMA(bp) > 0);
 	return 0;
 
  err:
@@ -1507,7 +1507,7 @@ STATIC void
 xfs_sb_relse(xfs_buf_t *bp)
 {
 	ASSERT(XFS_BUF_ISBUSY(bp));
-	ASSERT(valusema(&bp->b_lock) <= 0);
+	ASSERT(XFS_BUF_VALUSEMA(bp) <= 0);
 	XFS_BUF_UNASYNC(bp);
 	XFS_BUF_UNREAD(bp);
 #if !defined(_USING_PAGEBUF_T)

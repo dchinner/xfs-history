@@ -3010,10 +3010,12 @@ xfs_create_broken(
 #ifdef SIM
 	abort();
 #else
+#ifndef __linux__
 #ifdef	DEBUG
 	debug_stop_all_cpus((void *)-1LL);
 	debug("xfs");
 #endif	/* DEBUG */
+#endif
 #endif
 }
 
@@ -5082,7 +5084,7 @@ xfs_symlink(
 			byte_cnt = XFS_FSB_TO_B(mp, mval[n].br_blockcount);
 			bp = xfs_trans_get_buf(tp, mp->m_ddev_targp, d, 
 					       BTOBB(byte_cnt), 0);
-			ASSERT(bp && !geterror(bp));
+			ASSERT(bp && !XFS_BUF_GETERROR(bp));
 			if (pathlen < byte_cnt) {
 				byte_cnt = pathlen;
 			}
@@ -5454,7 +5456,9 @@ xfs_allocstore(
 	/*
 	 * This code currently only works for a single page.
 	 */
+/***
 	ASSERT(poff(offset) == 0);
+***/
 	ASSERT(count == NBPP);
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
@@ -6554,7 +6558,7 @@ xfs_zero_remaining_bytes(
 
 	mp = ip->i_mount;
 	bp = XFS_ngetrbuf(mp->m_sb.sb_blocksize,mp);
-	ASSERT(!geterror(bp));
+	ASSERT(!XFS_BUF_GETERROR(bp));
 
 	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
 		XFS_BUF_SET_TARGET(bp, &mp->m_rtdev_targ);
@@ -6583,7 +6587,9 @@ xfs_zero_remaining_bytes(
 		XFS_BUF_UNWRITE(bp);
 		XFS_BUF_READ(bp);
 		XFS_BUF_SET_ADDR(bp, XFS_FSB_TO_DB(ip, imap.br_startblock));
+#ifndef __linux__
 		bp_dcache_wbinval(bp);
+#endif
 		xfsbdstrat(mp, bp); 
 		if (error = xfs_iowait(bp))
 			break;

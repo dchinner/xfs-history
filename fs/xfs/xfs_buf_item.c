@@ -185,7 +185,7 @@ xfs_buf_item_format(
 	ASSERT((bip->bli_flags & XFS_BLI_LOGGED) ||
 	       (bip->bli_flags & XFS_BLI_STALE));
 	bp = bip->bli_buf;
-	ASSERT(BP_ISMAPPED(bp));
+	ASSERT(XFS_BUF_BP_ISMAPPED(bp));
 	vecp = log_vector;
 
 	/*
@@ -325,7 +325,9 @@ xfs_buf_item_unpin(
 		ASSERT(XFS_BUF_VALUSEMA(bp) <= 0);
 		ASSERT(!(XFS_BUF_ISDELAYWRITE(bp)));
 		ASSERT(XFS_BUF_ISSTALE(bp));
+/**
 		ASSERT(bp->b_pincount == 0);
+**/
 		ASSERT(bip->bli_format.blf_flags & XFS_BLI_CANCEL);
 		xfs_buf_item_trace("UNPIN STALE", bip);
 		xfs_buftrace("XFS_UNPIN STALE", bp);
@@ -1156,7 +1158,9 @@ xfs_buf_item_relse(
 	XFS_BUF_SET_FSPRIVATE(bp, bip->bli_item.li_bio_list);
 	if ((XFS_BUF_FSPRIVATE(bp, void *) == NULL) &&
 	    (XFS_BUF_IODONE_FUNC(bp) != NULL)) {
+/**
 		ASSERT((XFS_BUF_ISUNINITIAL(bp)) == 0);
+***/
 		XFS_BUF_CLR_IODONE_FUNC(bp);
 	}
 

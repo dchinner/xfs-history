@@ -328,7 +328,7 @@ xfs_ialloc_ag_alloc(
 					 args.mp->m_bsize * blks_per_cluster,
 					 0);
 		ASSERT(fbuf);
-		ASSERT(!geterror(fbuf));		
+		ASSERT(!XFS_BUF_GETERROR(fbuf));		
 		/*
 		 * Loop over the inodes in this buffer.
 		 */
@@ -1279,7 +1279,7 @@ xfs_ialloc_read_agi(
 	d = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
 	if (error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, d, 1, 0, &bp))
 		return error;
-	ASSERT(bp && !geterror(bp));
+	ASSERT(bp && !XFS_BUF_GETERROR(bp));
 	/*
 	 * Validate the magic number of the agi block.
 	 */

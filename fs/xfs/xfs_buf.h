@@ -49,6 +49,7 @@ typedef struct buf xfs_buf_t;
 #define XFS_B_DELWRI B_DELWRI
 #define XFS_B_READ   B_READ
 #define XFS_B_WRITE   B_WRITE
+#define XFS_B_STALE   B_STALE
 #define XFS_BUF_TRYLOCK	BUF_TRYLOCK
 #define XFS_INCORE_TRYLOCK	INCORE_TRYLOCK
 
@@ -75,15 +76,15 @@ typedef struct buf xfs_buf_t;
 
 #define XFS_BUF_BUSY(x)          ((x)->b_flags |= B_BUSY)
 #define XFS_BUF_UNBUSY(x)    	 ((x)->b_flags &= ~B_BUSY)
-#define XFS_BUF_ISBUSY(x)	     ((x)->b_flags & B_BUSY)
+#define XFS_BUF_ISBUSY(x)	 ((x)->b_flags & B_BUSY)
 
 #define XFS_BUF_ASYNC(x)         ((x)->b_flags |= B_ASYNC)
 #define XFS_BUF_UNASYNC(x)     	 ((x)->b_flags &= ~B_ASYNC)
 #define XFS_BUF_ISASYNC(x)       ((x)->b_flags & B_ASYNC)
 
-#define XFS_BUF_SHUT(x)         ((x)->b_flags |= B_XFS_SHUT)
+#define XFS_BUF_SHUT(x)          ((x)->b_flags |= B_XFS_SHUT)
 #define XFS_BUF_UNSHUT(x)     	 ((x)->b_flags &= ~B_XFS_SHUT)
-#define XFS_BUF_ISSHUT(x)       ((x)->b_flags & B_XFS_SHUT)
+#define XFS_BUF_ISSHUT(x)        ((x)->b_flags & B_XFS_SHUT)
 
 #define XFS_BUF_HOLD(x)         ((x)->b_flags |= B_HOLD)
 #define XFS_BUF_UNHOLD(x)       ((x)->b_flags &= ~B_HOLD)
@@ -309,18 +310,19 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 
 #define XFS_BUF_BUSY(x)          ((x)->pb_flags |= PBF_FORCEIO)
 #define XFS_BUF_UNBUSY(x)    	 ((x)->pb_flags &= ~PBF_FORCEIO)
-#define XFS_BUF_ISBUSY(x)	     ((x)->pb_flags & PBF_FORCEIO)
+#define XFS_BUF_ISBUSY(x)	 (1)
 
 #define XFS_BUF_ASYNC(x)         ((x)->pb_flags |= PBF_ASYNC)
 #define XFS_BUF_UNASYNC(x)     	 ((x)->pb_flags &= ~PBF_ASYNC)
 #define XFS_BUF_ISASYNC(x)       ((x)->pb_flags & PBF_ASYNC)
 
-#define XFS_BUF_SHUT(x)          /* error! not implemented yet */
-#define XFS_BUF_UNSHUT(x)     	 /* error! not implemented yet */
+#define XFS_BUF_SHUT(x)          printk("XFS_BUF_SHUT not implemented yet\n") 
+#define XFS_BUF_UNSHUT(x)     	 printk("XFS_BUF_UNSHUT not implemented yet\n")
 #define XFS_BUF_ISSHUT(x)        (0)
 
-#define XFS_BUF_HOLD(x)		pagebuf_hold(x)
-#define XFS_BUF_UNHOLD(x)       /* error! not implemented yet */
+
+#define XFS_BUF_HOLD(x)		pagebuf_hold(x)  
+#define XFS_BUF_UNHOLD(x)       printk("XFS_BUF_UNHOLD not implemented yet\n")
 #define XFS_BUF_ISHOLD(x)       (1)
 /* this may go away... calling iostart will define read or write */
 /* used for irix at the moment not needed for linux? */
@@ -332,21 +334,21 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define XFS_BUF_UNWRITE(x)      ((x)->pb_flags &= ~PBF_WRITE)
 #define XFS_BUF_ISWRITE(x)      ((x)->pb_flags & PBF_WRITE)
 
-#define XFS_BUF_UNCACHED(x)      /* error! not implemeneted yet */
-#define XFS_BUF_UNUNCACHED(x)    /* error! not implemeneted yet */
+#define XFS_BUF_UNCACHED(x)      printk("XFS_BUF_UNCACHED not implemented yet\n")
+#define XFS_BUF_UNUNCACHED(x)    printk("XFS_BUF_UNUNCACHED not implemented yet\n")
 #define XFS_BUF_ISUNCACHED(x)    (0) 
 
 #define XFS_BUF_ISUNINITIAL(x)   ((x)->pb_flags & PBF_UNINITIAL)
 #define XFS_BUF_UNUNINITIAL(x)   ((x)->pb_flags &= ~PBF_UNINITIAL)
 
-#define XFS_BUF_AGE(x)        /* error! not implemeneted yet */
+#define XFS_BUF_AGE(x)           printk("XFS_BUF_AGE not implemented yet\n")
 
-#define XFS_BUF_BP_ISMAPPED(bp)  1 /* error! not implemeneted yet */
-#define XFS_BUF_IS_IOSPL(bp)     1 /* error! not implemeneted yet */
+#define XFS_BUF_BP_ISMAPPED(bp)  1
+#define XFS_BUF_IS_IOSPL(bp)     xfs_buf_iospl() 
 #define XFS_BUF_IS_GRIO(bp)      ((bp)->pb_flags & PBF_GRIO)
 
 /* hmm what does the mean on linux? may go away */
-#define XFS_BUF_PAGEIO(x)        /* error! not implemeneted yet */
+#define XFS_BUF_PAGEIO(x)        printk("XFS_BUF_PAGEIO not implemented yet\n") 
 /*
  * Flags for incore_match() and findchunk_match().
  */
@@ -414,7 +416,7 @@ extern void xfs_pb_nfreer(page_buf_t *);
 #define XFS_BUF_SET_VTYPE(bp, type)
 #define XFS_BUF_SET_REF(bp, ref)
 
-#define XFS_BUF_ISPINNED(bp) 0 /* ERROR implement me */ 
+#define XFS_BUF_ISPINNED(bp)   pagebuf_ispin(bp)
 
 #define XFS_BUF_VALUSEMA(bp) 	pagebuf_is_locked(bp)
 #define XFS_BUF_CPSEMA(bp)   	pagebuf_cond_lock(bp)

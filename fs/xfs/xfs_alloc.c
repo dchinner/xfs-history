@@ -594,7 +594,7 @@ xfs_alloc_read_agfl(
 	if (error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, d, 1, 0, &bp))
 		return error;
 	ASSERT(bp);
-	ASSERT(!geterror(bp));
+	ASSERT(!XFS_BUF_GETERROR(bp));
 	XFS_BUF_SET_VTYPE_REF(bp, B_FS_AGFL, XFS_AGFL_REF);
 	*bpp = bp;
 	return 0;
@@ -2301,7 +2301,7 @@ xfs_alloc_read_agf(
 			(flags & XFS_ALLOC_FLAG_TRYLOCK) ? XFS_BUF_TRYLOCK : 0U,
 			&bp))
 		return error;
-	ASSERT(!bp || !geterror(bp));
+	ASSERT(!bp || !XFS_BUF_GETERROR(bp));
 	if (!bp) {
 		*bpp = NULL;
 		return 0;

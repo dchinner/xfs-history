@@ -1228,10 +1228,11 @@ xfsbdstrat(
 {
 #if !defined(_USING_PAGEBUF_T)
   	int		dev_major = emajor(bp->b_edev);
+
+	ASSERT(bp->b_target);
 #endif
 
 	ASSERT(mp);
-	ASSERT(bp->b_target);
 	if (!XFS_FORCED_SHUTDOWN(mp)) {
 		/*
 		 * We want priority I/Os to non-XLV disks to go thru'

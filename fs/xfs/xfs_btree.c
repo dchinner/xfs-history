@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.71 $"
+#ident	"$Revision$"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -449,7 +449,7 @@ xfs_btree_dup_cursor(
 			}
 			new->bc_bufs[i] = bp;
 			ASSERT(bp);
-			ASSERT(!geterror(bp));
+			ASSERT(!XFS_BUF_GETERROR(bp));
 		} else
 			new->bc_bufs[i] = NULL;
 	}
@@ -542,7 +542,7 @@ xfs_btree_get_bufl(
 	d = XFS_FSB_TO_DADDR(mp, fsbno);
 	bp = xfs_trans_get_buf(tp, mp->m_ddev_targp, d, mp->m_bsize, lock);
 	ASSERT(bp);
-	ASSERT(!geterror(bp));
+	ASSERT(!XFS_BUF_GETERROR(bp));
 	return bp;
 }
 
@@ -566,7 +566,7 @@ xfs_btree_get_bufs(
 	d = XFS_AGB_TO_DADDR(mp, agno, agbno);
 	bp = xfs_trans_get_buf(tp, mp->m_ddev_targp, d, mp->m_bsize, lock);
 	ASSERT(bp);
-	ASSERT(!geterror(bp));
+	ASSERT(!XFS_BUF_GETERROR(bp));
 	return bp;
 }
 
@@ -767,7 +767,7 @@ xfs_btree_read_bufl(
 #pragma mips_frequency_hint NEVER
 		return error;
 	}
-	ASSERT(!bp || !geterror(bp));
+	ASSERT(!bp || !XFS_BUF_GETERROR(bp));
 	if (bp != NULL) {
 		XFS_BUF_SET_VTYPE_REF(bp, B_FS_MAP, refval);
 	}
@@ -801,7 +801,7 @@ xfs_btree_read_bufs(
 #pragma mips_frequency_hint NEVER
 		return error;
 	}
-	ASSERT(!bp || !geterror(bp));
+	ASSERT(!bp || !XFS_BUF_GETERROR(bp));
 	if (bp != NULL)
 		switch (refval) {
 		case XFS_ALLOC_BTREE_REF:

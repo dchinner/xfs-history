@@ -199,6 +199,7 @@ xfs_retrieved(
 	uint		*total_retrieved,
 	xfs_fsize_t	isize);
 
+#if !defined(__linux__)
 #ifndef DEBUG
 
 #define	xfs_strat_write_check(io,off,count,imap,nimap)
@@ -233,6 +234,7 @@ xfs_check_gap_list(
 	xfs_iocore_t	*ip);
 
 #endif /* DEBUG */		      
+#endif
 
 STATIC int
 xfs_build_gap_list(
@@ -4541,7 +4543,6 @@ xfs_zero_bp(
 		pfdp = getnextpg(bp, pfdp);
 	}
 }
-#endif /* !defined(__linux__) */
 
 /*
  * Verify that the gap list is properly sorted and that no entries
@@ -4572,6 +4573,7 @@ xfs_check_gap_list(
 	}
 }
 #endif
+#endif /* !defined(__linux__) */
 
 /*
  * For the given inode, offset, and count of bytes, build a list
@@ -4581,6 +4583,7 @@ xfs_check_gap_list(
  * The list must be empty when we start, and the inode lock must
  * be held exclusively.
  */
+#if !defined(__linux__)
 STATIC int				/* error */
 xfs_build_gap_list(
 	xfs_iocore_t	*io,
@@ -4666,6 +4669,7 @@ xfs_build_gap_list(
 	xfs_check_gap_list(io);
 	return 0;
 }
+#endif /* !defined(__linux__) */
 
 /*
  * Remove or trim any entries in the inode's gap list which overlap
@@ -5258,6 +5262,7 @@ xfs_strat_write_subbp_trace(
 }
 #endif /* XFS_STRAT_TRACE */
 
+#if !defined(__linux__)
 #ifdef DEBUG
 /*
  * xfs_strat_write_check
@@ -5312,6 +5317,7 @@ xfs_strat_write_check(
 	return;
 }
 #endif /* DEBUG */
+#endif
 
 /*
  * xfs_strat_write_iodone -
@@ -5620,7 +5626,6 @@ xfs_strat_write_relse(
 
 	freerbuf(rbp);
 }
-#endif /* !defined(__linux__) */
 
 #ifdef DEBUG
 /*ARGSUSED*/
@@ -5636,7 +5641,6 @@ xfs_check_rbp(
 	xfs_bmbt_irec_t	imap;
 	xfs_fileoff_t	rbp_offset_fsb;
 	xfs_filblks_t	rbp_len_fsb;
-	pfd_t		*pfdp;
 	xfs_fsblock_t	firstblock;
 	int		error;
 
@@ -5664,7 +5668,6 @@ xfs_check_rbp(
 		XFS_BB_FSB_OFFSET(mp, rbp->b_offset)) ==
 	       rbp->b_blkno);
 
-#ifndef __linux__
 	if (rbp->b_flags & B_PAGEIO) {
 		pfdp = NULL;
 		pfdp = getnextpg(rbp, pfdp);
@@ -5676,7 +5679,6 @@ xfs_check_rbp(
 		ASSERT(BTOBB(poff(XFS_BUF_PTR(rbp))) ==
 		       dpoff(rbp->b_offset));
 	}
-#endif
 }
 
 /*
@@ -5757,6 +5759,7 @@ xfs_check_bp(
 	       bp->b_blkno);
 }
 #endif /* DEBUG */
+#endif /* !defined(__linux__) */
 
 
 /*
@@ -6527,8 +6530,8 @@ xfs_bioerror_relse(
 {
 	int64_t fl;
 
-	ASSERT(bp->b_iodone != xfs_buf_iodone_callbacks);
-	ASSERT(bp->b_iodone != xlog_iodone);
+	ASSERT(XFS_BUF_IODONE_FUNC(bp) != xfs_buf_iodone_callbacks);
+	ASSERT(XFS_BUF_IODONE_FUNC(bp) != xlog_iodone);
 
 	xfs_buftrace("XFS IOERRELSE", bp);
 	fl = XFS_BUF_BFLAGS(bp);
@@ -6636,8 +6639,6 @@ xfs_bwrite(
 	/*
 	 * XXXsup how does this work for quotas.
 	 */
-	ASSERT(bp->b_target);
-	ASSERT(bp->b_vp == NULL);
 	XFS_BUF_SET_BDSTRAT_FUNC(bp, xfs_bdstrat_cb);
 	XFS_BUF_SET_FSPRIVATE3(bp, mp);
 	XFS_BUF_WRITE(bp);

@@ -19,7 +19,7 @@
 #ifndef _FS_XFS_MACROS_H
 #define	_FS_XFS_MACROS_H
 
-#ident 	"$Revision: 1.10 $"
+#ident 	"$Revision$"
 
 /*
  * Set for debug kernels and simulation, and 32-bit kernels,
@@ -28,7 +28,7 @@
  */
 #define	XFS_WANT_SPACE_C	\
 	(!defined(_STANDALONE) && \
-	 (defined(DEBUG) || (defined(_KERNEL) && _MIPS_SIM != _ABI64)))
+	 (defined(_KERNEL) ))
 
 /*
  * Set for debug simulation and kernel builds, but not for standalone.
@@ -36,7 +36,7 @@
  * Used in xfs_macros.c.
  */
 #define	XFS_WANT_FUNCS_C	\
-	(!defined(_STANDALONE) && defined(DEBUG))
+	(!defined(_STANDALONE))
 
 /*
  * Corresponding names used in .h files.

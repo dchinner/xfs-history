@@ -1201,7 +1201,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	XFS_BUF_SET_BDSTRAT_FUNC(bp, xlog_bdstrat_cb);
 	XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)1);
 	ASSERT(XFS_BUF_ISBUSY(log->l_xbuf));
-	ASSERT(valusema(&log->l_xbuf->b_lock) <= 0);
+	ASSERT(XFS_BUF_VALUSEMA(log->l_xbuf) <= 0);
 	spinlock_init(&log->l_icloglock, "iclog");
 	spinlock_init(&log->l_grant_lock, "grhead_iclog");
 	initnsema(&log->l_flushsema, 0, "ic-flush");
@@ -1254,7 +1254,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 		iclog->ic_callback_tail = &(iclog->ic_callback);
 
 		ASSERT(XFS_BUF_ISBUSY(iclog->ic_bp));
-		ASSERT(valusema(&iclog->ic_bp->b_lock) <= 0);
+		ASSERT(XFS_BUF_VALUSEMA(&iclog->ic_bp) <= 0);
 		sv_init(&iclog->ic_forcesema, SV_DEFAULT, "iclog-force");
 
 		iclogp = &iclog->ic_next;
@@ -3224,7 +3224,7 @@ xlog_verify_disk_cycle_no(xlog_t	 *log,
 
     if (BLOCK_LSN(iclog->ic_header.h_lsn) < 10) {
 	cycle_no = CYCLE_LSN(iclog->ic_header.h_lsn);
-	bp = xlog_get_bp(1);
+	bp = xlog_get_bp(1, log->l_mp);
 	for (i = 0; i < BLOCK_LSN(iclog->ic_header.h_lsn); i++) {
 	    xlog_bread(log, i, 1, bp);
 	    if (GET_CYCLE(XFS_BUF_PTR(bp)) != cycle_no)
