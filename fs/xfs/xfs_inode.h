@@ -108,7 +108,8 @@ typedef struct xfs_inode {
  */
 #define	XFS_MAX_INCORE_EXTENTS	32768
 
-#define	XFS_ITOV(ip)	((ip)->i_vnode)
+#define	XFS_ITOV(ip)	((vnode_t*)((ip)->i_vnode))
+#define	XFS_VTOI(ip)	((xfs_inode_t*)((vp)->v_data))
 
 /*
  * Value for inode buffers' b_ref field.
@@ -130,6 +131,7 @@ extern void		xfs_iunlock(xfs_inode_t *);
 extern void		xfs_iflock(xfs_inode_t *);
 extern int		xfs_iflock_nowait(xfs_inode_t *);
 extern void		xfs_ifunlock(xfs_inode_t *);
+extern void		xfs_ireclaim(xfs_inode_t *);
 
 /*
  * xfs_inode.c prototypes.
