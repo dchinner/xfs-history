@@ -1512,17 +1512,21 @@ xfs_idestroy(
 		ASSERT(ip->i_real_bytes == 0);
 		break;
 	}
+#ifdef NOTYET
 	if (ip->i_range_lock.r_sleep != NULL) {
 		freesema(ip->i_range_lock.r_sleep);
 		kmem_free(ip->i_range_lock.r_sleep, sizeof(sema_t));
 	}
+#endif /* NOTYET */
 	mrfree(&ip->i_lock);
 	mrfree(&ip->i_iolock);
 #ifndef SIM
 	xfs_free_remaining_tickets( ip );
 #endif
 	freesplock(ip->i_ticketlock);
+#ifdef NOTYET
 	freesplock(ip->i_range_lock.r_splock);
+#endif /* NOTYET */
 	freesema(&ip->i_flock);
 	freesema(&ip->i_pinsema);
 #ifndef SIM

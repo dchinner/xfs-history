@@ -18,6 +18,7 @@ typedef struct xfs_ihash {
 	ulong			ih_version;
 } xfs_ihash_t;
 
+#ifdef NOTYET
 /*
  * The range structure is used to describe a locked range
  * within a file.  It is used in conjunction with the
@@ -41,6 +42,7 @@ typedef struct xfs_range_lock {
 	sema_t		*r_sleep;	/* semaphore for sleeping on */
 	xfs_range_t	*r_range_list;	/* list of locked ranges */
 } xfs_range_lock_t;
+#endif /* NOTYET */
 
 /*
  * This is the xfs in-core inode structure.
@@ -81,7 +83,9 @@ typedef struct xfs_inode {
 	sema_t			i_flock;	/* inode flush lock */
 	unsigned int		i_pincount;	/* inode pin count */
 	sema_t			i_pinsema;	/* inode pin sema */
+#ifdef NOTYET
 	xfs_range_lock_t	i_range_lock;	/* range lock base */
+#endif /* NOTYET */
 
 	/* I/O state */
 	off_t			i_next_offset;	/* seq read detector */
