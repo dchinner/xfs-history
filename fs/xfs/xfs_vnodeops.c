@@ -1,4 +1,4 @@
-#ident "$Revision: 1.339 $"
+#ident "$Revision: 1.341 $"
 
 
 #ifdef SIM
@@ -650,20 +650,21 @@ xfs_setattr(
 	lock_flags = XFS_ILOCK_EXCL;
 	if (!(mask & AT_SIZE)) {
 		tp = xfs_trans_alloc(mp, XFS_TRANS_SETATTR_NOT_SIZE);
+		commit_flags = 0;
 		if (code = xfs_trans_reserve(tp, 0,
 					     XFS_ICHANGE_LOG_RES(mp), 0,
 					     0, 0)) {
-			xfs_trans_cancel(tp, 0);
-			return code;
+			lock_flags = 0;
+			goto error_return;
 		}
-		commit_flags = 0;
-
 	} else {
 		if (DM_EVENT_ENABLED (vp->v_vfsp, ip, DM_TRUNCATE) &&
 		    !(flags & ATTR_DMI)) {
 			code = dm_data_event(vp, DM_TRUNCATE, vap->va_size, 0);
-			if (code)
-				return code;
+			if (code) {
+				lock_flags = 0;
+				goto error_return;
+			}
 		}
 		lock_flags |= XFS_IOLOCK_EXCL;
 	}
@@ -1183,9 +1184,8 @@ xfs_setattr(
 	if (lock_flags != 0) {
 		xfs_iunlock(ip, lock_flags);
 	}
-
 	return code;
-}
+} /* xfs_setattr */
 
 
 /*
