@@ -76,6 +76,22 @@ xfs_corruption_error(
 extern void
 xfs_hex_dump(void *p, int length);
 
+
+/* dump_stack() showed up in 2.4.20, show_stack is arch-specific */
+static inline void
+xfs_stack_trace(void)
+{
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,20)
+	dump_stack();
+#else
+  #if defined(CONFIG_X86) || defined(CONFIG_X86_64)
+	show_stack(0);
+  #else
+	return;
+  #endif
+#endif
+}
+
 #define	XFS_ERROR_REPORT(e, lvl, mp)	\
 	xfs_error_report(e, lvl, mp, __FILE__, __LINE__, __return_address)
 #define	XFS_CORRUPTION_ERROR(e, lvl, mp, mem)	\
