@@ -63,7 +63,10 @@ endif
 subdir-$(CONFIG_XFS_FS)		+= linux
 # Uncomment when grio directory created
 # subdir-$(CONFIG_XFS_GRIO)	+= grio		
-subdir-$(CONFIG_XFS_DMAPI)	+= dmapi
+# Kludge, 2.4.0-test13-pre3 Makefiles are still not quite right.  Keith Owens.
+ifneq ($(CONFIG_XFS_DMAPI),)
+  subdir-$(CONFIG_XFS_FS)	+= dmapi
+endif
 subdir-$(CONFIG_XFS_SUPPORT)	+= support
 
 obj-y :=
