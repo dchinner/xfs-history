@@ -32,7 +32,6 @@
 #ifndef __XFS_SUPPORT_H__
 #define __XFS_SUPPORT_H__
 
-#include <linux/types.h>
 #include <support/types.h>
 
 #include <support/arch.h>
