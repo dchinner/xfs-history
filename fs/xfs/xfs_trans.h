@@ -5,11 +5,16 @@
 struct xfs_item_ops;
 struct xfs_log_item_desc;
 struct xfs_mount;
+struct xfs_log_item;
+
+typedef struct xfs_ail_entry {
+	struct xfs_log_item	*ail_forw;	/* AIL forw pointer */
+	struct xfs_log_item	*ail_back;	/* AIL back pointer */
+} xfs_ail_entry_t;
 
 typedef struct xfs_log_item {
+	xfs_ail_entry_t			li_ail;		/* AIL pointers */
 	xfs_lsn_t			li_lsn;		/* last on-disk lsn */
-	struct xfs_log_item		*li_forw;	/* AIL pointer */
-	struct xfs_log_item		*li_back;	/* AIL pointer */
 	struct xfs_log_item_desc	*li_desc;	/* ptr to current desc*/
 	struct xfs_mount		*li_mountp;	/* ptr to fs mount */
 	uint				li_type;	/* item type */
@@ -22,8 +27,6 @@ typedef struct xfs_log_item {
 } xfs_log_item_t;
 
 #define	XFS_LI_IN_AIL	0x1
-#define	XFS_LI_LEFTSIB	0x2
-#define	XFS_LI_RIGHTSIB	0x4
 
 /*
  * Log item types.
@@ -68,8 +71,9 @@ typedef struct xfs_log_item_desc {
 	unsigned char	lid_index;
 } xfs_log_item_desc_t;
 
-#define	XFS_LID_DIRTY	0x1
-#define	XFS_LID_PINNED	0x2
+#define	XFS_LID_DIRTY		0x1
+#define	XFS_LID_PINNED		0x2
+#define	XFS_LID_SYNC_UNLOCK	0x4
 
 /*
  * This structure is used to maintain a chunk list of log_item_desc
@@ -212,6 +216,7 @@ buf_t		*xfs_trans_chunkread(xfs_trans_t *, vnode_t *, struct bmapval *,
 void		xfs_trans_brelse(xfs_trans_t *, buf_t *);
 void		xfs_trans_bjoin(xfs_trans_t *, buf_t *);
 void		xfs_trans_bhold(xfs_trans_t *, buf_t *);
+void		xfs_trans_bhold_until_committed(xfs_trans_t *, buf_t *);
 struct xfs_inode	*xfs_trans_iget(struct xfs_mount *, xfs_trans_t *,
 					xfs_ino_t , uint);
 void		xfs_trans_iput(xfs_trans_t *, struct xfs_inode *, uint);
@@ -224,6 +229,7 @@ xfs_trans_id_t	xfs_trans_id(xfs_trans_t *);
 void		xfs_trans_commit(xfs_trans_t *, uint flags);
 void		xfs_trans_commit_async(struct xfs_mount *);
 void		xfs_trans_cancel(xfs_trans_t *);
+void		xfs_trans_ail_init(struct xfs_mount *);
 
 /*
  * Not necessarily exported, but used outside a single file.
