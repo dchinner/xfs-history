@@ -1410,7 +1410,7 @@ xfs_attr_refillstate(xfs_da_state_t *state)
 						blk->blkno, blk->disk_blkno,
 						&blk->bp, XFS_ATTR_FORK);
 			if (error)
-				return(XFS_ERROR(error));
+				return(error);
 		} else {
 			blk->bp = NULL;
 		}
@@ -1429,7 +1429,7 @@ xfs_attr_refillstate(xfs_da_state_t *state)
 						blk->blkno, blk->disk_blkno,
 						&blk->bp, XFS_ATTR_FORK);
 			if (error)
-				return(XFS_ERROR(error));
+				return(error);
 		} else {
 			blk->bp = NULL;
 		}
@@ -1510,7 +1510,7 @@ xfs_attr_node_list(xfs_attr_list_context_t *context)
 	if (cursor->blkno > 0) {
 		error = xfs_da_read_buf(NULL, context->dp, cursor->blkno, -1,
 					      &bp, XFS_ATTR_FORK);
-		if (error)
+		if ((error != 0) && (error != EDIRCORRUPTED))
 			return(error);
 		if (bp) {
 			node = (xfs_da_intnode_t *)bp->b_un.b_addr;
@@ -1557,7 +1557,8 @@ xfs_attr_node_list(xfs_attr_list_context_t *context)
 						      XFS_ATTR_FORK);
 			if (error)
 				return(error);
-			ASSERT(bp != NULL);
+			if (bp == NULL)
+				return(XFS_ERROR(EDIRCORRUPTED));
 			node = (xfs_da_intnode_t *)bp->b_un.b_addr;
 			if (node->hdr.info.magic == XFS_ATTR_LEAF_MAGIC)
 				break;
@@ -1603,7 +1604,8 @@ xfs_attr_node_list(xfs_attr_list_context_t *context)
 					      &bp, XFS_ATTR_FORK);
 		if (error)
 			return(error);
-		ASSERT(bp != NULL);
+		if (bp == NULL)
+			return(XFS_ERROR(EDIRCORRUPTED));
 	}
 	xfs_trans_brelse(NULL, bp);
 	return(0);
