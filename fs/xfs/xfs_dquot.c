@@ -1,4 +1,4 @@
-#ident "$Revision: 1.15 $"
+#ident "$Revision: 1.16 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -930,7 +930,7 @@ xfs_qm_dqget(
 	 * The chain is kept locked during lookup.
 	 */
 	if (xfs_qm_dqlookup(mp, id, h, O_dqpp) == 0) {
-#ifndef _BANYAN_XFS
+#ifndef _IRIX62_XFS_ONLY
 		XFSSTATS.xs_qm_dqcachehits++;
 #endif
 		/* 
@@ -944,7 +944,7 @@ xfs_qm_dqget(
 		xfs_dqtrace_entry(*O_dqpp, "DQGET DONE (FROM CACHE)"); 
 		return (0);	/* success */
 	}
-#ifndef _BANYAN_XFS
+#ifndef _IRIX62_XFS_ONLY
 	 XFSSTATS.xs_qm_dqcachemisses++;
 #endif
 
@@ -1047,7 +1047,7 @@ xfs_qm_dqget(
 			xfs_qm_dqput(tmpdqp);
 			XFS_DQ_HASH_UNLOCK(h);
 			xfs_qm_dqdestroy(dqp);
-#ifndef _BANYAN_XFS
+#ifndef _IRIX62_XFS_ONLY
 			XFSSTATS.xs_qm_dquot_dups++; 
 #endif
 			goto again;
@@ -1202,7 +1202,9 @@ xfs_qm_dqflush(
 	xfs_mount_t		*mp;
 	buf_t			*bp;
 	xfs_disk_dquot_t 	*ddqp;
-	int			s, error;
+	int			error;
+	SPLDECL(s);
+
 	
 	ASSERT(XFS_DQ_IS_LOCKED(dqp));
 	ASSERT(XFS_DQ_IS_FLUSH_LOCKED(dqp));
@@ -1252,7 +1254,7 @@ xfs_qm_dqflush(
 	mp = dqp->q_mount;
 
 	/* lsn is 64 bits */
-	s = AIL_LOCK(mp);
+	AIL_LOCK(mp, s);
 	dqp->q_logitem.qli_flush_lsn = dqp->q_logitem.qli_item.li_lsn;
 	AIL_UNLOCK(mp, s);
 
@@ -1300,7 +1302,7 @@ xfs_qm_dqflush_done(
         xfs_dq_logitem_t	*qip)
 {
         xfs_dquot_t     	*dqp;
-        int             	s;
+	SPLDECL(s);
 
         dqp = qip->qli_dquot;
 
@@ -1314,7 +1316,7 @@ xfs_qm_dqflush_done(
          */
         if ((qip->qli_item.li_flags & XFS_LI_IN_AIL) &&
 	    qip->qli_item.li_lsn == qip->qli_flush_lsn) {
-                s = AIL_LOCK(dqp->q_mount);
+                AIL_LOCK(dqp->q_mount, s);
 		/*
 		 * xfs_trans_delete_ail() drops the AIL lock.
 		 */
