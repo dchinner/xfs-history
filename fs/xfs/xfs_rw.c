@@ -3866,7 +3866,7 @@ xfs_diostrat( buf_t *bp)
 	buf_t		*bps[XFS_BMAP_MAX_NMAP], *nbp;
 	xfs_fileoff_t	offset_fsb;
 	xfs_fsblock_t	firstfsb;
-	xfs_filblks_t	count_fsb;
+	xfs_filblks_t	count_fsb, datablocks;
 	xfs_bmap_free_t free_list;
 	caddr_t		base;
 	ssize_t		resid, count, totxfer;
@@ -3974,6 +3974,13 @@ xfs_diostrat( buf_t *bp)
 					 */
 					numrtextents = (count_fsb+rtextsize-1)/
 						rtextsize;
+					datablocks = 0;
+				} else {
+					/*
+					 * If this is a write to the data
+					 * partition, reserve the space.
+					 */
+					datablocks = count_fsb;
 				}
 
 				/*
@@ -3981,7 +3988,7 @@ xfs_diostrat( buf_t *bp)
  				 */
 				tp = xfs_trans_alloc( mp, XFS_TRANS_DIOSTRAT);
 				error = xfs_trans_reserve( tp, 
-					   XFS_BM_MAXLEVELS(mp) + count_fsb, 
+					   XFS_BM_MAXLEVELS(mp) + datablocks, 
 					   XFS_WRITE_LOG_RES(mp),
 					   numrtextents,
 					   XFS_TRANS_PERM_LOG_RES,
