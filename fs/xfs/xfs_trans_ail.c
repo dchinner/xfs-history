@@ -245,6 +245,9 @@ xfs_trans_next_ail(xfs_mount_t		*mp,
 		nlip = xfs_ail_next(&(mp->m_ail), lip);
 	} else {
 		nlip = xfs_ail_min(&(mp->m_ail));
+		if (gen != NULL) {
+			*gen = (int)mp->m_ail_gen;
+		}
 		if (restarts != NULL) {
 			*restarts++;
 		}
