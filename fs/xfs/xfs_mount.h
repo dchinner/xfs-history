@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.74 $"
+#ident	"$Revision: 1.75 $"
 
 struct buf;
 struct cred;
@@ -127,6 +127,8 @@ typedef struct xfs_mount {
 #if XFS_BIG_FILESYSTEMS
 	xfs_ino_t		m_inoadd;	/* add value for ino64_offset */
 #endif
+	int			m_dalign;	/* stripe unit */
+	int			m_swidth;	/* stripe width */
 } xfs_mount_t;
 
 /*
