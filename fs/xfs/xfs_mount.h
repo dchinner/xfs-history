@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.84 $"
+#ident	"$Revision: 1.85 $"
 
 struct buf;
 struct cred;
@@ -48,6 +48,9 @@ typedef struct xfs_trans_reservations {
 	uint	tr_attrset;	/* set/create an attribute */
 	uint	tr_attrrm;	/* remove an attribute */
 	uint	tr_clearagi;	/* clear bad agi unlinked ino bucket */
+	uint	tr_growrtalloc;	/* grow realtime allocations */
+	uint	tr_growrtzero;	/* grow realtime zeroing */
+	uint	tr_growrtfree;	/* grow realtime freeing */
 } xfs_trans_reservations_t;
 
 typedef struct xfs_mount {
@@ -88,7 +91,7 @@ typedef struct xfs_mount {
 	struct xfs_quotainfo	*m_quotainfo;	/* disk quota information */
 	struct vnode 		*m_ddevp;	/* ptr to data dev vnode */
 	struct vnode 		*m_logdevp;	/* ptr to log dev vnode */
-	struct vnode 		*m_rtdevp;	/* prt to rt dev vnode   */
+	struct vnode 		*m_rtdevp;	/* ptr to rt dev vnode   */
 	__uint8_t		m_dircook_elog;	/* log d-cookie entry bits */
 	__uint8_t		m_blkbit_log;	/* blocklog + NBBY */
 	__uint8_t		m_blkbb_log;	/* blocklog - BBSHIFT */
