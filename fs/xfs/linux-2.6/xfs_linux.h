@@ -252,11 +252,6 @@ typedef struct irix5_dirent {	/* Irix5 view of dirent structure */
 #define howmany(x, y)   (((x)+((y)-1))/(y))
 #define roundup(x, y)   ((((x)+((y)-1))/(y))*(y))
 
-
-struct xfs_args;
-extern int  mountargs_xfs (char *, struct xfs_args *);
-extern void xfs_cleanup(void);
-
 /* Move the kernel do_div definition off to one side */
 static inline __u32 xfs_do_div(void *a, __u32 b, int n)
 {
