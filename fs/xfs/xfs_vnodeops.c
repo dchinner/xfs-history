@@ -1,4 +1,4 @@
-#ident "$Revision: 1.362 $"
+#ident "$Revision: 1.363 $"
 
 
 #ifdef SIM
@@ -5342,7 +5342,13 @@ xfs_fcntl(
 		 * maximum size plus 1 pages.
                  */
 		ASSERT(scache_linemask != 0);
-#ifdef R10000_SPECULATION_WAR	/* makes tlb invalidate during dma more
+
+#ifdef MH_R10000_SPECULATION_WAR
+		if (IS_R10000())
+			da.d_mem = _PAGESZ;
+		else
+			da.d_mem = scache_linemask + 1;
+#elif R10000_SPECULATION_WAR	/* makes tlb invalidate during dma more
 	effective, by decreasing the likelihood of a valid reference in the
 	same page as dma user address space; leaving the tlb invalid avoids
 	the speculative reference. We return the more stringent
