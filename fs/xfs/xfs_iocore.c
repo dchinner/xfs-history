@@ -140,7 +140,6 @@ xfs_iocore_inode_init(
 	io->io_mount = mp;
 	io->io_lock = &ip->i_lock;
 	io->io_iolock = &ip->i_iolock;
-	mutex_init(&io->io_rlock, MUTEX_DEFAULT, "xfs_rlock");
 
 	xfs_iocore_reset(io);
 
@@ -172,6 +171,5 @@ void
 xfs_iocore_destroy(
 	xfs_iocore_t	*io)
 {
-	mutex_destroy(&io->io_rlock);
 }
 

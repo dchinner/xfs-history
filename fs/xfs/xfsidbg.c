@@ -77,7 +77,6 @@ static void	xfsidbg_xdir2free(xfs_dir2_free_t *);
 static void	xfsidbg_xdir2sf(xfs_dir2_sf_t *);
 static void	xfsidbg_xexlist(xfs_inode_t *);
 static void	xfsidbg_xflist(xfs_bmap_free_t *);
-static void	xfsidbg_xgaplist(xfs_inode_t *);
 static void	xfsidbg_xhelp(void);
 static void 	xfsidbg_xiclog(xlog_in_core_t *);
 static void	xfsidbg_xiclogall(xlog_in_core_t *);
@@ -655,27 +654,6 @@ static int	kdbm_xfs_xflist(
 		return diag;
 
 	xfsidbg_xflist((xfs_bmap_free_t *) addr);
-	return 0;
-}
-
-static int	kdbm_xfs_xgaplist(
-	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
-{
-	unsigned long addr;
-	int nextarg = 1;
-	long offset = 0;
-	int diag;
-
-	if (argc != 1)
-		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
-	if (diag)
-		return diag;
-
-	xfsidbg_xgaplist((xfs_inode_t *) addr);
 	return 0;
 }
 
@@ -1741,8 +1719,6 @@ static struct xif {
 				"Dump XFS bmap extents in inode"},
   {  "xflist",	kdbm_xfs_xflist,	"<xfs_bmap_free_t>",
 				"Dump XFS to-be-freed extent list"},
-  {  "xgaplst",	kdbm_xfs_xgaplist,	"<xfs_inode_t>",
-				"Dump inode gap list"},
   {  "xhelp",	kdbm_xfs_xhelp,		"",
 				"Print idbg-xfs help"},
   {  "xicall",	kdbm_xfs_xiclogall,	"<xlog_in_core_t>",
@@ -3411,28 +3387,6 @@ xfsidbg_xflist(xfs_bmap_free_t *flist)
 }
 
 /*
- * Print out the list of xfs_gap_ts in ip->i_iocore.io_gap_list.
- */
-static void
-xfsidbg_xgaplist(xfs_inode_t *ip)
-{
-	xfs_gap_t	*curr_gap;
-
-	curr_gap = ip->i_iocore.io_gap_list;
-	if (curr_gap == NULL) {
-		kdb_printf("Gap list is empty for inode 0x%p\n", ip);
-		return;
-	}
-
-	while (curr_gap != NULL) {
-		kdb_printf("gap 0x%p next 0x%p offset 0x%Lx count 0x%x\n",
-		       curr_gap, curr_gap->xg_next, curr_gap->xg_offset_fsb,
-		       curr_gap->xg_count_fsb);
-		curr_gap = curr_gap->xg_next;
-	}
-}
-
-/*
  * Print out the help messages for these functions.
  */
 static void
@@ -4167,16 +4121,7 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		&ip->i_pinsema);
 	kdb_printf("udquotp 0x%p gdquotp 0x%p\n",
 		ip->i_udquot, ip->i_gdquot);
-	kdb_printf("&rlock 0x%p\n", &ip->i_iocore.io_rlock);
-	kdb_printf("next_offset %Lx ", ip->i_iocore.io_next_offset);
-	kdb_printf("io_offset %Lx reada_blkno %s io_size 0x%x\n",
-		ip->i_iocore.io_offset,
-		xfs_fmtfsblock(ip->i_iocore.io_reada_blkno, ip->i_mount),
-		ip->i_iocore.io_size);
-	kdb_printf("last_req_sz 0x%x new_size %Lx\n",
-		ip->i_iocore.io_last_req_sz, ip->i_iocore.io_new_size);
-	kdb_printf("write off %Lx gap list 0x%p\n",
-		ip->i_iocore.io_write_offset, ip->i_iocore.io_gap_list);
+	kdb_printf("new_size %Lx\n", ip->i_iocore.io_new_size);
 	kdb_printf(
 "readiolog %u, readioblocks %u, writeiolog %u, writeioblocks %u, maxiolog %u\n",
 		(unsigned int) ip->i_iocore.io_readio_log,
@@ -4213,18 +4158,10 @@ xfsidbg_xcore(xfs_iocore_t *io)
 		kdb_printf("io_obj 0x%p (dcxvn) io_mount 0x%p\n",
 			io->io_obj, io->io_mount);
 	}
-	kdb_printf("&lock 0x%p &iolock 0x%p &flock 0x%p &rlock 0x%p\n",
+	kdb_printf("&lock 0x%p &iolock 0x%p &flock 0x%p\n",
 		io->io_lock, io->io_iolock,
-		io->io_flock, &io->io_rlock);
-	kdb_printf("next_offset %Lx ", io->io_next_offset);
-	kdb_printf("io_offset %Lx reada_blkno %s io_size 0x%x\n",
-		io->io_offset,
-		xfs_fmtfsblock(io->io_reada_blkno, io->io_mount),
-		io->io_size);
-	kdb_printf("last_req_sz 0x%x new_size %Lx\n",
-		io->io_last_req_sz, io->io_new_size);
-	kdb_printf("write off %Lx gap list 0x%p\n",
-		io->io_write_offset, io->io_gap_list);
+		io->io_flock);
+	kdb_printf("new_size %Lx\n", io->io_new_size);
 	kdb_printf(
 "readiolog %u, readioblocks %u, writeiolog %u, writeioblocks %u, maxiolog %u\n",
 		(unsigned int) io->io_readio_log,

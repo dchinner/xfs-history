@@ -48,7 +48,7 @@ xfs_ihash_init(xfs_mount_t *mp)
 
 	mp->m_ihsize = XFS_BUCKETS(mp);
 	mp->m_ihash = (xfs_ihash_t *)kmem_zalloc(mp->m_ihsize
-				      * sizeof(xfs_ihash_t), KM_SLEEP);
+				      * sizeof(xfs_ihash_t), KM_SLEEP_IO);
 	ASSERT(mp->m_ihash != NULL);
 	for (i = 0; i < mp->m_ihsize; i++) {
 		mrinit(&(mp->m_ihash[i].ih_lock),"xfshash");
@@ -91,7 +91,7 @@ xfs_chash_init(xfs_mount_t *mp)
 	}
 	mp->m_chash = (xfs_chash_t *)kmem_zalloc(mp->m_chsize
 						 * sizeof(xfs_chash_t), 
-						 KM_SLEEP);
+						 KM_SLEEP_IO);
 	ASSERT(mp->m_chash != NULL);
 
 	for (i = 0; i < mp->m_chsize; i++) {
@@ -460,7 +460,7 @@ finish_inode:
 			ASSERT(xfs_chashlist_zone != NULL);
 			chlnew = (xfs_chashlist_t *)
 					kmem_zone_zalloc(xfs_chashlist_zone,
-								  KM_SLEEP);
+						tp ? KM_SLEEP : KM_SLEEP_IO);
 			ASSERT(chlnew != NULL);
 			goto chlredo;
 		} else {

@@ -105,7 +105,7 @@ xfs_mount_init(void)
 {
 	xfs_mount_t *mp;
 
-	mp = kmem_zalloc(sizeof(*mp), KM_SLEEP);
+	mp = kmem_zalloc(sizeof(*mp), KM_SLEEP_IO);
 
 	AIL_LOCKINIT(&mp->m_ail_lock, "xfs_ail");
 	spinlock_init(&mp->m_sb_lock, "xfs_sb");
@@ -809,7 +809,7 @@ xfs_mountfs(
 	 */
 	mrinit(&mp->m_peraglock, "xperag");
 	mp->m_perag =
-		kmem_zalloc(sbp->sb_agcount * sizeof(xfs_perag_t), KM_SLEEP);
+		kmem_zalloc(sbp->sb_agcount * sizeof(xfs_perag_t), KM_SLEEP_IO);
 
 	/*
 	 * log's mount-time initialization. Perform 1st part recovery if needed
@@ -1019,9 +1019,8 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 
 	xfs_log_unmount(mp);			/* Done! No more fs ops. */
 
-	xfs_unmountfs_close(mp, vfs_flags, cr);
-
 	xfs_freesb(mp);
+
 
 	/*
 	 * All inodes from this mount point should be freed.
@@ -1036,6 +1035,7 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	if (XFS_FORCED_SHUTDOWN(mp)) {
 		(void)xfs_incore_relse(&mp->m_ddev_targ, 0, 1); /* synchronous*/
 	}
+	xfs_unmountfs_close(mp, vfs_flags, cr);
 	xfs_uuid_unmount(mp);
 
 #if defined(DEBUG) || defined(INDUCE_IO_ERROR)
@@ -1491,7 +1491,7 @@ xfs_uuid_mount(xfs_mount_t *mp)
 		xfs_uuidtab = kmem_realloc(xfs_uuidtab,
 	                (xfs_uuidtab_size + 1) * sizeof(*xfs_uuidtab),
 	                xfs_uuidtab_size  * sizeof(*xfs_uuidtab),
-	                KM_SLEEP);
+	                KM_SLEEP_IO);
 		hole = xfs_uuidtab_size++;
 	}
 	xfs_uuidtab[hole] = mp->m_sb.sb_uuid;

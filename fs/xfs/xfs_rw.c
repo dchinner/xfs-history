@@ -70,149 +70,6 @@ xfs_delalloc_cleanup(
 					        << io->io_readio_log)
 #define	XFS_WRITEIO_ALIGN(io,off)	(((off) >> io->io_writeio_log) \
 					        << io->io_writeio_log)
-
-#if !defined(XFS_RW_TRACE)
-#define	xfs_rw_enter_trace(tag, ip, uiop, ioflags)
-#define	xfs_iomap_enter_trace(tag, ip, offset, count);
-#define	xfs_iomap_map_trace(tag, ip, offset, count, bmapp, imapp)
-#define xfs_inval_cached_trace(ip, offset, len, first, last)
-#else
-/*
- * Trace routine for the read/write path.  This is the routine entry trace.
- */
-static void
-xfs_rw_enter_trace(
-	int		tag,	     
-	xfs_iocore_t	*io,
-	uio_t		*uiop,
-	int		ioflags)
-{
-	xfs_inode_t	*ip = XFS_IO_INODE(io);
-
-	if (!IO_IS_XFS(io) || (ip->i_rwtrace == NULL)) {
-		return;
-	}
-
-	ktrace_enter(ip->i_rwtrace,
-		     (void*)((unsigned long)tag),
-		     (void*)ip,
-		     (void*)((ip->i_d.di_size >> 32) & 0xffffffff),
-		     (void*)(ip->i_d.di_size & 0xffffffff),
-		     (void*)(((__uint64_t)uiop->uio_offset >> 32) &
-			     0xffffffff),
-		     (void*)(uiop->uio_offset & 0xffffffff),
-		     (void*)uiop->uio_resid,
-		     (void*)((unsigned long)ioflags),
-		     (void*)((io->io_next_offset >> 32) & 0xffffffff),
-		     (void*)(io->io_next_offset & 0xffffffff),
-		     (void*)((unsigned long)((io->io_offset >> 32) &
-					     0xffffffff)),
-		     (void*)(io->io_offset & 0xffffffff),
-		     (void*)((unsigned long)(io->io_size)),
-		     (void*)((unsigned long)(io->io_last_req_sz)),
-		     (void*)((unsigned long)((io->io_new_size >> 32) &
-					     0xffffffff)),
-		     (void*)(io->io_new_size & 0xffffffff));
-}
-
-static void
-xfs_iomap_enter_trace(
-	int		tag,
-	xfs_iocore_t	*io,
-	xfs_off_t	offset,
-	size_t		count)
-{
-	xfs_inode_t	*ip = XFS_IO_INODE(io);
-
-	if (!IO_IS_XFS(io) || (ip->i_rwtrace == NULL)) {
-		return;
-	}
-
-	ktrace_enter(ip->i_rwtrace,
-		     (void*)((unsigned long)tag),
-		     (void*)ip,
-		     (void*)((ip->i_d.di_size >> 32) & 0xffffffff),
-		     (void*)(ip->i_d.di_size & 0xffffffff),
-		     (void*)(((__uint64_t)offset >> 32) & 0xffffffff),
-		     (void*)(offset & 0xffffffff),
-		     (void*)((unsigned long)count),
-		     (void*)((io->io_next_offset >> 32) & 0xffffffff),
-		     (void*)(io->io_next_offset & 0xffffffff),
-		     (void*)((io->io_offset >> 32) & 0xffffffff),
-		     (void*)(io->io_offset & 0xffffffff),
-		     (void*)((unsigned long)(io->io_size)),
-		     (void*)((unsigned long)(io->io_last_req_sz)),
-		     (void*)((io->io_new_size >> 32) & 0xffffffff),
-		     (void*)(io->io_new_size & 0xffffffff),
-		     (void*)0);
-}
-
-void
-xfs_iomap_map_trace(
-	int		tag,	     
-	xfs_iocore_t	*io,
-	xfs_off_t	offset,
-	size_t		count,
-	struct bmapval	*bmapp,
-	xfs_bmbt_irec_t	*imapp)    
-{
-	xfs_inode_t	*ip = XFS_IO_INODE(io);
-
-	if (!IO_IS_XFS(io) || (ip->i_rwtrace == NULL)) {
-		return;
-	}
-
-	ktrace_enter(ip->i_rwtrace,
-		     (void*)((unsigned long)tag),
-		     (void*)ip,
-		     (void*)((ip->i_d.di_size >> 32) & 0xffffffff),
-		     (void*)(ip->i_d.di_size & 0xffffffff),
-		     (void*)(((__uint64_t)offset >> 32) & 0xffffffff),
-		     (void*)(offset & 0xffffffff),
-		     (void*)((unsigned long)count),
-		     (void*)((bmapp->offset >> 32) & 0xffffffff),
-		     (void*)(bmapp->offset & 0xffffffff),
-		     (void*)((unsigned long)(bmapp->length)),
-		     (void*)((unsigned long)(bmapp->pboff)),
-		     (void*)((unsigned long)(bmapp->pbsize)),
-		     (void*)(bmapp->bn),
-		     (void*)(__psint_t)(imapp->br_startoff),
-		     (void*)((unsigned long)(imapp->br_blockcount)),
-		     (void*)(__psint_t)(imapp->br_startblock));
-}
-
-static void
-xfs_inval_cached_trace(
-	xfs_iocore_t	*io,
-	xfs_off_t	offset,
-	xfs_off_t	len,
-	xfs_off_t	first,
-	xfs_off_t	last)
-{
-	xfs_inode_t	*ip = XFS_IO_INODE(io);
-
-	if (!IO_IS_XFS(io) || (ip->i_rwtrace == NULL)) 
-		return;
-	ktrace_enter(ip->i_rwtrace,
-		(void *)(__psint_t)XFS_INVAL_CACHED,
-		(void *)ip,
-		(void *)(((__uint64_t)offset >> 32) & 0xffffffff),
-		(void *)(offset & 0xffffffff),
-		(void *)(((__uint64_t)len >> 32) & 0xffffffff),
-		(void *)(len & 0xffffffff),
-		(void *)(((__uint64_t)first >> 32) & 0xffffffff),
-		(void *)(first & 0xffffffff),
-		(void *)(((__uint64_t)last >> 32) & 0xffffffff),
-		(void *)(last & 0xffffffff),
-		(void *)0,
-		(void *)0,
-		(void *)0,
-		(void *)0,
-		(void *)0,
-		(void *)0);
-}
-#endif	/* XFS_RW_TRACE */
-
 /*
  * This is a subroutine for xfs_write() and other writers (xfs_ioctl)
  * which clears the setuid and setgid bits when a file is written.
@@ -285,6 +142,7 @@ xfs_check_gap_list(
 }
 #endif
 
+#ifndef __linux__
 /*
  * For the given inode, offset, and count of bytes, build a list
  * of xfs_gap_t structures in the inode's gap list describing the
@@ -402,6 +260,7 @@ xfs_free_gap_list(
 	}
 	io->io_gap_list = NULL;
 }
+#endif /* !__linux__ */
 
 /*
  * Force a shutdown of the filesystem instantly while keeping
@@ -742,8 +601,6 @@ xfs_inval_cached_pages(
 	if (flush_end > (__uint64_t)LONGLONG_MAX) {
 		flush_end = LONGLONG_MAX;
 	}
-	xfs_inval_cached_trace(io, offset, len, ctooff(offtoct(offset)),
-		flush_end);
 	VOP_FLUSHINVAL_PAGES(vp, ctooff(offtoct(offset)), -1, FI_REMAPF_LOCKED);
 	if (relock) {
 		XFS_IUNLOCK(mp, io, XFS_IOLOCK_EXCL);

@@ -824,7 +824,7 @@ xfs_dir2_leaf_getdents(
 	map_size =
 		howmany(uio->uio_resid + mp->m_dirblksize,
 			mp->m_sb.sb_blocksize);
-	map = kmem_alloc(map_size * sizeof(*map), KM_SLEEP);
+	map = kmem_alloc(map_size * sizeof(*map), tp ? KM_SLEEP : KM_SLEEP_IO);
 	map_valid = ra_index = ra_offset = ra_current = map_blocks = 0;
 	bp = NULL;
 	eof = 1;
