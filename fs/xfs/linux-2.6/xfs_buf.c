@@ -1855,7 +1855,7 @@ STATIC ctl_table pagebuf_table[] = {
 	{PB_DEBUG, "debug", &pb_params.debug.val,
 	sizeof(ulong), 0644, NULL, &proc_doulongvec_minmax,
 	&sysctl_intvec, NULL, 
-	pb_params.debug.min, pb_params.debug.max},
+	&pb_params.debug.min, &pb_params.debug.max},
 #endif
 	{0}
 };
