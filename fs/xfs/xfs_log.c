@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.162 $"
+#ident	"$Revision: 1.163 $"
 
 /*
  * High level interface routines for log manager
@@ -2606,7 +2606,7 @@ xlog_state_release_iclog(xlog_t		*log,
 	
 	if (iclog->ic_state & XLOG_STATE_IOERROR) {
 		LOG_UNLOCK(log, spl);
-		return (EIO);
+		return XFS_ERROR(EIO);
 	}
 
 	ASSERT(iclog->ic_refcnt > 0);
@@ -2712,7 +2712,7 @@ xlog_state_sync_all(xlog_t *log, uint flags)
 	iclog = log->l_iclog;
 	if (iclog->ic_state & XLOG_STATE_IOERROR) {
 		LOG_UNLOCK(log, spl);
-		return (EIO);
+		return XFS_ERROR(EIO);
 	}
 
 	/* If the head iclog is not active nor dirty, we just attach
@@ -2750,7 +2750,7 @@ xlog_state_sync_all(xlog_t *log, uint flags)
 				LOG_UNLOCK(log, spl);
 				
 				if (xlog_state_release_iclog(log, iclog))
-					return (EIO);
+					return XFS_ERROR(EIO);
 				spl = LOG_LOCK(log);
 				if (iclog->ic_header.h_lsn == lsn &&
 				    iclog->ic_state != XLOG_STATE_DIRTY)
@@ -2783,7 +2783,7 @@ maybe_sleep:
 		 */
 		if (iclog->ic_state & XLOG_STATE_IOERROR) {
 			LOG_UNLOCK(log, spl);
-			return (EIO);
+			return XFS_ERROR(EIO);
 		}
 		sv_wait(&iclog->ic_forcesema, PINOD, &log->l_icloglock, spl);
 		/*
@@ -2792,7 +2792,7 @@ maybe_sleep:
 		 * and the memory read should be atomic.
 		 */
 		if (iclog->ic_state & XLOG_STATE_IOERROR)
-			return (EIO);
+			return XFS_ERROR(EIO);
 		
 	} else {
 
@@ -2831,7 +2831,7 @@ try_again:
 
     if (iclog->ic_state & XLOG_STATE_IOERROR) {
 	    LOG_UNLOCK(log, spl);
-	    return (EIO);
+	    return XFS_ERROR(EIO);
     }
 
     do {
