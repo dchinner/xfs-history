@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision$"
+#ident	"$Revision: 1.39 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3135,6 +3135,7 @@ xfsidbg_xlogitem(xfs_log_item_t *lip)
 	}
 }
 
+#ifdef DEBUG
 /*
  * Print out a summary of the AIL hanging off of a mount struct.
  */
@@ -3142,7 +3143,6 @@ static void
 xfsidbg_xaildump(xfs_mount_t *mp)
 {
 	xfs_log_item_t *lip;
-	xfs_log_item_t *bio_lip;
 	static char *lid_type[] = {
 		"???",		/* 0 */
 		"5-3-buf",	/* 1 */
@@ -3199,6 +3199,7 @@ xfsidbg_xaildump(xfs_mount_t *mp)
 		}
 	}
 }
+#endif /* DEBUG */
 
 /*
  * Print xfs mount structure.
