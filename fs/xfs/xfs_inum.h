@@ -15,6 +15,7 @@ typedef	__uint32_t	xfs_agino_t;	/* within allocation grp inode number */
 
 #define	NULLFSINO	((xfs_ino_t)-1)
 #define	NULLAGINO	((xfs_agino_t)-1)
+#define	NULLAGINO_ALLOC	((xfs_agino_t)0)
 
 #define	xfs_ino_mask(k)	((1 << (k)) - 1)
 #define	xfs_ino_offset_bits(s)	((s)->sb_inopblog)
