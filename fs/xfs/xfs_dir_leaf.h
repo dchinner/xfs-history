@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_LEAF_H
 #define	_FS_XFS_DIR_LEAF_H
 
-#ident	"$Revision: 1.1 $"
+#ident	"$Revision: 1.2 $"
 
 /*
  * xfs_dir_leaf.h
@@ -106,7 +106,6 @@ int xfs_dir_shortform_to_leaf(struct xfs_trans *trans,
 #ifndef SIM
 int xfs_dir_shortform_removename(struct xfs_trans *trans,
 					struct xfs_da_name *remove);
-void xfs_dir_shortform_print(struct xfs_trans *trans, struct xfs_inode *dp);
 int xfs_dir_shortform_getdents(struct xfs_trans *trans, struct xfs_inode *dp,
 					   struct uio *uio, int *eofp,
 					   struct dirent *dbp);
@@ -144,8 +143,7 @@ int	xfs_dir_leaf_remove(struct xfs_trans *trans, struct buf *leaf_buffer,
 int	xfs_dir_leaf_getdents_int(struct buf *bp, struct xfs_inode *dp,
 					struct uio *uio,
 					int *eobp, struct dirent *dbp);
-void	xfs_dir_leaf_print_int(struct buf *leaf_buffer,
-					struct xfs_inode *dir_inode);
+
 /*
  * Routines used for shrinking the Btree.
  */
