@@ -62,6 +62,7 @@
 
 #include "page_buf_internal.h"
 
+#define NBBY		8
 #define SECTOR_SHIFT	9
 #define SECTOR_SIZE	(1<<SECTOR_SHIFT)
 #define SECTOR_MASK	(SECTOR_SIZE - 1)
@@ -1600,11 +1601,10 @@ _pagebuf_page_io(
 		sector = SECTOR_SIZE;
 	}
 
-	/* The b_size field of struct buffer_head is an unsigned short
-	 * ... we may need to split this request up.  [64K is too big]
+	/* If we are doing I/O larger than the bh->b_size field then
+	 * we need to split this request up.
 	 */
-	ASSERT(sizeof(bh->b_size) == 2);
-	while (sector > 0xffff) {
+	while (sector > ((1 << NBBY * sizeof(bh->b_size)) - 1)) {
 		sector >>= 1;
 		blk_length++;
 	}
