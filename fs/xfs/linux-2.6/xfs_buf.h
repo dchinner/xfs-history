@@ -127,6 +127,7 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 
 	PBF_FORCEIO = (1 << 27),
 	PBF_FLUSH = (1 << 28),	/* flush disk write cache */
+	PBF_READ_AHEAD = (1 << 29),
 	PBF_FS_RESERVED_3 = (1 << 31)	/* reserved (XFS use: XFS_B_STALE) */
 
 } page_buf_flags_t;

@@ -72,6 +72,10 @@
 #define SECTOR_MASK	(SECTOR_SIZE - 1)
 #define BN_ALIGN_MASK	((1 << (PAGE_CACHE_SHIFT - SECTOR_SHIFT)) - 1)
 
+#ifndef GFP_READAHEAD
+#define GFP_READAHEAD	0
+#endif
+
 /*
  * Debug code
  */
@@ -182,7 +186,8 @@ struct pbstats pbstats;
  */
 
 #define pb_to_gfp(flags) \
-	(((flags) & PBF_DONT_BLOCK) ? GFP_NOFS : GFP_KERNEL)
+	(((flags) & PBF_READ_AHEAD) ? GFP_READAHEAD : \
+	 ((flags) & PBF_DONT_BLOCK) ? GFP_NOFS : GFP_KERNEL)
 
 #define pagebuf_allocate(flags) \
 	kmem_cache_alloc(pagebuf_cache, pb_to_gfp(flags))
@@ -294,13 +299,20 @@ purge_addresses(void)
 
 STATIC int
 _pagebuf_initialize(
-    page_buf_t *pb,
-    pb_target_t *target,
-    loff_t range_base,
-    size_t range_length,
-    page_buf_flags_t flags)
+	page_buf_t		*pb,
+	pb_target_t		*target,
+	loff_t			range_base,
+	size_t			range_length,
+	page_buf_flags_t	flags)
 {
 	assert(target);
+
+	/*
+	 * We don't want certain flags to apperear in pb->pb_flags.
+	 */
+	flags &= ~(PBF_LOCK|PBF_ENTER_PAGES|PBF_MAPPED);
+	flags &= ~(PBF_DONT_BLOCK|PBF_READ_AHEAD);
+
 	pb_tracking_get(pb);
 
 	memset(pb, 0, sizeof(page_buf_private_t));
@@ -312,14 +324,13 @@ _pagebuf_initialize(
 	PB_SET_OWNER(pb);
 	pb->pb_target = target;
 	pb->pb_file_offset = range_base;
-	pb->pb_buffer_length = pb->pb_count_desired = range_length;
-	/* set buffer_length and count_desired to the same value initially
+	/*
+	 * Set buffer_length and count_desired to the same value initially
 	 * io routines should use count_desired, which will the same in
 	 * most cases but may be reset (e.g. XFS recovery)
 	 */
-	pb->pb_flags = (flags &
-			~(PBF_LOCK|PBF_ENTER_PAGES|PBF_MAPPED|PBF_DONT_BLOCK)) |
-			PBF_NONE;
+	pb->pb_buffer_length = pb->pb_count_desired = range_length;
+	pb->pb_flags = flags | PBF_NONE;
 	pb->pb_bn = PAGE_BUF_DADDR_NULL;
 	atomic_set(&PBP(pb)->pb_pin_count, 0);
 	init_waitqueue_head(&PBP(pb)->pb_waiters);
@@ -456,7 +467,7 @@ _pagebuf_lookup_pages(
 	loff_t			next_buffer_offset;
 	unsigned long		page_count, pi, index;
 	struct page		*page, *cached_page;
-	int			gfp_mask, retry_count = 0, rval = 0;
+	int			gfp_mask, retry_count = 5, rval = 0;
 	int			all_mapped, good_pages, nbytes;
 	size_t			blocksize, size, offset;
 
@@ -470,7 +481,10 @@ _pagebuf_lookup_pages(
 	 * delalloc pages to obtain memory.
 	 */
 
-	if (flags & PBF_DONT_BLOCK) {
+	if (flags & PBF_READ_AHEAD) {
+		gfp_mask = GFP_READAHEAD;
+		retry_count = 0;
+	} else if (flags & PBF_DONT_BLOCK) {
 		gfp_mask = GFP_NOFS;
 	} else if (flags & PBF_MAPPABLE) {
 		gfp_mask = GFP_KERNEL;
@@ -520,7 +534,7 @@ _pagebuf_lookup_pages(
 					cached_page = alloc_pages(gfp_mask, 0);
 
 					if (!cached_page) {
-						if (++retry_count < 6) {
+						if (--retry_count > 0) {
 							pagebuf_daemon_wakeup(1);
 							current->state = TASK_UNINTERRUPTIBLE;
 							schedule_timeout(10);
@@ -871,16 +885,13 @@ pagebuf_lookup(
  */
 void
 pagebuf_readahead(
-    pb_target_t * target,	/* target for buffer (or NULL)	 */
-    loff_t ioff,		/* starting offset of range	*/
-    size_t isize,		/* length of range		*/
-    int	   flags)		/* extra flags for the read	*/
+	pb_target_t		*target,
+	loff_t			ioff,
+	size_t			isize,
+	int			flags)
 {
-	if (start_aggressive_readahead(GFP_KERNEL)) {
-		(void)pagebuf_get(target, ioff, isize,
-			flags | PBF_TRYLOCK | PBF_READ |
-			PBF_ASYNC | PBF_MAPPABLE);
-	}
+	flags |= (PBF_TRYLOCK|PBF_READ|PBF_ASYNC|PBF_MAPPABLE|PBF_READ_AHEAD);
+	pagebuf_get(target, ioff, isize, flags);
 }
 
 page_buf_t *
@@ -1278,8 +1289,8 @@ int pagebuf_iostart(		/* start I/O on a buffer	  */
 		return status;
 	}
 
-	pb->pb_flags &= ~(PBF_READ | PBF_WRITE | PBF_ASYNC | PBF_DELWRI);
-	pb->pb_flags |= flags & (PBF_READ | PBF_WRITE | PBF_ASYNC | PBF_SYNC);
+	pb->pb_flags &= ~(PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_DELWRI|PBF_READ_AHEAD);
+	pb->pb_flags |= flags & (PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_SYNC|PBF_READ_AHEAD);
 
 	if (pb->pb_bn == PAGE_BUF_DADDR_NULL) {
 		BUG();
