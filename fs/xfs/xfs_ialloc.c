@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.22 $"
+#ident	"$Revision: 1.23 $"
 
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -263,11 +263,23 @@ xfs_ialloc_ag_alloc(
 	newfsbno = xfs_agb_to_fsb(sbp, agi->agi_seqno, newbno);
 	/*
 	 * Allocate a variable-sized extent.
+	 * We 
 	 */
-	newfsbno = xfs_alloc_vextent(tp, newfsbno, minnewblocks, maxnewblocks,
-				     &newblocks, XFS_ALLOCTYPE_NEAR_BNO);
-	if (newfsbno == NULLFSBLOCK)
-		return 0;
+	for (;;) {
+		newfsbno = xfs_alloc_vextent(tp, newfsbno, minnewblocks, maxnewblocks,
+					     &newblocks, XFS_ALLOCTYPE_NEAR_BNO,
+					     maxnewblocks);
+		if (newfsbno != NULLFSBLOCK)
+			break;
+		maxnewblocks >>= 1;
+		/*
+		 * Should this assert?  We should be guaranteed that the 
+		 * minimum length allocation will work, by the select call.
+		 */
+		if (maxnewblocks < minnewblocks)
+			return 0;
+	}
+
 	/*
 	 * Convert the results.
 	 */
@@ -412,7 +424,7 @@ xfs_ialloc_ag_select(
 		 * Is there enough free space for the file plus a block
 		 * of inodes (if we need to allocate some)?
 		 */
-		if (xfs_alloc_ag_freeblks(mp, tp, agno) >=
+		if (xfs_alloc_ag_freeblks(mp, tp, agno, 1) >=
 		    needspace + (agi->agi_freecount == 0))
 			return agbuf;
 		xfs_trans_brelse(tp, agbuf);
