@@ -1,4 +1,4 @@
-#ident "$Revision: 1.236 $"
+#ident "$Revision: 1.238 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1698,6 +1698,7 @@ xfs_stickytest(
 
 #define DLF_IGET	0x01	/* get entry inode if name lookup succeeds */
 #define	DLF_NODNLC	0x02	/* don't use the dnlc */
+#define	DLF_LOCK_SHARED	0x04	/* directory locked shared */
 
 /*
  * Wrapper around xfs_dir_lookup. This routine will first look in
@@ -1716,14 +1717,18 @@ xfs_dir_lookup_int(
 	pathname_t   		*pnp,
 	xfs_ino_t    		*inum,
 	xfs_inode_t  		**ipp,
-	struct ncfastdata	*fd)
+	struct ncfastdata	*fd,
+	uint			*dir_unlocked)
 {
 	vnode_t		*vp;
 	vnode_t		*dir_vp;	   
 	xfs_inode_t	*dp;
+	xfs_ino_t	curr_inum;
 	int		name_len;
-	int		code = 0;
+	int		error;
 	int		do_iget;
+	uint		dir_gen;
+	uint		lock_mode;
 	bhv_desc_t	*bdp;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
@@ -1731,6 +1736,11 @@ xfs_dir_lookup_int(
 		       (inst_t *)__return_address);
 	do_iget = flags & DLF_IGET;
 	ASSERT((flags & (DLF_IGET | DLF_NODNLC)) != (DLF_IGET | DLF_NODNLC));
+	error = 0;
+	ASSERT(!(flags & DLF_IGET) || (dir_unlocked != NULL));
+	if (dir_unlocked != NULL) {
+		*dir_unlocked = 0;
+	}
 
 	/*
 	 * Handle degenerate pathname component.
@@ -1741,22 +1751,39 @@ xfs_dir_lookup_int(
 		if (do_iget) {
 			*ipp = XFS_BHVTOI(dir_bdp);
 		}
-		return (0);
+		return 0;
         }
 
         /*
-         * Try the directory name lookup cache.
+         * Try the directory name lookup cache.  We can't wait on
+	 * inactive/reclaim in the inode we're looking for because
+	 * we're holding the directory lock.
          */
-        if (!(flags & DLF_NODNLC) &&
-	    (bdp = dnlc_lookup_fast(dir_vp, name, pnp, fd, NOCRED))) {
-                *inum = XFS_BHVTOI(bdp)->i_ino;
-		if (do_iget) {
-			*ipp = XFS_BHVTOI(bdp);
-			ASSERT((*ipp)->i_d.di_mode != 0);
-		} else {
-			VN_RELE(BHV_TO_VNODE(bdp));
+        if (!(flags & DLF_NODNLC)) {
+		if (bdp = dnlc_lookup_fast(dir_vp, name, pnp, fd,
+					   NOCRED, VN_GET_NOWAIT)) {
+			*inum = XFS_BHVTOI(bdp)->i_ino;
+			if (do_iget) {
+				*ipp = XFS_BHVTOI(bdp);
+				ASSERT((*ipp)->i_d.di_mode != 0);
+			} else {
+				/*
+				 * This is only safe for directory
+				 * inodes that have not been unlinked.
+				 * Otherwise we could deadlock because
+				 * the inactive call could start a
+				 * transaction while we hold the directory
+				 * lock here.
+				 */
+#ifdef DEBUG
+				vp = BHV_TO_VNODE(bdp);
+				ASSERT(vp->v_type == VDIR);
+				ASSERT(XFS_BHVTOI(bdp)->i_d.di_nlink > 0);
+#endif
+				VN_RELE(BHV_TO_VNODE(bdp));
+			}
+			return 0;
 		}
-		return 0;
         }
 
 	/*
@@ -1768,39 +1795,103 @@ xfs_dir_lookup_int(
 		name_len = strlen(name);
 
 	dp = XFS_BHVTOI(dir_bdp);
-	code = xfs_dir_lookup(tp, dp, name, name_len, inum);
-	if (!code && do_iget) {
-		code = xfs_iget(dp->i_mount, NULL, *inum,
-				0, ipp, 0);
-		if (code) {
-			*ipp = NULL;
-			return code;
+	error = xfs_dir_lookup(tp, dp, name, name_len, inum);
+	if (!error && do_iget) {
+		if (flags & DLF_LOCK_SHARED) {
+			lock_mode = XFS_ILOCK_SHARED;
+		} else {
+			lock_mode = XFS_ILOCK_EXCL;
 		}
-		/*
-		 * This should never happen since the name exists in the
-		 * directory, but if the inode number in the directory is
-		 * bogus it is better to return EIO than to crash on
-		 * a NULL pointer below.  Don't use ENOENT for this case,
-		 * since that would indicate the some callers to go ahead
-		 * and try to create an entry with the given name.
-		 */
-		if (*ipp == NULL) {
-			return XFS_ERROR(EIO);
+		*dir_unlocked = 1;
+		while (1) {
+			/*
+			 * Unlock the directory and save the directory's
+			 * generation count.  We do this because we can't
+			 * hold the directory lock while doing the vn_get()
+			 * in xfs_iget().  Doing so could cause us to hold
+			 * a lock while waiting for the inode to finish
+			 * being inactive while it's waiting for a log
+			 * reservationin the inactive routine.
+			 */
+			dir_gen = dp->i_gen;
+			xfs_iunlock(dp, lock_mode);
+
+			error = xfs_iget(dp->i_mount, NULL, *inum,
+					 0, ipp, 0);
+
+			xfs_ilock(dp, lock_mode);
+
+			if (error) {
+				*ipp = NULL;
+				return error;
+			}
+
+			/*
+			 * If something changed in the directory try again.
+			 * If we get an error just return the error.  That
+			 * includes the case where the file is removed
+			 * (ENOENT).  If the inode number has changed, then
+			 * drop the inode we have and get the latest one.
+			 * If the inode number is the same, then we just
+			 * go with it.  This includes the case where the
+			 * inode is freed and recreated under the same
+			 * name while we're doing the iget.  It is OK
+			 * to use the inode we already have in that case,
+			 * as there is only one copy of an inode in the
+			 * cache at a time (regardless of generation count)
+			 * and it just looks like the first lookup never
+			 * occurred.
+			 */
+			if (dp->i_gen != dir_gen) {
+				/*
+				 * If the directory was removed while
+				 * we left it unlocked then just get
+				 * out of here.
+				 */
+				if (dp->i_d.di_nlink == 0) {
+					vp = XFS_ITOV(*ipp);
+					VN_RELE(vp);
+					return XFS_ERROR(ENOENT);
+				}
+
+				error = xfs_dir_lookup(tp, dp, name,
+						       name_len, &curr_inum);
+
+				if (error || (curr_inum != *inum)) {
+					vp = XFS_ITOV(*ipp);
+					VN_RELE(vp);
+					if (error) {
+						return error;
+					} else {
+						/*
+						 * Drop the directory
+						 * lock and do the iget
+						 * again.  Save the ino
+						 * that we found in *inum
+						 * for when we do the
+						 * check again.
+						 */
+						*inum = curr_inum;
+						continue;
+					}
+				}
+			}
+			/*
+			 * Everything is consistent, so just go with
+			 * what we've got.
+			 */
+			break;
 		}
-		ASSERT(*ipp != NULL);
 
 		if ((*ipp)->i_d.di_mode == 0) {
 			vp = XFS_ITOV(*ipp);
 			/*
-			 * The inode has been freed.  This
-			 * had better be "..".
+			 * The inode has been freed.  Something is
+			 * wrong so just get out of here.
 			 */
-			ASSERT((name[0] == '.') &&
-			       (name[1] == '.') &&
-			       (name[2] == 0));
 			*ipp = NULL;
 			VN_RELE(vp);
-			code = XFS_ERROR(ENOENT);
+			error = XFS_ERROR(ENOENT);
 		} else {
 			bdp = XFS_ITOBHV(*ipp);
 			ASSERT(!(flags & DLF_NODNLC));
@@ -1808,7 +1899,7 @@ xfs_dir_lookup_int(
 		}
 	}
 
-	return (code);
+	return error;
 }
 
 
@@ -1831,8 +1922,10 @@ xfs_lookup(
 	xfs_inode_t		*dp, *ip;
 	struct vnode		*vp, *newvp;
 	xfs_ino_t		e_inum;
-	int			code = 0;
+	int			error;
 	uint			lock_mode;
+	uint			lookup_flags;
+	uint			dir_unlocked;
 	struct ncfastdata	fastdata;
 	vnode_t 		*dir_vp;
 
@@ -1857,22 +1950,39 @@ xfs_lookup(
 		return XFS_ERROR(ENOENT);
 	}
 
-	if (code = xfs_iaccess(dp, IEXEC, credp)) {
+	if (error = xfs_iaccess(dp, IEXEC, credp)) {
 		xfs_iunlock_map_shared(dp, lock_mode);
-		return code;
+		return error;
 	}
 
-	code = xfs_dir_lookup_int(NULL, dir_bdp, DLF_IGET, name, pnp, 
-				  &e_inum, &ip, &fastdata);
-	if (code) {
+	lookup_flags = DLF_IGET;
+	if (lock_mode == XFS_ILOCK_SHARED) {
+		lookup_flags |= DLF_LOCK_SHARED;
+	}
+	error = xfs_dir_lookup_int(NULL, dir_bdp, lookup_flags, name, pnp,
+				  &e_inum, &ip, &fastdata, &dir_unlocked);
+	if (error) {
 		xfs_iunlock_map_shared(dp, lock_mode);
-		return code;
+		return error;
+	}
+
+	vp = XFS_ITOV(ip);
+
+	if (dir_unlocked) {
+		/*
+		 * If the directory had to be unlocked in the call,
+		 * then its permissions may have changed.  Make sure
+		 * that it is OK to give this inode back to the caller.
+		 */
+		if (error = xfs_iaccess(dp, IEXEC, credp)) {
+			xfs_iunlock_map_shared(dp, lock_mode);
+			VN_RELE(vp);
+			return error;
+		}
 	}
 	ITRACE(ip);
 
 	xfs_iunlock_map_shared(dp, lock_mode);
-
-	vp = XFS_ITOV(ip);
 
 	/*
 	 * If vnode is a device return special vnode instead.
@@ -2179,6 +2289,7 @@ xfs_create(
 	boolean_t		truncated;
 	uint			cancel_flags;
 	int			committed;
+	uint			dir_unlocked;
 	struct ncfastdata	fastdata;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
@@ -2241,8 +2352,8 @@ xfs_create(
 	 * In the case where there is an entry, we'll get it later after
 	 * dropping our transaction.
 	 */
-	error = xfs_dir_lookup_int(NULL, dir_bdp, DLF_NODNLC, name, NULL, 
-				   &e_inum, NULL, NULL);
+	error = xfs_dir_lookup_int(NULL, dir_bdp, DLF_NODNLC, name,
+				   NULL, &e_inum, NULL, NULL, NULL);
 	if (error && (error != ENOENT)) {
 		goto error_return;
 	}
@@ -2339,17 +2450,29 @@ xfs_create(
 
 		/*
 		 * Now that we've dropped our log reservation, get a
-		 * reference to the inode we are re-creating.  It had
-		 * better still be there since we haven't dropped the
-		 * directory lock.
+		 * reference to the inode we are re-creating.  If we
+		 * have to drop the directory lock in the call and
+		 * the entry is removed, then just start over.
 		 */
 		error = xfs_dir_lookup_int(NULL, dir_bdp, DLF_IGET, name,
-					   NULL, &e_inum, &ip, &fastdata);
+					   NULL, &e_inum, &ip, &fastdata,
+					   &dir_unlocked);
 		if (error) {
-			ASSERT(error != ENOENT);
+			if (error == ENOENT) {
+				ASSERT(dir_unlocked);
+				xfs_iunlock(dp, XFS_ILOCK_EXCL);
+				goto try_again;
+			}
 			goto error_return;
 		}
 
+		if (dir_unlocked) {
+			/*
+			 * Make sure that the lookup we did is still
+			 * legal.  We'll process the error below.
+			 */
+			error = xfs_iaccess(dp, IEXEC, credp);
+		}
 		dir_generation = dp->i_gen;
 		xfs_iunlock(dp, XFS_ILOCK_EXCL);
 
@@ -2358,10 +2481,12 @@ xfs_create(
 		 * obvious problems and get out if they occur.
 		 */
 		vp = XFS_ITOV(ip);
-		if (flags & VEXCL) {
-                        error = XFS_ERROR(EEXIST);
-		} else if (vp->v_type == VDIR) {
-                        error = XFS_ERROR(EISDIR);
+		if (!error) {
+			if (flags & VEXCL) {
+				error = XFS_ERROR(EEXIST);
+			} else if (vp->v_type == VDIR) {
+				error = XFS_ERROR(EISDIR);
+			}
 		}
 
 		if (error) {
@@ -2575,6 +2700,7 @@ xfs_get_dir_entry(
 	xfs_inode_t		*ip;
 	xfs_ino_t		e_inum;
 	int			error;
+	uint			dir_unlocked;
 	struct ncfastdata	fastdata;
 
         xfs_ilock(dp, XFS_ILOCK_EXCL);
@@ -2590,7 +2716,8 @@ xfs_get_dir_entry(
 	}
 
 	error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(dp), DLF_IGET, name, 
-				   NULL, &e_inum, &ip, &fastdata);
+				   NULL, &e_inum, &ip, &fastdata,
+				   &dir_unlocked);
         if (error) {
                 xfs_iunlock(dp, XFS_ILOCK_EXCL);
 		*ipp = NULL;
@@ -2661,7 +2788,7 @@ xfs_lock_dir_and_entry(
 		 * we hold.
 		 */
 		error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(dp), DLF_NODNLC,
-				name, NULL, &e_inum, NULL, &fastdata);
+				name, NULL, &e_inum, NULL, &fastdata, NULL);
 		if (error) {
 			xfs_iunlock(dp, XFS_ILOCK_EXCL);
 			return error;
@@ -2731,8 +2858,8 @@ xfs_lock_dir_and_entry(
 			 * reservation that we hold.
 			 */
 			error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(dp),
-				DLF_NODNLC, name, NULL, &e_inum, NULL,
-				&fastdata);
+				   DLF_NODNLC, name, NULL, &e_inum, NULL,
+				   &fastdata, NULL);
 
                         if (error) {
 				xfs_iunlock(dp, XFS_ILOCK_EXCL);
@@ -3229,7 +3356,7 @@ xfs_link(
 	 * waiting for a log reservation in xfs_inactive.
 	 */
 	error = xfs_dir_lookup_int(NULL, target_dir_bdp, DLF_NODNLC,
-			target_name, NULL, &e_inum, NULL, NULL);
+			target_name, NULL, &e_inum, NULL, NULL, NULL);
 	if (error != ENOENT) {
 		if (error == 0) {
 			error = XFS_ERROR(EEXIST);
@@ -3409,6 +3536,8 @@ xfs_lock_for_rename(
 	int			num_inodes;
 	int			i, j;
 	uint			lock_mode;
+	uint			dir_unlocked;
+	uint			lookup_flags;
 	struct ncfastdata	fastdata;
 
 	ip2 = NULL;
@@ -3429,8 +3558,13 @@ xfs_lock_for_rename(
 		return XFS_ERROR(ENOENT);
 	}
 
-        error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(dp1), DLF_IGET,
-				   name1, NULL, &inum1, &ip1, &fastdata);
+	lookup_flags = DLF_IGET;
+	if (lock_mode == XFS_ILOCK_SHARED) {
+		lookup_flags |= DLF_LOCK_SHARED;
+	}
+        error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(dp1), lookup_flags,
+				   name1, NULL, &inum1, &ip1,
+				   &fastdata, &dir_unlocked);
 
 	/*
 	 * Save the current generation so that we can detect if it's
@@ -3456,8 +3590,13 @@ xfs_lock_for_rename(
 		return XFS_ERROR(ENOENT);
 	}
 
-        error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(dp2), DLF_IGET,
-				   name2, NULL, &inum2, &ip2, &fastdata);
+	lookup_flags = DLF_IGET;
+	if (lock_mode == XFS_ILOCK_SHARED) {
+		lookup_flags |= DLF_LOCK_SHARED;
+	}
+        error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(dp2), lookup_flags,
+				   name2, NULL, &inum2, &ip2, &fastdata,
+				   &dir_unlocked);
 	dir_gen2 = dp2->i_gen;
         xfs_iunlock_map_shared(dp2, lock_mode);
 	if (error == ENOENT) {		/* target does not need to exist. */
@@ -3638,7 +3777,7 @@ xfs_rename_ancestor_check(
 			break;
 		}
 		error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(ip), 0, "..",
-				NULL, &parent_ino, NULL, &fastdata);
+				NULL, &parent_ino, NULL, &fastdata, NULL);
 		if (error) {
 			break;
 		}
@@ -4370,8 +4509,8 @@ xfs_mkdir(
 	 * do a vn_get for the vnode and the vnode is inactive and
 	 * waiting for a log reservation in xfs_inactive.
 	 */
-        error = xfs_dir_lookup_int(NULL, dir_bdp, DLF_NODNLC, dir_name, NULL,
-				   &e_inum, NULL, NULL);
+        error = xfs_dir_lookup_int(NULL, dir_bdp, DLF_NODNLC, dir_name,
+				   NULL, &e_inum, NULL, NULL, NULL);
         if (error != ENOENT) {
 		if (error == 0)
 			error = XFS_ERROR(EEXIST);
@@ -4886,7 +5025,7 @@ xfs_symlink(
 	 * for a log reservation.
 	 */
         error = xfs_dir_lookup_int(NULL, dir_bdp, DLF_NODNLC, link_name,
-				   NULL, &e_inum, NULL, NULL);
+				   NULL, &e_inum, NULL, NULL, NULL);
 	if (error != ENOENT) {
 		if (!error) {
 			error = XFS_ERROR(EEXIST);
@@ -5545,9 +5684,9 @@ xfs_fcntl(
 	struct getbmap		bm;
 	struct fsdmidata	d;
 	extern int		scache_linemask;
-	
-	vn_trace_entry(vp, "xfs_fcntl", (inst_t *)__return_address);
+
 	vp = BHV_TO_VNODE(bdp);
+	vn_trace_entry(vp, "xfs_fcntl", (inst_t *)__return_address);
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
 	switch (cmd) {
