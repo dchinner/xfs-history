@@ -849,8 +849,27 @@ xfs_fsync(vnode_t	*vp,
 	  int		flag,
 	  cred_t	*credp)
 {
-	ASSERT (0);
-	return 0;
+	xfs_inode_t *ip;
+	int error;
+
+	ip = XFS_VTOI(vp);
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	if (flag & FSYNC_INVAL) {
+		if (ip->i_flags & XFS_IEXTENTS && ip->i_bytes > 0) {
+			xfs_fsblock_t	last;
+			xfs_sb_t	*sbp;
+
+			last = xfs_bmap_last_offset(NULL, ip);
+			sbp = &ip->i_mount->m_sb;
+			pflushinvalvp(vp, 0, xfs_fsb_to_bb(sbp, last));
+		}
+	} else
+		pflushvp(vp, ip->i_d.di_size,
+			 (flag & FSYNC_WAIT) ? 0 : B_ASYNC);
+	xfs_iflock(ip);
+	xfs_iflush(ip, (flag & FSYNC_WAIT) ? 0 : B_ASYNC);
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	return error;
 }
 
 
