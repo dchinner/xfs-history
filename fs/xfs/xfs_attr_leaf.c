@@ -1605,6 +1605,7 @@ xfs_attr_leaf_getvalue(buf_t *bp, xfs_da_args_t *args)
  * Move the indicated entries from one leaf to another.
  * NOTE: this routine modifies both source and destination leaves.
  */
+/*ARGSUSED*/
 STATIC void
 xfs_attr_leaf_moveents(xfs_attr_leafblock_t *leaf_s, int start_s,
 			xfs_attr_leafblock_t *leaf_d, int start_d,
