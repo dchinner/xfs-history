@@ -6,6 +6,7 @@
 struct xfs_inode;
 struct ktrace;
 struct xfs_gap;
+struct vnode;
 
 /*
  * This is the type used in the xfs inode hash table.
@@ -316,7 +317,7 @@ void		xfs_inobp_check(xfs_mount_t *, buf_t *);
 /*
  * xfs_vnodeops.c prototypes.
  */
-int		xfs_fast_fid(vnode_t *, xfs_fid_t *);
+int		xfs_fast_fid(struct vnode *, xfs_fid_t *);
 
 extern int		xfs_do_fast_fid;
 extern struct zone	*xfs_inode_zone;
