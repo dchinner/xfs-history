@@ -2682,7 +2682,7 @@ xfsidbg_xdaargs(xfs_da_args_t *n)
 	i = ~(ATTR_ROOT | ATTR_CREATE | ATTR_REPLACE | XFS_ATTR_INCOMPLETE);
 	if ((n->flags & i) != 0)
 		qprintf("0x%x", n->flags & i);
-	qprintf("> rename %d\n", n->rename);
+	qprintf("> rename %d justcheck %d\n", n->rename, n->justcheck);
 	qprintf(" leaf: blkno %d index %d rmtblkno %d rmtblkcnt %d\n",
 		  n->blkno, n->index, n->rmtblkno, n->rmtblkcnt);
 	qprintf(" leaf2: blkno %d index %d rmtblkno %d rmtblkcnt %d\n",
