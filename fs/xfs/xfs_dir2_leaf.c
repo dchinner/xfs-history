@@ -40,29 +40,6 @@
 
 #include <xfs.h>
 
-
-#if defined(XFSDEBUG) && defined(CONFIG_KDB) && 0
-
-#undef xfs_dir2_print_args
-#define xfs_dir2_print_args(ARGS) \
-    printk("    inumber=%Ld, name=\"%*.*s\", hashval=0x%x, dir inumber=%Ld\n", \
-       ARGS->inumber, (int)ARGS->namelen, (int)ARGS->namelen, ARGS->name, \
-       ARGS->hashval, ARGS->dp->i_ino);
-
-#undef xfs_dir2_trace_args
-#define xfs_dir2_trace_args(A,B) { \
-    printk("[%s] (0x%p)\n", A, B); \
-    xfs_dir2_print_args(B); \
-}
-   
-#undef xfs_dir2_trace_args_bb
-#define xfs_dir2_trace_args_bb(A,B,C,D) {\
-    printk("[%s] (0x%p, 0x%p)\n", A, B, C); \
-    xfs_dir2_print_args(B); \
-}
-
-#endif
-
 /*
  * Local function declarations.
  */

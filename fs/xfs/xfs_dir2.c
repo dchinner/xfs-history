@@ -37,23 +37,6 @@
 
 #include <xfs.h>
 
-
-#if defined(XFSDEBUG) && defined(CONFIG_KDB) && 0
-
-#undef xfs_dir2_trace_args
-#define xfs_dir2_trace_args(A,B) \
-    printk("[%s] (0x%p)\n", A, B);
-    
-#undef xfs_dir2_trace_args_s
-#define xfs_dir2_trace_args_s(A,B,C) \
-    printk("[%s] (0x%p, %d)\n", A, B, C);
-    
-#undef xfs_dir2_trace_args_db
-#define xfs_dir2_trace_args_db(A,B,C,D) \
-    printk("[%s] (0x%p, %d, 0x%p)\n", A, B, C, D);
-
-#endif
-
 /*
  * Declarations for interface routines.
  */
