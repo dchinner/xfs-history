@@ -1,4 +1,4 @@
-#ident "$Revision: 1.75 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -703,8 +703,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	xfs_da_intnode_t *node;
 	xfs_da_node_entry_t *btree;
 	xfs_dir_leafblock_t *leaf;
-	__uint32_t bno, cookhash, hash;
-	daddr_t mappedbno;
+	__uint32_t bno, cookhash;
 	xfs_mount_t *mp;
 	int error, eob, i;
 	buf_t *bp;
@@ -779,10 +778,13 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 				}
 			}
 			if (i == node->hdr.count) {
-				xfs_dir_trace_g_du("node: hash not found",
-							  dp, uio);
 				xfs_trans_brelse(trans, bp);
-				return(XFS_ERROR(ENOENT));
+				xfs_dir_trace_g_du("node: hash beyond EOF",
+							  dp, uio);
+				uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, 0, 0,
+							     XFS_DA_MAXHASH);
+				*eofp = 1;
+				return(0);
 			}
 			xfs_dir_trace_g_dub("node: going to block",
 						   dp, uio, bno);
