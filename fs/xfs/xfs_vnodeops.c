@@ -4349,6 +4349,8 @@ xfs_rename(
 	int		ancestor_checked;
 	xfs_inode_t	*inodes[4];
 	int		gencounts[4];
+	int		target_ip_dropped = 0;	/* dropped target_ip link? */
+	int		src_dp_dropped = 0;	/* dropped src_dp link? */
 	vnode_t 	*src_dir_vp;
 	bhv_desc_t	*target_dir_bdp;
 	bhv_head_t	*target_dir_bhp;
@@ -4610,6 +4612,7 @@ xfs_rename(
 			rename_which_error_return = __LINE__;
 			goto abort_return;;
 		}
+		target_ip_dropped = 1;
 
 		if (src_is_directory) {
 			/*
@@ -4671,6 +4674,7 @@ xfs_rename(
 			rename_which_error_return = __LINE__;
 			goto abort_return;
 		}
+		src_dp_dropped = 1;
 	}
 
 	error = xfs_dir_removename(tp, src_dp, src_name, &first_block,
@@ -4682,7 +4686,6 @@ xfs_rename(
 	xfs_ichgtime(src_dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
 	dnlc_remove(src_dir_vp, src_name);
-
 
 	/*
 	 * Update the generation counts on all the directory inodes
@@ -4725,6 +4728,15 @@ xfs_rename(
 		return error;
 	}
 	/*
+	 * Take refs. for vop_link_removed calls below.  No need to worry 
+	 * about directory refs. because the caller holds them.
+	 */
+	if (target_ip_dropped) 
+		IHOLD(target_ip);
+	if (src_dp_dropped)
+		IHOLD(src_ip);
+
+	/*
 	 * trans_commit will unlock src_ip, target_ip & decrement
 	 * the vnode references.
 	 */
@@ -4735,6 +4747,20 @@ xfs_rename(
 #endif
 		IRELE(target_ip);
 	}
+	/*
+	 * Let interposed file systems know about removed links.
+	 */
+	if (target_ip_dropped) {
+		VOP_LINK_REMOVED(XFS_ITOV(target_ip), target_dir_vp, 
+				 (target_ip)->i_d.di_nlink==0);
+		IRELE(target_ip);
+	}
+	if (src_dp_dropped) {
+		VOP_LINK_REMOVED(src_dir_vp, XFS_ITOV(src_ip), 
+				 (src_dp)->i_d.di_nlink==0);
+		IRELE(src_ip);
+	}
+
 	if (error) {
 		return error;
 	}
