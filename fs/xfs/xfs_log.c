@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.217 $"
+#ident	"$Revision: 1.218 $"
 
 /*
  * High level interface routines for log manager
@@ -592,13 +592,12 @@ xfs_log_unmount(xfs_mount_t *mp)
  */
 
 /*
- * I suspect this length is significant. The message is changed
- * since the first two letters are either "Un" or "uN" depending
- * on the FS endian.
- * ugly hack territory.
+ * Unmount record used to have a string "Unmount filesystem--" in the 
+ * data section where the "Un" was really a magic number (XLOG_UNMOUNT_TYPE). 
+ * We just write the magic number now since that particular field isn't
+ * currently architecture converted and "nUmount" is a bit foo.
+ * As far as I know, there weren't any dependencies on the old behaviour.
  */
- 
-#define UNMOUNT_MAGIC_LEN 20
 
 int
 xfs_log_unmount_write(xfs_mount_t *mp)
@@ -613,8 +612,8 @@ xfs_log_unmount_write(xfs_mount_t *mp)
 	xfs_lsn_t	 lsn;
 	int		 error;
 	int		 spl;        
-        char             magic[UNMOUNT_MAGIC_LEN]="XX(unmount)--------";
-
+        __uint16_t       magic = XLOG_UNMOUNT_TYPE;
+        
 #if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
 	if (! xlog_debug && xlog_devt == log->l_dev)
 		return 0;
@@ -640,15 +639,8 @@ xfs_log_unmount_write(xfs_mount_t *mp)
 	} while (iclog != first_iclog);
 #endif
 	if (! (XLOG_FORCED_SHUTDOWN(log))) {
-            
-/* XXX - INT_SET here soon - is that a race? */
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-                magic[0]='n'; magic[1]='U';
-#else
-                magic[0]='U'; magic[1]='n';
-#endif
 		reg[0].i_addr = (void*)&magic;
-		reg[0].i_len  = UNMOUNT_MAGIC_LEN;
+		reg[0].i_len  = sizeof(__uint16_t);
                 
 		error = xfs_log_reserve(mp, 600, 1, &tic, XFS_LOG, 0);
 		if (!error) {
