@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.120 $"
+#ident  "$Revision: 1.121 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -410,7 +410,7 @@ xfs_cmountfs(
 	vfs_flags = (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE;
 	if (ddev != 0) {
 		ddevvp = makespecvp( ddev, VBLK );
-		error = VOP_OPEN(&ddevvp, vfs_flags, cr);
+		VOP_OPEN(ddevvp, &ddevvp, vfs_flags, cr, error);
 		if (error) {
 			VN_RELE(ddevvp);
 			goto error0;
@@ -421,7 +421,7 @@ xfs_cmountfs(
 	}
 	if (rtdev != 0) {
 		rdevvp = makespecvp( rtdev, VBLK );
-		error = VOP_OPEN(&rdevvp, vfs_flags, cr);
+		VOP_OPEN(rdevvp, &rdevvp, vfs_flags, cr, error);
 		if (error) {
 			VN_RELE(rdevvp);
 			goto error1;
@@ -436,7 +436,7 @@ xfs_cmountfs(
 			mp->m_logdevp = ddevvp;
 		} else {
 			ldevvp = makespecvp( logdev, VBLK );
-			error = VOP_OPEN(&ldevvp, vfs_flags, cr);
+			VOP_OPEN(ldevvp, &ldevvp, vfs_flags, cr, error);
 			if (error) {
 				VN_RELE(ldevvp);
 				goto error2;
@@ -521,19 +521,19 @@ xfs_cmountfs(
 
  error3:
 	if (ldevvp) {
-		VOP_CLOSE(ldevvp, vfs_flags, L_TRUE, 0, cr, NULL);
+		VOP_CLOSE(ldevvp, vfs_flags, L_TRUE, 0, cr, NULL, error);
 		binval(logdev);
 		VN_RELE(ldevvp);
 	}
  error2:
 	if (rdevvp) {
-		VOP_CLOSE(rdevvp, vfs_flags, L_TRUE, 0, cr, NULL);
+		VOP_CLOSE(rdevvp, vfs_flags, L_TRUE, 0, cr, NULL, error);
 		binval(rtdev);
 		VN_RELE(rdevvp);
 	}
  error1:
 	if (ddevvp) {
-		VOP_CLOSE(ddevvp, vfs_flags, L_TRUE, 0, cr, NULL);
+		VOP_CLOSE(ddevvp, vfs_flags, L_TRUE, 0, cr, NULL, error);
 		binval(ddev);
 		VN_RELE(ddevvp);
 	}
@@ -1104,7 +1104,8 @@ devvptoxfs(
 
 	if (devvp->v_type != VBLK)
 		return ENOTBLK;
-	if (error = VOP_OPEN(&devvp, FREAD, cr))
+	VOP_OPEN(devvp, &devvp, FREAD, cr, error);
+	if (error)
 		return error;
 	dev = devvp->v_rdev;
 	VOP_RWLOCK(devvp, VRWLOCK_WRITE);
@@ -1156,7 +1157,7 @@ xfs_statdevvp(
 	vnode_t		*devvp)
 {
 	buf_t		*bp;
-	int		error;
+	int		error, unused;
 	__uint64_t	fakeinos;
 	xfs_extlen_t	lsize;
 	xfs_sb_t	*sbp;
@@ -1184,7 +1185,7 @@ xfs_statdevvp(
 		error = EINVAL;
 	}
 	brelse(bp);
-	(void) VOP_CLOSE(devvp, FREAD, L_TRUE, 0, get_current_cred(), NULL);
+	VOP_CLOSE(devvp, FREAD, L_TRUE, 0, get_current_cred(), NULL, unused);
 	return error;
 }
 

@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.17 $"
+#ident "$Revision: 1.18 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -174,7 +174,7 @@ readlink_by_handle (
 	auio.uio_offset	= 0;
 	auio.uio_segflg	= UIO_USERSPACE;
 	auio.uio_resid	= bufsiz;
-	error = VOP_READLINK (vp, &auio, get_current_cred());
+	VOP_READLINK (vp, &auio, get_current_cred(), error);
 out:
 	VN_RELE (vp);
 	rvp->r_val1 = bufsiz - auio.uio_resid;
@@ -292,7 +292,8 @@ vp_open (
 	tvp = vp;
 	VN_HOLD (tvp);
 
-	if (error = VOP_SETFL (vp, 0, filemode, crp))
+	VOP_SETFL (vp, 0, filemode, crp, error);
+	if (error)
 		goto out;
 
 	/*
@@ -314,13 +315,15 @@ vp_open (
 		}
 	}
 	/* Check discretionary permissions. */
-	if (error = VOP_ACCESS (vp, mode, 0, crp))
+	VOP_ACCESS (vp, mode, 0, crp, error);
+	if (error)
 		goto out;
 
 	/*
 	 * Do opening protocol.
 	 */
-	if ((error = VOP_OPEN (&vp, filemode, crp)) == 0) {
+	VOP_OPEN (vp, &vp, filemode, crp, error);
+	if (!error) {
 		if (tvp)
 			VN_RELE (tvp);
 	}
@@ -358,9 +361,9 @@ vp_to_handle (
 			return EBADF;
 	}
 #ifdef SMALLFIDS
-	error = VOP_FID (vp, &fidp);
+	VOP_FID (vp, &fidp, error);
 #else
-	error = VOP_FID2 (vp, &fid);
+	VOP_FID2 (vp, &fid, error);
 	fidp = &fid;
 #endif /* SMALLFIDS */
 	if (error)
