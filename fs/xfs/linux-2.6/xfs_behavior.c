@@ -40,7 +40,7 @@
  */
 #include <xfs.h>
 
-xfs_zone_t	*bhv_global_zone;
+kmem_zone_t	*bhv_global_zone;
 
 /*
  * Global initialization function called out of main.
