@@ -351,7 +351,7 @@ xfs_zero_last_block(
 		}
 		if (PBF_NOT_DONE(pb)) {
 			/* pagebuf functions return negative errors */
-			if (error = -pagebuf_iostart(pb, PBF_READ)) {
+			if ((error = -pagebuf_iostart(pb, PBF_READ))) {
 				pagebuf_rele(pb);
 				goto out_lock;
 			}
@@ -359,7 +359,7 @@ xfs_zero_last_block(
 	}
 
 
-	if (error = -pagebuf_iozero(ip, pb, zero_offset, zero_len)) {
+	if ((error = -pagebuf_iozero(ip, pb, zero_offset, zero_len))) {
 		pagebuf_rele(pb);
 		goto out_lock;
 	}
@@ -538,7 +538,7 @@ xfs_zero_eof(
 		}
 
 		/* pagebuf_iozero returns negative error */
-		if (error = -pagebuf_iozero(ip, pb, 0, lsize)) {
+		if ((error = -pagebuf_iozero(ip, pb, 0, lsize))) {
 			pagebuf_rele(pb);
 			goto out_lock;
 		}
@@ -840,9 +840,9 @@ retry:
 			 */
 
 			tp = xfs_trans_alloc(mp, XFS_TRANS_WRITE_SYNC);
-			if (error = xfs_trans_reserve(tp, 0,
+			if ((error = xfs_trans_reserve(tp, 0,
 						      XFS_SWRITE_LOG_RES(mp),
-						      0, 0, 0)) {
+						      0, 0, 0))) {
 				/* Transaction reserve failed */
 				xfs_trans_cancel(tp, 0);
 			} else {
@@ -920,7 +920,7 @@ xfs_bmap(bhv_desc_t	*bdp,
 
 		if (XFS_IS_QUOTA_ON(ip->i_mount)) {
 			if (XFS_NOT_DQATTACHED(ip->i_mount, ip)) {
-				if (error = xfs_qm_dqattach(ip, XFS_QMOPT_ILOCKED)) {
+				if ((error = xfs_qm_dqattach(ip, XFS_QMOPT_ILOCKED))) {
 					xfs_iunlock(ip, XFS_ILOCK_EXCL);
 					return XFS_ERROR(error);
 				}
@@ -1031,7 +1031,7 @@ xfs_strategy(bhv_desc_t	*bdp,
 
 	if (XFS_IS_QUOTA_ON(mp)) {
 		if (XFS_NOT_DQATTACHED(mp, ip)) {
-			if (error = xfs_qm_dqattach(ip, 0)) {
+			if ((error = xfs_qm_dqattach(ip, 0))) {
 				return XFS_ERROR(error);
 			}
 		}
@@ -1848,7 +1848,7 @@ xfs_iomap_write_direct(
 	/*
 	 * determine if this is a realtime file
 	 */
-        if (rt = (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0) {
+        if ((rt = (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)) != 0) {
                 rtextsize = mp->m_sb.sb_rextsize;
         } else
                 rtextsize = 0;

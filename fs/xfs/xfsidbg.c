@@ -1322,7 +1322,7 @@ static void	printvnode(vnode_t *vp)
 
 	kdb_printf("vnode: 0x%p type %s\n", vp, vnode_type[vp->v_type]);
 
-	if (bh = vp->v_bh.bh_first) {
+	if ((bh = vp->v_bh.bh_first)) {
 		kdb_printf("   v_inode 0x%p v_bh->bh_first 0x%p pobj 0x%p\n",
 						vp->v_inode, bh, bh->bd_pdata);
 
@@ -1356,8 +1356,8 @@ static int	kdbm_vnode(
 	long offset = 0;
 	int diag;
 	vnode_t		*vp;
-	bhv_desc_t	*bh;
-	kdb_symtab_t	 symtab;
+/*	bhv_desc_t	*bh; */
+/*	kdb_symtab_t	 symtab;*/
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
@@ -1621,13 +1621,13 @@ static int	kdbm_vn(
 {
 	int		diag;
 	int		nextarg = 1;
-	char		*symname;
+/*	char		*symname; */
 	long		offset = 0;
 	unsigned long	addr;
 	struct inode	*ip;
-	bhv_desc_t	*bh;
-	ktrace_entry_t	*ktep;
-	ktrace_snap_t	kts;
+/*	bhv_desc_t	*bh; */
+/*	ktrace_entry_t	*ktep; */
+/*	ktrace_snap_t	kts; */
 	vnode_t		*vp;
 
 	if (argc != 1)
@@ -3223,11 +3223,11 @@ xfs_dir2data(void *addr, int size)
 	xfs_dir2_data_free_t *m;
 	xfs_dir2_data_entry_t *e;
 	xfs_dir2_data_unused_t *u;
-	xfs_dir2_leaf_entry_t *l;
+	xfs_dir2_leaf_entry_t *l=NULL;
 	int j, k;
 	char *p;
 	char *t;
-	xfs_dir2_block_tail_t *tail;
+	xfs_dir2_block_tail_t *tail=NULL;
 
 	db = (xfs_dir2_data_t *)addr;
 	bb = (xfs_dir2_block_t *)addr;

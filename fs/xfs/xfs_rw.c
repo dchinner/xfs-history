@@ -227,9 +227,9 @@ xfs_write_clear_setuid(
 
 	mp = ip->i_mount;
 	tp = xfs_trans_alloc(mp, XFS_TRANS_WRITEID);
-	if (error = xfs_trans_reserve(tp, 0,
+	if ((error = xfs_trans_reserve(tp, 0,
 				      XFS_WRITEID_LOG_RES(mp),
-				      0, 0, 0)) {
+				      0, 0, 0))) {
 		xfs_trans_cancel(tp, 0);
 		return error;
 	}
@@ -663,7 +663,7 @@ xfs_bwrite(
 	XFS_BUF_SET_FSPRIVATE3(bp, mp);
 	XFS_BUF_WRITE(bp);
 
-   	if (error = XFS_bwrite(bp)) {
+   	if ((error = XFS_bwrite(bp))) {
 		ASSERT(mp);
 		/* 
 		 * Cannot put a buftrace here since if the buffer is not 
@@ -767,7 +767,6 @@ void
 xfs_refcache_insert(
 	xfs_inode_t	*ip)
 {
-	int		s;
 	vnode_t		*vp;
 	xfs_inode_t	*release_ip;
 	xfs_inode_t	**refcache;

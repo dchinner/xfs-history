@@ -264,7 +264,7 @@ again:
 			if (   ip->i_prevp != &ih->ih_next
 			    && mrtrypromote(&ih->ih_lock)) {
 
-				if (iq = ip->i_next) {
+				if ((iq = ip->i_next)) {
 					iq->i_prevp = ip->i_prevp;
 				}
 
@@ -300,7 +300,6 @@ again:
 				xfs_iget_vnode_init(mp, vp, ip);
 			} else {
 				if ( ! (vp = vn_get(vp, &vmap, 0))) {
-#pragma mips_frequency_hint NEVER
 					XFS_STATS_INC(xs_ig_frecycle);
 
 					goto again;
@@ -415,7 +414,7 @@ finish_inode:
 	 * These values _must_ be set before releasing ihlock!
 	 */
 	ip->i_hash = ih;
-	if (iq = ih->ih_next) {
+	if ((iq = ih->ih_next)) {
 		iq->i_prevp = &ip->i_next;
 	}
 	ip->i_next = iq;
@@ -439,7 +438,7 @@ finish_inode:
 
 			/* insert this inode into the doubly-linked list 
 			 * where chl points */
-			if (iq = chl->chl_ip) {
+			if ((iq = chl->chl_ip)) {
 				ip->i_cprev = iq->i_cprev;
 				iq->i_cprev->i_cnext = ip;
 				iq->i_cprev = ip;
@@ -488,7 +487,7 @@ finish_inode:
 	 * Link ip to its mount and thread it on the mount's inode list.
 	 */
 	XFS_MOUNT_ILOCK(mp);
-	if (iq = mp->m_inodes) {
+	if ((iq = mp->m_inodes)) {
 		ASSERT(iq->i_mprev->i_mnext == iq);
 		ip->i_mprev = iq->i_mprev;
 		iq->i_mprev->i_mnext = ip;
@@ -619,7 +618,7 @@ xfs_inode_incore(xfs_mount_t	*mp,
 			if (ip->i_transp == tp) {
 				if (ip->i_prevp != &ih->ih_next &&
 				    mrtrypromote(&ih->ih_lock)) {
-					if (iq = ip->i_next) {
+					if ((iq = ip->i_next)) {
 						iq->i_prevp = ip->i_prevp;
 					}
 					*ip->i_prevp = iq;
@@ -733,7 +732,7 @@ xfs_iextract(
  
 	ih = ip->i_hash;
 	mrupdate(&ih->ih_lock);
-	if (iq = ip->i_next) {
+	if ((iq = ip->i_next)) {
 		iq->i_prevp = ip->i_prevp;
 	}
 	*ip->i_prevp = iq;

@@ -209,7 +209,6 @@ xfs_dm_send_create_event(
 	xfs_inode_t	*dip;
 	xfs_ino_t	inum;
 	vnode_t		*dir_vp;
-	bhv_desc_t	*bdp;
 #ifdef __sgi
 	struct ncfastdata fd;
 #endif
@@ -273,7 +272,6 @@ STATIC int
 prohibited_mr_events(bhv_desc_t	*bdp)
 {
 	int	prohibited;
-	int	s;
 #ifdef __sgi
 	preg_t	*preg;
 #endif
@@ -619,14 +617,14 @@ xfs_get_dirents(
 STATIC int
 xfs_dirents_to_stats(
 	xfs_mount_t	*mp,
-	dirent_t	*direntp,	/* array of dirent structs */
+	xfs_dirent_t	*direntp,	/* array of dirent structs */
 	void		*bufp,		/* buffer to fill */
 	size_t		direntbufsz,	/* sz of filled part of dirent buf */
 	size_t		*spaceleftp,	/* IO - space left in user buffer */
 	size_t		*nwrittenp,	/* number of bytes written to 'bufp' */
 	off_t		*locp)
 {
-	dirent_t	*p;
+	xfs_dirent_t	*p;
 	dm_stat_t	*statp;
 	size_t		reclen;
 	size_t		namelen;
@@ -648,7 +646,7 @@ xfs_dirents_to_stats(
 	statp = (dm_stat_t *) bufp;
 	for (reclen = (size_t) p->d_reclen; direntbufsz > 0;
 					direntbufsz -= reclen,
-					p = (dirent_t *) ((char *) p + reclen),
+					p = (xfs_dirent_t *) ((char *) p + reclen),
 					reclen = (size_t) p->d_reclen) {
 
 		namelen = strlen(p->d_name) + 1;
@@ -989,7 +987,7 @@ xfs_dm_rdwr(
 {
 	int		error;
 	int		oflags;
-	ssize_t		count, xfer;
+	ssize_t		xfer;
 	vnode_t		*vp = BHV_TO_VNODE(bdp);
 	struct file	file;
 	ssize_t		ret;
@@ -1707,7 +1705,7 @@ xfs_dm_get_dirattrs_rvp(
 	xfs_inode_t    	*dp;
 	xfs_mount_t	*mp;
 	size_t		direntbufsz, statbufsz;
-	size_t		nread, spaceleft, nwritten;
+	size_t		nread, spaceleft, nwritten=0;
 	void		*direntp, *statbufp;
 	uint		lock_mode;
 	int		error;
@@ -1747,7 +1745,7 @@ xfs_dm_get_dirattrs_rvp(
 	 * is an overly conservative size for the dirent buf.
 	 */
 	statbufsz = NBPP;
-	direntbufsz = (NBPP / DM_STAT_SIZE(MAXNAMLEN)) * sizeof(dirent_t);
+	direntbufsz = (NBPP / DM_STAT_SIZE(MAXNAMLEN)) * sizeof(xfs_dirent_t);
 
 	direntp = kmem_alloc(direntbufsz, KM_SLEEP);
 	statbufp = kmem_alloc(statbufsz, KM_SLEEP);
@@ -1787,7 +1785,7 @@ xfs_dm_get_dirattrs_rvp(
 		 * of them 
 		 */
 		error = xfs_dirents_to_stats(mp,
-					  (dirent_t *) direntp,
+					  (xfs_dirent_t *) direntp,
 					  statbufp,
 					  nread,
 					  &spaceleft, 
@@ -2362,19 +2360,19 @@ xfs_dm_punch_hole(
 	 */
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	tp = xfs_trans_alloc(mp, XFS_TRANS_SETATTR_SIZE);
-	if (error = xfs_trans_reserve(tp, 0,
+	if ((error = xfs_trans_reserve(tp, 0,
 				     XFS_ITRUNCATE_LOG_RES(mp), 0,
 				     XFS_TRANS_PERM_LOG_RES,
-				     XFS_ITRUNCATE_LOG_COUNT)) {
+				     XFS_ITRUNCATE_LOG_COUNT))) {
 		xfs_trans_cancel(tp, 0);
 		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 		return(error);
 	}
 	tp2 = xfs_trans_alloc(mp, XFS_TRANS_SETATTR_SIZE);
-	if (error = xfs_trans_reserve(tp2, 0,
+	if ((error = xfs_trans_reserve(tp2, 0,
 				     XFS_ITRUNCATE_LOG_RES(mp), 0,
 				     XFS_TRANS_PERM_LOG_RES,
-				     XFS_ITRUNCATE_LOG_COUNT)) {
+				     XFS_ITRUNCATE_LOG_COUNT))) {
 		xfs_trans_cancel(tp, 0);
 		xfs_trans_cancel(tp2, 0);
 		xfs_iunlock(ip, XFS_IOLOCK_EXCL);

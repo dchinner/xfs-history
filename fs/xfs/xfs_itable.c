@@ -203,7 +203,7 @@ xfs_bulkstat(
 	int			flags, 	/* defined in xfs_itable.h */
 	int			*done)	/* 1 if there're more stats to get */
 {
-	xfs_agblock_t		agbno;	/* allocation group block number */
+	xfs_agblock_t		agbno=0;	/* allocation group block number */
 	xfs_buf_t		*agbp;	/* agi header buffer */
 	xfs_agi_t		*agi;	/* agi header data */
 	xfs_agino_t		agino;	/* inode # in allocation group */
@@ -224,7 +224,7 @@ xfs_bulkstat(
 	xfs_inobt_rec_t		*irbp;	/* current irec buffer pointer */
 	xfs_inobt_rec_t		*irbuf;	/* start of irec buffer */
 	xfs_inobt_rec_t		*irbufend; /* end of good irec buffer entries */
-	xfs_ino_t		lastino; /* last inode number returned */
+	xfs_ino_t		lastino=0; /* last inode number returned */
 	int			nbcluster; /* # of blocks in a cluster */
 	int			nicluster; /* # of inodes in a cluster */
 	int			nimask;	/* mask for inode clusters */
@@ -248,7 +248,7 @@ xfs_bulkstat(
 	 */
 	vfsp = XFS_MTOVFS(mp);
 	if (!(flags & BULKSTAT_FG_VFSLOCKED)) {
-		if (error = vfs_busy(vfsp))
+		if ((error = vfs_busy(vfsp)))
 			return error;
 		vfs_unbusy_needed = 1;
 	}
@@ -808,12 +808,12 @@ xfs_fd_to_mp(
 {
 	dev_t		dev;
 	int		error;
-	vfile_t		*fp;
+	vfile_t		*fp=NULL;
 	vfs_t		*vfsp;
 	vnode_t		*vp;
 	bhv_desc_t 	*bdp;
 
-	if (error = getf(fd, &fp))
+	if ((error = getf(fd, &fp)))
 		return XFS_ERROR(error);
 	if (!VF_IS_VNODE(fp))
 		return XFS_ERROR(EINVAL);

@@ -147,8 +147,8 @@ xfs_growfs_data_private(
 		mrunlock(&mp->m_peraglock);
 	}
 	tp = xfs_trans_alloc(mp, XFS_TRANS_GROWFS);
-	if (error = xfs_trans_reserve(tp, XFS_GROWFS_SPACE_RES(mp),
-			XFS_GROWDATA_LOG_RES(mp), 0, 0, 0)) {
+	if ((error = xfs_trans_reserve(tp, XFS_GROWFS_SPACE_RES(mp),
+			XFS_GROWDATA_LOG_RES(mp), 0, 0, 0))) {
 		xfs_trans_cancel(tp, 0);
 		return error;
 	}

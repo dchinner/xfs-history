@@ -422,12 +422,12 @@ xfs_qm_dqalloc(
 
 	xfs_trans_ijoin(tp, quotip, XFS_ILOCK_EXCL);
 	nmaps = 1;
-	if (error = xfs_bmapi(tp, quotip, 
+	if ((error = xfs_bmapi(tp, quotip, 
 			      offset_fsb, XFS_DQUOT_CLUSTER_SIZE_FSB,
 			      XFS_BMAPI_METADATA | XFS_BMAPI_WRITE,
 			      &firstblock, 
 			      XFS_QM_DQALLOC_SPACE_RES(mp),
-			      &map, &nmaps, &flist)) {
+			      &map, &nmaps, &flist))) {
 		goto error0;
 	}
 	ASSERT(map.br_blockcount == XFS_DQUOT_CLUSTER_SIZE_FSB);
@@ -455,7 +455,7 @@ xfs_qm_dqalloc(
 			      dqp->dq_flags & (XFS_DQ_USER|XFS_DQ_GROUP),
 			      bp);
 
-	if (error = xfs_bmap_finish(&tp, &flist, firstblock, &committed)) {
+	if ((error = xfs_bmap_finish(&tp, &flist, firstblock, &committed))) {
 		goto error1;
 	}
 
@@ -546,8 +546,8 @@ xfs_qm_dqtobp(
 				return (ENOENT);
 
 			ASSERT(tp);
-			if (error = xfs_qm_dqalloc(tp, mp, dqp, quotip,
-						dqp->q_fileoffset, &bp)) 
+			if ((error = xfs_qm_dqalloc(tp, mp, dqp, quotip,
+						dqp->q_fileoffset, &bp))) 
 				return (error);	
 			newdquot = B_TRUE;
 		} else {
@@ -567,10 +567,10 @@ xfs_qm_dqtobp(
 	 */
 	if (! newdquot) {
 		xfs_dqtrace_entry(dqp, "DQTOBP READBUF");
-		if (error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp,
+		if ((error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp,
 					       dqp->q_blkno,
 					       XFS_QI_DQCHUNKLEN(mp),
-					       0, &bp)) {
+					       0, &bp))) {
 			return (error);
 		}
 		if (error || !bp)
@@ -627,7 +627,7 @@ xfs_qm_dqread(
 	 * dqp already knows its own type (GROUP/USER).
 	 */
 	xfs_dqtrace_entry(dqp, "DQREAD");
-	if (error = xfs_qm_dqtobp(tp, dqp, &ddqp, &bp, flags)) {
+	if ((error = xfs_qm_dqtobp(tp, dqp, &ddqp, &bp, flags))) {
 		return (error);
 	}
 
@@ -684,20 +684,20 @@ xfs_qm_idtodq(
 	xfs_dquot_t 	*dqp;
 	int 	    	error;
 	xfs_trans_t	*tp;
-	int		cancelflags;
+	int		cancelflags=0;
 
 	dqp = xfs_qm_dqinit(mp, id, type);
 	tp = NULL;
 	if (flags & XFS_QMOPT_DQALLOC) {
 		tp = xfs_trans_alloc(mp, XFS_TRANS_QM_DQALLOC);
-		if (error = xfs_trans_reserve(tp,
+		if ((error = xfs_trans_reserve(tp,
 				       XFS_QM_DQALLOC_SPACE_RES(mp),
 				       XFS_WRITE_LOG_RES(mp) + 
 					      BBTOB(XFS_QI_DQCHUNKLEN(mp)) - 1 +
 					      128,
 				       0,
 				       XFS_TRANS_PERM_LOG_RES,
-				       XFS_WRITE_LOG_COUNT)) {
+				       XFS_WRITE_LOG_COUNT))) {
 			cancelflags = 0;
 			goto error0;
 		}
@@ -708,7 +708,7 @@ xfs_qm_idtodq(
 	 * Read it from disk; xfs_dqread() takes care of
 	 * all the necessary initialization of dquot's fields (locks, etc) 
 	 */
-	if (error = xfs_qm_dqread(tp, id, dqp, flags)) {
+	if ((error = xfs_qm_dqread(tp, id, dqp, flags))) {
 		/*
 		 * This can happen if quotas got turned off (ESRCH),
 		 * or if the dquot didn't exist on disk and we ask to 
@@ -719,8 +719,8 @@ xfs_qm_idtodq(
 		goto error0;
 	}
 	if (tp) {
-		if (error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES,
-					     NULL))
+		if ((error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES,
+					     NULL)))
 			goto error1;
 	}
 	
@@ -833,7 +833,7 @@ xfs_qm_dqlookup(
 			if (dqp->HL_PREVP != &qh->qh_next) {
 				xfs_dqtrace_entry(dqp,
 						  "DQLOOKUP: HASH MOVETOFRONT");
-				if (d = dqp->HL_NEXT)
+				if ((d = dqp->HL_NEXT))
 					d->HL_PREVP = dqp->HL_PREVP;
 				*(dqp->HL_PREVP) = d;
 				d = qh->qh_next;
@@ -948,10 +948,10 @@ xfs_qm_dqget(
 	 * This can return ENOENT if dquot didn't exist on disk and we didn't
 	 * ask it to allocate; ESRCH if quotas got turned off suddenly.
 	 */
-	if (error = xfs_qm_idtodq(mp, id, type, 
+	if ((error = xfs_qm_idtodq(mp, id, type, 
 				  flags & (XFS_QMOPT_DQALLOC|XFS_QMOPT_DQREPAIR|
 					   XFS_QMOPT_DOWARN),
-				  &dqp)) {
+				  &dqp))) {
 		if (ip)
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
 		return (error);
@@ -1111,7 +1111,7 @@ xfs_qm_dqput(
 			 * it (probably) has. Otherwise it'll keep the 
 			 * gdquot from getting reclaimed.
 			 */
-			if (gdqp = dqp->q_gdquot) {
+			if ((gdqp = dqp->q_gdquot)) {
 				/* 
 				 * Avoid a recursive dqput call 
 				 */
@@ -1210,7 +1210,7 @@ xfs_qm_dqflush(
 	 * We don't need a transaction envelope because we know that the
 	 * the ondisk-dquot has already been allocated for.
 	 */
-	if (error = xfs_qm_dqtobp(NULL, dqp, &ddqp, &bp, XFS_QMOPT_DOWARN)) {
+	if ((error = xfs_qm_dqtobp(NULL, dqp, &ddqp, &bp, XFS_QMOPT_DOWARN))) {
 		xfs_dqtrace_entry(dqp, "DQTOBP FAIL");
 		ASSERT(error != ENOENT);
 		/* 

@@ -303,7 +303,7 @@ _xfs_trans_update_ail(
 	)
 {
 	xfs_ail_entry_t		*ailp;
-	xfs_log_item_t		*dlip;
+	xfs_log_item_t		*dlip=NULL;
 	xfs_log_item_t		*mlip;	/* ptr to minimum lip */
 
 	ailp = &(mp->m_ail);

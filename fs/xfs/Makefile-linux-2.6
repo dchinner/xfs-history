@@ -39,11 +39,7 @@
 # but I am not going to change every file at the moment.  It also needs
 # -I $TOPDIR/fs to pick up #include <xfs_support/xxx>, the support files should
 # really be in linux/include/xfs_support, not hidden under fs.  Keith Owens.
-EXTRA_CFLAGS += -Wno-unused  -Wno-parentheses \
-                -Wno-uninitialized -I. -I$(TOPDIR)/fs \
-		-funsigned-char 
-
-EXTRA_CFLAGS += $(shell if $(CC) -Wno-unknown-pragmas -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-Wno-unknown-pragmas"; fi)
+EXTRA_CFLAGS +=  -I. -I$(TOPDIR)/fs  -funsigned-char 
 
 ifeq ($(CONFIG_XFS_DEBUG),y)
 	EXTRA_CFLAGS += -DDEBUG -DXFSDEBUG

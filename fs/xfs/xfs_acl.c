@@ -496,7 +496,6 @@ xfs_acl_vget(vnode_t *vp, int kind, struct acl *acl)
 int
 xfs_acl_get(vnode_t *vp, struct acl *acl, struct acl *dacl)
 {
-	vfile_t *fp;
 	int error;
 	int derror = 0;
 

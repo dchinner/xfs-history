@@ -139,7 +139,7 @@ xfs_init(int	fstype)
 	extern mutex_t	        xfs_uuidtabmon;
 	extern mutex_t	        xfs_Gqm_lock;
 	extern xfs_zone_t	*xfs_gap_zone;
-#ifdef DEBUG
+#ifdef DEBUG_NOT
 	extern ktrace_t	        *xfs_alloc_trace_buf;
 	extern ktrace_t	        *xfs_bmap_trace_buf;
 	extern ktrace_t	        *xfs_bmbt_trace_buf;
@@ -317,9 +317,9 @@ xfs_cmountfs(
 	xfs_mount_t	*mp;
 	int		error = 0;
 	int		vfs_flags;
-	size_t		n;
-	char		*tmp_fsname_buffer;
-        int             client = 0;
+/*	size_t		n; */
+/*	char		*tmp_fsname_buffer; */
+	int             client = 0;
 
 	/*
 	 * The new use of remount to update various cxfs parameters
@@ -496,7 +496,7 @@ xfs_cmountfs(
 	 * read in superblock to check read-only flags and shared
 	 * mount status
 	 */
-	if (error = xfs_readsb(mp, ddev)) {
+	if ((error = xfs_readsb(mp, ddev))) {
 		goto error3;
 	}
 
@@ -562,7 +562,7 @@ xfs_cmountfs(
 	}
 
 	if (client == 0) {
-		if (error = xfs_mountfs(vfsp, mp, ddev, 0)) {
+		if ((error = xfs_mountfs(vfsp, mp, ddev, 0))) {
 #ifdef DEBUG
 			cmn_err(CE_WARN, "xfs: xfs_mountfs failed: error %d.",
 				error);
@@ -685,7 +685,6 @@ xfs_mount(
 	dev_t		ddev;
 	dev_t		logdev;
 	dev_t		rtdev;
-	vnode_t		*rootvp;
 	int		error;
 
 	if (mvp->v_type != VDIR)
@@ -702,7 +701,7 @@ xfs_mount(
 	if (error)
 		return (error);
 
-	if (error = spectodevs(vfsp->vfs_super, &args, &ddev, &logdev, &rtdev))
+	if ((error = spectodevs(vfsp->vfs_super, &args, &ddev, &logdev, &rtdev)))
 		return error;
 
 	error = xfs_cmountfs(vfsp, ddev, logdev, rtdev, NONROOT_MOUNT,
@@ -1077,7 +1076,7 @@ xfs_unmount_flush(
 {
 	xfs_inode_t	*rip = mp->m_rootip;
         xfs_inode_t     *rbmip;
-	xfs_inode_t     *rsumip;
+	xfs_inode_t     *rsumip=NULL;
 	vnode_t         *rvp = XFS_ITOV(rip);
 	int             error;
 
@@ -1190,7 +1189,6 @@ xfs_statvfs(
 	xfs_mount_t	*mp;
 	xfs_sb_t	*sbp;
 	int		s;
-	struct vfs	*vfsp = bhvtovfs(bdp);
 
 	mp = XFS_BHVTOM(bdp);
 	sbp = &(mp->m_sb);
@@ -1863,7 +1861,7 @@ xfs_syncsub(
 	 * Get the Quota Manager to flush the dquots in a similar manner.
 	 */
 	if (XFS_IS_QUOTA_ON(mp)) {
-		if (error = xfs_qm_sync(mp, flags)) {
+		if ((error = xfs_qm_sync(mp, flags))) {
 			/*
 			 * If we got an IO error, we will be shutting down.
 			 * So, there's nothing more for us to do here.
@@ -1954,9 +1952,9 @@ xfs_syncsub(
 		 * recovery that all others are OK.
 		 */
 		tp = xfs_trans_alloc(mp, XFS_TRANS_DUMMY1);
-		if (error = xfs_trans_reserve(tp, 0,
+		if ((error = xfs_trans_reserve(tp, 0,
 				XFS_ICHANGE_LOG_RES(mp),
-				0, 0, 0))  {
+				0, 0, 0)))  {
 			xfs_trans_cancel(tp, 0);
 			kmem_free(ipointer, sizeof(xfs_iptr_t));
 			return error;
@@ -2020,7 +2018,6 @@ xfs_vget(
 		ino  = xfid2->fid_ino;
 		igen = xfid2->fid_gen;
 	} else {
-#pragma mips_frequency_hint NEVER
 		/*
 		 * Invalid.  Since handles can be created in user space
 		 * and passed in via gethandle(), this is not cause for
@@ -2031,18 +2028,15 @@ xfs_vget(
 	mp = XFS_BHVTOM(bdp);
 	error = xfs_iget(mp, NULL, ino, XFS_ILOCK_SHARED, &ip, 0);
 	if (error) {
-#pragma mips_frequency_hint NEVER
 		*vpp = NULL;
 		return error;
 	}
         if (ip == NULL) {
-#pragma mips_frequency_hint NEVER
                 *vpp = NULL;
                 return XFS_ERROR(EIO);
         }
 
 	if (ip->i_d.di_mode == 0 || ip->i_d.di_gen != igen) {
-#pragma mips_frequency_hint NEVER
 		xfs_iput(ip, XFS_ILOCK_SHARED);
 		*vpp = NULL;
 		return 0;

@@ -115,7 +115,7 @@
 #define _LIST_REMOVE(h, dqp, PVP, NXT)				\
         {							\
                  xfs_dquot_t *d;				\
-                 if ((d) = (dqp)->NXT)				\
+                 if (((d) = (dqp)->NXT))				\
                          (d)->PVP = (dqp)->PVP;			\
                  *((dqp)->PVP) = d;				\
                  (dqp)->NXT = NULL;				\
@@ -127,7 +127,7 @@
 #define _LIST_INSERT(h, dqp, PVP, NXT)				\
 	{							\
 		 xfs_dquot_t *d;				\
-		 if ((d) = (h)->qh_next)			\
+		 if (((d) = (h)->qh_next))			\
 			 (d)->PVP = &((dqp)->NXT);		\
 		 (dqp)->NXT = d;				\
 		 (dqp)->PVP = &((h)->qh_next);			\

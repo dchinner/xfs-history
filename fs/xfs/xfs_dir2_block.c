@@ -88,16 +88,16 @@ xfs_dir2_block_addname(
 	xfs_inode_t		*dp;		/* directory inode */
 	xfs_dir2_data_unused_t	*dup;		/* block unused entry */
 	int			error;		/* error return value */
-	xfs_dir2_data_unused_t	*enddup;	/* unused at end of data */
+	xfs_dir2_data_unused_t	*enddup=NULL;	/* unused at end of data */
 	xfs_dahash_t		hash;		/* hash value of found entry */
 	int			high;		/* high index for binary srch */
 	int			highstale;	/* high stale index */
-	int			lfloghigh;	/* last final leaf to log */
-	int			lfloglow;	/* first final leaf to log */
+	int			lfloghigh=0;	/* last final leaf to log */
+	int			lfloglow=0;	/* first final leaf to log */
 	int			len;		/* length of the new entry */
 	int			low;		/* low index for binary srch */
 	int			lowstale;	/* low stale index */
-	int			mid;		/* midpoint for binary srch */
+	int			mid=0;		/* midpoint for binary srch */
 	xfs_mount_t		*mp;		/* filesystem mount point */
 	int			needlog;	/* need to log header */
 	int			needscan;	/* need to rescan freespace */
@@ -111,9 +111,8 @@ xfs_dir2_block_addname(
 	/*
 	 * Read the (one and only) directory block into dabuf bp.
 	 */
-	if (error =
-	    xfs_da_read_buf(tp, dp, mp->m_dirdatablk, -1, &bp, XFS_DATA_FORK)) {
-#pragma mips_frequency_hint NEVER
+	if ((error =
+	    xfs_da_read_buf(tp, dp, mp->m_dirdatablk, -1, &bp, XFS_DATA_FORK))) {
 		return error;
 	}
 	ASSERT(bp != NULL);
@@ -122,7 +121,6 @@ xfs_dir2_block_addname(
 	 * Check the magic number, corrupted if wrong.
 	 */
 	if (INT_GET(block->hdr.magic, ARCH_CONVERT) != XFS_DIR2_BLOCK_MAGIC) {
-#pragma mips_frequency_hint NEVER
 		xfs_da_brelse(tp, bp);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
@@ -164,7 +162,6 @@ xfs_dir2_block_addname(
 				 * to hold the new leaf too?
 				 */
 				if (INT_GET(dup->length, ARCH_CONVERT) < len + (uint)sizeof(*blp)) {
-#pragma mips_frequency_hint NEVER
 					/*
 					 * Yes, we use the second-largest
 					 * entry instead if it works.
@@ -182,7 +179,6 @@ xfs_dir2_block_addname(
 				 * just check its length.
 				 */
 				if (INT_GET(dup->length, ARCH_CONVERT) < len) {
-#pragma mips_frequency_hint NEVER
 					dup = NULL;
 				}
 			}
@@ -202,7 +198,6 @@ xfs_dir2_block_addname(
 	 * Will need to compact to make this work.
 	 */
 	else {
-#pragma mips_frequency_hint NEVER
 		/*
 		 * Tag just before the first leaf entry.
 		 */
@@ -234,7 +229,6 @@ xfs_dir2_block_addname(
 	 * If we don't have space for the new entry & leaf ...
 	 */
 	if (!dup) {
-#pragma mips_frequency_hint NEVER
 		/*
 		 * Not trying to actually do anything, or don't have
 		 * a space reservation: return no-space.
@@ -263,7 +257,6 @@ xfs_dir2_block_addname(
 	 * XXX should be the one closest to mid but mid is not yet computed.
 	 */
 	if (compact) {
-#pragma mips_frequency_hint NEVER
 		int	fromidx;		/* source leaf index */
 		int	toidx;			/* target leaf index */
 
@@ -324,7 +317,6 @@ xfs_dir2_block_addname(
 			high = mid - 1;
 	}
 	while (mid >= 0 && INT_GET(blp[mid].hashval, ARCH_CONVERT) >= args->hashval) {
-#pragma mips_frequency_hint NEVER
 		mid--;
 	}
 	/*
@@ -454,7 +446,7 @@ xfs_dir2_block_getdents(
 	xfs_inode_t		*dp,		/* incore inode */
 	uio_t			*uio,		/* caller's buffer control */
 	int			*eofp,		/* eof reached? (out) */
-	dirent_t		*dbp,		/* caller's buffer */
+	xfs_dirent_t		*dbp,		/* caller's buffer */
 	xfs_dir2_put_t		put)		/* abi's formatting function */
 {
 	xfs_dir2_block_t	*block;		/* directory block structure */
@@ -475,16 +467,14 @@ xfs_dir2_block_getdents(
 	 * If the block number in the offset is out of range, we're done.
 	 */
 	if (XFS_DIR2_DATAPTR_TO_DB(mp, uio->uio_offset) > mp->m_dirdatablk) {
-#pragma mips_frequency_hint NEVER
 		*eofp = 1;
 		return 0;
 	}
 	/*
 	 * Can't read the block, give up, else get dabuf in bp.
 	 */
-	if (error =
-	    xfs_da_read_buf(tp, dp, mp->m_dirdatablk, -1, &bp, XFS_DATA_FORK)) {
-#pragma mips_frequency_hint NEVER
+	if ((error =
+	    xfs_da_read_buf(tp, dp, mp->m_dirdatablk, -1, &bp, XFS_DATA_FORK))) {
 		return error;
 	}
 	ASSERT(bp != NULL);
@@ -560,7 +550,6 @@ xfs_dir2_block_getdents(
 		 * If it didn't fit, set the final offset to here & return.
 		 */
 		if (!p.done) {
-#pragma mips_frequency_hint NEVER
 			uio->uio_offset =
 				XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
 					(char *)dep - (char *)block);
@@ -648,7 +637,7 @@ xfs_dir2_block_lookup(
 	 * Get the buffer, look up the entry.
 	 * If not found (ENOENT) then return, have no buffer.
 	 */
-	if (error = xfs_dir2_block_lookup_int(args, &bp, &ent))
+	if ((error = xfs_dir2_block_lookup_int(args, &bp, &ent)))
 		return error;
 	dp = args->dp;
 	mp = dp->i_mount;
@@ -699,9 +688,8 @@ xfs_dir2_block_lookup_int(
 	/*
 	 * Read the buffer, return error if we can't get it.
 	 */
-	if (error =
-	    xfs_da_read_buf(tp, dp, mp->m_dirdatablk, -1, &bp, XFS_DATA_FORK)) {
-#pragma mips_frequency_hint NEVER
+	if ((error =
+	    xfs_da_read_buf(tp, dp, mp->m_dirdatablk, -1, &bp, XFS_DATA_FORK))) {
 		return error;
 	}
 	ASSERT(bp != NULL);
@@ -732,7 +720,6 @@ xfs_dir2_block_lookup_int(
 	 * Back up to the first one with the right hash value.
 	 */
 	while (mid > 0 && INT_GET(blp[mid - 1].hashval, ARCH_CONVERT) == args->hashval) {
-#pragma mips_frequency_hint NEVER
 		mid--;
 	}
 	/*
@@ -794,8 +781,7 @@ xfs_dir2_block_removename(
 	 * Look up the entry in the block.  Gets the buffer and entry index.
 	 * It will always be there, the vnodeops level does a lookup first.
 	 */
-	if (error = xfs_dir2_block_lookup_int(args, &bp, &ent)) {
-#pragma mips_frequency_hint NEVER
+	if ((error = xfs_dir2_block_lookup_int(args, &bp, &ent))) {
 		return error;
 	}
 	dp = args->dp;
@@ -872,8 +858,7 @@ xfs_dir2_block_replace(
 	 * Lookup the entry in the directory.  Get buffer and entry index.
 	 * This will always succeed since the caller has already done a lookup.
 	 */
-	if (error = xfs_dir2_block_lookup_int(args, &bp, &ent)) {
-#pragma mips_frequency_hint NEVER
+	if ((error = xfs_dir2_block_lookup_int(args, &bp, &ent))) {
 		return error;
 	}
 	dp = args->dp;
@@ -959,10 +944,9 @@ xfs_dir2_leaf_to_block(
 		bestsp = XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_CONVERT);
 		if (INT_GET(bestsp[INT_GET(ltp->bestcount, ARCH_CONVERT) - 1], ARCH_CONVERT) ==
 		    mp->m_dirblksize - (uint)sizeof(block->hdr)) {
-#pragma mips_frequency_hint NEVER
-			if (error =
+			if ((error =
 			    xfs_dir2_leaf_trim_data(args, lbp,
-				    (xfs_dir2_db_t)(INT_GET(ltp->bestcount, ARCH_CONVERT) - 1)))
+				    (xfs_dir2_db_t)(INT_GET(ltp->bestcount, ARCH_CONVERT) - 1))))
 				goto out;
 		} else {
 			error = 0;
@@ -975,7 +959,6 @@ xfs_dir2_leaf_to_block(
 	if (dbp == NULL &&
 	    (error = xfs_da_read_buf(tp, dp, mp->m_dirdatablk, -1, &dbp,
 		    XFS_DATA_FORK))) {
-#pragma mips_frequency_hint NEVER
 		goto out;
 	}
 	block = dbp->data;
@@ -1040,7 +1023,6 @@ xfs_dir2_leaf_to_block(
 	error = xfs_da_shrink_inode(args, mp->m_dirleafblk, lbp);
 	lbp = NULL;
 	if (error) {
-#pragma mips_frequency_hint NEVER
 		goto out;
 	}
 	/*
@@ -1099,7 +1081,6 @@ xfs_dir2_sf_to_block(
 	 * Bomb out if the shortform directory is way too short.
 	 */
 	if (dp->i_d.di_size < offsetof(xfs_dir2_sf_hdr_t, parent)) {
-#pragma mips_frequency_hint NEVER
 		ASSERT(XFS_FORCED_SHUTDOWN(mp));
 		return XFS_ERROR(EIO);
 	}
@@ -1124,7 +1105,6 @@ xfs_dir2_sf_to_block(
 	 */
 	error = xfs_dir2_grow_inode(args, XFS_DIR2_DATA_SPACE, &blkno);
 	if (error) {
-#pragma mips_frequency_hint NEVER
 		return error;
 	}
 	/*
@@ -1132,7 +1112,6 @@ xfs_dir2_sf_to_block(
 	 */
 	error = xfs_dir2_data_init(args, blkno, &bp);
 	if (error) {
-#pragma mips_frequency_hint NEVER
 		return error;
 	}
 	block = bp->data;

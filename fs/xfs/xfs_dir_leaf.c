@@ -161,7 +161,6 @@ xfs_dir_shortform_addname(xfs_da_args_t *args)
 	 * failed part way through.
 	 */
 	if (dp->i_d.di_size < sizeof(xfs_dir_sf_hdr_t)) {
-#pragma mips_frequency_hint NEVER
 		ASSERT(XFS_FORCED_SHUTDOWN(dp->i_mount));
 		return XFS_ERROR(EIO);
 	}
@@ -212,7 +211,6 @@ xfs_dir_shortform_removename(xfs_da_args_t *args)
 	 * failed part way through.
 	 */
 	if (dp->i_d.di_size < sizeof(xfs_dir_sf_hdr_t)) {
-#pragma mips_frequency_hint NEVER
 		ASSERT(XFS_FORCED_SHUTDOWN(dp->i_mount));
 		return XFS_ERROR(EIO);
 	}
@@ -266,7 +264,6 @@ xfs_dir_shortform_lookup(xfs_da_args_t *args)
 	 * failed part way through.
 	 */
 	if (dp->i_d.di_size < sizeof(xfs_dir_sf_hdr_t)) {
-#pragma mips_frequency_hint NEVER
 		ASSERT(XFS_FORCED_SHUTDOWN(dp->i_mount));
 		return XFS_ERROR(EIO);
 	}
@@ -318,7 +315,6 @@ xfs_dir_shortform_to_leaf(xfs_da_args_t *iargs)
 	 * failed part way through.
 	 */
 	if (dp->i_d.di_size < sizeof(xfs_dir_sf_hdr_t)) {
-#pragma mips_frequency_hint NEVER
 		ASSERT(XFS_FORCED_SHUTDOWN(dp->i_mount));
 		return XFS_ERROR(EIO);
 	}
@@ -410,11 +406,11 @@ xfs_dir_shortform_compare(const void *a, const void *b)
 /*ARGSUSED*/
 int
 xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
-				       dirent_t *dbp, xfs_dir_put_t put)
+				       xfs_dirent_t *dbp, xfs_dir_put_t put)
 {
 	xfs_dir_shortform_t *sf;
 	xfs_dir_sf_entry_t *sfe;
-	int retval, i, sbsize, nsbuf, lastresid, want_entno;
+	int retval, i, sbsize, nsbuf, lastresid=0, want_entno;
 	xfs_mount_t *mp;
 	xfs_dahash_t cookhash, hash;
 	xfs_dir_put_args_t p;
@@ -597,7 +593,6 @@ xfs_dir_shortform_replace(xfs_da_args_t *args)
 	 * failed part way through.
 	 */
 	if (dp->i_d.di_size < sizeof(xfs_dir_sf_hdr_t)) {
-#pragma mips_frequency_hint NEVER
 		ASSERT(XFS_FORCED_SHUTDOWN(dp->i_mount));
 		return XFS_ERROR(EIO);
 	}
@@ -1026,7 +1021,7 @@ xfs_dir_leaf_compact(xfs_trans_t *trans, xfs_dabuf_t *bp, int musthave,
 	xfs_dir_leaf_hdr_t *hdr_s, *hdr_d;
 	xfs_mount_t *mp;
 	char *tmpbuffer;
-	char *tmpbuffer2;
+	char *tmpbuffer2=NULL;
 	int rval;
 	int lbsize;
 
@@ -1042,7 +1037,7 @@ xfs_dir_leaf_compact(xfs_trans_t *trans, xfs_dabuf_t *bp, int musthave,
 	 */
 	if (musthave || justcheck) {
 	        tmpbuffer2 = kmem_alloc(lbsize, KM_SLEEP);
-	  	bcopy(bp->data, tmpbuffer2, lbsize);
+      	  	bcopy(bp->data, tmpbuffer2, lbsize);
 	} 
 	bzero(bp->data, lbsize);
 
@@ -1936,7 +1931,7 @@ xfs_dir_leaf_getdents_int(
 	xfs_dablk_t	bno,
 	uio_t		*uio,
 	int		*eobp,
-	dirent_t	*dbp,
+	xfs_dirent_t	*dbp,
 	xfs_dir_put_t	put,
 	xfs_daddr_t		nextda)
 {
@@ -1946,7 +1941,7 @@ xfs_dir_leaf_getdents_int(
 	int			entno, want_entno, i, nextentno;
 	xfs_mount_t		*mp;
 	xfs_dahash_t		cookhash;
-	xfs_dahash_t		nexthash;
+	xfs_dahash_t		nexthash=0;
 #if (XFS_64 == 0)
 	xfs_dahash_t		lasthash;
 #endif
@@ -2030,7 +2025,7 @@ xfs_dir_leaf_getdents_int(
 	     ;
 		     entno >= 0 && i < INT_GET(leaf->hdr.count, ARCH_CONVERT);
 			     entry++, i++, (entno = nextentno)) {
-		int lastresid, retval;
+		int lastresid=0, retval;
 		xfs_dircook_t lastoffset;
 		xfs_dahash_t thishash;
 
@@ -2180,7 +2175,7 @@ xfs_dir_put_dirent32_direct(xfs_dir_put_args_t *pa)
 {
 	iovec_t *iovp;
 	int reclen, namelen;
-	irix5_dirent_t *idbp;
+	xfs_dirent32_t *idbp;
 	uio_t *uio;
 
 #if XFS_BIG_FILESYSTEMS
@@ -2190,14 +2185,14 @@ xfs_dir_put_dirent32_direct(xfs_dir_put_args_t *pa)
 	}
 #endif
 	namelen = pa->namelen;
-	reclen = IRIX5_DIRENTSIZE(namelen);
+	reclen = DIRENT32SIZE(namelen);
 	uio = pa->uio;
 	if (reclen > uio->uio_resid) {
 		pa->done = 0;
 		return 0;
 	}
 	iovp = uio->uio_iov;
-	idbp = (irix5_dirent_t *)iovp->iov_base;
+	idbp = (xfs_dirent32_t *)iovp->iov_base;
 	iovp->iov_base = (char *)idbp + reclen;
 	iovp->iov_len -= reclen;
 	uio->uio_resid -= reclen;
@@ -2217,7 +2212,7 @@ int
 xfs_dir_put_dirent32_uio(xfs_dir_put_args_t *pa)
 {
 	int		retval, reclen, namelen;
-	irix5_dirent_t	*idbp;
+	xfs_dirent32_t	*idbp;
 	uio_t		*uio;
 
 #if XFS_BIG_FILESYSTEMS
@@ -2228,13 +2223,13 @@ xfs_dir_put_dirent32_uio(xfs_dir_put_args_t *pa)
 #endif
 
 	namelen = pa->namelen;
-	reclen = IRIX5_DIRENTSIZE(namelen);
+	reclen = DIRENT32SIZE(namelen);
 	uio = pa->uio;
 	if (reclen > uio->uio_resid) {
 		pa->done = 0;
 		return 0;
 	}
-	idbp = (irix5_dirent_t *)pa->dbp;
+	idbp = (xfs_dirent32_t *)pa->dbp;
 	idbp->d_reclen = reclen;
 	idbp->d_ino = pa->ino;
 	idbp->d_off = pa->cook.o;
@@ -2253,7 +2248,7 @@ xfs_dir_put_dirent64_direct(xfs_dir_put_args_t *pa)
 {
 	iovec_t *iovp;
 	int reclen, namelen;
-	dirent_t *idbp;
+	xfs_dirent_t *idbp;
 	uio_t *uio;
 
 	namelen = pa->namelen;
@@ -2264,7 +2259,7 @@ xfs_dir_put_dirent64_direct(xfs_dir_put_args_t *pa)
 		return 0;
 	}
 	iovp = uio->uio_iov;
-	idbp = (dirent_t *)iovp->iov_base;
+	idbp = (xfs_dirent_t *)iovp->iov_base;
 	iovp->iov_base = (char *)idbp + reclen;
 	iovp->iov_len -= reclen;
 	uio->uio_resid -= reclen;
@@ -2284,7 +2279,7 @@ int
 xfs_dir_put_dirent64_uio(xfs_dir_put_args_t *pa)
 {
 	int		retval, reclen, namelen;
-	dirent_t	*idbp;
+	xfs_dirent_t	*idbp;
 	uio_t		*uio;
 
 	namelen = pa->namelen;

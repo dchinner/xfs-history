@@ -1009,7 +1009,6 @@ xfs_ialloc(
 	vnode_t		*vp;
 	uint		flags;
 	int		error;
-	int		i;
 
 	/*
 	 * Call the space management code to pick
@@ -1453,7 +1452,7 @@ xfs_itruncate_finish(
 	xfs_fsblock_t	first_block;
 	xfs_fileoff_t	first_unmap_block;
 	xfs_fileoff_t	last_block;
-	xfs_filblks_t	unmap_len;
+	xfs_filblks_t	unmap_len=0;
 	xfs_mount_t	*mp;
 	xfs_trans_t	*ntp;
 	int		done;
@@ -2877,7 +2876,6 @@ xfs_iflush(
 	xfs_chash_t		*ch;
 	xfs_inode_t		*iq;
 	int			clcount;	/* count of inodes clustered */
-	vnode_t			*vp;
 	int			bufwasdelwri;
 	enum { INT_DELWRI = (1 << 0), INT_ASYNC = (1 << 1) };
 	SPLDECL(s);
@@ -3480,10 +3478,10 @@ xfs_iaccess(
 	/*
 	 * Verify that the MAC policy allows the requested access.
 	 */
-	if (error = _MAC_XFS_IACCESS(ip, mode, cr))
+	if ((error = _MAC_XFS_IACCESS(ip, mode, cr)))
 		return XFS_ERROR(error);
 	
-	if ((mode & IWRITE) && !WRITEALLOWED(XFS_ITOV(ip)))
+   	if ((mode & IWRITE) && !WRITEALLOWED(XFS_ITOV(ip)))
 		return XFS_ERROR(EROFS);
 
 	/*

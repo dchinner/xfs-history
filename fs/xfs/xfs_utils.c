@@ -565,9 +565,9 @@ xfs_truncate_file(
 	xfs_itruncate_start(ip, XFS_ITRUNC_DEFINITE, (xfs_fsize_t)0);
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_TRUNCATE_FILE);
-	if (error = xfs_trans_reserve(tp, 0, XFS_ITRUNCATE_LOG_RES(mp), 0,
+	if ((error = xfs_trans_reserve(tp, 0, XFS_ITRUNCATE_LOG_RES(mp), 0,
 				      XFS_TRANS_PERM_LOG_RES,
-				      XFS_ITRUNCATE_LOG_COUNT)) {
+				      XFS_ITRUNCATE_LOG_COUNT))) {
 		xfs_trans_cancel(tp, 0);
 		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 		return error;
@@ -620,7 +620,7 @@ xfs_get_fsinfo(int fd, char **fsname, int64_t *fsid)
 	xfs_mount_t *mp;
 	int error;
 
-	if (error = xfs_fd_to_mp(fd, 0, &mp, 1))
+	if ((error = xfs_fd_to_mp(fd, 0, &mp, 1)))
 		return XFS_ERROR(error);
 
 	*fsname = mp->m_fsname;

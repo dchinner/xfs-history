@@ -264,7 +264,7 @@ STATIC int linvfs_fsync(
  * We need to build a uio, cred, ...
  */
 
-#define nextdp(dp)      ((struct dirent *)((char *)(dp) + (dp)->d_reclen))
+#define nextdp(dp)      ((struct xfs_dirent *)((char *)(dp) + (dp)->d_reclen))
 
 STATIC int linvfs_readdir(
 	struct file *filp,
@@ -281,7 +281,7 @@ STATIC int linvfs_readdir(
 	int			namelen, size = 0;
 	size_t			rlen = PAGE_CACHE_SIZE << 2;
 	off_t			start_offset;
-	dirent_t		*dbp = NULL;
+	xfs_dirent_t		*dbp = NULL;
 
         vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
 
@@ -315,7 +315,7 @@ STATIC int linvfs_readdir(
 		}
 
 		size = rlen - uio.uio_resid;
-		dbp = (dirent_t *)read_buf;
+		dbp = (xfs_dirent_t *)read_buf;
 		while (size > 0) {
 			namelen = strlen(dbp->d_name);
 

@@ -102,7 +102,6 @@ int
 xfs_errortag_add(int error_tag, xfs_mount_t *mp)
 {
 	int i;
-	int error;
 	int len;
 	int64_t fsid;
 
@@ -137,7 +136,6 @@ int
 xfs_errortag_clear(int error_tag, xfs_mount_t *mp)
 {
 	int i;
-	int error;
 	int64_t fsid;
 
 	bcopy(mp->m_fixedfsid, &fsid, sizeof(fsid_t));
@@ -191,7 +189,6 @@ xfs_errortag_clearall_umount(int64_t fsid, char *fsname, int loud)
 int
 xfs_errortag_clearall(xfs_mount_t *mp)
 {
-	int error;
 	int64_t fsid;
 
 	bcopy(mp->m_fixedfsid, &fsid, sizeof(fsid_t));

@@ -162,7 +162,7 @@ xfs_attr_shortform_remove(xfs_da_args_t *args)
 {
 	xfs_attr_shortform_t *sf;
 	xfs_attr_sf_entry_t *sfe;
-	int base, size, end, totsize, i;
+	int base, size=0, end, totsize, i;
 	xfs_inode_t *dp;
 
 	/*
@@ -2689,7 +2689,7 @@ xfs_attr_node_inactive(xfs_trans_t **trans, xfs_inode_t *dp, xfs_dabuf_t *bp,
 		/*
 		 * Atomically commit the whole invalidate stuff.
 		 */
-		if (error = xfs_attr_rolltrans(trans, dp))
+		if ((error = xfs_attr_rolltrans(trans, dp)))
 			return (error);
 	}
 
@@ -2835,7 +2835,7 @@ xfs_attr_leaf_freextent(xfs_trans_t **trans, xfs_inode_t *dp,
 			/*
 			 * Roll to next transaction.
 			 */
-			if (error = xfs_attr_rolltrans(trans, dp))
+			if ((error = xfs_attr_rolltrans(trans, dp)))
 				return (error);
 		}
 
@@ -2877,7 +2877,7 @@ xfs_attr_rolltrans(xfs_trans_t **transp, xfs_inode_t *dp)
 	 * is in progress. The caller takes the responsibility to cancel
 	 * the duplicate transaction that gets returned.
 	 */
-	if (error = xfs_trans_commit(trans, 0, NULL))
+	if ((error = xfs_trans_commit(trans, 0, NULL)))
 		return (error);
 
 	trans = *transp;

@@ -119,7 +119,7 @@ xfs_attr_get(bhv_desc_t *bdp, char *name, char *value, int *valuelenp,
 	 * Do we answer them, or ignore them?
 	 */
 	xfs_ilock(args.dp, XFS_ILOCK_SHARED);
-	if (error = xfs_iaccess(XFS_BHVTOI(bdp), IREAD, cred)) {
+	if ((error = xfs_iaccess(XFS_BHVTOI(bdp), IREAD, cred))) {
 		xfs_iunlock(args.dp, XFS_ILOCK_SHARED);
                 return(XFS_ERROR(error));
 	}
@@ -180,7 +180,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 		return (EIO);
 
 	xfs_ilock(dp, XFS_ILOCK_SHARED);
-	if (error = xfs_iaccess(dp, IWRITE, cred)) {
+	if ((error = xfs_iaccess(dp, IWRITE, cred))) {
 		xfs_iunlock(dp, XFS_ILOCK_SHARED);
                 return(XFS_ERROR(error));
 	}
@@ -190,7 +190,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	 * Attach the dquots to the inode.
 	 */
 	if (XFS_IS_QUOTA_ON(mp)) {
-		if (error = xfs_qm_dqattach(dp, 0))
+		if ((error = xfs_qm_dqattach(dp, 0)))
 			return (error);
 	}
 	
@@ -262,17 +262,17 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	if (rsvd)
 		args.trans->t_flags |= XFS_TRANS_RESERVE;
 
-	if (error = xfs_trans_reserve(args.trans, (uint) nblks,
+	if ((error = xfs_trans_reserve(args.trans, (uint) nblks,
 				      XFS_ATTRSET_LOG_RES(mp, nblks),
 				      0, XFS_TRANS_PERM_LOG_RES,
-				      XFS_ATTRSET_LOG_COUNT)) {
+				      XFS_ATTRSET_LOG_COUNT))) {
 		xfs_trans_cancel(args.trans, 0);
 		return(error);
 	}
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
 
 	if (XFS_IS_QUOTA_ON(mp)) {
-		if (error = xfs_trans_reserve_blkquota(args.trans, dp, nblks)) {
+		if ((error = xfs_trans_reserve_blkquota(args.trans, dp, nblks))) {
 			xfs_iunlock(dp, XFS_ILOCK_EXCL);
 			xfs_trans_cancel(args.trans, XFS_TRANS_RELEASE_LOG_RES);
 			return (error);
@@ -360,7 +360,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 		 * Commit the leaf transformation.  We'll need another (linked)
 		 * transaction to add the new attribute to the leaf.
 		 */
-		if (error = xfs_attr_rolltrans(&args.trans, dp))
+		if ((error = xfs_attr_rolltrans(&args.trans, dp)))
 			goto out;
 			
 	}
@@ -438,7 +438,7 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 		return (EIO);
 
 	xfs_ilock(dp, XFS_ILOCK_SHARED);
-	if (error = xfs_iaccess(dp, IWRITE, cred)) {
+	if ((error = xfs_iaccess(dp, IWRITE, cred))) {
 		xfs_iunlock(dp, XFS_ILOCK_SHARED);	
                 return(XFS_ERROR(error));
 	} else if (XFS_IFORK_Q(dp) == 0 ||
@@ -468,7 +468,7 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	 */
 	if (XFS_IS_QUOTA_ON(mp)) {
 		if (XFS_NOT_DQATTACHED(mp, dp)) {
-			if (error = xfs_qm_dqattach(dp, 0))
+			if ((error = xfs_qm_dqattach(dp, 0)))
 				return (error);
 		}
 	}
@@ -492,11 +492,11 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	if (flags & ATTR_ROOT)
 		args.trans->t_flags |= XFS_TRANS_RESERVE;
 
-	if (error = xfs_trans_reserve(args.trans,
+	if ((error = xfs_trans_reserve(args.trans,
 				      XFS_ATTRRM_SPACE_RES(mp),
 				      XFS_ATTRRM_LOG_RES(mp),
 				      0, XFS_TRANS_PERM_LOG_RES,
-				      XFS_ATTRRM_LOG_COUNT)) {
+				      XFS_ATTRRM_LOG_COUNT))) {
 		xfs_trans_cancel(args.trans, 0);
 		return(error);
 	
@@ -618,7 +618,7 @@ xfs_attr_list(bhv_desc_t *bdp, char *buffer, int bufsize, int flags,
 	 * Do they have permission?
 	 */
 	xfs_ilock(dp, XFS_ILOCK_SHARED);
-	if (error = xfs_iaccess(dp, IREAD, cred)) {
+	if ((error = xfs_iaccess(dp, IREAD, cred))) {
 		xfs_iunlock(dp, XFS_ILOCK_SHARED);
                 return(XFS_ERROR(error));
 	}
@@ -677,9 +677,9 @@ xfs_attr_inactive(xfs_inode_t *dp)
 	 * the log.
 	 */
 	trans = xfs_trans_alloc(mp, XFS_TRANS_ATTRINVAL);
-	if (error = xfs_trans_reserve(trans, 0, XFS_ATTRINVAL_LOG_RES(mp), 0,
+	if ((error = xfs_trans_reserve(trans, 0, XFS_ATTRINVAL_LOG_RES(mp), 0,
 				      XFS_TRANS_PERM_LOG_RES,
-				      XFS_ATTRINVAL_LOG_COUNT)) {
+				      XFS_ATTRINVAL_LOG_COUNT))) {
 		xfs_trans_cancel(trans, 0);
 		return(error);
 	}
@@ -713,9 +713,9 @@ xfs_attr_inactive(xfs_inode_t *dp)
 	 * and the unlink transaction has already hit the disk so
 	 * async inactive transactions are safe.
 	 */
-	if (error = xfs_itruncate_finish(&trans, dp, 0LL, XFS_ATTR_FORK,
+	if ((error = xfs_itruncate_finish(&trans, dp, 0LL, XFS_ATTR_FORK,
 				(!(mp->m_flags & XFS_MOUNT_WSYNC)
-				 ? 1 : 0)))
+				 ? 1 : 0))))
 		goto out;
 
 	/*
@@ -859,7 +859,7 @@ xfs_attr_leaf_addname(xfs_da_args_t *args)
 		 * Commit the current trans (including the inode) and start
 		 * a new one.
 		 */
-		if (error = xfs_attr_rolltrans(&args->trans, dp))
+		if ((error = xfs_attr_rolltrans(&args->trans, dp)))
 			return (error);
 
 		/*
@@ -873,7 +873,7 @@ xfs_attr_leaf_addname(xfs_da_args_t *args)
 	 * Commit the transaction that added the attr name so that
 	 * later routines can manage their own transactions.
 	 */
-	if (error = xfs_attr_rolltrans(&args->trans, dp))
+	if ((error = xfs_attr_rolltrans(&args->trans, dp)))
 		return (error);
 
 	/*
@@ -1194,7 +1194,7 @@ restart:
 			 * Commit the node conversion and start the next
 			 * trans in the chain.
 			 */
-			if (error = xfs_attr_rolltrans(&args->trans, dp))
+			if ((error = xfs_attr_rolltrans(&args->trans, dp)))
 				goto out;
 
 			goto restart;
@@ -1245,7 +1245,7 @@ restart:
 	 * Commit the leaf addition or btree split and start the next
 	 * trans in the chain.
 	 */
-	if (error = xfs_attr_rolltrans(&args->trans, dp))
+	if ((error = xfs_attr_rolltrans(&args->trans, dp)))
 		goto out;
 
 	/*
@@ -1345,7 +1345,7 @@ restart:
 		/*
 		 * Commit and start the next trans in the chain.
 		 */
-		if (error = xfs_attr_rolltrans(&args->trans, dp))
+		if ((error = xfs_attr_rolltrans(&args->trans, dp)))
 			goto out;
 
 	} else if (args->rmtblkno > 0) {
@@ -1476,7 +1476,7 @@ xfs_attr_node_removename(xfs_da_args_t *args)
 		/*
 		 * Commit the Btree join operation and start a new trans.
 		 */
-		if (error = xfs_attr_rolltrans(&args->trans, dp))
+		if ((error = xfs_attr_rolltrans(&args->trans, dp)))
 			goto out;
 	}
 
@@ -1963,7 +1963,7 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 		/*
 		 * Start the next trans in the chain.
 		 */
-		if (error = xfs_attr_rolltrans(&args->trans, dp))
+		if ((error = xfs_attr_rolltrans(&args->trans, dp)))
 			return (error);
 	}
 
@@ -2005,7 +2005,7 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 		xfs_biomove(bp, 0, tmp, src, XFS_B_WRITE);
 		if (tmp < XFS_BUF_SIZE(bp))
 			xfs_biozero(bp, tmp, XFS_BUF_SIZE(bp) - tmp);
-		if (error = xfs_bwrite(mp, bp)) {/* GROT: NOTE: synchronous write */
+		if ((error = xfs_bwrite(mp, bp))) {/* GROT: NOTE: synchronous write */
 			return (error);
 		}
 		src += tmp;
@@ -2111,7 +2111,7 @@ xfs_attr_rmtval_remove(xfs_da_args_t *args)
 		/*
 		 * Close out trans and start the next one in the chain.
 		 */
-		if (error = xfs_attr_rolltrans(&args->trans, args->dp))
+		if ((error = xfs_attr_rolltrans(&args->trans, args->dp)))
 			return (error);
 	}
 	return(0);

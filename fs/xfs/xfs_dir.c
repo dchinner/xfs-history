@@ -122,7 +122,7 @@ STATIC int xfs_dir_leaf_removename(xfs_da_args_t *args, int *number_entries,
 						 int *total_namebytes);
 STATIC int xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					     uio_t *uio, int *eofp,
-					     dirent_t *dbp,
+					     xfs_dirent_t *dbp,
 					     xfs_dir_put_t put);
 STATIC int xfs_dir_leaf_replace(xfs_da_args_t *args);
 
@@ -134,7 +134,7 @@ STATIC int xfs_dir_node_lookup(xfs_da_args_t *args);
 STATIC int xfs_dir_node_removename(xfs_da_args_t *args);
 STATIC int xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					     uio_t *uio, int *eofp,
-					     dirent_t *dbp,
+					     xfs_dirent_t *dbp,
 					     xfs_dir_put_t put);
 STATIC int xfs_dir_node_replace(xfs_da_args_t *args);
 
@@ -215,7 +215,7 @@ xfs_dir_init(xfs_trans_t *trans, xfs_inode_t *dir, xfs_inode_t *parent_dir)
 	args.trans = trans;
 
 	ASSERT((dir->i_d.di_mode & IFMT) == IFDIR);
-	if (error = xfs_dir_ino_validate(trans->t_mountp, parent_dir->i_ino))
+	if ((error = xfs_dir_ino_validate(trans->t_mountp, parent_dir->i_ino)))
 		return error;
 
 	return(xfs_dir_shortform_create(&args, parent_dir->i_ino));
@@ -235,7 +235,7 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 
-	if (retval = xfs_dir_ino_validate(trans->t_mountp, inum))
+	if ((retval = xfs_dir_ino_validate(trans->t_mountp, inum)))
 		return (retval);
 
 	XFS_STATS_INC(xs_dir_create);
@@ -429,10 +429,9 @@ xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 static int							/* error */
 xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 {
-	dirent_t *dbp;
-	int locklen = 0, alignment, retval, is32;
+	xfs_dirent_t *dbp;
+	int  alignment, retval, is32;
 	xfs_dir_put_t put;
-	int error;
 
 	XFS_STATS_INC(xs_dir_getdents);
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
@@ -496,7 +495,7 @@ xfs_dir_replace(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 		return(XFS_ERROR(EINVAL));
 	}
 
-	if (retval = xfs_dir_ino_validate(trans->t_mountp, inum))
+	if ((retval = xfs_dir_ino_validate(trans->t_mountp, inum)))
 		return retval;
 
 	/*
@@ -670,7 +669,7 @@ xfs_dir_leaf_lookup(xfs_da_args_t *args)
  */
 STATIC int
 xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
-				  int *eofp, dirent_t *dbp, xfs_dir_put_t put)
+				  int *eofp, xfs_dirent_t *dbp, xfs_dir_put_t put)
 {
 	xfs_dabuf_t *bp;
 	int retval, eob;
@@ -872,7 +871,7 @@ xfs_dir_node_lookup(xfs_da_args_t *args)
 
 STATIC int
 xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
-				  int *eofp, dirent_t *dbp, xfs_dir_put_t put)
+				  int *eofp, xfs_dirent_t *dbp, xfs_dir_put_t put)
 {
 	xfs_da_intnode_t *node;
 	xfs_da_node_entry_t *btree;
@@ -984,7 +983,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 			return XFS_ERROR(EFSCORRUPTED);
 		}
 		xfs_dir_trace_g_dul("node: leaf detail", dp, uio, leaf);
-		if (nextbno = INT_GET(leaf->hdr.info.forw, ARCH_CONVERT)) {
+		if ((nextbno = INT_GET(leaf->hdr.info.forw, ARCH_CONVERT))) {
 			nextda = xfs_da_reada_buf(trans, dp, nextbno,
 						  XFS_DATA_FORK);
 		} else

@@ -710,7 +710,7 @@ xfs_log_write(xfs_mount_t *	mp,
 	if (XLOG_FORCED_SHUTDOWN(log))
 		return XFS_ERROR(EIO);
 
-	if (error = xlog_write(mp, reg, nentries, tic, start_lsn, 0)) {
+	if ((error = xlog_write(mp, reg, nentries, tic, start_lsn, 0))) {
 		xfs_force_shutdown(mp, XFS_LOG_IO_ERROR);
 	}
 	return (error);
@@ -749,7 +749,7 @@ xfs_log_move_tail(xfs_mount_t	*mp,
 	if (tail_lsn != 1)
 		log->l_tail_lsn = tail_lsn;
 
-	if (tic = log->l_write_headq) {
+	if ((tic = log->l_write_headq)) {
 #ifdef DEBUG
 		if (log->l_flags & XLOG_ACTIVE_RECOVERY)
 			panic("Recovery problem");
@@ -767,7 +767,7 @@ xfs_log_move_tail(xfs_mount_t	*mp,
 			tic = tic->t_next;
 		} while (tic != log->l_write_headq);
 	}
-	if (tic = log->l_reserve_headq) {
+	if ((tic = log->l_reserve_headq)) {
 #ifdef DEBUG
 		if (log->l_flags & XLOG_ACTIVE_RECOVERY)
 			panic("Recovery problem");
@@ -1114,7 +1114,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	xlog_t			*log;
 	xlog_rec_header_t	*head;
 	xlog_in_core_t		**iclogp;
-	xlog_in_core_t		*iclog, *prev_iclog;
+	xlog_in_core_t		*iclog, *prev_iclog=NULL;
 	xfs_buf_t			*bp;
 	int			i;
 	int			iclogsize;
@@ -1234,8 +1234,8 @@ xlog_commit_record(xfs_mount_t  *mp,
 	reg[0].i_addr = 0;
 	reg[0].i_len = 0;
 
-	if (error = xlog_write(mp, reg, 1, ticket, commitlsnp, 
-			       XLOG_COMMIT_TRANS)) {
+	if ((error = xlog_write(mp, reg, 1, ticket, commitlsnp, 
+			       XLOG_COMMIT_TRANS))) {
 		xfs_force_shutdown(mp, XFS_LOG_IO_ERROR);
 	}
 	return (error);
@@ -1411,7 +1411,7 @@ xlog_sync(xlog_t		*log,
 	 * is shutting down.
 	 */
 	XFS_BUF_WRITE(bp);
-	if (error = XFS_bwrite(bp)) {
+	if ((error = XFS_bwrite(bp))) {
 		xfs_ioerror_alert("xlog_sync", log->l_mp, XFS_BUF_TARGET(bp), 
 				  XFS_BUF_ADDR(bp));
 		current->flags = save_flags;
@@ -1448,7 +1448,7 @@ xlog_sync(xlog_t		*log,
 		/* account for internal log which does't start at block #0 */
 		XFS_BUF_SET_ADDR(bp, XFS_BUF_ADDR(bp) + log->l_logBBstart);
 		XFS_BUF_WRITE(bp);
-		if (error = XFS_bwrite(bp)) {
+		if ((error = XFS_bwrite(bp))) {
 			xfs_ioerror_alert("xlog_sync (split)", log->l_mp, 
 					  XFS_BUF_TARGET(bp), XFS_BUF_ADDR(bp));
 			current->flags = save_flags;
@@ -1616,8 +1616,8 @@ xlog_write(xfs_mount_t *	mp,
 	ticket->t_curr_res -= len;
     
     for (index = 0; index < nentries; ) {
-	if (error = xlog_state_get_iclog_space(log, len, &iclog, ticket, 
-					       &contwr, &log_offset))
+	if ((error = xlog_state_get_iclog_space(log, len, &iclog, ticket, 
+					       &contwr, &log_offset)))
 		return (error);
 
 	ASSERT(log_offset <= iclog->ic_size - 1);
@@ -1719,7 +1719,7 @@ xlog_write(xfs_mount_t *	mp,
 	    firstwr = 0;
 	    if (partial_copy) {			/* copied partial region */
 		    /* already marked WANT_SYNC by xlog_state_get_iclog_space */
-		    if (error = xlog_state_release_iclog(log, iclog))
+		    if ((error = xlog_state_release_iclog(log, iclog)))
 			    return (error);
 		    break;			/* don't increment index */
 	    } else {				/* copied entire region */
@@ -1728,7 +1728,7 @@ xlog_write(xfs_mount_t *	mp,
 
 		if (iclog->ic_size - log_offset <= sizeof(xlog_op_header_t)) {
 		    xlog_state_want_sync(log, iclog);
-		    if (error = xlog_state_release_iclog(log, iclog))
+		    if ((error = xlog_state_release_iclog(log, iclog)))
 			   return (error); 
 		    if (index == nentries)
 			    return 0;		/* we are done */
@@ -1765,9 +1765,6 @@ xlog_state_clean_log(xlog_t *log)
 	xlog_in_core_t	*iclog;
 	int changed = 0;
 
-#ifdef DEBUG
-	int niclogws = 0;
-#endif
 	iclog = log->l_iclog;
 	do {
 		if (iclog->ic_state == XLOG_STATE_DIRTY) {
@@ -2236,7 +2233,7 @@ restart:
 		/* If I'm the only one writing to this iclog, sync it to disk */
 		if (iclog->ic_refcnt == 1) {
 			LOG_UNLOCK(log, spl);
-			if (error = xlog_state_release_iclog(log, iclog))
+			if ((error = xlog_state_release_iclog(log, iclog)))
 				return (error);
 		} else {
 			iclog->ic_refcnt--;
@@ -2424,7 +2421,7 @@ xlog_regrant_write_log_space(xlog_t	   *log,
 	 * this transaction.
 	 */
 
-	if (ntic = log->l_write_headq) {
+	if ((ntic = log->l_write_headq)) {
 		free_bytes = xlog_space_left(log, log->l_grant_write_cycle,
 					     log->l_grant_write_bytes);
 		do {
@@ -3468,14 +3465,14 @@ xfs_log_force_umount(
 	 * that we don't enqueue anything once the SHUTDOWN flag
 	 * is set, and this action is protected by the GRANTLOCK.
 	 */
-	if (tic = log->l_reserve_headq) {
+	if ((tic = log->l_reserve_headq)) {
 		do {
 			sv_signal(&tic->t_sema);
 			tic = tic->t_next;
 		} while (tic != log->l_reserve_headq);
 	}
 	
-	if (tic = log->l_write_headq) {
+	if ((tic = log->l_write_headq)) {
 		do {
 			sv_signal(&tic->t_sema);
 			tic = tic->t_next;

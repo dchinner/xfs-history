@@ -476,7 +476,7 @@ xfs_rename_error_checks(
 	}
 
 	/* Do some generic error tests now that we have the lock */
-	if (error = xfs_pre_rename(XFS_ITOV(src_ip))) {
+	if ((error = xfs_pre_rename(XFS_ITOV(src_ip)))) {
 		error = XFS_ERROR(error);
 		*status = __LINE__;
 		goto error_return;
@@ -576,14 +576,14 @@ xfs_rename_target_checks(
 			goto error_return;
 		}
 
-		if (error = xfs_pre_rmdir(XFS_ITOV(target_ip))) {
+		if ((error = xfs_pre_rmdir(XFS_ITOV(target_ip)))) {
 			error = XFS_ERROR(error);
 			rename_which_error_return = __LINE__;
 			goto error_return;
 		}
 
 	} else {
-		if (error = xfs_pre_remove(XFS_ITOV(target_ip))) {
+		if ((error = xfs_pre_remove(XFS_ITOV(target_ip)))) {
 			error = XFS_ERROR(error);
 			rename_which_error_return = __LINE__;
 			goto error_return;
@@ -758,7 +758,7 @@ xfs_rename(
 	 * Attach the dquots to the inodes
 	 */
 	if (XFS_IS_QUOTA_ON(mp)) {
-		if (error = xfs_qm_vop_rename_dqattach(inodes)) {
+		if ((error = xfs_qm_vop_rename_dqattach(inodes))) {
 			xfs_trans_cancel(tp, cancel_flags);
 			rename_which_error_return = __LINE__;
 			goto rele_return;

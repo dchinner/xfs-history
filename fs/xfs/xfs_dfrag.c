@@ -42,20 +42,20 @@ xfs_swapext(
 	xfs_swapext_t   *sxp)
 {
 	xfs_swapext_t 	sx;
-        xfs_inode_t     *ip, *tip, *ips[2];
+	xfs_inode_t     *ip=NULL, *tip=NULL, *ips[2];
 	xfs_trans_t     *tp;
 	xfs_mount_t     *mp;
 	xfs_bstat_t	*sbp;
 	struct file	*fp = NULL, *tfp = NULL;
 	vnode_t 	*vp, *tvp;
-        bhv_desc_t      *bdp, *tbdp;
-        vn_bhv_head_t   *bhp, *tbhp;
-	uint		lock_flags;
+	bhv_desc_t      *bdp, *tbdp;
+	vn_bhv_head_t   *bhp, *tbhp;
+	uint		lock_flags=0;
 	int		ilf_fields, tilf_fields;
 	int		error = 0;
 	xfs_ifork_t	tempif, *ifp, *tifp;
 	__uint64_t	tmp;
-	__uint64_t	cxfs_val;
+/*	__uint64_t	cxfs_val; */
 	int		aforkblks = 0;
 	int		taforkblks = 0;
 	int		locked = 0;
@@ -139,10 +139,10 @@ xfs_swapext(
 	xfs_lock_inodes(ips, 2, 0, lock_flags);
 
 	/* Check permissions */
-        if (error = _MAC_XFS_IACCESS(ip, MACWRITE, NULL)) {
+        if ((error = _MAC_XFS_IACCESS(ip, MACWRITE, NULL))) {
 		goto error0;
 	}
-        if (error = _MAC_XFS_IACCESS(tip, MACWRITE, NULL)) {
+        if ((error = _MAC_XFS_IACCESS(tip, MACWRITE, NULL))) {
 		goto error0;
 	}
 	if ((current->fsuid != ip->i_d.di_uid) &&
@@ -244,9 +244,9 @@ xfs_swapext(
 	VN_FLAGCLR(vp, VREMAPPING);
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_SWAPEXT);
-	if (error = xfs_trans_reserve(tp, 0,
+	if ((error = xfs_trans_reserve(tp, 0,
 				     XFS_ICHANGE_LOG_RES(mp), 0,
-				     0, 0)) {
+				     0, 0))) {
 		xfs_iunlock(ip,  XFS_IOLOCK_EXCL);
 		xfs_iunlock(tip, XFS_IOLOCK_EXCL);
 		xfs_trans_cancel(tp, 0);

@@ -63,7 +63,6 @@ xfs_quotactl(
 	int		type,
 	xfs_caddr_t	addr)
 {
-	int 		error;
 
 #ifdef QUOTADEBUG
 	static int count = 0;
@@ -308,7 +307,7 @@ xfs_qm_scall_quotaoff(
 	 * So, if we couldn't purge all the dquots from the filesystem,
 	 * we can't get rid of the incore data structures.
 	 */
-	while (nculprits = xfs_qm_dqpurge_all(mp, dqtype|XFS_QMOPT_QUOTAOFF)) {
+	while ((nculprits = xfs_qm_dqpurge_all(mp, dqtype|XFS_QMOPT_QUOTAOFF))) {
 		delay(10 * nculprits);
 	}
 
@@ -492,7 +491,7 @@ xfs_qm_scall_quotaon(
 		return XFS_ERROR(EEXIST);
 	sbflags |= XFS_SB_QFLAGS;
 
-	if (error = xfs_qm_write_sb_changes(mp, sbflags))
+	if ((error = xfs_qm_write_sb_changes(mp, sbflags)))
 		return (error);
 	/*
 	 * If we had just turned on quotas (ondisk) for rootfs, or if we aren't
@@ -627,8 +626,8 @@ xfs_qm_scall_setqlim(
 		return (0);
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_QM_SETQLIM); 
-	if (error = xfs_trans_reserve(tp, 0, sizeof(xfs_disk_dquot_t) + 128,
-				      0, 0, XFS_DEFAULT_LOG_COUNT)) {
+	if ((error = xfs_trans_reserve(tp, 0, sizeof(xfs_disk_dquot_t) + 128,
+				      0, 0, XFS_DEFAULT_LOG_COUNT))) {
 		xfs_trans_cancel(tp, 0);
 		return (error);
 	}
@@ -645,7 +644,7 @@ xfs_qm_scall_setqlim(
 	 * Get the dquot (locked), and join it to the transaction.
 	 * Allocate the dquot if this doesn't exist.
 	 */
-	if (error = xfs_qm_dqget(mp, NULL, id, type, XFS_QMOPT_DQALLOC, &dqp)) {
+	if ((error = xfs_qm_dqget(mp, NULL, id, type, XFS_QMOPT_DQALLOC, &dqp))) {
 		xfs_trans_cancel(tp, XFS_TRANS_ABORT);
 		mutex_unlock(&(XFS_QI_QOFFLOCK(mp)));
 		ASSERT(error != ENOENT);
@@ -772,7 +771,7 @@ xfs_qm_scall_getquota(
 	 * we aren't passing the XFS_QMOPT_DOALLOC flag. If it doesn't
 	 * exist, we'll get ENOENT back.
 	 */
-	if (error = xfs_qm_dqget(mp, NULL, id, type, 0, &dqp)) {
+	if ((error = xfs_qm_dqget(mp, NULL, id, type, 0, &dqp))) {
 		return (error);
 	}
 
@@ -808,8 +807,8 @@ xfs_qm_log_quotaoff_end(
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_QM_QUOTAOFF_END);
 
-	if (error = xfs_trans_reserve(tp, 0, sizeof(xfs_qoff_logitem_t) * 2,
-				      0, 0, XFS_DEFAULT_LOG_COUNT)) {
+	if ((error = xfs_trans_reserve(tp, 0, sizeof(xfs_qoff_logitem_t) * 2,
+				      0, 0, XFS_DEFAULT_LOG_COUNT))) {
 		xfs_trans_cancel(tp, 0);
 		return (error);
 	}
@@ -837,16 +836,16 @@ xfs_qm_log_quotaoff(
 {
 	xfs_trans_t	       *tp;
 	int 			error, s;
-	xfs_qoff_logitem_t     *qoffi;
-	uint			oldsbqflag;
+	xfs_qoff_logitem_t     *qoffi=NULL;
+	uint			oldsbqflag=0;
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_QM_QUOTAOFF);
-	if (error = xfs_trans_reserve(tp, 0, 
+	if ((error = xfs_trans_reserve(tp, 0, 
 				      sizeof(xfs_qoff_logitem_t) * 2 +
 				      mp->m_sb.sb_sectsize + 128,
 				      0,
 				      0, 
-				      XFS_DEFAULT_LOG_COUNT)) {
+				      XFS_DEFAULT_LOG_COUNT))) {
 		goto error0;
 	}
 
@@ -1181,7 +1180,7 @@ STATIC void
 xfs_qm_hashinsert(xfs_dqhash_t *h, xfs_dqtest_t *dqp)
 {							
 	xfs_dquot_t *d;			
-	if ((d) = (h)->qh_next)		
+	if (((d) = (h)->qh_next))
 		(d)->HL_PREVP = &((dqp)->HL_NEXT);	
 	(dqp)->HL_NEXT = d;			
 	(dqp)->HL_PREVP = &((h)->qh_next);		
@@ -1274,8 +1273,8 @@ xfs_dqtest_cmp(
 	int		error;
 
 	/* xfs_qm_dqtest_print(d); */
-	if (error = xfs_qm_dqget(d->q_mount, NULL, d->d_id, d->dq_flags, 0,
-				 &dqp)) {
+	if ((error = xfs_qm_dqget(d->q_mount, NULL, d->d_id, d->dq_flags, 0,
+				 &dqp))) {
 		xfs_qm_dqtest_failed(d, NULL, "dqget failed", 0, 0, error);
 		return;
 	}
@@ -1361,7 +1360,7 @@ xfs_qm_internalqcheck_adjust(
 	ipreleased = B_FALSE;
  again:
 	lock_flags = XFS_ILOCK_SHARED;
-        if (error = xfs_iget(mp, tp, ino, lock_flags, &ip, bno)) {
+        if ((error = xfs_iget(mp, tp, ino, lock_flags, &ip, bno))) {
 		*res = BULKSTAT_RV_NOTHING;
                 return (error);
 	}
@@ -1439,9 +1438,9 @@ xfs_qm_internalqcheck(
 		 * Iterate thru all the inodes in the file system,
 		 * adjusting the corresponding dquot counters
 		 */
-		if (error = xfs_bulkstat(mp, NULL, &lastino, &count, 
+		if ((error = xfs_bulkstat(mp, NULL, &lastino, &count, 
 				 xfs_qm_internalqcheck_adjust,
-				 0, NULL, BULKSTAT_FG_IGET, &done)) {
+				 0, NULL, BULKSTAT_FG_IGET, &done))) {
 			break;
 		}
 	} while (! done);

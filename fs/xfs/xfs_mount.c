@@ -361,7 +361,7 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	XFS_BUF_READ(bp);
 	XFS_BUF_SET_TARGET(bp, mp->m_ddev_targp);
 	xfsbdstrat(mp, bp);
-	if (error = xfs_iowait(bp)) {
+	if ((error = xfs_iowait(bp))) {
 		cmn_err(CE_WARN, "XFS: SB read failed");
 		goto err;
 	}
@@ -372,7 +372,7 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	 */
 	sbp = XFS_BUF_TO_SBP(bp);
         xfs_xlatesb(XFS_BUF_PTR(bp), &(mp->m_sb), 1, ARCH_CONVERT, XFS_SB_ALL_BITS);
-	if (error = xfs_mount_validate_sb(mp, &(mp->m_sb))) {
+	if ((error = xfs_mount_validate_sb(mp, &(mp->m_sb)))) {
 		cmn_err(CE_WARN, "XFS: SB validate failed");
 		goto err;
 	}
@@ -500,7 +500,7 @@ xfs_mountfs(
 
 	noio = dev == 0 && mp->m_sb_bp != NULL;
 	if (mp->m_sb_bp == NULL) {
-		if (error = xfs_readsb(mp, dev)) {
+		if ((error = xfs_readsb(mp, dev))) {
 			return (error);
 		}
 	}
@@ -738,7 +738,7 @@ xfs_mountfs(
 	/*
 	 * Initialize realtime fields in the mount structure
 	 */
-	if (error = xfs_rtmount_init(mp)) {
+	if ((error = xfs_rtmount_init(mp))) {
   		cmn_err(CE_WARN, "XFS: RT mount failed");
 		goto error1;
         }
@@ -860,7 +860,7 @@ xfs_mountfs(
 	/*
 	 * Initialize realtime inode pointers in the mount structure
 	 */
-	if (error = xfs_rtmount_inodes(mp)) {
+	if ((error = xfs_rtmount_inodes(mp))) {
 		/*
 		 * Free up the root inode.
 		 */
@@ -996,10 +996,10 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	 * None of the dquots should really be busy at this point.
 	 */
 	if (mp->m_quotainfo) {
-		while (ndquots = xfs_qm_dqpurge_all(mp, 
+		while ((ndquots = xfs_qm_dqpurge_all(mp, 
 						  XFS_QMOPT_UQUOTA|
 						  XFS_QMOPT_GQUOTA|
-						  XFS_QMOPT_UMOUNTING)) {
+						  XFS_QMOPT_UMOUNTING))) {
 			delay(ndquots * 10);
 		}
 	}
@@ -1353,7 +1353,7 @@ int
 xfs_mod_incore_sb_batch(xfs_mount_t *mp, xfs_mod_sb_t *msb, uint nmsb, int rsvd)
 {
 	int		s;
-	int		status;
+	int		status=0;
 	xfs_mod_sb_t	*msbp;
 
 	/*

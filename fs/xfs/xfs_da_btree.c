@@ -932,7 +932,7 @@ xfs_da_fixhashpath(xfs_da_state_t *state, xfs_da_state_path_t *path)
 	xfs_da_state_blk_t *blk;
 	xfs_da_intnode_t *node;
 	xfs_da_node_entry_t *btree;
-	xfs_dahash_t lasthash;
+	xfs_dahash_t lasthash=0;
 	int level, count;
 
 	level = path->active-1;
@@ -1260,7 +1260,7 @@ xfs_da_blk_link(xfs_da_state_t *state, xfs_da_state_blk_t *old_blk,
 {
 	xfs_da_blkinfo_t *old_info, *new_info, *tmp_info;
 	xfs_da_args_t *args;
-	int before, error;
+	int before=0, error;
 	xfs_dabuf_t *bp;
 
 	/*
@@ -1482,7 +1482,7 @@ xfs_da_path_shift(xfs_da_state_t *state, xfs_da_state_path_t *path,
 	xfs_da_blkinfo_t *info;
 	xfs_da_intnode_t *node;
 	xfs_da_args_t *args;
-	xfs_dablk_t blkno;
+	xfs_dablk_t blkno=0;
 	int level, error;
 
 	/*
@@ -1666,8 +1666,7 @@ xfs_da_grow_inode(xfs_da_args_t *args, xfs_dablk_t *new_blkno)
 	/*
 	 * Find a spot in the file space to put the new block.
 	 */
-	if (error = xfs_bmap_first_unused(tp, dp, count, &bno, w)) {
-#pragma mips_frequency_hint NEVER
+	if ((error = xfs_bmap_first_unused(tp, dp, count, &bno, w))) {
 		return error;
 	}
 	if (w == XFS_DATA_FORK && XFS_DIR_IS_V2(mp))
@@ -1677,12 +1676,11 @@ xfs_da_grow_inode(xfs_da_args_t *args, xfs_dablk_t *new_blkno)
 	 */
 	nmap = 1;
 	ASSERT(args->firstblock != NULL);
-	if (error = xfs_bmapi(tp, dp, bno, count,
+	if ((error = xfs_bmapi(tp, dp, bno, count,
 			XFS_BMAPI_AFLAG(w)|XFS_BMAPI_WRITE|XFS_BMAPI_METADATA|
 			XFS_BMAPI_CONTIG,
 			args->firstblock, args->total, &map, &nmap,
-			args->flist)) {
-#pragma mips_frequency_hint NEVER
+			args->flist))) {
 		return error;
 	}
 	ASSERT(nmap <= 1);
@@ -1695,16 +1693,15 @@ xfs_da_grow_inode(xfs_da_args_t *args, xfs_dablk_t *new_blkno)
 	 * try without the CONTIG flag.  Loop until we get it all.
 	 */
 	else if (nmap == 0 && count > 1) {
-#pragma mips_frequency_hint NEVER
 		mapp = kmem_alloc(sizeof(*mapp) * count, KM_SLEEP);
 		for (b = bno, mapi = 0; b < bno + count; ) {
 			nmap = MIN(XFS_BMAP_MAX_NMAP, count);
 			c = (int)(bno + count - b);
-			if (error = xfs_bmapi(tp, dp, b, c,
+			if ((error = xfs_bmapi(tp, dp, b, c,
 					XFS_BMAPI_AFLAG(w)|XFS_BMAPI_WRITE|
 					XFS_BMAPI_METADATA,
 					args->firstblock, args->total,
-					&mapp[mapi], &nmap, args->flist)) {
+					&mapp[mapi], &nmap, args->flist))) {
 				kmem_free(mapp, sizeof(*mapp) * count);
 				return error;
 			}
@@ -1715,7 +1712,6 @@ xfs_da_grow_inode(xfs_da_args_t *args, xfs_dablk_t *new_blkno)
 			    mapp[mapi - 1].br_blockcount;
 		}
 	} else {
-#pragma mips_frequency_hint NEVER
 		mapi = 0;
 		mapp = NULL;
 	}
@@ -1727,7 +1723,6 @@ xfs_da_grow_inode(xfs_da_args_t *args, xfs_dablk_t *new_blkno)
 	if (got != count || mapp[0].br_startoff != bno ||
 	    mapp[mapi - 1].br_startoff + mapp[mapi - 1].br_blockcount !=
 	    bno + count) {
-#pragma mips_frequency_hint NEVER
 		if (mapp != &map)
 			kmem_free(mapp, sizeof(*mapp) * count);
 		return XFS_ERROR(ENOSPC);
@@ -1740,7 +1735,7 @@ xfs_da_grow_inode(xfs_da_args_t *args, xfs_dablk_t *new_blkno)
 	 */
 	if (w == XFS_DATA_FORK && XFS_DIR_IS_V1(mp)) {
 		ASSERT(mapi == 1);
-		if (error = xfs_bmap_last_offset(tp, dp, &bno, w))
+		if ((error = xfs_bmap_last_offset(tp, dp, &bno, w)))
 			return error;
 		size = XFS_FSB_TO_B(mp, bno);
 		if (size != dp->i_d.di_size) {
@@ -1796,7 +1791,7 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 	 * Read the last block in the btree space.
 	 */
 	last_blkno = (xfs_dablk_t)lastoff - mp->m_dirblkfsbs;
-	if (error = xfs_da_read_buf(tp, ip, last_blkno, -1, &last_buf, w))
+	if ((error = xfs_da_read_buf(tp, ip, last_blkno, -1, &last_buf, w)))
 		return error;
 	/*
 	 * Copy the last block into the dead buffer and log it.
@@ -1828,8 +1823,8 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 	/*
 	 * If the moved block has a left sibling, fix up the pointers.
 	 */
-	if (sib_blkno = INT_GET(dead_info->back, ARCH_CONVERT)) {
-		if (error = xfs_da_read_buf(tp, ip, sib_blkno, -1, &sib_buf, w))
+	if ((sib_blkno = INT_GET(dead_info->back, ARCH_CONVERT))) {
+		if ((error = xfs_da_read_buf(tp, ip, sib_blkno, -1, &sib_buf, w)))
 			goto done;
 		sib_info = sib_buf->data;
 		if (INT_GET(sib_info->forw, ARCH_CONVERT) != last_blkno ||
@@ -1847,8 +1842,8 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 	/*
 	 * If the moved block has a right sibling, fix up the pointers.
 	 */
-	if (sib_blkno = INT_GET(dead_info->forw, ARCH_CONVERT)) {
-		if (error = xfs_da_read_buf(tp, ip, sib_blkno, -1, &sib_buf, w))
+	if ((sib_blkno = INT_GET(dead_info->forw, ARCH_CONVERT))) {
+		if ((error = xfs_da_read_buf(tp, ip, sib_blkno, -1, &sib_buf, w)))
 			goto done;
 		sib_info = sib_buf->data;
 		if (   INT_GET(sib_info->back, ARCH_CONVERT) != last_blkno
@@ -1870,7 +1865,7 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 	 * Walk down the tree looking for the parent of the moved block.
 	 */
 	for (;;) {
-		if (error = xfs_da_read_buf(tp, ip, par_blkno, -1, &par_buf, w))
+		if ((error = xfs_da_read_buf(tp, ip, par_blkno, -1, &par_buf, w)))
 			goto done;
 		par_node = par_buf->data;
 		if (INT_GET(par_node->hdr.info.magic, ARCH_CONVERT) != XFS_DA_NODE_MAGIC ||
@@ -1913,7 +1908,7 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 			error = XFS_ERROR(EFSCORRUPTED);
 			goto done;
 		}
-		if (error = xfs_da_read_buf(tp, ip, par_blkno, -1, &par_buf, w))
+		if ((error = xfs_da_read_buf(tp, ip, par_blkno, -1, &par_buf, w)))
 			goto done;
 		par_node = par_buf->data;
 		if (INT_GET(par_node->hdr.level, ARCH_CONVERT) != level ||
@@ -1977,8 +1972,8 @@ xfs_da_shrink_inode(xfs_da_args_t *args, xfs_dablk_t dead_blkno,
 				&done)) == ENOSPC) {
 			if (w != XFS_DATA_FORK)
 				goto done;
-			if (error = xfs_da_swap_lastblock(args, &dead_blkno,
-					&dead_buf))
+			if ((error = xfs_da_swap_lastblock(args, &dead_blkno,
+					&dead_buf)))
 				goto done;
 		} else if (error)
 			goto done;
@@ -1991,7 +1986,7 @@ xfs_da_shrink_inode(xfs_da_args_t *args, xfs_dablk_t dead_blkno,
 	 * Adjust the directory size for version 1.
 	 */
 	if (w == XFS_DATA_FORK && XFS_DIR_IS_V1(mp)) {
-		if (error = xfs_bmap_last_offset(tp, dp, &bno, w))
+		if ((error = xfs_bmap_last_offset(tp, dp, &bno, w)))
 			return error;
 		size = XFS_FSB_TO_B(dp->i_mount, bno);
 		if (size != dp->i_d.di_size) {
@@ -2022,11 +2017,9 @@ xfs_da_map_covers_blocks(
 	for (i = 0, off = bno; i < nmap; i++) {
 		if (mapp[i].br_startblock == HOLESTARTBLOCK ||
 		    mapp[i].br_startblock == DELAYSTARTBLOCK) {
-#pragma mips_frequency_hint NEVER
 			return 0;
 		}
 		if (off != mapp[i].br_startoff) {
-#pragma mips_frequency_hint NEVER
 			return 0;
 		}
 		off += mapp[i].br_blockcount;
@@ -2051,13 +2044,13 @@ xfs_da_do_buf(
 {
 	xfs_buf_t		*bp = 0;
 	xfs_buf_t		**bplist;
-	int		error;
+	int		error=0;
 	int		i;
 	xfs_bmbt_irec_t	map;
 	xfs_bmbt_irec_t	*mapp;
 	xfs_daddr_t	mappedbno;
 	xfs_mount_t	*mp;
-	int		nbplist;
+	int		nbplist=0;
 	int		nfsb;
 	int		nmap;
 	xfs_dabuf_t	*rbp;
@@ -2079,15 +2072,13 @@ xfs_da_do_buf(
 		if (nfsb == 1) {
 			xfs_fsblock_t	fsb;
 
-			if (error =
+			if ((error =
 			    xfs_bmapi_single(trans, dp, whichfork, &fsb,
-				    (xfs_fileoff_t)bno)) {
-#pragma mips_frequency_hint NEVER
+				    (xfs_fileoff_t)bno))) {
 				return error;
 			}
 			mapp = &map;
 			if (fsb == NULLFSBLOCK) {
-#pragma mips_frequency_hint NEVER
 				nmap = 0;
 			} else {
 				map.br_startblock = fsb;
@@ -2096,17 +2087,16 @@ xfs_da_do_buf(
 				nmap = 1;
 			}
 		} else {
-#pragma mips_frequency_hint NEVER
 			xfs_fsblock_t	firstblock;
 
 			firstblock = NULLFSBLOCK;
 			mapp = kmem_alloc(sizeof(*mapp) * nfsb, KM_SLEEP);
 			nmap = nfsb;
-			if (error = xfs_bmapi(trans, dp, (xfs_fileoff_t)bno,
+			if ((error = xfs_bmapi(trans, dp, (xfs_fileoff_t)bno,
 					nfsb,
 					XFS_BMAPI_METADATA |
 						XFS_BMAPI_AFLAG(whichfork),
-					&firstblock, 0, mapp, &nmap, NULL))
+					&firstblock, 0, mapp, &nmap, NULL)))
 				goto exit0;
 		}
 	} else {
@@ -2117,12 +2107,10 @@ xfs_da_do_buf(
 		nmap = 1;
 	}
 	if (!xfs_da_map_covers_blocks(nmap, mapp, bno, nfsb)) {
-#pragma mips_frequency_hint NEVER
 		error = mappedbno == -2 ? 0 : XFS_ERROR(EFSCORRUPTED);
 		goto exit0;
 	}
 	if (caller != 3 && nmap > 1) {
-#pragma mips_frequency_hint NEVER
 		bplist = kmem_alloc(sizeof(*bplist) * nmap, KM_SLEEP);
 		nbplist = 0;
 	} else
@@ -2160,7 +2148,6 @@ xfs_da_do_buf(
 #endif
 		}
 		if (error) {
-#pragma mips_frequency_hint NEVER
 			if (bp)
 				xfs_trans_brelse(trans, bp);
 			goto exit1;
@@ -2177,7 +2164,6 @@ xfs_da_do_buf(
 			}
 		}
 		if (bplist) {
-#pragma mips_frequency_hint NEVER
 			bplist[nbplist++] = bp;
 		}
 	}
@@ -2185,7 +2171,6 @@ xfs_da_do_buf(
 	 * Build a dabuf structure.
 	 */
 	if (bplist) {
-#pragma mips_frequency_hint NEVER
 		rbp = xfs_da_buf_make(nbplist, bplist, ra);
 	} else if (bp)
 		rbp = xfs_da_buf_make(1, &bp, ra);
@@ -2212,7 +2197,6 @@ xfs_da_do_buf(
 				   (INT_GET(free->hdr.magic, ARCH_CONVERT) != XFS_DIR2_FREE_MAGIC),
 				mp, XFS_ERRTAG_DA_READ_BUF,
 				XFS_RANDOM_DA_READ_BUF)) {
-#pragma mips_frequency_hint NEVER
 			xfs_buftrace("DA READ ERROR", rbp->bps[0]);
 			error = XFS_ERROR(EFSCORRUPTED);
 			xfs_da_brelse(trans, rbp);
@@ -2221,11 +2205,9 @@ xfs_da_do_buf(
 		}
 	}
 	if (bplist) {
-#pragma mips_frequency_hint NEVER
 		kmem_free(bplist, sizeof(*bplist) * nmap);
 	}
 	if (mapp != &map) {
-#pragma mips_frequency_hint NEVER
 		kmem_free(mapp, sizeof(*mapp) * nfsb);
 	}
 	if (bpp)

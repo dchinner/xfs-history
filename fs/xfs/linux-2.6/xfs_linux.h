@@ -69,28 +69,28 @@ typedef struct statvfs {
 	char	f_fstr[32];	/* filesystem-specific string */
 } statvfs_t;
 
-typedef struct dirent {		/* data from readdir() */
+typedef struct xfs_dirent {		/* data from readdir() */
 	xfs_ino_t d_ino;	/* inode number of entry */
 	xfs_off_t d_off;	/* offset of disk directory entry */
 	unsigned short d_reclen;/* length of this record */
 	char d_name[1];		/* name of file */
-} dirent_t;
+} xfs_dirent_t;
 
-typedef struct irix5_dirent {	/* Irix5 view of dirent structure */
+typedef struct xfs_dirent32 {	/* Irix5 view of dirent structure */
 	app32_ulong_t d_ino;	/* inode number of entry */
 	xfs32_off_t d_off;	/* offset of disk directory entry */
 	unsigned short d_reclen;/* length of this record */
 	char d_name[1];		/* name of file */
-} irix5_dirent_t;
+} xfs_dirent32_t;
 
 #define GETDENTS_ABI(abi, uiop)	1
-#define DIRENTBASESIZE		(((dirent_t *)0)->d_name - (char *)0)
+#define DIRENTBASESIZE		(((xfs_dirent_t *)0)->d_name - (char *)0)
 #define DIRENTSIZE(namelen)	\
 	((DIRENTBASESIZE + (namelen) + \
 		sizeof(xfs_off_t)) & ~(sizeof(xfs_off_t) - 1))
-#define IRIX5_DIRENTBASESIZE	(((irix5_dirent_t *)0)->d_name - (char *)0)
-#define IRIX5_DIRENTSIZE(namelen) \
-	((IRIX5_DIRENTBASESIZE + (namelen) + \
+#define DIRENT32BASESIZE	(((xfs_dirent32_t *)0)->d_name - (char *)0)
+#define DIRENT32SIZE(namelen) \
+	((DIRENT32BASESIZE + (namelen) + \
 		sizeof(xfs32_off_t)) & ~(sizeof(xfs32_off_t) - 1))
 
 #define ABI_IRIX5	0x02	/* an IRIX5/SVR4 ABI binary */

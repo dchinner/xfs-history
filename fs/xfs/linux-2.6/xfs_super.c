@@ -243,7 +243,7 @@ mountargs_xfs(
 		return 1;
 	}
 
-	if (dsunit && !dswidth || !dsunit && dswidth) {
+	if ((dsunit && !dswidth) || (!dsunit && dswidth)) {
 		printk(
 "mount: both sunit and swidth options have to be specified\n");
 		return 1;
