@@ -131,6 +131,7 @@ xfs_iformat(xfs_mount_t		*mp,
 	xfs_bmbt_rec_t		*recp;
 	xfs_fsblock_t		*ptrp;
 	int			dinode_size;
+	int			real_size;
 
 	switch (ip->i_d.di_mode & IFMT) {
 	case IFIFO:
