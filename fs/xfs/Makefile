@@ -4,12 +4,19 @@
 
 WORKAREA ?= `pwd`
 
+ARCH = `uname -m`
+ifeq ($(ARCH),"i686")
+	ARCH = i386
+endif
+ifeq ($(ARCH),"586")
+	ARCH = i386
+endif
 KERN_SPEC = kernel-2.4.spec
 KERNEL_VERSION = 2.4.0
 
 SGI_VERSION = `cat $(WORKAREA)/SPECS/_sgi_kvers_`
 
-default all: checkproc tarballs i386kernel i586kernel i686kernel i386cmd
+default all: checkproc tarballs i386kernel i586kernel i686kernel ia64kernel cmds
 
 checkproc:
 	if [ ! -e /proc/stat ]; then \
@@ -23,31 +30,45 @@ tarballs: xfs-cmds
 	cp $(WORKAREA)/cmd/xfs/build/xfs-cmds-*.src.tar.gz $(WORKAREA)/SOURCES
 
 i386kernel:
-	@echo "=== Making $@ `date`"; \
-	cd $(WORKAREA)/SPECS; \
-	rpm -ba --target=i386 ${KERN_SPEC}; \
-	echo "=== Done Making $@ `date`"
+	if [[ "i386" == $(ARCH) ]]; then \
+		@echo "=== Making $@ `date`"; \
+		cd $(WORKAREA)/SPECS; \
+		rpm -ba --target=i386 ${KERN_SPEC}; \
+		echo "=== Done Making $@ `date`"; \
+	fi
 
 i586kernel:
-	@echo "=== Making $@ `date`"; \
-	cd $(WORKAREA)/SPECS; \
-	rpm -ba --target=i586 ${KERN_SPEC}; \
-	echo "=== Done Making $@ `date`"
+	if [[ "i386" == $(ARCH) ]]; then \
+		@echo "=== Making $@ `date`"; \
+		cd $(WORKAREA)/SPECS; \
+		rpm -ba --target=i586 ${KERN_SPEC}; \
+		echo "=== Done Making $@ `date`"; \
+	fi
 
 i686kernel:
-	@echo "=== Making $@ `date`"; \
-	cd $(WORKAREA)/SPECS; \
-	rpm -ba --target=i686 ${KERN_SPEC}; \
-	echo "=== Done Making $@ `date`"
+	if [[ "i386" == $(ARCH) ]]; then \
+		@echo "=== Making $@ `date`"; \
+		cd $(WORKAREA)/SPECS; \
+		rpm -ba --target=i686 ${KERN_SPEC}; \
+		echo "=== Done Making $@ `date`"; \
+	fi
 
-i386cmd: xfs-cmds
+ia64kernel:
+	if [[ "ia64" == $(ARCH) ]]; then \
+		@echo "=== Making $@ `date`"; \
+		cd $(WORKAREA)/SPECS; \
+		rpm -ba --target=ia64 ${KERN_SPEC}; \
+		echo "=== Done Making $@ `date`"; \
+	fi
+
+cmds: xfs-cmds
 	[ ! -d $(WORKAREA)/SRPMS ] \
 		&& mkdir $(WORKAREA)/SRPMS || exit 0
 	cp $(WORKAREA)/cmd/xfs/build/rpm/xfs-cmds-*.src.rpm $(WORKAREA)/SRPMS
-	[ ! -d $(WORKAREA)/RPMS/i386 ] \
-		&& mkdir -p $(WORKAREA)/RPMS/i386 || exit 0
-	cp $(WORKAREA)/cmd/xfs/build/rpm/xfs-cmds-*.i386.rpm \
-			$(WORKAREA)/RPMS/i386
+	[ ! -d $(WORKAREA)/RPMS/$(ARCH) ] \
+		&& mkdir -p $(WORKAREA)/RPMS/$(ARCH) || exit 0
+	cp $(WORKAREA)/cmd/xfs/build/rpm/xfs-cmds-*.$(ARCH).rpm \
+			$(WORKAREA)/RPMS/$(ARCH)
 
 xfs-cmds:
 	echo "=== Making $@ `date`"
