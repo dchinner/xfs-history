@@ -8,7 +8,6 @@
 #include <sys/timers.h>
 #include <sys/buf.h>
 #include <sys/uio.h>
-#include <sys/user.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <specfs/snode.h>
@@ -60,7 +59,6 @@
 #include <sys/dirent.h>
 #include <sys/attributes.h>
 #include <ksys/fdt.h>
-#include <ksys/fdt_private.h>
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -363,51 +361,21 @@ xfs_close(
 	struct flid	*fl)
 {
 
-	extern 	int	grio_remove_reservation( pid_t, dev_t, gr_ino_t);
-	int		isshd, vpcount, i;
-	proc_t		*p = curprocp;
+	extern 	int	grio_remove_reservation(pid_t, dev_t, gr_ino_t);
         xfs_inode_t	*ip;
-	struct file	*fp;
-	struct fdt	*fdt;
 	vnode_t 	*vp = PVN_TO_VN(pvp);
 
 	vn_trace_entry(vp, "xfs_close");
 	ip = XFS_VTOI(vp);
 
 	/*
-	 * If this is the last close of a file,
-	 * remove any outstanding i/o rate guarantees.
+	 * If this is the last close of a file, and this process
+	 * no longer has the file open via another file descriptor, 
+	 * then remove any outstanding i/o rate guarantees.
 	 */
-	if ( lastclose && ( ip->i_d.di_flags & XFS_DIFLAG_REALTIME) ) {
-		vpcount = 0;
-
-		if (isshd = ISSHDFD(p)) {
-			fdt = p->p_shaddr->s_fdt;
-			FDT_READ_LOCK(fdt);
-		} else
-			fdt = p->p_user->u_fdt;
-
-		for (i = 0 ; i < fdt->fd_nofiles; i++ ) {
-			if ((fp = fdt_getfast(fdt, i))) {
-				if ((fp->f_vnode == vp) && (fp->f_count > 0)) {
-					vpcount++;
-				}
-			}
-		}
-
-		if (isshd)
-			FDT_UNLOCK(fdt);
-
-		/*
-		 * If this process is nolonger accessing
-		 * this file, remove any guarantees that
-		 * were made by this process on this file.
-		 */
-		if (!vpcount) {
-			grio_remove_reservation(p->p_pid,ip->i_dev,ip->i_ino);
-		}
-	}
-
+	if ((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) && lastclose &&
+	    !fdt_vnode_isopen(vp))
+		grio_remove_reservation(curprocp->p_pid, ip->i_dev, ip->i_ino);
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 	cleanlocks(vp, fl);
