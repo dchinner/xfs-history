@@ -1,4 +1,4 @@
-#ident "$Revision: 1.16 $"
+#ident "$Revision: 1.17 $"
 
 
 #include <sys/param.h>
@@ -549,9 +549,12 @@ xfs_qm_dqflush_all(
 {
 	int		recl;
 	xfs_dquot_t	*dqp;
+	int		niters;
 
 	if (mp->m_quotainfo == NULL)	
 		return (0);
+	niters = 0;
+
 again:
 	xfs_qm_mplist_lock(mp);
 	FOREACH_DQUOT_IN_MP(dqp, mp) {
@@ -580,6 +583,20 @@ again:
 		xfs_qm_mplist_unlock(mp);
 		xfs_qm_dqflush(dqp, flags); 
 		xfs_dqunlock(dqp);
+		/*
+		 * If this is the root filesystem doing a quotacheck,
+		 * we should do periodic bflushes. This is because there's
+		 * no bflushd at this point.
+		 */
+		if (mp->m_flags & XFS_MOUNT_ROOTQCHECK) {
+			if (++niters == XFS_QM_MAX_DQCLUSTER_LOGSZ) {
+				xfs_log_force(mp, (xfs_lsn_t)0,
+					      XFS_LOG_FORCE | XFS_LOG_SYNC);	
+				bflush(mp->m_dev);
+				niters = 0;
+			}
+		}
+
 		xfs_qm_mplist_lock(mp);
 		if (recl != mp->QI_MPLRECLAIMS) {
 			xfs_qm_mplist_unlock(mp);
@@ -623,7 +640,7 @@ xfs_qm_dettach_pdquots(
 			nrecl = mp->QI_MPLRECLAIMS;
 			xfs_qm_mplist_unlock(mp);
 			xfs_qm_dqput(pdqp);
-
+			
 			xfs_qm_mplist_lock(mp);
 			if (nrecl != mp->QI_MPLRECLAIMS) 
 				goto again;
@@ -641,12 +658,14 @@ xfs_qm_dettach_pdquots(
  */
 int
 xfs_qm_dqpurge_all(
-	xfs_mount_t	*mp,
-	uint		flags)  /* QUOTAOFF/UMOUNTING/UQUOTA/PQUOTA */
+		   xfs_mount_t	*mp,
+		   uint		flags) /* QUOTAOFF/UMOUNTING/UQUOTA/PQUOTA */
 {
 	xfs_dquot_t 	*dqp;
 	uint		dqtype;
 	int		nrecl;
+	xfs_dquot_t 	*nextdqp;
+	int		nmisses;
 
 	if (mp->m_quotainfo == NULL)
 		return (0);
@@ -664,7 +683,8 @@ xfs_qm_dqpurge_all(
 	 */
 	xfs_qm_dettach_pdquots(mp);
 
- again:
+      again:
+	nmisses = 0;
 	ASSERT(XFS_QM_IS_MPLIST_LOCKED(mp));
 	/*
 	 * Try to get rid of all of the unwanted dquots. The idea is to
@@ -702,12 +722,14 @@ xfs_qm_dqpurge_all(
 		
 		/*
 		 * Take the dquot off the mplist and hashlist. It may remain on
-		 * freelist. This also returns a ptr to the next dquot on mplist.
+		 * freelist in INACTIVE state.
 		 */
-		dqp = xfs_qm_dqpurge(dqp, flags);
+		nextdqp = dqp->MPL_NEXT;
+		nmisses += xfs_qm_dqpurge(dqp, flags);
+		dqp = nextdqp;
 	}
 	xfs_qm_mplist_unlock(mp);
-	return (0);
+	return (nmisses);
 }
 
 STATIC int
@@ -815,7 +837,7 @@ xfs_qm_dqattach_one(
 		xfs_dqlock(udqhint);	
 		xfs_dqlock(dqp);
 	}	
-done:	
+      done:	
 #ifdef QUOTADEBUG
 	if (udqhint) {
 		if (dolock)
@@ -883,12 +905,12 @@ xfs_qm_dqattach_projhint(
 		 * dqput() does the unlocking of the dquot.
 		 */
 		xfs_qm_dqrele(tmp);
-			
+		
 		ASSERT(! XFS_DQ_IS_LOCKED(udq));
 		ASSERT(! XFS_DQ_IS_LOCKED(pdq));
 		xfs_dqlock(udq);
 		xfs_dqlock(pdq);
-
+		
 	} else {
 		ASSERT(XFS_DQ_IS_LOCKED(udq));
 		if (! locked) {
@@ -896,7 +918,7 @@ xfs_qm_dqattach_projhint(
 			xfs_dqlock(pdq);
 		}
 	}
-
+	
 	ASSERT(XFS_DQ_IS_LOCKED(udq));
 	ASSERT(XFS_DQ_IS_LOCKED(pdq));
 	/*
@@ -913,7 +935,7 @@ xfs_qm_dqattach_projhint(
 	}
 }
 
-			 
+
 /*
  * Given a locked inode, attach dquot(s) to it, taking UQUOTAON / PQUOTAON
  * in to account.
@@ -926,8 +948,8 @@ xfs_qm_dqattach_projhint(
  */
 int		
 xfs_qm_dqattach(
-	xfs_inode_t	*ip,
-	uint		flags)
+		xfs_inode_t	*ip,
+		uint		flags)
 {
 	int		error;
 	xfs_mount_t 	*mp;
@@ -993,7 +1015,7 @@ xfs_qm_dqattach(
 					 flags & XFS_QMOPT_DQLOCK);
 	}
 
- done:
+      done:
 
 #ifdef QUOTADEBUG
 	if (! error) {
@@ -1025,7 +1047,7 @@ xfs_qm_dqattach(
 #endif
 	return (error);						
 }
-     
+
 /*
  * Release dquots (and their references) if any.
  * The inode should be locked EXCL except when this's called by
@@ -1099,12 +1121,12 @@ xfs_qm_sync(
 	 * We won't block unless we are asked to.
 	 */
 	nowait = (boolean_t)(flags & SYNC_BDFLUSH || (flags & SYNC_WAIT) == 0);
-
- again:
+	
+      again:
 	xfs_qm_mplist_lock(mp);
 	/*
-	 * dqpurge_all takes the mplist and iterate thru all dquots in
-	 * quotaoff also. However, if the QUOTA_ACTIVE bits are not cleared
+	 * dqpurge_all() also takes the mplist lock and iterate thru all dquots
+	 * in quotaoff. However, if the QUOTA_ACTIVE bits are not cleared
 	 * when we have the mplist lock, we know that dquots will be consistent
 	 * as long as we have it locked.
 	 */
@@ -1179,7 +1201,7 @@ xfs_qm_sync(
 			goto again;
 		}
 	}
-
+	
 	xfs_qm_mplist_unlock(mp);
 }
 
@@ -1545,32 +1567,29 @@ xfs_qm_reset_dqcounts(
 		ddq->d_iwarns = 0UL;
 		ddq = (xfs_disk_dquot_t *) ((xfs_dqblk_t *)ddq + 1);
 	}
-
+	
 	return (0);
 }
-				
+
 STATIC int
 xfs_qm_dqiter_bufs(
-	xfs_mount_t	*mp,
-	xfs_dqid_t	firstid,
-	xfs_fsblock_t	bno,   
-	xfs_filblks_t	blkcnt,
-	uint		flags)
+		   xfs_mount_t	*mp,
+		   xfs_dqid_t	firstid,
+		   xfs_fsblock_t	bno,   
+		   xfs_filblks_t	blkcnt,
+		   uint		flags)
 {
 	buf_t		*bp;	
 	int		error;
 	int		notcommitted;
 	int		incr;
-	uint		rootfs;
-	extern dev_t	rootdev;
-
+	
 	ASSERT(blkcnt > 0);
 	notcommitted = 0;
 	incr = (blkcnt > XFS_QM_MAX_DQCLUSTER_LOGSZ) ? 
 		XFS_QM_MAX_DQCLUSTER_LOGSZ : blkcnt;
-	rootfs = (mp->m_dev == rootdev);
 	error = 0;
-
+	
 	/*
 	 * Blkcnt arg can be a very big number, and might even be
 	 * larger than the log itself. So, we have to break it up into
@@ -1595,13 +1614,13 @@ xfs_qm_dqiter_bufs(
 		bdwrite(bp);
 		/*
 		 * When quotachecking the root filesystem,
-		 * we don't have bdflush, and we may fill
+		 * we may not have bdflush, and we may fill
 		 * up all available freebufs.
 		 * The workaround here is to push on the
 		 * log and do a bflush on the rootdev
 		 * periodically.
 		 */
-		if (rootfs) {
+		if (mp->m_flags & XFS_MOUNT_ROOTQCHECK) {
 			if (++notcommitted == incr) {
 				xfs_log_force(mp, (xfs_lsn_t)0,
 					      XFS_LOG_FORCE | XFS_LOG_SYNC);	
@@ -1920,7 +1939,17 @@ xfs_qm_quotacheck(
 	 * algorithm doesn't like that.
 	 */
 	ASSERT(mp->QI_MPLNDQUOTS == 0);
-
+	
+#ifdef _BANYAN_XFS
+	/*
+	 * IRIX62 and bonsai start the bdflush after vfs_mountroot, ficus and
+	 * kudzu do it before. This flags makes everybody alert to the fact that
+	 * the buffer cache can get full, and no one's there to do the flushing
+	 * for us.
+	 */
+	if (rootdev == mp->m_dev)
+		mp->m_flags |= XFS_MOUNT_ROOTQCHECK;
+#endif
 	/*
 	 * First we go thru all the dquots on disk, USR and PRJ, and reset
 	 * their counters to zero. We need a clean slate.
@@ -1936,7 +1965,7 @@ xfs_qm_quotacheck(
 				mp->m_fsname);
 		}
 		if (error = xfs_qm_dqiterate(mp, uip, XFS_QMOPT_UQUOTA))
-			return (error);
+			goto error_return;
 		if (uip->i_d.di_nblocks > XFS_QM_BIG_QCHECK_NBLKS) 
 			cmn_err(CE_NOTE, "XFS quotacheck %s: Done.",
 				mp->m_fsname);
@@ -1945,7 +1974,7 @@ xfs_qm_quotacheck(
 	
 	if (pip = mp->QI_PQIP) {
 		if (error = xfs_qm_dqiterate(mp, pip, XFS_QMOPT_PQUOTA))
-			return (error);
+			goto error_return;
 		flags |= XFS_PQUOTA_CHKD;
 	}
 
@@ -1971,11 +2000,11 @@ xfs_qm_quotacheck(
 		xfs_qm_dqpurge_all(mp, 
 				   XFS_QMOPT_UQUOTA|XFS_QMOPT_PQUOTA|
 				   XFS_QMOPT_QUOTAOFF);
-		return (error);
+		goto error_return;
 	}
 	/*
-	 * We've made all the changes that we need to make incore. Now flush_them
-	 * down to disk buffers.
+	 * We've made all the changes that we need to make incore.
+	 * Now flush_them down to disk buffers.
 	 */
 	xfs_qm_dqflush_all(mp, XFS_QMOPT_DELWRI);
 
@@ -1999,6 +2028,9 @@ xfs_qm_quotacheck(
 #ifdef QUOTADEBUG
 	XQM_LIST_PRINT(&(mp->QI_MPL_LIST), MPL_NEXT, "++++ Mp list +++"); 
 #endif
+
+ error_return:
+	mp->m_flags &= ~(XFS_MOUNT_ROOTQCHECK);
 	return (error);
 }
 
@@ -2075,7 +2107,6 @@ xfs_qm_init_quotainos(
 	return (0);
 }
 
-
 /*
  * Traverse the freelist of dquots and attempt to reclaim a maximum of
  * 'howmany' dquots. This operation races with dqlookup(), and attempts to
@@ -2090,12 +2121,14 @@ xfs_qm_shake_freelist(
 	xfs_dqhash_t	*hash;
 	xfs_dquot_t	*dqp, *nextdqp;
 	int 		restarts;
+	int		nflushes;
 
 	if (howmany <= 0)
 		return (0);
 
 	nreclaimed = 0; 
 	restarts = 0;
+	nflushes = 0;
 
 #ifdef QUOTADEBUG
 	printf("Shake free 0x%x\n", howmany);
@@ -2160,6 +2193,20 @@ xfs_qm_shake_freelist(
 		 */
 		if (XFS_DQ_IS_DIRTY(dqp)) {
 			xfs_dqtrace_entry(dqp, "DQSHAKE: DQDIRTY");
+			/*
+			 * We'll be doing a dqflush, and it is 
+			 * possible to fill up the entire buffer cache 
+			 * with dirty delayed write buffers when doing
+			 * this on a root filesystem, if bdflush isn't
+			 * running. So, do a flush periodically.
+			 */
+			if (dqp->q_mount->m_flags & XFS_MOUNT_ROOTQCHECK) {
+				if (!(++nflushes % XFS_QM_MAX_DQCLUSTER_LOGSZ)){
+					xfs_log_force(dqp->q_mount, (xfs_lsn_t)0,
+						 XFS_LOG_FORCE | XFS_LOG_SYNC);	
+					bflush(dqp->q_mount->m_dev);
+				}
+			}
 			/*
 			 * We flush it delayed write, so don't bother
 			 * releasing the mplock.
@@ -2267,9 +2314,11 @@ xfs_qm_dqreclaim_one(void)
 	xfs_dquot_t 	*dqpout;
 	xfs_dquot_t	*dqp;
 	int		restarts;
-	
+	int		nflushes;
+
 	restarts = 0;
 	dqpout = NULL;
+	nflushes = 0;
 
 	/* lockorder: hashchainlock, freelistlock, mplistlock, dqlock, dqflock */
  startagain:
@@ -2337,8 +2386,23 @@ xfs_qm_dqreclaim_one(void)
 		if (XFS_DQ_IS_DIRTY(dqp)) {
 			xfs_dqtrace_entry(dqp, "DQRECLAIM: DQDIRTY");
 			/*
+			 * We'll be doing a dqflush, and it is 
+			 * possible to fill up the entire buffer cache 
+			 * with dirty delayed write buffers when doing
+			 * this on a root filesystem, if bdflush isn't
+			 * running. So, do a flush periodically.
+			 */
+			if (dqp->q_mount->m_flags & XFS_MOUNT_ROOTQCHECK) {
+				if (!(++nflushes % XFS_QM_MAX_DQCLUSTER_LOGSZ)) {
+					xfs_log_force(dqp->q_mount, (xfs_lsn_t)0,
+						XFS_LOG_FORCE | XFS_LOG_SYNC);	
+					bflush(dqp->q_mount->m_dev);
+				}
+			}
+			
+			/*
 			 * We flush it delayed write, so don't bother
-			 * releasing the mplock.
+			 * releasing the freelist lock.
 			 */
 			(void) xfs_qm_dqflush(dqp, XFS_QMOPT_DELWRI);
 			xfs_dqunlock(dqp); /* dqflush unlocks dqflock */
