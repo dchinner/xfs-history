@@ -337,7 +337,7 @@ xfs_acl_set_attr(vnode_t *vp, struct acl *aclp, int kind, int *error)
                  (char *)&newacl, len, ATTR_ROOT, sys_cred, *error);
 }
 
-STATIC int
+int
 xfs_acl_vtoacl(vnode_t *vp, struct acl *access_acl, struct acl *default_acl)
 {
 	int error = 0;

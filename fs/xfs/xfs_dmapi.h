@@ -103,13 +103,6 @@ xfs_dm_fcntl(
 	cred_t		*credp,
 	int		*rvalp);
 
-extern int
-xfs_dm_mapevent(
-	bhv_desc_t	*bdp,
-	int		flags,
-        xfs_off_t	offset,
-        dm_fcntl_t	*dmfcntlp);
-
 /*
  *	Function defined in xfs_vnodeops.c used by DMAPI as well as by xfs_vnodeops.c
  */

@@ -137,6 +137,7 @@ struct xfs_mount;
 
 typedef struct buftarg {
 	struct pb_target	*pb_targ;
+	struct block_device	*bd_targ;
 	dev_t			dev;
 } buftarg_t;
 

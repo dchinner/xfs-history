@@ -32,6 +32,11 @@
 
 #include <xfs.h>
 
+#ifdef CELL_CAPABLE
+void cxfs_unmount(xfs_mount_t *);
+#else
+# define cxfs_unmount(mp)	do { } while (0)
+#endif
 
 STATIC void	xfs_sb_relse(xfs_buf_t *);
 STATIC void	xfs_mount_reset_sbqflags(xfs_mount_t *);
@@ -1051,9 +1056,7 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	(void) xfs_errortag_clearall_umount(fsid, mp->m_fsname, 0);
 #endif
 
-#ifdef CELL_CAPABLE
 	cxfs_unmount(mp);
-#endif
 	xfs_mount_free(mp, 1);
 	return 0;
 }
@@ -1061,16 +1064,13 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 void
 xfs_unmountfs_close(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 {
-	if (mp->m_ddev_targ.pb_targ) {
-		linvfs_release_target(mp->m_ddev_targ.pb_targ);
-	}
-	if (mp->m_rtdev_targ.pb_targ) {
-		linvfs_release_target(mp->m_rtdev_targ.pb_targ);
-	}
+	if (mp->m_ddev_targ.pb_targ)
+		linvfs_release_buftarg(&mp->m_ddev_targ);
+	if (mp->m_rtdev_targ.pb_targ)
+		linvfs_release_buftarg(&mp->m_rtdev_targ);
 	if (mp->m_logdev_targ.pb_targ &&
-	    mp->m_logdev_targ.pb_targ != mp->m_ddev_targ.pb_targ) {
-		linvfs_release_target(mp->m_logdev_targ.pb_targ);
-	}
+	    mp->m_logdev_targ.pb_targ != mp->m_ddev_targ.pb_targ)
+		linvfs_release_buftarg(&mp->m_logdev_targ);
 }
 
 int

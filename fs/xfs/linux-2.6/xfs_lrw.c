@@ -46,17 +46,21 @@
                                                 << io->io_writeio_log)
 #define	XFS_STRAT_WRITE_IMAPS	2
 
-int xfs_iomap_write_delay(xfs_iocore_t *, loff_t, size_t, pb_bmap_t *,
+STATIC int xfs_iomap_read(xfs_iocore_t *, loff_t, size_t, int, pb_bmap_t *,
+			int *, struct pm *);
+STATIC int xfs_iomap_write(xfs_iocore_t	*, loff_t, size_t, pb_bmap_t *,
+			int *, int, struct pm *);
+STATIC int xfs_iomap_write_delay(xfs_iocore_t *, loff_t, size_t, pb_bmap_t *,
 			int *, int, int);
-int xfs_iomap_write_direct(xfs_iocore_t *, loff_t, size_t, pb_bmap_t *,
+STATIC int xfs_iomap_write_direct(xfs_iocore_t *, loff_t, size_t, pb_bmap_t *,
 			int *, int, int);
-int _xfs_imap_to_bmap(xfs_iocore_t *, xfs_off_t, xfs_bmbt_irec_t *,
+STATIC int _xfs_imap_to_bmap(xfs_iocore_t *, xfs_off_t, xfs_bmbt_irec_t *,
 			pb_bmap_t *, int, int);
 
 #ifndef DEBUG
 #define	xfs_strat_write_check(io,off,count,imap,nimap)
 #else /* DEBUG */
-STATIC void
+void
 xfs_strat_write_check(
 	xfs_iocore_t	*io,
 	xfs_fileoff_t	offset_fsb,
@@ -73,7 +77,6 @@ xfs_read(
         int             ioflag,
         cred_t          *credp,
         flid_t          *fl)
-        
 {
 	ssize_t		ret;
 	int		error = 0;
@@ -1203,7 +1206,7 @@ xfs_strategy(bhv_desc_t	*bdp,
 }	
 
 
-int
+STATIC int
 _xfs_imap_to_bmap(
 	xfs_iocore_t    *io,
 	xfs_off_t	offset,
@@ -1257,7 +1260,7 @@ _xfs_imap_to_bmap(
 	return(pbm);	/* Return the number filled */
 }
 
-int
+STATIC int
 xfs_iomap_read(
 	xfs_iocore_t	*io,
 	loff_t		offset,
@@ -1389,7 +1392,7 @@ out:
  * given as a scratch area in order to reduce stack space.  No
  * values are returned within it.
  */
-STATIC void
+void
 xfs_strat_write_check(
 	xfs_iocore_t	*io,
 	xfs_fileoff_t	offset_fsb,
@@ -1505,7 +1508,7 @@ xfs_write_bmap(
 	pbmapp->pbm_bsize = XFS_FSB_TO_B(mp, length);
 }
 
-int
+STATIC int
 xfs_iomap_write_delay(
 	xfs_iocore_t	*io,
 	loff_t		offset,

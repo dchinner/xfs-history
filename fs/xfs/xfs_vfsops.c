@@ -35,15 +35,20 @@
 #include <xfs.h>
 #include <linux/xfs_iops.h>
 
-
-#define	NONROOT_MOUNT	ROOT_UNMOUNT
-#define	whymount_t	whymountroot_t
-static char *whymount[] = { "initial mount", "remount", "unmount" };
-
 STATIC xfs_mount_t *xfs_get_vfsmount(vfs_t *, dev_t, dev_t, dev_t);
 STATIC int xfs_ibusy(xfs_mount_t *);
 STATIC int xfs_sync(bhv_desc_t *, int, cred_t *);
 STATIC int xfs_unmount(bhv_desc_t *, int, cred_t *);
+
+#ifdef CELL_CAPABLE
+extern void cxfs_arrinit(void);
+extern int  cxfs_mount(xfs_mount_t *, struct xfs_args *, dev_t, int *);
+extern void cxfs_unmount(mp);
+#else
+# define cxfs_arrinit()		do { } while (0)
+# define cxfs_mount(mp,ap,d,c)	(0)
+# define cxfs_unmount(mp)	do { } while (0)
+#endif
 
 /*
  * xfs_init
@@ -55,7 +60,6 @@ STATIC int xfs_unmount(bhv_desc_t *, int, cred_t *);
  * vswp -- pointer to the XFS entry in the vfs switch table
  * fstype -- index of XFS in the vfs switch table used as the XFS fs type.
  */
-/* ARGSUSED */
 int
 xfs_init(int	fstype)
 {
@@ -159,12 +163,10 @@ xfs_init(int	fstype)
 
 	xfs_dir_startup();
 	
-#ifdef CELL_CAPABLE
 	/*
          * Special initialization for cxfs
 	 */
 	cxfs_arrinit();
-#endif
 
 #if (defined(DEBUG) || defined(INDUCE_IO_ERROR))
 	xfs_error_test_init();
@@ -180,19 +182,6 @@ xfs_init(int	fstype)
 	 */
 
 	return 0;
-}
-
-/*
- * xfs_fill_buftarg
- *
- * Put the "appropriate" things in a buftarg_t structure.
- */
-STATIC
-void
-xfs_fill_buftarg(buftarg_t *btp, dev_t dev, struct super_block *sb)
-{
-	btp->pb_targ = pagebuf_lock_enable(dev, sb);
-	btp->dev    = dev;
 }
 
 void
@@ -244,46 +233,40 @@ xfs_cmountfs(
 	dev_t		ddev,
 	dev_t		logdev,
 	dev_t		rtdev,
-	whymount_t	why,
 	struct xfs_args	*ap,
-	struct mounta	*args,
 	struct cred	*cr)
 {
 	xfs_mount_t	*mp;
 	int		error = 0;
-	int		vfs_flags;
-/*	size_t		n; */
-/*	char		*tmp_fsname_buffer; */
 	int             client = 0;
+	int		vfs_flags;
+
+	mp = xfs_get_vfsmount(vfsp, ddev, logdev, rtdev);
 
 	/*
-	 * The new use of remount to update various cxfs parameters
-	 * should of already been picked of before this.  If anything
-         * has gotten by, it shouldn't have.
+	 * Open data, real time, and log devices now - order is important.
 	 */
-        ASSERT((vfsp->vfs_flag & VFS_REMOUNT) == 0); 
-	if (vfsp->vfs_flag & VFS_REMOUNT) 
-	                return 0;
-
-        mp = xfs_get_vfsmount(vfsp, ddev, logdev, rtdev);
-
-	/*
- 	 * Open the data and real time devices now.
-	 */
-
 	vfs_flags = (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE;
-	xfs_fill_buftarg(&mp->m_ddev_targ, ddev, vfsp->vfs_super);
-	if (logdev != ddev) {
-		xfs_fill_buftarg(&mp->m_logdev_targ, logdev, vfsp->vfs_super);
+	linvfs_fill_buftarg(&mp->m_ddev_targ, ddev, vfsp->vfs_super, 1);
+	if (rtdev &&
+		(error = linvfs_fill_buftarg(
+			&mp->m_rtdev_targ, rtdev, vfsp->vfs_super, 0))) {
+		linvfs_release_buftarg(&mp->m_ddev_targ);
+		goto error2;
 	}
-	if (rtdev != 0) {
-		xfs_fill_buftarg(&mp->m_rtdev_targ, rtdev, vfsp->vfs_super);
+	if (logdev != ddev &&
+		(error = linvfs_fill_buftarg(
+			&mp->m_logdev_targ, logdev, vfsp->vfs_super, 0))) {
+		linvfs_release_buftarg(&mp->m_ddev_targ);
+		if (mp->m_rtdev_targ.pb_targ)
+			linvfs_release_buftarg(&mp->m_rtdev_targ);
+		goto error2;
 	}
+
 	mp->m_ddev_targp = &mp->m_ddev_targ;
 
 	/* Values are in BBs */
-	if ((ap != NULL) && (ap->version >= 2) && 
-	    (ap->flags & XFSMNT_NOALIGN) != XFSMNT_NOALIGN) {
+	if ((ap->flags & XFSMNT_NOALIGN) != XFSMNT_NOALIGN) {
 		/*
 		 * At this point the superblock has not been read
 		 * in, therefore we do not know the block size.
@@ -296,78 +279,46 @@ xfs_cmountfs(
 		mp->m_dalign = 0;
 		mp->m_swidth = 0;
 	}
+
 	if (logdev != 0) {
 		if (logdev == ddev) {
 			mp->m_logdev_targ = mp->m_ddev_targ;
 		} else {
-			/* Ensure that logdev isn't already mounted */
-			if (vfs_devsearch(logdev, VFS_FSTYPE_ANY) != NULL) {
-				error = XFS_ERROR(EBUSY);
-				goto error3;
-			}
-
 			/* Set the log device's block size */
 			set_blocksize(logdev, 512);
 		}
-		if (ap != NULL && ap->version != 0) {
-			/* Called through the mount system call */
-			if ((ap->version < 1) || (ap->version > 4)) {
-				error = XFS_ERROR(EINVAL);
-				goto error3;
-			}
-			if (ap->logbufs != 0 &&
-			    ap->logbufs != -1 &&
-			    (ap->logbufs < 2 || ap->logbufs > 8)) {
-				cmn_err(CE_WARN,
-					"xfs: invalid logbufs value");
-				error = XFS_ERROR(EINVAL);
-				goto error3;
-			}
-			mp->m_logbufs = ap->logbufs;
-			if (ap->logbufsize != -1 &&
-			    ap->logbufsize != 16 * 1024 &&
-			    ap->logbufsize != 32 * 1024) {
-				cmn_err(CE_WARN, "xfs: invalid logbufsize");
-				error = XFS_ERROR(EINVAL);
-				goto error3;
-			}
-			mp->m_logbsize = ap->logbufsize;
-			mp->m_fsname_len = strlen(args->spec) + 1;
-			mp->m_fsname = kmem_alloc(mp->m_fsname_len, KM_SLEEP);
-			strcpy(mp->m_fsname, args->spec);
-		} else {
-			/*
-			 * Called through vfs_mountroot/xfs_mountroot.
-			 * Or, called by mount with no args structure.
-			 * In this case use the dev number (in hex) for 
-			 * the filesystem name.
-			 */
-			mp->m_logbufs = -1;
-			mp->m_logbsize = -1;
-			mp->m_fsname_len = ap ? 11 : 2;
-			mp->m_fsname = kmem_alloc(mp->m_fsname_len, KM_SLEEP);
-			if (ap)
-				sprintf(mp->m_fsname, "0x%x", ddev);
-			else
-				strcpy(mp->m_fsname, "/");
+
+		if (ap->logbufs != 0 && ap->logbufs != -1 &&
+		    (ap->logbufs < 2 || ap->logbufs > 8)) {
+			cmn_err(CE_WARN, "XFS: invalid logbufs value");
+			error = XFS_ERROR(EINVAL);
+			goto error3;
 		}
+		mp->m_logbufs = ap->logbufs;
+		if (ap->logbufsize != -1 &&
+		    ap->logbufsize != 16 * 1024 &&
+		    ap->logbufsize != 32 * 1024) {
+			cmn_err(CE_WARN, "XFS: invalid logbufsize");
+			error = XFS_ERROR(EINVAL);
+			goto error3;
+		}
+		mp->m_logbsize = ap->logbufsize;
+		mp->m_fsname_len = strlen(ap->fsname) + 1;
+		mp->m_fsname = kmem_alloc(mp->m_fsname_len, KM_SLEEP);
+		strcpy(mp->m_fsname, ap->fsname);
 	}
 	if (rtdev != 0) {
 		if (rtdev == ddev || rtdev == logdev) {
-			cmn_err(CE_WARN, "XFS: Cannot mount filesystem with identical rtdev and logdev.");
+			cmn_err(CE_WARN,
+	"XFS: Cannot mount filesystem with identical rtdev and logdev.");
 			error = XFS_ERROR(EINVAL);
 			goto error3;
 		} else {
-			/* Ensure that rtdev isn't already mounted */
-			if (vfs_devsearch(rtdev, VFS_FSTYPE_ANY) != NULL) {
-				error = XFS_ERROR(EBUSY);
-				goto error3;
-			}
-
 			/* Set the realtime device's block size */
 			set_blocksize(rtdev, 512);
 		}
 	}
+
 	/*
 	 * Pull in the 'wsync' and 'ino64' mount options before we do the real
 	 * work of mounting and recovery.  The arg pointer will
@@ -402,10 +353,9 @@ xfs_cmountfs(
 			mp->m_flags |= XFS_MOUNT_OSYNCISDSYNC;
 
 		if (ap->flags & XFSMNT_IOSIZE) {
-			if (ap->version < 3 ||
-			    ap->iosizelog > XFS_MAX_IO_LOG ||
+			if (ap->iosizelog > XFS_MAX_IO_LOG ||
 			    ap->iosizelog < XFS_MIN_IO_LOG) {
-				cmn_err(CE_WARN, "xfs: invalid log iosize");
+				cmn_err(CE_WARN, "XFS: invalid log iosize");
 				error = XFS_ERROR(EINVAL);
 				goto error3;
 			}
@@ -419,7 +369,8 @@ xfs_cmountfs(
 		 */
 		if (ap->flags & XFSMNT_NORECOVERY) {
 			if (!(vfsp->vfs_flag & VFS_RDONLY)) {
-				cmn_err(CE_WARN, "xfs: tried to mount a FS read-write without recovery!");
+				cmn_err(CE_WARN,
+		"XFS: tried to mount a FS read-write without recovery!");
 				error = XFS_ERROR(EINVAL);
 				goto error3;
 			}
@@ -434,16 +385,16 @@ xfs_cmountfs(
 	 * read in superblock to check read-only flags and shared
 	 * mount status
 	 */
-	if ((error = xfs_readsb(mp, ddev))) {
+	if ((error = xfs_readsb(mp, ddev)))
 		goto error3;
-	}
 
 	/*
 	 * prohibit r/w mounts of read-only filesystems
 	 */
-	if (mp->m_sb.sb_flags & XFS_SBF_READONLY &&
+	if ((mp->m_sb.sb_flags & XFS_SBF_READONLY) &&
 	    !(vfsp->vfs_flag & VFS_RDONLY)) {
-		cmn_err(CE_WARN, "xfs: cannot mount a read-only filesystem as read-write");
+		cmn_err(CE_WARN, "XFS: "
+			"cannot mount a read-only filesystem as read-write");
 		error = XFS_ERROR(EROFS);
 		xfs_freesb(mp);
 		goto error3;
@@ -478,35 +429,23 @@ xfs_cmountfs(
 		/*
 		 * Shared XFS V0 can't deal with DMI.  Return EINVAL.
 		 */
-#if 0
-		if (mp->m_sb.sb_shared_vn == 0 && (args->flags & MS_DMI)) {
-#else
 		if (mp->m_sb.sb_shared_vn == 0 && (ap->flags & XFSMNT_DMAPI)) {
-#endif
 			error = XFS_ERROR(EINVAL);
 			xfs_freesb(mp);
 			goto error3;
 		}
 	}
 
-	/* Default to local- cxfs_arrmount will change this if necessary. */
+	/* Default to local - cxfs_arrmount will change this if necessary. */
 	mp->m_cxfstype = XFS_CXFS_NOT;
 
-#ifdef CELL_CAPABLE
 	error = cxfs_mount(mp, ap, ddev, &client);
-#endif
-	if (error) {
+	if (error)
 		goto error3;
-	}
 
 	if (client == 0) {
-		if ((error = xfs_mountfs(vfsp, mp, ddev, 0))) {
-#ifdef DEBUG
-			cmn_err(CE_WARN, "xfs: xfs_mountfs failed: error %d.",
-				error);
-#endif
+		if ((error = xfs_mountfs(vfsp, mp, ddev, 0)))
 			goto error3;
-		}
 	}
 
 	return error;
@@ -517,19 +456,18 @@ xfs_cmountfs(
  error3:
 	/* It's impossible to get here before buftargs are filled */
 	xfs_binval(mp->m_ddev_targ);
-	linvfs_release_target(mp->m_ddev_targ.pb_targ);
+	linvfs_release_buftarg(&mp->m_ddev_targ);
 	if (logdev && logdev != ddev) {
 		xfs_binval(mp->m_logdev_targ);
-		linvfs_release_target(mp->m_logdev_targ.pb_targ);
+		linvfs_release_buftarg(&mp->m_logdev_targ);
 	}
 	if (rtdev != 0) {
 		xfs_binval(mp->m_rtdev_targ);
-		linvfs_release_target(mp->m_rtdev_targ.pb_targ);
+		linvfs_release_buftarg(&mp->m_rtdev_targ);
 	}
+ error2:
 	if (error) {
-#ifdef CELL_CAPABLE
 	        cxfs_unmount(mp);
-#endif
 		xfs_mount_free(mp, 1);
 	}
 	return error;
@@ -544,12 +482,12 @@ xfs_cmountfs(
  */
 STATIC xfs_mount_t *
 xfs_get_vfsmount(
-	vfs_t	*vfsp,
-	dev_t	ddev,
-	dev_t	logdev,
-	dev_t	rtdev)
+	vfs_t		*vfsp,
+	dev_t		ddev,
+	dev_t		logdev,
+	dev_t		rtdev)
 {
-	xfs_mount_t *mp;
+	xfs_mount_t	*mp;
 
 	/*
 	 * Allocate VFS private data (xfs mount structure).
@@ -570,47 +508,12 @@ xfs_get_vfsmount(
 }
 
 /*
- * xfs_mountargs -- Copy in xfs mount arguments
- *
- * Does the intialization and copying of xfs mount arguments taking account 
- * of the various xfs argument versions and abi's.
- *
- * The value returned is an error code.
- */
-int
-xfs_mountargs(
-	struct mounta	*uap,
-        struct xfs_args *ap)
-{
-	bzero(ap, sizeof (struct xfs_args));
-	ap->slcount = -1;
-        ap->stimeout = -1;
-	ap->ctimeout = -1;
-
-	if (uap->datalen && uap->dataptr) { 
-
-		/* Copy in the xfs_args version number */
-		memcpy(ap, uap->dataptr, sizeof(ap->version));
-
-		if (ap->version != 3) {
-			return XFS_ERROR(EINVAL);
-		}
-		memcpy(ap, uap->dataptr, sizeof(struct xfs_args_ver_3));
-	}
-
-	ap->fsname = uap->spec;
-
-	return (0);
-}
-
-/*
  * xfs_mount
  *
  * The file system configurations are:
  *	(1) device (partition) with data and internal log
  *	(2) logical volume with data and log subvolumes.
  *	(3) logical volume with data, log, and realtime subvolumes.
- *
  */ 
 STATIC int
 xfs_mount(
@@ -619,33 +522,22 @@ xfs_mount(
 	struct mounta	*uap,
 	cred_t		*credp)
 {
-	struct xfs_args	args;			/* xfs mount arguments */
+	struct xfs_args	*args;
 	dev_t		ddev;
 	dev_t		logdev;
 	dev_t		rtdev;
 	int		error;
 
+	args = (struct xfs_args *)uap->dataptr;
+
 	if (mvp->v_type != VDIR)
 		return XFS_ERROR(ENOTDIR);
 
-	if (   ((uap->flags & MS_REMOUNT) == 0)
-	    && ((vn_count(mvp) != 1) || (mvp->v_flag & VROOT)) )
-		return XFS_ERROR(EBUSY);
-
-	/*
-	 * Copy in XFS-specific arguments.
-	 */
-	error = xfs_mountargs(uap, &args);
+	error = spectodevs(vfsp->vfs_super, args, &ddev, &logdev, &rtdev);
 	if (error)
-		return (error);
-
-	if ((error = spectodevs(vfsp->vfs_super, &args, &ddev, &logdev, &rtdev)))
 		return error;
 
-	error = xfs_cmountfs(vfsp, ddev, logdev, rtdev, NONROOT_MOUNT,
-			     &args, uap, credp);
-	return error;
-
+	return xfs_cmountfs(vfsp, ddev, logdev, rtdev, args, credp);
 }
 
 
@@ -666,185 +558,6 @@ xfs_vfsmount(
 	vfs_unlock(vfsp);
 	return (error);
 }
-
-#ifndef __linux__
-
-/*
- * xfs_mountroot() mounts the root file system.
- *
- * This function is called by vfs_mountroot(), which is called my main().
- * Must check that the root device has a XFS superblock and as such a
- * XFS file system. If the device does not, reject the mountroot request
- * and return error so that vfs_mountroot() knows to continue its search
- * for someone able to mount root.
- *
- * "why" is:
- *	ROOT_INIT	initial call.
- *	ROOT_REMOUNT	remount the root file system.
- *	ROOT_UNMOUNT	unmounting the root (e.g., as part a system shutdown).
- */
-STATIC int
-xfs_mountroot(
-	vfs_t			*vfsp,
-	bhv_desc_t		*bdp,
-	enum whymountroot	why)
-{
-	int		error;
-	static int	xfsrootdone;
-	struct cred	*cr = get_current_cred();
-	dev_t		ddev, logdev, rtdev;
-	xfs_mount_t	*mp;
-	xfs_buf_t	*bp;
-
-	/*
-	 * Check that the root device holds an XFS file system.
-	 *
-	 * If the device is an XLV volume, cannot check for an
-	 * XFS superblock because the device is not yet open.
-	if ((why == ROOT_INIT) && 
-	     (MAJOR(rootdev) != XLV_MAJOR) &&
-	     (xfs_isdev(rootdev))) {
-		return XFS_ERROR(ENOSYS);
-	}
-	*/
-	
-	switch (why) {
-	case ROOT_INIT:
-		if (xfsrootdone++)
-			return XFS_ERROR(EBUSY);
-
-		if (rootdev == NODEV)
-			return XFS_ERROR(ENODEV);
-
-		vfsp->vfs_dev = rootdev;
-		break;
-
-	case ROOT_REMOUNT:
-		vfs_setflag(vfsp, VFS_REMOUNT);
-		break;
-
-	case ROOT_UNMOUNT:
-		mp = XFS_BHVTOM(bdp);
-		if (xfs_ibusy(mp)) {
-			XFS_bflush(mp->m_ddev_targ);
-			/*
-			 * There are still busy vnodes in the file system.
-			 * Flush what we can and then get out without
-			 * unmounting cleanly.  This will force recovery
-			 * to run when we reboot.  We return an error
-			 * even though nobody looks at it since we're
-			 * going down.
-			 *
-			 * It turns out that we always take this path,
-			 * because init and the uadmin command still have
-			 * files open when we get here.  We just try to
-			 * flush everything so that we'll be clean
-			 * anyway.
-			 *
-			 * First try the inodes.  xfs_sync() will try to
-			 * flush even those inodes which are currently
-			 * being referenced.  xfs_iflush_all() will purge
-			 * and flush all the unreferenced vnodes.
-			 */
-			xfs_sync(bdp,
-				 (SYNC_WAIT | SYNC_CLOSE |
-				  SYNC_ATTR | SYNC_FSDATA),
-				 cr);
-			xfs_iflush_all(mp, XFS_FLUSH_ALL);
-			if (mp->m_quotainfo) {
-				xfs_qm_dqrele_all_inodes(mp, 
-							 XFS_UQUOTA_ACCT |
-							 XFS_GQUOTA_ACCT);
-				xfs_qm_dqpurge_all(mp, 
-						   XFS_QMOPT_UQUOTA|
-						   XFS_QMOPT_GQUOTA|
-						   XFS_QMOPT_UMOUNTING);
-			}
-			/*
-			 * Force the log to unpin as many buffers as
-			 * possible and then sync them out.
-			 */
-			xfs_log_force(mp, (xfs_lsn_t)0,
-				      XFS_LOG_FORCE | XFS_LOG_SYNC);
-			xfs_binval(mp->m_ddev_targ);
-			if (mp->m_rtdev != NODEV) {
-				xfs_binval(mp->m_rtdev_targ);
-			}
-
-			/*
-			 * Force the log again to sync out any changes
-			 * caused by any delayed allocation buffers just
-			 * getting flushed out now.  Even though it seems
-			 * silly, flush the file system device again so that
-			 * any meta-data in the log gets flushed.
-			 */
-			xfs_log_force(mp, (xfs_lsn_t)0,
-				      XFS_LOG_FORCE | XFS_LOG_SYNC);
-			xfs_binval(mp->m_ddev_targ);
-
-			/*
-			 * Finally, try to flush out the superblock.  If
-			 * it is pinned at this point we can't, because
-			 * we don't want to get stuck waiting for it to
-			 * be unpinned.  It should be unpinned normally
-			 * because of the log flushes above.
-			 */
-			bp = xfs_getsb(mp, 0);
-			if (!(XFS_BUF_ISPINNED(bp))) {
-				XFS_BUF_UNDONE(bp);
-				XFS_BUF_UNREAD(bp);
-				XFS_BUF_WRITE(bp);
-				ASSERT(mp->m_dev == XFS_BUF_TARGET(bp));
-				xfsbdstrat(mp, bp);
-				(void) xfs_iowait(bp);
-			}
-			return XFS_ERROR(EBUSY);
-		}
-		error = xfs_unmount(bdp, 0, NULL);
-		return error;
-	}
-	error = vfs_lock(vfsp);
-	if (error) {
-		goto bad;
-	}
-        
-	ddev = logdev = rootdev;
-	rtdev = 0;
-        
-	ASSERT(ddev && logdev);
-
-	error = xfs_cmountfs(vfsp, ddev, logdev, rtdev, why, NULL, NULL, cr);
-
-	if (error) {
-		vfs_unlock(vfsp);
-		goto bad;
-	}
-	vfs_unlock(vfsp);
-	return(0);
-bad:
-	cmn_err(CE_WARN, "%s of root device %V failed with errno %d\n",
-		whymount[why], rootdev, error);
-	return error;
-}
-
-
-/* VFS_ROOTINIT */
-STATIC int
-xfs_rootinit(
-	vfs_t *vfsp)
-{
-	return(xfs_mountroot(vfsp, NULL, ROOT_INIT));
-}
-
-/* VFS_MOUNTROOT */
-STATIC int
-xfs_vfsmountroot(
-	bhv_desc_t *bdp,
-	enum whymountroot       why)
-{
-	return(xfs_mountroot(bhvtovfs(bdp), bdp, why));
-}
-#endif /* __linux__ */
 
 /*
  * xfs_ibusy searches for a busy inode in the mounted file system.
@@ -898,12 +611,11 @@ xfs_ibusy(
 }
 
 
-/*ARGSUSED*/
 STATIC int
 xfs_unmount(
 	bhv_desc_t	*bdp,
-	int	flags,
-	cred_t	*credp)
+	int		flags,
+	cred_t		*credp)
 {
 	xfs_mount_t	*mp;
 	xfs_inode_t	*rip;
@@ -920,17 +632,18 @@ xfs_unmount(
 	rvp = XFS_ITOV(rip);
 
 	if (vfsp->vfs_flag & VFS_DMI) {
-		bhv_desc_t	*rbdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(rvp), &xfs_vnodeops);
+		bhv_desc_t	*rbdp;
 
+		rbdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(rvp), &xfs_vnodeops);
 		error = dm_send_namesp_event(DM_EVENT_PREUNMOUNT,
 				rbdp, DM_RIGHT_NULL, rbdp, DM_RIGHT_NULL,
 				NULL, NULL, 0, 0,
-				(mp->m_dmevmask & (1 << DM_EVENT_PREUNMOUNT)) != 0 ?
+				(mp->m_dmevmask & (1<<DM_EVENT_PREUNMOUNT))?
 					0:DM_FLAGS_UNWANTED);
 			if (error)
 				return XFS_ERROR(error);
 		unmount_event_wanted = 1;
-		unmount_event_flags = (mp->m_dmevmask & (1 << DM_EVENT_UNMOUNT)) != 0 ?
+		unmount_event_flags = (mp->m_dmevmask & (1<<DM_EVENT_UNMOUNT))?
 					0 : DM_FLAGS_UNWANTED;
 	}
 
@@ -939,7 +652,6 @@ xfs_unmount(
 	 * out of the reference cache.
 	 */
 	xfs_refcache_purge_mp(mp);
-
 
 	/*
 	 * Make sure there are no active users.
@@ -1000,7 +712,6 @@ out:
 	}
 
 	return XFS_ERROR(error);
-
 }
 
 /*
@@ -1090,8 +801,6 @@ fscorrupt_out2:
 
 /*
  * xfs_root extracts the root vnode from a vfs.
- * This function is called by traverse() and vfs_mountroot()
- * when crossing a mount point.
  *
  * vfsp -- the vfs struct for the desired file system
  * vpp  -- address of the caller's vnode pointer which should be

@@ -4645,6 +4645,7 @@ xfs_seek(
 }
 
 
+#ifdef CELL_CAPABLE
 /*
  * xfs_allocstore
  *
@@ -4824,6 +4825,7 @@ xfs_allocstore(
 	}
 	return error;
 }
+#endif
 
 /*
  * xfs_get_uiosize - get uio size info

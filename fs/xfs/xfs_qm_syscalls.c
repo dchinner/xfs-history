@@ -39,7 +39,6 @@ STATIC int	xfs_qm_scall_getquota(xfs_mount_t *, xfs_dqid_t, uint, xfs_caddr_t);
 STATIC int	xfs_qm_scall_getqstat(xfs_mount_t *, xfs_caddr_t);
 STATIC int	xfs_qm_scall_setqlim(xfs_mount_t *, xfs_dqid_t, uint, xfs_caddr_t);
 STATIC int	xfs_qm_scall_quotaon(xfs_mount_t *, uint);
-STATIC int	xfs_qm_scall_qwarn(xfs_mount_t *, xfs_dqid_t, xfs_caddr_t);
 STATIC int	xfs_qm_log_quotaoff(xfs_mount_t *, xfs_qoff_logitem_t **, uint);
 STATIC int	xfs_qm_log_quotaoff_end(xfs_mount_t *, xfs_qoff_logitem_t *,
 					uint);

@@ -49,27 +49,6 @@
 
 
 int
-xfs_getattr(
-	bhv_desc_t	*bdp,
-	vattr_t		*vap,
-	int		flags,
-	cred_t		*credp);
-
-int
-xfs_setattr(
-	bhv_desc_t	*bdp,
-	vattr_t		*vap,
-	int		flags,
-	cred_t		*credp);
-
-int
-xfs_set_dmattrs (
-	bhv_desc_t	*bdp,
-	u_int		evmask,
-	u_int16_t	state,
-	cred_t		*credp);
-
-int
 xfs_get_uiosize(
 	xfs_mount_t	*mp,
 	xfs_inode_t	*ip,
@@ -1109,8 +1088,7 @@ xfs_ioctl(
 	case XFS_IOC_FSGETXATTR:
 		va.va_mask = AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS;
 
-		error = xfs_getattr(bdp, &va, 0, &cred);
-
+		VOP_GETATTR(vp, &va, 0, &cred, error);
 		if (error)
 			return -error;
 
@@ -1132,15 +1110,13 @@ xfs_ioctl(
 			return -XFS_ERROR(EFAULT);
 
 		va.va_mask = AT_XFLAGS | AT_EXTSIZE;
-
 		va.va_xflags  = fa.fsx_xflags;
 		va.va_extsize = fa.fsx_extsize;
 
 		attr_flags = (filp->f_flags & (O_NDELAY|O_NONBLOCK) )
 							? ATTR_NONBLOCK : 0;
 
-		error = xfs_setattr(bdp, &va, attr_flags, &cred);
-
+		VOP_SETATTR(vp, &va, attr_flags, &cred, error);
 		if (error)
 			return -error;
 
@@ -1150,8 +1126,7 @@ xfs_ioctl(
 	case XFS_IOC_FSGETXATTRA:
 		va.va_mask = AT_XFLAGS|AT_EXTSIZE|AT_ANEXTENTS;
 
-		error = xfs_getattr(bdp, &va, 0, &cred);
-
+		VOP_GETATTR(vp, &va, 0, &cred, error);
 		if (error)
 			return -error;
 

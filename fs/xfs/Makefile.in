@@ -41,7 +41,7 @@
 
 XFS_EXTRA_CFLAGS	:= $(src_includelist /fs/xfs) $(src_includelist /fs) -funsigned-char
 ifeq ($(CONFIG_XFS_DEBUG),y)
-  XFS_EXTRA_CFLAGS	+= -DDEBUG -DXFSDEBUG
+  XFS_EXTRA_CFLAGS	+= -g -DSTATIC="" -DDEBUG -DXFSDEBUG
 endif
 extra_cflags_all($(XFS_EXTRA_CFLAGS))
 

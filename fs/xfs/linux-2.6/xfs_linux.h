@@ -64,7 +64,7 @@
 #include <linux/acl.h>
 
 #ifndef STATIC
-#define STATIC
+#define STATIC static
 #endif
 
 typedef struct pathname {

@@ -41,10 +41,6 @@
 
 extern int xfs_bmap (bhv_desc_t *, xfs_off_t, ssize_t, int, struct cred *, pb_bmap_t *, int *);
 extern int xfs_strategy (bhv_desc_t *, xfs_off_t, ssize_t, int, struct cred *, pb_bmap_t *, int *);
-extern int xfs_iomap_read (xfs_iocore_t *, loff_t, size_t, int,
-				pb_bmap_t *, int *, struct pm *);
-extern int xfs_iomap_write (xfs_iocore_t *, loff_t, size_t, pb_bmap_t *,
-				int *, int, struct pm *);
 extern int xfsbdstrat (struct xfs_mount *, struct xfs_buf *);
 extern int xfs_bdstrat_cb (struct xfs_buf *);
 

@@ -1,5 +1,4 @@
 /*
- *									  *
  * Copyright (c) 2000 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -34,151 +33,50 @@
 #define __XFS_CLNT_H__
 
 /*
- * XFS arguments to the mount system call.
+ * XFS arguments structure, constructed from the arguments we
+ * are passed via the mount system call.
+ *
+ * NOTE: The mount system call is handled differently between
+ * Linux and IRIX.  In IRIX we worked work with a binary data
+ * structure coming in across the syscall interface from user
+ * space (the mount userspace knows about each filesystem type
+ * and the set of valid options for it, and converts the users
+ * argument string into a binary structure _before_ making the
+ * system call), and the ABI issues that this implies.
+ * 
+ * In Linux, we are passed a comma separated set of options;
+ * ie. a NULL terminated string of characters.  Userspace mount
+ * code does not have any knowledge of mount options expected by
+ * each filesystem type and so each filesystem parses its mount
+ * options in kernel space.
+ *
+ * For the Linux port, we kept this structure pretty much intact
+ * and use it internally (because the existing code groks it).
+ * We also kept "struct mounta" too, whereas we don't really need
+ * that - we keep it so that the vnode/vfs interface survives for
+ * the CXFS layer though.
  */
 struct xfs_args {
-
-        /*
-	 * These items common to all versions.
-	 */
-	int	version;	/* version of this */
-				/* 1, see xfs_args_ver_1 */
-				/* 2, see xfs_args_ver_2 */
-				/* 3, see xfs_args_ver_3 */
-				/* 4, see xfs_args_ver_4 */
-	int	flags;		/* flags, see XFSMNT_... below */
+	int	flags;		/* flags -> see XFSMNT_... macros below */
 	int	logbufs;	/* Number of log buffers, -1 to default */
 	int	logbufsize;	/* Size of log buffers, -1 to default */
-	char	*fsname;	/* filesystem name (mount point) */
-
-	/*
-	 * The following items added in version 2.  They are for stripe
-         * aligment.  Set 0 for no alignment handling (see XFSMNT_NOALIGN 
-	 * flag).
-	 */
-	int	sunit;		/* stripe unit (bbs) */
-	int	swidth;		/* stripe width (bbs), multiple of sunit */
-
-        /*
-         * The following items added in version 3.
-	 */
+	char	fsname[MAXNAMELEN];	/* data device name */
+	char	rtname[MAXNAMELEN];	/* realtime device filename */
+	char	logname[MAXNAMELEN];	/* journal device filename */
+	int	sunit;		/* stripe unit (BBs) */
+	int	swidth;		/* stripe width (BBs), multiple of sunit */
 	uchar_t	iosizelog;	/* log2 of the preferred I/O size */
-	uchar_t	reserved_0;	/* reserved fields */
-	short	reserved_1;
-	dev_t	logdev;		/* Log device */
-	dev_t	rtdev;		/* Realtime device */
 
-        /*
-	 * The following items added in version 4.  This stuff is for
-         * cxfs support.
-	 */
-        char    **servlist;     /* Table of hosts which may be servers */
-        int     *servlistlen;   /* Table of hostname lengths. */
-        int     slcount;        /* Count of hosts which may be servers. */
-        int     stimeout;       /* Server timeout in milliseconds */
-        int     ctimeout;       /* Client timeout in milliseconds */
-        char    *server;        /* Designated server hostname (for remount). */
-        int     servlen;        /* Length of server hostname (for remount). */
-        int     servcell;       /* Server cell (internal testing only) */
+	/*  The remainder is for CXFS support.  */
+	char	**servlist;	/* Table of hosts which may be servers */
+	int	*servlistlen;	/* Table of hostname lengths. */
+	int	slcount;	/* Count of hosts which may be servers. */
+	int	stimeout;	/* Server timeout in milliseconds */
+	int	ctimeout;	/* Client timeout in milliseconds */
+	char	*server;	/* Designated server hostname (for remount). */
+	int	servlen;	/* Length of server hostname (for remount). */
+	int	servcell;	/* Server cell (internal testing only) */
 };
-
-#ifdef __KERNEL__
-
-struct xfs_args32_ver_1 {
-	__int32_t	version;
-	__int32_t	flags;
-	__int32_t	logbufs;
-	__int32_t	logbufsize;
-	app32_ptr_t	fsname;
-};
-
-struct xfs_args32_ver_2 {
-	__int32_t	version;
-	__int32_t	flags;
-	__int32_t	logbufs;
-	__int32_t	logbufsize;
-	app32_ptr_t	fsname;
-	__int32_t	sunit;
-	__int32_t	swidth;
-};
-
-struct xfs_args32_ver_3 {
-	__int32_t	version;
-	__int32_t	flags;
-	__int32_t	logbufs;
-	__int32_t	logbufsize;
-	app32_ptr_t	fsname;
-	__int32_t	sunit;
-	__int32_t	swidth;
-	uint8_t		iosizelog;
-	uint8_t		reserved_3_0;
-	__int16_t	reserved_3_1;
-	__int32_t	reserved_3_2;
-	__int32_t	reserved_3_3;
-};
-
-struct xfs_args32_ver_4 {
-	__int32_t	version;
-	__int32_t	flags;
-	__int32_t	logbufs;
-	__int32_t	logbufsize;
-	app32_ptr_t	fsname;
-	__int32_t	sunit;
-	__int32_t	swidth;
-	uint8_t		iosizelog;
-	uint8_t		reserved_3_0;
-	__int16_t	reserved_3_1;
-	__int32_t	reserved_3_2;
-	__int32_t	reserved_3_3;
-        app32_ptr_t     servlist;
-        app32_ptr_t     servlistlen;
-  	__int32_t	slcount;
-        __int32_t       stimeout;
-        __int32_t       ctimeout;
-        app32_ptr_t     server;
-  	__int32_t	servlen;
-  	__int32_t	servcell;
-};
-
-struct xfs_args_ver_1 {
-	int	version;
-	int	flags;
-	int	logbufs;
-	int	logbufsize;
-	char	*fsname;
-};
-
-struct xfs_args_ver_2 {
-	int	version;
-	int	flags;
-	int	logbufs;
-	int	logbufsize;
-	char	*fsname;
-	int	sunit;
-	int	swidth;
-};
-
-struct xfs_args_ver_3 {
-	int	version;
-	int	flags;
-	int	logbufs;
-	int	logbufsize;
-	char	*fsname;
-	int	sunit;
-	int	swidth;
-	uchar_t	iosizelog;
-	uchar_t	reserved_0;
-	short	reserved_1;
-	int	reserved_2;
-	int	reserved_3;
-};
-
-#define XFSARGS_FOR_CXFSARR(ap)		\
-	((ap)->servlist || (ap)->slcount >= 0 || \
-	 (ap)->stimeout >= 0 || (ap)->ctimeout >= 0 || \
-	 (ap)->flags & (XFSMNT_CLNTONLY | XFSMNT_UNSHARED))
-
-#endif	/* __KERNEL__ */
 
 /*
  * XFS mount option flags
@@ -222,5 +120,12 @@ struct xfs_args_ver_3 {
 #define XFSMNT_GQUOTAENF	0x00800000	/* group quota limit
 						 * enforcement */
 #define XFSMNT_NOUUID		0x01000000	/* Ignore fs uuid */
+
+
+/* Did we get any args for CXFS to consume? */
+#define XFSARGS_FOR_CXFSARR(ap)		\
+	((ap)->servlist || (ap)->slcount >= 0 || \
+	 (ap)->stimeout >= 0 || (ap)->ctimeout >= 0 || \
+	 (ap)->flags & (XFSMNT_CLNTONLY | XFSMNT_UNSHARED))
 
 #endif	/* __XFS_CLNT_H__ */

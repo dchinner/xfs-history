@@ -33,12 +33,6 @@
 #include <xfs.h>
 
 
-STATIC void
-xfs_delalloc_cleanup(
-	xfs_inode_t	*ip,
-	xfs_fileoff_t	start_fsb,
-	xfs_filblks_t	count_fsb);
-
 /*
  * Round the given file offset down to the nearest read/write
  * size boundary.

@@ -86,12 +86,19 @@
 				XFS_QUOTA_STRING XFS_VNTRACE_STRING \
 				XFS_DBG_STRING /* must be last */
 
-
+struct buftarg;
 struct xfs_args;
 
+int
+linvfs_fill_buftarg(
+	struct buftarg	*btp,
+	dev_t		dev,
+	struct super_block *sb,
+	int		data);
+
 void
-linvfs_release_target(
-	struct pb_target *target);
+linvfs_release_buftarg(
+	struct buftarg	*btp);
 
 int
 fs_dounmount(

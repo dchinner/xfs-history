@@ -32,8 +32,6 @@
 # Makefile for XFS on Linux.
 #
 
-#CFLAGS := $(filter-out -Wall,$(CFLAGS))
-
 # This needs -I. because everything does #include <xfs.h> instead of "xfs.h".
 # The code is wrong, local files should be included using "xfs.h", not <xfs.h>
 # but I am not going to change every file at the moment.  It also needs
@@ -42,7 +40,7 @@
 EXTRA_CFLAGS +=  -I. -I$(TOPDIR)/fs  -funsigned-char 
 
 ifeq ($(CONFIG_XFS_DEBUG),y)
-	EXTRA_CFLAGS += -DDEBUG -DXFSDEBUG
+	EXTRA_CFLAGS += -g -DSTATIC="" -DDEBUG -DXFSDEBUG
 endif
 
 subdir-$(CONFIG_XFS_FS)		+= linux

@@ -105,7 +105,7 @@ xfs_trans_alloc(
 {
 	xfs_trans_t	*tp;
 
-	xfs_check_frozen(mp, NULL, NULL, XFS_FREEZE_TRANS);
+	xfs_check_frozen(mp, NULL, 0, XFS_FREEZE_TRANS);
 
 	ASSERT(xfs_trans_zone != NULL);
 	tp = kmem_zone_zalloc(xfs_trans_zone, KM_SLEEP_IO);
