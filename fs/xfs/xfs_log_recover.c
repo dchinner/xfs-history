@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.34 $"
+#ident	"$Revision: 1.35 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -192,6 +192,10 @@ xlog_find_verify_cycle(caddr_t	*bap,		/* update ptr as we go */
 
 /*
  * Potentially backup over partial log record write
+ *
+ * In the typical case, last_blk is the number of the block directly after
+ * a good log record.  Therefore, we subtract one to get the block number
+ * of the last block in the given buffer.
  */
 STATIC int
 xlog_find_verify_log_record(caddr_t	ba,	     /* update ptr as we go */
@@ -200,8 +204,14 @@ xlog_find_verify_log_record(caddr_t	ba,	     /* update ptr as we go */
 {
     xlog_rec_header_t *rhead;
     int		      i;
+    int		      extra_bblks = 0;
 
     ASSERT(start_blk != 0 || *last_blk != start_blk);
+
+    /* We may be verifying a partial log record */
+    if (*last_blk - start_blk < BTOBB(XLOG_MAX_RECORD_BSIZE)) {
+	extra_bblks = BTOBB(XLOG_MAX_RECORD_BSIZE) - (*last_blk - start_blk);
+    }
 
     ba -= BBSIZE;
     for (i=(*last_blk)-1; i>=0; i--) {
@@ -212,12 +222,24 @@ xlog_find_verify_log_record(caddr_t	ba,	     /* update ptr as we go */
 		xlog_warn("xFS: xlog_find_verify_log_record: need to backup");
 		ASSERT(0);
 		return XFS_ERROR(EIO);
-	}
+	    }
 	    ba -= BBSIZE;
 	}
     }
+
+    /* We hit the beginning of the physical log */
+    if (i == -1)
+	    return -1;
+
+    /*
+     * We may have found a log record header before we expected one.
+     * last_blk will be the 1st block # with a given cycle #.  We may end
+     * up reading an entire log record.  In this case, we don't want to
+     * reset last_blk.  Only when last_blk points in the middle of a log
+     * record do we update last_blk.
+     */
     rhead = (xlog_rec_header_t *)ba;
-    if (*last_blk - i != BTOBB(rhead->h_len)+1)
+    if (*last_blk - i + extra_bblks != BTOBB(rhead->h_len)+1)
 	*last_blk = i;
     return 0;
 }	/* xlog_find_verify_log_record */
@@ -239,94 +261,142 @@ int
 xlog_find_head(xlog_t  *log,
 	       daddr_t *head_blk)
 {
-	buf_t	*bp, *big_bp;
-	daddr_t	new_blk, first_blk, start_blk, mid_blk, last_blk;
-	daddr_t num_scan_bblks;
-	uint	first_half_cycle, mid_cycle, last_half_cycle, cycle;
-	caddr_t	ba;
-	int	error, i, log_bbnum = log->l_logBBsize;
+    buf_t   *bp, *big_bp;
+    daddr_t new_blk, first_blk, start_blk, mid_blk, last_blk;
+    daddr_t num_scan_bblks;
+    uint    first_half_cycle, mid_cycle, last_half_cycle, cycle;
+    caddr_t ba;
+    int     error, i, log_bbnum = log->l_logBBsize;
 
-	/* special case freshly mkfs'ed filesystem */
-	if ((error = xlog_find_zeroed(log, &first_blk)) == -1) {
-		*head_blk = first_blk;
-		return 0;
-	} else if (error)
-		return error;
+    /* special case freshly mkfs'ed filesystem; return immediately */
+    if ((error = xlog_find_zeroed(log, &first_blk)) == -1) {
+	*head_blk = first_blk;
+	return 0;
+    } else if (error)
+	return error;
 
-	first_blk = 0;					/* read first block */
-	bp = xlog_get_bp(1);
-	if (error = xlog_bread(log, 0, 1, bp))
-		goto bp_err;
-	first_half_cycle = GET_CYCLE(bp->b_dmaaddr);
+    first_blk = 0;				/* get cycle # of 1st block */
+    bp = xlog_get_bp(1);
+    if (error = xlog_bread(log, 0, 1, bp))
+	goto bp_err;
+    first_half_cycle = GET_CYCLE(bp->b_dmaaddr);
 
-	last_blk = log->l_logBBsize-1;			/* read last block */
-	if (error = xlog_bread(log, last_blk, 1, bp))
-		goto bp_err;
-	last_half_cycle = GET_CYCLE(bp->b_dmaaddr);
-	ASSERT(last_half_cycle != 0);
+    last_blk = log->l_logBBsize-1;		/* get cycle # of last block */
+    if (error = xlog_bread(log, last_blk, 1, bp))
+	goto bp_err;
+    last_half_cycle = GET_CYCLE(bp->b_dmaaddr);
+    ASSERT(last_half_cycle != 0);
 
-	if (first_half_cycle == last_half_cycle) {/* all cycle nos are same */
-		last_blk = 0;
-	} else {		/* have 1st and last; look for middle cycle */
-		if (error = xlog_find_cycle_start(log, bp, first_blk,
-						  &last_blk, last_half_cycle))
-			goto bp_err;
+    if (first_half_cycle == last_half_cycle) { /* all cycle #s are same */
+	last_blk = 0;
+    } else {
+	/* Find 1st block # with cycle # matching last_half_cycle */
+	if (error = xlog_find_cycle_start(log, bp, first_blk,
+					  &last_blk, last_half_cycle))
+	    goto bp_err;
+    }
+
+    /*
+     * Now validate the answer.  Scan back some number of maximum possible
+     * blocks and make sure each one has the expected cycle number.
+     */
+    num_scan_bblks = BTOBB(XLOG_MAX_ICLOGS<<XLOG_MAX_RECORD_BSHIFT);
+    big_bp = xlog_get_bp(num_scan_bblks);
+    if (last_blk >= num_scan_bblks) {
+	/*
+	 * We are guaranteed that the entire check can be performed
+	 * in one buffer.
+	 */
+	start_blk = last_blk - num_scan_bblks;
+	if (error = xlog_bread(log, start_blk, num_scan_bblks, big_bp))
+	    goto big_bp_err;
+	ba = big_bp->b_dmaaddr;
+	new_blk = xlog_find_verify_cycle(&ba, start_blk, num_scan_bblks,
+					 first_half_cycle);
+	if (new_blk != -1)
+	    last_blk = new_blk;
+    } else {			/* need to read 2 parts of log */
+	/*
+	 * We need to read the log in 2 parts.  Scan the physical end of log
+	 * first.  If all the cycle numbers are good, we can then move to the
+	 * beginning of the log.  last_blk should be a # close to the beginning
+	 * of the log.
+	 */
+	start_blk = log_bbnum - num_scan_bblks + last_blk;
+	if (error = xlog_bread(log, start_blk, num_scan_bblks-last_blk, big_bp))
+	    goto big_bp_err;
+	ba = big_bp->b_dmaaddr;
+	new_blk = xlog_find_verify_cycle(&ba, start_blk, num_scan_bblks-last_blk,
+					 last_half_cycle);
+	if (new_blk != -1) {
+	    last_blk = new_blk;
+	    goto bad_blk;
 	}
 
-	/* Now validate the answer */
-	num_scan_bblks = BTOBB(XLOG_MAX_ICLOGS<<XLOG_MAX_RECORD_BSHIFT);
-	big_bp = xlog_get_bp(num_scan_bblks);
-	if (last_blk >= num_scan_bblks) {
-		start_blk = last_blk - num_scan_bblks;
-		if (error = xlog_bread(log, start_blk, num_scan_bblks, big_bp))
-			goto big_bp_err;
-		ba = big_bp->b_dmaaddr;
-		new_blk = xlog_find_verify_cycle(&ba, start_blk,
-						 num_scan_bblks,
-						 first_half_cycle);
-		if (new_blk != -1)
-			last_blk = new_blk;
-	} else {	/* need to read 2 parts of log */
-		/* scan end of physical log */
-		start_blk = log_bbnum - num_scan_bblks + last_blk;
-		if (error = xlog_bread(log, start_blk,
-				       num_scan_bblks - last_blk, big_bp))
-			goto big_bp_err;
-		ba = big_bp->b_dmaaddr;
-		new_blk = xlog_find_verify_cycle(&ba, start_blk,
-						 num_scan_bblks - last_blk,
-						 last_half_cycle);
-		if (new_blk != -1) {
-			last_blk = new_blk;
-			goto bad_blk;
-		}
-
-		/* scan beginning of physical log */
-		start_blk = 0;
-		if (error = xlog_bread(log, start_blk, last_blk, big_bp))
-			goto big_bp_err;
-		ba = big_bp->b_dmaaddr;
-		new_blk = xlog_find_verify_cycle(&ba, start_blk, last_blk,
-						 first_half_cycle);
-		if (new_blk != -1)
-			last_blk = new_blk;
-	}
+	/* Scan beginning of log now.  The 1st part is good */
+	start_blk = 0;
+	if (error = xlog_bread(log, start_blk, last_blk, big_bp))
+	    goto big_bp_err;
+	ba = big_bp->b_dmaaddr;
+	new_blk = xlog_find_verify_cycle(&ba, start_blk, last_blk,
+					 first_half_cycle);
+	if (new_blk != -1)
+	    last_blk = new_blk;
+    }
 
 bad_blk:
-	/* Potentially backup over partial log record write */
-	if (error = xlog_find_verify_log_record(ba, start_blk, &last_blk))
+    /*
+     * Now we need to make sure last_blk is not pointing to a block in
+     * the middle of a log record.
+     */
+    num_scan_bblks = BTOBB(XLOG_MAX_RECORD_BSIZE);
+    if (last_blk >= num_scan_bblks) {
+	start_blk = last_blk - num_scan_bblks;  /* don't read last_blk */
+	if (error = xlog_bread(log, start_blk, num_scan_bblks, big_bp))
+	    goto big_bp_err;
+
+	/* start ptr at last block ptr before last_blk */
+	ba = big_bp->b_dmaaddr + XLOG_MAX_RECORD_BSIZE;
+	if ((error= xlog_find_verify_log_record(ba,start_blk,&last_blk)) == -1) {
+	    error = XFS_ERROR(EIO);
+	    goto big_bp_err;
+	} else if (error)
+	    goto big_bp_err;
+    } else {
+	start_blk = 0;
+	if (error = xlog_bread(log, start_blk, last_blk, big_bp))
+	    goto big_bp_err;
+	ba = big_bp->b_dmaaddr + BBTOB(last_blk);
+	if ((error= xlog_find_verify_log_record(ba,start_blk,&last_blk)) == -1) {
+	    /* We hit the beginning of the log during our search */
+	    start_blk = log_bbnum - num_scan_bblks + last_blk;
+	    new_blk = log_bbnum;
+	    if (error = xlog_bread(log, start_blk, log_bbnum - start_blk,
+				   big_bp))
 		goto big_bp_err;
-	
-	xlog_put_bp(big_bp);
-	xlog_put_bp(bp);
-	*head_blk = last_blk;
-	/*
-	 * When returning here, we have a good block number.  Bad block
-	 * means that during a previous crash, we didn't have a clean break
-	 * from cycle number N to cycle number N-1.  In this case, we need
-	 * to find the first block with cycle number N-1.
-	 */
-	return 0;
+	    ba = big_bp->b_dmaaddr + BBTOB(log_bbnum - start_blk);
+	    if ((error = xlog_find_verify_log_record(ba, start_blk,
+						     &new_blk)) == -1) {
+		error = XFS_ERROR(EIO);
+		goto big_bp_err;
+	    } else if (error)
+		goto big_bp_err;
+	    if (new_blk != log_bbnum)
+		last_blk = new_blk;
+	} else if (error)
+	    goto big_bp_err;
+    }
+
+    xlog_put_bp(big_bp);
+    xlog_put_bp(bp);
+    *head_blk = last_blk;
+    /*
+     * When returning here, we have a good block number.  Bad block
+     * means that during a previous crash, we didn't have a clean break
+     * from cycle number N to cycle number N-1.  In this case, we need
+     * to find the first block with cycle number N-1.
+     */
+    return 0;
 
 big_bp_err:
 	xlog_put_bp(big_bp);
@@ -567,7 +637,10 @@ xlog_find_zeroed(xlog_t	 *log,
 	if (new_blk != -1)
 		last_blk = new_blk;
 
-	/* Potentially backup over partial log record write */
+	/*
+	 * Potentially backup over partial log record write.  We don't need
+	 * to search the end of the log because we know it is zero.
+	 */
 	if (error = xlog_find_verify_log_record(ba, start_blk, &last_blk))
 	    goto big_bp_err;
 
@@ -2104,7 +2177,7 @@ bread_err:
     if (error)
 	    return error;
 
-#ifdef KERNEL
+#ifdef _KERNEL
     bflush(log->l_mp->m_dev);    /* Flush out all the delayed write buffers */
 
     /*
@@ -2154,7 +2227,7 @@ bread_err:
     xlog_recover_process_efis(log);
     xlog_recover_process_iunlinks(log);
     xlog_recover_check_summary(log);
-#endif /* KERNEL */
+#endif /* _KERNEL */
     return 0;
 }	/* xlog_do_recover */
 
