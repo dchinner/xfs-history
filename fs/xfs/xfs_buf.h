@@ -482,17 +482,17 @@ extern dev_t	XFS_pb_target(page_buf_t *);
 
 #define xfs_buf_read(target, blkno, len, flags) \
 		pagebuf_get((target)->inode, (blkno) << 9, (len) << 9, \
-				PBF_LOCK | PBF_READ | PBF_MAPPED)
+			PBF_LOCK | PBF_READ | PBF_MAPPED | PBF_MAPPABLE)
 #define xfs_buf_get(target, blkno, len, flags) \
 		pagebuf_get((target)->inode, (blkno) << 9, (len) << 9, \
-				PBF_LOCK | PBF_MAPPED)
+			PBF_LOCK | PBF_MAPPED | PBF_MAPPABLE)
 
 #define xfs_buf_read_flags(target, blkno, len, flags) \
 		pagebuf_get((target)->inode, (blkno) << 9, (len) << 9, \
-				PBF_READ | flags)
+			PBF_READ | PBF_MAPPABLE | flags)
 #define xfs_buf_get_flags(target, blkno, len, flags) \
 		pagebuf_get((target)->inode, (blkno) << 9, (len) << 9, \
-				flags)
+			PBF_MAPPABLE | flags)
 
 static inline int	xfs_bawrite(void *mp, page_buf_t *bp)
 {
