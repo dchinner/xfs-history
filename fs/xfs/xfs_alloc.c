@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.96 $"
+#ident	"$Revision: 1.97 $"
 
 /*
  * Free space allocation for XFS.
@@ -1494,6 +1494,7 @@ xfs_alloc_ag_vextent_size(
 	if (rlen < args->minlen || !xfs_alloc_fix_minleft(args)) {
 		xfs_btree_del_cursor(cnt_cur, XFS_BTREE_NOERROR);
 		xfs_alloc_trace_alloc(fname, "nominleft", args);
+		args->agbno = NULLAGBLOCK;
 		return 0;
 	}
 	rlen = args->len;
