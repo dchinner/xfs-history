@@ -375,6 +375,7 @@ xfs_ialloc_ag_select(
 	xfs_agi_t	*agi;		/* allocation group header */
 	int		doneleft;	/* done searching lower numbered ag's */
 	int		doneright;	/* done "" higher numbered ag's */
+	int		flags;		/* alloc buffer locking flags */
 	xfs_mount_t	*mp;		/* mount point structure */
 	int		needspace;	/* file mode implies space allocated */
 	xfs_agnumber_t	pagno;		/* parent ag number */
@@ -400,7 +401,8 @@ xfs_ialloc_ag_select(
 	 * to the right (higher numbered) of the parent allocation group,
 	 * alternating left and right.
 	 */
-	for (agoff = S_ISDIR(mode) != 0 && !sameag, doneleft = doneright = 0;
+	for (agoff = S_ISDIR(mode) != 0 && !sameag, doneleft = doneright = 0,
+	     flags = sameag ? 0 : XFS_ALLOC_FLAG_TRYLOCK;
 	     !doneleft || !doneright;
 	     agoff = -agoff + (agoff >= 0)) {
 		/*
@@ -413,12 +415,22 @@ xfs_ialloc_ag_select(
 		 */
 		if (agoff >= 0 && pagno + agoff >= agcount) {
 			doneright = 1;
+			if (doneleft && flags) {
+				flags = 0;
+				agoff = S_ISDIR(mode) != 0 && !sameag;
+				doneleft = doneright = 0;
+			}
 			continue;
 		/*
 		 * If this one is off the end to the left, stop there.
 		 */
 		} else if (agoff < 0 && pagno < -agoff) {
 			doneleft = 1;
+			if (doneright && flags) {
+				flags = 0;
+				agoff = S_ISDIR(mode) != 0 && !sameag;
+				doneleft = doneright = 0;
+			}
 			continue;
 		}
 		/*
@@ -431,7 +443,7 @@ xfs_ialloc_ag_select(
 		 * Is there enough free space for the file plus a block
 		 * of inodes (if we need to allocate some)?
 		 */
-		if (xfs_alloc_ag_freeblks(mp, tp, agno, 0) >=
+		if (xfs_alloc_ag_freeblks(mp, tp, agno, flags) >=
 		    needspace + (agi->agi_freecount == 0))
 			return agbuf;
 		xfs_trans_brelse(tp, agbuf);
