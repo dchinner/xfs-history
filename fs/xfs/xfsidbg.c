@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.76 $"
+#ident	"$Revision: 1.77 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3550,8 +3550,8 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	qprintf("ag_maxlevels %d bm_maxlevels[d,a] %d %d in_maxlevels %d\n",
 		mp->m_ag_maxlevels, mp->m_bm_maxlevels[0],
 		mp->m_bm_maxlevels[1], mp->m_in_maxlevels);
-	qprintf("perag 0x%x &peraglock 0x%x &growlock 0x%x rbmrotor %d\n",
-		mp->m_perag, &mp->m_peraglock, &mp->m_growlock, mp->m_rbmrotor);
+	qprintf("perag 0x%x &peraglock 0x%x &growlock 0x%x\n",
+		mp->m_perag, &mp->m_peraglock, &mp->m_growlock);
 	printflags(mp->m_flags, xmount_flags,"flags");
 	qprintf("ialloc_inos %d ialloc_blks %d litino %d\n",
 		mp->m_ialloc_inos, mp->m_ialloc_blks, mp->m_litino);
