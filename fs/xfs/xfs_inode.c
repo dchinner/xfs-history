@@ -1,9 +1,10 @@
 #include <sys/param.h>
 #ifdef SIM
-#define	_KERNEL
+#define	_KERNEL 1
 #endif
 #include <sys/buf.h>
 #include <sys/vnode.h>
+#include <sys/pfdat.h>
 #include <sys/cred.h>
 #ifdef SIM
 #undef _KERNEL
@@ -49,7 +50,10 @@
 
 zone_t *xfs_inode_zone;
 
-
+/*
+ * Used in xfs_itruncate().  This number needs more thought.
+ */
+#define	XFS_ITRUNC_MAX_EXTENTS	128
 
 /*
  * This routine is called to map an inode number within a file
@@ -467,6 +471,117 @@ xfs_ialloc(xfs_trans_t	*tp,
 	 */
 	xfs_trans_log_inode(tp, ip, flags);
 	return ip;
+}
+
+/*
+ * Shrink the file to the given new_size.  The new
+ * size must be smaller than the current size.
+ * This will free up the underlying blocks and clear
+ * the buffer and page caches of file data in the
+ * removed range.
+ *
+ * The transaction passed to this routine must have made
+ * a permanent log reservation of at least XFS_ITRUNCATE_LOG_RES.
+ * This routine may commit the given transaction and
+ * start new ones, so make sure everything involved in
+ * the transaction is tidy before calling here.
+ * Some transaction will be returned to the caller to be
+ * committed.  The incoming transaction must already include
+ * the inode, and both inode locks must be held exclusively.
+ * The inode must also be "held" within the transaction.  On
+ * return the inode will be "held" within the returned transaction.
+ * This routine does NOT require any disk space to be reserved
+ * for it within the transaction.
+ *
+ * XXXXXXXXXXXXajs
+ * Calling ptossvp() within the scope of the ilock in this
+ * routine depends on chunktoss() (called from ptossvp()) not
+ * having to write out any buffers.  This requires new handling
+ * for buffers overlapping the truncated range which is not
+ * done yet.
+ */
+void
+xfs_itruncate(xfs_trans_t	**tp,
+	      xfs_inode_t	*ip,
+	      __int64_t		new_size)
+{
+	xfs_fsblock_t	first_block;
+	xfs_fsblock_t	first_unmap_block;
+	xfs_fsblock_t	last_block;
+	xfs_extlen_t	unmap_len;
+	__int64_t	last_byte;
+	xfs_mount_t	*mp;
+	xfs_sb_t	*sbp;
+	xfs_trans_t	*ntp;
+	int		done;
+	xfs_bmap_free_t	free_list;
+
+	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
+	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE) != 0);
+	ASSERT(new_size < ip->i_d.di_size);
+	ASSERT(*tp != NULL);
+	ASSERT((*tp)->t_flags & XFS_TRANS_PERM_LOG_RES);
+	ASSERT(ip->i_transp == *tp);
+	ASSERT(ip->i_item.ili_flags & XFS_ILI_HOLD);
+
+	mp = (*tp)->t_mountp;
+	/*
+	 * Call ptossvp() to get rid of pages and buffers
+	 * overlapping the region being removed.  Make sure
+	 * to catch any pages brought in by buffers overlapping
+	 * the EOF by searching out beyond the isize by our
+	 * writeio size.
+	 */
+	last_byte = ip->i_d.di_size + (1 << mp->m_writeio_log);
+	ptossvp(XFS_ITOV(ip), new_size, last_byte);
+
+	sbp = &(mp->m_sb);
+	first_unmap_block = xfs_b_to_fsb(sbp, new_size);
+	last_block = xfs_b_to_fsbt(sbp, ip->i_d.di_size);
+	if (first_unmap_block > last_block) {
+		/*
+		 * The old size and new size both fall on the same
+		 * fs block, so there are no blocks to free.
+		 * Just set the new size of the inode and return.
+		 */
+		ip->i_d.di_size = new_size;
+		xfs_trans_log_inode(*tp, ip, XFS_ILOG_CORE);
+		return;
+	}
+	done = 0;
+	unmap_len = last_block - first_unmap_block + 1;
+	while (!done) {
+		/*
+		 * Free up up to XFS_ITRUNC_MAX_EXTENTS.  xfs_bunmapi()
+		 * will tell us whether it freed the entire range or
+		 * not.
+		 */
+		first_block = NULLFSBLOCK;
+		free_list.xbf_first = NULL;
+		free_list.xbf_count = 0;
+		first_block = xfs_bunmapi(*tp, ip, first_unmap_block,
+					  unmap_len, first_block,
+					  XFS_ITRUNC_MAX_EXTENTS, &free_list,
+					  &done);
+
+		/*
+		 * Duplicate the transaction that has the permanent
+		 * reservation and commit the old transaction.
+		 */
+		ntp = xfs_trans_dup(*tp);
+		xfs_bmap_finish(tp, &free_list, first_block);
+		xfs_trans_commit(*tp, 0);
+		*tp = ntp;
+
+		/*
+		 * Add the inode being truncated to the next chained
+		 * transaction.
+		 */
+		xfs_trans_ijoin(*tp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
+		xfs_trans_ihold(*tp, ip);
+	}
+	ip->i_d.di_size = new_size;
+	xfs_trans_log_inode(*tp, ip, XFS_ILOG_CORE);
 }
 
 /*
