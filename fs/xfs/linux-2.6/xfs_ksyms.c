@@ -137,7 +137,7 @@ EXPORT_SYMBOL(xfs_next_bit);
 EXPORT_SYMBOL(xfs_contig_bits);
 EXPORT_SYMBOL(xfs_bmbt_get_all);
 EXPORT_SYMBOL(xfs_params);
-#if ARCH_CONVERT != ARCH_NOCONVERT
+#if __BYTE_ORDER != __BIG_ENDIAN
 EXPORT_SYMBOL(xfs_bmbt_disk_get_all);
 #endif
 
