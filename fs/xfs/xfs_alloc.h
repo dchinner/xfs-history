@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ALLOC_H
 #define	_FS_XFS_ALLOC_H
 
-#ident	"$Revision: 1.39 $"
+#ident	"$Revision: 1.41 $"
 
 struct buf;
 struct xfs_mount;
@@ -153,7 +153,6 @@ int				/* error */
 xfs_alloc_vextent(
 	xfs_alloc_arg_t	*args);	/* allocation argument structure */
 
-#ifndef SIM
 /*
  * Free an extent.
  */
@@ -164,4 +163,3 @@ xfs_free_extent(
 	xfs_extlen_t	len);	/* length of extent */
 #endif	/* !SIM */
 
-#endif	/* !_FS_XFS_ALLOC_H */
