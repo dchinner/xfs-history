@@ -5,7 +5,6 @@
  */
 
 #include <sys/param.h>
-#include <sys/buf.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/debug.h>
@@ -20,6 +19,7 @@
 #ifdef SIM
 #define _KERNEL
 #endif
+#include <sys/buf.h>
 #include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL
@@ -60,13 +60,16 @@ buf_t *
 xfs_btree_read_bufl(xfs_mount_t *mp, xfs_trans_t *tp, xfs_fsblock_t fsbno,
 		    uint lock_flag)
 {
+	buf_t		*bp;		/* return value */
 	daddr_t		d;		/* disk block address */
 	xfs_sb_t	*sbp;		/* superblock structure */
 
 	ASSERT(fsbno != NULLFSBLOCK);
 	sbp = &mp->m_sb;
 	d = xfs_fsb_to_daddr(sbp, fsbno);
-	return xfs_trans_read_buf(tp, mp->m_dev, d, mp->m_bsize, lock_flag);
+	bp = xfs_trans_read_buf(tp, mp->m_dev, d, mp->m_bsize, lock_flag);
+	ASSERT(!bp || !geterror(bp));
+	return bp;
 }
 
 /*
@@ -76,6 +79,7 @@ buf_t *
 xfs_btree_read_bufs(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno,
 		 xfs_agblock_t agbno, uint lock_flag)
 {
+	buf_t		*bp;		/* return value */
 	daddr_t		d;		/* disk block address */
 	xfs_sb_t	*sbp;		/* superblock structure */
 
@@ -83,7 +87,9 @@ xfs_btree_read_bufs(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno,
 	ASSERT(agbno != NULLAGBLOCK);
 	sbp = &mp->m_sb;
 	d = xfs_agb_to_daddr(sbp, agno, agbno);
-	return xfs_trans_read_buf(tp, mp->m_dev, d, mp->m_bsize, lock_flag);
+	bp = xfs_trans_read_buf(tp, mp->m_dev, d, mp->m_bsize, lock_flag);
+	ASSERT(!bp || !geterror(bp));
+	return bp;
 }
 
 #ifdef XFSDEBUG
@@ -266,9 +272,10 @@ xfs_btree_dup_cursor(xfs_btree_cur_t *cur)
 	newcur->bc_rec = cur->bc_rec;
 	for (i = 0; i < newcur->bc_nlevels; i++) {
 		newcur->bc_ptrs[i] = cur->bc_ptrs[i];
-		if (buf = cur->bc_bufs[i])
-			newcur->bc_bufs[i] = xfs_trans_read_buf(tp, mp->m_dev, buf->b_blkno, mp->m_bsize, 0);
-		else
+		if (buf = cur->bc_bufs[i]) {
+			buf = newcur->bc_bufs[i] = xfs_trans_read_buf(tp, mp->m_dev, buf->b_blkno, mp->m_bsize, 0);
+			ASSERT(buf && !geterror(buf));
+		} else
 			newcur->bc_bufs[i] = 0;
 	}
 	return newcur;
@@ -298,13 +305,16 @@ buf_t *
 xfs_btree_get_bufl(xfs_mount_t *mp, xfs_trans_t *tp, xfs_fsblock_t fsbno,
 		   uint lock_flag)
 {
-	daddr_t d;
-	xfs_sb_t *sbp;
+	buf_t		*bp;
+	daddr_t		d;
+	xfs_sb_t	*sbp;
 
 	ASSERT(fsbno != NULLFSBLOCK);
 	sbp = &mp->m_sb;
 	d = xfs_fsb_to_daddr(sbp, fsbno);
-	return xfs_trans_get_buf(tp, mp->m_dev, d, mp->m_bsize, lock_flag);
+	bp = xfs_trans_get_buf(tp, mp->m_dev, d, mp->m_bsize, lock_flag);
+	ASSERT(bp && !geterror(bp));
+	return bp;
 }
 
 /*
@@ -314,14 +324,17 @@ buf_t *
 xfs_btree_get_bufs(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno,
 		  xfs_agblock_t agbno, uint lock_flag)
 {
-	daddr_t d;
-	xfs_sb_t *sbp;
+	buf_t		*bp;
+	daddr_t		d;
+	xfs_sb_t	*sbp;
 
 	ASSERT(agno != NULLAGNUMBER);
 	ASSERT(agbno != NULLAGBLOCK);
 	sbp = &mp->m_sb;
 	d = xfs_agb_to_daddr(sbp, agno, agbno);
-	return xfs_trans_get_buf(tp, mp->m_dev, d, mp->m_bsize, lock_flag);
+	bp = xfs_trans_get_buf(tp, mp->m_dev, d, mp->m_bsize, lock_flag);
+	ASSERT(bp && !geterror(bp));
+	return bp;
 }
 
 /*

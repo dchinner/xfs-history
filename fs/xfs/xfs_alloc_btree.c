@@ -773,6 +773,7 @@ xfs_alloc_lookup(
 		if (!buf) {
 			buf = xfs_trans_read_buf(tp, mp->m_dev, d,
 						 mp->m_bsize, 0);
+			ASSERT(buf && !geterror(buf));
 			xfs_btree_setbuf(cur, level, buf);
 		}
 		block = xfs_buf_to_sblock(buf);

@@ -244,14 +244,17 @@ xfs_alloc_read_agf(
 	xfs_agnumber_t	agno,		/* allocation group number */
 	int		flags)		/* XFS_ALLOC_FLAG_... */
 {
+	buf_t		*bp;		/* return value */
 	daddr_t		d;		/* disk block address */
 	xfs_sb_t	*sbp;		/* superblock structure */
 
 	ASSERT(agno != NULLAGNUMBER);
 	sbp = &mp->m_sb;
 	d = xfs_ag_daddr(sbp, agno, XFS_AGF_DADDR);
-	return xfs_trans_read_buf(tp, mp->m_dev, d, 1,
+	bp = xfs_trans_read_buf(tp, mp->m_dev, d, 1,
 		(flags & XFS_ALLOC_FLAG_TRYLOCK) ? BUF_TRYLOCK : 0U);
+	ASSERT(!bp || !geterror(bp));
+	return bp;
 }
 
 /*
@@ -1656,7 +1659,8 @@ xfs_alloc_vextent(
 			/*
 			 * Start with allocation group given by bno.
 			 */
-			tagno = agno = xfs_fsb_to_agno(sbp, bno);
+			tagno = xfs_fsb_to_agno(sbp, bno);
+			agno = 0;
 			flags = 0;
 		} else {
 			/*

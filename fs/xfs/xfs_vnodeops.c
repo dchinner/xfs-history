@@ -2997,6 +2997,7 @@ xfs_symlink(vnode_t	*dir_vp,
 			byte_cnt = xfs_fsb_to_b(sbp, mval[n].br_blockcount);
 			bp = xfs_trans_get_buf (tp, mp->m_dev, d, 
 				BTOBB(byte_cnt), 0);
+			ASSERT(bp && !geterror(bp));
 			if (pathlen < byte_cnt)
 				byte_cnt = pathlen;
 			pathlen -= byte_cnt;

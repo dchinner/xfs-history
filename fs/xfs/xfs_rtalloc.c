@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.5 $"
+#ident	"$Revision: 1.7 $"
 
 /*
  * Free realtime space allocation for xFS.
@@ -471,6 +471,7 @@ xfs_rtbuf_get(
 	xfs_rtblock_t	block,
 	int		issum)
 {
+	buf_t		*bp;
 	daddr_t		d;
 	xfs_bmap_free_t	*flist;
 	xfs_inode_t	*ip;
@@ -486,7 +487,9 @@ xfs_rtbuf_get(
 	ASSERT(flist == NULL);
 	sbp = &mp->m_sb;
 	d = xfs_fsb_to_daddr(sbp, map.br_startblock);
-	return xfs_trans_read_buf(tp, mp->m_dev, d, mp->m_bsize, 0);
+	bp = xfs_trans_read_buf(tp, mp->m_dev, d, mp->m_bsize, 0);
+	ASSERT(bp && !geterror(bp));
+	return bp;
 }
 
 STATIC int

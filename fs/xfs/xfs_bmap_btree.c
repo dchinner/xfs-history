@@ -1,7 +1,6 @@
 #ident	"$Revision: 1.4 $"
 
 #include <sys/param.h>
-#include <sys/buf.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/debug.h>
@@ -17,6 +16,7 @@
 #ifdef SIM
 #define _KERNEL
 #endif
+#include <sys/buf.h>
 #include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL
@@ -1089,6 +1089,7 @@ xfs_bmbt_lookup(
 				buf = (buf_t *)0;
 			if (!buf) {
 				buf = xfs_trans_read_buf(tp, mp->m_dev, d, mp->m_bsize, 0);
+				ASSERT(buf && !geterror(buf));
 				xfs_btree_setbuf(cur, level, buf);
 			}
 		}
@@ -1334,13 +1335,16 @@ xfs_bmbt_read_agf(
 	xfs_trans_t	*tp,
 	xfs_agnumber_t	agno)
 {
+	buf_t		*bp;		/* return value */
 	daddr_t		d;		/* disk block address */
 	xfs_sb_t	*sbp;		/* superblock structure */
 
 	ASSERT(agno != NULLAGNUMBER);
 	sbp = &mp->m_sb;
 	d = xfs_ag_daddr(sbp, agno, XFS_AGF_DADDR);
-	return xfs_trans_read_buf(tp, mp->m_dev, d, 1, 0);
+	bp = xfs_trans_read_buf(tp, mp->m_dev, d, 1, 0);
+	ASSERT(bp && !geterror(bp));
+	return bp;
 }
 
 /*
