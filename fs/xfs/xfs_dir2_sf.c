@@ -21,7 +21,7 @@
  * this program; if not, write the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.5 $"
+#ident "$Revision$"
 
 /*
  * xfs_dir2_sf.c

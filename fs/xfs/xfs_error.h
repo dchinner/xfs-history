@@ -24,7 +24,7 @@
 #ifndef	_XFS_ERROR_H
 #define	_XFS_ERROR_H
 
-#ident "$Revision: 1.9 $"
+#ident "$Revision$"
 
 #define XFS_ERECOVER	1	/* Failure to recover log */
 #define XFS_ELOGSTAT	2	/* Failure to stat log in user space */
@@ -67,7 +67,8 @@ extern int	xfs_error_trap(int);
 #define	XFS_ERRTAG_IUNLINK				13
 #define	XFS_ERRTAG_IUNLINK_REMOVE			14
 #define	XFS_ERRTAG_DIR_INO_VALIDATE			15
-#define XFS_ERRTAG_MAX					16
+#define XFS_ERRTAG_BULKSTAT_READ_CHUNK			16
+#define XFS_ERRTAG_MAX					17
 
 /*
  * Random factors for above tags, 1 means always, 2 means 1/2 time, etc.
@@ -88,6 +89,7 @@ extern int	xfs_error_trap(int);
 #define	XFS_RANDOM_IUNLINK				XFS_RANDOM_DEFAULT
 #define	XFS_RANDOM_IUNLINK_REMOVE			XFS_RANDOM_DEFAULT
 #define	XFS_RANDOM_DIR_INO_VALIDATE			XFS_RANDOM_DEFAULT
+#define	XFS_RANDOM_BULKSTAT_READ_CHUNK			XFS_RANDOM_DEFAULT
 
 #if !defined(SIM) && (defined(DEBUG) || defined(INDUCE_IO_ERROR))
 extern int	xfs_error_test(int, int *, char *, int, char *, unsigned long);

@@ -21,7 +21,7 @@
  * this program; if not, write the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.234 $"
+#ident	"$Revision$"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -2513,13 +2513,22 @@ xfs_bmap_alloc(
 #ifdef SIM
 		ASSERT(0);
 #else
+		xfs_rtblock_t	rtb;
+
 		atype = ap->rval == 0 ?
 			XFS_ALLOCTYPE_ANY_AG : XFS_ALLOCTYPE_NEAR_BNO;
 		ap->rval /= mp->m_sb.sb_rextsize;
+		rtb = ap->rval;
 		ap->alen = ralen;
 		if (error = xfs_rtallocate_extent(ap->tp, ap->rval, 1, ap->alen,
-				&ralen, atype, ap->wasdel, prod, &ap->rval))
+				&ralen, atype, ap->wasdel, prod, &rtb))
 			return error;
+		if (rtb == NULLFSBLOCK && prod > 1 &&
+		    (error = xfs_rtallocate_extent(ap->tp, ap->rval, 1,
+						   ap->alen, &ralen, atype,
+						   ap->wasdel, 1, &rtb)))
+			return error;
+		ap->rval = rtb;
 		if (ap->rval != NULLFSBLOCK) {
 			ap->rval *= mp->m_sb.sb_rextsize;
 			ralen *= mp->m_sb.sb_rextsize;

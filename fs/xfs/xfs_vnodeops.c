@@ -21,7 +21,7 @@
  * this program; if not, write the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.429 $"
+#ident "$Revision$"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -3631,7 +3631,12 @@ again:
 #endif
 }
 
+#ifdef	DEBUG
+#define	REMOVE_DEBUG_TRACE(x)	{remove_which_error_return = (x);}
 int remove_which_error_return = 0;
+#else /* ! DEBUG */
+#define	REMOVE_DEBUG_TRACE(x)
+#endif	/* ! DEBUG */
 
 /*
  * xfs_remove
@@ -3699,7 +3704,7 @@ xfs_remove(
 	 */
 	error = xfs_get_dir_entry(dp, name, &ip, &dir_generation);
 	if (error) {
-		remove_which_error_return = __LINE__;
+		REMOVE_DEBUG_TRACE(__LINE__);
 		goto std_return;
 	}
 	dm_di_mode = ip->i_d.di_mode;
@@ -3712,7 +3717,7 @@ xfs_remove(
 		if (!error && dp != ip && XFS_NOT_DQATTACHED(mp, ip)) 
 			error = xfs_qm_dqattach(ip, 0);
 		if (error) {
-			remove_which_error_return = __LINE__;
+			REMOVE_DEBUG_TRACE(__LINE__);
 			IRELE(ip);
 			goto std_return;
 		}
@@ -3739,7 +3744,7 @@ xfs_remove(
 	}
 	if (error) {
 		ASSERT(error != ENOSPC);
-		remove_which_error_return = __LINE__;
+		REMOVE_DEBUG_TRACE(__LINE__);
 		xfs_trans_cancel(tp, 0);
 		IRELE(ip);
 		return error;
@@ -3748,7 +3753,7 @@ xfs_remove(
 	error = xfs_lock_dir_and_entry(dp, name, ip, dir_generation,
 				       &entry_changed);
 	if (error) {
-		remove_which_error_return = __LINE__;
+		REMOVE_DEBUG_TRACE(__LINE__);
 		xfs_trans_cancel(tp, cancel_flags);
 		IRELE(ip);
 		goto std_return;
@@ -3781,26 +3786,26 @@ xfs_remove(
 	}
  
 	if (error = xfs_iaccess(dp, IEXEC | IWRITE, credp)) {
-		remove_which_error_return = __LINE__;
+		REMOVE_DEBUG_TRACE(__LINE__);
 		goto error_return;
 	}
 	if (error = _MAC_XFS_IACCESS(ip, MACWRITE, credp)) {
-		remove_which_error_return = __LINE__;
+		REMOVE_DEBUG_TRACE(__LINE__);
 		goto error_return;
 	}
 	if (error = xfs_stickytest(dp, ip, credp)) {
-		remove_which_error_return = __LINE__;
+		REMOVE_DEBUG_TRACE(__LINE__);
 		goto error_return;
 	}
 
 	if (error = xfs_pre_remove(XFS_ITOV(ip))) {
 		error = XFS_ERROR(error);
-		remove_which_error_return = __LINE__;
+		REMOVE_DEBUG_TRACE(__LINE__);
 		goto error_return;
 	}
 	if ((ip->i_d.di_mode & IFMT) == IFDIR) {
 		error = XFS_ERROR(EPERM);
-		remove_which_error_return = __LINE__;
+		REMOVE_DEBUG_TRACE(__LINE__);
 		goto error_return;
 	}
 
@@ -3810,12 +3815,12 @@ xfs_remove(
 	if (name[0] == '.') {
 		if (name[1] == '\0') {
 			error = XFS_ERROR(EINVAL);
-			remove_which_error_return = __LINE__;
+			REMOVE_DEBUG_TRACE(__LINE__);
 			goto error_return;
 		}
 		else if (name[1] == '.' && name[2] == '\0') {
 			error = XFS_ERROR(EEXIST);
-			remove_which_error_return = __LINE__;
+			REMOVE_DEBUG_TRACE(__LINE__);
 			goto error_return;
 		}
 	} 
@@ -3828,7 +3833,7 @@ xfs_remove(
 		&first_block, &free_list, 0);
 	if (error) {
 		ASSERT(error != ENOENT);
-		remove_which_error_return = __LINE__;
+		REMOVE_DEBUG_TRACE(__LINE__);
 		goto error1;
 	}
 	xfs_ichgtime(dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
@@ -3840,7 +3845,7 @@ xfs_remove(
 
 	error = xfs_droplink(tp, ip);
 	if (error) {
-		remove_which_error_return = __LINE__;
+		REMOVE_DEBUG_TRACE(__LINE__);
 		goto error1;
 	}
 
@@ -3866,7 +3871,7 @@ xfs_remove(
 
 	error = xfs_bmap_finish(&tp, &free_list, first_block, &committed);
 	if (error) {
-		remove_which_error_return = __LINE__;
+		REMOVE_DEBUG_TRACE(__LINE__);
 		goto error_rele;
 	}
 
@@ -4540,7 +4545,7 @@ xfs_rmdir(
 	 */
 	error = xfs_get_dir_entry(dp, name, &cdp, &dir_generation);
 	if (error) {
-		remove_which_error_return = __LINE__;
+		REMOVE_DEBUG_TRACE(__LINE__);
 		goto std_return;
 	}
 	mp = dp->i_mount;
@@ -4557,7 +4562,7 @@ xfs_rmdir(
 			error = xfs_qm_dqattach(cdp, 0);
 		if (error) {
 			IRELE(cdp);
-			remove_which_error_return = __LINE__;
+			REMOVE_DEBUG_TRACE(__LINE__);
 			goto std_return;
 		}
 	}

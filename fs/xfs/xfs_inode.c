@@ -1,4 +1,4 @@
-#ident "$Revision: 1.260 $"
+#ident "$Revision$"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif

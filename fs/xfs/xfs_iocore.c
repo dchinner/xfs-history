@@ -1,4 +1,4 @@
-#ident "$Revision: 1.5 $"
+#ident "$Revision$"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -180,6 +180,7 @@ xfs_frlock2(
 	return error;
 }
 
+/* ARGSUSED */
 static int
 xfs_checklock(
 	bhv_desc_t	*bdp,
@@ -250,6 +251,21 @@ xfs_ioops_t	xfs_iocore_xfs = {
 };
 
 void
+xfs_iocore_inode_reinit(
+	xfs_inode_t	*ip)
+{
+	xfs_iocore_t	*io = &ip->i_iocore;
+
+	io->io_flags = XFS_IOCORE_ISXFS;
+	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
+		io->io_flags |= XFS_IOCORE_RT;
+	}
+
+	io->io_dmevmask = ip->i_d.di_dmevmask;
+	io->io_dmstate = ip->i_d.di_dmstate;
+}
+
+void
 xfs_iocore_inode_init(
 	xfs_inode_t	*ip)
 {
@@ -265,13 +281,7 @@ xfs_iocore_inode_init(
 
 	io->io_obj = (void *)ip;
 
-	io->io_flags = XFS_IOCORE_ISXFS;
-	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
-		io->io_flags |= XFS_IOCORE_RT;
-	}
-
-	io->io_dmevmask = ip->i_d.di_dmevmask;
-	io->io_dmstate = ip->i_d.di_dmstate;
+	xfs_iocore_inode_reinit(ip);
 }
 
 void

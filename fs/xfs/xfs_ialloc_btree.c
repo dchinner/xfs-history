@@ -22,7 +22,7 @@
  * Place - Suite 330, Boston MA 02111-1307, USA.
  */
 
-#ident	"$Revision: 1.44 $"
+#ident	"$Revision$"
 
 /*
  * Inode allocation management for XFS.

@@ -21,7 +21,7 @@
  * this program; if not, write the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.68 $"
+#ident	"$Revision$"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #include <sys/sysmacros.h>
@@ -545,11 +545,10 @@ xfs_bulkstat(
 						error = xfs_itobp(mp, tp, ip,
 						                  &dip, &bp, bno);
 						kmem_zone_free(xfs_inode_zone, ip);
-						if (error != 0) {
-							if (vfs_unbusy_needed) {
-								vfs_unbusy(vfsp);
-							}
-							return error;
+						if (XFS_TEST_ERROR(error != 0,
+								   mp, XFS_ERRTAG_BULKSTAT_READ_CHUNK,
+								   XFS_RANDOM_BULKSTAT_READ_CHUNK)) {
+							break;
 						}
 						clustidx = ((caddr_t)dip - 
 						          XFS_BUF_PTR(bp))/

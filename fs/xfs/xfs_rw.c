@@ -21,7 +21,7 @@
  * this program; if not, write the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.293 $"
+#ident "$Revision$"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -2118,8 +2118,8 @@ xfs_read_core(
 		error = XFS_ERROR(EINVAL);
 		goto out;
 	}
-	if (count <= 0) {
-		error = 0;
+	if ((ssize_t)count <= 0) {
+		error = (ssize_t)count < 0 ? XFS_ERROR(EINVAL) : 0;
 		goto out;
 	}
 	if (ioflag & IO_RSYNC) {
@@ -3329,7 +3329,7 @@ xfs_write_file(
 	int		fillhole;
 	int		gaps_mapped;
 	off_t		offset;
-	ssize_t		count;
+	size_t		count;
 	int		read;
 	xfs_fsize_t	isize;
 	xfs_fsize_t	new_size;
@@ -4071,8 +4071,8 @@ start:
 		error = XFS_ERROR(EINVAL);
 		goto out;
 	}
-	if (count <= 0) {
-		error = 0;
+	if ((ssize_t)count <= 0) {
+		error = (ssize_t)count < 0 ? XFS_ERROR(EINVAL) : 0;
 		goto out;
 	}
 
@@ -4394,6 +4394,8 @@ xfs_bmap(
 
 	ip = XFS_BHVTOI(bdp);
 	ASSERT((ip->i_d.di_mode & IFMT) == IFREG);
+	ASSERT(((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0) ==
+	       ((ip->i_iocore.io_flags & XFS_IOCORE_RT) != 0));
 	ASSERT((flags == B_READ) || (flags == B_WRITE));
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount)) {
 		return (EIO);

@@ -20,7 +20,7 @@
  * this program; if not, write the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston MA 02111-1307, USA.
  **************************************************************************/
-#ident	"$Revision: 1.109 $"
+#ident	"$Revision$"
 
 #define FSID_T
 #include <sys/types.h>
@@ -2122,7 +2122,6 @@ xfs_prdinode_core(xfs_dinode_core_t *dip)
 	printflags(dip->di_flags, diflags, "flags");
 	qprintf("gen 0x%x\n", dip->di_gen);
 }
-
 
 /*
  * Print xfs extent list for a fork.

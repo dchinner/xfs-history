@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.126 $"
+#ident "$Revision$"
 
 struct bhv_desc;
 struct xfs_buf;
@@ -142,6 +142,7 @@ void xfs_inode_clear_read_ahead(xfs_iocore_t *io);
  */
 
 extern void xfs_iocore_inode_init(struct xfs_inode *);
+extern void xfs_iocore_inode_reinit(struct xfs_inode *);
 extern void xfs_iocore_reset(xfs_iocore_t *);
 extern void xfs_iocore_destroy(xfs_iocore_t *);
 

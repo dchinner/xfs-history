@@ -21,7 +21,7 @@
  * this program; if not, write the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.8 $"
+#ident "$Revision$"
 
 /*
  * XFS v2 directory implmentation.
@@ -561,7 +561,7 @@ xfs_dir2_getdents(
 		rval = xfs_dir2_sf_getdents(dp, uio, eofp, dbp, put);
 	else if (rval = xfs_dir2_isblock(tp, dp, &v)) {
 #pragma mips_frequency_hint NEVER
-		return rval;
+		;
 	} else if (v)
 		rval = xfs_dir2_block_getdents(tp, dp, uio, eofp, dbp, put);
 	else
