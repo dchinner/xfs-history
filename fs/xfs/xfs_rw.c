@@ -1,4 +1,4 @@
-#ident "$Revision: 1.219 $"
+#ident "$Revision: 1.220 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -149,9 +149,9 @@ xfs_zero_bp(
 
 STATIC int
 xfs_retrieved(
-	int		available,
+	uint		available,
 	off_t		offset,
-	int		count,
+	size_t		count,
 	uint		*total_retrieved,
 	xfs_fsize_t	isize);
 
@@ -311,7 +311,7 @@ xfs_iomap_enter_trace(
 	int		tag,
 	xfs_inode_t	*ip,
 	off_t		offset,
-	int		count)
+	size_t		count)
 {
 	if (ip->i_rwtrace == NULL) {
 		return;
@@ -341,7 +341,7 @@ xfs_iomap_map_trace(
 	int		tag,	     
 	xfs_inode_t	*ip,
 	off_t		offset,
-	int		count,
+	size_t		count,
 	struct bmapval	*bmapp,
 	xfs_bmbt_irec_t	*imapp)    
 {
@@ -530,13 +530,13 @@ xfs_next_bmap(
  */
 STATIC int
 xfs_retrieved(
-	int		available,
+	uint		available,
 	off_t		offset,
-	int		count,
+	size_t		count,
 	uint		*total_retrieved,
 	xfs_fsize_t	isize)
 {
-	int		retrieved;
+	uint		retrieved;
 	xfs_fsize_t	file_bytes_left;
 	
 
