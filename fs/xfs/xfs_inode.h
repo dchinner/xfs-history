@@ -52,11 +52,14 @@ typedef struct xfs_inode {
 	xfs_inode_log_item_t	i_item;		/* logging information */
 	mrlock_t		i_lock;		/* inode lock */
 	sema_t			i_flock;	/* inode flush lock */
+	unsigned int		i_pincount;	/* inode pin count */
+	sema_t			i_pinsema;	/* inode pin sema */
 
 	/* Miscellaneous state. */
 	unsigned short		i_flags;	/* see defined flags below */
 	unsigned long		i_vcode;	/* version code token (RFS) */
 	unsigned long		i_mapcnt;	/* count of mapped pages */
+	unsigned long		i_update_core;	/* timestamps are dirty */
 
 	/* File incore extent information. */
 	size_t			i_bytes; 	/* bytes in i_u1 */	
@@ -138,7 +141,7 @@ extern void		xfs_iext_realloc(xfs_inode_t *, int);
 extern void		xfs_iroot_realloc(xfs_inode_t *, int);
 extern void		xfs_ipin(xfs_inode_t *);
 extern void		xfs_iunpin(xfs_inode_t *);
-extern void		xfs_iflush(xfs_inode_t *);
+extern void		xfs_iflush(xfs_inode_t *, uint);
 extern void		xfs_iprint(xfs_inode_t *);
 
 #endif	/* _XFS_INODE_H */
