@@ -25,7 +25,6 @@
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_buf_item.h"
-#include "xfs_bio.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
 #include "xfs_mount.h"
@@ -44,7 +43,7 @@
  * Use the buffer cache routine incore_match() to find the buffer
  * if it is already owned by this transaction.
  *
- * If we don't already own the buffer, use xfs_get_buf() to get it.
+ * If we don't already own the buffer, use get_buf() to get it.
  * If it doesn't yet have an associated xfs_buf_log_item structure,
  * then allocate one and add the item to this transaction.
  *
@@ -96,7 +95,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	 * easily deadlock with our current transaction as well as cause
 	 * us to run out of stack space.
 	 */
-	bp = xfs_get_buf(dev, blkno, len, flags | BUF_BUSY);
+	bp = get_buf(dev, blkno, len, flags | BUF_BUSY);
 	if (bp == NULL) {
 		return NULL;
 	}
@@ -233,7 +232,7 @@ xfs_trans_getsb(xfs_trans_t	*tp,
  * Use the buffer cache routine incore_match() to find the buffer
  * if it is already owned by this transaction.
  *
- * If we don't already own the buffer, use xfs_read_buf() to get it.
+ * If we don't already own the buffer, use read_buf() to get it.
  * If it doesn't yet have an associated xfs_buf_log_item structure,
  * then allocate one and add the item to this transaction.
  *
@@ -305,7 +304,7 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 	 * easily deadlock with our current transaction as well as cause
 	 * us to run out of stack space.
 	 */
-	bp = xfs_read_buf(dev, blkno, len, flags | BUF_BUSY);
+	bp = read_buf(dev, blkno, len, flags | BUF_BUSY);
 	if (bp == NULL) {
 		return NULL;
 	}

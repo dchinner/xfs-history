@@ -29,7 +29,6 @@
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_buf_item.h"
-#include "xfs_bio.h"
 #include "xfs_sb.h"
 #include "xfs_mount.h"
 #include "xfs_trans_priv.h"
@@ -400,7 +399,7 @@ xfs_buf_item_unlock(xfs_buf_log_item_t *bip)
 	 * Release the buffer if XFS_BLI_HOLD was not set.
 	 */
 	if (!hold) {
-		xfs_brelse(bp);
+		brelse(bp);
 	}
 }
 

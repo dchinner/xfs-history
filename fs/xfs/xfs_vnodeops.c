@@ -52,7 +52,6 @@
 #include "xfs_sb.h"
 #include "xfs_ag.h"
 #include "xfs_mount.h"
-#include "xfs_bio.h"
 #include "xfs_alloc_btree.h"
 #include "xfs_bmap_btree.h"
 #include "xfs_ialloc_btree.h"
@@ -865,7 +864,7 @@ xfs_readlink(vnode_t	*vp,
                 for (n = 0; n < nmaps; n++) {
                         d = XFS_FSB_TO_DADDR(mp, mval[n].br_startblock);
                         byte_cnt = XFS_FSB_TO_B(mp, mval[n].br_blockcount);
-                        bp = xfs_read_buf (mp->m_dev, d, BTOBB(byte_cnt), 0);
+                        bp = read_buf (mp->m_dev, d, BTOBB(byte_cnt), 0);
                         if (pathlen < byte_cnt)
                                 byte_cnt = pathlen;
                         pathlen -= byte_cnt;

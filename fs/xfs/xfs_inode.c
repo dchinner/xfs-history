@@ -43,7 +43,6 @@
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
 #include "xfs_buf_item.h"
-#include "xfs_bio.h"
 #include "xfs_rw.h"
 #include "xfs_error.h"
 
@@ -1763,11 +1762,11 @@ xfs_iflush(
 	}
 
 	if (flags & B_DELWRI) {
-		xfs_bdwrite(bp);
+		bdwrite(bp);
 	} else if (flags & B_ASYNC) {
-		xfs_bawrite(bp);
+		bawrite(bp);
 	} else {
-		xfs_bwrite(bp);
+		bwrite(bp);
 	}
 
 	return;
