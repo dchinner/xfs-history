@@ -31,14 +31,20 @@
  */
 /*
  *
- * $Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfsquotasstubs.c,v 1.7 2000/06/09 02:50:02 kenmcd Exp $
- * $Author: kenmcd $
- * $Id: xfsquotasstubs.c,v 1.7 2000/06/09 02:50:02 kenmcd Exp $
+ * $Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfsquotasstubs.c,v 1.8 2000/06/09 03:18:45 mostek Exp $
+ * $Author: mostek $
+ * $Id: xfsquotasstubs.c,v 1.8 2000/06/09 03:18:45 mostek Exp $
  *
  * $Log: xfsquotasstubs.c,v $
- * Revision 1.7  2000/06/09 02:50:02  kenmcd
- * Updated copyright and license notices, ready for open source release
- * Merge of 2.3.99pre2-xfs:slinx:55821a by ananth.
+ * Revision 1.8  2000/06/09 03:18:45  mostek
+ * Merge of 2.3.99pre2-xfs:slinx:56126a by ananth.
+ *
+ *   delete a couple of include files not really needed that
+ *   cause problems with builds on Redhat 5.2.
+ *
+ * Revision 1.8  2000/03/31 15:11:13  mostek
+ * delete a couple of include files not really needed that
+ * cause problems with builds on Redhat 5.2.
  *
  * Revision 1.7  2000/03/29 01:45:59  kenmcd
  * Updated copyright and license notices, ready for open source release
@@ -81,8 +87,6 @@
  */
 #include <sys/types.h>
 #include <sys/systm.h>
-#include <sys/quota.h>
-#include <xfs_types.h>
 #include <linux/xfs_sema.h>
 
 struct xfs_qm *xfs_Gqm = NULL;
