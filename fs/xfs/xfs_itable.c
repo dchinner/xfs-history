@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.41 $"
+#ident	"$Revision: 1.43 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -165,6 +165,7 @@ xfs_bulkstat(
 	int			ubcount; /* size of user's buffer */
 	int			ubleft;	/* spaces left in user's buffer */
 	caddr_t			ubufp;	/* current pointer into user's buffer */
+	int                     fmterror;
 
 	/*
 	 * Get the last inode value, see if there's nothing to do.
@@ -180,6 +181,7 @@ xfs_bulkstat(
 	ubcount = ubleft = *ubcountp;
 	*ubcountp = 0;
 	*done = 0;
+	fmterror = 0;
 	ubufp = ubuffer;
 	nicluster = mp->m_sb.sb_blocksize >= XFS_INODE_CLUSTER_SIZE(mp) ?
 		mp->m_sb.sb_inopblock :
@@ -390,10 +392,22 @@ xfs_bulkstat(
 				bno = XFS_AGB_TO_DADDR(mp, agno, agbno);
 				/*
 				 * iget the inode and fill in a single buffer.
-				 * See: xfs_bulkstat_one() & dm_bulkstat_one()
+				 * See: xfs_bulkstat_one & dm_bulkstat_one.
+				 * This is also used to count inodes/blks, etc
+				 * in xfs_qm_quotacheck.
 				 */
-				if (!(*formatter)(mp, tp, ino, ubufp, bno))
+				if (!(fmterror = 
+					(*formatter)(mp, tp, ino, ubufp, bno)))
 					continue;
+				if (fmterror < 0) {
+					/*
+					 * Quota code returns the negative
+					 * val of the error. Break out in that
+					 * case. XXXHack for quota patch.
+					 */
+					ubleft = 0;
+					break;
+				}
 				if (ubufp)
 					ubufp += statstruct_size; 
 				ubleft--;
@@ -429,7 +443,10 @@ xfs_bulkstat(
 		*done = 1;
 	} else
 		*lastinop = (ino64_t)lastino;
-	return 0;
+	/*
+	 * Temporary hack for the quota patch ... XXXsup
+	 */
+	return (fmterror < 0 ? -(fmterror) : 0);
 }
 
 /*
