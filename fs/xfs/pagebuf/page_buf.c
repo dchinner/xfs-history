@@ -1381,9 +1381,11 @@ _pagebuf_page_io(
 {
 	size_t			blk_length = 0;
 	struct buffer_head	*bh, *head, *bufferlist[MAX_BUF_PER_PAGE];
-	int			concat_ok, multi_ok, i = 0, cnt = 0, err = 0;
+	int			concat_ok, multi_ok, cache_ok;
+	int			i = 0, cnt = 0, err = 0;
 
 	if (blocksize < PAGE_CACHE_SIZE) {
+		cache_ok = !((pb->pb_flags & PBF_FORCEIO) || (rw == WRITE));
 		multi_ok = 1;
 
 		/* TODO XXX:nathans -[512 byte bh]-  We do not use blocksize
@@ -1406,6 +1408,8 @@ _pagebuf_page_io(
 		/* Find buffer_heads belonging to just this pagebuf */
 		bh = head = page_buffers(page);
 		do {
+			if (buffer_uptodate(bh) && cache_ok)
+				continue;
 			blk_length = i << 9;
 			if (blk_length < pg_offset)
 				continue;
