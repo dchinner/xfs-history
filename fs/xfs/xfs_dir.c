@@ -8,6 +8,7 @@
 #ifdef SIM
 #include <string.h>
 #include <bstring.h>
+#include <stdio.h>
 #else
 /* ick... need a kernel prototype for this. */
 extern size_t strlen(const char *);
@@ -58,6 +59,7 @@ STATIC int xfs_dir_shortform_lookup(xfs_trans_t *trans,
 					struct xfs_dir_name *args);
 STATIC int xfs_dir_shortform_to_leaf(xfs_trans_t *trans,
 					struct xfs_dir_name *args);
+STATIC void xfs_dir_shortform_print(xfs_trans_t *trans, xfs_inode_t *dp);
 
 /*
  * Internal routines when dirsize == XFS_LBSIZE(sbp).
@@ -71,6 +73,7 @@ STATIC int xfs_dir_leaf_lookup(xfs_trans_t *trans, struct xfs_dir_name *args);
 STATIC int xfs_dir_leaf_to_shortform(xfs_trans_t *trans,
 					struct xfs_dir_name *args);
 STATIC int xfs_dir_leaf_to_node(xfs_trans_t *trans, struct xfs_dir_name *args);
+STATIC void xfs_dir_leaf_print(xfs_trans_t *trans, xfs_inode_t *dp);
 
 /*
  * Internal routines when dirsize > XFS_LBSIZE(sbp).
@@ -82,6 +85,7 @@ STATIC int xfs_dir_node_lookup(xfs_trans_t *trans, struct xfs_dir_name *args);
 #if 0
 STATIC int xfs_dir_node_to_leaf(xfs_trans_t *trans, struct xfs_dir_name *args);
 #endif
+STATIC void xfs_dir_node_print(xfs_trans_t *trans, xfs_inode_t *dp);
 
 /*
  * Utility routines.
@@ -265,6 +269,24 @@ xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 	*inum = args.inumber;
 
 	return(retval);
+}
+
+void
+xfs_dir_print(xfs_trans_t *trans, xfs_inode_t *dp)
+{
+	xfs_sb_t *sbp;
+
+	sbp = &dp->i_mount->m_sb;
+	/*
+	 * Decide on what work routines to call based on the inode size.
+	 */
+	if (dp->i_d.di_size <= XFS_LITINO(sbp)) {
+		xfs_dir_shortform_print(trans, dp);
+	} else if (dp->i_d.di_size == XFS_LBSIZE(sbp)) {
+		xfs_dir_leaf_print(trans, dp);
+	} else {
+		xfs_dir_node_print(trans, dp);
+	}
 }
 
 int
@@ -512,6 +534,30 @@ out:
 	return(retval);
 }
 
+/*
+ * Print the shortform directory.
+ */
+STATIC void
+xfs_dir_shortform_print(xfs_trans_t *trans, xfs_inode_t *dp)
+{
+	struct xfs_dir_shortform *sf;
+	struct xfs_dir_sf_entry *sfe;
+	xfs_ino_t ino;
+	int i;
+
+	sf = (struct xfs_dir_shortform *)dp->i_u1.iu_data;
+	printf("%20lld  .\n", dp->i_ino);
+	bcopy(sf->hdr.parent, (char *)&ino, sizeof(ino));
+	printf("%20lld  ..\n", ino);
+
+	sfe = &sf->list[0];
+	for (i = sf->hdr.count-1; i >= 0; i--) {
+		bcopy(sfe->inumber, (char *)&ino, sizeof(ino));
+		printf("%20lld  %*.*s\n", ino, sfe->namelen, sfe->namelen, sfe->name);
+		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
+	}
+}
+
 /*========================================================================
  * External routines when dirsize == XFS_LBSIZE(sbp).
  *========================================================================*/
@@ -722,6 +768,19 @@ xfs_dir_leaf_to_node(xfs_trans_t *trans, struct xfs_dir_name *args)
 	return(retval);
 }
 
+/*
+ * Print the leaf directory.
+ */
+STATIC void
+xfs_dir_leaf_print(xfs_trans_t *trans, xfs_inode_t *dp)
+{
+	buf_t *bp;
+
+	bp = xfs_dir_read_buf(trans, dp, 0);
+	xfs_dir_leaf_print_int(bp, dp);
+	xfs_trans_brelse(trans, bp);
+}
+
 /*========================================================================
  * External routines when dirsize > XFS_LBSIZE(sbp).
  *========================================================================*/
@@ -863,6 +922,41 @@ xfs_dir_node_lookup(xfs_trans_t *trans, struct xfs_dir_name *args)
 		xfs_trans_brelse(trans, state.path.blk[i].bp);
 
 	return(retval);
+}
+
+/*
+ * Print the B-tree directory.
+ */
+STATIC void
+xfs_dir_node_print(xfs_trans_t *trans, xfs_inode_t *dp)
+{
+	__uint32_t bno;
+	buf_t *bp;
+
+	bno = 0;
+	for (;;) {
+		struct xfs_dir_intnode *node;
+		struct xfs_dir_node_entry *btree;
+
+		bp = xfs_dir_read_buf(trans, dp, bno);
+		node = (struct xfs_dir_intnode *)bp->b_un.b_addr;
+		if (node->hdr.info.magic != XFS_DIR_NODE_MAGIC)
+			break;
+		btree = &node->btree[0];
+		bno = btree->before;
+		xfs_trans_brelse(trans, bp);
+	}
+	for (;;) {
+		struct xfs_dir_leafblock *leaf;
+
+		xfs_dir_leaf_print_int(bp, dp);
+		leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
+		bno = leaf->hdr.info.forw;
+		xfs_trans_brelse(trans, bp);
+		if (bno == 0)
+			break;
+		bp = xfs_dir_read_buf(trans, dp, bno);
+	}
 }
 
 /*========================================================================

@@ -271,6 +271,9 @@ int	xfs_dir_lookup(xfs_trans_t *tp,
 		       int name_length,
 		       xfs_ino_t *inode_number);
 
+void	xfs_dir_print(xfs_trans_t *tp,
+		      xfs_inode_t *dp);
+
 int	xfs_dir_getdents(void);
 
 #endif	/* !_FS_XFS_DIR_H */

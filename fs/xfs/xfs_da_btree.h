@@ -91,4 +91,9 @@ int	xfs_dir_leaf_lookup_int(buf_t *leaf_buffer, struct xfs_dir_name *args,
 				      int *index_found_at);
 int	xfs_dir_node_lookup_int(struct xfs_dir_state *state);
 
+/*
+ * Routines used to print things from the Btree.
+ */
+void	xfs_dir_leaf_print_int(buf_t *leaf_buffer, xfs_inode_t *dir_inode);
+
 #endif	/* !FS_XFS_DIR_BTREE_H */

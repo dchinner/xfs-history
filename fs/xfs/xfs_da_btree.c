@@ -7,6 +7,7 @@
 #include <sys/debug.h>
 #ifdef SIM
 #include <bstring.h>
+#include <stdio.h>
 #else
 #include <sys/systm.h>
 #endif
@@ -2108,4 +2109,26 @@ xfs_dir_blk_unlink(struct xfs_dir_state *state,
 
 	xfs_trans_log_buf(state->trans, save_blk->bp, 0,
 					sizeof(*save_info) - 1);
+}
+
+/*
+ * Print the contents of a leaf block.
+ */
+void
+xfs_dir_leaf_print_int(buf_t *bp, xfs_inode_t *dp)
+{
+	struct xfs_dir_leafblock *leaf;
+	struct xfs_dir_leaf_entry *entry;
+	struct xfs_dir_leaf_name *namest;
+	xfs_ino_t ino;
+	int i;
+
+	leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
+	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
+	entry = &leaf->leaves[0];
+	for (i = 0; i < leaf->hdr.count; entry++, i++) {
+		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
+		bcopy(namest->inumber, (char *)&ino, sizeof(ino));
+		printf("%20lld  %*.*s\n", ino, namest->namelen, namest->namelen, namest->name);
+	}
 }
