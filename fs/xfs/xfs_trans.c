@@ -208,10 +208,6 @@ xfs_trans_reserve(
 
 	error = 0;
 	rsvd = (tp->t_flags & XFS_TRANS_RESERVE) != 0;
-
-	/* Mark this thread as being in a transaction */
-	current->journal_info = tp;
-
 	/*
 	 * Attempt to reserve the needed disk blocks by decrementing
 	 * the number needed from the number available.  This will
@@ -221,7 +217,6 @@ xfs_trans_reserve(
 		error = xfs_mod_incore_sb(tp->t_mountp, XFS_SBS_FDBLOCKS,
 					  -blocks, rsvd);
 		if (error != 0) {
-			current->journal_info = NULL;
 			return (XFS_ERROR(ENOSPC));
 		}
 		tp->t_blk_res += blocks;
@@ -293,8 +288,6 @@ undo_blocks:
 					 blocks, rsvd);
 		tp->t_blk_res = 0;
 	}
-
-	current->journal_info = NULL;
 
 	return (error);
 }
@@ -709,7 +702,6 @@ shut_us_down:
 		XFS_STATS_INC(xfsstats.xs_trans_empty);
 		if (commit_lsn_p)
 			*commit_lsn_p = commit_lsn;
-		current->journal_info = NULL;
 		return (shutdown);
 	}
 #if defined(XLOG_NOLOG) || defined(DEBUG)
@@ -794,7 +786,6 @@ shut_us_down:
 	 */
 	if (error || commit_lsn == -1) { 
 		xfs_trans_uncommit(tp, flags|XFS_TRANS_ABORT);
-		current->journal_info = NULL;
 		return XFS_ERROR(EIO);
 	}
 	
@@ -857,10 +848,6 @@ shut_us_down:
 	} else {
 		XFS_STATS_INC(xfsstats.xs_trans_async);
 	}
-
-	/* mark this thread as no longer being in a transaction */
-	current->journal_info = NULL;
-
 	return (error);
 }
 
@@ -1065,9 +1052,6 @@ xfs_trans_cancel(
 	}
 	xfs_trans_free_items(tp, flags);
 	xfs_trans_free(tp);
-
-	/* mark this thread as no longer being in a transaction */
-	current->journal_info = NULL;
 }
 
 
