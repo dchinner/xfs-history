@@ -8,13 +8,18 @@ typedef struct xfs_inode_log_item {
 	xfs_log_item_t		ili_item;
 	struct xfs_inode	*ili_inode;
 	xfs_lsn_t		ili_flush_lsn;
-	unsigned short		ili_recur;
+	unsigned short		ili_ilock_recur;
+	unsigned short		ili_iolock_recur;
 	unsigned short		ili_flags;
 	unsigned short		ili_ref;
 	unsigned int		ili_fields;
 } xfs_inode_log_item_t;
 
-#define	XFS_ILI_HOLD	0x1
+#define	XFS_ILI_HOLD		0x1
+#define	XFS_ILI_IOLOCKED_EXCL	0x2
+#define	XFS_ILI_IOLOCKED_SHARED	0x4
+
+#define	XFS_ILI_IOLOCKED_ANY   (XFS_ILI_IOLOCKED_EXCL | XFS_ILI_IOLOCKED_SHARED)
 
 /*
  * Flags for xfs_trans_log_inode flags field.
