@@ -99,7 +99,6 @@ xfs_attr_get(vnode_t *vp, char *name, char *value, int *valuelenp, int flags,
 	xfs_da_args_t args;
 	int error;
 
-	xfsda_t_reinit("attr_get", __FILE__, __LINE__);
 	XFSSTATS.xs_attr_get++;
 
 	/*
@@ -160,7 +159,6 @@ xfs_attr_set(vnode_t *vp, char *name, char *value, int valuelen, int flags,
 	xfs_da_args_t args;
 	int error, retval, committed;
 
-	xfsda_t_reinit("attr_set", __FILE__, __LINE__);
 	XFSSTATS.xs_attr_set++;
 	dp = XFS_VTOI(vp);
 
@@ -296,7 +294,6 @@ xfs_attr_remove(vnode_t *vp, char *name, int flags, struct cred *cred)
 	xfs_da_args_t args;
 	int error;
 
-	xfsda_t_reinit("attr_remove", __FILE__, __LINE__);
 	XFSSTATS.xs_attr_remove++;
 	dp = XFS_VTOI(vp);
 
@@ -377,7 +374,6 @@ xfs_attr_list(vnode_t *vp, char *buffer, int bufsize, int flags,
 	xfs_inode_t *dp;
 	int error;
 
-	xfsda_t_reinit("attr_list", __FILE__, __LINE__);
 	XFSSTATS.xs_attr_list++;
 	dp = XFS_VTOI(vp);
 
@@ -429,8 +425,6 @@ int								/* error */
 xfs_attr_inactive(xfs_inode_t *dp)
 {
 	int error;
-
-	xfsda_t_reinit("attr_inactive", __FILE__, __LINE__);
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
