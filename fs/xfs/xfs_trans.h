@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision: 1.86 $"
+#ident "$Revision: 1.87 $"
 
 struct buf;
 struct xfs_efd_log_item;
@@ -688,7 +688,6 @@ typedef struct xfs_trans {
 #define	XFS_ATTRSET_LOG_COUNT		3     
 #define	XFS_ATTRRM_LOG_COUNT		3     
 
-
 /*
  * Here we centralize the specification of XFS meta-data buffer
  * reference count values.  This determine how hard the buffer
@@ -696,12 +695,12 @@ typedef struct xfs_trans {
  */
 #define	XFS_AGF_REF		4
 #define	XFS_AGI_REF		4
-#define	XFS_AGFL_REF		2
+#define	XFS_AGFL_REF		3
+#define	XFS_INO_BTREE_REF	3
 #define	XFS_ALLOC_BTREE_REF	2
 #define	XFS_BMAP_BTREE_REF	2
-#define	XFS_GEN_LBTREE_REF	2
-#define	XFS_GEN_SBTREE_REF	2
-#define	XFS_INO_BTREE_REF	2
+#define	XFS_DIR_BTREE_REF	2
+#define	XFS_ATTR_BTREE_REF	1
 #define	XFS_INO_REF		1     
 #define	XFS_DQUOT_REF		1     
 
