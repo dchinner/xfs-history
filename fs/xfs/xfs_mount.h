@@ -1,7 +1,9 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.3 $"
+
+struct xfs_ihash;
 
 typedef struct xfs_mount {
 	xfs_tid_t		m_tid;
@@ -16,6 +18,8 @@ typedef struct xfs_mount {
 	dev_t			m_dev;
 	int			m_bsize;
 	xfs_agnumber_t		m_agrotor;
+	struct xfs_ihash	*m_ihash;
+	ulong			m_ihashmask;
 } xfs_mount_t;
 
 void xfs_mod_sb(xfs_trans_t *, int, int);
