@@ -317,9 +317,10 @@ typedef struct xfs_trans {
  *    the inode\'s bmap btree: max depth * block size
  * And the bmap_finish transaction can free the blocks and bmap blocks:
  *    the agf for each of the ags: 4 * sector size
+ *    the flist block for each of the ags: 4 * sector size
  *    the super block to reflect the freed blocks: sector size
  *    worst case split in allocation btrees per extent assuming 4 extents:
- *					4 * 2 * max depth * block size
+ *		4 exts * 2 trees * 2 * max depth * block size
  */
 #define	XFS_ITRUNCATE_LOG_RES(mp) \
 	(MAX( \
@@ -327,8 +328,9 @@ typedef struct xfs_trans {
 	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp)) + \
 	  (128 * (1 + XFS_BM_MAXLEVELS(mp)))), \
 	 ((4 * (mp)->m_sb.sb_sectsize) + \
+	  (4 * (mp)->m_sb.sb_sectsize) + \
 	  (mp)->m_sb.sb_sectsize + \
-	  (4 * 2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp))) + \
+	  (4 * 2 * 2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp))) + \
 	  (128 * (5 + (4 * XFS_AG_MAXLEVELS(mp)))))))
      
 /*
