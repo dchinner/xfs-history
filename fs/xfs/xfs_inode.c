@@ -488,7 +488,9 @@ xfs_ialloc(
 	 * directory, group of new file is set to that of the parent, and
 	 * new subdirectory gets ISGID bit from parent.
 	 */
-	if ((vp->v_vfsp->vfs_flag & VFS_GRPID) || (pip->i_d.di_mode & ISGID)) {
+	if (pip != NULL &&
+	    ((vp->v_vfsp->vfs_flag & VFS_GRPID) ||
+	     (pip->i_d.di_mode & ISGID))) {
 		ip->i_d.di_gid = pip->i_d.di_gid;
 		if ((pip->i_d.di_mode & ISGID) && (mode & IFMT) == IFDIR)
 			ip->i_d.di_mode |= ISGID;
