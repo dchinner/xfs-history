@@ -6,14 +6,18 @@
 # unless it's something special (ie not a .c file).
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
-EXTRA_CFLAGS += -I.. -I.
+
+EXTRA_CFLAGS += -I.. -I. -D_KERNEL
+
 O_TARGET := xfs.o
+
 LINO_OBJS   := linux/xfs_file.o  linux/xfs_super.o \
  linux/xfs_vnode.o linux/xfs_behavior.o linux/xfs_vfs.o  linux/xfs_random.o \
- linux/xfs_locks.o linux/xfs_globals.o linux/xfs_debug.o linux/xfs_uuid.o
+ linux/xfs_locks.o linux/xfs_globals.o linux/xfs_debug.o linux/xfs_uuid.o \
+ linux/xfs_dnlc.o linux/xfs_fs_bio.o linux/xfs_fs_subr.o
+ 
+# linux/xfs_inode.o
 
-# xfs_linux_ops_inode.o
-# fs_bio.o
 M_OBJS   := $(O_TARGET)
 XFS_OBJS  :=   xfs_alloc.o \
                 xfs_alloc_btree.o \

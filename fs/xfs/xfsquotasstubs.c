@@ -1,13 +1,12 @@
 /*
  *
- * $Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfsquotasstubs.c,v 1.1 1999/08/30 23:18:36 mostek Exp $
+ * $Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfsquotasstubs.c,v 1.2 1999/09/01 00:35:47 mostek Exp $
  * $Author: mostek $
- * $Id: xfsquotasstubs.c,v 1.1 1999/08/30 23:18:36 mostek Exp $
+ * $Id: xfsquotasstubs.c,v 1.2 1999/09/01 00:35:47 mostek Exp $
  *
  * $Log: xfsquotasstubs.c,v $
- * Revision 1.1  1999/08/30 23:18:36  mostek
- * Create quota stubs file in Linux port. This was not in the XFS directory
- * so it didn't come along on the first shot.
+ * Revision 1.2  1999/09/01 00:35:47  mostek
+ * Get rid of warnings (void) arguments.
  *
  */
 
@@ -26,60 +25,60 @@
 struct xfs_qm *xfs_Gqm = NULL;
 mutex_t	xfs_Gqm_lock;
 
-struct xfs_qm   *xfs_qm_init() {return NULL;}
+struct xfs_qm   *xfs_qm_init(void) {return NULL;}
 
-void 		xfs_qm_destroy() { return; }
-int		xfs_qm_dqflush_all() { return nopkg(); }
-int		xfs_qm_dqattach() { return nopkg(); }
-int		xfs_quotactl() { return nopkg(); }
-int		xfs_qm_dqpurge_all() { return nopkg(); }
-void		xfs_qm_mount_quotainit() { return; }
-void		xfs_qm_unmount_quotadestroy() { return; }
-int		xfs_qm_mount_quotas() { return nopkg(); }
-int 		xfs_qm_unmount_quotas() { return nopkg(); }
-void		xfs_qm_dqdettach_inode() { return; }
-int 		xfs_qm_sync() { return nopkg(); }
-int		xfs_qm_check_inoquota() { return nopkg(); }
-int		xfs_qm_check_inoquota2() { return nopkg(); }
-void		xfs_qm_dqrele_all_inodes() { return; }
+void 		xfs_qm_destroy(void) { return; }
+int		xfs_qm_dqflush_all(void) { return nopkg(); }
+int		xfs_qm_dqattach(void) { return nopkg(); }
+int		xfs_quotactl(void) { return nopkg(); }
+int		xfs_qm_dqpurge_all(void) { return nopkg(); }
+void		xfs_qm_mount_quotainit(void) { return; }
+void		xfs_qm_unmount_quotadestroy(void) { return; }
+int		xfs_qm_mount_quotas(void) { return nopkg(); }
+int 		xfs_qm_unmount_quotas(void) { return nopkg(); }
+void		xfs_qm_dqdettach_inode(void) { return; }
+int 		xfs_qm_sync(void) { return nopkg(); }
+int		xfs_qm_check_inoquota(void) { return nopkg(); }
+int		xfs_qm_check_inoquota2(void) { return nopkg(); }
+void		xfs_qm_dqrele_all_inodes(void) { return; }
 
 /*
  * dquot interface
  */
-void		xfs_dqlock() { return; }
-void		xfs_dqunlock() { return; }
-void		xfs_dqunlock_nonotify() { return; }
-void		xfs_dqlock2() {return;}
-void 		xfs_qm_dqput() { return; }
-void 		xfs_qm_dqrele() { return; }
-int		xfs_qm_dqid() { return -1; }
-int		xfs_qm_dqget() { return nopkg(); }	
-int 		xfs_qm_dqcheck() { return nopkg(); }
+void		xfs_dqlock(void) { return; }
+void		xfs_dqunlock(void) { return; }
+void		xfs_dqunlock_nonotify(void) { return; }
+void		xfs_dqlock2(void) {return;}
+void 		xfs_qm_dqput(void) { return; }
+void 		xfs_qm_dqrele(void) { return; }
+int		xfs_qm_dqid(void) { return -1; }
+int		xfs_qm_dqget(void) { return nopkg(); }	
+int 		xfs_qm_dqcheck(void) { return nopkg(); }
 
 /*
  * Transactions
  */
-void 		xfs_trans_alloc_dqinfo() { return; }
-void 		xfs_trans_free_dqinfo() { return; }
-void		xfs_trans_dup_dqinfo() { return; }
-void		xfs_trans_mod_dquot() { return; }
-int		xfs_trans_mod_dquot_byino() { return nopkg(); }
-void		xfs_trans_apply_dquot_deltas() { return; }
-void		xfs_trans_unreserve_and_mod_dquots() { return; }
-int		xfs_trans_reserve_quota_nblks() { return nopkg(); }
-int		xfs_trans_reserve_quota_bydquots() { return nopkg(); }
-void		xfs_trans_log_dquot() { return; }
-void		xfs_trans_dqjoin() { return; }
+void 		xfs_trans_alloc_dqinfo(void) { return; }
+void 		xfs_trans_free_dqinfo(void) { return; }
+void		xfs_trans_dup_dqinfo(void) { return; }
+void		xfs_trans_mod_dquot(void) { return; }
+int		xfs_trans_mod_dquot_byino(void) { return nopkg(); }
+void		xfs_trans_apply_dquot_deltas(void) { return; }
+void		xfs_trans_unreserve_and_mod_dquots(void) { return; }
+int		xfs_trans_reserve_quota_nblks(void) { return nopkg(); }
+int		xfs_trans_reserve_quota_bydquots(void) { return nopkg(); }
+void		xfs_trans_log_dquot(void) { return; }
+void		xfs_trans_dqjoin(void) { return; }
 
 /* 
  * Vnodeops Utility Functions
  */
 
-struct xfs_dquot *xfs_qm_vop_chown() { return NULL; }
-int		xfs_qm_vop_dqalloc() { return nopkg(); }
-int		xfs_qm_vop_chown_dqalloc() { return nopkg(); }
-int		xfs_qm_vop_chown_reserve() { return nopkg(); }
-int		xfs_qm_vop_rename_dqattach() { return nopkg(); }
-void		xfs_qm_vop_dqattach_and_dqmod_newinode() { return; }
+struct xfs_dquot *xfs_qm_vop_chown(void) { return NULL; }
+int		xfs_qm_vop_dqalloc(void) { return nopkg(); }
+int		xfs_qm_vop_chown_dqalloc(void) { return nopkg(); }
+int		xfs_qm_vop_chown_reserve(void) { return nopkg(); }
+int		xfs_qm_vop_rename_dqattach(void) { return nopkg(); }
+void		xfs_qm_vop_dqattach_and_dqmod_newinode(void) { return; }
 
 
