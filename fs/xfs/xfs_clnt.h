@@ -12,19 +12,25 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident "$Revision: 1.10 $"
+#ident "$Revision: 1.11 $"
 
 /*
  * XFS arguments to the mount system call.
  */
 struct xfs_args {
 	int	version;	/* version of this */
-	int	flags;		/* flags */
-	int	logbufs;	/* Number of log buffers */
-	int	logbufsize;	/* Size of log buffers */
-	char	*fsname;	/* filesystem name */
-	int	sunit;		/* stripe unit */
-	int	swidth;		/* stripe width */
+				/* 1, see xfs_args_ver_1 */
+				/* 2, see xfs_args_ver_2 */
+	int	flags;		/* flags, see XFSMNT_... below */
+	int	logbufs;	/* Number of log buffers, -1 to default */
+	int	logbufsize;	/* Size of log buffers, -1 to default */
+	char	*fsname;	/* filesystem name (mount point) */
+	/*
+	 * Next two are for stripe aligment.
+	 * Set 0 for no alignment handling (see XFSMNT_NOALIGN flag)
+	 */
+	int	sunit;		/* stripe unit (bbs) */
+	int	swidth;		/* stripe width (bbs), multiple of sunit */
 };
 
 #ifdef _KERNEL
