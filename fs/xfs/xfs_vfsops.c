@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.199 $"
+#ident  "$Revision: 1.200 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -1815,19 +1815,18 @@ xfs_sync(
 	xfs_dinode_t	*dip;
 	xfs_buf_log_item_t	*bip;
 	xfs_iptr_t	*ipointer;
-#ifdef DEBUG
 	boolean_t	ipointer_in = B_FALSE;
 
 #define IPOINTER_SET	ipointer_in = B_TRUE
 #define IPOINTER_CLR	ipointer_in = B_FALSE
-#else
-#define IPOINTER_SET
-#define IPOINTER_CLR
-#endif
 
 
+/* Insert a marker record into the inode list after inode ip. The list
+ * must be locked when this is called. After the call the list will no
+ * longer be locked.
+ */
 #define IPOINTER_INSERT(ip, mp)	{ \
-		ASSERT(ipointer_in == B_FALSE); \
+		ASSERT_ALWAYS(ipointer_in == B_FALSE); \
 		ipointer->ip_mnext = ip->i_mnext; \
 		ipointer->ip_mprev = ip; \
 		ip->i_mnext = (xfs_inode_t *)ipointer; \
@@ -1838,8 +1837,13 @@ xfs_sync(
 		IPOINTER_SET; \
 	}
 
+/* Remove the marker from the inode list. If the marker was the only item
+ * in the list then there are no remaining inodes and we should zero out
+ * the whole list. If we are the current head of the list then move the head
+ * past us.
+ */
 #define IPOINTER_REMOVE(ip, mp)	{ \
-		ASSERT(ipointer_in == B_TRUE); \
+		ASSERT_ALWAYS (ipointer_in == B_TRUE); \
 		if (ipointer->ip_mnext == ipointer->ip_mprev) { \
 			mp->m_inodes = NULL; \
 			ip = NULL; \
@@ -1894,7 +1898,7 @@ xfs_sync(
 	IPOINTER_CLR;
 
 	do {
-		ASSERT(ipointer_in == B_FALSE);
+		ASSERT_ALWAYS(ipointer_in == B_FALSE);
 		ASSERT(vnode_refed == B_FALSE);
 		lock_flags = base_lock_flags;
 
@@ -1979,9 +1983,10 @@ xfs_sync(
 
 			/*
 			 * We need to unlock the inode list lock in order
-			 * to lock the inode.  Use the m_ireclaims counter
-			 * as a list version number to tell us whether we
-			 * need to start again at the beginning of the list.
+			 * to lock the inode. Insert a marker record into
+			 * the inode list to remember our position, dropping
+			 * the lock is now done inside the IPOINTER_INSERT
+			 * macro.
 			 *
 			 * We also use the inode list lock to protect us
 			 * in taking a snapshot of the vnode version number
@@ -1996,7 +2001,7 @@ xfs_sync(
 				/*
 				 * The vnode was reclaimed once we let go
 				 * of the inode list lock.  Skip to the
-				 * next list entry.
+				 * next list entry. Remove the marker.
 				 */
 
 				XFS_MOUNT_ILOCK(mp);
@@ -2008,6 +2013,10 @@ xfs_sync(
 			xfs_ilock(ip, lock_flags);
 			vnode_refed = B_TRUE;
 		}
+
+		/* From here on in the loop we may have a marker record
+		 * in the inode list.
+		 */
 
 		if (flags & SYNC_CLOSE) {
 			/*
@@ -2033,6 +2042,10 @@ xfs_sync(
 			xfs_ilock(ip, XFS_ILOCK_SHARED);
 		} else if (flags & SYNC_DELWRI) {
 			if (VN_DIRTY(vp)) {
+				/* We need to have droppped the lock here,
+				 * so insert a marker if we have not already
+				 * done so.
+				 */
 				if (mount_locked) {
 					IPOINTER_INSERT(ip, mp);
 				}
@@ -2052,6 +2065,9 @@ xfs_sync(
 
 		if (flags & SYNC_PDFLUSH) {
 			if (vp->v_dpages) {
+				/* Insert marker and drop lock if not already
+				 * done.
+				 */
 				if (mount_locked) {
 					IPOINTER_INSERT(ip, mp);
 				}
@@ -2070,6 +2086,10 @@ xfs_sync(
 			    ((ip->i_update_core) ||
 			     ((ip->i_itemp != NULL) &&
 			      (ip->i_itemp->ili_format.ilf_fields != 0)))) {
+
+				/* Insert marker and drop lock if not already
+				 * done.
+				 */
 				if (mount_locked) {
 					IPOINTER_INSERT(ip, mp);
 				}
@@ -2101,6 +2121,9 @@ xfs_sync(
 					if (!error) {
 						brelse(bp);
 					} else {
+						/* Bailing out, remove the
+						 * marker and free it.
+						 */
 						XFS_MOUNT_ILOCK(mp);
 						IPOINTER_REMOVE(ip, mp);
 						XFS_MOUNT_IUNLOCK(mp);
@@ -2116,7 +2139,10 @@ xfs_sync(
 					 * lock and check to see if we were the
 					 * inode reclaimed. If this happened
 					 * then the ipointer marker will no
-					 * longer point back at us.
+					 * longer point back at us. In this
+					 * case, move ip along to the inode
+					 * after the marker, remove the marker
+					 * and continue.
 					 */
 					XFS_MOUNT_ILOCK(mp);
 					mount_locked = B_TRUE;
@@ -2136,8 +2162,7 @@ xfs_sync(
 						 * clear the ILOCK bit from
 						 * the lock_flags so that we
 						 * won't try to drop a lock
-						 * we don't hold below.  Drop
-						 * the mount lock so that we
+						 * we don't hold below.
 						 */
 						lock_flags &= ~XFS_ILOCK_SHARED;
 						IPOINTER_REMOVE(ip_next, mp);
@@ -2151,7 +2176,8 @@ xfs_sync(
 						 * it is not pinned.  Drop
 						 * the mount lock here so
 						 * that we don't hold it for
-						 * too long.
+						 * too long. We already have
+						 * a marker in the list here.
 						 */
 						XFS_MOUNT_IUNLOCK(mp);
 						mount_locked = B_FALSE;
@@ -2229,9 +2255,14 @@ xfs_sync(
 				IPOINTER_REMOVE(ip, mp);
 			}
 			XFS_MOUNT_IUNLOCK(mp);
+			ASSERT_ALWAYS (ipointer_in == B_FALSE);
 			kmem_free(ipointer, sizeof(xfs_iptr_t));
 			return XFS_ERROR(error);
 		}
+		/* Let other threads have a chance at the mount lock
+		 * if we have looped many times without dropping the
+		 * lock.
+		 */
 		if ((++preempt & PREEMPT_MASK) == 0) {
 			if (mount_locked) {
 				IPOINTER_INSERT(ip, mp);
@@ -2244,10 +2275,11 @@ xfs_sync(
 			continue;
 		}
 
+		ASSERT_ALWAYS (ipointer_in == B_FALSE);
 		ip = ip->i_mnext;
 	} while (ip != mp->m_inodes);
 	XFS_MOUNT_IUNLOCK(mp);
-	ASSERT(ipointer_in == B_FALSE);
+	ASSERT_ALWAYS (ipointer_in == B_FALSE);
 
 	/*
 	 * Get the Quota Manager to flush the dquots in a similar manner.
