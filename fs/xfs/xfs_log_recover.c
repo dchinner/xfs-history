@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.59 $"
+#ident	"$Revision: 1.60 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1049,6 +1049,7 @@ xlog_recover_print_inode(xlog_recover_item_t *item)
     xfs_dinode_core_t	   *dino;
     caddr_t		   p;
     int			   len;
+    int			   attr_index;
     extern int		   print_inode, print_data;
 
     f = (xfs_inode_log_format_t *)item->ri_buf[0].i_addr;
@@ -1061,10 +1062,10 @@ xlog_recover_print_inode(xlog_recover_item_t *item)
     xlog_recover_print_inode_core((xfs_dinode_core_t *)item->ri_buf[1].i_addr);
 
     /* does anything come next */
-    switch (f->ilf_fields & XFS_ILOG_NONCORE) {
+    switch (f->ilf_fields & XFS_ILOG_DFORK) {
 	case XFS_ILOG_DEXT: {
-	    ASSERT(f->ilf_size == 3);
-	    printf("		EXTENTS inode data:\n");
+	    ASSERT(f->ilf_size <= 4);
+	    printf("		DATA FORK EXTENTS inode data:\n");
 	    if (print_inode && print_data) {
 		xlog_recover_print_data(item->ri_buf[2].i_addr,
 					item->ri_buf[2].i_len);
@@ -1073,7 +1074,7 @@ xlog_recover_print_inode(xlog_recover_item_t *item)
 	}
 	case XFS_ILOG_DBROOT: {
 	    ASSERT(f->ilf_size == 3);
-	    printf("		BTREE inode data:\n");
+	    printf("		DATA FORK BTREE inode data:\n");
 	    if (print_inode && print_data) {
 		xlog_recover_print_data(item->ri_buf[2].i_addr,
 					item->ri_buf[2].i_len);
@@ -1082,7 +1083,7 @@ xlog_recover_print_inode(xlog_recover_item_t *item)
 	}
 	case XFS_ILOG_DDATA: {
 	    ASSERT(f->ilf_size == 3);
-	    printf("		LOCAL inode data:\n");
+	    printf("		DATA FORK LOCAL inode data:\n");
 	    if (print_inode && print_data) {
 		xlog_recover_print_data(item->ri_buf[2].i_addr,
 					item->ri_buf[2].i_len);
@@ -1106,6 +1107,49 @@ xlog_recover_print_inode(xlog_recover_item_t *item)
 	default: {
 	    xlog_panic("xlog_print_trans_inode: illegal inode type");
 	}
+    }
+
+    if (f->ilf_fields & XFS_ILOG_AFORK) {
+	    if (f->ilf_fields & XFS_ILOG_DFORK) {
+		    attr_index = 3;
+	    } else {
+		    attr_index = 2;
+	    }
+	    switch (f->ilf_fields & XFS_ILOG_AFORK) {
+	        case XFS_ILOG_AEXT: {
+		    ASSERT(f->ilf_size <= 4);
+		    printf("		ATTR FORK EXTENTS inode data:\n");
+		    if (print_inode && print_data) {
+			    xlog_recover_print_data(
+					    item->ri_buf[attr_index].i_addr,
+					    item->ri_buf[attr_index].i_len);
+		    }
+		    break;
+	        }
+	        case XFS_ILOG_ABROOT: {
+		    ASSERT(f->ilf_size <= 4);
+		    printf("		ATTR FORK BTREE inode data:\n");
+		    if (print_inode && print_data) {
+			    xlog_recover_print_data(
+					    item->ri_buf[attr_index].i_addr,
+					    item->ri_buf[attr_index].i_len);
+		    }
+		    break;
+	        }
+	        case XFS_ILOG_ADATA: {
+		    ASSERT(f->ilf_size <= 4);
+		    printf("		ATTR FORK LOCAL inode data:\n");
+		    if (print_inode && print_data) {
+			    xlog_recover_print_data(
+					    item->ri_buf[attr_index].i_addr,
+					    item->ri_buf[attr_index].i_len);
+		    }
+		    break;
+	        }
+	        default: {
+		    xlog_panic("xlog_print_trans_inode: illegal inode log flag");
+	        }
+	    }
     }
     
 }	/* xlog_recover_print_inode */
@@ -1749,7 +1793,9 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	xfs_dinode_t		*dip;
 	int			len;
 	caddr_t			src;
+	caddr_t			dest;
 	int			error;
+	int			attr_index;
 
 	if (pass == XLOG_RECOVER_PASS1) {
 		return 0;
@@ -1777,7 +1823,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	bp = bread(mp->m_dev, imap.im_blkno, imap.im_len);
 	if (bp->b_flags & B_ERROR) {
 		cmn_err(CE_WARN,
-			"xFS: xlog_recover_do_inode_trans: bread error (%d)",
+			"XFS: xlog_recover_do_inode_trans: bread error (%d)",
 			bp->b_blkno);
 		ASSERT(0);
 		error = bp->b_error;
@@ -1796,36 +1842,78 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		goto write_inode_buffer;
 	len = item->ri_buf[2].i_len;
 	src = item->ri_buf[2].i_addr;
-	ASSERT(in_f->ilf_size == 3);
-	/* FIX ME: ATTR FORK */
-	switch (in_f->ilf_fields & XFS_ILOG_NONCORE) {
-	    case XFS_ILOG_DDATA:
-	    case XFS_ILOG_DEXT: {
-		    ASSERT((caddr_t)&dip->di_u+len <= bp->b_dmaaddr+bp->b_bcount);
-		    bcopy(src, &dip->di_u, len);
-		    break;
-	    }
-	    case XFS_ILOG_DBROOT: {
+	ASSERT(in_f->ilf_size <= 4);
+	ASSERT((in_f->ilf_size == 3) || (in_f->ilf_fields & XFS_ILOG_AFORK));
+	ASSERT(!(in_f->ilf_fields & XFS_ILOG_DFORK) ||
+	       (len == in_f->ilf_dsize));
+
+	switch (in_f->ilf_fields & XFS_ILOG_DFORK) {
+	case XFS_ILOG_DDATA:
+	case XFS_ILOG_DEXT:
+		ASSERT((caddr_t)&dip->di_u+len <= bp->b_dmaaddr+bp->b_bcount);
+		bcopy(src, &dip->di_u, len);
+		break;
+
+	case XFS_ILOG_DBROOT:
 		xfs_bmbt_to_bmdr((xfs_bmbt_block_t *)src, len,
 				 &(dip->di_u.di_bmbt),
 				 XFS_DFORK_DSIZE(dip, mp));
 		break;
-	    }
-	    case XFS_ILOG_DEV: {
-		    dip->di_u.di_dev = in_f->ilf_u.ilfu_rdev;
-		    break;
-	    }
-	    case XFS_ILOG_UUID: {
-		    dip->di_u.di_muuid = in_f->ilf_u.ilfu_uuid;
-		    break;
-	    }
-	    default: {
-		    xlog_warn("xFS: xlog_recover_do_inode_trans: Illegal flag");
-		    ASSERT(0);
-		    brelse(bp);
-		    return XFS_ERROR(EIO);
-	    }
+
+	case XFS_ILOG_DEV:
+		dip->di_u.di_dev = in_f->ilf_u.ilfu_rdev;
+		break;
+
+	case XFS_ILOG_UUID:
+		dip->di_u.di_muuid = in_f->ilf_u.ilfu_uuid;
+		break;
+
+	default:
+		xlog_warn("XFS: xlog_recover_do_inode_trans: Illegal flag");
+		ASSERT(0);
+		brelse(bp);
+		return XFS_ERROR(EIO);
 	}
+
+	/*
+	 * If we logged any attribute data, recover it.  There may or
+	 * may not have been any data fork data logged in this
+	 * transaction.
+	 */
+	if (in_f->ilf_fields & XFS_ILOG_AFORK) {
+		if (in_f->ilf_fields & XFS_ILOG_DFORK) {
+			attr_index = 3;
+		} else {
+			attr_index = 2;
+		}
+		len = item->ri_buf[attr_index].i_len;
+		src = item->ri_buf[attr_index].i_addr;
+		ASSERT(len == in_f->ilf_asize);
+
+		switch (in_f->ilf_fields & XFS_ILOG_DFORK) {
+		case XFS_ILOG_DDATA:
+		case XFS_ILOG_DEXT:
+			dest = XFS_DFORK_PTR(dip, XFS_ATTR_FORK);
+			ASSERT(dest+len <= bp->b_dmaaddr+bp->b_bcount);
+			ASSERT(len < XFS_DFORK_ASIZE(dip, mp));
+			bcopy(src, dest, len);
+			break;
+
+		case XFS_ILOG_DBROOT:
+			dest = XFS_DFORK_PTR(dip, XFS_ATTR_FORK);
+			xfs_bmbt_to_bmdr((xfs_bmbt_block_t *)src, len,
+					 (xfs_bmdr_block_t*)dest,
+					 XFS_DFORK_ASIZE(dip, mp));
+			break;
+
+		default:
+			xlog_warn("XFS: xlog_recover_do_inode_trans: Illegal flag");
+			ASSERT(0);
+			brelse(bp);
+			return XFS_ERROR(EIO);
+		}
+	}
+
 
 write_inode_buffer:
 	xfs_inobp_check(mp, bp);
