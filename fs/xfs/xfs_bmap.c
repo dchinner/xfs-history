@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.186 $"
+#ident	"$Revision: 1.187 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -184,7 +184,8 @@ xfs_bmap_btree_to_extents(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	int			*logflagsp, /* inode logging flags */
-	int			whichfork); /* data or attr fork */
+	int			whichfork,  /* data or attr fork */
+	int			async);     /* xaction can be async */
 
 #ifdef XFSDEBUG
 /*
@@ -776,7 +777,7 @@ xfs_bmap_add_extent_delay_real(
 					RIGHT.br_blockcount, &i))
 				return error;
 			ASSERT(i == 1);
-			if (error = xfs_bmbt_delete(cur, &i))
+			if (error = xfs_bmbt_delete(cur, 0, &i))
 				return error;
 			ASSERT(i == 1);
 			if (error = xfs_bmbt_decrement(cur, 0, &i))
@@ -1435,7 +1436,7 @@ xfs_bmap_add_extent_hole_real(
 				right.br_startblock, right.br_blockcount, &i))
 			return error;
 		ASSERT(i == 1);
-		if (error = xfs_bmbt_delete(cur, &i))
+		if (error = xfs_bmbt_delete(cur, 0, &i))
 			return error;
 		ASSERT(i == 1);
 		if (error = xfs_bmbt_decrement(cur, 0, &i))
@@ -1973,7 +1974,8 @@ xfs_bmap_btree_to_extents(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	int			*logflagsp, /* inode logging flags */
-	int			whichfork) /* data or attr fork */
+	int			whichfork,  /* data or attr fork */
+	int			async)      /* xaction can be async */
 {
 	/* REFERENCED */
 	xfs_bmbt_block_t	*cblock;/* child btree block */
@@ -2001,7 +2003,8 @@ xfs_bmap_btree_to_extents(
 	cblock = XFS_BUF_TO_BMBT_BLOCK(cbp);
 	ASSERT(cblock->bb_level == 0);
 	xfs_bmap_add_free(cbno, 1, cur->bc_private.b.flist, mp);
-	xfs_trans_set_sync(tp);
+	if (!async)
+		xfs_trans_set_sync(tp);
 	ip->i_d.di_nblocks--;
 	if (XFS_IS_QUOTA_ON(mp) &&
 	    ip->i_ino != mp->m_sb.sb_uquotino &&
@@ -2187,7 +2190,7 @@ xfs_bmap_del_extent(
 			flags |= XFS_ILOG_FEXT(whichfork);
 			break;
 		}
-		if (error = xfs_bmbt_delete(cur, &i))
+		if (error = xfs_bmbt_delete(cur, iflags & XFS_BMAPI_ASYNC, &i))
 			return error;
 		ASSERT(i == 1);
 		break;
@@ -3901,7 +3904,7 @@ xfs_bmapi(
 		 XFS_IFORK_NEXTENTS(ip, whichfork) <= ifp->if_ext_max) {
 		ASSERT(wr);
 		if (error = xfs_bmap_btree_to_extents(tp, ip, cur,
-				&tmp_logflags, whichfork))
+				&tmp_logflags, whichfork, 0))
 			goto error0;
 		logflags |= tmp_logflags;
 	}
@@ -4028,6 +4031,7 @@ xfs_bunmapi(
 	xfs_fileoff_t		start;		/* first file offset deleted */
 	int			tmp_logflags;	/* partial logging flags */
 	int			whichfork;	/* data or attribute fork */
+	int			async;		/* xactions can be async */
 
 	whichfork = (flags & XFS_BMAPI_ATTRFORK) ?
 		XFS_ATTR_FORK : XFS_DATA_FORK;
@@ -4038,6 +4042,7 @@ xfs_bunmapi(
 	mp = ip->i_mount;
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
+	async = flags & XFS_BMAPI_ASYNC;
 	ASSERT(len > 0);
 	ASSERT(nexts > 0);
 	ASSERT(ifp->if_ext_max ==
@@ -4184,7 +4189,7 @@ xfs_bunmapi(
 		 XFS_IFORK_NEXTENTS(ip, whichfork) <= ifp->if_ext_max) {
 		ASSERT(cur != NULL);
 		if (error = xfs_bmap_btree_to_extents(tp, ip, cur,
-				&tmp_logflags, whichfork))
+				&tmp_logflags, whichfork, async))
 			goto error0;
 		logflags |= tmp_logflags;
 	}
