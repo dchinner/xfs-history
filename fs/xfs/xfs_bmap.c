@@ -1,9 +1,10 @@
-#ident	"$Revision: 1.144 $"
+#ident	"$Revision: 1.145 $"
 
 #ifdef SIM
 #define	_KERNEL 1
 #endif
 #include <sys/param.h>
+#include <sys/sema.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -54,6 +55,8 @@
 #include "xfs_bmap.h"
 #include "xfs_rtalloc.h"
 #include "xfs_error.h"
+#include "xfs_da_btree.h"
+#include "xfs_dir_leaf.h"
 #ifdef SIM
 #include "sim.h"
 #endif
@@ -69,6 +72,39 @@ zone_t		*xfs_bmap_free_item_zone;
 /*
  * Prototypes for internal bmap routines.
  */
+
+/*
+ * Called from xfs_bmap_add_attrfork to handle btree format files.
+ */
+STATIC int					/* error */
+xfs_bmap_add_attrfork_btree(
+	xfs_trans_t		*tp,		/* transaction pointer */
+	xfs_inode_t		*ip,		/* incore inode pointer */
+	xfs_fsblock_t		*firstblock,	/* first block allocated */
+	xfs_bmap_free_t		*flist,		/* blocks to free at commit */
+	int			*flags);	/* inode logging flags */
+
+/*
+ * Called from xfs_bmap_add_attrfork to handle extents format files.
+ */
+STATIC int					/* error */
+xfs_bmap_add_attrfork_extents(
+	xfs_trans_t		*tp,		/* transaction pointer */
+	xfs_inode_t		*ip,		/* incore inode pointer */
+	xfs_fsblock_t		*firstblock,	/* first block allocated */
+	xfs_bmap_free_t		*flist,		/* blocks to free at commit */
+	int			*flags);	/* inode logging flags */
+
+/*
+ * Called from xfs_bmap_add_attrfork to handle local format files.
+ */
+STATIC int					/* error */
+xfs_bmap_add_attrfork_local(
+	xfs_trans_t		*tp,		/* transaction pointer */
+	xfs_inode_t		*ip,		/* incore inode pointer */
+	xfs_fsblock_t		*firstblock,	/* first block allocated */
+	xfs_bmap_free_t		*flist,		/* blocks to free at commit */
+	int			*flags);	/* inode logging flags */
 
 /*
  * Called by xfs_bmapi to update extent list structure and the btree
@@ -354,6 +390,103 @@ xfs_bmap_validate_ret(
 /*
  * Bmap internal routines.
  */
+
+/*
+ * Called from xfs_bmap_add_attrfork to handle btree format files.
+ */
+STATIC int					/* error */
+xfs_bmap_add_attrfork_btree(
+	xfs_trans_t		*tp,		/* transaction pointer */
+	xfs_inode_t		*ip,		/* incore inode pointer */
+	xfs_fsblock_t		*firstblock,	/* first block allocated */
+	xfs_bmap_free_t		*flist,		/* blocks to free at commit */
+	int			*flags)		/* inode logging flags */
+{
+	xfs_btree_cur_t		*cur;		/* btree cursor */
+	int			error;		/* error return value */
+	xfs_mount_t		*mp;		/* file system mount struct */
+	int			stat;		/* newroot status */
+
+	mp = ip->i_mount;
+	if (ip->i_df.if_broot_bytes <= XFS_IFORK_DSIZE(ip)) {
+		*flags |= XFS_ILOG_DBROOT;
+	} else {
+		cur = xfs_btree_init_cursor(mp, tp, NULL, 0, XFS_BTNUM_BMAP, ip,
+			XFS_DATA_FORK);
+		cur->bc_private.b.flist = flist;
+		cur->bc_private.b.firstblock = *firstblock;
+		error = xfs_bmbt_lookup_ge(cur, 0, 0, 0, &stat);
+		if (error) {
+			xfs_btree_del_cursor(cur);
+			return error;
+		}
+		error = xfs_bmbt_newroot(cur, flags, &stat);
+		if (error || stat == 0) {
+			xfs_btree_del_cursor(cur);
+			return error ? error : XFS_ERROR(ENOSPC);
+		}
+		*firstblock = cur->bc_private.b.firstblock;
+		xfs_btree_del_cursor(cur);
+	}
+	return 0;
+}
+
+/*
+ * Called from xfs_bmap_add_attrfork to handle extents format files.
+ */
+STATIC int					/* error */
+xfs_bmap_add_attrfork_extents(
+	xfs_trans_t		*tp,		/* transaction pointer */
+	xfs_inode_t		*ip,		/* incore inode pointer */
+	xfs_fsblock_t		*firstblock,	/* first block allocated */
+	xfs_bmap_free_t		*flist,		/* blocks to free at commit */
+	int			*flags)		/* inode logging flags */
+{
+	xfs_btree_cur_t		*cur;
+	int			error;
+
+	if (ip->i_df.if_bytes <= XFS_IFORK_DSIZE(ip))
+		return 0;
+	error = xfs_bmap_extents_to_btree(tp, ip, firstblock, flist, &cur, 0, 0,
+		flags, XFS_DATA_FORK);
+	if (cur) {
+		cur->bc_private.b.allocated = 0;
+		xfs_btree_del_cursor(cur);
+	}
+	return error;
+}
+
+/*
+ * Called from xfs_bmap_add_attrfork to handle local format files.
+ */
+STATIC int					/* error */
+xfs_bmap_add_attrfork_local(
+	xfs_trans_t		*tp,		/* transaction pointer */
+	xfs_inode_t		*ip,		/* incore inode pointer */
+	xfs_fsblock_t		*firstblock,	/* first block allocated */
+	xfs_bmap_free_t		*flist,		/* blocks to free at commit */
+	int			*flags)		/* inode logging flags */
+{
+	xfs_da_name_t		dargs;
+	int			error;
+
+	if (ip->i_df.if_bytes <= XFS_IFORK_DSIZE(ip))
+		return 0;
+	if ((ip->i_d.di_mode & IFMT) == IFDIR) {
+		bzero(&dargs, sizeof(dargs));
+		dargs.dp = ip;
+		dargs.firstblock = firstblock;
+		dargs.flist = flist;
+		dargs.total = 1;
+		dargs.whichfork = XFS_DATA_FORK;
+		error = xfs_dir_shortform_to_leaf(tp, &dargs);
+		*flags |= XFS_ILOG_DEXT;
+	} else {
+		error = xfs_bmap_local_to_extents(tp, ip, firstblock, 1, flags,
+			XFS_DATA_FORK);
+	}
+	return error;
+}
 
 /*
  * Called by xfs_bmapi to update extent list structure and the btree
@@ -2647,6 +2780,88 @@ xfs_bmap_worst_indlen(
 }
 
 /*
+ * Convert inode from non-attributed to attributed.
+ * Must not be in a transaction, ip must not be locked.
+ */
+int						/* error code */
+xfs_bmap_add_attrfork(
+	xfs_inode_t		*ip)		/* incore inode pointer */
+{
+	int			committed;
+	int			error;
+	xfs_fsblock_t		firstblock;
+	xfs_bmap_free_t		flist;
+	int			logflags;
+	xfs_mount_t		*mp;
+	int			s;
+	xfs_trans_t		*tp;
+
+	if (XFS_IFORK_Q(ip))
+		return 0;
+	mp = ip->i_mount;
+	tp = xfs_trans_alloc(mp, XFS_TRANS_ADDAFORK);
+	if (error =
+	    xfs_trans_reserve(tp, 1, XFS_ADDAFORK_LOG_RES(mp), 0, 0, 0))
+		goto error0;
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	if (XFS_IFORK_Q(ip))
+		goto error1;
+	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
+	ip->i_d.di_forkoff = mp->m_attroffset >> 3;
+	logflags = XFS_ILOG_CORE;
+	XFS_BMAP_INIT(&flist, &firstblock);
+	switch (ip->i_d.di_format) {
+	case XFS_DINODE_FMT_DEV:
+	case XFS_DINODE_FMT_UUID:
+		break;
+	case XFS_DINODE_FMT_LOCAL:
+		error = xfs_bmap_add_attrfork_local(tp, ip, &firstblock,
+			&flist, &logflags);
+		if (error)
+			goto error2;
+		break;
+	case XFS_DINODE_FMT_EXTENTS:
+		error = xfs_bmap_add_attrfork_extents(tp, ip, &firstblock,
+			&flist, &logflags);
+		if (error)
+			goto error2;
+		break;
+	case XFS_DINODE_FMT_BTREE:
+		error = xfs_bmap_add_attrfork_btree(tp, ip, &firstblock,
+			&flist, &logflags);
+		if (error)
+			goto error2;
+		break;
+	default:
+		ASSERT(0);
+		error = XFS_ERROR(EINVAL);
+		goto error2;
+	}
+	xfs_trans_log_inode(tp, ip, logflags);
+	if (mp->m_sb.sb_versionnum < XFS_SB_VERSION_HASATTR) {
+		s = XFS_SB_LOCK(mp);
+		if (mp->m_sb.sb_versionnum < XFS_SB_VERSION_HASATTR) {
+			mp->m_sb.sb_versionnum = XFS_SB_VERSION_HASATTR;
+			xfs_mod_sb(tp, XFS_SB_VERSIONNUM);
+		}
+		XFS_SB_UNLOCK(mp, s);
+	}
+	error = xfs_bmap_finish(&tp, &flist, firstblock, &committed);
+	if (error)
+		goto error2;
+	error = xfs_trans_commit(tp, 0);
+	return error;
+
+error2:
+	xfs_bmap_cancel(&flist);
+error1:
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+error0:
+	xfs_trans_cancel(tp, XFS_TRANS_ABORT);
+	return error;
+}
+
+/*
  * Add the extent to the list of extents to be free at transaction end.
  * The list is maintained sorted (by block number).
  */
@@ -2745,7 +2960,7 @@ xfs_bmap_compute_maxlevels(
  * freed.  This is necessary to prevent blocks from being reallocated
  * and written to before the free and reallocation are actually permanent.
  * We do not just make the first transaction synchronous here, because
- * there are more efficent ways to gain the same protection in some cases
+ * there are more efficient ways to gain the same protection in some cases
  * (see the file truncation code).
  *
  * Return 1 if the given transaction was committed and a new one

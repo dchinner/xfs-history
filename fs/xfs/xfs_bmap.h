@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.49 $"
+#ident "$Revision: 1.50 $"
 
 struct getbmap;
 struct xfs_bmbt_irec;
@@ -82,6 +82,14 @@ typedef struct xfs_bmalloca {
 	int			low;	/* low on space, using seq'l ags */
 	xfs_fsblock_t		rval;	/* starting block of new extent */
 } xfs_bmalloca_t;
+
+/*
+ * Convert inode from non-attributed to attributed.
+ * Must not be in a transaction, ip must not be locked.
+ */
+int					/* error code */
+xfs_bmap_add_attrfork(
+	struct xfs_inode	*ip);	/* incore inode pointer */
 
 /*
  * Add the extent to the list of extents to be free at transaction end.
