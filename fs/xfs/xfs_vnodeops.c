@@ -843,7 +843,7 @@ xfs_setattr(
 				ip->i_d.di_flags |= XFS_DIFLAG_NOATIME;
 			if (vap->va_xflags & XFS_XFLAG_NODUMP)
 				ip->i_d.di_flags |= XFS_DIFLAG_NODUMP;
-			if (vap->va_xflags & XFS_XFLAG_RTINHERIT &&
+			if ((vap->va_xflags & XFS_XFLAG_RTINHERIT) &&
 			    (ip->i_d.di_mode & S_IFMT) == S_IFDIR)
 				ip->i_d.di_flags |= XFS_DIFLAG_RTINHERIT;
 		}
