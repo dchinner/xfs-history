@@ -1,4 +1,4 @@
-#ident "$Revision: 1.242 $"
+#ident "$Revision: 1.243 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2433,8 +2433,7 @@ xfs_write_file(
 	uio_t		*uiop,
 	int		ioflag,
 	cred_t		*credp,
-	xfs_lsn_t	*commit_lsn_p,
-	int		*append)
+	xfs_lsn_t	*commit_lsn_p)
 {
 	struct bmapval	bmaps[XFS_MAX_RW_NBMAPS];
 	struct bmapval	*bmapp;
@@ -2671,26 +2670,6 @@ xfs_write_file(
 			}
 
 			/*
-			 * save the commit lsn for dsync writes
-			 * so xfs_write can force the log up to
-			 * the appropriate point.  don't bother
-			 * doing this for sync writes since xfs_write
-			 * will have to kick off a sync xaction to
-			 * log the timestamp updates anyway.
-			 *
-			 * blindly reset b_fsprivate3 here since
-			 * the XFS routines don't clear that field
-			 * when they release a metadata buffer.
-			 *
-			 * b_fsprivate3 on this buffer *must* be
-			 * reset before going down to xfs_strat_write 
-			 * or xfs_strat_write will stamp an lsn
-			 * into a mount structure.
-			 */
-			if (ioflag & IO_DSYNC)
-				bp->b_fsprivate3 = commit_lsn_p;
-
-			/*
 			 * There is not much we can do with buffer errors.
 			 * The assumption here is that the space underlying
 			 * the buffer must now be allocated (even if it
@@ -2807,14 +2786,10 @@ xfs_write_file(
 				if (!(bp->b_flags & B_DONE)) {
 					chunkreread(bp);
 				}
+
 				bp->b_flags |= B_STALE;
 				(void) bwrite(bp);
-				/*
-				 * clean up after ourselves to avoid
-				 * potential future confusion
-				 */
-				if (ioflag & IO_DSYNC)
-					bp->b_fsprivate3 = NULL;
+
 				bmapp++;
 				nbmaps--;
 				continue;
@@ -2857,13 +2832,23 @@ xfs_write_file(
 				    bmapp->bsize) {
 					bp->b_relse = chunkrelse;
 				}
-				error = bwrite(bp);
 				/*
-				 * clean up after ourselves to avoid
-				 * potential future confusion
+				 * save the commit lsn for dsync writes
+				 * so xfs_write can force the log up to
+				 * the appropriate point.  don't bother
+				 * doing this for sync writes since xfs_write
+				 * will have to kick off a sync xaction to
+				 * log the timestamp updates anyway.
 				 */
-				if (ioflag & IO_DSYNC)
+				if (ioflag & IO_DSYNC) {
+					bp->b_fsprivate3 = commit_lsn_p;
+					bp->b_flags |= B_HOLD;
+				}
+				error = bwrite(bp);
+				if (ioflag & IO_DSYNC) {
 					bp->b_fsprivate3 = NULL;
+					brelse(bp);
+				}
 			} else {
 				bdwrite(bp);
 			}
@@ -2902,7 +2887,6 @@ xfs_write_file(
 					ip->i_update_core = 1;
 					ip->i_update_size = 1;
 					isize = offset;
-					*append = 1;
 				}
 				xfs_iunlock(ip, XFS_ILOCK_EXCL);
 			}
@@ -2997,7 +2981,6 @@ xfs_write(
 	off_t		savedsize;
 	xfs_fsize_t	limit;
 	int		eventsent;
-	int		appended;
 	vnode_t 	*vp;
 	xfs_lsn_t	commit_lsn;
 
@@ -3024,7 +3007,6 @@ xfs_write(
 	mp = ip->i_mount;
 
 	eventsent = 0;
-	appended = 0;
 	commit_lsn = -1;
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
 		return (EIO);
@@ -3193,7 +3175,7 @@ retry:
 			error = xfs_diordwr(bdp, uiop, ioflag, credp, B_WRITE);
 		} else {
 			error = xfs_write_file(bdp, uiop, ioflag, credp,
-						&commit_lsn, &appended);
+						&commit_lsn);
 		}
 
 #ifndef SIM
@@ -3252,17 +3234,24 @@ retry:
 		 * It's not fast, but it's necessary.
 		 *
 		 * If this a dsync write and the size got changed
-		 * because we were appending to the file, then we
-		 * need to ensure that the size change gets logged
-		 * in a synchronous transaction.  If an allocation
-		 * transaction occurred without extending the size,
-		 * then we have to force the log up the proper point
-		 * to ensure that the allocation is permanent.
+		 * non-transactionally, then we need to ensure that
+		 * the size change gets logged in a synchronous
+		 * transaction.  If an allocation transaction occurred
+		 * without extending the size, then we have to force
+		 * the log up the proper point to ensure that the
+		 * allocation is permanent.  We can't count on
+		 * the fact that buffered writes lock out direct I/O
+		 * writes because the direct I/O write could have extended
+		 * the size non-transactionally and then finished just before
+		 * we started.  xfs_write_file will think that the file
+		 * didn't grow but the update isn't safe unless the
+		 * size change is logged.
 		 *
 		 * If the vnode is a swap vnode, then don't do anything
 		 * which could require allocating memory.
 		 */
-		if (((ioflag & IO_SYNC) || ((ioflag & IO_DSYNC) && appended)) &&
+		if ((ioflag & IO_SYNC ||
+		     (ioflag & IO_DSYNC && ip->i_update_size)) &&
 		    !(vp->v_flag & VISSWAP)) {
 			tp = xfs_trans_alloc(mp, XFS_TRANS_WRITE_SYNC);
 			if (transerror = xfs_trans_reserve(tp, 0,
@@ -3282,8 +3271,19 @@ retry:
 				error = transerror;
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		} else if ((ioflag & IO_DSYNC) && !(vp->v_flag & VISSWAP)) {
+			/*
+			 * force the log if we've committed a transaction
+			 * against the inode or if someone else has and
+			 * the commit record hasn't gone to disk (e.g.
+			 * the inode is pinned).  This guarantees that
+			 * all changes affecting the inode are permanent
+			 * when we return.
+			 */
 			if (commit_lsn != -1)
 				xfs_log_force(mp, (xfs_lsn_t)commit_lsn,
+					      XFS_LOG_FORCE | XFS_LOG_SYNC );
+			else if (xfs_ipincount(ip) > 0)
+				xfs_log_force(mp, (xfs_lsn_t)0,
 					      XFS_LOG_FORCE | XFS_LOG_SYNC );
 		}
 		if (ioflag & (IO_NFS|IO_NFS3)) {
