@@ -22,6 +22,7 @@ typedef	struct xfs_bmap_free
  */
 #define	XFS_BMAPI_WRITE		0x1	/* write operation: allocate space */
 #define	XFS_BMAPI_DELAY		0x2	/* delayed write operation */
+#define	XFS_BMAPI_ENTIRE	0x4	/* return entire extent, not trimmed */
 
 /*
  * Add the extent to the list of extents to be free at transaction end.
