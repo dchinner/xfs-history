@@ -679,8 +679,20 @@ xfs_trans_binval(
 	bip = (xfs_buf_log_item_t *)(bp->b_fsprivate);
 	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)bip);
 	ASSERT(lidp != NULL);
-	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
 	ASSERT(bip->bli_refcount > 0);
+
+	if (bip->bli_flags & XFS_BLI_STALE) {
+		/*
+		 * If the buffer is already invalidated, then
+		 * just return.
+		 */
+		ASSERT(!(bp->b_flags & B_DELWRI));
+		ASSERT(!(bip->bli_flags & (XFS_BLI_LOGGED | XFS_BLI_DIRTY)));
+		ASSERT(lidp->lid_flags & XFS_LID_DIRTY);
+		ASSERT(tp->t_flags & XFS_TRANS_DIRTY);
+		xfs_buf_item_trace("BINVAL RECUR", bip);
+		return;
+	}
 
 	/*
 	 * Clear the dirty bit in the buffer and set the STALE flag
