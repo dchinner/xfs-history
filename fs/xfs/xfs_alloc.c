@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.104 $"
+#ident	"$Revision: 1.105 $"
 
 /*
  * Free space allocation for XFS.
@@ -2265,6 +2265,7 @@ xfs_alloc_read_agf(
 	buf_t		**bpp)		/* buffer for the ag freelist header */
 {
 	xfs_agf_t	*agf;		/* ag freelist header */
+	int		agf_ok;		/* set if agf is consistent */
 	buf_t		*bp;		/* return value */
 	daddr_t		d;		/* disk block address */
 	int		error;
@@ -2285,14 +2286,18 @@ xfs_alloc_read_agf(
 	 * Validate the magic number of the agf block.
 	 */
 	agf = XFS_BUF_TO_AGF(bp);
-	XFS_WANT_CORRUPTED_GOTO(
+	agf_ok =
 		agf->agf_magicnum == XFS_AGF_MAGIC &&
 		XFS_AGF_GOOD_VERSION(agf->agf_versionnum) &&
 		agf->agf_freeblks <= agf->agf_length &&
 		agf->agf_flfirst < XFS_AGFL_SIZE &&
 		agf->agf_fllast < XFS_AGFL_SIZE &&
-		agf->agf_flcount <= XFS_AGFL_SIZE,
-		error0);
+		agf->agf_flcount <= XFS_AGFL_SIZE;
+	if (XFS_TEST_ERROR(!agf_ok, mp, XFS_ERRTAG_ALLOC_READ_AGF,
+			XFS_RANDOM_ALLOC_READ_AGF)) {
+		xfs_trans_brelse(tp, bp);
+		return XFS_ERROR(EFSCORRUPTED);
+	}
 	pag = &mp->m_perag[agno];
 	if (!pag->pagf_init) {
 		pag->pagf_freeblks = agf->agf_freeblks;
@@ -2318,11 +2323,6 @@ xfs_alloc_read_agf(
 	bp->b_ref = XFS_AGF_REF;
 	*bpp = bp;
 	return 0;
-
-error0:
-	bp->b_flags |= B_ERROR;
-	xfs_trans_brelse(tp, bp);
-	return error;
 }
 
 /*
