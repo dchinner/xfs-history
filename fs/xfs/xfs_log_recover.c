@@ -30,9 +30,9 @@
 
 #include "xfs_inum.h"
 #include "xfs_types.h"
+#include "xfs_log.h"
 #include "xfs_ag.h"		/* needed by xfs_sb.h */
 #include "xfs_sb.h"		/* depends on xfs_types.h & xfs_inum.h */
-#include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_mount.h"		/* depends on xfs_trans.h & xfs_sb.h */
 #include "xfs_inode_item.h"
@@ -47,6 +47,10 @@
 #endif
 
 STATIC int	xlog_find_zeroed(xlog_t *log, daddr_t *blk_no);
+STATIC void	xlog_recover_insert_item_backq(xlog_recover_item_t **q,
+					       xlog_recover_item_t *item);
+STATIC void	xlog_recover_insert_item_frontq(xlog_recover_item_t **q,
+						xlog_recover_item_t *item);
 
 buf_t *
 xlog_get_bp(int num_bblks)
@@ -466,7 +470,7 @@ xlog_recover_find_tid(xlog_recover_t *q,
 	xlog_recover_t *p = q;
 
 	while (p != NULL) {
-		if (p->r_tid == tid)
+		if (p->r_log_tid == tid)
 		    break;
 		p = p->r_next;
 	}
@@ -484,21 +488,12 @@ xlog_recover_put_hashq(xlog_recover_t **q,
 
 
 static void
-xlog_recover_add_item(xlog_recover_item_t **ihead)
+xlog_recover_add_item(xlog_recover_item_t **itemq)
 {
-	xlog_recover_item_t	*item;
+	xlog_recover_item_t *item;
 
-	item = kmem_zalloc(sizeof(xlog_recover_item_t),0);
-	if (*ihead == 0) {
-		item->ri_prev = item->ri_next = item;
-		*ihead = item;
-		
-	} else {
-		item->ri_next		= *ihead;
-		item->ri_prev		= (*ihead)->ri_prev;
-		(*ihead)->ri_prev	= item;
-		item->ri_prev->ri_next	= item;
-	}
+	item = kmem_zalloc(sizeof(xlog_recover_item_t), 0);
+	xlog_recover_insert_item_backq(itemq, item);
 }	/* xlog_recover_add_item */
 
 
@@ -512,17 +507,37 @@ xlog_recover_add_to_cont_trans(xlog_recover_t	*trans,
 	int			old_len;
 	
 	item = trans->r_itemq;
+	if (item == 0) {
+		/* finish copying rest of trans header */
+		xlog_recover_add_item(&trans->r_itemq);
+		ptr = (caddr_t)&trans->r_theader+sizeof(xfs_trans_header_t)-len;
+		bcopy(dp, ptr, len); /* s, d, l */
+		return;
+	}
 	item = item->ri_prev;
 
 	old_ptr = item->ri_buf[item->ri_cnt-1].i_addr;
 	old_len = item->ri_buf[item->ri_cnt-1].i_len;
 
-	ptr = kmem_realloc(old_ptr, len, 0);
-	bcopy(&ptr[old_len], dp, len);
-	item->ri_buf[item->ri_cnt-1].i_len += old_len;
+	ptr = kmem_realloc(old_ptr, len+old_len, 0);
+	bcopy(dp , &ptr[old_len], len);			/* s, d, l */
+	item->ri_buf[item->ri_cnt-1].i_len += len;
+	item->ri_buf[item->ri_cnt-1].i_addr = ptr;
 }	/* xlog_recover_add_to_cont_trans */
 
 
+/* The next region to add is the start of a new region.  It could be
+ * a whole region or it could be the first part of a new region.  Because
+ * of this, the assumption here is that the type and size fields of all
+ * format structures fit into the first 32 bits of the structure.
+ *
+ * This works because all regions must be 32 bit aligned.  Therefore, we
+ * either have both fields or we have neither field.  In the case we have
+ * neither field, the data part of the region is zero length.  We only have
+ * a log_op_header and can throw away the header since a new one will appear
+ * later.  If we have at least 4 bytes, then we can determine how many regions
+ * will appear in the current log item.
+ */
 static void
 xlog_recover_add_to_trans(xlog_recover_t	*trans,
 			  caddr_t		dp,
@@ -534,18 +549,16 @@ xlog_recover_add_to_trans(xlog_recover_t	*trans,
 	caddr_t			 ptr;
 	int			 total;
 
-	ptr = kmem_alloc(len, 0);
+	ptr = kmem_zalloc(len, 0);
 	bcopy(dp, ptr, len);
 	
 	in_f = (xfs_inode_log_format_t *)ptr;
 	item = trans->r_itemq;
 	if (item == 0) {
-		xlog_recover_add_item(&trans->r_itemq);
 		ASSERT(*(uint *)dp == XFS_TRANS_HEADER_MAGIC);
-		thead			= (xfs_trans_header_t *)dp;
-		trans->r_type		= thead->th_type;
-		trans->r_items		= thead->th_num_items;
-		trans->r_trans_tid	= thead->th_tid;
+		if (len == sizeof(xfs_trans_header_t))
+			xlog_recover_add_item(&trans->r_itemq);
+		bcopy(dp, &trans->r_theader, len); /* s, d, l */
 		return;
 	}
 	if (item->ri_prev->ri_total != 0 &&
@@ -572,18 +585,14 @@ xlog_recover_new_tid(xlog_recover_t	**q,
 {
 	xlog_recover_t	*trans;
 
-	trans = kmem_alloc(sizeof(xlog_recover_t), 0);
-	trans->r_next  = 0;
-	trans->r_tid   = tid;
-	trans->r_type  = 0;
-	trans->r_state = 0;
-	trans->r_itemq = 0;
+	trans = kmem_zalloc(sizeof(xlog_recover_t), 0);
+	trans->r_log_tid   = tid;
 	xlog_recover_put_hashq(q, trans);
 }	/* xlog_recover_new_tid */
 
 
 static void
-xlog_recover_delete_tid(xlog_recover_t	**q,
+xlog_recover_unlink_tid(xlog_recover_t	**q,
 			xlog_recover_t	*trans)
 {
 	xlog_recover_t	*tp;
@@ -601,26 +610,52 @@ xlog_recover_delete_tid(xlog_recover_t	**q,
 			}
 		}
 		if (!found)
-			xlog_panic("xlog_recover_delete_tid: trans not found");
+			xlog_panic("xlog_recover_unlink_tid: trans not found");
 		tp->r_next = tp->r_next->r_next;
 	}
-}	/* xlog_recover_new_tid */
+}	/* xlog_recover_unlink_tid */
 
 
 static void
-xlog_recover_print_trans_info(xlog_recover_t *tr)
+xlog_recover_print_trans_head(xlog_recover_t *tr)
 {
     cmn_err(CE_CONT,
 	    "TRANS: tid: 0x%x type: %d #: %d trans: 0x%x q: 0x%x\n",
-	    tr->r_tid, tr->r_type, tr->r_items, tr->r_trans_tid,
-	    tr->r_itemq);
-}	/* xlog_recover_print_trans_info */
+	    tr->r_log_tid, tr->r_theader.th_type, tr->r_theader.th_num_items,
+	    tr->r_theader.th_tid, tr->r_itemq);
+}	/* xlog_recover_print_trans_head */
 
 static void
 xlog_recover_print_item(xlog_recover_item_t *item)
 {
 	int i;
 
+	switch (ITEM_TYPE(item)) {
+	    case XFS_LI_BUF: {
+		cmn_err(CE_CONT, "BUF ");
+		break;
+	    }
+	    case XFS_LI_INODE: {
+		cmn_err(CE_CONT, "INO ");
+		break;
+	    }
+	    case XFS_LI_EFD: {
+		cmn_err(CE_CONT, "EFD ");
+		break;
+	    }
+	    case XFS_LI_EFI: {
+		cmn_err(CE_CONT, "EFI ");
+		break;
+	    }
+	    case XFS_LI_IUNLINK: {
+		cmn_err(CE_CONT, "IUN ");
+		break;
+	    }
+	    default: {
+		cmn_err(CE_PANIC, "xlog_recover_print_item: illegal type\n");
+		break;
+	    }
+	}
 	cmn_err(CE_CONT,
 		"ITEM: type: %d cnt: %d ttl: %d ",
 		item->ri_type, item->ri_cnt, item->ri_total);
@@ -632,14 +667,17 @@ xlog_recover_print_item(xlog_recover_item_t *item)
 }	/* xlog_recover_print_item */
 
 static void
-xlog_recover_print_trans(xlog_recover_t *trans)
+xlog_recover_print_trans(xlog_recover_t	     *trans,
+			 xlog_recover_item_t *itemq,
+			 int		     print)
 {
 	xlog_recover_item_t *first_item, *item;
 
-	if (xlog_debug < 2)
+	if (print < 3)
 		return;
-	xlog_recover_print_trans(trans);
-	item = first_item = trans->r_itemq;
+	cmn_err(CE_CONT, "======================================\n");
+	xlog_recover_print_trans_head(trans);
+	item = first_item = itemq;
 	do {
 		xlog_recover_print_item(item);
 		item = item->ri_next;
@@ -647,18 +685,108 @@ xlog_recover_print_trans(xlog_recover_t *trans)
 }	/* xlog_recover_print_trans */
 
 static void
-xlog_recover_do_trans(xlog_recover_t *trans)
+xlog_recover_insert_item_backq(xlog_recover_item_t **q,
+			       xlog_recover_item_t *item)
 {
-	xlog_recover_print_trans(trans);
+	if (*q == 0) {
+		item->ri_prev = item->ri_next = item;
+		*q = item;
+	} else {
+		item->ri_next		= *q;
+		item->ri_prev		= (*q)->ri_prev;
+		(*q)->ri_prev		= item;
+		item->ri_prev->ri_next	= item;
+	}
+}	/* xlog_recover_insert_item_backq */
+
+static void
+xlog_recover_insert_item_frontq(xlog_recover_item_t **q,
+				xlog_recover_item_t *item)
+{
+	xlog_recover_insert_item_backq(q, item);
+	*q = item;
+}	/* xlog_recover_insert_item_frontq */
+
+static void
+xlog_recover_reorder_trans(xlog_t	  *log,
+			   xlog_recover_t *trans)
+{
+    xlog_recover_item_t *first_item, *itemq, *itemq_next;
+
+    first_item = itemq = trans->r_itemq;
+    do {
+	itemq_next = itemq->ri_next;
+	switch (ITEM_TYPE(itemq)) {
+	    case XFS_LI_BUF: {
+		xlog_recover_insert_item_frontq(&trans->r_buf_inq, itemq);
+		break;
+	    }
+	    case XFS_LI_INODE: {
+		xlog_recover_insert_item_backq(&trans->r_buf_inq, itemq);
+		break;
+	    }
+	    case XFS_LI_EFD:
+	    case XFS_LI_EFI: {
+		xlog_recover_insert_item_backq(&log->l_recover_extq, itemq);
+		break;
+	    }
+	    case XFS_LI_IUNLINK: {
+		xlog_recover_insert_item_backq(&log->l_recover_iunlinkq, itemq);
+		break;
+	    }
+	    default: {
+		xlog_panic("unrecognized type of log operation");
+	    }
+	}
+	itemq = itemq_next;
+    } while (first_item != itemq);
+}	/* xlog_recover_reorder_trans */
+
+static void
+xlog_recover_do_buffer_trans(xlog_recover_item_t *item)
+{
+}	/* xlog_recover_do_buffer_trans */
+
+static void
+xlog_recover_do_inode_trans(xlog_recover_item_t *item)
+{
+}	/* xlog_recover_do_inode_trans */
+
+static void
+xlog_recover_do_buffer_inode_trans(xlog_recover_t *trans)
+{
+	xlog_recover_item_t *item, *first_item;
+
+	first_item = item = trans->r_buf_inq;
+	do {
+		if (ITEM_TYPE(item) == XFS_LI_BUF) {
+			xlog_recover_do_buffer_trans(item);
+		} else if (ITEM_TYPE(item) == XFS_LI_INODE) {
+			xlog_recover_do_inode_trans(item);
+		} else {
+			xlog_panic("xlog_recover_do_buffer_inode_trans");
+		}
+		item = item->ri_next;
+	} while (first_item != item);
+}	/* xlog_recover_do_buffer_inode_trans */
+
+static void
+xlog_recover_do_trans(xlog_t	     *log,
+		      xlog_recover_t *trans)
+{
+	xlog_recover_print_trans(trans, trans->r_itemq, xlog_debug);
+	xlog_recover_reorder_trans(log, trans);
+	xlog_recover_print_trans(trans, trans->r_buf_inq, xlog_debug+1);
+	xlog_recover_do_buffer_inode_trans(trans);
 }	/* xlog_recover_do_trans */
 
 
 static void
-xlog_recover_free_trans(xlog_recover_t *trans)
+xlog_recover_free_trans(xlog_recover_t      *trans)
 {
 	xlog_recover_item_t *first_item, *item, *free_item;
 
-	item = first_item = trans->r_itemq;
+	item = first_item = trans->r_buf_inq;
 	do {
 		free_item = item;
 		item = item->ri_next;
@@ -669,11 +797,12 @@ xlog_recover_free_trans(xlog_recover_t *trans)
 
 
 static void
-xlog_recover_commit_trans(xlog_recover_t **q,
+xlog_recover_commit_trans(xlog_t	 *log,
+			  xlog_recover_t **q,
 			  xlog_recover_t *trans)
 {
-	xlog_recover_delete_tid(q, trans);
-	xlog_recover_do_trans(trans);
+	xlog_recover_unlink_tid(q, trans);
+	xlog_recover_do_trans(log, trans);
 	xlog_recover_free_trans(trans);
 }	/* xlog_recover_commit_trans */
 
@@ -694,7 +823,8 @@ xlog_recover_unmount_trans(xlog_recover_t *trans)
  * NOTE: skip LRs with 0 data length.
  */
 static void
-xlog_recover_process_data(xlog_recover_t    *rhash[],
+xlog_recover_process_data(xlog_t	    *log,
+			  xlog_recover_t    *rhash[],
 			  xlog_rec_header_t *rhead,
 			  caddr_t	    dp)
 {
@@ -716,13 +846,13 @@ xlog_recover_process_data(xlog_recover_t    *rhash[],
 	hash = XLOG_RHASH(tid);
 	trans = xlog_recover_find_tid(rhash[hash], tid);
 	if (trans == NULL) {			    /* not found; add new tid */
-	    if ((ohead->oh_flags & XLOG_START_TRANS) != 0)
-		xlog_recover_new_tid(&rhash[hash], tid);
+		if ((ohead->oh_flags & XLOG_START_TRANS) != 0)
+			xlog_recover_new_tid(&rhash[hash], tid);
 	} else {
 	    ASSERT(dp+ohead->oh_len <= lp);
 	    switch (ohead->oh_flags & ~XLOG_END_TRANS) {
 		case XLOG_COMMIT_TRANS: {
-		    xlog_recover_commit_trans(&rhash[hash], trans);
+		    xlog_recover_commit_trans(log, &rhash[hash], trans);
 		    break;
 		}
 		case XLOG_UNMOUNT_TRANS: {
@@ -798,12 +928,15 @@ xlog_do_recover(xlog_t	*log,
 	buf_t		  *hbp, *dbp;
 	int		  bblks;
 	xlog_recover_t	  *rhash[XLOG_RHASH_SIZE];
+	int		  stop_block = 3000;
 
 	hbp = xlog_get_bp(1);
 	dbp = xlog_get_bp(BTOBB(XLOG_RECORD_BSIZE));
 	bzero(rhash, sizeof(rhash));
 	if (tail_blk <= head_blk) {
 		for (blk_no = tail_blk; blk_no < head_blk; ) {
+			if (stop_block == blk_no)
+				stop_block--;
 			xlog_bread(log, blk_no, 1, hbp);
 			rhead = (xlog_rec_header_t *)hbp->b_dmaaddr;
 			ASSERT(rhead->h_magicno == XLOG_HEADER_MAGIC_NUM);
@@ -811,7 +944,7 @@ xlog_do_recover(xlog_t	*log,
 			if (bblks > 0) {
 				xlog_bread(log, blk_no+1, bblks, dbp);
 				xlog_unpack_data(rhead, dbp->b_dmaaddr);
-				xlog_recover_process_data(rhash, rhead,
+				xlog_recover_process_data(log, rhash, rhead,
 							  dbp->b_dmaaddr);
 			}
 			blk_no += (bblks+1);
