@@ -62,9 +62,13 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 
 	/*
 	 * Default to a normal get_buf() call if the tp is NULL.
+	 * Always specify the BUF_BUSY flag so that get_buf() does
+	 * not try to push out dirty buffers.  This keeps us from
+	 * running out of stack space due to recursive calls into
+	 * the buffer cache.
 	 */
 	if (tp == NULL) {
-		return (get_buf(dev, blkno, len, flags));
+		return (get_buf(dev, blkno, len, flags | BUF_BUSY));
 	}
 
 	/*
@@ -216,10 +220,14 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 	xfs_buf_log_item_t	*bip;
 
 	/*
-	 * Default to a normal read_buf() call if the tp is NULL.
+	 * Default to a normal get_buf() call if the tp is NULL.
+	 * Always specify the BUF_BUSY flag so that get_buf() does
+	 * not try to push out dirty buffers.  This keeps us from
+	 * running out of stack space due to recursive calls into
+	 * the buffer cache.
 	 */
 	if (tp == NULL) {
-		return (read_buf(dev, blkno, len, flags));
+		return (read_buf(dev, blkno, len, flags | BUF_BUSY));
 	}
 
 	/*
