@@ -3165,7 +3165,7 @@ xfsidbg_xiclogcb(xlog_in_core_t *iclog)
 
 	for (cb = iclog->ic_callback; cb != NULL; cb = cb->cb_next) {
 		qprintf("func ");
-		prsymoff((void *)cb->cb_func /* , NULL, NULL */);
+		prsymoff((unsigned long)cb->cb_func /* , NULL, NULL */);
 		qprintf(" arg 0x%p next 0x%p\n", cb->cb_arg, cb->cb_next);
 	}
 }
