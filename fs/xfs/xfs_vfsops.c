@@ -233,7 +233,7 @@ xfs_cmountfs(
 	/*
 	 * Open data, real time, and log devices now - order is important.
 	 */
-	mp->m_ddev_targp = pagebuf_lock_enable(ddev, vfsp->vfs_super, 0);
+	mp->m_ddev_targp = pagebuf_lock_enable(ddev, 0);
 	if (IS_ERR(mp->m_ddev_targp)) {
 		error = PTR_ERR(mp->m_ddev_targp);
 		goto error2;
@@ -241,7 +241,7 @@ xfs_cmountfs(
 
 	if (rtdev != 0) {
 		mp->m_rtdev_targp = 
-				pagebuf_lock_enable(rtdev, vfsp->vfs_super, 1);
+				pagebuf_lock_enable(rtdev, 1);
 		if (IS_ERR(mp->m_rtdev_targp)) {
 			error = PTR_ERR(mp->m_rtdev_targp);
 			pagebuf_lock_disable(mp->m_ddev_targp, 0);
@@ -251,7 +251,7 @@ xfs_cmountfs(
 
 	if (logdev != ddev) {
 		mp->m_logdev_targp = 
-				pagebuf_lock_enable(logdev, vfsp->vfs_super, 1);
+				pagebuf_lock_enable(logdev, 1);
 		if (IS_ERR(mp->m_logdev_targp)) {
 			error = PTR_ERR(mp->m_logdev_targp);
 			pagebuf_lock_disable(mp->m_ddev_targp, 1);
