@@ -39,12 +39,11 @@
 
 #include <support/uuid.h>
 
-MODULE_AUTHOR("Daniel Moore <dxm@sgi.com>");
-MODULE_DESCRIPTION("Support library for XFS/XVM");
+MODULE_AUTHOR("SGI <sgi.com>");
+MODULE_DESCRIPTION("Support library for XFS");
 
 void __init support_init (const char **name)
 {
-    printk("sgi_support: init\n");
     uuid_init();
 }
 
@@ -53,10 +52,8 @@ int init_module(void)
 {
     static int initiated = 0;
 
-    printk("sgi_support: init_module\n");
-
     if (initiated) {
-        printk("sgi_support: already loaded\n");
+        printk("xfs_support: already loaded\n");
         return 1;
     }
     
@@ -67,7 +64,6 @@ int init_module(void)
 
 void cleanup_module(void) 
 {
-    printk("sgi_support: cleanup_module\n");
 }
 
 

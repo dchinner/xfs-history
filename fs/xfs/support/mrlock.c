@@ -318,3 +318,4 @@ EXPORT_SYMBOL(mrdemote);
 EXPORT_SYMBOL(ismrlocked);
 EXPORT_SYMBOL(mrlock_init);
 EXPORT_SYMBOL(mrfree);
+EXPORT_SYMBOL(Atomic_spin);
