@@ -1344,7 +1344,6 @@ xlog_sync(xlog_t		*log,
 	uint		count;		/* byte count of bwrite */
 	int		split = 0;	/* split write into two regions */
 	int		error;
-	unsigned long save_flags = current->flags;
 
 	XFS_STATS_INC(xs_log_writes);
 	ASSERT(iclog->ic_refcnt == 0);
@@ -1354,8 +1353,6 @@ xlog_sync(xlog_t		*log,
 		xlog_panic("xlog_sync: illegal flag");
 #endif
 	
-	current->flags |= PF_MEMALLOC;
-
 	xlog_pack_data(log, iclog);       /* put cycle number in every block */
 	INT_SET(iclog->ic_header.h_len, ARCH_CONVERT, iclog->ic_offset);	/* real byte length */
 
@@ -1414,7 +1411,6 @@ xlog_sync(xlog_t		*log,
 	if ((error = XFS_bwrite(bp))) {
 		xfs_ioerror_alert("xlog_sync", log->l_mp, XFS_BUF_TARGET(bp), 
 				  XFS_BUF_ADDR(bp));
-		current->flags = save_flags;
 		return (error);
 	}
 	if (split) {
@@ -1451,11 +1447,9 @@ xlog_sync(xlog_t		*log,
 		if ((error = XFS_bwrite(bp))) {
 			xfs_ioerror_alert("xlog_sync (split)", log->l_mp, 
 					  XFS_BUF_TARGET(bp), XFS_BUF_ADDR(bp));
-			current->flags = save_flags;
 			return (error);
 		}
 	}
-	current->flags = save_flags;
 	return (0);
 }	/* xlog_sync */
 
