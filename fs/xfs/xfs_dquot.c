@@ -1,4 +1,4 @@
-#ident "$Revision: 1.9 $"
+#ident "$Revision: 1.10 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -603,8 +603,8 @@ xfs_qm_dqtobp(
 					       0, &bp)) {
 			return (error);
 		}
-		if (!bp || geterror(bp))
-			return XFS_ERROR(EIO);
+		if (error || !bp)
+			return XFS_ERROR(error);
 	}
 	ASSERT(bp->b_flags & B_BUSY);
 	ASSERT(valusema(&bp->b_lock) <= 0);
