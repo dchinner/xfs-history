@@ -21,6 +21,7 @@
 #include <linux/locks.h>
 #include <linux/slab.h>
 #include <linux/xfs_inode.h>
+#include <linux/blkdev.h>
 
 #include <linux/linux_to_xfs.h>
 
@@ -449,6 +450,8 @@ linvfs_put_super(
 {
 	vfs_t 		*vfsp = LINVFS_GET_VFS(sb);
 	int		error;
+	int		sector_size = 512;
+	kdev_t		dev = sb->s_dev;
 
 	ENTER("linvfs_put_super");
 	VFS_DOUNMOUNT(vfsp, 0, NULL, sys_cred, error); 
@@ -460,6 +463,12 @@ linvfs_put_super(
 	kfree(LINVFS_GET_CVP(sb));
 
 	/*  Do something to get rid of the VNODE/VFS layer here  */
+
+	/* Reset device block size */
+	if (hardsect_size[MAJOR(dev)])
+		sector_size = hardsect_size[MAJOR(dev)][MINOR(dev)];
+
+	set_blocksize(dev, sector_size);
 
 	MOD_DEC_USE_COUNT; 
 	EXIT("linvfs_put_super");

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR2_SF_H
 #define	_FS_XFS_DIR2_SF_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.1 $"
 
 /*
  * xfs_dir2_sf.h
@@ -47,9 +47,15 @@ typedef	struct { __uint8_t i[8]; } xfs_dir2_ino8_t;
  * fit in 32 bits.
  */
 typedef struct { __uint8_t i[4]; } xfs_dir2_ino4_t;
+#ifdef __LITTLE_ENDIAN
+#define	XFS_DIR2_SF_GET_INO4(di)	\
+	((uint)((di).i4.i[3] << 24) | (uint)((di).i4.i[2] << 16) | \
+	 (uint)((di).i4.i[1] << 8) | (uint)((di).i4.i[0]))
+#else
 #define	XFS_DIR2_SF_GET_INO4(di)	\
 	((uint)((di).i4.i[0] << 24) | (uint)((di).i4.i[1] << 16) | \
 	 (uint)((di).i4.i[2] << 8) | (uint)((di).i4.i[3]))
+#endif
 
 typedef union {
 	xfs_dir2_ino8_t	i8;
@@ -124,18 +130,30 @@ void xfs_dir2_sf_put_inumber(xfs_dir2_sf_t *sfp, xfs_ino_t *from,
 #define	XFS_DIR2_SF_PUT_INUMBER(sfp,from,to)	\
 	xfs_dir2_sf_put_inumber(sfp,from,to)
 #else
+#ifdef __LITTLE_ENDIAN
+#define	XFS_DIR2_SF_PUT_INUMBER(sfp,from,to)	\
+	((sfp)->hdr.i8count == 0 ? \
+		(void)((to)->i4 = *(xfs_dir2_ino4_t *)((char *)(from))) : \
+		(void)((to)->i8 = *(xfs_dir2_ino8_t *)(from)))
+#else
 #define	XFS_DIR2_SF_PUT_INUMBER(sfp,from,to)	\
 	((sfp)->hdr.i8count == 0 ? \
 		(void)((to)->i4 = *(xfs_dir2_ino4_t *)(((char *)(from))+4)) : \
 		(void)((to)->i8 = *(xfs_dir2_ino8_t *)(from)))
+#endif
 #endif
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_SF_GET_OFFSET)
 xfs_dir2_data_aoff_t xfs_dir2_sf_get_offset(xfs_dir2_sf_entry_t *sfep);
 #define	XFS_DIR2_SF_GET_OFFSET(sfep)	xfs_dir2_sf_get_offset(sfep)
 #else
+#ifdef __LITTLE_ENDIAN
+#define	XFS_DIR2_SF_GET_OFFSET(sfep)	\
+	(((sfep)->offset.i[1] << 8) | ((sfep)->offset.i[0]))
+#else
 #define	XFS_DIR2_SF_GET_OFFSET(sfep)	\
 	(((sfep)->offset.i[0] << 8) | ((sfep)->offset.i[1]))
+#endif
 #endif
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_SF_PUT_OFFSET)
@@ -143,9 +161,15 @@ void xfs_dir2_sf_put_offset(xfs_dir2_sf_entry_t *sfep,
 			    xfs_dir2_data_aoff_t off);
 #define	XFS_DIR2_SF_PUT_OFFSET(sfep,off)	xfs_dir2_sf_put_offset(sfep,off)
 #else
+#ifdef __LITTLE_ENDIAN
+#define	XFS_DIR2_SF_PUT_OFFSET(sfep,off)	\
+	((sfep)->offset.i[0] = ((off) >> 0) & 0xff, \
+	 (sfep)->offset.i[1] = ((off) >> 8) & 0xff)
+#else
 #define	XFS_DIR2_SF_PUT_OFFSET(sfep,off)	\
 	((sfep)->offset.i[0] = ((off) >> 8) & 0xff, \
 	 (sfep)->offset.i[1] = ((off) >> 0) & 0xff)
+#endif
 #endif
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_SF_ENTSIZE_BYNAME)

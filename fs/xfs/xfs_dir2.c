@@ -33,6 +33,9 @@
 #include <bstring.h>
 #else
 #include <sys/systm.h>
+#ifdef CELL_CAPABLE
+#include <sys/kthread.h>
+#endif
 #endif
 #include "xfs_macros.h"
 #include "xfs_types.h"
@@ -216,7 +219,7 @@ xfs_dir2_init(
 }
 
 /*
- * Enter a name in a directory.
+  Enter a name in a directory.
  */
 static int					/* error */
 xfs_dir2_createname(
@@ -477,7 +480,7 @@ xfs_dir2_getdents(
 	is32 = ABI_IS_IRIX5(GETDENTS_ABI(get_current_abi(), uio));
 	alignment = (is32 ? sizeof(irix5_off_t) : sizeof(off_t)) - 1;
 	if ((uio->uio_iovcnt == 1) &&
-#if CELL
+#if CELL_CAPABLE
 	    !KT_CUR_ISXTHREAD() &&
 #endif
 	    (((__psint_t)uio->uio_iov[0].iov_base & alignment) == 0) &&

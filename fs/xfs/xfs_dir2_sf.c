@@ -1,4 +1,4 @@
-#ident "$Revision: 1.1 $"
+#ident "$Revision: 1.2 $"
 
 /*
  * xfs_dir2_sf.c
@@ -726,6 +726,7 @@ xfs_dir2_sf_getdents(
 	xfs_dir2_put_args_t	p;		/* arg package for put rtn */
 	xfs_dir2_sf_entry_t	*sfep;		/* shortform directory entry */
 	xfs_dir2_sf_t		*sfp;		/* shortform structure */
+	off_t			dir_offset;
 
 	mp = dp->i_mount;
 	ASSERT(dp->i_df.if_flags & XFS_IFINLINE);
@@ -737,6 +738,9 @@ xfs_dir2_sf_getdents(
 		ASSERT(XFS_FORCED_SHUTDOWN(mp));
 		return XFS_ERROR(EIO);
 	}
+
+	dir_offset = uio->uio_offset;
+
 	ASSERT(dp->i_df.if_bytes == dp->i_d.di_size);
 	ASSERT(dp->i_df.if_u1.if_data != NULL);
 	sfp = (xfs_dir2_sf_t *)dp->i_df.if_u1.if_data;
@@ -744,7 +748,7 @@ xfs_dir2_sf_getdents(
 	/*
 	 * If the block number in the offset is out of range, we're done.
 	 */
-	if (XFS_DIR2_DATAPTR_TO_DB(mp, uio->uio_offset) > mp->m_dirdatablk) {
+	if (XFS_DIR2_DATAPTR_TO_DB(mp, dir_offset) > mp->m_dirdatablk) {
 #pragma mips_frequency_hint NEVER
 		*eofp = 1;
 		return 0;
@@ -758,7 +762,7 @@ xfs_dir2_sf_getdents(
 	/*
 	 * Put . entry unless we're starting past it.
 	 */
-	if (uio->uio_offset <=
+	if (dir_offset <=
 	    XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
 				       XFS_DIR2_DATA_DOT_OFFSET)) {
 		p.cook = XFS_DIR2_DB_OFF_TO_DATAPTR(mp, 0,
@@ -782,7 +786,7 @@ xfs_dir2_sf_getdents(
 	/*
 	 * Put .. entry unless we're starting past it.
 	 */
-	if (uio->uio_offset <=
+	if (dir_offset <=
 	    XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
 				       XFS_DIR2_DATA_DOTDOT_OFFSET)) {
 		p.cook = XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
@@ -812,7 +816,7 @@ xfs_dir2_sf_getdents(
 	     i++, sfep = XFS_DIR2_SF_NEXTENTRY(sfp, sfep)) {
 		off = XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
 			XFS_DIR2_SF_GET_OFFSET(sfep));
-		if (uio->uio_offset > off)
+		if (dir_offset > off)
 			continue;
 		p.namelen = sfep->namelen;
 		p.cook = XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
