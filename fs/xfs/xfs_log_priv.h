@@ -173,7 +173,7 @@ typedef struct log {
 	sema_t		l_flushsema;  /* iclog flushing semaphore	  : 20*/
 	lock_t		l_icloglock;  /* grab to change iclog state	  :  4*/
 	xfs_lsn_t	l_tail_lsn;   /* lsn of 1st LR w/ unflushed buffers: 8*/
-	xfs_lsn_t	l_my_tail_lsn;/* lsn of last LR on disk		   : 8*/
+	xfs_lsn_t	l_last_sync_lsn;/* lsn of last LR on disk	   : 8*/
 	xfs_mount_t	*l_mp;	      /* mount point			   : 4*/
 	buf_t		*l_xbuf;      /* extra buffer for log wrapping	   : 4*/
 	dev_t		l_dev;	      /* dev_t of log			   : 4*/
@@ -193,5 +193,36 @@ typedef struct log {
 /* common routines */
 extern daddr_t	xlog_find_head(xlog_t *log);
 extern daddr_t  xlog_print_find_oldest(xlog_t *log);
+
+typedef struct xlog_recover_item {
+	struct xlog_recover_item *ri_next;
+	struct xlog_recover_item *ri_prev;
+	int			 ri_type;
+	int			 ri_cnt;
+	int			 ri_total;	/* total regions */
+	void *			 ri_desc;
+	int			 ri_desc_len;
+	void *			 ri_buf1;
+	int			 ri_buf1_len;
+	void *			 ri_buf2;
+	int			 ri_buf2_len;
+} xlog_recover_item_t;
+
+typedef struct xlog_recover {
+	struct xlog_recover *r_next;
+	xlog_tid_t	    r_tid;
+	uint		    r_type;
+	int		    r_items;		/* number of items */
+	xfs_trans_id_t	    r_trans_tid;	/* internal transaction tid */
+	uint		    r_state;		/* not needed */
+	xlog_recover_item_t *r_transq;
+} xlog_recover_t;
+
+
+#define XLOG_RHASH_BITS  4
+#define XLOG_RHASH_SIZE	16
+#define XLOG_RHASH_SHIFT 2
+#define XLOG_RHASH(tid)	\
+	((((uint)tid)>>XLOG_RHASH_SHIFT) & (XLOG_RHASH_SIZE-1))
 
 #endif	/* _XFS_LOG_PRIV_H */
