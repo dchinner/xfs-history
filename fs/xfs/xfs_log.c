@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.153 $"
+#ident	"$Revision: 1.154 $"
 
 /*
  * High level interface routines for log manager
@@ -647,7 +647,40 @@ xfs_log_unmount(xfs_mount_t *mp)
 		}
 		if (tic)
 			xlog_state_put_ticket(log, tic);
+	} else {
+		/*
+		 * We're already in forced_shutdown mode, couldn't
+		 * even attempt to write out the unmount transaction.
+		 *
+		 * Go through the motions of sync'ing and releasing
+		 * the iclog, even though no I/O will actually happen,
+		 * we need to wait for other log I/O's that may already
+		 * be in progress.  Do this as a separate section of
+		 * code so we'll know if we ever get stuck here that
+		 * we're in this odd situation of trying to unmount
+		 * a file system that went into forced_shutdown as
+		 * the result of an unmount..
+		 */
+		spl = LOG_LOCK(log);
+		iclog = log->l_iclog;
+		iclog->ic_refcnt++;
+		LOG_UNLOCK(log, spl);
+
+		xlog_state_want_sync(log, iclog);
+		(void) xlog_state_release_iclog(log, iclog);
+
+		spl = LOG_LOCK(log);
+
+		if ( ! (   iclog->ic_state == XLOG_STATE_ACTIVE
+		        || iclog->ic_state == XLOG_STATE_DIRTY) ) {
+
+				sv_wait(&iclog->ic_forcesema, PMEM, 
+					&log->l_icloglock, spl);
+		} else {
+			LOG_UNLOCK(log, spl);
+		}
 	}
+
 	xlog_unalloc_log(log);
 
 	return 0;
@@ -1402,6 +1435,7 @@ xlog_unalloc_log(xlog_t *log)
 	xlog_in_core_t	*iclog, *next_iclog;
 	xlog_ticket_t	*tic, *next_tic;
 	int		i;
+
 
 	iclog = log->l_iclog;
 	for (i=0; i<log->l_iclog_bufs; i++) {
@@ -3156,7 +3190,7 @@ xfs_log_force_umount(
 	 * of XFS.
 	 */
 	log->l_flags |= XLOG_IO_ERROR;
-	
+
 	/*
 	 * If we hit a log error, we want to mark all the iclogs IOERROR
 	 * while we're still holding the loglock.
