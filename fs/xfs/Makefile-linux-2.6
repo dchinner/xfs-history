@@ -2,7 +2,7 @@
 #
 # Makefile for SGI xFS
 #
-# $Revision: 1.31 $
+# $Revision: 1.32 $
 DEPTH?=../..
 include ${DEPTH}/kcommondefs
 KPATH=$(TOP)/fs/xfs
@@ -57,10 +57,13 @@ XFS_CSRCS=	xfs_alloc.c \
 XFS_OBJS=$(XFS_CSRCS:.c=.o)
 $(XFS_NAME):$(XFS_NAME)($(XFS_OBJS)) MAKELIB
 
-TARGETS=$(XFS_NAME)
+XIDBG_NAME=xfsidbg.o
+XIDBG_CSRCS=xfsidbg.c
+
+TARGETS=$(XFS_NAME) $(XIDBG_NAME)
 
 LINTNAME=xfs
-CFILES=$(XFS_CSRCS)
+CFILES=$(XFS_CSRCS) $(XIDBG_CSRCS)
 HFILES=	xfs_ag.h \
 	xfs_alloc.h \
 	xfs_alloc_btree.h \
@@ -93,7 +96,8 @@ HFILES=	xfs_ag.h \
 	xfs_sb.h \
 	xfs_trans.h \
 	xfs_trans_priv.h \
-	xfs_types.h
+	xfs_types.h \
+	xfsidbg.h
 
 #
 # Rules
@@ -109,3 +113,8 @@ $(KCOMMONPREF)install: $(KCOMMONPREF)default
 
 headers!
 	$(INSTALL) -m 444 -F /usr/include/sys/fs $(HFILES)
+
+xfsidbg.o: xfsidbg.c
+	$(CCF) -c $(JALR) -G 0 -common $(KPATH)/xfsidbg.c && \
+	$(LDF) $(PRODOBJECT) -r $(.TARGET:T) -o $$$$.o && \
+	mv $$$$.o $(.TARGET:T)
