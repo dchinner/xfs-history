@@ -567,13 +567,13 @@ xfs_fs_freeze(
 	xfs_refcache_purge_mp(mp);
 
 	/* Flush delalloc and delwri data */
-	VFS_SYNC(vfsp, SYNC_DELWRI|SYNC_WAIT, sys_cred, error);
+	VFS_SYNC(vfsp, SYNC_DELWRI|SYNC_WAIT, NULL, error);
 
 	/* Pause transaction subsystem */
 	xfs_start_freeze(mp, XFS_FREEZE_TRANS);
 
 	/* Flush any remaining inodes into buffers */
-	VFS_SYNC(vfsp, SYNC_ATTR|SYNC_WAIT, sys_cred, error);
+	VFS_SYNC(vfsp, SYNC_ATTR|SYNC_WAIT, NULL, error);
 
 	/* Push all buffers out to disk */
 	xfs_binval(mp->m_ddev_targ);
