@@ -1,4 +1,4 @@
-#ident "$Revision: 1.71 $"
+#ident "$Revision: 1.73 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -130,7 +130,6 @@ xfs_inode_item_size(
 		} else {
 			iip->ili_format.ilf_fields &= ~XFS_ILOG_DDATA;
 		}
-		xfs_dir_shortform_validate(ip->i_mount, ip);
 		break;
 
 	case XFS_DINODE_FMT_DEV:
@@ -394,7 +393,6 @@ xfs_inode_item_format(
 			nvecs++;
 			iip->ili_format.ilf_dsize = data_bytes;
 		}
-		xfs_dir_shortform_validate(ip->i_mount, ip);
 		break;
 
 	case XFS_DINODE_FMT_DEV:
