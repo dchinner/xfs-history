@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.105 $"
+#ident	"$Revision: 1.106 $"
 
 /*
  * Free space allocation for XFS.
@@ -1596,10 +1596,8 @@ xfs_alloc_ag_vextent_small(
 			if (args->userdata) {
 				buf_t	*bp;
 
-				if (error = xfs_btree_read_bufs(args->mp,
-						args->tp, args->agno, fbno,
-						0, &bp, 0))
-					goto error0;
+				bp = xfs_btree_get_bufs(args->mp, args->tp,
+					args->agno, fbno, 0);
 				xfs_trans_binval(args->tp, bp);
 				/*
 				 * Since blocks move to the free list without
@@ -2040,9 +2038,7 @@ xfs_alloc_fix_freelist(
 			return error;
 		if (error = xfs_free_ag_extent(tp, agbp, args->agno, bno, 1, 1))
 			return error;
-		if (error = xfs_btree_read_bufs(mp, tp, args->agno, bno, 0,
-				&bp, 0))
-			return error;
+		bp = xfs_btree_get_bufs(mp, tp, args->agno, bno, 0);
 		xfs_trans_binval(tp, bp);
 		/*
 		 * Since blocks move to the free list without
