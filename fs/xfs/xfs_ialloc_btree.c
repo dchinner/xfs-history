@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.30 $"
+#ident	"$Revision: 1.29 $"
 
 /*
  * Inode allocation management for XFS.
@@ -41,10 +41,6 @@
 #include "sim.h"
 #endif
 
-#if !defined(SIM) || !defined(XFSDEBUG)
-#define	kmem_check()		/* dummy for memory-allocation checking */
-#endif
-
 /*
  * Prototypes for internal functions.
  */
@@ -75,19 +71,6 @@ xfs_inobt_insrec(
 	xfs_inobt_rec_t	*recp,		/* i/o: record data inserted */
 	xfs_btree_cur_t	**curp,		/* output: new cursor replacing cur */
 	int		*stat);		/* success/failure */
-
-#ifdef XFSDEBUG
-/*
- * Check key consistency in one btree level, then recurse down to the next.
- */
-STATIC void
-xfs_inobt_kcheck_btree(
-	xfs_btree_cur_t	*cur,		/* btree cursor */
-	xfs_agi_t	*agi,		/* a.g. inode header */
-	xfs_agblock_t	bno,		/* block number to check */
-	int		level,		/* level of the block */
-	xfs_inobt_key_t	*keyp);		/* value of expected first key */
-#endif	/* XFSDEBUG */
 
 /*
  * Log header fields from a btree block.
@@ -155,33 +138,6 @@ STATIC int				/* error */
 xfs_inobt_newroot(
 	xfs_btree_cur_t	*cur,		/* btree cursor */
 	int		*stat);		/* success/failure */
-
-#ifdef XFSDEBUG
-/*
- * Guts of xfs_inobt_rcheck.  For each level in the btree, check
- * all its blocks for consistency.
- */
-STATIC void
-xfs_inobt_rcheck_btree(
-	xfs_btree_cur_t	*cur,		/* btree cursor */
-	xfs_agi_t	*agi,		/* a.g. inode header */
-	xfs_agblock_t	rbno,		/* root block number */
-	int		levels);	/* number of levels in the btree */
-#endif	/* XFSDEBUG */
-
-#ifdef XFSDEBUG
-/*
- * Check one btree block for record consistency.
- */
-STATIC xfs_agblock_t			/* next block to process */
-xfs_inobt_rcheck_btree_block(
-	xfs_btree_cur_t	*cur,		/* btree cursor */
-	xfs_agnumber_t	agno,		/* allocation group number */
-	xfs_agblock_t	bno,		/* block number to check */
-	xfs_agblock_t	*fbno,		/* output: first block at next level */
-	void		*rec,		/* previous record/key value */
-	int		level);		/* level of this block */
-#endif	/* XFSDEBUG */
 
 /*
  * Move 1 record right from cur/level if possible.
@@ -263,7 +219,6 @@ xfs_inobt_delrec(
 	xfs_inobt_rec_t		*rrp;	/* right block record pointer */
 	xfs_btree_cur_t		*tcur;	/* temporary btree cursor */
 
-	xfs_inobt_rcheck(cur);
 	/*
 	 * Get the index of the entry being deleted, check for nothing there.
 	 */
@@ -389,8 +344,6 @@ xfs_inobt_delrec(
 				return error;
 			}
 		}
-		xfs_inobt_rcheck(cur);
-		kmem_check();
 		*stat = 1;
 		return 0;
 	}
@@ -411,8 +364,6 @@ xfs_inobt_delrec(
 				return error;
 			}
 		}
-		kmem_check();
-		xfs_inobt_rcheck(cur);
 		*stat = 1;
 		return 0;
 	}
@@ -480,7 +431,6 @@ xfs_inobt_delrec(
 						return error;
 					}
 				}
-				kmem_check();
 				*stat = 1;
 				return 0;
 			}
@@ -545,7 +495,6 @@ xfs_inobt_delrec(
 						     XFS_BTREE_NOERROR);
 				if (level == 0)
 					cur->bc_ptrs[0]++;
-				kmem_check();
 				*stat = 1;
 				return 0;
 			}
@@ -616,8 +565,6 @@ xfs_inobt_delrec(
 				return error;
 			}
 		}
-		xfs_inobt_rcheck(cur);
-		kmem_check();
 		*stat = 1;
 		return 0;
 	}
@@ -731,8 +678,6 @@ xfs_inobt_delrec(
 	 */
 	if (level > 0)
 		cur->bc_ptrs[level]--;
-	xfs_inobt_rcheck(cur);
-	kmem_check();
 	/* 
 	 * Return value means the next level up has something to do.
 	 */
@@ -776,11 +721,9 @@ xfs_inobt_insrec(
 	if (level >= cur->bc_nlevels) {
 		error = xfs_inobt_newroot(cur, &i);
 		*bnop = NULLAGBLOCK;
-		kmem_check();
 		*stat = i;
 		return error;
 	}
-	xfs_inobt_rcheck(cur);
 	/*
 	 * Make a key out of the record data to be inserted, and save it.
 	 */
@@ -790,7 +733,6 @@ xfs_inobt_insrec(
 	 * If we're off the left edge, return failure.
 	 */
 	if (ptr == 0) {
-		kmem_check();
 		*stat = 0;
 		return 0;
 	}
@@ -864,7 +806,6 @@ xfs_inobt_insrec(
 					/*
 					 * Otherwise the insert fails.
 					 */
-					kmem_check();
 					*stat = 0;
 					return 0;
 				}
@@ -941,82 +882,13 @@ xfs_inobt_insrec(
 	 * If there is one, give back a record value and a cursor too.
 	 */
 	*bnop = nbno;
-	xfs_inobt_rcheck(cur);
 	if (nbno != NULLAGBLOCK) {
 		*recp = nrec;
 		*curp = ncur;
-	} else
-		xfs_inobt_kcheck(cur);
-	kmem_check();
+	}
 	*stat = 1;
 	return 0;
 }
-
-#ifdef XFSDEBUG
-/*
- * Check key consistency in one btree level, then recurse down to the next.
- */
-STATIC void
-xfs_inobt_kcheck_btree(
-	xfs_btree_cur_t		*cur,	/* btree cursor */
-	xfs_agi_t		*agi,	/* a.g. inode header */
-	xfs_agblock_t		bno,	/* block number to check */
-	int			level,	/* level of the block */
-	xfs_inobt_key_t		*keyp)	/* value of expected first key */
-{
-	xfs_inobt_block_t	*block;	/* btree block pointer */
-	buf_t			*bp;	/* buffer for block */
-	int			i;	/* loop index */
-	xfs_inobt_key_t		key;	/* key value for comparisons */
-	xfs_inobt_key_t		*kp;	/* pointer to btree keys */
-	xfs_inobt_ptr_t		*pp;	/* pointer to btree index values */
-	xfs_inobt_rec_t		*rp;	/* pointer to btree records */
-
-	/*
-	 * Get the buffer and block for the one we're checking.
-	 */
-	ASSERT(bno != NULLAGBLOCK);
-	bp = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp, agi->agi_seqno,
-		bno, 0);
-	block = XFS_BUF_TO_INOBT_BLOCK(bp);
-	xfs_btree_check_sblock(cur, block, level);
-	/*
-	 * If a non-leaf, set up the key pointer & save the first
-	 * key value, if requested.
-	 */
-	if (level > 0) {
-		kp = XFS_INOBT_KEY_ADDR(block, 1, cur);
-		if (keyp)
-			key = *kp;
-	}
-	/*
-	 * If a leaf, set up the record pointer and save the key value
-	 * if requested.
-	 */
-	else {
-		rp = XFS_INOBT_REC_ADDR(block, 1, cur);
-		if (keyp)
-			key.ir_startino = rp->ir_startino;
-	}
-	/*
-	 * If the caller passed in a matching key, check it.
-	 */
-	if (keyp)
-		ASSERT(bcmp(keyp, &key, sizeof(key)) == 0);
-	/* 
-	 * If this is not yet a leaf, check the next level down recursively.
-	 */
-	if (level > 0) {
-		pp = XFS_INOBT_PTR_ADDR(block, 1, cur);
-		if (*pp != NULLAGBLOCK) {
-			for (i = 1; i <= block->bb_numrecs; i++, pp++, kp++)
-				xfs_inobt_kcheck_btree(cur, agi, *pp,
-					level - 1, kp);
-		}
-	}
-	xfs_trans_brelse(cur->bc_tp, bp);
-}
-#endif
 
 /*
  * Log header fields from a btree block.
@@ -1040,7 +912,6 @@ xfs_inobt_log_block(
 
 	xfs_btree_offsets(fields, offsets, XFS_BB_NUM_BITS, &first, &last);
 	xfs_trans_log_buf(tp, bp, first, last);
-	kmem_check();
 }
 
 /*
@@ -1063,7 +934,6 @@ xfs_inobt_log_keys(
 	first = (caddr_t)&kp[kfirst - 1] - (caddr_t)block;
 	last = ((caddr_t)&kp[klast] - 1) - (caddr_t)block;
 	xfs_trans_log_buf(cur->bc_tp, bp, first, last);
-	kmem_check();
 }
 
 /*
@@ -1086,7 +956,6 @@ xfs_inobt_log_ptrs(
 	first = (caddr_t)&pp[pfirst - 1] - (caddr_t)block;
 	last = ((caddr_t)&pp[plast] - 1) - (caddr_t)block;
 	xfs_trans_log_buf(cur->bc_tp, bp, first, last);
-	kmem_check();
 }
 
 /*
@@ -1109,7 +978,6 @@ xfs_inobt_log_recs(
 	first = (caddr_t)&rp[rfirst - 1] - (caddr_t)block;
 	last = ((caddr_t)&rp[rlast] - 1) - (caddr_t)block;
 	xfs_trans_log_buf(cur->bc_tp, bp, first, last);
-	kmem_check();
 }
 
 /*
@@ -1132,8 +1000,6 @@ xfs_inobt_lookup(
 	xfs_mount_t		*mp;	/* file system mount point */
 	xfs_inobt_rec_t		*rp;	/* pointer to the lookup record */
 
-	xfs_inobt_rcheck(cur);
-	xfs_inobt_kcheck(cur);
 	/*
 	 * Get the allocation group header, and the root block number.
 	 */
@@ -1219,7 +1085,6 @@ xfs_inobt_lookup(
 				 */
 				ASSERT(level == 0 && cur->bc_nlevels == 1);
 				cur->bc_ptrs[0] = dir != XFS_LOOKUP_LE;
-				kmem_check();
 				*stat = 0;
 				return 0;
 			}
@@ -1305,7 +1170,6 @@ xfs_inobt_lookup(
 				return error;
 			}
 			ASSERT(i == 1);
-			kmem_check();
 			*stat = 1;
 			return 0;
 		}
@@ -1313,7 +1177,6 @@ xfs_inobt_lookup(
 	else if (dir == XFS_LOOKUP_LE && diff > 0)
 		keyno--;
 	cur->bc_ptrs[0] = keyno;
-	kmem_check();
 	/*
 	 * Return if we succeeded or not.
 	 */
@@ -1351,7 +1214,6 @@ xfs_inobt_lshift(
 	xfs_inobt_ptr_t		*rpp;	/* address pointer for right block */
 	xfs_inobt_rec_t		*rrp;	/* record pointer for right block */
 
-	xfs_inobt_rcheck(cur);
 	/*
 	 * Set up variables for this block as "right".
 	 */
@@ -1388,7 +1250,6 @@ xfs_inobt_lshift(
 	 * If it's full, it can't take another entry.
 	 */
 	if (left->bb_numrecs == XFS_INOBT_BLOCK_MAXRECS(level, cur)) {
-		kmem_check();
 		*stat = 0;
 		return 0;
 	}
@@ -1455,8 +1316,6 @@ xfs_inobt_lshift(
 	 * Slide the cursor value left one.
 	 */
 	cur->bc_ptrs[level]--;
-	xfs_inobt_rcheck(cur);
-	kmem_check();
 	*stat = 1;
 	return 0;
 }
@@ -1487,7 +1346,6 @@ xfs_inobt_newroot(
 	xfs_inobt_block_t	*right;	/* right btree block */
 	xfs_inobt_rec_t		*rp;	/* btree record pointer */
 
-	xfs_inobt_rcheck(cur);
 	ASSERT(cur->bc_nlevels < XFS_IN_MAXLEVELS(cur->bc_mp));
 	/*
 	 * Get a block & a buffer.
@@ -1497,8 +1355,8 @@ xfs_inobt_newroot(
 	args.mp = cur->bc_mp;
 	args.fsbno = XFS_AGB_TO_FSB(args.mp, cur->bc_private.i.agno,
 		agi->agi_root);
-	args.mod = args.minleft = args.total = args.wasdel = args.isfl =
-		args.userdata = 0;
+	args.mod = args.minleft = args.alignment = args.total = args.wasdel =
+		args.isfl = args.userdata = 0;
 	args.minlen = args.maxlen = args.prod = 1;
 	args.type = XFS_ALLOCTYPE_NEAR_BNO;
 	error = xfs_alloc_vextent(&args);
@@ -1602,131 +1460,9 @@ xfs_inobt_newroot(
 	xfs_btree_setbuf(cur, cur->bc_nlevels, nbp);
 	cur->bc_ptrs[cur->bc_nlevels] = nptr;
 	cur->bc_nlevels++;
-	xfs_inobt_rcheck(cur);
-	xfs_inobt_kcheck(cur);
-	kmem_check();
 	*stat = 1;
 	return 0;
 }
-
-#ifdef XFSDEBUG
-/*
- * Guts of xfs_inobt_rcheck.  For each level in the btree, check
- * all its blocks for consistency.
- */
-STATIC void
-xfs_inobt_rcheck_btree(
-	xfs_btree_cur_t	*cur,		/* btree cursor */
-	xfs_agi_t	*agi,		/* a.g. inode header */
-	xfs_agblock_t	rbno,		/* root block number */
-	int		levels)		/* number of levels in the btree */
-{
-	xfs_agblock_t	bno;		/* current block number being checked */
-	xfs_agblock_t	fbno;		/* first block at this level */
-	xfs_inobt_key_t	key;		/* space for key value */
-	int		level;		/* btree level */
-	xfs_inobt_rec_t	rec;		/* space for record value */
-	void		*rp;		/* pointer to record or key */
-
-	/*
-	 * Starting at the root, check each block at each level of the tree.
-	 */
-	rp = levels - 1 ? (void *)&key : (void *)&rec;
-	for (level = levels - 1, bno = rbno; level >= 0; level--, bno = fbno) {
-		bno = xfs_inobt_rcheck_btree_block(cur, agi->agi_seqno, bno,
-			&fbno, rp, level);
-		while (bno != NULLAGBLOCK) {
-			ASSERT(bno < agi->agi_length);
-			bno = xfs_inobt_rcheck_btree_block(cur, agi->agi_seqno,
-				bno, (xfs_agblock_t *)0, rp, level);
-		}
-	}
-}
-
-/*
- * Check one btree block for record consistency.
- * Returns address of the next block to check.
- */
-STATIC xfs_agblock_t			/* next block to process */
-xfs_inobt_rcheck_btree_block(
-	xfs_btree_cur_t		*cur,	/* btree cursor */
-	xfs_agnumber_t		agno,	/* allocation group number */
-	xfs_agblock_t		bno,	/* block number to check */
-	xfs_agblock_t		*fbno,	/* output: first block at next level */
-	void			*rec,	/* previous record/key value */
-	int			level)	/* level of this block */
-{
-	xfs_inobt_block_t	*block;	/* allocation btree block */
-	buf_t			*bp;	/* buffer containing block */
-	int			i;	/* loop index */
-	xfs_inobt_key_t		*keyp;	/* btree key pointer (input) */
-	xfs_inobt_key_t		*kp;	/* btree key pointer in block */
-	xfs_inobt_ptr_t		*pp;	/* btree address pointer in block */
-	xfs_agblock_t		rbno;	/* return value */
-	xfs_inobt_rec_t		*recp;	/* btree record pointer (input) */
-	xfs_inobt_rec_t		*rp;	/* btree record pointer in block */
-
-	/*
-	 * Grab the buffer and btree block.
-	 */
-	bp = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp, agno, bno, 0);
-	block = XFS_BUF_TO_INOBT_BLOCK(bp);
-	xfs_btree_check_sblock(cur, block, level);
-	/*
-	 * If we're supposed to return the first block number for the
-	 * next level, get it.
-	 */
-	if (fbno && block->bb_numrecs) {
-		if (level > 0)
-			*fbno = *XFS_INOBT_PTR_ADDR(block, 1, cur);
-		else
-			*fbno = NULLAGBLOCK;
-	}
-	rbno = block->bb_rightsib;
-	if (level > 0)
-		keyp = (xfs_inobt_key_t *)rec;
-	else
-		recp = (xfs_inobt_rec_t *)rec;
-	/*
-	 * Loop over the entries in the btree block.
-	 */
-	for (i = 1; i <= block->bb_numrecs; i++) {
-		/*
-		 * Non-leaf block.  Check the key sequence.
-		 */
-		if (level > 0) {
-			kp = XFS_INOBT_KEY_ADDR(block, i, cur);
-			if (i == 1 && !fbno)
-				xfs_btree_check_key(cur->bc_btnum, keyp, kp);
-			else if (i > 1) {
-				xfs_btree_check_key(cur->bc_btnum,
-					(void *)(kp - 1), (void *)kp);
-				if (i == block->bb_numrecs)
-					*keyp = *kp;
-			}
-			pp = XFS_INOBT_PTR_ADDR(block, i, cur);
-			xfs_btree_check_sptr(cur, *pp, level);
-		}
-		/*
-		 * Leaf block.  Check the record sequence.
-		 */
-		else {
-			rp = XFS_INOBT_REC_ADDR(block, i, cur);
-			if (i == 1 && !fbno)
-				xfs_btree_check_rec(cur->bc_btnum, (void *)recp,
-					(void *)rp);
-			else if (i > 1) {
-				xfs_btree_check_rec(cur->bc_btnum,
-					(void *)(rp - 1), (void *)rp);
-				if (i == block->bb_numrecs)
-					*recp = *rp;
-			}
-		}
-	}
-	xfs_trans_brelse(cur->bc_tp, bp);
-	return rbno;
-}
-#endif
 
 /*
  * Move 1 record right from cur/level if possible.
@@ -1753,7 +1489,6 @@ xfs_inobt_rshift(
 	xfs_inobt_rec_t		*rrp;	/* record pointer for right block */
 	xfs_btree_cur_t		*tcur;	/* temporary cursor */
 
-	xfs_inobt_rcheck(cur);
 	/*
 	 * Set up variables for this block as "left".
 	 */
@@ -1790,7 +1525,6 @@ xfs_inobt_rshift(
 	 * If it's full, it can't take another entry.
 	 */
 	if (right->bb_numrecs == XFS_INOBT_BLOCK_MAXRECS(level, cur)) {
-		kmem_check();
 		*stat = 0;
 		return 0;
 	}
@@ -1849,8 +1583,6 @@ xfs_inobt_rshift(
 	}
 	xfs_inobt_updkey(tcur, rkp, level + 1);
 	xfs_btree_del_cursor(tcur, XFS_BTREE_NOERROR);
-	xfs_inobt_rcheck(cur);
-	kmem_check();
 	*stat = 1;
 	return 0;
 }
@@ -1883,7 +1615,6 @@ xfs_inobt_split(
 	xfs_inobt_ptr_t		*rpp;	/* right btree address pointer */
 	xfs_inobt_rec_t		*rrp;	/* right btree record pointer */
 
-	xfs_inobt_rcheck(cur);
 	/*
 	 * Set up left block (current one).
 	 */
@@ -1896,8 +1627,8 @@ xfs_inobt_split(
 	 * If we can't do it, we're toast.  Give up.
 	 */
 	args.fsbno = XFS_AGB_TO_FSB(args.mp, cur->bc_private.i.agno, lbno);
-	args.mod = args.minleft = args.total = args.wasdel = args.isfl =
-		args.userdata = 0;
+	args.mod = args.minleft = args.alignment = args.total = args.wasdel =
+		args.isfl = args.userdata = 0;
 	args.minlen = args.maxlen = args.prod = 1;
 	args.type = XFS_ALLOCTYPE_NEAR_BNO;
 	error = xfs_alloc_vextent(&args);
@@ -1905,7 +1636,6 @@ xfs_inobt_split(
 		return error;
 	}
 	if (args.fsbno == NULLFSBLOCK) {
-		kmem_check();
 		*stat = 0;
 		return 0;
 	}
@@ -2008,8 +1738,6 @@ xfs_inobt_split(
 		(*curp)->bc_ptrs[level + 1]++;
 	}
 	*bnop = args.agbno;
-	xfs_inobt_rcheck(cur);
-	kmem_check();
 	*stat = 1;
 	return 0;
 }
@@ -2028,7 +1756,6 @@ xfs_inobt_updkey(
 	xfs_inobt_key_t		*kp;	/* pointer to btree block keys */
 	int			ptr;	/* index of key in block */
 
-	xfs_inobt_rcheck(cur);
 	/*
 	 * Go up the tree from this level toward the root.
 	 * At each level, update the key value to the value input.
@@ -2044,8 +1771,6 @@ xfs_inobt_updkey(
 		*kp = *keyp;
 		xfs_inobt_log_keys(cur, bp, ptr, ptr);
 	}
-	xfs_inobt_rcheck(cur);
-	kmem_check();
 }
 
 /*
@@ -2131,7 +1856,6 @@ xfs_inobt_decrement(
 		xfs_btree_check_sblock(cur, block, lev - 1);
 		cur->bc_ptrs[lev - 1] = block->bb_numrecs;
 	}
-	kmem_check();
 	*stat = 1;
 	return 0;
 }
@@ -2173,7 +1897,6 @@ xfs_inobt_delete(
 			}
 		}
 	}
-	xfs_inobt_kcheck(cur);
 	*stat = i;
 	return 0;
 }
@@ -2210,7 +1933,6 @@ xfs_inobt_get_nextrec(
 	*ino = rec->ir_startino;
 	*fcnt = rec->ir_freecount;
 	*free = rec->ir_free;
-	kmem_check();
 	return 1;
 }
 
@@ -2245,7 +1967,6 @@ xfs_inobt_get_rec(
 	*ino = rec->ir_startino;
 	*fcnt = rec->ir_freecount;
 	*free = rec->ir_free;
-	kmem_check();
 	return 1;
 }
 
@@ -2329,7 +2050,6 @@ xfs_inobt_increment(
 		xfs_btree_setbuf(cur, lev - 1, bp);
 		cur->bc_ptrs[lev - 1] = 1;
 	}
-	kmem_check();
 	*stat = 1;
 	return 0;
 }
@@ -2390,31 +2110,10 @@ xfs_inobt_insert(
 			pcur = ncur;
 			ncur = (xfs_btree_cur_t *)0;
 		}
-		kmem_check();
 	} while (nbno != NULLAGBLOCK);
 	*stat = i;
 	return 0;
 }
-
-#ifdef XFSDEBUG
-/*
- * Check key consistency in the btree given by cur.
- */
-void
-xfs_inobt_kcheck(
-	xfs_btree_cur_t	*cur)		/* btree cursor */
-{
-	xfs_agi_t	*agi;		/* allocation group inode header */
-	xfs_agblock_t	bno;		/* block # of btree root */
-	int		levels;		/* # of levels in btree */
-
-	agi = XFS_BUF_TO_AGI(cur->bc_private.i.agbp);
-	bno = agi->agi_root;
-	levels = agi->agi_level;
-	ASSERT(levels == cur->bc_nlevels);
-	xfs_inobt_kcheck_btree(cur, agi, bno, levels - 1, (xfs_inobt_key_t *)0);
-}
-#endif	/* XFSDEBUG */
 
 /*
  * Lookup the record equal to ino in the btree given by cur.
@@ -2469,26 +2168,6 @@ xfs_inobt_lookup_le(
 	return xfs_inobt_lookup(cur, XFS_LOOKUP_LE, stat);
 }
 
-#ifdef XFSDEBUG
-/*
- * Check consistency in the given btree.
- * Checks header consistency and that keys/records are in the right order.
- */
-void
-xfs_inobt_rcheck(
-	xfs_btree_cur_t	*cur)		/* btree cursor */
-{
-	xfs_agi_t	*agi;		/* a.g. inode header */
-	xfs_agblock_t	bno;		/* block number of btree root */
-	int		levels;		/* number of levels in btree */
-
-	agi = XFS_BUF_TO_AGI(cur->bc_private.i.agbp);
-	bno = agi->agi_root;
-	levels = agi->agi_level;
-	xfs_inobt_rcheck_btree(cur, agi, bno, levels);
-}
-#endif	/* XFSDEBUG */
-
 /*
  * Update the record referred to by cur, to the value given
  * by [ino, fcnt, free].
@@ -2508,7 +2187,6 @@ xfs_inobt_update(
 	/*
 	 * Pick up the current block.
 	 */
-	xfs_inobt_rcheck(cur);
 	bp = cur->bc_bufs[0];
 	block = XFS_BUF_TO_INOBT_BLOCK(bp);
 	xfs_btree_check_sblock(cur, block, 0);
@@ -2532,9 +2210,6 @@ xfs_inobt_update(
 
 		key.ir_startino = ino;
 		xfs_inobt_updkey(cur, &key, 1);
-		xfs_inobt_rcheck(cur);
-		xfs_inobt_kcheck(cur);
 	}
-	kmem_check();
 	return 1;
 }
