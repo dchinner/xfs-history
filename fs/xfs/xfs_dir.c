@@ -1,4 +1,4 @@
-#ident "$Revision: 1.60 $"
+#ident "$Revision: 1.61 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -74,7 +74,6 @@ STATIC int xfs_dir_leaf_lookup(xfs_trans_t *trans, xfs_da_name_t *args);
 STATIC int xfs_dir_leaf_removename(xfs_trans_t *trans, xfs_da_name_t *args,
 					       int *number_entries,
 					       int *total_namebytes);
-STATIC void xfs_dir_leaf_print(xfs_trans_t *trans, xfs_inode_t *dp);
 STATIC int xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					     uio_t *uio, int *eofp,
 					     dirent_t *dbp);
@@ -88,7 +87,6 @@ STATIC int xfs_dir_node_addname(xfs_trans_t *trans, xfs_da_name_t *args);
 STATIC int xfs_dir_node_lookup(xfs_trans_t *trans, xfs_da_name_t *args);
 #ifndef SIM
 STATIC int xfs_dir_node_removename(xfs_trans_t *trans, xfs_da_name_t *args);
-STATIC void xfs_dir_node_print(xfs_trans_t *trans, xfs_inode_t *dp);
 STATIC int xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					     uio_t *uio, int *eofp,
 					     dirent_t *dbp);
@@ -195,7 +193,7 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (dp->i_d.di_size <= XFS_IFORK_DSIZE(dp)) {
+	if (dp->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
 		newsize = XFS_DIR_SF_ENTSIZE_BYNAME(args.namelen);
 		if ((dp->i_d.di_size + newsize) <= XFS_IFORK_DSIZE(dp)) {
 			retval = xfs_dir_shortform_addname(trans, &args);
@@ -205,7 +203,7 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 				retval = xfs_dir_leaf_addname(trans, &args);
 			}
 		}
-	} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
+	} else if (xfs_bmap_one_block(dp, XFS_DATA_FORK)) {
 		retval = xfs_dir_leaf_addname(trans, &args);
 		if (retval == ENOSPC) {
 			retval = xfs_dir_leaf_to_node(trans, &args);
@@ -265,9 +263,9 @@ xfs_dir_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (dp->i_d.di_size <= XFS_IFORK_DSIZE(dp)) {
+	if (dp->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
 		retval = xfs_dir_shortform_removename(trans, &args);
-	} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
+	} else if (xfs_bmap_one_block(dp, XFS_DATA_FORK)) {
 		retval = xfs_dir_leaf_removename(trans, &args,
 							&count, &totallen);
 		if (retval == 0) {
@@ -323,9 +321,9 @@ xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (dp->i_d.di_size <= XFS_IFORK_DSIZE(dp)) {
+	if (dp->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
 		retval = xfs_dir_shortform_lookup(trans, &args);
-	} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
+	} else if (xfs_bmap_one_block(dp, XFS_DATA_FORK)) {
 		retval = xfs_dir_leaf_lookup(trans, &args);
 	} else {
 		retval = xfs_dir_node_lookup(trans, &args);
@@ -342,26 +340,6 @@ xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 }
 
 #ifndef SIM
-/*
- * Print a directory's contents.
- * For debugging.
- */
-void
-xfs_dir_print(xfs_trans_t *trans, xfs_inode_t *dp)
-{
-	/*
-	 * Decide on what work routines to call based on the inode size.
-	 */
-	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
-	if (dp->i_d.di_size <= XFS_IFORK_DSIZE(dp)) {
-		xfs_dir_shortform_print(trans, dp);
-	} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
-		xfs_dir_leaf_print(trans, dp);
-	} else {
-		xfs_dir_node_print(trans, dp);
-	}
-}
-
 /*
  * Implement readdir.
  */
@@ -392,9 +370,9 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (dp->i_d.di_size <= XFS_IFORK_DSIZE(dp)) {
+	if (dp->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
 		retval = xfs_dir_shortform_getdents(trans, dp, uio, eofp, dbp);
-	} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
+	} else if (xfs_bmap_one_block(dp, XFS_DATA_FORK)) {
 		retval = xfs_dir_leaf_getdents(trans, dp, uio, eofp, dbp);
 	} else {
 		retval = xfs_dir_node_getdents(trans, dp, uio, eofp, dbp);
@@ -444,9 +422,9 @@ xfs_dir_replace(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (dp->i_d.di_size <= XFS_IFORK_DSIZE(dp)) {
+	if (dp->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
 		retval = xfs_dir_shortform_replace(trans, &args);
-	} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
+	} else if (xfs_bmap_one_block(dp, XFS_DATA_FORK)) {
 		retval = xfs_dir_leaf_replace(trans, &args);
 	} else {
 		retval = xfs_dir_node_replace(trans, &args);
@@ -474,7 +452,7 @@ xfs_dir_leaf_addname(xfs_trans_t *trans, xfs_da_name_t *args)
 	int index, retval;
 	buf_t *bp;
 
-	retval = xfs_da_read_buf(trans, args->dp, 0, &bp);
+	retval = xfs_da_read_buf(trans, args->dp, 0, &bp, XFS_DATA_FORK);
 	if (retval)
 		return(retval);
 	ASSERT(bp != NULL);
@@ -500,7 +478,7 @@ xfs_dir_leaf_removename(xfs_trans_t *trans, xfs_da_name_t *args,
 	int index, retval;
 	buf_t *bp;
 
-	retval = xfs_da_read_buf(trans, args->dp, 0, &bp);
+	retval = xfs_da_read_buf(trans, args->dp, 0, &bp, XFS_DATA_FORK);
 	if (retval)
 		return(retval);
 	ASSERT(bp != NULL);
@@ -527,7 +505,7 @@ xfs_dir_leaf_lookup(xfs_trans_t *trans, xfs_da_name_t *args)
 	int index, retval;
 	buf_t *bp;
 
-	retval = xfs_da_read_buf(trans, args->dp, 0, &bp);
+	retval = xfs_da_read_buf(trans, args->dp, 0, &bp, XFS_DATA_FORK);
 	if (retval)
 		return(retval);
 	ASSERT(bp != NULL);
@@ -537,20 +515,6 @@ xfs_dir_leaf_lookup(xfs_trans_t *trans, xfs_da_name_t *args)
 }
 
 #ifndef SIM
-/*
- * Print the leaf directory.
- */
-STATIC void
-xfs_dir_leaf_print(xfs_trans_t *trans, xfs_inode_t *dp)
-{
-	buf_t *bp;
-
-	(void) xfs_da_read_buf(trans, dp, 0, &bp);
-	ASSERT(bp != NULL);
-	xfs_dir_leaf_print_int(bp, dp);
-	xfs_trans_brelse(trans, bp);
-}
-
 /*
  * Copy out directory entries for getdents(), for leaf directories.
  */
@@ -567,7 +531,7 @@ xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 			return(0);
 		return(XFS_ERROR(ENOENT));
 	}
-	retval = xfs_da_read_buf(trans, dp, 0, &bp);
+	retval = xfs_da_read_buf(trans, dp, 0, &bp, XFS_DATA_FORK);
 	if (retval)
 		return(retval);
 	ASSERT(bp != NULL);
@@ -593,7 +557,7 @@ xfs_dir_leaf_replace(xfs_trans_t *trans, xfs_da_name_t *args)
 	xfs_dir_leaf_name_t *namest;
 
 	inum = args->inumber;
-	retval = xfs_da_read_buf(trans, args->dp, 0, &bp);
+	retval = xfs_da_read_buf(trans, args->dp, 0, &bp, XFS_DATA_FORK);
 	if (retval)
 		return(retval);
 	ASSERT(bp != NULL);
@@ -764,43 +728,6 @@ xfs_dir_node_lookup(xfs_trans_t *trans, xfs_da_name_t *args)
 }
 
 #ifndef SIM
-/*
- * Print the B-tree directory.
- */
-STATIC void
-xfs_dir_node_print(xfs_trans_t *trans, xfs_inode_t *dp)
-{
-	__uint32_t bno;
-	buf_t *bp;
-
-	bno = 0;
-	for (;;) {
-		xfs_da_intnode_t *node;
-		xfs_da_node_entry_t *btree;
-
-		(void) xfs_da_read_buf(trans, dp, bno, &bp);
-		ASSERT(bp != NULL);
-		node = (xfs_da_intnode_t *)bp->b_un.b_addr;
-		if (node->hdr.info.magic != XFS_DA_NODE_MAGIC)
-			break;
-		btree = &node->btree[0];
-		bno = btree->before;
-		xfs_trans_brelse(trans, bp);
-	}
-	for (;;) {
-		xfs_dir_leafblock_t *leaf;
-
-		xfs_dir_leaf_print_int(bp, dp);
-		leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
-		bno = leaf->hdr.info.forw;
-		xfs_trans_brelse(trans, bp);
-		if (bno == 0)
-			break;
-		(void) xfs_da_read_buf(trans, dp, bno, &bp);
-		ASSERT(bp != NULL);
-	}
-}
-
 STATIC int
 xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 			int *eofp, dirent_t *dbp)
@@ -818,7 +745,8 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 			xfs_da_intnode_t *node;
 			xfs_da_node_entry_t *btree;
 
-			retval = xfs_da_read_buf(trans, dp, bno, &bp);
+			retval = xfs_da_read_buf(trans, dp, bno, &bp,
+							XFS_DATA_FORK);
 			if (retval)
 				return(retval);
 			ASSERT(bp != NULL);
@@ -841,7 +769,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 			} else
 				return(XFS_ERROR(ENOENT));
 		}
-		retval = xfs_da_read_buf(trans, dp, bno, &bp);
+		retval = xfs_da_read_buf(trans, dp, bno, &bp, XFS_DATA_FORK);
 		if (retval)
 			return(retval);
 		if (bp == NULL)
@@ -865,7 +793,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 		if (bno == 0)
 			break;
 		uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, bno, 0);
-		retval = xfs_da_read_buf(trans, dp, bno, &bp);
+		retval = xfs_da_read_buf(trans, dp, bno, &bp, XFS_DATA_FORK);
 		if (retval)
 			return(retval);
 		ASSERT(bp != NULL);
