@@ -715,6 +715,7 @@ xfs_dirents_to_stats(
 	xfs_off_t	prevoff;
 	int		res;
 	dm_bulkstat_one_t dmb;
+	int		needed;
 
 	spaceleft = *spaceleftp;
 	*spaceleftp = 0;
@@ -738,7 +739,9 @@ xfs_dirents_to_stats(
 		/*
 		 * Make sure we have enough space.
 		 */
-		if (spaceleft <= DM_STAT_SIZE(*statp, namelen)) {
+		needed = DM_STAT_SIZE(*statp, namelen);
+		needed = (needed+(DM_STAT_ALIGN-1)) & ~(DM_STAT_ALIGN-1);
+		if (spaceleft < needed) {
 			/*
 			 * d_off field in dirent_t points at the next entry.
 			 */
@@ -757,7 +760,7 @@ xfs_dirents_to_stats(
 
 		dmb.kernel_buffer = 1;
 		(void)xfs_dm_bulkstat_one(mp, (xfs_ino_t)p->d_ino,
-					  statp, sizeof(*statp), &dmb,
+					  statp, spaceleft, &dmb,
 					  0, NULL, NULL, &res);
 		if (res != BULKSTAT_RV_DIDONE)
 			continue;
@@ -796,7 +799,7 @@ xfs_dirents_to_stats(
 	if (spaceleft > DM_STAT_SIZE(*statp, MAXNAMLEN)) {
 		*spaceleftp = spaceleft;
 	}
-	return(0);
+	return(1);
 }
 
 
@@ -1783,16 +1786,22 @@ xfs_dm_get_dirattrs_rvp(
 {
 	xfs_inode_t	*dp;
 	xfs_mount_t	*mp;
-	size_t		direntbufsz, statbufsz;
-	size_t		nread, spaceleft, nwritten=0;
-	void		*direntp, *statbufp;
+	size_t		direntbufsz;
+	size_t		nread, spaceleft, nwritten;
+	size_t		ubused = 0;
+	void		*direntp, *statbuf;
+	char		*statbufp;
 	uint		lock_mode;
-	int		error;
+	int		error = 0;
 	dm_attrloc_t	loc;
+	dm_attrloc_t	prev_loc;
 	bhv_desc_t	*xbdp;
 	bhv_desc_t	*mp_bdp;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	vfs_t		*vfsp = vp->v_vfsp;
+	uint		dir_gen = 0;
+	int		done = 0;
+	int		one_more = 0;
 
 	/* Returns negative errors to DMAPI */
 
@@ -1802,11 +1811,11 @@ xfs_dm_get_dirattrs_rvp(
 	if (copy_from_user( &loc, locp, sizeof(loc)))
 		return(-EFAULT);
 
-	if ((buflen / DM_STAT_SIZE(dm_stat_t, MAXNAMLEN)) == 0) {
-		if (put_user( DM_STAT_SIZE(dm_stat_t, MAXNAMLEN), rlenp ))
-			return(-EFAULT);
-		return(-E2BIG);
-	}
+	if (mask & ~(DM_AT_HANDLE|DM_AT_EMASK|DM_AT_PMANR|DM_AT_PATTR|DM_AT_DTIME|DM_AT_CFLAG|DM_AT_STAT))
+		return(-EINVAL);
+
+	if ((inode->i_mode & S_IFMT) != S_IFDIR)
+		return(-EINVAL);
 
 	mp_bdp = bhv_lookup(VFS_BHVHEAD(vfsp), &xfs_vfsops);
 	ASSERT(mp_bdp);
@@ -1815,34 +1824,35 @@ xfs_dm_get_dirattrs_rvp(
 
 	mp = XFS_BHVTOM(mp_bdp);
 	dp = XFS_BHVTOI(xbdp);
-	if ((dp->i_d.di_mode & S_IFMT) != S_IFDIR)
-		return(-ENOTDIR);
+
+	if (buflen < DM_STAT_SIZE(dm_stat_t, 0)) {
+		*rvp = 1; /* tell caller to try again */
+		goto finish_out;
+	}
 
 	/*
 	 * Don't get more dirents than are guaranteed to fit.
 	 * The minimum that the stat buf holds is the buf size over
-	 * maximum entry size.	That times the minimum dirent size
+	 * maximum entry size.  That times the minimum dirent size
 	 * is an overly conservative size for the dirent buf.
 	 */
-	statbufsz = NBPP;
-	direntbufsz = (NBPP / DM_STAT_SIZE(dm_stat_t, MAXNAMLEN)) * sizeof(xfs_dirent_t);
+	direntbufsz = (NBPP / DM_STAT_SIZE(dm_stat_t, MAXNAMLEN)) * sizeof(xfs_dirent_t) + (DM_STAT_ALIGN-1);
+	direntbufsz &= ~(DM_STAT_ALIGN-1);
 
 	direntp = kmem_alloc(direntbufsz, KM_SLEEP);
-	statbufp = kmem_alloc(statbufsz, KM_SLEEP);
-	error = 0;
+	statbuf = kmem_alloc(buflen, KM_SLEEP);
+	statbufp = (char *)statbuf;
 	spaceleft = buflen;
 	/*
 	 * Keep getting dirents until the ubuffer is packed with
 	 * dm_stat structures.
 	 */
 	do {
-		ulong	dir_gen = 0;
-
 		lock_mode = xfs_ilock_map_shared(dp);
 		/* See if the directory was removed after it was opened. */
 		if (dp->i_d.di_nlink <= 0) {
 			xfs_iunlock_map_shared(dp, lock_mode);
-			error = ENOENT;
+			error = EBADF;
 			break;
 		}
 		if (dir_gen == 0)
@@ -1852,53 +1862,64 @@ xfs_dm_get_dirattrs_rvp(
 			xfs_iunlock_map_shared(dp, lock_mode);
 			break;
 		}
+		prev_loc = loc;
 		error = xfs_get_dirents(dp, direntp, direntbufsz,
-						(xfs_off_t *)&loc, &nread);
+					(xfs_off_t *)&loc, &nread);
 		xfs_iunlock_map_shared(dp, lock_mode);
 
 		if (error) {
 			break;
 		}
-		if (nread == 0)
+		if (nread == 0) {
+			done = 1;
 			break;
+		}
+		if (one_more) {
+			loc = prev_loc;
+			done = 0;
+			break;
+		}
+
 		/*
 		 * Now iterate thru them and call bulkstat_one() on all
 		 * of them
 		 */
-		error = xfs_dirents_to_stats(mp,
+		statbufp += ubused;
+		done = xfs_dirents_to_stats(mp,
 					  (xfs_dirent_t *) direntp,
-					  statbufp,
+					  (void *)statbufp,
 					  nread,
 					  &spaceleft,
 					  &nwritten,
 					  (xfs_off_t *)&loc);
-		if (error) {
+		ubused += nwritten;
+
+		if (!done) {
+			/* ran out of space in user buffer */
 			break;
+		}
+		else {
+			one_more = 1;
+			continue;
 		}
 
-		if (nwritten) {
-			if (copy_to_user( bufp, statbufp, nwritten)) {
-				error = EFAULT;
-				break;
-			}
-			break;
-		}
-	} while (spaceleft);
-	/*
-	 *  If xfs_get_dirents found anything, there might be more to do.
-	 *  If it didn't read anything, signal all done (rval == 0).
-	 *  (Doesn't matter either way if there was an error.)
-	 */
-	if (nread) {
-		*rvp = 1;
+	} while (1);
+
+	if (!done) {
+		*rvp = 1; /* tell caller we have more */
 	} else {
 		*rvp = 0;
 	}
 
-	kmem_free(statbufp, statbufsz);
+	if (ubused && !error) {
+		if (copy_to_user(bufp, statbuf, ubused))
+			error = EFAULT;
+	}
+	kmem_free(statbuf, buflen);
 	kmem_free(direntp, direntbufsz);
-	if (!error){
-		if (put_user( buflen - spaceleft, rlenp))
+finish_out:
+	if (!error) {
+		if (put_user( ubused, rlenp))
 			error = EFAULT;
 	}
 
