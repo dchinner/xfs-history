@@ -6853,8 +6853,9 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		mp->m_ddev_targp ? mp->m_ddev_targp->pbr_dev : 0,
 		mp->m_logdev_targp ? mp->m_logdev_targp->pbr_dev : 0,
 		mp->m_rtdev_targp ? mp->m_rtdev_targp->pbr_dev : 0);
-	kdb_printf("bsize %d agfrotor %d agirotor %d ihash 0x%p ihsize %d\n",
-		mp->m_bsize, mp->m_agfrotor, mp->m_agirotor,
+	kdb_printf("bsize %d agfrotor %d xfs_rotorstep %d agirotor %d\n",
+		mp->m_bsize, mp->m_agfrotor, xfs_rotorstep, mp->m_agirotor);
+	kdb_printf("ihash 0x%p ihsize %d\n",
 		mp->m_ihash, mp->m_ihsize);
 	kdb_printf("inodes 0x%p ilock 0x%p ireclaims 0x%x\n",
 		mp->m_inodes, &mp->m_ilock, mp->m_ireclaims);
