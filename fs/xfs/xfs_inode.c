@@ -107,11 +107,12 @@ xfs_iformat(xfs_mount_t *mp, xfs_inode_t *ip, xfs_dinode_t *dip)
 	register int		size;
 	register int		nex;
 	register int		nrecs;
-	register char		*bp;
+	register char		*cp;
+	int			csize;
 	xfs_btree_block_t	*rootbp;
 	xfs_bmbt_rec_t		*recp;
 	xfs_agblock_t		*ptrp;
-	int			inode_size;
+	int			dinode_size;
 
 	switch (ip->i_d.di_mode & IFMT) {
 	case IFIFO:
@@ -186,33 +187,35 @@ xfs_iformat(xfs_mount_t *mp, xfs_inode_t *ip, xfs_dinode_t *dip)
 			nrecs = XFS_BMAP_BROOT_NUMRECS(&(dip->di_u.di_bmbt));
 			ip->i_broot_bytes = size;
 			ip->i_broot = kmem_alloc(size, KM_SLEEP);
-			inode_size = mp->m_sb.sb_inodesize;
+			dinode_size = mp->m_sb.sb_inodesize;
 
 			/*
 			 * Copy the btree block header first.
 			 */
 			rootbp = &(dip->di_u.di_bmbt);
-			bp = (char *)ip->i_broot;
-			size = sizeof(xfs_btree_block_t);
-			bcopy(rootbp, bp, size);
+			cp = (char *)ip->i_broot;
+			csize = sizeof(xfs_btree_block_t);
+			bcopy(rootbp, cp, csize);
 
 			/*
 			 * Get the addr of the first record into recp
 			 * and copy the records.
 			 */
-			recp = XFS_BMAP_BROOT_REC_ADDR(rootbp, 0, inode_size);
-			bp += size;
-			size = nrecs * sizeof(xfs_bmbt_rec_t);
-			bcopy(recp, bp, size);
+			recp = XFS_BMAP_BROOT_REC_ADDR(rootbp, 1, dinode_size);
+			cp = (char *)XFS_BMAP_BROOT_REC_ADDR(ip->i_broot, 1,
+							     size);
+			csize = nrecs * sizeof(xfs_bmbt_rec_t);
+			bcopy(recp, cp, csize);
 
 			/*
 			 * Get the addr of the first pointer into ptrp
 			 * and copy the pointers.
 			 */
-			ptrp = XFS_BMAP_BROOT_PTR_ADDR(rootbp, 0, inode_size);
-			bp += size;
-			size = nrecs * sizeof(xfs_agblock_t);
-			bcopy(ptrp, bp, size);
+			ptrp = XFS_BMAP_BROOT_PTR_ADDR(rootbp, 1, dinode_size);
+			cp = (char *)XFS_BMAP_BROOT_PTR_ADDR(ip->i_broot, 1,
+							     size);
+			csize = nrecs * sizeof(xfs_agblock_t);
+			bcopy(ptrp, cp, csize);
 			ip->i_flags |= XFS_IBROOT;
 			return;
 
@@ -297,6 +300,269 @@ xfs_iread(xfs_mount_t *mp, xfs_trans_t *tp, xfs_ino_t ino)
 	xfs_trans_brelse(tp, bp);
 	return (ip);
 }
+
+/*
+ * Allocate an inode on disk and return a copy of it's in-core version.
+ * The in-core inode is locked exclusively.  Set mode, nlink, and rdev
+ * appropriately within the inode.  The uid and gid for the inode are
+ * set according to the contents of the given cred structure.
+ *
+ * Use xfs_dialloc() to allocate the on-disk inode and xfs_iget()
+ * to obtain the in-core version of the allocated inode.  Finally,
+ * hand the in-core inode off to xfs_iinit() to fill in the proper
+ * values and log the initial contents of the inode.
+ */
+void
+xfs_ialloc(xfs_trans_t	*tp,
+	   xfs_inode_t	*pip,
+	   mode_t	mode,
+	   ushort	nlink,
+	   dev_t	rdev,
+	   xfs_inode_t	**ipp,
+	   struct cred	*cr)
+{
+	xfs_ino_t	ino;
+	xfs_inode_t	*ip;
+
+	/*
+	 * Call the space management code to allocate
+	 * the on-disk inode.  The 1 value for the
+	 * sameag parameter may not be quite correct
+	 * here.
+	 */
+	ino = xfs_dialloc(tp, pip->i_ino, 1, mode);
+
+	/*
+	 * Get the in-core inode with the lock held exclusively.
+	 * This is because we're setting fields here we need
+	 * to prevent others from looking at until we're done.
+	 */
+	ip = xfs_iget(tp->t_mountp, tp, ino, XFS_ILOCK_EXCL);
+	ASSERT(ip != NULL);
+
+	
+	
+
+}
+
+
+/*
+ * Reallocate the space for i_broot based on the number of records
+ * being added or deleted as indicated in rec_diff.  Move the records
+ * and pointers in i_broot to fit the new size.  When shrinking this
+ * will eliminate holes between the records and pointers created by
+ * the caller.  When growing this will create holes to be filled in
+ * by the caller.
+ *
+ * The caller must not request to add more records than would fit in
+ * the on-disk inode root.  If the i_broot is currently NULL, then
+ * if we adding records one will be allocated.  The caller must also
+ * not request that the number of records go below zero, although
+ * it can go to zero.
+ */
+void
+xfs_iroot_realloc(xfs_inode_t *ip, int rec_diff)
+{
+	int			cur_max;
+	int			new_max;
+	size_t			new_size;
+	char			*np;
+	char			*op;
+	xfs_btree_block_t	*new_broot;
+
+	/*
+	 * Handle the degenerate case quietly.
+	 */
+	if (rec_diff == 0) {
+		return;
+	}
+
+	if (rec_diff > 0) {
+		/*
+		 * If there wasn't any memory allocated before, just
+		 * allocate it now and get out.
+		 */
+		if (ip->i_broot_bytes == 0) {
+			new_size = (size_t)XFS_BMAP_BROOT_SPACE_CALC(rec_diff);
+			ip->i_broot = (xfs_btree_block_t*)kmem_alloc(new_size,
+								     KM_SLEEP);
+			ip->i_broot_bytes = new_size;
+			return;
+		}
+
+		/*
+		 * If there is already an existing i_broot, then we need
+		 * to realloc() it and shift the pointers to their new
+		 * location.  The records don't change location because
+		 * they are kept butted up against the btree block header.
+		 */
+		cur_max = XFS_BMAP_BROOT_MAXRECS(ip->i_broot_bytes);
+		new_max = cur_max + rec_diff;
+		new_size = (size_t)XFS_BMAP_BROOT_SPACE_CALC(new_max);
+		ip->i_broot = (xfs_btree_block_t *)
+			      kmem_realloc(ip->i_broot, new_size, KM_SLEEP);
+		op = (char *)XFS_BMAP_BROOT_PTR_ADDR(ip->i_broot, 1,
+						      ip->i_broot_bytes);
+		np = (char *)XFS_BMAP_BROOT_PTR_ADDR(ip->i_broot, 1,
+						      new_size);
+		ip->i_broot_bytes = new_size;
+		/*
+		 * This depends on bcopy() handling overlapping buffers.
+		 */
+		bcopy(op, np, cur_max * sizeof(xfs_agblock_t));
+		return;
+	}
+
+	/*
+	 * rec_diff is less than 0.  In this case, we are shrinking the
+	 * i_broot buffer.  It must already exist.  If we go to zero
+	 * records, just eliminate the space for the records and pointers
+	 * but leave space for the btree block header.
+	 */
+	ASSERT((ip->i_broot != NULL) && (ip->i_broot_bytes > 0));
+	cur_max = XFS_BMAP_BROOT_MAXRECS(ip->i_broot_bytes);
+	new_max = cur_max + rec_diff;
+	new_size = (size_t)XFS_BMAP_BROOT_SPACE_CALC(new_max);
+	ASSERT(new_max >= 0);
+	new_broot = (xfs_btree_block_t *)kmem_alloc(new_size, KM_SLEEP);
+	/*
+	 * First copy over the btree block header.
+	 */
+	bcopy(ip->i_broot, new_broot, sizeof(xfs_btree_block_t));
+
+	/*
+	 * Only copy the records and pointers if there are any.
+	 */
+	if (new_max > 0) {
+		/*
+		 * First copy then records.
+		 */
+		op = (char *)XFS_BMAP_BROOT_REC_ADDR(ip->i_broot, 1,
+						     ip->i_broot_bytes);
+		np = (char *)XFS_BMAP_BROOT_REC_ADDR(new_broot, 1, new_size);
+		bcopy(op, np, new_max * sizeof(xfs_bmbt_rec_t));	
+
+		/*
+		 * Then copy the pointers.
+		 */
+		op = (char *)XFS_BMAP_BROOT_PTR_ADDR(ip->i_broot, 1,
+						     ip->i_broot_bytes);
+		np = (char *)XFS_BMAP_BROOT_PTR_ADDR(new_broot, 1, new_size);
+		bcopy(op, np, new_max * sizeof(xfs_bmbt_rec_t));	
+	}
+	kmem_free(ip->i_broot, ip->i_broot_bytes);
+	ip->i_broot = new_broot;
+	ip->i_broot_bytes = new_size;
+	return;
+}
+	
+	
+/*
+ * This is called when the amount of space needed for iu_extents
+ * is increased or decreased.  The change in size is indicated by
+ * the number of extents that need to be added or deleted in the
+ * ext_diff parameter.
+ *
+ * If the amount of space needed has decreased below the size of the
+ * inline buffer, then switch to using the inline buffer.  Othewise,
+ * use kmem_realloc() or kmem_alloc() to adjust the size of the buffer
+ * to what is needed.
+ */
+void
+xfs_iext_realloc(xfs_inode_t *ip, int ext_diff)
+{
+	int	byte_diff;
+	int	new_size;
+
+	if (ext_diff == 0) {
+		return;
+	}
+
+	byte_diff = ext_diff * sizeof(xfs_extdesc_t);
+	new_size = ip->i_bytes + byte_diff;
+	/*
+	 * If the valid extents can fit in iu_inline_ext,
+	 * copy them from the malloc'd vector and free it.
+	 */
+	if (new_size <= sizeof(ip->i_u2.iu_inline_ext)) {
+		if (ip->i_u1.iu_extents != ip->i_u2.iu_inline_ext) {
+			bcopy(ip->i_u1.iu_extents, ip->i_u2.iu_inline_ext,
+			      new_size);
+			kmem_free(ip->i_u1.iu_extents, ip->i_bytes);
+			ip->i_u1.iu_extents = ip->i_u2.iu_inline_ext;
+		}
+	} else {
+		/*
+		 * Stuck with malloc/realloc.
+		 */
+		if (ip->i_u1.iu_extents != ip->i_u2.iu_inline_ext) {
+			ip->i_u1.iu_extents = (xfs_extdesc_t *)
+					      kmem_realloc(ip->i_u1.iu_extents,
+							   new_size, KM_SLEEP);
+		} else {
+			ip->i_u1.iu_extents = (xfs_extdesc_t *)
+					      kmem_alloc(new_size, KM_SLEEP);
+			bcopy(ip->i_u2.iu_inline_ext, ip->i_u1.iu_extents,
+			      sizeof(ip->i_u2.iu_inline_ext));
+		}
+	}
+	ip->i_bytes = new_size;
+}
+
+		
+/*
+ * This is called when the amount of space needed for iu_data
+ * is increased or decreased.  The change in size is indicated by
+ * the number of bytes that need to be added or deleted in the
+ * byte_diff parameter.
+ *
+ * If the amount of space needed has decreased below the size of the
+ * inline buffer, then switch to using the inline buffer.  Othewise,
+ * use kmem_realloc() or kmem_alloc() to adjust the size of the buffer
+ * to what is needed.
+ */
+void
+xfs_idata_realloc(xfs_inode_t *ip, int byte_diff)
+{
+	int	new_size;
+
+	if (byte_diff == 0) {
+		return;
+	}
+
+	new_size = ip->i_bytes + byte_diff;
+	ASSERT(new_size >= 0);
+	/*
+	 * If the valid extents/data can fit in iu_inline_ext/data,
+	 * copy them from the malloc'd vector and free it.
+	 */
+	if (new_size <= sizeof(ip->i_u2.iu_inline_data)) {
+		if (ip->i_u1.iu_data != ip->i_u2.iu_inline_data) {
+			bcopy(ip->i_u1.iu_data, ip->i_u2.iu_inline_data,
+			      new_size);
+			kmem_free(ip->i_u1.iu_data, ip->i_bytes);
+			ip->i_u1.iu_data = ip->i_u2.iu_inline_data;
+		}
+	} else {
+		/*
+		 * Stuck with malloc/realloc.
+		 */
+		if (ip->i_u1.iu_data != ip->i_u2.iu_inline_data) {
+			ip->i_u1.iu_data = (char *)
+					   kmem_realloc(ip->i_u1.iu_data,
+							new_size, KM_SLEEP);
+		} else {
+			ip->i_u1.iu_data = (char *)kmem_alloc(new_size,
+							      KM_SLEEP);
+			bcopy(ip->i_u2.iu_inline_data, ip->i_u1.iu_data,
+			      sizeof(ip->i_u2.iu_inline_data));
+		}
+	}
+	ip->i_bytes = new_size;
+}
+
+		
+
 
 /*
  * Map inode to disk block and offset.
