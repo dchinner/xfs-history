@@ -1,6 +1,6 @@
 #ifndef __XFS_QUOTA_H__
 #define __XFS_QUOTA_H__
-#ident "$Revision: 1.15 $"
+#ident "$Revision: 1.16 $"
 /*
  * External Interface to the XFS disk quota subsystem.
  */
@@ -159,7 +159,7 @@ extern int		xfs_quotactl(struct bhv_desc *, int, int, caddr_t);
 extern int		xfs_qm_dqpurge_all(struct xfs_mount *, uint);
 extern void		xfs_qm_mount_quotainit(struct xfs_mount *, uint);
 extern void		xfs_qm_unmount_quotadestroy(struct xfs_mount *);
-extern int		xfs_qm_mount_quotas(struct xfs_mount *, int);
+extern int		xfs_qm_mount_quotas(struct xfs_mount *);
 extern int 		xfs_qm_unmount_quotas(struct xfs_mount *);
 extern void		xfs_qm_dqdettach_inode(struct xfs_inode *ip);
 extern int 		xfs_qm_sync(struct xfs_mount *mp, short flags);
