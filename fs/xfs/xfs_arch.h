@@ -356,7 +356,7 @@
                (reference) = INT_SWAP((reference),(reference)) \
            : 0 \
         ), \
-        (valueref) \
+        INT_GET(reference, arch) \
     )
 
 #define INT_MODX(reference,arch,code) \
@@ -366,7 +366,7 @@
         : \
             ( \
                 (reference) = INT_GET((reference),arch) , \
-                ((reference) code) , \
+                ((reference) code), \
                 INT_SET(reference, arch, reference) \
             ) \
     )
