@@ -172,8 +172,13 @@ again:
 		      ip->i_u2.iu_rdev, ip);
 #endif
 
+#ifdef NOTYET
 	mrinit(&ip->i_lock, makesname(name, "xino", (int)vp->v_number));
 	initnsema(&ip->i_flock, 1, makesname(name, "fino", vp->v_number));
+#else
+	mrinit(&ip->i_lock, makesname(name, "xino", (int)0));
+	initnsema(&ip->i_flock, 1, makesname(name, "fino", 0));
+#endif
 	xfs_inode_item_init(ip, mp);
 	xfs_ilock(ip, (int)flags);
 
