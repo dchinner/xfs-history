@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_TYPES_H
 #define	_FS_XFS_TYPES_H
 
-#ident	"$Revision: 1.25 $"
+#ident	"$Revision$"
 
 /*
  * XFS types
@@ -54,6 +54,9 @@ typedef	long		xfs_rtword_t;	/* word type for bitmap manipulations */
 
 typedef	__int64_t	xfs_lsn_t;	/* log sequence number */
 typedef	__int32_t	xfs_tid_t;	/* transaction identifier */
+
+typedef	__uint32_t	xfs_dablk_t;	/* dir/attr block number (in file) */
+typedef	__uint32_t	xfs_dahash_t;	/* dir/attr hash value */
 
 /*
  * These types are 64 bits on disk but are either 32 or 64 bits in memory.

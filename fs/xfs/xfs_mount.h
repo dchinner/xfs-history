@@ -1,8 +1,8 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.60 $"
-#ident	"$Revision: 1.60 $"
+#ident	"$Revision$"
+#ident	"$Revision$"
 
 struct buf;
 struct cred;
@@ -102,6 +102,9 @@ typedef struct xfs_mount {
 	int			m_ialloc_blks;	/* blocks in inode allocation */
 	int			m_litino;	/* size of inode union area */
 	xfs_trans_reservations_t m_reservations; /* precomputed res values */
+#if XFS_BIG_FILESYSTEMS
+	xfs_ino_t		m_inoadd;	/* add value for ino64_offset */
+#endif
 } xfs_mount_t;
 
 /*
