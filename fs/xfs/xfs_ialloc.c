@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.4 $"
+#ident	"$Revision: 1.6 $"
 
 #include <sys/param.h>
 #include <sys/stat.h>		/* should really? */
@@ -1234,13 +1234,10 @@ xfs_dialloc(xfs_trans_t *tp, xfs_ino_t parent, int sameag, int mode)
 	ASSERT(free->di_core.di_magic == XFS_DINODE_MAGIC);
 	ASSERT(free->di_core.di_mode == 0);
 	agp->ag_iflist = free->di_u.di_next;
-	free->di_core.di_mode = mode;
 	free->di_core.di_version = XFS_DINODE_VERSION;
-	first = (caddr_t)&free->di_core.di_mode -
+	first = (caddr_t)&free->di_core.di_version -
 		(caddr_t)xfs_buf_to_dinode(fbuf);
-	last = (caddr_t)&free->di_core.di_version -
-		(caddr_t)xfs_buf_to_dinode(fbuf) +
-		sizeof(free->di_core.di_version) - 1;
+	last = first + sizeof(free->di_core.di_version) - 1;
 	xfs_trans_log_buf(tp, fbuf, first, last);
 	agp->ag_ifcount--;
 	first = offsetof(xfs_aghdr_t, ag_ifcount);
