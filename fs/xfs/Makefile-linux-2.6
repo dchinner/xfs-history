@@ -2,7 +2,7 @@
 #
 # Makefile for SGI XFS File System
 #
-# $Revision: 1.50 $
+# $Revision: 1.53 $
 DEPTH?=../..
 include ${DEPTH}/kcommondefs
 KPATH=$(TOP)/fs/xfs
@@ -15,6 +15,10 @@ KPATH=$(TOP)/fs/xfs
 # being set but not used. with DEBUG disabled, the ASSERT statements are gone.
 #
 KWOFF=,1552
+#endif
+
+#if defined(CELL_IRIX)
+SUBDIRS=cell
 #endif
 
 LCDEFS+= -D_NOPROJQUOTAS
