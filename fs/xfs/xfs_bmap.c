@@ -1028,18 +1028,25 @@ xfs_bmap_alloc(
 	 * Realtime allocation, done through xfs_rtallocate_extent.
 	 */
 	if (rt) {
+		xfs_extlen_t	ralen;
+
 		type = askbno == 0 ?
 			XFS_ALLOCTYPE_ANY_AG : XFS_ALLOCTYPE_NEAR_BNO;
 		if (ip->i_d.di_extsize)
 			prod = ip->i_d.di_extsize / sbp->sb_rextsize;
 		else
 			prod = 1;
-		abno = xfs_rtallocate_extent(tp, askbno, 1, asklen, alen, type,
-			wasdel, prod);
+		asklen = (asklen + sbp->sb_rextsize - 1) / sbp->sb_rextsize;
+		abno = xfs_rtallocate_extent(tp, askbno, 1, asklen, &ralen,
+			type, wasdel, prod);
 		if (abno != NULLFSBLOCK) {
-			ip->i_d.di_nblocks += *alen * sbp->sb_rextsize;
+			*alen = ralen * sbp->sb_rextsize;
+			ip->i_d.di_nblocks += *alen;
 			xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
-		}
+			if (wasdel)
+				ip->i_delayed_blks -= *alen;
+		} else
+			*alen = 0;
 	}
 	/*
 	 * Normal allocation, done through xfs_alloc_vextent.
@@ -1067,6 +1074,8 @@ xfs_bmap_alloc(
 		if (abno != NULLFSBLOCK) {
 			ip->i_d.di_nblocks += *alen;
 			xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+			if (wasdel)
+				ip->i_delayed_blks -= *alen;
 		}
 	}
 	/* for debugging */ ASSERT(abno != NULLFSBLOCK);
@@ -1998,6 +2007,7 @@ xfs_bmapi(
 				if (xfs_mod_incore_sb(mp, XFS_SB_FDBLOCKS,
 						      -alen))
 					break;
+				ip->i_delayed_blks += alen;
 				abno = NULLSTARTBLOCK;
 			} else {
 				abno = xfs_bmap_alloc(tp, ip, eof, &prev, &got,
@@ -2223,9 +2233,11 @@ xfs_bunmapi(
 		}
 		if (del.br_startoff + del.br_blockcount > start + len)
 			del.br_blockcount = start + len - del.br_startoff;
-		if (del.br_startblock == NULLSTARTBLOCK)
+		if (del.br_startblock == NULLSTARTBLOCK) {
 			xfs_mod_incore_sb(mp, XFS_SB_FDBLOCKS, del.br_blockcount);
 			/* could fail?? */
+			ip->i_delayed_blks -= del.br_blockcount;
+		}
 		logflags |= xfs_bmap_del_extent(ip, lastx, flist, cur, &del);
 		bno = del.br_startoff - 1;
 		/*
