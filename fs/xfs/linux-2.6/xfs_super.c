@@ -668,6 +668,8 @@ EXPORT_NO_SYMBOLS;
 
 int init_module(void)
 {
+	printk(KERN_INFO 
+		"XFS filesystem Copyright (c) 2000 Silicon Graphics, Inc.\n");
 	return init_xfs_fs();
 }
 
