@@ -530,11 +530,6 @@ xfs_bmbt_delrec(
 			l->lrp[i] = l->rrp[i];
 		xfs_bmbt_log_recs(cur, l->lbp, l->left->bb_numrecs + 1, l->left->bb_numrecs + l->right->bb_numrecs);
 	}
-	if (l->bp != l->lbp) {
-		xfs_btree_setbuf(cur, level, l->lbp);
-		cur->bc_ptrs[level] += l->left->bb_numrecs;
-	} else if (level + 1 < cur->bc_nlevels)
-		xfs_bmbt_increment(cur, level + 1);
 	l->left->bb_numrecs += l->right->bb_numrecs;
 	l->left->bb_rightsib = l->right->bb_rightsib;
 	xfs_bmbt_log_block(cur, l->lbp, XFS_BB_RIGHTSIB | XFS_BB_NUMRECS);
@@ -548,6 +543,11 @@ xfs_bmbt_delrec(
 	xfs_bmap_add_free(XFS_DADDR_TO_FSB(l->mp, l->rbp->b_blkno), 1,
 		cur->bc_private.b.flist, l->mp);
 	xfs_trans_binval(cur->bc_tp, l->rbp);
+	if (l->bp != l->lbp) {
+		cur->bc_bufs[level] = l->lbp;
+		cur->bc_ptrs[level] += l->left->bb_numrecs;
+	} else if (level + 1 < cur->bc_nlevels)
+		xfs_bmbt_increment(cur, level + 1);
 	xfs_bmbt_locals_free(l);
 	xfs_bmbt_rcheck(cur);
 	xfs_bmbt_trace_cursor("xfs_bmbt_delrec exit8", cur);
@@ -887,9 +887,9 @@ xfs_bmbt_killroot(
 	xfs_bmap_add_free(XFS_DADDR_TO_FSB(cur->bc_mp, cbp->b_blkno), 1,
 		cur->bc_private.b.flist, cur->bc_mp);
 	xfs_trans_binval(cur->bc_tp, cbp);
+	cur->bc_bufs[level - 1] = NULL;
 	block->bb_level--;
 	xfs_trans_log_inode(cur->bc_tp, ip, XFS_ILOG_BROOT);
-	xfs_btree_setbuf(cur, level - 1, 0);
 	cur->bc_nlevels--;
 	xfs_bmbt_rcheck(cur);
 	xfs_bmbt_trace_cursor("xfs_bmbt_killroot exit3", cur);

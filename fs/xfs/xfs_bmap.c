@@ -1541,6 +1541,8 @@ xfs_bmap_btree_to_extents(
 	ASSERT(cblock->bb_level == 0);
 	xfs_bmap_add_free(cbno, 1, cur->bc_private.b.flist, mp);
 	xfs_trans_binval(tp, cbp);
+	if (cur->bc_bufs[0] == cbp)
+		cur->bc_bufs[0] = NULL;
 	xfs_iroot_realloc(ip, -1);
 	ASSERT(ip->i_broot == NULL);
 	ASSERT((ip->i_flags & XFS_IBROOT) == 0);

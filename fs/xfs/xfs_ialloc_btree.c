@@ -344,7 +344,7 @@ xfs_inobt_delrec(
 			/*
 			 * Update the cursor so there's one fewer level.
 			 */
-			xfs_btree_setbuf(cur, level, 0);
+			cur->bc_bufs[level] = NULL;
 			cur->bc_nlevels--;
 		}
 		xfs_inobt_rcheck(cur);
@@ -555,20 +555,6 @@ xfs_inobt_delrec(
 				   left->bb_numrecs + right->bb_numrecs);
 	}
 	/*
-	 * If we joined with the left neighbor, set the buffer in the
-	 * cursor to the left block, and fix up the index.
-	 */
-	if (bp != lbp) {
-		xfs_btree_setbuf(cur, level, lbp);
-		cur->bc_ptrs[level] += left->bb_numrecs;
-	}
-	/*
-	 * If we joined with the right neighbor and there's a level above
-	 * us, increment the cursor at that level.
-	 */
-	else if (level + 1 < cur->bc_nlevels)
-		xfs_inobt_increment(cur, level + 1);
-	/*
 	 * Fix up the number of records in the surviving block.
 	 */
 	left->bb_numrecs += right->bb_numrecs;
@@ -597,6 +583,20 @@ xfs_inobt_delrec(
 	 */
 	xfs_free_extent(cur->bc_tp, rbno, 1);
 	xfs_trans_binval(cur->bc_tp, rbp);
+	/*
+	 * If we joined with the left neighbor, set the buffer in the
+	 * cursor to the left block, and fix up the index.
+	 */
+	if (bp != lbp) {
+		cur->bc_bufs[level] = NULL;
+		cur->bc_ptrs[level] += left->bb_numrecs;
+	}
+	/*
+	 * If we joined with the right neighbor and there's a level above
+	 * us, increment the cursor at that level.
+	 */
+	else if (level + 1 < cur->bc_nlevels)
+		xfs_inobt_increment(cur, level + 1);
 	xfs_inobt_rcheck(cur);
 	kmem_check();
 	/* 
