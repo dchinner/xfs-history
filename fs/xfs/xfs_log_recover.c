@@ -2260,11 +2260,34 @@ xlog_recover_process_efi(xfs_mount_t		*mp,
 	xfs_trans_t		*tp;
 	int			i;
 	xfs_extent_t		*extp;
+	xfs_fsblock_t		startblock_fsb;
 
 #ifdef SIM
 	ASSERT(0);
 #else
 	ASSERT(!(efip->efi_flags & XFS_EFI_RECOVERED));
+
+	/*
+	 * First check the validity of the extents described by the
+	 * EFI.  If any are bad, then assume that all are bad and
+	 * just toss the EFI.
+	 */
+	for (i = 0; i < efip->efi_format.efi_nextents; i++) {
+		extp = &(efip->efi_format.efi_extents[i]);
+		startblock_fsb = XFS_BB_TO_FSB(mp,
+				   XFS_FSB_TO_DADDR(mp, extp->ext_start));
+		if ((startblock_fsb == 0) ||
+		    (extp->ext_len == 0) ||
+		    (startblock_fsb >= mp->m_sb.sb_dblocks) ||
+		    (extp->ext_len >= mp->m_sb.sb_agblocks)) {
+			/*
+			 * This will pull the EFI from the AIL and
+			 * free the memory associated with it.
+			 */
+			xfs_efi_release(efip, efip->efi_format.efi_nextents);
+			return;
+		}
+	}
 
 	tp = xfs_trans_alloc(mp, 0);
 	xfs_trans_reserve(tp, 0, XFS_ITRUNCATE_LOG_RES(mp), 0, 0, 0);
