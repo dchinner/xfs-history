@@ -413,7 +413,6 @@ _pagebuf_lookup_pages(
 
 		nbytes = min_t(size_t, size, PAGE_CACHE_SIZE - offset);
 		size -= nbytes;
-		offset = 0;
 
 		if (!PageUptodate(page)) {
 			page_count--;
@@ -422,22 +421,23 @@ _pagebuf_lookup_pages(
 					bp->pb_locked = 1;
 			} else if (!PagePrivate(page)) {
 				uint sectorshift = bp->pb_target->pbr_sshift;
-				ulong range, i;
+				ulong range, j;
 
 				/*
 				 * In this case page->private holds a bitmap
 				 * of uptodate sectors within the page
 				 */
 				range = (offset + nbytes) >> sectorshift;
-				for (i = offset >> sectorshift; i < range; i++)
-					if (!test_bit(i, &page->private))
+				for (j = offset >> sectorshift; j < range; j++)
+					if (!test_bit(j, &page->private))
 						break;
-				if (i == range)
+				if (j == range)
 					page_count++;
 			}
 		}
 
 		bp->pb_pages[i] = page;
+		offset = 0;
 	}
 
 	if (!bp->pb_locked) {
