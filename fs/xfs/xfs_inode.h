@@ -123,35 +123,33 @@ typedef struct xfs_inode {
 /*
  * xfs_iget.c prototypes.
  */
-extern void		xfs_ihash_init(xfs_mount_t *);
-extern xfs_inode_t	*xfs_inode_incore(xfs_mount_t *, xfs_ino_t,
-					  xfs_trans_t *);
-extern xfs_inode_t	*xfs_iget(xfs_mount_t *, xfs_trans_t *, xfs_ino_t,uint);
-extern void		xfs_iput(xfs_inode_t *, uint);
-extern void		xfs_ilock(xfs_inode_t *, uint);
-extern int		xfs_ilock_nowait(xfs_inode_t *, uint);
-extern void		xfs_iunlock(xfs_inode_t *, uint);
-extern void		xfs_iflock(xfs_inode_t *);
-extern int		xfs_iflock_nowait(xfs_inode_t *);
-extern void		xfs_ifunlock(xfs_inode_t *);
-extern void		xfs_ireclaim(xfs_inode_t *);
+void		xfs_ihash_init(xfs_mount_t *);
+xfs_inode_t	*xfs_inode_incore(xfs_mount_t *, xfs_ino_t, xfs_trans_t *);
+xfs_inode_t	*xfs_iget(xfs_mount_t *, xfs_trans_t *, xfs_ino_t,uint);
+void		xfs_iput(xfs_inode_t *, uint);
+void		xfs_ilock(xfs_inode_t *, uint);
+int		xfs_ilock_nowait(xfs_inode_t *, uint);
+void		xfs_iunlock(xfs_inode_t *, uint);
+void		xfs_iflock(xfs_inode_t *);
+int		xfs_iflock_nowait(xfs_inode_t *);
+void		xfs_ifunlock(xfs_inode_t *);
+void		xfs_ireclaim(xfs_inode_t *);
 
 /*
  * xfs_inode.c prototypes.
  */
-extern xfs_inode_t	*xfs_iread(xfs_mount_t *, xfs_trans_t *, xfs_ino_t);
-extern void		xfs_iread_extents(xfs_mount_t *, xfs_trans_t *,
-					  xfs_inode_t *);
-extern xfs_inode_t	*xfs_ialloc(xfs_trans_t	*, xfs_inode_t *, mode_t,
-				    ushort, dev_t, struct cred *);
-extern void		xfs_idestroy(xfs_inode_t *);
-extern void		xfs_idata_realloc(xfs_inode_t *, int);
-extern void		xfs_iext_realloc(xfs_inode_t *, int);
-extern void		xfs_iroot_realloc(xfs_inode_t *, int);
-extern void		xfs_ipin(xfs_inode_t *);
-extern void		xfs_iunpin(xfs_inode_t *);
-extern void		xfs_iflush(xfs_inode_t *, uint);
-extern void		xfs_iprint(xfs_inode_t *);
+xfs_inode_t	*xfs_iread(xfs_mount_t *, xfs_trans_t *, xfs_ino_t);
+void		xfs_iread_extents(xfs_mount_t *, xfs_trans_t *, xfs_inode_t *);
+xfs_inode_t	*xfs_ialloc(xfs_trans_t	*, xfs_inode_t *, mode_t, ushort,
+			    dev_t, struct cred *);
+void		xfs_idestroy(xfs_inode_t *);
+void		xfs_idata_realloc(xfs_inode_t *, int);
+void		xfs_iext_realloc(xfs_inode_t *, int);
+void		xfs_iroot_realloc(xfs_inode_t *, int);
+void		xfs_ipin(xfs_inode_t *);
+void		xfs_iunpin(xfs_inode_t *);
+void		xfs_iflush(xfs_inode_t *, uint);
+void		xfs_iprint(xfs_inode_t *);
 
 extern struct zone	*xfs_inode_zone;
 

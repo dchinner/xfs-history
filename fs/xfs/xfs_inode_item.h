@@ -52,7 +52,7 @@ typedef struct xfs_inode_log_item {
 				 XFS_ILOG_BROOT | XFS_ILOG_DEV)
 
 	
-extern void	xfs_inode_item_init(struct xfs_inode *, xfs_mount_t *);
-extern void	xfs_iflush_done(buf_t *, xfs_inode_log_item_t *);
+void	xfs_inode_item_init(struct xfs_inode *, xfs_mount_t *);
+void	xfs_iflush_done(buf_t *, xfs_inode_log_item_t *);
 
 #endif	/* _XFS_INODE_ITEM_H */
