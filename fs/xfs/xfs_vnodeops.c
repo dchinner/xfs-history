@@ -535,6 +535,37 @@ xfs_setattr(vnode_t	*vp,
 			code = EINVAL;	/* EFBIG? */
 			goto error_return;
 		}
+		/*
+		 * Extent size must be a multiple of the appropriate block
+		 * size, if set at all.
+		 */
+		if ((mask & AT_EXTSIZE) && vap->va_extsize != 0) {
+			xfs_sb_t	*sbp;
+			xfs_extlen_t	size;
+
+			sbp = &ip->i_mount->m_sb;
+			if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
+				size = sbp->sb_rextsize << sbp->sb_blocklog;
+			else
+				size = sbp->sb_blocksize;
+			if (vap->va_extsize % size) {
+				code = EINVAL;
+				goto error_return;
+			}
+		}
+		/*
+		 * If realtime flag is set then must have realtime data.
+		 */
+		if ((mask & AT_XFLAGS) &&
+		    (vap->va_xflags & XFS_DIFLAG_REALTIME)) {
+			xfs_sb_t	*sbp;
+
+			sbp = &ip->i_mount->m_sb;
+			if (sbp->sb_rextsize == 0) {
+				code = EINVAL;	/* ??? */
+				goto error_return;
+			}
+		}
 	}
 
 	/*
@@ -2754,12 +2785,9 @@ xfs_fcntl(vnode_t	*vp,
 		}
 		ip = XFS_VTOI(vp);
 		sbp = &ip->i_mount->m_sb;
-		da.d_mem = sbp->sb_blocksize;	/* memory alignment?? */
-		da.d_miniosz =
-			(ip->i_d.di_extsize ? ip->i_d.di_extsize :
-			 (ip->i_d.di_flags & XFS_DIFLAG_REALTIME ?
-			  sbp->sb_rextsize : 1)) << sbp->sb_blocklog;
-		da.d_maxiosz = ctob(v.v_maxdmasz);	/* round? */
+		da.d_mem = BBSIZE;
+		da.d_miniosz = BBSIZE;
+		da.d_maxiosz = ctob(v.v_maxdmasz);
 		if (copyout(&da, arg, sizeof(da)))
 			error = EFAULT;
 		break;
