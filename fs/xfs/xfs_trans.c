@@ -1,4 +1,4 @@
-#ident "$Revision: 1.94 $"
+#ident "$Revision: 1.95 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -711,10 +711,9 @@ shut_us_down:
 #endif
 		}
 		if (tp->t_ticket) {
-			if (error = xfs_log_done(mp, tp->t_ticket, log_flags)) {
-				if (!shutdown)
-					shutdown = error;
-			}
+			commit_lsn = xfs_log_done(mp, tp->t_ticket, log_flags);
+			if (commit_lsn == -1 && !shutdown)
+				shutdown = XFS_ERROR(EIO);
 		}
 		xfs_trans_free_items(tp, shutdown? XFS_TRANS_ABORT : 0);
 		xfs_trans_free(tp);

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.211 $"
+#ident	"$Revision: 1.212 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -3145,16 +3145,17 @@ xfs_bmap_add_attrfork(
 	}
 	if (XFS_IFORK_Q(ip))
 		goto error0;
-	/*
-	 * For inodes coming from pre-6.2 filesystems.
-	 */
-	if (ip->i_d.di_aformat == 0)
+	if (ip->i_d.di_aformat != XFS_DINODE_FMT_EXTENTS) {
+		/*
+		 * For inodes coming from pre-6.2 filesystems.
+		 */
+		ASSERT(ip->i_d.di_aformat == 0);
 		ip->i_d.di_aformat = XFS_DINODE_FMT_EXTENTS;
-	else
-		ASSERT(ip->i_d.di_aformat == XFS_DINODE_FMT_EXTENTS);
+	}
 	ASSERT(ip->i_d.di_anextents == 0);
 	VN_HOLD(XFS_ITOV(ip));
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
+	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	switch (ip->i_d.di_format) {
 	case XFS_DINODE_FMT_DEV:
 		ip->i_d.di_forkoff = roundup(sizeof(dev_t), 8) >> 3;
@@ -3172,7 +3173,6 @@ xfs_bmap_add_attrfork(
 		error = XFS_ERROR(EINVAL);
 		goto error0;
 	}
-	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	ip->i_df.if_ext_max = XFS_IFORK_DSIZE(ip) / sizeof(xfs_bmbt_rec_t);
 	ASSERT(ip->i_afp == NULL);
 	ip->i_afp = kmem_zone_zalloc(xfs_ifork_zone, KM_SLEEP);
