@@ -1,4 +1,5 @@
-#ident	"$Revision: 1.68 $"
+
+#ident	"$Revision: 1.69 $"
 
 /*
  * High level interface routines for log manager
@@ -362,6 +363,14 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 		log->l_tail_lsn = log->l_last_sync_lsn;
 	xlog_push_buffers_to_disk(mp);
 
+	/*
+	 * XXX temporary hack until this code is revised for the
+	 * new perm reservation scheme.
+	 */
+	if (*ticket != NULL) {
+		ASSERT(flags & XFS_LOG_PERM_RESERV);
+		xlog_state_put_ticket(log, *ticket);
+	}
 	if ((int)(*ticket = xlog_state_get_ticket(log,len,client,flags)) == -1)
 		return XFS_ENOLOGSPACE;
 
