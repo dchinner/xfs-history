@@ -1,4 +1,4 @@
-#ident "$Revision: 1.61 $"
+#ident "$Revision: 1.62 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -294,6 +294,7 @@ xfs_buf_item_unpin(
 	mp = bip->bli_item.li_mountp;
 	bunpin(bp);
 	if ((refcount == 0) && (bip->bli_flags & XFS_BLI_STALE)) {
+		ASSERT(valusema(&bp->b_lock) <= 0);
 		ASSERT(!(bp->b_flags & B_DELWRI));
 		ASSERT(bp->b_flags & B_STALE);
 		ASSERT(bp->b_pincount == 0);
@@ -313,6 +314,43 @@ xfs_buf_item_unpin(
 	}
 
 }
+
+/*
+ * this is called from uncommit in the forced-shutdown path.
+ * we need to check to see if the reference count on the log item
+ * is going to drop to zero.  If so, unpin will free the log item
+ * so we need to free the item's descriptor (that points to the item)
+ * in the transaction.
+ */
+void
+xfs_buf_item_unpin_remove(
+	xfs_buf_log_item_t	*bip,
+	xfs_trans_t		*tp)
+{
+	xfs_log_item_desc_t	*lidp;
+
+	/*
+	 * will xfs_buf_item_unpin() call xfs_buf_item_relse()?
+	 */
+	if (bip->bli_refcount == 1 && (bip->bli_flags & XFS_BLI_STALE)) {
+		ASSERT(valusema(&bip->bli_buf->b_lock) <= 0);
+		/*
+		 * yes -- clear the xaction descriptor in-use flag
+		 * and free the chunk if required.  We can safely
+		 * do some work here and then call buf_item_unpin
+		 * to do the rest because if the if is true, then
+		 * we are holding the buffer locked so no one else
+		 * will be able to bump up the refcount.
+		 */
+		lidp = xfs_trans_find_item(tp, (xfs_log_item_t *) bip);
+		xfs_trans_free_item(tp, lidp);
+	}
+
+	xfs_buf_item_unpin(bip);
+
+	return;
+}
+
 /*
  * This is called to attempt to lock the buffer associated with this
  * buf log item.  Don't sleep on the buffer lock.  If we can't get
@@ -521,6 +559,7 @@ struct xfs_item_ops xfs_buf_item_ops = {
 	(void(*)(xfs_log_item_t*, xfs_log_iovec_t*))xfs_buf_item_format,
 	(void(*)(xfs_log_item_t*))xfs_buf_item_pin,
 	(void(*)(xfs_log_item_t*))xfs_buf_item_unpin,
+	(void(*)(xfs_log_item_t*, xfs_trans_t *))xfs_buf_item_unpin_remove,
 	(uint(*)(xfs_log_item_t*))xfs_buf_item_trylock,
 	(void(*)(xfs_log_item_t*))xfs_buf_item_unlock,
 	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_buf_item_committed,
