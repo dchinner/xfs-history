@@ -1,4 +1,4 @@
-#ident "$Revision: 1.197 $"
+#ident "$Revision: 1.198 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -11,6 +11,9 @@
 #include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/debug.h>
+#include <sys/acl.h>
+#include <sys/mac_label.h>
+#include <sys/capability.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -3262,25 +3265,46 @@ xfs_iaccess(
 	mode_t		mode,
 	cred_t		*cr)
 {
-#if 0
+	int error;
+	mode_t orgmode = mode;
 	/*
-	 * For TIRIX: Verify that the label allows access.
+	 * Verify that the MAC policy allows the requested access.
 	 */
-	if (_MAC_XFS_IACCESS(ip, cr, mode))
-		return XFS_ERROR(EACCESS);
-#endif
+	if (error = _MAC_XFS_IACCESS(ip, mode, cr))
+		return XFS_ERROR(error);
 	
 	if ((mode & IWRITE) && !WRITEALLOWED(XFS_ITOV(ip), cr))
 		return XFS_ERROR(EROFS);
-	if (cr->cr_uid == 0)
-		return 0;
+
+	/*
+	 * If there's an Access Control List it's used instead of
+	 * the mode bits.
+	 */
+	if ((error = _ACL_XFS_IACCESS(ip, mode, cr)) != -1)
+		return error ? XFS_ERROR(error) : 0;
+
+	/*
+	 * changed this to a (set of) CAP checks.
+	 *
+	 * if (cr->cr_uid == 0)
+	 *	return 0;
+	 */
 	if (cr->cr_uid != ip->i_d.di_uid) {
 		mode >>= 3;
 		if (!groupmember(ip->i_d.di_gid, cr))
 			mode >>= 3;
 	}
-	if ((ip->i_d.di_mode & mode) != mode)
+	if ((ip->i_d.di_mode & mode) == mode)
+		return 0;
+
+	if (((orgmode & IWRITE) && !_CAP_CRABLE(cr, CAP_DAC_WRITE)) ||
+	    ((orgmode & IREAD) && !_CAP_CRABLE(cr, CAP_DAC_READ_SEARCH)) ||
+	    ((orgmode & IEXEC) && !_CAP_CRABLE(cr, CAP_DAC_EXECUTE))) {
+#ifdef	NOISE
+		cmn_err(CE_NOTE, "Ick: mode=%o, orgmode=%o", mode, orgmode);
+#endif	/* NOISE */
 		return XFS_ERROR(EACCES);
+	}
 	return 0;
 }
 
