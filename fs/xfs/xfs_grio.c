@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.61 1995/10/24 07:44:23 ack Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.62 1995/12/16 00:10:59 sp Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -356,7 +356,7 @@ xfs_io_is_guaranteed( xfs_inode_t *ip, stream_id_t *stream_id)
 	xfs_ino_t		inum;
 	grio_stream_info_t	*griosp;
 
-	proc_id = private.p_curproc->p_pid;
+	proc_id = curprocp->p_pid;
 	fs_dev 	= ip->i_dev;
 	inum 	= ip->i_ino;
 
