@@ -2113,9 +2113,6 @@ xfs_rtallocate_extent(
 	xfs_fsblock_t	sb;		/* summary file block number */
 	xfs_buf_t		*sumbp;		/* summary file block buffer */
 
-        printk("xfs_rtallocate_extent block=%Ld, min=%d, max=%d, type=%d, del=%d, prod=%d\n",
-                bno, minlen, maxlen, type, wasdel, prod);
-        
 	ASSERT(minlen > 0 && minlen <= maxlen);
 	mp = tp->t_mountp;
 	/*
