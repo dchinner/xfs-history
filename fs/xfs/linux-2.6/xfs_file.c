@@ -224,6 +224,22 @@ static int linvfs_readdir(
 	return -error;
 }
 
+int linvfs_generic_file_mmap(struct file *filp, struct vm_area_struct *vma)
+{
+	vnode_t	*vp;
+	int	ret;
+
+	ret = generic_file_mmap(filp, vma);
+	if (!ret) {
+		vattr_t va, *vap;
+
+		vap = &va;
+		vap->va_mask = AT_UPDATIME;
+		vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
+		VOP_SETATTR(vp, vap, AT_UPDATIME, NULL, ret);
+	}
+	return(ret);
+}
 
 extern int linvfs_ioctl(
 	struct inode *inode,
@@ -238,7 +254,7 @@ struct file_operations linvfs_file_operations =
 	read:		linvfs_read,  
 	write:		linvfs_write,
 	ioctl:		linvfs_ioctl,
-	mmap:		generic_file_mmap,
+	mmap:		linvfs_generic_file_mmap,
 	open:		linvfs_open,
 	release:	linvfs_release,
 	fsync:		linvfs_fsync,

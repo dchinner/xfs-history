@@ -145,8 +145,9 @@ xfs_rdwr(
 
 	if (read) {
 		ret = pagebuf_generic_file_read(filp, buf, size, offsetp); 
+		/* if (!(ioflag & IO_INVIS)) add this somehow with DMAPI */
+			xfs_ichgtime(xip, XFS_ICHGTIME_ACC);
 	} else {
-		/* last zero eof */
 		ret = pagebuf_generic_file_write(filp, buf, size, offsetp);
 	}
 out:
@@ -162,6 +163,7 @@ xfs_read(
 	loff_t		*offsetp)
 {
 	ssize_t ret;
+
 	/* xfs_rwlockf(bdp, VRWLOCK_READ, 0); obtained in readpage or linvfs_file_read */
 	ret = xfs_rdwr(bdp, filp, buf, size, offsetp, 1);
 	return(ret);
@@ -651,6 +653,16 @@ xfs_write(
 		ip, ip->i_size, *offsetp, size));
 
 	/*
+	 * On Linux, generic_file_write updates the times even if
+	 * no data is copied in so long as the write had a size.
+	 *
+	 * We must update xfs' times since revalidate will overcopy xfs.
+	 */
+	if (size) {
+		/* if (!(ioflag & IO_INVIS)) add this somehow with DMAPI */
+			xfs_ichgtime(xip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
+	}
+	/*
 	 * If the offset is beyond the size of the file, we have a couple
 	 * of things to do. First, if there is already space allocated
 	 * we need to either create holes or zero the disk or ...
@@ -916,6 +928,7 @@ xfs_iomap_write(
 	xfs_bmap_free_t free_list;
 	int		allocate; 
 	int		found; 
+	int		iunlock = 1; /* Cleared if lower routine did unlock */
 
 	maps = *npbmaps;
 	if (!maps)
@@ -926,7 +939,6 @@ xfs_iomap_write(
 	 * return them.
 	 */
 
-	allocate = ioflag & PBF_FILE_ALLOCATE;
 	found = 0;
 	error = xfs_iomap_read(io, offset, count, pbmapp, npbmaps, NULL);
 	if (error)
@@ -943,6 +955,7 @@ xfs_iomap_write(
 	 * If we are allocating, we can't have DELAY, either.
 	 */
 
+	allocate = ioflag & PBF_FILE_ALLOCATE;
 	if (*npbmaps) {
 		int not_ok_flags;
 
@@ -964,6 +977,7 @@ xfs_iomap_write(
 	if (allocate) {
 		error = xfs_iomap_write_convert(io, offset, count, pbmapp,
 					npbmaps, ioflag, found);
+		iunlock = 0;	/* xfs_iomap_write_convert unlocks inode */
 	} else {
 		if (ioflag & PBF_DIRECT)
 			error = xfs_iomap_write_direct(io, offset, count, pbmapp,
@@ -974,7 +988,7 @@ xfs_iomap_write(
 	}
 
 out:
-	if (!allocate)
+	if (iunlock)
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
 out_no_unlock:
@@ -1619,6 +1633,8 @@ xfs_iomap_write_convert(
 	return error;
 }
 
+int xfs_direct_offset, xfs_map_last, xfs_last_map;
+
 STATIC int
 xfs_iomap_write_direct(
 	xfs_iocore_t	*io,
@@ -1670,12 +1686,30 @@ xfs_iomap_write_direct(
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	last_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)(offset + count)));
 	count_fsb = last_fsb - offset_fsb;
+	if (found && (pbmapp->pbm_flags & PBMF_HOLE)) {
+		xfs_fileoff_t	map_last_fsb;
+		map_last_fsb = XFS_B_TO_FSB(mp,
+			((xfs_ufsize_t)(offset +
+				(pbmapp->pbm_bsize - pbmapp->pbm_offset))));
+		
+		if (pbmapp->pbm_offset) {
+			xfs_direct_offset++;
+		}
+		if (map_last_fsb < last_fsb) {
+			xfs_map_last++;
+			last_fsb = map_last_fsb;
+			count_fsb = last_fsb - offset_fsb;
+		} else if (last_fsb < map_last_fsb) {
+			xfs_last_map++;
+		}
+		ASSERT(count_fsb > 0);
+	}
 
 	/*
 	 * roundup the allocation request to m_dalign boundary if file size
 	 * is greater that 512K and we are allocating past the allocation eof
 	 */
-	if (mp->m_dalign && (isize >= 524288) && aeof) {
+	if (!found && mp->m_dalign && (isize >= 524288) && aeof) {
 		int eof;
 		xfs_fileoff_t new_last_fsb;
 		new_last_fsb = roundup(last_fsb, mp->m_dalign);

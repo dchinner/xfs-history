@@ -607,6 +607,9 @@ linvfs_read_full_page(
 	bhv_desc_t	*bdp;
 	xfs_inode_t	*ip;
 
+	if (!PageLocked(page))
+		BUG();
+
 	xfs_hit_full_page++;
 	vp = LINVFS_GET_VP(inode);
 	ASSERT(vp);
@@ -618,7 +621,7 @@ linvfs_read_full_page(
 		ASSERT(atomic_read(&page->count));
 		UnlockPage(page);
 		xfs_ilock(ip, XFS_IOLOCK_SHARED);
-		LockPage(page);
+		lock_page(page); /* We can wait for the page with inode I/O lock */
 		if (Page_Uptodate(page)) {
 			UnlockPage(page);
 			xfs_hit_nowait_done++;
@@ -653,7 +656,7 @@ linvfs_write_full_page(
 		ASSERT(atomic_read(&page->count));
 		UnlockPage(page);
 		xfs_ilock(ip, XFS_IOLOCK_EXCL);
-		LockPage(page);
+		lock_page(page); /* We can wait for the page with inode I/O lock */
 		if (Page_Uptodate(page)) {
 			xfs_hit_nowait_done++;
 			xfs_iunlock(ip, XFS_IOLOCK_EXCL);
