@@ -28,17 +28,16 @@ typedef struct xlog_recover_item {
 	xfs_log_iovec_t		 ri_buf[XLOG_MAX_REGIONS_IN_ITEM];
 } xlog_recover_item_t;
 
+struct xlog_tid;
 typedef struct xlog_recover {
 	struct xlog_recover *r_next;
-	xlog_tid_t	    r_tid;
-	uint		    r_type;
-	int		    r_items;		/* number of items */
-	xfs_trans_id_t	    r_trans_tid;	/* internal transaction tid */
+	xlog_tid_t	    r_log_tid;		/* log's transaction id */
+	xfs_trans_header_t  r_theader;		/* trans header for partial */
 	int		    r_state;		/* not needed */
-	xlog_recover_item_t *r_itemq;		/* q for buffers & inodes */
-	xlog_recover_item_t *r_item_extq;	/* q for extents */
-	xlog_recover_item_t *r_item_iunlinkq;	/* q for inode unlinks */
+	xlog_recover_item_t *r_itemq;		/* q for everything */
+	xlog_recover_item_t *r_buf_inq;		/* q for buffers & inodes */
 } xlog_recover_t;
 
+#define ITEM_TYPE(i)	(*(ushort *)(i)->ri_buf[0].i_addr)
 
 #endif /* _XFS_LOG_RECOVER_H */
