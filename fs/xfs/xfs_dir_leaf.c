@@ -120,12 +120,12 @@ xfs_dir_ino_validate(xfs_mount_t *mp, xfs_ino_t ino)
 		return;
 	}
 	agblkno = XFS_INO_TO_AGBNO(mp, ino);
-	if (agno >= mp->m_sb.sb_agblocks) {
+	if (agblkno >= mp->m_sb.sb_agblocks) {
 		cmn_err(CE_PANIC, "Invalid inode number 0x%x\n", (long)ino);
 		return;
 	}
 	ioff = XFS_INO_TO_OFFSET(mp, ino);
-	if (agno >= (1 << mp->m_sb.sb_inopblog)) {
+	if (ioff >= (1 << mp->m_sb.sb_inopblog)) {
 		cmn_err(CE_PANIC, "Invalid inode number 0x%x\n", (long)ino);
 		return;
 	}
