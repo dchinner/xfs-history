@@ -136,11 +136,11 @@ xfs-objs			+= $(xfs-obj-y) \
 
 # Objects in pagebuf/
 xfs-objs			+= page_buf.o \
-				   page_buf_io.o \
 				   page_buf_locking.o
 
 # Objects in linux/
-xfs-objs			+= xfs_behavior.o \
+xfs-objs			+= xfs_aops.o \
+				   xfs_behavior.o \
 				   xfs_file.o \
 				   xfs_fs_subr.o \
 				   xfs_globals.o \
