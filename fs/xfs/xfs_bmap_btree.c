@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.113 $"
+#ident	"$Revision: 1.114 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2783,7 +2783,7 @@ xfs_bmbt_set_all(
 	} else {
 		INT_SET(r->l0, ARCH_CONVERT, ((xfs_bmbt_rec_base_t)extent_flag << 63) |
 			((xfs_bmbt_rec_base_t)s->br_startoff << 9));
-		INT_SET(r->l1, ARCH_CONVERT. ((xfs_bmbt_rec_base_t)s->br_startblock << 21) | 
+		INT_SET(r->l1, ARCH_CONVERT, ((xfs_bmbt_rec_base_t)s->br_startblock << 21) | 
 			  ((xfs_bmbt_rec_base_t)s->br_blockcount &
 			   (xfs_bmbt_rec_base_t)XFS_MASK64LO(21)));
 	}
@@ -2900,7 +2900,7 @@ xfs_bmbt_set_blockcount(
 	INT_SET(r->l1, ARCH_CONVERT, (INT_GET(r->l1, ARCH_CONVERT) & (xfs_bmbt_rec_base_t)XFS_MASK64HI(43)) |
 		  (xfs_bmbt_rec_base_t)(v & XFS_MASK64LO(21)));
 #else	/* !BMBT_USE_64 */
-	INT_SET(r->l3, ARCH_CONVERT, (INT_GET(r->l3) & (xfs_bmbt_rec_base_t)XFS_MASK32HI(11)) |
+	INT_SET(r->l3, ARCH_CONVERT, (INT_GET(r->l3, ARCH_CONVERT) & (xfs_bmbt_rec_base_t)XFS_MASK32HI(11)) |
 		  ((xfs_bmbt_rec_base_t)v & XFS_MASK32LO(21)));
 #endif	/* BMBT_USE_64 */
 }

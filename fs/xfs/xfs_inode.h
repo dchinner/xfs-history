@@ -32,7 +32,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.137 $"
+#ident "$Revision: 1.138 $"
 
 struct bhv_desc;
 struct xfs_buf;

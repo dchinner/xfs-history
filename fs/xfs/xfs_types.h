@@ -32,7 +32,7 @@
 #ifndef __XFS_TYPES_H
 #define	__XFS_TYPES_H
 
-#ident	"$Revision: 1.43 $"
+#ident	"$Revision: 1.45 $"
 
 /*
  * XFS types
@@ -50,19 +50,11 @@
  */
 
 #ifndef XFS_BIG_FILES
-#if _MIPS_SIM == _ABI64
-#define	XFS_BIG_FILES		1
-#else
 #define	XFS_BIG_FILES		0
-#endif
 #endif
 
 #ifndef XFS_BIG_FILESYSTEMS
-#if _MIPS_SIM == _ABI64 || _MIPS_SIM == _ABIN32
 #define	XFS_BIG_FILESYSTEMS	1
-#else
-#define	XFS_BIG_FILESYSTEMS	0
-#endif
 #endif
 
 #if !defined(SIM) & 0

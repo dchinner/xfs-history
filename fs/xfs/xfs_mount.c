@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.228 $"
+#ident	"$Revision: 1.229 $"
 
 #include <xfs_os_defs.h>
 
@@ -710,7 +710,7 @@ xfs_mountfs_int(
 			readio_log = XFS_WSYNC_READIO_LOG;
 			writeio_log = XFS_WSYNC_WRITEIO_LOG;
 		} else {
-#if !defined(SIM) && _MIPS_SIM != _ABI64
+#if !defined(SIM)
 			if (physmem <= 8192) {		/* <= 32MB */
 				readio_log = XFS_READIO_LOG_SMALL;
 				writeio_log = XFS_WRITEIO_LOG_SMALL;
@@ -728,7 +728,7 @@ xfs_mountfs_int(
 		writeio_log = mp->m_writeio_log;
 	}
 
-#if !defined(SIM) && _MIPS_SIM != _ABI64
+#if !defined(SIM)
 	/*
 	 * Set the number of readahead buffers to use based on
 	 * physical memory size.
@@ -760,7 +760,7 @@ xfs_mountfs_int(
 	 * size.  This may still be overridden by the file system
 	 * block size if it is larger than the chosen cluster size.
 	 */
-#if !defined(SIM) && _MIPS_SIM != _ABI64
+#if !defined(SIM)
 	if (physmem <= btoc(32 * 1024 * 1024)) { /* <= 32 MB */
 		mp->m_inode_cluster_size = XFS_INODE_SMALL_CLUSTER_SIZE;
 	} else {

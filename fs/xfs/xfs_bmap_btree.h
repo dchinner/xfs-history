@@ -32,7 +32,7 @@
 #ifndef _FS_XFS_BMAP_BTREE_H
 #define	_FS_XFS_BMAP_BTREE_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.48 $"
 
 #include "xfs_buf.h"
 
@@ -95,7 +95,7 @@ typedef struct xfs_bmdr_block
 #endif
 
 
-#define	BMBT_USE_64	(_MIPS_SIM == _ABI64 || _MIPS_SIM == _ABIN32)
+#define	BMBT_USE_64	1
 
 typedef struct xfs_bmbt_rec_32
 {

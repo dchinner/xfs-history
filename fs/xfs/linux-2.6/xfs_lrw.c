@@ -161,8 +161,15 @@ xfs_read(
 	loff_t		*offsetp)
 {
 	ssize_t ret;
+	xfs_fsize_t	n, limit = XFS_MAX_FILE_OFFSET;
 
-	/* xfs_rwlockf(bdp, VRWLOCK_READ, 0); obtained in readpage or linvfs_file_read */
+	n = XFS_MAX_FILE_OFFSET - *offsetp;
+	if (n <= 0)
+		return 0;
+
+	if (n < size)
+		size = n;
+
 	ret = xfs_rdwr(bdp, filp, buf, size, offsetp, 1);
 	return(ret);
 }
@@ -229,10 +236,8 @@ xfs_zero_last_block(
 		    mp->m_sb.sb_blocksize, poff(isize)));
 	if ((mp->m_sb.sb_blocksize < NBPP) && ((i = poff(isize)) != 0)) {
 		struct page *page;
-		struct page ** hash;
 
-		hash = page_hash(&ip->i_data, isize >> PAGE_CACHE_SHIFT);
-		page = __find_lock_page(&ip->i_data, isize >> PAGE_CACHE_SHIFT, hash);
+		page = find_lock_page(&ip->i_data, isize >> PAGE_CACHE_SHIFT);
 		if (page) {
 
 			dprintk(xfs_zlb_debug,
@@ -645,6 +650,7 @@ xfs_write(
 	struct xfs_mount *mp;
 	ssize_t ret;
 	xfs_fsize_t     isize;
+	xfs_fsize_t	n, limit = XFS_MAX_FILE_OFFSET;
 	xfs_iocore_t    *io;
 
 	xip = XFS_BHVTOI(bdp);
@@ -656,6 +662,14 @@ xfs_write(
 	dprintk(xfsw_debug,
 	     ("xfsw(%d): ip 0x%p(is 0x%Lx) offset 0x%Lx size 0x%x\n",
 		current->pid, ip, ip->i_size, *offsetp, size));
+
+	n = limit - *offsetp;
+	if (n <= 0) {
+		xfs_iunlock(xip, XFS_ILOCK_EXCL|XFS_IOLOCK_EXCL);
+		return EFBIG;
+	}
+	if (n < size)
+		size = n;
 
 	/*
 	 * On Linux, generic_file_write updates the times even if

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision$"
+#ident "$Revision: 1.9 $"
 
 /*
  * XFS bit manipulation routines, used in non-realtime code.
@@ -184,7 +184,7 @@ xfs_lowbit64(
 	__uint64_t	v)
 {
 	int		i;
-#if (_MIPS_SIM == _ABIN32 || _MIPS_SIM == _ABI64)
+#if XFS_64
 	if (v & 0x00000000ffffffff)
 		if (v & 0x000000000000ffff)
 			if (v & 0x00000000000000ff)
@@ -250,7 +250,7 @@ xfs_highbit64(
 	__uint64_t	v)
 {
 	int		i;
-#if (_MIPS_SIM == _ABIN32 || _MIPS_SIM == _ABI64)
+#if  XFS_64
 	if (v & 0xffffffff00000000)
 		if (v & 0xffff000000000000)
 			if (v & 0xff00000000000000)

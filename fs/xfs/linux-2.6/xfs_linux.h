@@ -80,7 +80,6 @@
 #ifndef __XFS_LINUX_
 #define __XFS_LINUX_
 
-#define _MIPS_SIM _ABIN32
 
 #ifndef STATIC
 #define STATIC
@@ -93,6 +92,14 @@
 # include <asm/types.h>		/* Need BITS_PER_LONG */
 # undef  __KERNEL__
 #endif	/* __KERNEL__ */
+
+#if (BITS_PER_LONG == 32)
+#define XFS_64	0
+#elif (BITS_PER_LONG == 64)
+#define XFS_64	1
+#else
+#error BITS_PER_LONG must be 32 or 64
+#endif
 
 #include <sys/types.h>
 
