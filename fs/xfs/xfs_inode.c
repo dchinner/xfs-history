@@ -374,8 +374,7 @@ xfs_iread_extents(xfs_trans_t	*tp,
  * Use xfs_dialloc() to allocate the on-disk inode. If xfs_dialloc()
  * has a free inode available on its freelist, call xfs_iget()
  * to obtain the in-core version of the allocated inode.  Finally,
- * hand the in-core inode off to xfs_iinit() to fill in the proper
- * values and log the initial contents of the inode.  In this case,
+ * fill in the inode and log its initial contents.  In this case,
  * ialloc_context would be set to NULL and call_again set to false.
  *
  * If xfs_dialloc() does not have an available inode on the freelist,
@@ -410,20 +409,31 @@ xfs_ialloc(xfs_trans_t	*tp,
 	__int32_t	curr_time;
 
 	/*
-	 * Call the space management code to allocate
-	 * the on-disk inode.
+	 * Call the space management code to pick
+	 * the on-disk inode to be allocated.
 	 */
-	ino = xfs_dialloc(tp, pip ? pip->i_ino : 0, pip == NULL, mode,
-			  ialloc_context, call_again);
+	ino = xfs_dialloc_ino(tp, pip ? pip->i_ino : 0, pip == NULL, mode,
+			      ialloc_context, call_again);
 	if (*call_again) {
                 return NULL;
         }
 	ASSERT(ino != NULLFSINO);
+	ASSERT(*ialloc_context != NULL);
 
 	/*
 	 * Get the in-core inode with the lock held exclusively.
 	 * This is because we're setting fields here we need
 	 * to prevent others from looking at until we're done.
+	 *
+	 * We do this before the call to xfs_dialloc_finish() because
+	 * we need to get our inode/vnode before we lock the buffer
+	 * containing the inode.  This ordering is forced by xfs_reclaim()
+	 * needing the buffer to flush the inode.  The inode we want or
+	 * another one on the same buffer might try to grab the buffer
+	 * in the reclaim routine called from vn_get/alloc() called from
+	 * xfs_trans_iget() called from here.  That would deadlock, so
+	 * we get the inode/vnode before locking the buffer in
+	 * xfs_dialloc_finish().
 	 */
 	ip = xfs_trans_iget(tp->t_mountp, tp, ino, XFS_ILOCK_EXCL);
 	ASSERT(ip != NULL);
@@ -476,6 +486,12 @@ xfs_ialloc(xfs_trans_t	*tp,
 	 * Log the new values stuffed into the inode.
 	 */
 	xfs_trans_log_inode(tp, ip, flags);
+
+	/*
+	 * Finish the on-disk portion of the allocation now that we
+	 * have the inode.
+	 */
+	xfs_dialloc_finish(tp, ino, *ialloc_context);
 	return ip;
 }
 
@@ -498,13 +514,6 @@ xfs_ialloc(xfs_trans_t	*tp,
  * return the inode will be "held" within the returned transaction.
  * This routine does NOT require any disk space to be reserved
  * for it within the transaction.
- *
- * XXXXXXXXXXXXajs
- * Calling ptossvp() within the scope of the ilock in this
- * routine depends on chunktoss() (called from ptossvp()) not
- * having to write out any buffers.  This requires new handling
- * for buffers overlapping the truncated range which is not
- * done yet.
  */
 void
 xfs_itruncate(xfs_trans_t	**tp,
