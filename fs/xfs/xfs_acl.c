@@ -45,12 +45,12 @@ STATIC int	xfs_acl_allow_set(vnode_t *, int);
 
 xfs_zone_t *xfs_acl_zone;
 
+
 /*
- * Test for existence of the extended attributes which implement
- * the system.posix_acl_access and system.posix_acl_default attrs
+ * Test for existence of access ACL attribute as efficiently as possible.
  */
 int
-posix_acl_access_exists(
+xfs_acl_vhasacl_access(
 	vnode_t		*vp)
 {
 	int		error;
@@ -59,12 +59,17 @@ posix_acl_access_exists(
 	return (error == 0);
 }
 
+/*
+ * Test for existence of default ACL attribute as efficiently as possible.
+ */
 int
-posix_acl_default_exists(
+xfs_acl_vhasacl_default(
 	vnode_t		*vp)
 {
 	int		error;
 
+	if (vp->v_type != VDIR)
+		return 0;
 	xfs_acl_get_attr(vp, NULL, ACL_TYPE_DEFAULT, ATTR_KERNOVAL, &error);
 	return (error == 0);
 }

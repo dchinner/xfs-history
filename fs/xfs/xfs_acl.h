@@ -32,9 +32,6 @@
 #ifndef __XFS_ACL_H__
 #define __XFS_ACL_H__
 
-#define SYSTEM_POSIXACL_ACCESS  "posix_acl_access"
-#define SYSTEM_POSIXACL_DEFAULT "posix_acl_default"
-
 #ifdef CONFIG_FS_POSIX_ACL
 
 #include <linux/posix_acl.h>
@@ -48,6 +45,8 @@ extern int xfs_acl_iaccess(struct xfs_inode *, mode_t, cred_t *);
 extern int xfs_acl_get(struct vnode *, xfs_acl_t *, xfs_acl_t *);
 extern int xfs_acl_set(struct vnode *, xfs_acl_t *, xfs_acl_t *);
 extern int xfs_acl_vtoacl(struct vnode *, xfs_acl_t *, xfs_acl_t *);
+extern int xfs_acl_vhasacl_access(struct vnode *);
+extern int xfs_acl_vhasacl_default(struct vnode *);
 extern int xfs_acl_vset(struct vnode *, void *, size_t, int);
 extern int xfs_acl_vget(struct vnode *, void *, size_t, int);
 extern int xfs_acl_vremove(struct vnode *vp, int);
@@ -60,13 +59,12 @@ extern struct xfs_zone *xfs_acl_zone;
 #define _ACL_ZONE_INIT(z,name)	((z) = kmem_zone_init(sizeof(xfs_acl_t), name))
 #define _ACL_ZONE_DESTROY(z)	(kmem_cache_destroy(z))
 #define _ACL_INHERIT(c,v,d)	(xfs_acl_inherit(c,v,d))
-#define _ACL_GET_ACCESS(pv,pa)  (xfs_acl_vtoacl(pv,pa,NULL)==0)
-#define _ACL_GET_DEFAULT(pv,pd) (xfs_acl_vtoacl(pv,NULL,pd)==0)
+#define _ACL_GET_ACCESS(pv,pa)	(xfs_acl_vtoacl(pv,pa,NULL) == 0)
+#define _ACL_GET_DEFAULT(pv,pd)	(xfs_acl_vtoacl(pv,NULL,pd) == 0)
+#define _ACL_ACCESS_EXISTS	xfs_acl_vhasacl_access
+#define _ACL_DEFAULT_EXISTS	xfs_acl_vhasacl_default
 #define _ACL_XFS_IACCESS(i,m,c)	\
 	(XFS_IFORK_Q(i) ? xfs_acl_iaccess(i,m,c) : -1)
-
-extern int posix_acl_access_exists(vnode_t *);
-extern int posix_acl_default_exists(vnode_t *);
 
 #else
 
@@ -82,11 +80,9 @@ extern int posix_acl_default_exists(vnode_t *);
 #define _ACL_INHERIT(c,v,d)	(0)
 #define _ACL_GET_ACCESS(pv,pa)	(0)
 #define _ACL_GET_DEFAULT(pv,pd)	(0)
+#define _ACL_ACCESS_EXISTS	(NULL)
+#define _ACL_DEFAULT_EXISTS	(NULL)
 #define _ACL_XFS_IACCESS(i,m,c)	(-1)
-
-/* need to be able to take the address of these functions */
-extern __inline__ int posix_acl_access_exists(vnode_t *vp)	{ return 0; }
-extern __inline__ int posix_acl_default_exists(vnode_t *vp)	{ return 0; }
 
 #endif
 
