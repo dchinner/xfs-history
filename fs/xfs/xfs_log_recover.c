@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.42 $"
+#ident	"$Revision: 1.43 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -191,11 +191,13 @@ xlog_find_verify_cycle(caddr_t	*bap,		/* update ptr as we go */
 
 
 /*
- * Potentially backup over partial log record write
+ * Potentially backup over partial log record write.
  *
  * In the typical case, last_blk is the number of the block directly after
  * a good log record.  Therefore, we subtract one to get the block number
- * of the last block in the given buffer.
+ * of the last block in the given buffer.  extra_bblks contains the number
+ * of blocks we would have read on a previous read.  This happens when the
+ * last log record is split over the end of the physical log.
  */
 STATIC int
 xlog_find_verify_log_record(caddr_t	ba,	     /* update ptr as we go */
@@ -209,7 +211,7 @@ xlog_find_verify_log_record(caddr_t	ba,	     /* update ptr as we go */
 
     ASSERT(start_blk != 0 || *last_blk != start_blk);
 
-    /* We may be verifying a partial log record */
+    /* We may be verifying a split log record */
     if (*last_blk - start_blk < BTOBB(XLOG_MAX_RECORD_BSIZE)) {
 	extra_bblks = BTOBB(XLOG_MAX_RECORD_BSIZE) - (*last_blk - start_blk);
 	extra = 1;
@@ -258,6 +260,9 @@ xlog_find_verify_log_record(caddr_t	ba,	     /* update ptr as we go */
  * current cycle number -1 won't be present in the log if we start writing
  * from our current block number.
  *
+ * last_blk contains the block number of the first block with a given
+ * cycle number.
+ *
  * Also called from xfs_log_print.c
  *
  * Return: zero if normal, non-zero if error.
@@ -286,14 +291,25 @@ xlog_find_head(xlog_t  *log,
 	goto bp_err;
     first_half_cycle = GET_CYCLE(bp->b_dmaaddr);
 
-    last_blk = log->l_logBBsize-1;		/* get cycle # of last block */
+    last_blk = log_bbnum-1;			/* get cycle # of last block */
     if (error = xlog_bread(log, last_blk, 1, bp))
 	goto bp_err;
     last_half_cycle = GET_CYCLE(bp->b_dmaaddr);
     ASSERT(last_half_cycle != 0);
 
-    if (first_half_cycle == last_half_cycle) { /* all cycle #s are same */
-	last_blk = 0;
+    /*
+     * If the 1st half cycle number is equal to the last half cycle number,
+     * then the entire log is stamped with the same cycle number.  In this
+     * case, last_blk can't be set to zero (which makes sense).  The below
+     * math doesn't work out properly with last_blk equal to zero.  Instead,
+     * we set it to log_bbnum which is an illegal block number, but this
+     * value makes the math correct.  If last_blk doesn't changed through
+     * all the tests below, *head_blk is set to zero at the very end rather
+     * than log_bbnum.  In a sense, log_bbnum and zero are the same block
+     * in a circular file.
+     */
+    if (first_half_cycle == last_half_cycle) {
+	last_blk = log_bbnum;
     } else {
 	/* Find 1st block # with cycle # matching last_half_cycle */
 	if (error = xlog_find_cycle_start(log, bp, first_blk,
@@ -394,7 +410,10 @@ bad_blk:
 
     xlog_put_bp(big_bp);
     xlog_put_bp(bp);
-    *head_blk = last_blk;
+    if (last_blk == log_bbnum)
+	    *head_blk = 0;
+    else
+	    *head_blk = last_blk;
     /*
      * When returning here, we have a good block number.  Bad block
      * means that during a previous crash, we didn't have a clean break
