@@ -397,15 +397,12 @@ xfs_attr_shortform_allfit(buf_t *bp, xfs_inode_t *dp)
 
 	leaf = (xfs_attr_leafblock_t *)bp->b_un.b_addr;
 	ASSERT(leaf->hdr.info.magic == XFS_ATTR_LEAF_MAGIC);
-	if (leaf->hdr.usedbytes > XFS_IFORK_ASIZE(dp))
-		return(0);
 
-	/*
-	 * Too close to call, figure it out the hard way.
-	 */
 	entry = &leaf->entries[0];
 	bytes = sizeof(struct xfs_attr_sf_hdr);
 	for (i = 0; i < leaf->hdr.count; entry++, i++) {
+		if (entry->flags & XFS_ATTR_INCOMPLETE)
+			continue;		/* don't copy partial entries */
 		if (!(entry->flags & XFS_ATTR_LOCAL))
 			return(0);
 		name_loc = XFS_ATTR_LEAF_NAME_LOCAL(leaf, i);
@@ -459,6 +456,8 @@ xfs_attr_leaf_to_shortform(xfs_trans_t *trans, buf_t *bp, xfs_da_args_t *iargs)
 	args.total = iargs->total;
 	args.whichfork = XFS_ATTR_FORK;
 	for (i = 0; i < leaf->hdr.count; entry++, i++) {
+		if (entry->flags & XFS_ATTR_INCOMPLETE)
+			continue;		/* don't copy partial entries */
 		if (entry->nameidx == 0)
 			continue;
 		ASSERT(entry->flags & XFS_ATTR_LOCAL);
@@ -1508,8 +1507,10 @@ xfs_attr_leaf_lookup_int(buf_t *bp, xfs_da_args_t *args)
 /*
  * GROT: Add code to remove incomplete entries.
  */
-		if (entry->flags & XFS_ATTR_INCOMPLETE)
-			continue;		/* skip incomplete entries */
+		if (((entry->flags & XFS_ATTR_INCOMPLETE) != 0) &&
+		    ((args->flags & XFS_ATTR_INCOMPLETE) == 0)) {
+			continue;	/* skip incomplete entries if asked */
+		}
 		if (entry->flags & XFS_ATTR_LOCAL) {
 			name_loc = XFS_ATTR_LEAF_NAME_LOCAL(leaf, probe);
 			if (name_loc->namelen != args->namelen)
@@ -1921,6 +1922,7 @@ xfs_attr_leaf_clearflag(xfs_da_args_t *args)
 	ASSERT(args->aleaf_index < leaf->hdr.count);
 	ASSERT(args->aleaf_index >= 0);
 	entry = &leaf->entries[ args->aleaf_index ];
+	ASSERT(entry->flags & XFS_ATTR_INCOMPLETE);
 	entry->flags &= ~XFS_ATTR_INCOMPLETE;
 	xfs_trans_log_buf(trans, bp,
 			 XFS_DA_LOGRANGE(leaf, entry, sizeof(*entry)));
@@ -1965,6 +1967,7 @@ xfs_attr_leaf_setflag(xfs_da_args_t *args)
 	ASSERT(args->aleaf_index < leaf->hdr.count);
 	ASSERT(args->aleaf_index >= 0);
 	entry = &leaf->entries[ args->aleaf_index ];
+	ASSERT((entry->flags & XFS_ATTR_INCOMPLETE) == 0);
 	entry->flags |= XFS_ATTR_INCOMPLETE;
 	xfs_trans_log_buf(trans, bp,
 			 XFS_DA_LOGRANGE(leaf, entry, sizeof(*entry)));
