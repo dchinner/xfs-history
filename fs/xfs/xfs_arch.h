@@ -39,6 +39,7 @@
 
 #include <asm/byteorder.h>
 #include <linux/autoconf.h>
+#include "xfs_types.h"
 
 /* supported architecures */
   
@@ -47,10 +48,29 @@
 #define ARCH_SPARC	2
 #define ARCH_UNKNOWN    127
 
+/* if these are wrong, it's very foncusing */
+
+#if defined(__LITTLE_ENDIAN) && defined(__BIG_ENDIAN)
+#error both __LITTLE_ENDIAN and __BIG_ENDIAN are defined!
+#endif
+
+#if (!defined(__LITTLE_ENDIAN)) && (!defined(__BIG_ENDIAN))
+#error neither __LITTLE_ENDIAN or __BIG_ENDIAN are defined!
+#endif
+
+#ifndef XFS_BIG_FILESYSTEMS
+#error XFS_BIG_FILESYSTEMS must be defined true or false
+#endif
+
 /* select native architecture */
   
 #ifdef CONFIG_X86
 #define ARCH_NOCONVERT ARCH_INTEL_IA32
+
+#ifdef __BIG_ENDIAN
+#error big endian X86!?
+#endif
+
 #elif defined(__sparc__)
 #define ARCH_NOCONVERT ARCH_SPARC
 #else
@@ -268,13 +288,19 @@
     
 #define DIRINO4_GET_ARCH(pointer,arch) \
     (INT_GET_UNALIGNED_32(pointer))
-    
-#ifdef XFS_BIG_FILESYSTEMS
+
+#if XFS_BIG_FILESYSTEMS
 #define DIRINO_GET_ARCH(pointer,arch) \
     INT_GET_UNALIGNED_64(pointer)
 #else
+/* MACHINE ARCHITECTURE dependent */
+#ifdef __LITLE_ENDIAN
+#define DIRINO_GET_ARCH(pointer,arch) \
+    DIRINO4_GET_ARCH((((__u8*)pointer)+4),arch)
+#else
 #define DIRINO_GET_ARCH(pointer,arch) \
     DIRINO4_GET_ARCH(pointer,arch)
+#endif
 #endif    
 
 #define DIRINO_COPY_ARCH(from,to,arch) \
@@ -371,7 +397,7 @@
             (INT_GET_UNALIGNED_32_BE(pointer)) \
     )
     
-#ifdef XFS_BIG_FILESYSTEMS
+#if XFS_BIG_FILESYSTEMS
 #define DIRINO_GET_ARCH(pointer,arch) \
     ( ((arch) == ARCH_NOCONVERT) \
         ? \
@@ -380,8 +406,14 @@
             (INT_GET_UNALIGNED_64_BE(pointer)) \
     )
 #else
+/* MACHINE ARCHITECTURE dependent */
+#ifdef __LITTLE_ENDIAN
+#define DIRINO_GET_ARCH(pointer,arch) \
+    DIRINO4_GET_ARCH((((__u8*)pointer)+4),arch)
+#else
 #define DIRINO_GET_ARCH(pointer,arch) \
     DIRINO4_GET_ARCH(pointer,arch)
+#endif
 #endif    
 
 #define DIRINO_COPY_ARCH(from,to,arch) \
