@@ -549,6 +549,12 @@ xfs_iunlock(xfs_inode_t	*ip,
 		ASSERT(ismrlocked(&ip->i_lock, (MR_UPDATE | MR_ACCESS)));
 		mrunlock(&ip->i_lock);
 	}
+
+	/*
+	 * Let the AIL know that this item has been unlocked in case
+	 * it is in the AIL and anyone is waiting on it.
+	 */
+	xfs_trans_unlocked_item(ip->i_mount, (xfs_log_item_t*)&(ip->i_item));
 }
 
 /*
