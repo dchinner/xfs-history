@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.78 $"
+#ident	"$Revision: 1.81 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -1165,7 +1165,7 @@ xfs_ialloc_read_agi(
 	 */
 	agi = XFS_BUF_TO_AGI(bp);
 	if ((agi->agi_magicnum != XFS_AGI_MAGIC) ||
-	    (agi->agi_versionnum != XFS_AGI_VERSION)) {
+	    !XFS_AGI_GOOD_VERSION(agi->agi_versionnum)) {
 		bp->b_flags |= B_ERROR;
 		xfs_trans_brelse(tp, bp);
 		return EIO;

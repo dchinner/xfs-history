@@ -1,4 +1,4 @@
-#ident "$Revision: 1.158 $"
+#ident "$Revision: 1.159 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -207,7 +207,7 @@ xfs_inotobp(
 	}
 	dip = (xfs_dinode_t *)(bp->b_un.b_addr);
 	if ((dip->di_core.di_magic != XFS_DINODE_MAGIC) ||
-	    (dip->di_core.di_version != XFS_DINODE_VERSION)) {
+	    !XFS_DINODE_GOOD_VERSION(dip->di_core.di_version)) {
 		bp->b_flags |= B_ERROR;
 		xfs_trans_brelse(tp, bp);
 		return EIO;
@@ -312,7 +312,7 @@ xfs_itobp(
 	}
 	dip = (xfs_dinode_t *)(bp->b_un.b_addr);
 	if ((dip->di_core.di_magic != XFS_DINODE_MAGIC) ||
-	    (dip->di_core.di_version != XFS_DINODE_VERSION)) {
+	    !XFS_DINODE_GOOD_VERSION(dip->di_core.di_version)) {
 		bp->b_flags |= B_ERROR;
 		xfs_trans_brelse(tp, bp);
 		return EIO;
@@ -1592,7 +1592,7 @@ xfs_iunlink(
 	 */
 	agi = XFS_BUF_TO_AGI(agibp);
 	if ((agi->agi_magicnum != XFS_AGI_MAGIC) ||
-	    (agi->agi_versionnum != XFS_AGI_VERSION)) {
+	    !XFS_AGI_GOOD_VERSION(agi->agi_versionnum)) {
 		agibp->b_flags |= B_ERROR;
 		xfs_trans_brelse(tp, agibp);
 		return EIO;
@@ -1686,7 +1686,7 @@ xfs_iunlink_remove(
 	 */
 	agi = XFS_BUF_TO_AGI(agibp);
 	if ((agi->agi_magicnum != XFS_AGI_MAGIC) ||
-	    (agi->agi_versionnum != XFS_AGI_VERSION)) {
+	    !XFS_AGI_GOOD_VERSION(agi->agi_versionnum)) {
 		agibp->b_flags |= B_ERROR;
 		xfs_trans_brelse(tp, agibp);
 		return EIO;

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.63 $"
+#ident	"$Revision: 1.70 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1415,7 +1415,7 @@ xfs_bmbt_read_agf(
 	 */
 	agf = XFS_BUF_TO_AGF(bp);
 	if ((agf->agf_magicnum != XFS_AGF_MAGIC) ||
-	    (agf->agf_versionnum != XFS_AGF_VERSION)) {
+	    !XFS_AGF_GOOD_VERSION(agf->agf_versionnum)) {
 		bp->b_flags |= B_ERROR;
 		xfs_trans_brelse(tp, bp);
 		return EIO;

@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.69 $"
+#ident	"$Revision: 1.71 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -3060,7 +3060,7 @@ xlog_recover_check_summary(xlog_t	*log)
 		agfbp = read_buf(mp->m_dev, agfdaddr, 1, 0);
 		agfp = XFS_BUF_TO_AGF(agfbp);
 		ASSERT(agfp->agf_magicnum == XFS_AGF_MAGIC);
-		ASSERT(agfp->agf_versionnum == XFS_AGF_VERSION);
+		ASSERT(XFS_AGF_GOOD_VERSION(agfp->agf_versionnum));
 		ASSERT(agfp->agf_seqno == agno);
 
 		freeblks += agfp->agf_freeblks + agfp->agf_flcount;
@@ -3070,7 +3070,7 @@ xlog_recover_check_summary(xlog_t	*log)
 		agibp = read_buf(mp->m_dev, agidaddr, 1, 0);
 		agip = XFS_BUF_TO_AGI(agibp);
 		ASSERT(agip->agi_magicnum == XFS_AGI_MAGIC);
-		ASSERT(agip->agi_versionnum == XFS_AGI_VERSION);
+		ASSERT(XFS_AGI_GOOD_VERSION(agip->agi_versionnum));
 		ASSERT(agip->agi_seqno == agno);
 
 		itotal += agip->agi_count;
