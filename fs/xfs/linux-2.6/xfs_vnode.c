@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.28 $"
+#ident	"$Revision: 1.29 $"
 
 #include <xfs_os_defs.h>
 
@@ -554,7 +554,6 @@ vn_revalidate(struct vnode *vp, int flags)
 {
 	int		error;
 	struct inode	*inode;
-	cred_t		cred;
 	vattr_t		va;
 
 	vn_trace_entry(vp, "vn_revalidate", (inst_t *)__return_address);
@@ -563,7 +562,7 @@ vn_revalidate(struct vnode *vp, int flags)
 
 	ASSERT(vp->v_bh.bh_first != NULL);
 
-	VOP_GETATTR(vp, &va, flags, &cred, error);
+	VOP_GETATTR(vp, &va, flags, NULL, error);
 
 	if (! error) {
 		inode = LINVFS_GET_IP(vp);
@@ -639,6 +638,7 @@ again:
 		return;
 	}
 
+	VOPINFO.vn_active--;
 	vp->v_flag |= VRECLM;
 	NESTED_VN_UNLOCK(vp);
 
@@ -772,7 +772,6 @@ vn_remove(struct vnode *vp)
 	vn_trace_entry(vp, "vn_remove", (inst_t *)__return_address);
 
 	VOPINFO.vn_remove++;
-	VOPINFO.vn_active--;
 
 	s = VN_LOCK(vp);
 
