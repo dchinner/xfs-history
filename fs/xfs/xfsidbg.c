@@ -2897,7 +2897,7 @@ xfs_dir2data(void *addr, int size)
 		if (u->freetag == XFS_DIR2_DATA_FREE_TAG) {
 			printk("0x%x unused freetag 0x%x length 0x%x tag 0x%x\n",
 				p - (char *)addr, INT_GET(u->freetag, ARCH_UNKNOWN), INT_GET(u->length, ARCH_UNKNOWN),
-				*XFS_DIR2_DATA_UNUSED_TAG_P_ARCH(u, ARCH_UNKNOWN));
+				INT_GET(*XFS_DIR2_DATA_UNUSED_TAG_P_ARCH(u, ARCH_UNKNOWN), ARCH_UNKNOWN));
 			p += INT_GET(u->length, ARCH_UNKNOWN);
 			continue;
 		}
