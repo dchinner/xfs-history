@@ -67,7 +67,9 @@
 #define	kmem_check()	/* dummy for memory-allocation checking */
 #endif
 
+#if defined(DEBUG) && !defined(SIM)
 ktrace_t	*xfs_bmap_trace_buf;
+#endif
 
 zone_t		*xfs_bmap_free_item_zone;
 
