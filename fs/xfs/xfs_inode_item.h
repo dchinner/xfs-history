@@ -20,6 +20,9 @@ typedef struct xfs_inode_log_format {
 		dev_t		ilfu_rdev;	/* rdev value for dev inode*/
 		uuid_t		ilfu_uuid;	/* mount point value */
 	} ilf_u;
+	__int64_t		ilf_blkno;	/* blkno of inode buffer */
+	int			ilf_len;	/* len of inode buffer */
+	int			ilf_boffset;	/* off of inode in buffer */
 } xfs_inode_log_format_t;
 
 struct proc;
@@ -62,7 +65,7 @@ typedef struct xfs_inode_log_item {
 				 XFS_ILOG_EXT | XFS_ILOG_BROOT | \
 				 XFS_ILOG_DEV | XFS_ILOG_UUID)
 
-	
+     
 void	xfs_inode_item_init(struct xfs_inode *, xfs_mount_t *);
 void	xfs_iflush_done(buf_t *, xfs_inode_log_item_t *);
 
