@@ -177,8 +177,8 @@ xfs_dir2_block_to_leaf(
 	/*
 	 * Set the counts in the leaf header.
 	 */
-	leaf->hdr.count = btp->count; /* INT_: direct copy */
-	leaf->hdr.stale = btp->stale; /* INT_: direct copy */
+	INT_SET(leaf->hdr.count, ARCH_CONVERT, INT_GET(btp->count, ARCH_CONVERT)); /* INT_: type change */
+	INT_SET(leaf->hdr.stale, ARCH_CONVERT, INT_GET(btp->stale, ARCH_CONVERT)); /* INT_: type change */
 	/*
 	 * Could compact these but I think we always do the conversion
 	 * after squeezing out stale entries.
@@ -209,7 +209,7 @@ xfs_dir2_block_to_leaf(
 	ltp = XFS_DIR2_LEAF_TAIL_P(mp, leaf);
 	INT_SET(ltp->bestcount, ARCH_CONVERT, 1);
 	bestsp = XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_CONVERT);
-	bestsp[0] = block->hdr.bestfree[0].length; /* INT_: direct copy */
+	INT_SET(bestsp[0], ARCH_CONVERT, INT_GET(block->hdr.bestfree[0].length, ARCH_CONVERT));
 	/*
 	 * Log the data header and leaf bests table.
 	 */
@@ -444,7 +444,7 @@ xfs_dir2_leaf_addname(
 		else
 			xfs_dir2_leaf_log_bests(tp, lbp, use_block, use_block);
 		data = dbp->data;
-		bestsp[use_block] = data->hdr.bestfree[0].length; /* INT_: direct copy */
+		INT_SET(bestsp[use_block], ARCH_CONVERT, INT_GET(data->hdr.bestfree[0].length, ARCH_CONVERT));
 		grown = 1;
 	}
 	/*
@@ -501,7 +501,7 @@ xfs_dir2_leaf_addname(
 	 * Log the change unless we've already done that.
 	 */
 	if (INT_GET(bestsp[use_block], ARCH_CONVERT) != INT_GET(data->hdr.bestfree[0].length, ARCH_CONVERT)) {
-		bestsp[use_block] = data->hdr.bestfree[0].length; /* INT_: direct copy */
+		INT_SET(bestsp[use_block], ARCH_CONVERT, INT_GET(data->hdr.bestfree[0].length, ARCH_CONVERT));
 		if (!grown)
 			xfs_dir2_leaf_log_bests(tp, lbp, use_block, use_block);
 	}
@@ -1596,7 +1596,7 @@ xfs_dir2_leaf_removename(
 	 * put the new value in the bests table and log that.
 	 */
 	if (INT_GET(data->hdr.bestfree[0].length, ARCH_CONVERT) != oldbest) {
-		bestsp[db] = data->hdr.bestfree[0].length; /* INT_: direct copy */
+		INT_SET(bestsp[db], ARCH_CONVERT, INT_GET(data->hdr.bestfree[0].length, ARCH_CONVERT));
 		xfs_dir2_leaf_log_bests(tp, lbp, db, db);
 	}
 	xfs_dir2_data_check(dp, dbp);
@@ -1943,7 +1943,7 @@ xfs_dir2_node_to_leaf(
 	 * Set up the leaf tail from the freespace block.
 	 */
 	ltp = XFS_DIR2_LEAF_TAIL_P(mp, leaf);
-	ltp->bestcount = free->hdr.nvalid; /* INT_: direct copy */
+	INT_SET(ltp->bestcount, ARCH_CONVERT, INT_GET(free->hdr.nvalid, ARCH_CONVERT));
 	/*
 	 * Set up the leaf bests table.
 	 */
