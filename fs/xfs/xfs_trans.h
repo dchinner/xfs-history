@@ -144,37 +144,38 @@ typedef struct xfs_log_item_desc {
 /*
  * This structure is used to maintain a chunk list of log_item_desc
  * structures. The free field is a bitmask indicating which descriptors
- * in this chunk's array are free.
+ * in this chunk's array are free.  The unused field is the first value
+ * not used since this chunk was allocated.
  */
+#define	XFS_LIC_NUM_SLOTS	15
 typedef struct xfs_log_item_chunk {
 	struct xfs_log_item_chunk	*lic_next;
-	unsigned int			lic_free;
-	xfs_log_item_desc_t		lic_descs[15];
+	ushort				lic_free;
+	ushort				lic_unused;
+	xfs_log_item_desc_t		lic_descs[XFS_LIC_NUM_SLOTS];
 } xfs_log_item_chunk_t;
 
-#define	XFS_LIC_MAX_SLOT	14
-#define	XFS_LIC_NUM_SLOTS	15
-#define	XFS_LIC_FREEMASK	0x7fff
+#define	XFS_LIC_MAX_SLOT	(XFS_LIC_NUM_SLOTS - 1)
+#define	XFS_LIC_FREEMASK	((1 << XFS_LIC_NUM_SLOTS) - 1)
+
 /*
- * Initialize the given chunk.  For each descriptor, set its index
- * to where it is in the chunk and its size to 0.  Set the chunk's
- * free descriptor mask to indicate that all descriptors are free.
+ * Initialize the given chunk.  Set the chunk's free descriptor mask
+ * to indicate that all descriptors are free.  The caller gets to set
+ * lic_unused to the right value (0 matches all free).  The
+ * lic_descs.lid_index values are set up as each desc is allocated.
  */
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_LIC_INIT)
 void xfs_lic_init(xfs_log_item_chunk_t *cp);
 #define	XFS_LIC_INIT(cp)	xfs_lic_init(cp)
 #else
-#define	XFS_LIC_INIT(cp)	{ \
-					int			x; \
-					xfs_log_item_desc_t	*dp; \
-					dp = (cp)->lic_descs; \
-					for (x = 0; x <= XFS_LIC_MAX_SLOT; \
-					     x++) { \
-						dp->lid_index = (unsigned char)x; \
-						dp++; \
-					} \
-					(cp)->lic_free = XFS_LIC_FREEMASK; \
-				}
+#define	XFS_LIC_INIT(cp)	((cp)->lic_free = XFS_LIC_FREEMASK)
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_LIC_INIT_SLOT)
+void xfs_lic_init_slot(xfs_log_item_chunk_t *cp, int slot);
+#define	XFS_LIC_INIT_SLOT(cp,slot)	xfs_lic_init_slot(cp, slot)
+#else
+#define	XFS_LIC_INIT_SLOT(cp,slot)	\
+	((cp)->lic_descs[slot].lid_index = (unsigned char)(slot))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_LIC_VACANCY)
 int xfs_lic_vacancy(xfs_log_item_chunk_t *cp);
@@ -186,7 +187,7 @@ int xfs_lic_vacancy(xfs_log_item_chunk_t *cp);
 void xfs_lic_all_free(xfs_log_item_chunk_t *cp);
 #define	XFS_LIC_ALL_FREE(cp)		xfs_lic_all_free(cp)
 #else
-#define	XFS_LIC_ALL_FREE(cp)		((cp)->lic_free |= XFS_LIC_FREEMASK)
+#define	XFS_LIC_ALL_FREE(cp)		((cp)->lic_free = XFS_LIC_FREEMASK)
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_LIC_ARE_ALL_FREE)
 int xfs_lic_are_all_free(xfs_log_item_chunk_t *cp);

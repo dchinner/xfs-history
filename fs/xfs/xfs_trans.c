@@ -1,4 +1,4 @@
-#ident "$Revision: 1.74 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -117,7 +117,6 @@ xfs_trans_alloc(
 	tp->t_magic = XFS_TRANS_MAGIC;
 	tp->t_type = type;
 	tp->t_mountp = mp;
-	tp->t_flags = 0;
 	tp->t_items_free = XFS_LIC_NUM_SLOTS;
 	XFS_LIC_INIT(&(tp->t_items));
 
@@ -157,7 +156,6 @@ xfs_trans_dup(
 	tp->t_blk_res = tp->t_blk_res_used;
 	ntp->t_rtx_res = tp->t_rtx_res - tp->t_rtx_res_used;
 	tp->t_rtx_res = tp->t_rtx_res_used;
-	ntp->t_log_res = 0;
 
 	return ntp;
 }
@@ -192,7 +190,7 @@ xfs_trans_reserve(
 	 * fail if the count would go below zero.
 	 */
 	if (blocks > 0) {
-		error = xfs_mod_incore_sb(tp->t_mountp, XFS_SB_FDBLOCKS,
+		error = xfs_mod_incore_sb(tp->t_mountp, XFS_SBS_FDBLOCKS,
 					  -blocks);
 		if (error != 0) {
 			return (XFS_ERROR(ENOSPC));
@@ -238,7 +236,7 @@ xfs_trans_reserve(
 	 * fail if the count would go below zero.
 	 */
 	if (rtextents > 0) {
-		error = xfs_mod_incore_sb(tp->t_mountp, XFS_SB_FREXTENTS,
+		error = xfs_mod_incore_sb(tp->t_mountp, XFS_SBS_FREXTENTS,
 					  -rtextents);
 		if (error) {
 			error = XFS_ERROR(ENOSPC);
@@ -268,7 +266,7 @@ undo_log:
 
 undo_blocks:
 	if (blocks > 0) {
-		(void) xfs_mod_incore_sb(tp->t_mountp, XFS_SB_FDBLOCKS,
+		(void) xfs_mod_incore_sb(tp->t_mountp, XFS_SBS_FDBLOCKS,
 					 blocks);
 		tp->t_blk_res = 0;
 	}
@@ -460,23 +458,20 @@ void
 xfs_trans_unreserve_and_mod_sb(
 	xfs_trans_t	*tp)
 {
-	xfs_mod_sb_t	msb[8];		/* If you add cases, add entries */
+	xfs_mod_sb_t	msb[9];		/* If you add cases, add entries */
 	xfs_mod_sb_t	*msbp;
-	int		n;
 	int		error;
 
-	msbp = &msb[0];
-	n = 0;
+	msbp = msb;
 
 	/*
 	 * Release any reserved blocks.  Any that were allocated
 	 * will be taken back again by fdblocks_delta below.
 	 */
 	if (tp->t_blk_res > 0) {
-		msbp->msb_field = XFS_SB_FDBLOCKS;
+		msbp->msb_field = XFS_SBS_FDBLOCKS;
 		msbp->msb_delta = tp->t_blk_res;
 		msbp++;
-		n++;
 	}
 
 	/*
@@ -484,10 +479,9 @@ xfs_trans_unreserve_and_mod_sb(
 	 * allocated will be taken back again by frextents_delta below.
 	 */
 	if (tp->t_rtx_res > 0) {
-		msbp->msb_field = XFS_SB_FREXTENTS;
+		msbp->msb_field = XFS_SBS_FREXTENTS;
 		msbp->msb_delta = tp->t_rtx_res;
 		msbp++;
-		n++;
 	}
 
 	/*
@@ -498,54 +492,47 @@ xfs_trans_unreserve_and_mod_sb(
 	 */
 	if (tp->t_flags & XFS_TRANS_SB_DIRTY) {
 		if (tp->t_icount_delta != 0) {
-			msbp->msb_field = XFS_SB_ICOUNT;
+			msbp->msb_field = XFS_SBS_ICOUNT;
 			msbp->msb_delta = tp->t_icount_delta;
 			msbp++;
-			n++;
 		}
 		if (tp->t_ifree_delta != 0) {
-			msbp->msb_field = XFS_SB_IFREE;
+			msbp->msb_field = XFS_SBS_IFREE;
 			msbp->msb_delta = tp->t_ifree_delta;
 			msbp++;
-			n++;
 		}
 		if (tp->t_fdblocks_delta != 0) {
-			msbp->msb_field = XFS_SB_FDBLOCKS;
+			msbp->msb_field = XFS_SBS_FDBLOCKS;
 			msbp->msb_delta = tp->t_fdblocks_delta;
 			msbp++;
-			n++;
 		}
 		if (tp->t_frextents_delta != 0) {
-			msbp->msb_field = XFS_SB_FREXTENTS;
+			msbp->msb_field = XFS_SBS_FREXTENTS;
 			msbp->msb_delta = tp->t_frextents_delta;
 			msbp++;
-			n++;
 		}
 		if (tp->t_dblocks_delta != 0) {
-			msbp->msb_field = XFS_SB_DBLOCKS;
+			msbp->msb_field = XFS_SBS_DBLOCKS;
 			msbp->msb_delta = tp->t_dblocks_delta;
 			msbp++;
-			n++;
 		}
 		if (tp->t_agcount_delta != 0) {
-			msbp->msb_field = XFS_SB_AGCOUNT;
+			msbp->msb_field = XFS_SBS_AGCOUNT;
 			msbp->msb_delta = tp->t_agcount_delta;
 			msbp++;
-			n++;
 		}
 		if (tp->t_imaxpct_delta != 0) {
-			msbp->msb_field = XFS_SB_IMAX_PCT;
+			msbp->msb_field = XFS_SBS_IMAX_PCT;
 			msbp->msb_delta = tp->t_imaxpct_delta;
 			msbp++;
-			n++;
 		}
 	}
 
 	/*
 	 * If we need to change anything, do it.
 	 */
-	if (n > 0) {
-		error = xfs_mod_incore_sb_batch(tp->t_mountp, msb, n);
+	if (msbp > msb) {
+		error = xfs_mod_incore_sb_batch(tp->t_mountp, msb, msbp - msb);
 		ASSERT(error == 0);
 	}
 }
@@ -814,7 +801,7 @@ xfs_trans_cancel(
 		licp = &(tp->t_items);
 		while (licp != NULL) {
 			lidp = licp->lic_descs;
-			for (i = 0; i <= XFS_LIC_MAX_SLOT; i++, lidp++) {
+			for (i = 0; i < licp->lic_unused; i++, lidp++) {
 				if (XFS_LIC_ISFREE(licp, i)) {
 					continue;
 				}
@@ -940,7 +927,7 @@ xfs_trans_chunk_committed(
 	int			s;
 
 	lidp = licp->lic_descs;
-	for (i = 0; i <= XFS_LIC_MAX_SLOT; i++, lidp++) {
+	for (i = 0; i < licp->lic_unused; i++, lidp++) {
 		if (XFS_LIC_ISFREE(licp, i)) {
 			continue;
 		}
