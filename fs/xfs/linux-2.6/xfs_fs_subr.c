@@ -55,11 +55,8 @@ fs_dounmount(
 	 * on the rot vnode is released whether the call succeeds or
 	 * fails.
 	 */
-	error = vfs_lock_offline(vfsp);
 	if (rootvp)
 		VN_RELE(rootvp);
-	if (error)
-		return error;
 
 	/*
 	 * Now invoke SYNC and UNMOUNT ops, using the PVFS versions is
@@ -74,10 +71,6 @@ fs_dounmount(
 	PVFS_SYNC(fbdp, SYNC_ATTR|SYNC_DELWRI|SYNC_NOWAIT, cr, error);
 	if (error == 0)
 		PVFS_UNMOUNT(fbdp, flags, cr, error);
-
-	if (error) {
-		vfs_unlock(vfsp);	/* clears VFS_OFFLINE flag, too */
-	}
 	return error;
 }
 

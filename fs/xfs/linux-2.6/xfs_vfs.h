@@ -45,8 +45,6 @@ struct xfs_mount_args;
 typedef struct vfs {
 	u_int		vfs_flag;	/* flags */
 	dev_t		vfs_dev;	/* device of mounted VFS */
-	short		vfs_busycnt;	/* # of accesses in progress */
-	sv_t		vfs_wait;	/* busy mount point sync */
 	u_int		vfs_bsize;	/* native block size */
 	int		vfs_fstype;	/* file system type index */
 	fsid_t		vfs_fsid;	/* file system id */
@@ -73,16 +71,6 @@ typedef struct vfs {
 
 #define bhvtovfs(bdp)	((struct vfs *)BHV_VOBJ(bdp))
 #define VFS_BHVHEAD(vfsp) (&(vfsp)->vfs_bh)
-
-#define VFS_INIT(vfsp) { \
-	sv_init(&(vfsp)->vfs_wait, SV_DEFAULT, "vfs_wait"); \
-	bhv_head_init(VFS_BHVHEAD(vfsp),"vfs"); \
-}
-
-#define VFS_FREE(vfsp) {	\
-	sv_destroy(&(vfsp)->vfs_wait); \
-	bhv_head_destroy(VFS_BHVHEAD(vfsp)); \
-}
 
 
 #define VFS_RDONLY	0x0001		/* read-only vfs */
@@ -200,14 +188,45 @@ typedef struct vfsops {
 	rv = (*((vfsops_t *)(bdp)->bd_ops)->vfs_sync)(bdp, flag, cr);	\
 }
 
-extern vfs_t	*vfs_allocate(void);	/* Allocate a new vfs. */
-extern void	vfs_deallocate(vfs_t *);/* Deallocate a vfs. */
-extern void	vfs_insertbhv(vfs_t *, bhv_desc_t *, vfsops_t *, void *);
-					/* link vfs base behavior with vfs */
-extern int	vfs_lock_offline(struct vfs *);
-extern int	vfs_lock(struct vfs *); /* lock and unlock a vfs */
-extern void	vfs_unlock(struct vfs *);
-extern int	vfs_busy(struct vfs *); /* mark busy for serial sync/unmount */
-extern void	vfs_unbusy(struct vfs *);
+
+static __inline vfs_t *
+vfs_allocate(void)
+{
+	vfs_t	*vfsp;
+
+	vfsp = kmalloc(sizeof(vfs_t), GFP_KERNEL);
+	if (vfsp) {
+		memset(vfsp, 0, sizeof(vfs_t));
+		bhv_head_init(VFS_BHVHEAD(vfsp), "vfs");
+	}
+	return (vfsp);
+}
+
+static __inline void
+vfs_deallocate(
+	vfs_t		*vfsp)
+{
+	bhv_head_destroy(VFS_BHVHEAD(vfsp));
+	kfree(vfsp);
+}
+
+/*
+ * Called by fs dependent VFS_MOUNT code to link the VFS base file system
+ * dependent behavior with the VFS virtual object.
+ */
+static __inline void
+vfs_insertbhv(
+	vfs_t		*vfsp,
+	bhv_desc_t	*bdp,
+	vfsops_t	*vfsops,
+	void		*mount)
+{
+	/*
+	 * Initialize behavior desc with ops and data and then
+	 * attach it to the vfs.
+	 */
+	bhv_desc_init(bdp, mount, vfsp, vfsops);
+	bhv_insert_initial(&vfsp->vfs_bh, bdp);
+}
 
 #endif	/* __XFS_VFS_H__ */
