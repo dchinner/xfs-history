@@ -72,7 +72,7 @@ typedef struct xfs_inode {
 		char		iu_inline_data[XFS_INLINE_DATA];
 						/* very small file data */
 		dev_t		iu_rdev;	/* dev number if special */
-		xfs_uuid_t	iu_uuid;	/* mount point value */
+		uuid_t		iu_uuid;	/* mount point value */
 	} i_u2;
 
 	/* File incore attribute extent information. */

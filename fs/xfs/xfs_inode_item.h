@@ -38,7 +38,7 @@ typedef struct xfs_inode_log_format {
 	uint			ilf_dsize;	/* size of data/ext/root */
 	union {
 		dev_t		ilfu_rdev;	/* rdev value for dev inodes */
-		xfs_uuid_t	ilfu_uuid;	/* mount point value */
+		uuid_t		ilfu_uuid;	/* mount point value */
 	} ilf_u;
 } xfs_inode_log_format_t;
 	
