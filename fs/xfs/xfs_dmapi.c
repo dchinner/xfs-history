@@ -2846,6 +2846,8 @@ xfs_dm_mount(
 	bhv_desc_t	*rootbdp;
 	int		error;
 
+	if (*dir_name == '\0')
+		return EINVAL;
 	VFS_ROOT(vfsp, &rootvp, error);
 	if (error)
 		return error;
@@ -2855,9 +2857,6 @@ xfs_dm_mount(
 	error = dm_send_mount_event(vfsp, DM_RIGHT_NULL, NULL, DM_RIGHT_NULL,
 				    rootbdp, DM_RIGHT_NULL, dir_name,
 				    fsname);
-
-	if (error == 0)
-		dm_hookup_vfsmount(vfsp, mnt);
 
 	return error;
 }

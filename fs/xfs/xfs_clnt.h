@@ -63,6 +63,7 @@ struct xfs_args {
 	char	fsname[MAXNAMELEN];	/* data device name */
 	char	rtname[MAXNAMELEN];	/* realtime device filename */
 	char	logname[MAXNAMELEN];	/* journal device filename */
+	char	mtpt[MAXNAMELEN];	/* filesystem mount point */
 	int	sunit;		/* stripe unit (BBs) */
 	int	swidth;		/* stripe width (BBs), multiple of sunit */
 	uchar_t	iosizelog;	/* log2 of the preferred I/O size */
