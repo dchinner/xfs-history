@@ -89,30 +89,6 @@ xfs_setattr(
 #else
 #define MAX_DIO_SIZE(mp)	XFS_B_TO_FSBT((mp), KIO_MAX_ATOMIC_IO << 10)
 #define XFS_TO_LINUX_DEVT(dev)	(kdev_t_to_nr(XFS_DEV_TO_KDEVT(dev)))
-
-static inline int
-open_private_file(struct file *file, struct dentry *dentry, int oflags)
-{
-	mode_t fmode = (oflags+1) & O_ACCMODE;
-	int error = init_private_file(file, dentry, fmode);
-
-	if (error == -EFBIG) {
-		/* try again */
-		file->f_flags = oflags;
-		error = file->f_op->open(dentry->d_inode, file);
-	}
-
-	if (!error)
-		 file->f_flags = oflags;
-	return error;
-}
-
-static inline void
-close_private_file(struct file *file)
-{
-	if (file->f_op->release)
-		file->f_op->release(file->f_dentry->d_inode, file);
-}
 #endif
 
 /* Structure used to hold the on-disk version of a dm_attrname_t.  All
@@ -247,10 +223,8 @@ prohibited_mr_events(
 	 */
 	spin_lock(&mapping->i_mmap_lock);
 	if (!prio_tree_empty(&mapping->i_mmap)) {
-		struct inode *ip = LINVFS_GET_IP(vp);
 		struct prio_tree_iter iter;
-		while ((vma = vma_prio_tree_next(vma, &mapping->i_mmap,
-					&iter, 0, ip->i_size)) != NULL) {
+		while ((vma = vma_prio_tree_next(vma, &iter)) != NULL) {
 			/* SPECIAL CASE: all events prohibited if any mmap
 			 * areas with VM_EXEC
 			 */
@@ -272,7 +246,7 @@ prohibited_mr_events(
 	spin_unlock(&mapping->i_mmap_lock);
 #else
 	spin_lock(&mapping->i_shared_lock);
-	for (vma = mapping->i_mmap_shared; vma; vma = vma->vm_next_share) {
+	for (vma = mapping->i_mmap_shared; vma; vma = vma->vm_next) {
 		if (!(vma->vm_flags & VM_DENYWRITE)) {
 			prohibited |= (1 << DM_EVENT_WRITE);
 			break;
@@ -1069,12 +1043,12 @@ xfs_dm_rdwr(
 {
 	int		error;
 	int		oflags;
+	int		ioflags;
 	ssize_t		xfer;
-	struct file	file;
+	struct file	*file;
 	struct inode	*inode;
 	struct dentry	*dentry;
 	bhv_desc_t	*xbdp;
-	int		have_write_access = 0;
 
 	if (off < 0 || vp->v_type != VREG)
 		return(EINVAL);
@@ -1092,9 +1066,12 @@ xfs_dm_rdwr(
 	 */
 
 	oflags |= O_LARGEFILE | O_NONBLOCK;
+	ioflags = IO_INVIS;
 	XFS_BHV_LOOKUP(vp, xbdp);
-	if (xfs_dm_direct_ok(xbdp, off, len, bufp))
+	if (xfs_dm_direct_ok(xbdp, off, len, bufp)) {
+		ioflags |= IO_ISDIRECT;
 		oflags |= O_DIRECT;
+	}
 
 	if (fflag & O_SYNC)
 		oflags |= O_SYNC;
@@ -1113,29 +1090,27 @@ xfs_dm_rdwr(
 		return ENOMEM;
 	}
 
-	/* If the file is an executable, and some proc is trying to execute it
-	 * then get_write_access() will return ETXTBUSY.
-	 * We know that all threads, including any trying to execute
-	 * the file, are blocked on WRITE and READ events waiting for this
-	 * file to come online.
-	 */
 	if (fmode & FMODE_WRITE) {
-		error = get_write_access(inode);
-		if (!error)
-			have_write_access = 1;
+		error = -get_write_access(inode);
+		if (error) {
+			dput(dentry);
+			return error;
+		}
 	}
 
-	error = open_private_file(&file, dentry, oflags);
-	if (error) {
-		error = EINVAL;
-		goto put_access;
+	file = dentry_open(dentry, NULL, oflags);
+	if (IS_ERR(file)) {
+		/* dentry_open did the dput */
+		if (fmode & FMODE_WRITE)
+			put_write_access(inode);
+		return EINVAL;
 	}
-	file.f_op = &linvfs_invis_file_operations;
+	file->f_op = &linvfs_invis_file_operations;
 
 	if (fmode & FMODE_READ) {
-		xfer = file.f_op->read(&file, bufp, len, (loff_t*)&off);
+		xfer = file->f_op->read(file, bufp, len, (loff_t*)&off);
 	} else {
-		xfer = file.f_op->write(&file, bufp, len, (loff_t*)&off);
+		xfer = file->f_op->write(file, bufp, len, (loff_t*)&off);
 	}
 
 	if (xfer >= 0) {
@@ -1146,9 +1121,9 @@ xfs_dm_rdwr(
 		error = -(int)xfer;
 	}
 
-	close_private_file(&file);
- put_access:
-	if ((fmode & FMODE_WRITE) && have_write_access)
+	if (file->f_op->release)
+		file->f_op->release(file->f_dentry->d_inode, file);
+	if (fmode & FMODE_WRITE)
 		put_write_access(inode);
 	dput(dentry);
 	return error;
