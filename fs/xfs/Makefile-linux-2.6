@@ -2,7 +2,7 @@
 #
 # Makefile for SGI xFS
 #
-# $Revision$
+# $Revision: 1.1 $
 DEPTH?=../..
 include ${DEPTH}/kcommondefs
 KPATH=$(TOP)/fs/xfs
@@ -27,6 +27,8 @@ XFS_CSRCS=	byte_to_bits.c \
 		xfs_trans.c \
 		xfs_trans_ail.c \
 		xfs_trans_async.c \
+		xfs_trans_buf.c \
+		xfs_trans_inode.c \
 		xfs_trans_item.c
 XFS_OBJS=$(XFS_CSRCS:.c=.o)
 $(XFS_NAME):$(XFS_NAME)($(XFS_OBJS)) MAKELIB
