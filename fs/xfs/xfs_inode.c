@@ -509,8 +509,9 @@ xfs_itruncate(xfs_trans_t	**tp,
 	xfs_fsblock_t	first_block;
 	xfs_fsblock_t	first_unmap_block;
 	xfs_fsblock_t	last_block;
-	xfs_extlen_t	unmap_len;
 	__int64_t	last_byte;
+	off_t		toss_start;
+	xfs_extlen_t	unmap_len;
 	xfs_mount_t	*mp;
 	xfs_sb_t	*sbp;
 	xfs_trans_t	*ntp;
@@ -532,10 +533,16 @@ xfs_itruncate(xfs_trans_t	**tp,
 	 * overlapping the region being removed.  Make sure
 	 * to catch any pages brought in by buffers overlapping
 	 * the EOF by searching out beyond the isize by our
-	 * writeio size.
+	 * writeio size. We round new_size up to a block boundary
+	 * so that we don't toss things on the same block as
+	 * new_size but before it.
 	 */
+	toss_start = xfs_b_to_fsb(sbp, new_size);
+	toss_start = xfs_fsb_to_b(sbp, toss_start);
 	last_byte = ip->i_d.di_size + (1 << mp->m_writeio_log);
-	ptossvp(XFS_ITOV(ip), new_size, last_byte);
+	if (last_byte > toss_start) {
+		ptossvp(XFS_ITOV(ip), toss_start, last_byte);
+	}
 
 	sbp = &(mp->m_sb);
 	first_unmap_block = xfs_b_to_fsb(sbp, new_size);
@@ -603,7 +610,8 @@ xfs_itruncate(xfs_trans_t	**tp,
 void
 xfs_igrow(xfs_trans_t	*tp,
 	  xfs_inode_t	*ip,
-	  __int64_t	new_size)
+	  __int64_t	new_size,
+	  cred_t	*credp)
 {
 	__int64_t	isize;
 	timestruc_t	tv;
@@ -619,7 +627,7 @@ xfs_igrow(xfs_trans_t	*tp,
 		 * Zero any pages that may have been created by
 		 * xfs_write_file() beyond the end of the file.
 		 */
-		xfs_zero_eof(ip, new_size, isize);
+		xfs_zero_eof(ip, new_size, isize, credp);
 	}
 
 	/*
