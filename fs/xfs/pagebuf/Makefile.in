@@ -4,7 +4,8 @@
 
 expsyms(page_buf.o page_buf_io.o page_buf_locking.o)
 objlink(pagebuf.o avl.o page_buf.o page_buf_io.o page_buf_locking.o)
-select(CONFIG_PAGE_BUF pagebuf.o)
+# No select() for xfs/pagebuf in this directory.  It is a sub-component of XFS,
+# see fs/xfs/Makefile.in for the objlink.
 
 # Debug options:
 #	-DCONFIG_AVL_DEBUG
