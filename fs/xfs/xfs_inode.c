@@ -414,6 +414,7 @@ xfs_ialloc(xfs_trans_t	*tp,
 	case IFLNK:
 /*		ip->i_d.di_format = XFS_DINODE_FMT_LOCAL; */
 		ip->i_d.di_format = XFS_DINODE_FMT_EXTENTS;
+		ip->i_flags |= XFS_IEXTENTS;
 		break;
 	case IFMNT:
 		ip->i_d.di_format = XFS_DINODE_FMT_UUID;
@@ -577,9 +578,15 @@ xfs_iext_realloc(xfs_inode_t *ip, int ext_diff)
 		 * copy them from the malloc'd vector and free it.
 		 */
 		if (ip->i_u1.iu_extents != ip->i_u2.iu_inline_ext) {
-			bcopy(ip->i_u1.iu_extents, ip->i_u2.iu_inline_ext,
-			      new_size);
-			kmem_free(ip->i_u1.iu_extents, ip->i_bytes);
+			/*
+			 * For now, empty files are format EXTENTS,
+			 * so the iu_extents pointer is null.
+			 */
+			if (ip->i_u1.iu_extents) {
+				bcopy(ip->i_u1.iu_extents,
+				      ip->i_u2.iu_inline_ext, new_size);
+				kmem_free(ip->i_u1.iu_extents, ip->i_bytes);
+			}
 			ip->i_u1.iu_extents = ip->i_u2.iu_inline_ext;
 		}
 	} else {
