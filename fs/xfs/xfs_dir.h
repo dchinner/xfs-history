@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_H
 #define	_FS_XFS_DIR_H
 
-#ident	"$Revision: 1.14 $"
+#ident	"$Revision: 1.15 $"
 
 /*
  * xfs_dir.h
@@ -103,7 +103,7 @@ struct xfs_dir_leafblock {
 		struct xfs_dir_blkinfo info;	/* block type, links, etc. */
 		__uint16_t count;	/* count of active leaf_entry's */
 		__uint16_t namebytes;	/* num bytes of name strings stored */
-		__uint16_t firstused;	/* first used byte in name area */
+		__uint16_t firstused;	/* 1st used name byte - sizeof(hdr) */
 		__uint8_t  holes;	/* != 0 if blk needs compaction */
 		__uint8_t  pad1;
 		struct xfs_dir_leaf_map {/* RLE map of free bytes */
