@@ -132,10 +132,6 @@ typedef struct xfs_dirent {		/* data from readdir() */
 #define FSC_NOTIFY_NAME_CHANGED(vp)
 #endif
 
-#ifndef ENOTSUP
-#define ENOTSUP		EOPNOTSUPP	/* Not supported (POSIX 1003.1b) */
-#endif
-
 #ifndef ENOATTR
 #define ENOATTR		ENODATA		/* Attribute not found */
 #endif
