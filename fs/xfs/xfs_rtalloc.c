@@ -264,7 +264,7 @@ xfs_rtallocate_extent_block(
 		return besti;
 	}
 	*nextp = next;
-	return NULLFSBLOCK;
+	return NULLRTBLOCK;
 }
 
 STATIC xfs_rtblock_t
@@ -293,11 +293,11 @@ xfs_rtallocate_extent_exact(
 	}
 	maxlen = next - base;
 	if (maxlen < minlen)
-		return NULLFSBLOCK;
+		return NULLRTBLOCK;
 	if (prod > 1 && (i = maxlen % prod)) {
 		maxlen -= i;
 		if (maxlen < minlen)
-			return NULLFSBLOCK;
+			return NULLRTBLOCK;
 	}
 	xfs_rtallocate_range(tp, base, maxlen, rbuf, rsb);
 	*len = maxlen;
@@ -330,7 +330,7 @@ xfs_rtallocate_extent_near(
 		bno = mp->m_sb.sb_rextents - 1;
 	r = xfs_rtallocate_extent_exact(tp, bno, minlen, maxlen, len, rbuf,
 		rsb, prod);
-	if (r != NULLFSBLOCK)
+	if (r != NULLRTBLOCK)
 		return r;
 	bbno = XFS_BITTOBLOCK(mp, bno);
 	i = 0;
@@ -342,15 +342,15 @@ xfs_rtallocate_extent_near(
 			    (r = xfs_rtallocate_extent_block(tp, bbno + i,
 					minlen, maxlen, len, &n, rbuf, rsb,
 					prod)) !=
-					NULLFSBLOCK)
+					NULLRTBLOCK)
 				return r;
 			else if (i < 0) {
 				for (j = -1; j > i; j--) {
 					if (!xfs_rtany_summary(mp, tp, log2len, mp->m_rsumlevels - 1, bbno + j, rbuf, rsb)) {
-						if ((r = xfs_rtallocate_extent_block(tp, bbno + j, minlen, maxlen, len, &n, rbuf, rsb, prod)) != NULLFSBLOCK)
+						if ((r = xfs_rtallocate_extent_block(tp, bbno + j, minlen, maxlen, len, &n, rbuf, rsb, prod)) != NULLRTBLOCK)
 							return r;
 					}
-					if ((r = xfs_rtallocate_extent_block(tp, bbno + i, minlen, maxlen, len, &n, rbuf, rsb, prod)) != NULLFSBLOCK)
+					if ((r = xfs_rtallocate_extent_block(tp, bbno + i, minlen, maxlen, len, &n, rbuf, rsb, prod)) != NULLRTBLOCK)
 						return r;
 				}
 			}
@@ -366,7 +366,7 @@ xfs_rtallocate_extent_near(
 		else
 			break;
 	}
-	return NULLFSBLOCK;
+	return NULLRTBLOCK;
 }
 
 STATIC xfs_rtblock_t
@@ -391,25 +391,25 @@ xfs_rtallocate_extent_size(
 		for (i = 0; i < mp->m_sb.sb_rbmblocks; i++) {
 			if (!xfs_rtget_summary(mp, tp, l, i, rbuf, rsb))
 				continue;
-			if ((r = xfs_rtallocate_extent_block(tp, i, maxlen, maxlen, len, &n, rbuf, rsb, prod)) != NULLFSBLOCK)
+			if ((r = xfs_rtallocate_extent_block(tp, i, maxlen, maxlen, len, &n, rbuf, rsb, prod)) != NULLRTBLOCK)
 				return r;
 			if (XFS_BITTOBLOCK(mp, n) > i + 1)
 				i = XFS_BITTOBLOCK(mp, n) - 1;
 		}
 	}
 	if (minlen > --maxlen)
-		return NULLFSBLOCK;
+		return NULLRTBLOCK;
 	for (l = xfs_rthibit(maxlen); l >= xfs_rthibit(minlen); l--) {
 		for (i = 0; i < mp->m_sb.sb_rbmblocks; i++) {
 			if (!xfs_rtget_summary(mp, tp, l, i, rbuf, rsb))
 				continue;
-			if ((r = xfs_rtallocate_extent_block(tp, i, XFS_RTMAX(minlen, 1 << l), XFS_RTMIN(maxlen, (1 << (l + 1)) - 1), len, &n, rbuf, rsb, prod)) != NULLFSBLOCK)
+			if ((r = xfs_rtallocate_extent_block(tp, i, XFS_RTMAX(minlen, 1 << l), XFS_RTMIN(maxlen, (1 << (l + 1)) - 1), len, &n, rbuf, rsb, prod)) != NULLRTBLOCK)
 				return r;
 			if (XFS_BITTOBLOCK(mp, n) > i + 1)
 				i = XFS_BITTOBLOCK(mp, n) - 1;
 		}
 	}
-	return NULLFSBLOCK;
+	return NULLRTBLOCK;
 }
 
 STATIC void
@@ -1082,7 +1082,7 @@ xfs_rtallocate_extent(
 		if (i = minlen % prod)
 			minlen += prod - i;
 		if (maxlen < minlen)
-			return NULLFSBLOCK;
+			return NULLRTBLOCK;
 	}
 	xfs_ilock(mp->m_rbmip, XFS_ILOCK_EXCL);
 	switch (type) {
@@ -1100,7 +1100,7 @@ xfs_rtallocate_extent(
 		break;
 	}
 	xfs_iunlock(mp->m_rbmip, XFS_ILOCK_EXCL);
-	if (r != NULLFSBLOCK) {
+	if (r != NULLRTBLOCK) {
 		int slen = (int)*len;
 
 		ASSERT(*len >= minlen && *len <= maxlen);
