@@ -621,7 +621,7 @@ xfs_get_fsinfo(int fd, char **fsname, int64_t *fsid)
 	xfs_mount_t *mp;
 	int error;
 
-	if ((error = xfs_fd_to_mp(fd, 0, &mp, 1)))
+	if ((error = xfs_fd_to_mp(fd, 0, &mp, 1, 0)))
 		return XFS_ERROR(error);
 
 	*fsname = mp->m_fsname;

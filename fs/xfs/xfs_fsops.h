@@ -64,4 +64,12 @@ xfs_reserve_blocks(
 	__uint64_t		*inval, 
 	xfs_fsop_resblks_t	*outval);
 
+int
+xfs_fs_freeze(
+	xfs_mount_t		*mp);
+
+int
+xfs_fs_thaw(
+	xfs_mount_t		*mp);
+
 #endif	/* __XFS_FSOPS_H__ */

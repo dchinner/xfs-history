@@ -800,11 +800,13 @@ xfs_inumbers(
  * a mount structure pointer.
  */
 int						/* error status */
+/* ARGSUSED */
 xfs_fd_to_mp(
 	int		fd,			/* file descriptor to convert */
 	int		wperm,			/* need write perm on device */
 	xfs_mount_t	**mpp,			/* return mount pointer */
-	int		rperm)			/* set if root per on file fd */
+	int		rperm,			/* set if root per on file fd */
+	int		cfunc)			/* cxfs function */
 {
 	dev_t		dev;
 	int		error;
@@ -834,7 +836,7 @@ xfs_fd_to_mp(
 	bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
 	if (!bdp) {
 #if CELL_CAPABLE
-		if (cell_enabled && (rperm == 0)) {
+		if (cell_enabled && cfunc) {
 #pragma mips_frequency_hint NEVER
 			*mpp = get_cxfs_mountp(vfsp);
 			if (*mpp)

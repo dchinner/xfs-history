@@ -115,9 +115,11 @@ _xfs_force_shutdown(
 #define XFS_MAX_DRELSE_RETRIES	10
 	logerror = flags & XFS_LOG_IO_ERROR;
 
-	cmn_err(CE_NOTE,
+	if (!(flags & XFS_FORCE_UMOUNT)) {
+		cmn_err(CE_NOTE,
 		"xfs_force_shutdown(%s,0x%x) called from line %d of file %s.  Return address = 0x%x",
 			mp->m_fsname,flags,lnnum,fname,__return_address); 
+	}
 	/*
 	 * No need to duplicate efforts.
 	 */
@@ -140,7 +142,7 @@ _xfs_force_shutdown(
 		cmn_err(CE_ALERT,
     "Corruption of in-memory data detected.  Shutting down filesystem: %s",
 			mp->m_fsname);
-	} else {
+	} else if (!(flags & XFS_FORCE_UMOUNT)) {
 		if (logerror) {
 			cmn_err(CE_ALERT,
 			"Log I/O Error Detected.  Shutting down filesystem: %s",
@@ -158,8 +160,10 @@ _xfs_force_shutdown(
 				mp->m_fsname);
 		}
 	}
-	cmn_err(CE_ALERT,
+	if (!(flags & XFS_FORCE_UMOUNT)) {
+		cmn_err(CE_ALERT,
 		"Please umount the filesystem, and rectify the problem(s)");
+	}
 
 	/*
 	 * Release all delayed write buffers for this device.

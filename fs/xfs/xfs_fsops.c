@@ -510,3 +510,55 @@ xfs_reserve_blocks(
 	XFS_SB_UNLOCK(mp, s);
 	return(0);
 }
+
+
+int
+xfs_fs_freeze(
+	xfs_mount_t	*mp)
+{
+	vfs_t		*vfsp;
+	/*REFERENCED*/
+	int		error;
+
+	vfsp = XFS_MTOVFS(mp);
+
+	/* Stop new writers */
+	xfs_start_freeze(mp, XFS_FREEZE_WRITE);
+
+	/* Flush the refcache */
+	xfs_refcache_purge_mp(mp);
+
+	/* Flush delalloc and delwri data */
+	VFS_SYNC(vfsp, SYNC_DELWRI|SYNC_WAIT, sys_cred, error);
+
+	/* Flush inactive inodes */
+	xfs_iflush_all(mp, XFS_FLUSH_ALL);
+
+	/* Pause transaction subsystem */
+	xfs_start_freeze(mp, XFS_FREEZE_TRANS);
+
+	/* Flush any remaining inodes into buffers */
+	VFS_SYNC(vfsp, SYNC_ATTR|SYNC_WAIT, sys_cred, error);
+
+	/* Push all buffers out to disk */
+	xfs_binval(mp->m_ddev_targ);
+	if (mp->m_rtdev != NODEV) {
+		xfs_binval(mp->m_rtdev_targ);
+	}
+
+	/* Push the superblock and write an unmount record */
+	xfs_log_unmount_write(mp);
+	xfs_unmountfs_writesb(mp);
+
+	return 0;
+}
+
+
+int
+xfs_fs_thaw(
+	xfs_mount_t	*mp)
+{
+	xfs_unmountfs_writesb(mp);
+	xfs_finish_freeze(mp);
+	return 0;
+}

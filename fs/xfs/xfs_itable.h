@@ -48,7 +48,8 @@ xfs_fd_to_mp(
 	int			fd,	/* file descriptor */
 	int			wperm,	/* need write perm on device fd */
 	struct xfs_mount	**mpp,	/* output: mount structure pointer */
-	int			rperm);	/* need root perm on file fd */
+	int			rperm,	/* need root perm on file fd */
+	int			cfunc);	/* cxfs function */
 
 /* 
  * xfs_bulkstat() is used to fill in xfs_bstat structures as well as dm_stat

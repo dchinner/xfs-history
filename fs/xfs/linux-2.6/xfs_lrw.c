@@ -609,9 +609,6 @@ xfs_write(
         
 	vp = BHV_TO_VNODE(bdp);
 	xip = XFS_BHVTOI(bdp);
-	if (XFS_FORCED_SHUTDOWN(xip->i_mount)) {
-		return EIO;
-	}
 
         buf = uiop->uio_iov->iov_base;
         size = uiop->uio_iov->iov_len;
@@ -622,7 +619,11 @@ xfs_write(
 	io = &(xip->i_iocore);
 	mp = io->io_mount;
 
-	xfs_check_frozen(mp, XFS_FREEZE_WRITE);
+	xfs_check_frozen(mp, bdp, ioflag, XFS_FREEZE_WRITE);
+
+	if (XFS_FORCED_SHUTDOWN(xip->i_mount)) {
+		return EIO;
+	}
 
 	if (direct) {
 		if (((__psint_t)buf & (ip->i_sb->s_blocksize - 1)) ||

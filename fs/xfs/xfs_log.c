@@ -802,7 +802,7 @@ xfs_log_need_covered(xfs_mount_t *mp)
 	int 		spl, needed = 0, gen;
 	xlog_t		*log = mp->m_log; 
 
-	if (mp->m_frozen)
+	if (mp->m_frozen || XFS_FORCED_SHUTDOWN(mp))
 		return 0;
 
 	spl = LOG_LOCK(log);
