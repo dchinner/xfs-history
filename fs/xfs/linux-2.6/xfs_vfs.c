@@ -31,9 +31,6 @@
  */
 
 #include <xfs.h>
-
-#undef  NODEV
-#include <linux/version.h>
 #include <linux/locks.h>
 #include <linux/smp_lock.h>
 

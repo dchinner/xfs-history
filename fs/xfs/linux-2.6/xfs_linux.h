@@ -38,6 +38,7 @@
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/string.h>
+#include <linux/kdev_t.h>
 #include <asm/page.h>
 #include <asm/param.h>
 #include <asm/byteorder.h>
@@ -92,6 +93,21 @@ typedef struct pathname {
 	u_short	pn_complen;	/* last component length */
 } pathname_t;
 
+typedef struct statvfs {
+	ulong_t	f_bsize;	/* fundamental file system block size */
+	ulong_t	f_frsize;	/* fragment size */
+	__uint64_t f_blocks;	/* total # of blocks of f_frsize on fs */
+	__uint64_t f_bfree;	/* total # of free blocks of f_frsize */
+	__uint64_t f_bavail;	/* # of free blocks avail to non-superuser */
+	__uint64_t f_files;	/* total # of file nodes (inodes) */
+	__uint64_t f_ffree;	/* total # of free file nodes */
+	__uint64_t f_favail;	/* # of free nodes avail to non-superuser */
+	ulong_t	f_namemax;	/* maximum file name length */
+	ulong_t	f_fsid;		/* file system id (dev for now) */
+	char	f_basetype[16];	/* target fs type name, null-terminated */
+	char	f_fstr[32];	/* filesystem-specific string */
+} statvfs_t;
+
 typedef __u64	xfs_off_t;
 typedef __s32	xfs32_off_t;
 typedef __u64	xfs_ino_t;	/* <inode> type */
@@ -139,6 +155,59 @@ typedef __uint32_t	xfs_dev_t;
 #endif	/* PTE_64BIT */
 #endif
 
+/* bytes to clicks */
+#ifdef BPCSHIFT
+#define	btoc(x)		(((__psunsigned_t)(x)+(NBPC-1))>>BPCSHIFT)
+#define	btoct(x)	((__psunsigned_t)(x)>>BPCSHIFT)
+#define	btoc64(x)	(((__uint64_t)(x)+(NBPC-1))>>BPCSHIFT)
+#define	btoct64(x)	((__uint64_t)(x)>>BPCSHIFT)
+#define	io_btoc(x)	(((__psunsigned_t)(x)+(IO_NBPC-1))>>IO_BPCSHIFT)
+#define	io_btoct(x)	((__psunsigned_t)(x)>>IO_BPCSHIFT)
+#else
+#define	btoc(x)		(((__psunsigned_t)(x)+(NBPC-1))/NBPC)
+#define	btoct(x)	((__psunsigned_t)(x)/NBPC)
+#define	btoc64(x)	(((__uint64_t)(x)+(NBPC-1))/NBPC)
+#define	btoct64(x)	((__uint64_t)(x)/NBPC)
+#define	io_btoc(x)	(((__psunsigned_t)(x)+(IO_NBPC-1))/IO_NBPC)
+#define	io_btoct(x)	((__psunsigned_t)(x)/IO_NBPC)
+#endif
+
+/* off_t bytes to clicks */
+#ifdef BPCSHIFT
+#define offtoc(x)       (((__uint64_t)(x)+(NBPC-1))>>BPCSHIFT)
+#define offtoct(x)      ((xfs_off_t)(x)>>BPCSHIFT)
+#else
+#define offtoc(x)       (((__uint64_t)(x)+(NBPC-1))/NBPC)
+#define offtoct(x)      ((xfs_off_t)(x)/NBPC)
+#endif
+
+/* clicks to off_t bytes */
+#ifdef BPCSHIFT
+#define	ctooff(x)	((xfs_off_t)(x)<<BPCSHIFT)
+#else
+#define	ctooff(x)	((xfs_off_t)(x)*NBPC)
+#endif
+
+/* clicks to bytes */
+#ifdef BPCSHIFT
+#define	ctob(x)		((__psunsigned_t)(x)<<BPCSHIFT)
+#define btoct(x)        ((__psunsigned_t)(x)>>BPCSHIFT)
+#define	ctob64(x)	((__uint64_t)(x)<<BPCSHIFT)
+#define	io_ctob(x)	((__psunsigned_t)(x)<<IO_BPCSHIFT)
+#else
+#define	ctob(x)		((__psunsigned_t)(x)*NBPC)
+#define btoct(x)        ((__psunsigned_t)(x)/NBPC)
+#define	ctob64(x)	((__uint64_t)(x)*NBPC)
+#define	io_ctob(x)	((__psunsigned_t)(x)*IO_NBPC)
+#endif
+
+/* bytes to clicks */
+#ifdef BPCSHIFT
+#define btoc(x)         (((__psunsigned_t)(x)+(NBPC-1))>>BPCSHIFT)
+#else
+#define btoc(x)         (((__psunsigned_t)(x)+(NBPC-1))/NBPC)
+#endif
+
 
 #define bzero(p,s)	memset((p), 0, (s))
 #define bcopy(s,d,n)	memcpy((d),(s),(n))
@@ -175,6 +244,13 @@ typedef __uint32_t	xfs_dev_t;
 
 #define	PLTWAIT 0x288 /* O'01000' */
 #define	PVFS	27
+
+#define FREAD		0x01
+#define FWRITE		0x02
+#define FNDELAY		0x04
+#define FNONBLOCK	0x80
+#define FINVIS		0x0100	/* don't update timestamps - XFS */
+#define FSOCKET		0x0200	/* open file refers to a vsocket */
 
 #define MIN(a,b)	(((a)<(b))?(a):(b))
 #define MAX(a,b)	(((a)>(b))?(a):(b))

@@ -38,12 +38,8 @@
  */
 
 #include <xfs.h>
-
-#undef  NODEV
-#include <linux/version.h>
-#include <linux/locks.h>
-#include <linux/slab.h>
 #include <linux/mm.h>
+#include <linux/locks.h>
 #include <linux/xfs_iops.h>
 #include <linux/xfs_file.h>
 

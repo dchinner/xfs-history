@@ -31,9 +31,6 @@
  */
 
 #include <xfs.h>
-
-#undef  NODEV
-#include <linux/version.h>
 #include <linux/bitops.h>
 #include <linux/locks.h>
 #include <linux/xfs_iops.h>
@@ -42,10 +39,6 @@
 #include <linux/page_buf.h>
 
 #define	MS_DATA		0x04
-
-#ifdef sysinfo
-#undef sysinfo
-#endif
 
 /* xfs_vfs.c */
 

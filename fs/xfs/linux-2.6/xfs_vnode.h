@@ -37,6 +37,34 @@
 #define ISVDEV(t) \
 	((t) == VCHR || (t) == VBLK || (t) == VFIFO || (t) == VSOCK)
 
+/*
+ * Conversion between vnode types/modes and encoded type/mode as
+ * seen by stat(2) and mknod(2).
+ */
+extern enum vtype       iftovt_tab[];
+extern ushort           vttoif_tab[];
+#define IFTOVT(M)       (iftovt_tab[((M) & S_IFMT) >> 12])
+#define VTTOIF(T)       (vttoif_tab[(int)(T)])
+#define MAKEIMODE
+/* XXXnathans MAKEIMODE looks dodgey - should be...? */
+/* #define MAKEIMODE(type,mode)	(mode)	- for Linux? */
+
+/*
+ * One file structure is allocated for each call to open/creat/pipe.
+ * Mainly used to hold the read/write pointer associated with each
+ * open file.
+ * vf_lock protects:
+ *      vf_flag
+ */
+typedef struct vfile {
+	lock_t	vf_lock;	/* spinlock for vf_flag */
+	int	vf_flag;
+	void	*__vf_data__;	/* DON'T ACCESS DIRECTLY */
+} vfile_t;
+
+#define VF_TO_VNODE(vfp)	\
+	(ASSERT(!((vfp)->vf_flag & FSOCKET)), (vnode_t *)(vfp)->__vf_data__)
+#define VF_IS_VNODE(vfp)	(!((vfp)->vf_flag & FSOCKET))
 
 /*
  * Vnode flags.

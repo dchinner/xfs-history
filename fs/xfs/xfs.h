@@ -58,17 +58,12 @@
 #include <linux/xfs_vnode.h>
 #include <linux/xfs_fs_subr.h>
 #include <pseudo-inc/sys/ktrace.h>
-#include <pseudo-inc/sys/sysmacros.h>
 #include <linux/xfs_move.h>
 #include <pseudo-inc/sys/quota.h>
 #include <pseudo-inc/sys/dirent.h>
-#include <pseudo-inc/sys/statvfs.h>
 #include <pseudo-inc/sys/attributes.h>
 #include <pseudo-inc/sys/acl.h>
 #include <pseudo-inc/sys/kabi.h>
-#include <pseudo-inc/sys/mode.h>
-#include <pseudo-inc/sys/file.h>
-#include <pseudo-inc/ksys/vfile.h>
 #include <pseudo-inc/ksys/fsc_notify.h>
 
 #include <linux/slab.h>

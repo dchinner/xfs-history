@@ -35,10 +35,6 @@
  */
 
 #include <xfs.h>
-#include <linux/xfs_lrw.h>
-
-#undef  NODEV
-#include <linux/version.h>
 #include <linux/page_buf.h>
 #include <linux/pagemap.h>
 #include <linux/capability.h>
