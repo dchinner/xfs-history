@@ -1276,6 +1276,8 @@ xfs_ifree(
 
 	xfs_difree(tp, ip->i_ino);
 	ip->i_d.di_mode = 0;		/* mark incore inode as free */
+	ip->i_d.di_flags = 0;
+
 	/*
 	 * Bump the generation count so no one will be confused
 	 * by reincarnations of this inode.
