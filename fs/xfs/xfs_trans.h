@@ -572,6 +572,7 @@ typedef struct xfs_trans {
 #define	XFS_LINK_LOG_COUNT		2
 #define	XFS_RENAME_LOG_COUNT		2
 #define	XFS_WRITE_LOG_COUNT		2     
+#define	XFS_ADDAFORK_LOG_COUNT		2
 
 
 /*
