@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_LEAF_H
 #define	_FS_XFS_DIR_LEAF_H
 
-#ident	"$Revision: 1.13 $"
+#ident	"$Revision: 1.14 $"
 
 /*
  * xfs_dir_leaf.h
@@ -233,7 +233,7 @@ int	xfs_dir_put_dirent32_direct(xfs_dir_put_args_t *pa);
 int	xfs_dir_put_dirent32_uio(xfs_dir_put_args_t *pa);
 int	xfs_dir_put_dirent64_direct(xfs_dir_put_args_t *pa);
 int	xfs_dir_put_dirent64_uio(xfs_dir_put_args_t *pa);
-int	xfs_dir_ino_validate(xfs_mount_t *mp, xfs_ino_t ino);
+int	xfs_dir_ino_validate(struct xfs_mount *mp, xfs_ino_t ino);
 
 
 /*
