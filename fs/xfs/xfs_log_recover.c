@@ -93,7 +93,7 @@ xlog_bread(xlog_t	*log,
 	xfsbdstrat(log->l_mp, bp);
 	if ((error = xfs_iowait(bp))) {
 		xfs_ioerror_alert("xlog_bread", log->l_mp, 
-				  XFS_BUF_TARGET(bp), XFS_BUF_ADDR(bp));
+				  bp, XFS_BUF_ADDR(bp));
 		return (error);
 	}
 	return error;
@@ -126,7 +126,7 @@ xlog_bwrite(
 
 	if ((error = xfs_bwrite(log->l_mp, bp))) 
 		xfs_ioerror_alert("xlog_bwrite", log->l_mp, 
-				  XFS_BUF_TARGET(bp), XFS_BUF_ADDR(bp));
+				  bp, XFS_BUF_ADDR(bp));
 	
 	return (error);
 }	/* xlog_bwrite */
@@ -225,6 +225,8 @@ xlog_recover_iodone(
 		 * this during recovery. One strike!
 		 */
 		mp = XFS_BUF_FSPRIVATE(bp, xfs_mount_t *);
+		xfs_ioerror_alert("xlog_recover_iodone",
+				  mp, bp, XFS_BUF_ADDR(bp));
 		xfs_force_shutdown(mp, XFS_METADATA_IO_ERROR);
 	}
 	XFS_BUF_SET_FSPRIVATE(bp, NULL);
@@ -1896,8 +1898,8 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 		bp = xfs_buf_read(mp->m_ddev_targp, blkno, len, 0);
 	}
 	if (XFS_BUF_ISERROR(bp)) {
-		xfs_ioerror_alert("xlog_recover_do..(read)", log->l_mp, 
-				  mp->m_dev, blkno);
+		xfs_ioerror_alert("xlog_recover_do..(read#1)", log->l_mp, 
+				  bp, blkno);
 		error = XFS_BUF_GETERROR(bp);
 		xfs_buf_relse(bp);
 		return error;
@@ -1993,8 +1995,8 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	bp = xfs_buf_read_flags(mp->m_ddev_targp, imap.im_blkno, imap.im_len,
 								XFS_BUF_LOCK);
 	if (XFS_BUF_ISERROR(bp)) {
-		xfs_ioerror_alert("xlog_recover_do..(read)", mp, 
-				  mp->m_dev, imap.im_blkno);
+		xfs_ioerror_alert("xlog_recover_do..(read#2)", mp, 
+				  bp, imap.im_blkno);
 		error = XFS_BUF_GETERROR(bp);
 		xfs_buf_relse(bp);
 		return error;
@@ -2284,8 +2286,8 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 			     XFS_FSB_TO_BB(mp, dq_f->qlf_len),
 			     0, &bp);
 	if (error) {
-		xfs_ioerror_alert("xlog_recover_do..(read)", mp, 
-				  mp->m_dev, dq_f->qlf_blkno);
+		xfs_ioerror_alert("xlog_recover_do..(read#3)", mp, 
+				  bp, dq_f->qlf_blkno);
 		return error;
 	}
 	ASSERT(bp);
@@ -2879,6 +2881,10 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 		 */
 		agidaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
 		agibp = xfs_buf_read(mp->m_ddev_targp, agidaddr, 1, 0);
+		if (XFS_BUF_ISERROR(agibp)) {
+			xfs_ioerror_alert("xlog_recover_process_iunlinks(agi#1)",
+					  log->l_mp, agibp, agidaddr);
+		}
 		agi = XFS_BUF_TO_AGI(agibp);
 		ASSERT(INT_GET(agi->agi_magicnum, ARCH_CONVERT) == XFS_AGI_MAGIC);
 
@@ -2962,6 +2968,10 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 			agidaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
 			agibp = xfs_buf_read(mp->m_ddev_targp,
 					 agidaddr, 1, 0);
+			if (XFS_BUF_ISERROR(agibp)) {
+				xfs_ioerror_alert("xlog_recover_process_iunlinks(agi#2)",
+						  log->l_mp, agibp, agidaddr);
+			}
 			agi = XFS_BUF_TO_AGI(agibp);
 			ASSERT(INT_GET(agi->agi_magicnum, ARCH_CONVERT) == XFS_AGI_MAGIC);
 		}
@@ -3298,6 +3308,8 @@ xlog_do_recover(xlog_t	*log,
 	XFS_BUF_READ(bp);
 	xfsbdstrat(log->l_mp, bp);
 	if ((error = xfs_iowait(bp))) {
+		xfs_ioerror_alert("xlog_do_recover",
+				  log->l_mp, bp, XFS_BUF_ADDR(bp));
 		ASSERT(0);
 		xfs_buf_relse(bp);
 		return error;
@@ -3472,6 +3484,10 @@ xlog_recover_check_summary(xlog_t	*log)
 	for (agno = 0; agno < mp->m_sb.sb_agcount; agno++) {
 		agfdaddr = XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR);
 		agfbp = xfs_buf_read(mp->m_ddev_targp, agfdaddr, 1, 0);
+		if (XFS_BUF_ISERROR(agfbp)) {
+			xfs_ioerror_alert("xlog_recover_check_summary(agf)",
+					  log->l_mp, agfbp, agfdaddr);
+		}
 		agfp = XFS_BUF_TO_AGF(agfbp);
 		ASSERT(INT_GET(agfp->agf_magicnum, ARCH_CONVERT) == XFS_AGF_MAGIC);
 		ASSERT(XFS_AGF_GOOD_VERSION(INT_GET(agfp->agf_versionnum, ARCH_CONVERT)));
@@ -3483,6 +3499,10 @@ xlog_recover_check_summary(xlog_t	*log)
 
 		agidaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
 		agibp = xfs_buf_read(mp->m_ddev_targp, agidaddr, 1, 0);
+		if (XFS_BUF_ISERROR(agibp)) {
+			xfs_ioerror_alert("xlog_recover_check_summary(agi)",
+					  log->l_mp, agibp, agidaddr);
+		}
 		agip = XFS_BUF_TO_AGI(agibp);
 		ASSERT(INT_GET(agip->agi_magicnum, ARCH_CONVERT) == XFS_AGI_MAGIC);
 		ASSERT(XFS_AGI_GOOD_VERSION(INT_GET(agip->agi_versionnum, ARCH_CONVERT)));

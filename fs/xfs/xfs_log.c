@@ -934,10 +934,8 @@ xlog_iodone(xfs_buf_t *bp)
 	 * Race to shutdown the filesystem if we see an error.
 	 */
 	if (XFS_BUF_GETERROR(bp)) {
-#ifdef DEBUG
-		xfs_fs_cmn_err(CE_ALERT, iclog->ic_log->l_mp,
-			"xlog_iodone: log write error buf 0x%p", bp);
-#endif
+		xfs_ioerror_alert("xlog_iodone",
+				  iclog->ic_log->l_mp, bp, XFS_BUF_ADDR(bp));
 		XFS_BUF_STALE(bp);
 		xfs_force_shutdown(iclog->ic_log->l_mp, XFS_LOG_IO_ERROR);
 		/*
@@ -1412,7 +1410,7 @@ xlog_sync(xlog_t		*log,
 	 */
 	XFS_BUF_WRITE(bp);
 	if ((error = XFS_bwrite(bp))) {
-		xfs_ioerror_alert("xlog_sync", log->l_mp, XFS_BUF_TARGET(bp), 
+		xfs_ioerror_alert("xlog_sync", log->l_mp, bp, 
 				  XFS_BUF_ADDR(bp));
 		return (error);
 	}
@@ -1449,7 +1447,7 @@ xlog_sync(xlog_t		*log,
 		XFS_BUF_WRITE(bp);
 		if ((error = XFS_bwrite(bp))) {
 			xfs_ioerror_alert("xlog_sync (split)", log->l_mp, 
-					  XFS_BUF_TARGET(bp), XFS_BUF_ADDR(bp));
+					  bp, XFS_BUF_ADDR(bp));
 			return (error);
 		}
 	}

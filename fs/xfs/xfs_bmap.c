@@ -4066,7 +4066,10 @@ xfs_bmap_finish(
 			 */
 			mp = ntp->t_mountp;
 			if (!XFS_FORCED_SHUTDOWN(mp))
-				xfs_force_shutdown(mp, XFS_METADATA_IO_ERROR);
+				xfs_force_shutdown(mp,
+						   (error == EFSCORRUPTED) ?
+						   XFS_CORRUPT_INCORE :
+						   XFS_METADATA_IO_ERROR);
 			return error;
 		}
 		xfs_trans_log_efd_extent(ntp, efd, free->xbfi_startblock,

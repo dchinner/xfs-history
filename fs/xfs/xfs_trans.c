@@ -1010,7 +1010,7 @@ xfs_trans_cancel(
 	 */
 	if ((tp->t_flags & XFS_TRANS_DIRTY) &&
 	    !XFS_FORCED_SHUTDOWN(tp->t_mountp))
-		xfs_force_shutdown(tp->t_mountp, XFS_METADATA_IO_ERROR); 
+		xfs_force_shutdown(tp->t_mountp, XFS_CORRUPT_INCORE); 
 #ifdef DEBUG
 	if (!(flags & XFS_TRANS_ABORT)) {
 		licp = &(tp->t_items);

@@ -297,7 +297,7 @@ xfs_trans_read_buf(
 		bp = xfs_buf_read_flags(target, blkno, len, flags);
 		if ((bp != NULL) && (XFS_BUF_GETERROR(bp) != 0)) {
 			xfs_ioerror_alert("xfs_trans_read_buf", mp,
-					  target->dev, blkno);
+					  bp, blkno);
 			error = XFS_BUF_GETERROR(bp);
 			xfs_buf_relse(bp);
 			return error;
@@ -345,7 +345,7 @@ xfs_trans_read_buf(
 			xfs_iowait(bp);
 			if (XFS_BUF_GETERROR(bp) != 0) {
 				xfs_ioerror_alert("xfs_trans_read_buf", mp, 
-						  target->dev, blkno);
+						  bp, blkno);
 				error = XFS_BUF_GETERROR(bp);
 				xfs_buf_relse(bp);
 				/*
@@ -399,7 +399,7 @@ xfs_trans_read_buf(
 		error = XFS_BUF_GETERROR(bp);
 			
 		xfs_ioerror_alert("xfs_trans_read_buf", mp, 
-				  target->dev, blkno);
+				  bp, blkno);
 		if (tp->t_flags & XFS_TRANS_DIRTY)
 			xfs_force_shutdown(tp->t_mountp, XFS_METADATA_IO_ERROR); 
 		xfs_buf_relse(bp);

@@ -204,7 +204,7 @@ void
 xfs_ioerror_alert(
 	char 			*func,
 	struct xfs_mount	*mp,
-	dev_t			dev,
-	xfs_daddr_t			blkno);
+	xfs_buf_t		*bp,
+	xfs_daddr_t		blkno);
 	  
 #endif /* __XFS_RW_H__ */

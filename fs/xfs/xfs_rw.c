@@ -136,15 +136,28 @@ _xfs_force_shutdown(
 	if (xfs_log_force_umount(mp, logerror))
 		return;
 
-	if (flags & XFS_CORRUPT_INCORE)
+	if (flags & XFS_CORRUPT_INCORE) {
 		cmn_err(CE_ALERT,
     "Corruption of in-memory data detected.  Shutting down filesystem: %s",
 			mp->m_fsname);
-	else
-		cmn_err(CE_ALERT,
-			"I/O Error Detected.  Shutting down filesystem: %s",
-			mp->m_fsname);
-
+	} else {
+		if (logerror) {
+			cmn_err(CE_ALERT,
+			"Log I/O Error Detected.  Shutting down filesystem: %s",
+				mp->m_fsname);
+		} else {
+#if CELL_CAPABLE
+			if (flags & XFS_SHUTDOWN_REMOTE_REQ)
+				cmn_err(CE_ALERT,
+	"CXFS Shutdown request from remote cell. Shutting down filesystem: %s",
+				mp->m_fsname);
+			else
+#endif
+			cmn_err(CE_ALERT,
+				"I/O Error Detected.  Shutting down filesystem: %s",
+				mp->m_fsname);
+		}
+	}
 	cmn_err(CE_ALERT,
 		"Please umount the filesystem, and rectify the problem(s)");
 
@@ -279,13 +292,18 @@ void
 xfs_ioerror_alert(
 	char 			*func,
 	struct xfs_mount	*mp,
-	dev_t			dev,
+	xfs_buf_t		*bp,
 	xfs_daddr_t		blkno)
 {
-	cmn_err(CE_ALERT,
-            "I/O error in filesystem (\"%s\") meta-data dev 0x%x block 0x%Lx:\n"
-            "    %s",
-		mp->m_fsname, (int)dev, (__uint64_t)blkno, func);
+        cmn_err(CE_ALERT,
+ "I/O error in filesystem (\"%s\") meta-data dev 0x%x block 0x%x\n"
+ "       (\"%s\") error %d buf count %u",
+                (mp == NULL || mp->m_fsname == NULL) ? "(fs name not set)" : mp->m_fsname,
+                XFS_BUF_TARGET(bp),
+                (__uint64_t)blkno,
+                func,
+                XFS_BUF_GETERROR(bp),
+                XFS_BUF_COUNT(bp));
 }
 
 /*
@@ -321,8 +339,11 @@ xfs_read_buf(
 		*bpp = bp;
 	} else {
 		*bpp = NULL;
-		if (!error)
+		if (error) {
+			xfs_ioerror_alert("xfs_read_buf", mp, bp, XFS_BUF_ADDR(bp));
+		} else {
 			error = XFS_ERROR(EIO);
+		}
 		if (bp) {
 			XFS_BUF_UNDONE(bp);
 			XFS_BUF_UNDELAYWRITE(bp);

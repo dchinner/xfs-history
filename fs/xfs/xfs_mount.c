@@ -369,6 +369,8 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	xfsbdstrat(mp, bp);
 	if ((error = xfs_iowait(bp))) {
 		cmn_err(CE_WARN, "XFS: SB read failed");
+		xfs_ioerror_alert("xfs_readsb",
+				  mp, bp, XFS_BUF_ADDR(bp));
 		goto err;
 	}
 
@@ -1106,6 +1108,9 @@ xfs_unmountfs_writesb(xfs_mount_t *mp)
 		xfsbdstrat(mp, sbp);
 		/* Nevermind errors we might get here. */
 		error = xfs_iowait(sbp);
+		if (error)
+			xfs_ioerror_alert("xfs_unmountfs_writesb",
+					  mp, sbp, XFS_BUF_ADDR(sbp));
 		if (error && mp->m_mk_sharedro)
 			xfs_fs_cmn_err(CE_ALERT, mp, "Superblock write error detected while unmounting.  Filesystem may not be marked shared readonly");
 	}
