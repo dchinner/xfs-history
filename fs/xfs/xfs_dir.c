@@ -1,4 +1,4 @@
-#ident "$Revision: 1.95 $"
+#ident "$Revision: 1.96 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -30,6 +30,9 @@
 #include <stdio.h>
 #else
 #include <sys/systm.h>
+#endif
+#ifdef CELL
+#include <sys/kthread.h>
 #endif
 #include <string.h>
 #include "xfs_macros.h"
