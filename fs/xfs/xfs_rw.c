@@ -2250,6 +2250,7 @@ xfs_write_clear_setuid(
 	xfs_trans_set_sync(tp);
 	error = xfs_trans_commit(tp, 0);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	return 0;
 }
 
 /*
@@ -2357,7 +2358,10 @@ start:
 		if (((ip->i_d.di_mode & (ISUID | ISGID)) &&
 		     (credp->cr_uid != 0)) &&
 		    !(vp->v_flag & VISSWAP)) {
-			xfs_write_clear_setuid(ip);
+			error = xfs_write_clear_setuid(ip);
+			if (error) {
+				return error;
+			}
 		}
 retry:
 		if (ioflag & IO_DIRECT)
