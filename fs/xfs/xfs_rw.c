@@ -903,6 +903,9 @@ xfs_read(
 		break;
 
 	case IFDIR:
+		error = XFS_ERROR(EISDIR);
+		break;
+
 	case IFLNK:
 		error = XFS_ERROR(EINVAL);
 		break;
@@ -914,6 +917,7 @@ xfs_read(
 	default:
 		ASSERT(0);
 		error = XFS_ERROR(EINVAL);
+		break;
 	}
 	return error;
 }
@@ -1616,6 +1620,8 @@ xfs_write(
 		break;
 
 	case IFDIR:
+		return XFS_ERROR(EISDIR);
+
 	case IFLNK:
 		return XFS_ERROR(EINVAL);
 
