@@ -350,7 +350,7 @@ pagebuf_generic_file_write(
 
 	pb_flags = PBF_WRITE;
 	if (filp->f_flags & O_SYNC)
-		pb_flags |= PBF_SYNC;
+		pb_flags |= PBF_SYNC | PBF_FLUSH;
 	if (direct)
 		pb_flags |= PBF_DIRECT;
 

@@ -1397,7 +1397,8 @@ _pagebuf_page_io(
 	off_t			pg_offset,	/* starting offset in page */
 	size_t			pg_length,	/* count of data to process */
 	int			locking,	/* page locking in use */
-	int			rw)	/* read/write operation */
+	int			rw,	/* read/write operation */
+	int			flush)
 {
 	size_t			blk_length = 0;
 	struct buffer_head	*bh, *head, *bufferlist[MAX_BUF_PER_PAGE];
@@ -1539,6 +1540,11 @@ request:
 		/* Indicate that there is another page in progress */
 		atomic_inc(&PBP(pb)->pb_io_remaining);
 
+#ifdef RQ_WRITE_ORDERED
+		if (flush)
+			set_bit(BH_Ordered_Flush, &bufferlist[cnt-1]->b_state);
+#endif
+
 		for (i = 0; i < cnt; i++) {
 			bh = bufferlist[i];
 
@@ -1582,7 +1588,8 @@ _page_buf_page_apply(
 	loff_t			offset,
 	struct page		*page,
 	size_t			pg_offset,
-	size_t			pg_length)
+	size_t			pg_length,
+	int			last)
 {
 	page_buf_daddr_t	bn = pb->pb_bn;
 	kdev_t			dev = pb->pb_dev;
@@ -1608,7 +1615,7 @@ _page_buf_page_apply(
 
 	if (pb->pb_flags & PBF_READ) {
 		_pagebuf_page_io(page, pb, bn, dev, sector, blocksize,
-		    	(off_t)pg_offset, pg_length, pb->pb_locked, READ);
+		    	(off_t)pg_offset, pg_length, pb->pb_locked, READ, 0);
 	} else if (pb->pb_flags & PBF_WRITE) {
 		int locking = (pb->pb_flags & _PBF_LOCKABLE) == 0;
 
@@ -1616,7 +1623,8 @@ _page_buf_page_apply(
 		if (locking && (pb->pb_locked == 0))
 			lock_page(page);
 		_pagebuf_page_io(page, pb, bn, dev, sector, blocksize,
-			(off_t)pg_offset, pg_length, locking, WRITE);
+			(off_t)pg_offset, pg_length, locking, WRITE,
+			last && (pb->pb_flags & PBF_FLUSH));
 	}
 
 	return (ret_len);
@@ -1857,7 +1865,8 @@ pagebuf_segment_apply(			/* apply function to segments   */
 
 		/* func probably = _page_buf_page_apply */
 		sval = func(pb, buffer_offset,
-				pb->pb_pages[buf_index], page_offset, len);
+				pb->pb_pages[buf_index], page_offset, len,
+				buf_index+1 == pb->pb_page_count);
 		if (sval <= 0) {
 			status = sval;
 			break;

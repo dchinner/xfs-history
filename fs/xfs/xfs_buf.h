@@ -90,6 +90,10 @@ static inline void xfs_buf_undelay(page_buf_t *pb)
 #define XFS_BUF_UNASYNC(x)     	 ((x)->pb_flags &= ~PBF_ASYNC)
 #define XFS_BUF_ISASYNC(x)       ((x)->pb_flags & PBF_ASYNC)
 
+#define XFS_BUF_FLUSH(x)	 ((x)->pb_flags |= PBF_FLUSH)
+#define XFS_BUF_UNFLUSH(x)	 ((x)->pb_flags &= ~PBF_FLUSH)
+#define XFS_BUF_ISFLUSH(x)	 ((x)->pb_flags & PBF_FLUSH)
+
 #define XFS_BUF_SHUT(x)          printk("XFS_BUF_SHUT not implemented yet\n") 
 #define XFS_BUF_UNSHUT(x)     	 printk("XFS_BUF_UNSHUT not implemented yet\n")
 #define XFS_BUF_ISSHUT(x)        (0)

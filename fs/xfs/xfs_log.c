@@ -1397,6 +1397,15 @@ xlog_sync(xlog_t		*log,
 		XFS_BUF_BUSY(bp);
 		XFS_BUF_ASYNC(bp);
 	}
+	/* 
+	 * Do a disk write cache flush for the log block.
+	 * This is a bit of a sledgehammer, it would be better
+	 * to use a tag barrier here that just prevents reordering. 
+	 * It may not be needed to flush the first split block in the log wrap
+	 * case, but do it anyways to be safe -AK
+	 */
+	if (!(log->l_mp->m_flags & XFS_MOUNT_NOLOGFLUSH))
+		XFS_BUF_FLUSH(bp); 
 
 	ASSERT(XFS_BUF_ADDR(bp) <= log->l_logBBsize-1);
 	ASSERT(XFS_BUF_ADDR(bp) + BTOBB(count) <= log->l_logBBsize);
@@ -1426,6 +1435,8 @@ xlog_sync(xlog_t		*log,
 		XFS_BUF_SET_FSPRIVATE(bp, iclog);
 		XFS_BUF_BUSY(bp);
 		XFS_BUF_ASYNC(bp);
+		if (!(log->l_mp->m_flags & XFS_MOUNT_NOLOGFLUSH))
+			XFS_BUF_FLUSH(bp);
 		dptr = XFS_BUF_PTR(bp);
 		/*
 		 * Bump the cycle numbers at the start of each block
