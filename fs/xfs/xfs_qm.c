@@ -323,7 +323,7 @@ int
 xfs_qm_mount_quotas(
 	xfs_mount_t	*mp)
 {
-	int		s;
+	unsigned long		s;
 	int		error;
 	uint		sbf;
 
@@ -1438,7 +1438,8 @@ xfs_qm_qino_alloc(
 	uint		flags)
 {
 	xfs_trans_t 	*tp;
-	int		error, s;
+	int		error;
+	unsigned long s;
 	cred_t		zerocr;
 	int		committed;
 

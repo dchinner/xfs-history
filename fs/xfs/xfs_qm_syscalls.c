@@ -162,7 +162,7 @@ xfs_qm_scall_quotaoff(
 	boolean_t		force)
 {
 	uint			dqtype;
-	int			s;
+	unsigned long	s;
 	int			error;
 	uint			inactivate_flags;
 	xfs_qoff_logitem_t 	*qoffstart;
@@ -410,7 +410,8 @@ xfs_qm_scall_quotaon(
 	xfs_mount_t	*mp,
 	uint		flags)
 {
-	int		error, s;
+	int		error;
+	unsigned long s;
 	uint		qf;
 	uint		accflags;
 	__int64_t	sbflags;
@@ -813,7 +814,8 @@ xfs_qm_log_quotaoff(
 	uint		       flags)
 {
 	xfs_trans_t	       *tp;
-	int 			error, s;
+	int 			error;
+	unsigned long 	s; 
 	xfs_qoff_logitem_t     *qoffi=NULL;
 	uint			oldsbqflag=0;
 

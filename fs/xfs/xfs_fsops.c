@@ -438,7 +438,7 @@ xfs_fs_counts(
 	xfs_mount_t		*mp,
 	xfs_fsop_counts_t	*cnt)
 {
-	int			s;
+	unsigned long	s;
 
 	s = XFS_SB_LOCK(mp);
 	cnt->freedata = mp->m_sb.sb_fdblocks;
@@ -472,7 +472,7 @@ xfs_reserve_blocks(
 {
 	__uint64_t              lcounter, delta;
 	__uint64_t              request;
-	int s;
+	unsigned long s;
 
 	/* If inval is null, report current values and return */
 

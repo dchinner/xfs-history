@@ -3782,7 +3782,7 @@ xfs_bmap_add_attrfork(
 	xfs_bmap_free_t		flist;		/* freed extent list */
 	int			logflags;	/* logging flags */
 	xfs_mount_t		*mp;		/* mount structure */
-	int			s;		/* spinlock spl value */
+	unsigned long		s;		/* spinlock spl value */
 	xfs_trans_t		*tp;		/* transaction pointer */
 
 	ASSERT(ip->i_df.if_ext_max ==

@@ -858,7 +858,7 @@ xfs_statvfs(
 	xfs_extlen_t	lsize;
 	xfs_mount_t	*mp;
 	xfs_sb_t	*sbp;
-	int		s;
+	unsigned long		s;
 
 	mp = XFS_BHVTOM(bdp);
 	sbp = &(mp->m_sb);

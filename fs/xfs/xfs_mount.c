@@ -1433,7 +1433,7 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, xfs_sb_field_t field,
 int
 xfs_mod_incore_sb(xfs_mount_t *mp, xfs_sb_field_t field, int delta, int rsvd)
 {
-	int	s;
+	unsigned long	s;
 	int	status;
 
 	s = XFS_SB_LOCK(mp);
@@ -1456,7 +1456,7 @@ xfs_mod_incore_sb(xfs_mount_t *mp, xfs_sb_field_t field, int delta, int rsvd)
 int
 xfs_mod_incore_sb_batch(xfs_mount_t *mp, xfs_mod_sb_t *msb, uint nmsb, int rsvd)
 {
-	int		s;
+	unsigned long		s;
 	int		status=0;
 	xfs_mod_sb_t	*msbp;
 
@@ -1623,7 +1623,7 @@ xfs_mount_reset_sbqflags(
 	xfs_mount_t	*mp)
 {
 	xfs_trans_t	*tp;
-	int		s;
+	unsigned long		s;
 
 	mp->m_qflags = 0;
 	/*
@@ -1687,7 +1687,7 @@ xfs_start_freeze(
 	xfs_mount_t	*mp,
 	int		level)
 {
-	int	s = mutex_spinlock(&mp->m_freeze_lock);
+	unsigned long	s = mutex_spinlock(&mp->m_freeze_lock);
 
 	mp->m_frozen = level;
 	mutex_spinunlock(&mp->m_freeze_lock, s);
@@ -1702,7 +1702,7 @@ void
 xfs_finish_freeze(
 	xfs_mount_t *mp)
 {
-	int	s = mutex_spinlock(&mp->m_freeze_lock);
+	unsigned long	s = mutex_spinlock(&mp->m_freeze_lock);
 
 	if (mp->m_frozen) {
 		mp->m_frozen = 0;

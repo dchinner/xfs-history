@@ -480,7 +480,7 @@ xfs_bump_ino_vers2(
 	xfs_inode_t	*ip)
 {
 	xfs_mount_t	*mp;
-	int		s;
+	unsigned long		s;
 
 	ASSERT(ismrlocked (&ip->i_lock, MR_UPDATE));
 	ASSERT(ip->i_d.di_version == XFS_DINODE_VERSION_1);
