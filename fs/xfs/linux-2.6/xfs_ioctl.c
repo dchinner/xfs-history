@@ -85,6 +85,8 @@
 
 #include <asm/uaccess.h> /* For copy_from_user */
 
+#include <sys/uuid.h>
+
 #define BREAKPOINT() asm("   int $3");
 
 
@@ -1052,6 +1054,27 @@ int xfs_ioctl (
 	case XFS_IOC_READLINK_BY_HANDLE: {
 
 		return xfs_readlink_by_handle(cmd, arg, filp, inode, vfsp, mp);
+	}
+
+	case XFS_IOC_GETFSUUID: {
+
+		char	uuidbuf[UUID_STR_LEN + 1];
+		uint_t	status;
+		char	*p;
+
+		uuidbuf[0] = '\0';
+		p = uuidbuf;
+		status = uuid_s_ok;
+
+		uuid_to_string(&mp->m_sb.sb_uuid, &p, &status);
+
+		if (status != uuid_s_ok)
+			return -XFS_ERROR(EINVAL);
+
+		return copy_to_user((char *)arg,
+				    uuidbuf,
+				    (UUID_STR_LEN + 1) * sizeof(char));
+		
 	}
 
 	default:

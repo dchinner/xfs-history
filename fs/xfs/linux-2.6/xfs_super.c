@@ -523,7 +523,8 @@ linvfs_statfs(
 	buf->f_bavail = stat.f_bavail;
 	buf->f_files = stat.f_files;
 	buf->f_ffree = stat.f_ffree;
-	/* sfs.f_fsid = stat.f_fsid; JIMJIMJIM Fix this??? */
+	buf->f_fsid.val[0] = stat.f_fsid;
+	buf->f_fsid.val[1] = 0;
 	buf->f_namelen = stat.f_namemax;
 
 	return 0;
