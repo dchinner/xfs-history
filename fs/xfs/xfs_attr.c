@@ -1,4 +1,4 @@
-#ident "$Revision: 1.51 $"
+#ident "$Revision: 1.52 $"
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/buf.h>
@@ -166,7 +166,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	xfs_inode_t 	*dp;
 	xfs_fsblock_t 	firstblock;
 	xfs_bmap_free_t flist;
-	int 		error, committed;
+	int 		error, err2, committed;
 	int		local, size;
 	uint	      	nblks;
 	xfs_mount_t	*mp;
@@ -308,7 +308,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 			if (mp->m_flags & XFS_MOUNT_WSYNC) {
 				xfs_trans_set_sync(args.trans);
 			}
-			error = xfs_trans_commit(args.trans, 
+			err2 = xfs_trans_commit(args.trans, 
 						 XFS_TRANS_RELEASE_LOG_RES);
 			xfs_iunlock(dp, XFS_ILOCK_EXCL);
 
@@ -318,7 +318,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 			if (!error && (flags & ATTR_KERNOTIME) == 0) {
 				xfs_ichgtime(dp, XFS_ICHGTIME_CHG);
 			}
-			return(error);
+			return(error == 0 ? err2 : error);
 		}
 
 		/*
