@@ -703,15 +703,44 @@ xfs_isize_check(
 		return;
 
 	nimaps = 2;
-	map_first = XFS_B_TO_FSB(mp, isize);
+	map_first = XFS_B_TO_FSB(mp, (xfs_ufsize_t)isize);
 	(void) xfs_bmapi(NULL, ip, map_first,
-			 (XFS_B_TO_FSB(mp, XFS_MAX_FILE_OFFSET) - map_first),
+			 (XFS_B_TO_FSB(mp,
+				       (xfs_ufsize_t)XFS_MAX_FILE_OFFSET) -
+			  map_first),
 			 XFS_BMAPI_ENTIRE, NULLFSBLOCK, 0, imaps, &nimaps,
 			 NULL);
 	ASSERT(nimaps == 1);
 	ASSERT(imaps[0].br_startblock == HOLESTARTBLOCK);
 }
 #endif	/* DEBUG */
+
+/*
+ * Calculate the last possible buffered byte in a file.  This must
+ * include data that was buffered beyond the EOF by the write code.
+ * This also needs to deal with overflowing the xfs_fsize_t type
+ * which can happen for sizes near the limit.
+ */
+xfs_fsize_t
+xfs_file_last_byte(
+	xfs_inode_t	*ip)
+{
+	xfs_mount_t	*mp;
+	xfs_fsize_t	last_byte;
+	xfs_fileoff_t	last_block;
+
+	mp = ip->i_mount;
+	last_block = XFS_B_TO_FSB(mp, (xfs_ufsize_t)ip->i_d.di_size);
+	last_byte = XFS_FSB_TO_B(mp, last_block);
+	if (last_byte < 0) {
+		return XFS_MAX_FILE_OFFSET;
+	}
+	last_byte += (1 << mp->m_writeio_log);
+	if (last_byte < 0) {
+		return XFS_MAX_FILE_OFFSET;
+	}
+	return last_byte;
+}
 
 #ifndef SIM
 /*
@@ -771,11 +800,17 @@ xfs_itruncate_start(
 	 * given range and for the pflushinvalvp() case it ensures
 	 * that we get the latest mapped changes flushed out.
 	 */
-	toss_start = XFS_B_TO_FSB(mp, new_size);
+	toss_start = XFS_B_TO_FSB(mp, (xfs_ufsize_t)new_size);
 	toss_start = XFS_FSB_TO_B(mp, toss_start);
-	last_byte = XFS_ISIZE_MAX(ip);
-	last_byte = XFS_B_TO_FSB(mp, last_byte);
-	last_byte = XFS_FSB_TO_B(mp, last_byte);
+	if (toss_start < 0) {
+		/*
+		 * The place to start tossing is beyond our maximum
+		 * file size, so there is no way that the data extended
+		 * out there.
+		 */
+		return;
+	}
+	last_byte = xfs_file_last_byte(ip);
 	if (last_byte > toss_start) {
 		if (flags & XFS_ITRUNC_DEFINITE) {
 			if (VN_MAPPED(vp)) {
@@ -841,7 +876,7 @@ xfs_itruncate_finish(
 
 	ntp = *tp;
 	mp = (ntp)->t_mountp;
-	first_unmap_block = XFS_B_TO_FSB(mp, new_size);
+	first_unmap_block = XFS_B_TO_FSB(mp, (xfs_ufsize_t)new_size);
 
 	/*
 	 * The first thing we do is set the size to new_size permanently
@@ -875,12 +910,18 @@ xfs_itruncate_finish(
 	 * the end of the file (in a crash where the space is allocated
 	 * but the inode size is not yet updated), simply remove any
 	 * blocks which show up between the new EOF and the maximum
-	 * possible file size.
+	 * possible file size.  If the first block to be removed is
+	 * beyond the maximum file size (ie it is the same as last_block),
+	 * then there is nothing to do.
 	 */
-	last_block = XFS_B_TO_FSBT(mp, XFS_MAX_FILE_OFFSET);
+	last_block = XFS_B_TO_FSB(mp, (xfs_ufsize_t)XFS_MAX_FILE_OFFSET);
 	ASSERT(first_unmap_block <= last_block);
 	done = 0;
-	unmap_len = last_block - first_unmap_block + 1;
+	if (last_block == first_unmap_block) {
+		done = 1;
+	} else {
+		unmap_len = last_block - first_unmap_block + 1;
+	}
 	while (!done) {
 		/*
 		 * Free up up to XFS_ITRUNC_MAX_EXTENTS.  xfs_bunmapi()
