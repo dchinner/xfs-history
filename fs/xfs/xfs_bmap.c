@@ -2987,10 +2987,14 @@ xfs_bunmapi(
 				break;
 			ep--;
 			xfs_bmbt_get_all(ep, &got);
-			bno = got.br_startoff + got.br_blockcount - 1;
-			if (bno < start)
-				break;
 		}
+		/*
+		 * Is the last block of this extent before the range
+		 * we're supposed to delete?  If so, we're done.
+		 */
+		bno = got.br_startoff + got.br_blockcount - 1;
+		if (bno < start)
+			break;
 		/*
 		 * Then deal with the (possibly delayed) allocated space
 		 * we found.
