@@ -64,6 +64,12 @@
 #include "xfs_quota_priv.h"
 
 /*
+ * turn on to get uio size histogram dumping.
+ * this flag also needs to be turned on in xfs_rw.c -- rcc
+#define UIOSZ_DEBUG
+ */
+ 
+/*
  * External functions & data not in header files.
  */
 #ifdef DEBUG
@@ -186,6 +192,9 @@ static void 	xfsidbg_xstrat_strace(xfs_inode_t *);
 #endif
 static void	xfsidbg_xtp(xfs_trans_t *);
 static void	xfsidbg_xtrans_res(xfs_mount_t *);
+#if defined(DEBUG) && defined(UIOSZ_DEBUG)
+static void	xfsidbg_xuiosz_dump(void);
+#endif
 
 #define	VD	(void (*)())
 
@@ -294,6 +303,9 @@ static struct xif {
 #endif
     "xtp",	VD xfsidbg_xtp,		"Dump XFS transaction structure",
     "xtrres",	VD xfsidbg_xtrans_res,	"Dump XFS reservation values",
+#if defined(DEBUG) && defined(UIOSZ_DEBUG)
+    "xuiosz",	VD xfsidbg_xuiosz_dump,	"Dump uio size distribution",
+#endif
     0,		0,	0
 };
 
@@ -3530,6 +3542,7 @@ xfsidbg_xnode(xfs_inode_t *ip)
 {
 	static char *tab_flags[] = {
 		"grio",		/* XFS_IGRIO */
+		"uiosize",	/* XFS_IUIOSZ */
 		NULL
 	};
 
@@ -3574,6 +3587,10 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		ip->i_last_req_sz, ip->i_new_size);
 	qprintf("write off %llx gap list 0x%x ",
 		ip->i_write_offset, ip->i_gap_list);
+	qprintf(
+	"readiolog %u, readioblocks %u, writeiolog %u, writeioblocks %u\n",
+		(unsigned int) ip->i_readio_log, ip->i_readio_blocks,
+		(unsigned int) ip->i_writeio_log, ip->i_writeio_blocks);
 	printflags((int)ip->i_flags, tab_flags, "flags");
 	qprintf("\n");
 	qprintf("update_core 0x%x\n", (int)(ip->i_update_core));
@@ -4384,3 +4401,35 @@ xfsidbg_vnode_find(vfs_t *vfsp, vnumber_t vnum)
 	}
 	return NULL;
 }
+
+#if defined(DEBUG) && defined(UIOSZ_DEBUG)
+/*
+ * a function for dumping uio debug histograms.
+ * this has to be loaded into the idbg function array above
+ */
+static void
+xfsidbg_xuiosz_dump(void)
+{
+	int i;
+	extern int uiodbg_switch;
+	extern int uiodbg_readiolog[4];
+	extern int uiodbg_writeiolog[4];
+
+	qprintf("switch = %d\n", uiodbg_switch);
+	qprintf("reads -> ");
+	for (i = 0; i < XFS_UIO_MAX_READIO_LOG - XFS_UIO_MIN_READIO_LOG; i++) {
+		qprintf("%dK = %d  ",
+			(1 << (XFS_UIO_MIN_READIO_LOG + i)) / 1024,
+			uiodbg_readiolog[i - XFS_UIO_MIN_READIO_LOG]);
+	}
+	qprintf("\nwrites -> ");
+	for (i = 0; i < XFS_UIO_MAX_WRITEIO_LOG - XFS_UIO_MIN_WRITEIO_LOG;i++) {
+		qprintf("%dK = %d  ",
+			(1 << (XFS_UIO_MIN_WRITEIO_LOG + i)) / 1024,
+			uiodbg_writeiolog[i - XFS_UIO_MIN_WRITEIO_LOG]);
+	}
+	qprintf("\n");
+
+	return;
+}
+#endif
