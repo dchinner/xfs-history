@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.72 $"
+#ident	"$Revision: 1.73 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -4296,7 +4296,7 @@ xfsidbg_xtp(xfs_trans_t *tp)
 	case XFS_TRANS_WRITEID:		qprintf("WRITEID");		break;
 	case XFS_TRANS_ADDAFORK:	qprintf("ADDAFORK");		break;
 	case XFS_TRANS_ATTRINVAL:	qprintf("ATTRINVAL");		break;
-	case XFS_ATRUNCATE:		qprintf("ATRUNCATE");		break;
+	case XFS_TRANS_ATRUNCATE:	qprintf("ATRUNCATE");		break;
 	case XFS_TRANS_ATTR_SET:	qprintf("ATTR_SET");		break;
 	case XFS_TRANS_ATTR_RM:		qprintf("ATTR_RM");		break;
 	case XFS_TRANS_ATTR_FLAG:	qprintf("ATTR_FLAG");		break;

@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision: 1.89 $"
+#ident "$Revision: 1.90 $"
 
 struct buf;
 struct xfs_efd_log_item;
@@ -89,7 +89,7 @@ typedef struct xfs_log_item {
 #define	XFS_TRANS_WRITEID		18
 #define	XFS_TRANS_ADDAFORK		19
 #define	XFS_TRANS_ATTRINVAL		20
-#define	XFS_ATRUNCATE			21
+#define	XFS_TRANS_ATRUNCATE		21
 #define	XFS_TRANS_ATTR_SET		22
 #define	XFS_TRANS_ATTR_RM		23
 #define	XFS_TRANS_ATTR_FLAG		24
