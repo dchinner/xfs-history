@@ -532,15 +532,15 @@ xfs_ilock(xfs_inode_t	*ip,
 	ASSERT(lock_flags != 0);
 
 	if (lock_flags & XFS_IOLOCK_EXCL) {
-		mrlock(&ip->i_iolock, MR_UPDATE, PINOD | PRECALC);
+		mrlock(&ip->i_iolock, MR_UPDATE, PINOD);
 	} else if (lock_flags & XFS_IOLOCK_SHARED) {
-		mrlock(&ip->i_iolock, MR_ACCESS, PINOD | PRECALC);
+		mrlock(&ip->i_iolock, MR_ACCESS, PINOD);
 	}
 
 	if (lock_flags & XFS_ILOCK_EXCL) {
-		mrlock(&ip->i_lock, MR_UPDATE, PINOD | PRECALC);
+		mrlock(&ip->i_lock, MR_UPDATE, PINOD);
 	} else if (lock_flags & XFS_ILOCK_SHARED) {
-		mrlock(&ip->i_lock, MR_ACCESS, PINOD | PRECALC);
+		mrlock(&ip->i_lock, MR_ACCESS, PINOD);
 	}
 
 }
@@ -677,7 +677,7 @@ xfs_iunlock(xfs_inode_t	*ip,
 void
 xfs_iflock(xfs_inode_t *ip)
 {
-	psema(&(ip->i_flock), PINOD | PRECALC);
+	psema(&(ip->i_flock), PINOD);
 }
 
 int
