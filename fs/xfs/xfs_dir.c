@@ -22,6 +22,7 @@ extern size_t strlen(const char *);
 #include "xfs_mount.h"
 #include "xfs_alloc_btree.h"
 #include "xfs_bmap_btree.h"
+#include "xfs_bmap.h"
 #include "xfs_btree.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
@@ -73,8 +74,9 @@ xfs_dir_init(xfs_trans_t *trans, xfs_inode_t *dir, xfs_inode_t *parent_dir)
  * Generic handler routine to add a name to a directory.
  * Transitions directory from shortform to Btree as necessary.
  */
-xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
-				       xfs_ino_t inum)
+xfs_dir_createname(xfs_trans_t *trans, xfs_fsblock_t *first_block,
+                   xfs_extlen_t total, xfs_bmap_free_t *free_list,
+		   xfs_inode_t *dp, char *name, xfs_ino_t inum)
 {
 	struct xfs_dir_name args;
 	int retval, newsize, namelen;

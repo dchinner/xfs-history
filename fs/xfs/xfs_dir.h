@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_H
 #define	_FS_XFS_DIR_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.2 $"
 
 /*
  * xfs_dir.h
@@ -271,6 +271,9 @@ int	xfs_dir_init(xfs_trans_t *trans,
 		     xfs_inode_t *parent_dir);
 
 int	xfs_dir_createname(xfs_trans_t *trans,
+			   xfs_fsblock_t *first_block,
+			   xfs_extlen_t total,
+			   xfs_bmap_free_t *free_list,
 			   xfs_inode_t *dp,
 			   char *name_string,
 			   xfs_ino_t inode_number);
