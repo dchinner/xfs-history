@@ -3,6 +3,8 @@
 
 #ident "$Revision: 1.24 $"
 
+struct xfs_inode;
+
 /*
  * List of extents to be free "later".
  * The list is kept sorted on xbf_startblock.
@@ -37,6 +39,14 @@ typedef	struct xfs_bmap_free
  */
 #define	DELAYSTARTBLOCK		((xfs_fsblock_t)-1LL)
 #define	HOLESTARTBLOCK		((xfs_fsblock_t)-2LL)
+
+/*
+ * Trace operations for bmap extent tracing
+ */
+#define	XFS_BMAP_TRACE_DELETE	1
+#define	XFS_BMAP_TRACE_INSERT	2
+#define	XFS_BMAP_TRACE_PRE_UP	3
+#define	XFS_BMAP_TRACE_POST_UP	4
 
 #define	XFS_BMAP_INIT(flp, fbp)	\
 	((flp)->xbf_first = NULL, (flp)->xbf_count = 0, *(fbp) = NULLFSBLOCK)
@@ -104,6 +114,19 @@ void
 xfs_bmap_read_extents(
 	xfs_trans_t		*tp,		/* transaction pointer */
 	struct xfs_inode	*ip);		/* incore inode */
+
+#if defined(DEBUG) && !defined(SIM)
+/*
+ * Add bmap trace insert entries for all the contents of the extent list.
+ */
+void
+xfs_bmap_trace_exlist(
+	char			*fname,		/* function name */
+	struct xfs_inode	*ip,		/* incore inode pointer */
+	xfs_extnum_t		cnt);		/* count of entries in list */
+#else
+#define	xfs_bmap_trace_exlist(f,ip,c)
+#endif
 
 /*
  * Map file blocks to filesystem blocks.

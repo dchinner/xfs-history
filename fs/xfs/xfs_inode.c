@@ -207,8 +207,10 @@ xfs_iformat(
 			}
 			ip->i_bytes = size;
 			ip->i_real_bytes = real_size;
-			if (size)
+			if (size) {
 				bcopy(&dip->di_u.di_bmx, ip->i_u1.iu_extents, size); 
+				xfs_bmap_trace_exlist("xfs_iformat", ip, nex);
+			}
 			ip->i_flags |= XFS_IEXTENTS;
 			return;
 
