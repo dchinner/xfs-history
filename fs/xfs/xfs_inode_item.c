@@ -1,4 +1,4 @@
-#ident "$Revision: 1.45 $"
+#ident "$Revision: 1.46 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -40,7 +40,8 @@
 #include "xfs_ialloc_btree.h"
 #include "xfs_btree.h"
 #include "xfs_ialloc.h"
-#include "xfs_dir.h"
+#include "xfs_attr_sf.h"
+#include "xfs_dir_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"

@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.94 $"
+#ident	"$Revision: 1.95 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -40,10 +40,12 @@
 #include "xfs_ialloc_btree.h"
 #include "xfs_btree.h"
 #include "xfs_ialloc.h"
-#include "xfs_dir.h"
+#include "xfs_attr_sf.h"
+#include "xfs_dir_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
+#include "xfs_dir.h"
 #include "xfs_alloc.h"
 #include "xfs_rtalloc.h"
 #include "xfs_bmap.h"

@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.56 $"
+#ident	"$Revision: 1.58 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -41,7 +41,8 @@
 #include <sys/fs/xfs_mount.h>		/* depends on xfs_trans.h & xfs_sb.h */
 #include <sys/fs/xfs_bmap_btree.h>
 #include <sys/fs/xfs_alloc.h>
-#include <sys/fs/xfs_dir.h>
+#include <sys/fs/xfs_attr_sf.h>
+#include <sys/fs/xfs_dir_sf.h>
 #include <sys/fs/xfs_dinode.h>
 #include <sys/fs/xfs_imap.h>
 #include <sys/fs/xfs_inode_item.h>

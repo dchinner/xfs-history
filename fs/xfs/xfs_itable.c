@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.16 $"
+#ident	"$Revision: 1.17 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -25,7 +25,8 @@
 #include "xfs_bmap_btree.h"
 #include "xfs_ialloc_btree.h"
 #include "xfs_btree.h"
-#include "xfs_dir.h"
+#include "xfs_attr_sf.h"
+#include "xfs_dir_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
