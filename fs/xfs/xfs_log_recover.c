@@ -966,7 +966,7 @@ xlog_recover_print_buffer(xlog_recover_item_t *item)
     extern int			print_buffer;
 
     f = (xfs_buf_log_format_t *)item->ri_buf[0].i_addr;
-    f = (xfs_buf_log_format64_t *)item->ri_buf[0].i_addr;
+    f64 = (xfs_buf_log_format64_t *)item->ri_buf[0].i_addr;
     len = item->ri_buf[0].i_len;
     printf("	");
     if ((f->blf_type == XFS_LI_BUF) || (f->blf_type == XFS_LI_OBUF)) {
