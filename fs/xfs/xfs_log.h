@@ -39,9 +39,11 @@
 /*
  * Flags to xfs_log_force()
  *
- *	XFS_LOG_SYNC:	Synchronous force in-core log to disk. (default)
+ *	XFS_LOG_SYNC:	Synchronous force in-core log to disk
  *	XFS_LOG_FORCE:	Start in-core log write now.
  *	XFS_LOG_URGE:	Start write within some window of time.
+ *
+ * Note: Either XFS_LOG_FORCE or XFS_LOG_URGE must be set.
  */
 #define XFS_LOG_SYNC		0x1
 #define XFS_LOG_FORCE		0x2
