@@ -36,15 +36,19 @@ headers:i386kernel
 	fi
 
 i386cmd: xfs-cmds
-	[ ! -d $(WORKAREA)/RPMS ]  && mkdir $(WORKAREA)/RPMS	|| exit 0
-	[ ! -d $(WORKAREA)/SRPMS ] && mkdir $(WORKAREA)/SRPMS	|| exit 0
-	cp $(WORKAREA)/cmd/xfs/build/rpm/xfs-cmds-*.i386.rpm $(WORKAREA)/RPMS
-	cp $(WORKAREA)/cmd/xfs/build/rpm/xfs-cmds-*.src.rpm  $(WORKAREA)/SRPMS
+	[ ! -d $(WORKAREA)/SRPMS ] \
+		&& mkdir $(WORKAREA)/SRPMS || exit 0
+	cp $(WORKAREA)/cmd/xfs/build/rpm/xfs-cmds-*.src.rpm $(WORKAREA)/SRPMS
+	[ ! -d $(WORKAREA)/RPMS/i386 ] \
+		&& mkdir -p $(WORKAREA)/RPMS/i386 || exit 0
+	cp $(WORKAREA)/cmd/xfs/build/rpm/xfs-cmds-*.i386.rpm \
+			$(WORKAREA)/RPMS/i386
 
 xfs-cmds:
 	echo "=== Making $@ `date`"
 	[ ! -L $(WORKAREA)/linux/include/asm ] && \
-	ln -s $(WORKAREA)/linux/include/asm-i386 $(WORKAREA)/linux/include/asm
+		ln -s $(WORKAREA)/linux/include/asm-i386 \
+			$(WORKAREA)/linux/include/asm || exit 0
 	cd $(WORKAREA)/cmd/xfs && ./Makepkgs verbose
 
 clean:
