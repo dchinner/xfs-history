@@ -147,8 +147,9 @@ static void	xfsidbg_xiclogall(xlog_in_core_t *);
 static void	xfsidbg_xiclogcb(xlog_in_core_t *);
 #ifdef DEBUG
 static void	xfsidbg_xiclogtrace(xlog_in_core_t *);
+static void	xfsidbg_xilock_trace(xfs_inode_t *);
 #endif
-static void	xfsidbg_xinodes(xfs_mount_t *mp);
+static void	xfsidbg_xinodes(xfs_mount_t *);
 static void	xfsidbg_xlog(xlog_t *);
 #ifdef DEBUG
 static void	xfsidbg_xlog_granttrace(xlog_t *);
@@ -261,6 +262,7 @@ static struct xif {
     "xiclog",	VD xfsidbg_xiclog,	"Dump XFS in-core log",
 #ifdef DEBUG
     "xictrc",	VD xfsidbg_xiclogtrace,	"Dump XFS in-core log trace",
+    "xilocktrc",VD xfsidbg_xilock_trace,"Dump XFS ilock trace",
 #endif
     "xinodes",	VD xfsidbg_xinodes, 	"Dump XFS inodes per mount",
 #ifdef DEBUG
@@ -1098,8 +1100,8 @@ xfs_efi_item_print(xfs_efi_log_item_t *efip, int summary)
 	qprintf("size %d nextents %d next extent %d\n",
 		efip->efi_format.efi_size, efip->efi_format.efi_nextents,
 		efip->efi_next_extent);
-	qprintf("id %llx flags: ", efip->efi_format.efi_id);
-	printflags(efip->efi_flags, efi_flags, NULL);
+	qprintf("id %llx", efip->efi_format.efi_id);
+	printflags(efip->efi_flags, efi_flags, "flags :");
 	qprintf("\n");
 	qprintf("efi extents:\n");
 	ep = &(efip->efi_format.efi_extents[0]);
@@ -2542,6 +2544,49 @@ xfsidbg_xbxitrace(xfs_inode_t *ip)
 		if (xfs_bmap_trace_entry(ktep))
 			qprintf("\n");
 		ktep = ktrace_next(ip->i_xtrace, &kts);
+	}
+}
+
+
+/*
+ * Print out the bmap extent trace buffer attached to the given inode.
+ */
+static void
+xfsidbg_xilock_trace(xfs_inode_t *ip)
+{
+	static char *xiflags[] = {
+		"IOLOCK_EXCL",
+		"IOLOCK_SHAR",
+		"ILOCK_EXCL",
+		"ILOCK_SHAR",
+		"IUNLK_NONOT",
+		0
+	};
+
+	ktrace_entry_t	*ktep;
+	ktrace_snap_t	kts;
+	if (ip->i_lock_trace == NULL) {
+		qprintf("The inode ilock trace buffer is not initialized\n");
+		return;
+	}
+
+	ktep = ktrace_first(ip->i_lock_trace, &kts);
+	while (ktep != NULL) {
+		 if ((__psint_t)ktep->val[0]) {
+			 printflags((__psint_t)ktep->val[2], xiflags,"Flags ");
+			 if ((__psint_t)ktep->val[1] == 1) 
+				 qprintf("LOCK\n");
+			 else if ((__psint_t)ktep->val[1] == 2)
+				 qprintf("LOCK SHARED\n");
+			 else if ((__psint_t)ktep->val[1] == 3)
+				 qprintf("UNLOCK\n");
+			 prsymoff((void *)ktep->val[3], NULL, NULL);
+			 qprintf("Pid 0xd, cpu %d\n",
+				 (__psint_t)ktep->val[5],
+				 (__psint_t)ktep->val[4]);
+			 qprintf("-----------------------\n");
+		 }
+		 ktep = ktrace_next(ip->i_lock_trace, &kts);
 	}
 }
 
