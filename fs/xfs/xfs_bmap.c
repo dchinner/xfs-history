@@ -59,6 +59,7 @@
 #include "xfs_da_btree.h"
 #include "xfs_dir_leaf.h"
 #include "xfs_bit.h"
+#include "xfs_rw.h"
 #ifdef SIM
 #include "sim.h"
 #endif
@@ -2935,9 +2936,11 @@ xfs_bmap_add_attrfork(
 		s = XFS_SB_LOCK(mp);
 		if (mp->m_sb.sb_versionnum < XFS_SB_VERSION_HASATTR) {
 			mp->m_sb.sb_versionnum = XFS_SB_VERSION_HASATTR;
+			XFS_SB_UNLOCK(mp, s);
 			xfs_mod_sb(tp, XFS_SB_VERSIONNUM);
+		} else {
+			XFS_SB_UNLOCK(mp, s);
 		}
-		XFS_SB_UNLOCK(mp, s);
 	}
 	error = xfs_bmap_finish(&tp, &flist, firstblock, &committed);
 	if (error)
@@ -4187,6 +4190,7 @@ xfs_getbmap(
 	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS &&
 	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE)
 		return XFS_ERROR(EINVAL);
+
 	mp = ip->i_mount;
 	if (whichfork == XFS_DATA_FORK &&
 	    ip->i_d.di_flags & XFS_DIFLAG_PREALLOC) {
@@ -4269,9 +4273,11 @@ xfs_getbmap(
 		} else {
 			if (map[i].br_startblock == HOLESTARTBLOCK)
 				out.bmv_block = -1;
-			else
-				out.bmv_block = XFS_FSB_TO_DADDR(mp,
+			else {
+				out.bmv_block = XFS_FSB_TO_DB(ip,
 					map[i].br_startblock);
+			}
+
 			if (copyout(&out, ap, sizeof(out))) {
 				error = XFS_ERROR(EFAULT);
 				break;
