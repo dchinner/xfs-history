@@ -1149,16 +1149,6 @@ xfs_ialloc(
 	ip->i_d.di_aformat = XFS_DINODE_FMT_EXTENTS;
 	ip->i_d.di_anextents = 0;
 
-	/*
-	 * Make sure the vnode's VENF_LOCKING flag corresponds with
-	 * the inode's mode.  Also do some sanity checking that
-	 * other vnode flags are not set.
-	 */
-	if (MANDLOCK(vp, ip->i_d.di_mode))
-		VN_FLAGSET(vp, VENF_LOCKING);
-	else
-		VN_FLAGCLR(vp, VENF_LOCKING);
-
 #if DEBUG
 	{
 		uint	badflags = VNOSWAP |

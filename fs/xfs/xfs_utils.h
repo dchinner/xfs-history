@@ -150,10 +150,6 @@ extern int
 xfs_clear_sharedro(
 	int		fd);
 
-extern int      xfs_pre_rename(struct vnode *vp);
-extern int      xfs_pre_remove(struct vnode *vp);
-extern int      xfs_pre_rmdir(struct vnode *vp);
-
 
 #ifdef DEBUG
 extern int

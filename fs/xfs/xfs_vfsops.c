@@ -1143,15 +1143,6 @@ xfs_syncsub(
 			}
 		}
 
-		/*
-		 * We don't mess with swap files from here since it is
-		 * too easy to deadlock on memory.
-		 */
-		if (vp && (vp->v_flag & VISSWAP)) {
-			ip = ip->i_mnext;
-			continue;
-		}
-
 		if (XFS_FORCED_SHUTDOWN(mp) && !(flags & SYNC_CLOSE)) {
 			XFS_MOUNT_IUNLOCK(mp);
 			kmem_free(ipointer, sizeof(xfs_iptr_t));

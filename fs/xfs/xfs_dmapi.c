@@ -936,16 +936,6 @@ xfs_dm_rdwr(
 	if (off < 0 || vp->v_type != VREG)
 		return(EINVAL);
 
-
-	/*
-	 * Disallow outsiders reading/writing swap.  Not worried about data
-	 * corruption so much as what happens when a process which has the
-	 * vnode RWlock sleeps somewhere because there's no system memory,
-	 * and the pager needs to acquire the lock to swap out pages: deadlock.
-	 */
-	if (vp->v_flag & VISSWAP && vp->v_type == VREG)
-		return EACCES;
-
 	if (fmode & FMODE_READ) {
 	        XFS_STATS_INC(xfsstats.xs_read_calls);
 		oflags = O_RDONLY;

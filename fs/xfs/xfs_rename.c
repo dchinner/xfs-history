@@ -475,13 +475,6 @@ xfs_rename_error_checks(
 		goto error_return;
 	}
 
-	/* Do some generic error tests now that we have the lock */
-	if ((error = xfs_pre_rename(XFS_ITOV(src_ip)))) {
-		error = XFS_ERROR(error);
-		*status = __LINE__;
-		goto error_return;
-	}
-
 	/*
 	 * Source and target are identical.
 	 */
@@ -576,18 +569,7 @@ xfs_rename_target_checks(
 			goto error_return;
 		}
 
-		if ((error = xfs_pre_rmdir(XFS_ITOV(target_ip)))) {
-			error = XFS_ERROR(error);
-			rename_which_error_return = __LINE__;
-			goto error_return;
-		}
-
 	} else {
-		if ((error = xfs_pre_remove(XFS_ITOV(target_ip)))) {
-			error = XFS_ERROR(error);
-			rename_which_error_return = __LINE__;
-			goto error_return;
-		}
 
 		if (src_is_directory) {
 			error = XFS_ERROR(ENOTDIR);

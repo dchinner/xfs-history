@@ -552,10 +552,6 @@ xfs_setattr(
 			code = XFS_ERROR(EINVAL);
 			goto error_return;
 		}
-		if (vp->v_flag & VISSWAP) {
-			code = XFS_ERROR(EACCES);
-			goto error_return;
-		}
 		/* 
 		 * Make sure that the dquots are attached to the inode.
 		 */
@@ -3175,11 +3171,6 @@ xfs_remove(
 	}
 #endif
 
-	if ((error = xfs_pre_remove(XFS_ITOV(ip)))) {
-		error = XFS_ERROR(error);
-		REMOVE_DEBUG_TRACE(__LINE__);
-		goto error_return;
-	}
 	if ((ip->i_d.di_mode & IFMT) == IFDIR) {
 		error = XFS_ERROR(EPERM);
 		REMOVE_DEBUG_TRACE(__LINE__);
@@ -3982,10 +3973,6 @@ xfs_rmdir(
 	}
 	if ((cdp->i_d.di_mode & IFMT) != IFDIR) {
 	        error = XFS_ERROR(ENOTDIR);
-		goto error_return;
-	}
-	if ((error = xfs_pre_rmdir(XFS_ITOV(cdp)))) {
-		error = XFS_ERROR(error);
 		goto error_return;
 	}
 	ASSERT(cdp->i_d.di_nlink >= 2);

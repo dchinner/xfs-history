@@ -925,7 +925,6 @@ xfs_mountfs(
 		error = XFS_ERROR(EFSCORRUPTED);
 		goto error3;
 	}
-	VN_FLAGSET(rvp, VROOT);
 	mp->m_rootip = rip;	/* save it */
 
 	xfs_iunlock(rip, XFS_ILOCK_EXCL);

@@ -629,65 +629,6 @@ xfs_get_fsinfo(int fd, char **fsname, int64_t *fsid)
 }
 #endif /* DEBUG || INDUCE_IO_ERROR */
 
-/* Called by filesystems VOP_RENAME
- * once it has found the source vnode to
- * unlink.  Note that an the VOP_RENAME
- * should also call vn_pre_{remove,rmdir} if the
- * target node exists (and therefore it is being removed).
- */
-int
-xfs_pre_rename( struct vnode *vp )
-{
-        if (vp->v_flag & VISSWAP && vp->v_type == VREG) {
-                return EBUSY;
-        }
-	/* JIMJIM - investigate need to check if inode/dentry is mounted on */
-        if (vp->v_flag & VMOUNTING) {
-                return EBUSY;
-        }
-        return 0;
-}
-
-/* Called by every filesystems VOP_REMOVE
- * once it has the vnode that it is going to unlink.
- * Verifies generic rules about whether such an
- * unlink is legal.
- * Also called by VOP_RENAME if the target exists and
- * therefore will be removed.
- */
-int
-xfs_pre_remove( struct vnode *vp )
-{
-        if (vp->v_type == VDIR) { return EPERM; }
-        if (vp->v_flag & VISSWAP && vp->v_type == VREG) {
-                return EBUSY;
-        }
-	/* JIMJIM - investigate need to check if inode/dentry is mounted on */
-        if (vp->v_flag & VMOUNTING) {
-                return EBUSY;
-        }
-        return 0;
-}
-
-/* Called by every filesystems VOP_RMDIR
- * once it has the vnode that it is going to unlink.
- * Verifies generic rules about whether such an
- * unlink is legal.
- *
- * Also called by VOP_RENAME if the target exists and
- * therefore will be removed.
- */
-int
-xfs_pre_rmdir( struct vnode *vp )
-{
-        if (vp->v_type != VDIR) { return EPERM; }
-	/* JIMJIM - investigate need to check if inode/dentry is mounted on */
-        if (vp->v_flag & VMOUNTING) {
-                return EBUSY;
-        }
-        return 0;
-}
-
 #ifdef DEBUG
 int
 xfs_isshutdown(bhv_desc_t *bhv)
