@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_GROW_H
 #define	_FS_XFS_GROW_H
 
-#ident	"$Revision: 1.5 $"
+#ident	"$Revision: 1.6 $"
 
 /*
  * File system growth interfaces
@@ -30,21 +30,21 @@
 /* Output for XFS_FS_GEOMETRY */
 typedef struct xfs_fsop_geom
 {
-	__uint32_t	blocksize;
-	__uint32_t	rtextsize;
-	__uint32_t	agblocks;
-	__uint32_t	agcount;
-	__uint32_t	logblocks;
-	__uint32_t	sectsize;
-	__uint32_t	inodesize;
-	__uint32_t	imaxpct;
-	__uint64_t	datablocks;
-	__uint64_t	rtblocks;
-	__uint64_t	rtextents;
-	__uint64_t	logstart;
-	uuid_t		uuid;
-	__uint32_t	sunit;
-	__uint32_t	swidth;	
+	__uint32_t	blocksize;	/* filesystem (data) block size */
+	__uint32_t	rtextsize;	/* realtime extent size */
+	__uint32_t	agblocks;	/* fsblocks in an allocation group */
+	__uint32_t	agcount;	/* number of allocation groups */
+	__uint32_t	logblocks;	/* fsblocks in the log */
+	__uint32_t	sectsize;	/* (data) sector size, bytes */
+	__uint32_t	inodesize;	/* inode size in bytes */
+	__uint32_t	imaxpct;	/* max allowed space for inodes (%) */
+	__uint64_t	datablocks;	/* fsblocks in the data subvolume */
+	__uint64_t	rtblocks;	/* fsblocks in the realtime subvolume */
+	__uint64_t	rtextents;	/* rt extents in the realtime subvol */
+	__uint64_t	logstart;	/* starting fsblock of the log */
+	uuid_t		uuid;		/* unique id of the filesystem */
+	__uint32_t	sunit;		/* stripe unit, fsblocks */
+	__uint32_t	swidth;		/* stripe width, fsblocks */
 } xfs_fsop_geom_t;
 
 /* Output for XFS_FS_COUNTS */
@@ -59,22 +59,22 @@ typedef struct xfs_fsop_counts
 /* Input for growfs data op */
 typedef struct xfs_growfs_data
 {
-	__uint64_t	newblocks;
-	__uint32_t	imaxpct;
+	__uint64_t	newblocks;	/* new data subvol size, fsblocks */
+	__uint32_t	imaxpct;	/* new inode space percentage limit */
 } xfs_growfs_data_t;
 
 /* Input for growfs log op */
 typedef struct xfs_growfs_log
 {
-	__uint32_t	newblocks;
-	__int32_t	isint;
+	__uint32_t	newblocks;	/* new log size, fsblocks */
+	__int32_t	isint;		/* 1 if new log is internal */
 } xfs_growfs_log_t;
 
 /* Input for growfs rt op */
 typedef struct xfs_growfs_rt
 {
-	__uint64_t	newblocks;
-	__uint32_t	extsize;
+	__uint64_t	newblocks;	/* new realtime size, fsblocks */
+	__uint32_t	extsize;	/* new realtime extent size, fsblocks */
 } xfs_growfs_rt_t;
 
 #ifdef _KERNEL
