@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.278 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -2027,7 +2027,7 @@ xfs_read_core(
 	/* check for locks if some exist and mandatory locking is enabled */
 	if ((vp->v_flag & (VENF_LOCKING|VFRLOCKS)) == 
 	    (VENF_LOCKING|VFRLOCKS)) {
-		error = fs_checklock2(vp, FREAD, offset, count, 
+		error = XFS_CHECKLOCK(mp, bdp, vp, FREAD, offset, count, 
 				uiop->uio_fmode, credp, fl, VRWLOCK_READ,
 				ioflag);
 		if (error)
@@ -3967,7 +3967,7 @@ start:
 	/* check for locks if some exist and mandatory locking is enabled */
 	if ((vp->v_flag & (VENF_LOCKING|VFRLOCKS)) == 
 	    (VENF_LOCKING|VFRLOCKS)) {
-		error = fs_checklock2(vp, FWRITE, offset, count, 
+		error = XFS_CHECKLOCK(mp, bdp, vp, FWRITE, offset, count, 
 				     uiop->uio_fmode, credp, fl, 
 				     VRWLOCK_WRITE, ioflag);
 		if (error)

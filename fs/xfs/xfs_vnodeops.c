@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.403 $"
 
 
 #ifdef SIM
@@ -264,17 +264,6 @@ xfs_frlock(
 	off_t		offset,
 	vrwlock_t	vrwlock,
 	cred_t		*credp);
-
-STATIC int
-xfs_frlock2(
-	bhv_desc_t	*bdp,
-	int		cmd,
-	flock_t		*flockp,
-	int		flag,
-	off_t		offset,
-	vrwlock_t	vrwlock,
-	cred_t		*credp,
-	int		token_index);
 
 STATIC int
 xfs_allocstore(
@@ -5308,20 +5297,6 @@ xfs_rwunlockf(
 }
 
 /*
- * xfs_rwlocking  - should never get here
- */
-/* ARGSUSED */
-void
-xfs_rwlocking(
-	bhv_desc_t	*bdp,
-	vrwlock_t	locktype,
-	int		token_index,
-	int		locking)
-{
-	panic("xfs_rwlocking should never be called\n");
-}
-
-/*
  * xfs_seek
  *
  * Return an error if the new offset has overflowed and gone below
@@ -5388,44 +5363,6 @@ xfs_frlock(
 	return error;
 }
 
-/*
- * xfs_frlock2
- *
- * This is a stub.
- */
-STATIC int
-xfs_frlock2(
-	bhv_desc_t	*bdp,
-	int		cmd,
-	flock_t		*flockp,
-	int		flag,
-	off_t		offset,
-	vrwlock_t	vrwlock,
-	cred_t		*credp,
-	int		ioflag)
-{
-	xfs_inode_t	*ip;
-	int		dolock, error;
-
-	vn_trace_entry(BHV_TO_VNODE(bdp), "xfs_frlock2",
-			(inst_t *)__return_address);
-	ip = XFS_BHVTOI(bdp);
-
-	dolock = (vrwlock == VRWLOCK_NONE);
-	if (dolock) {
-		xfs_ilock(ip, XFS_IOLOCK_EXCL);
-		vrwlock = VRWLOCK_WRITE;
-	}
-
-	ASSERT(vrwlock == VRWLOCK_READ ? ismrlocked(&ip->i_iolock, MR_ACCESS) :
-		ismrlocked(&ip->i_iolock, MR_UPDATE));
-
-	error = fs_frlock2(bdp, cmd, flockp, flag, offset, vrwlock, 
-			credp, ioflag);
-	if (dolock)
-		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
-	return error;
-}
 
 /*
  * xfs_allocstore
@@ -7014,8 +6951,6 @@ vnodeops_t xfs_vnodeops = {
 	(vop_readbuf_t)fs_nosys,
 	(vop_strgetmsg_t)fs_nosys,
 	(vop_strputmsg_t)fs_nosys,
-	(vop_frlock2_t)fs_nosys,
-	(vop_rwlocking_t)fs_nosys
 };
 
 #else
@@ -7078,8 +7013,6 @@ vnodeops_t xfs_vnodeops = {
 	(vop_readbuf_t)xfs_vop_readbuf,
 	fs_strgetmsg,
 	fs_strputmsg,
-	xfs_frlock2,
-	xfs_rwlocking
 };
 
 #endif /* SIM */

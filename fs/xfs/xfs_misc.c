@@ -1,9 +1,10 @@
-#ident "$Revision: 1.3 $"
+#ident "$Revision: 1.4 $"
 
 #include <sys/types.h>
 #include <sys/sema.h>
 #include <sys/uuid.h>
 #include <sys/vfs.h>
+#include <sys/vnode.h>
 #include <sys/buf.h>
 
 #include "xfs_macros.h"
