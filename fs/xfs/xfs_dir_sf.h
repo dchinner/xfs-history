@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_SF_H
 #define	_FS_XFS_DIR_SF_H
 
-#ident	"$Revision: 1.1 $"
+#ident	"$Revision: 1.2 $"
 
 /*
  * xfs_dir_sf.h
@@ -68,4 +68,53 @@ int xfs_dir_sf_allfit(int count, int totallen);
 	       (sizeof(xfs_dir_sf_entry_t)-1)*(count) + (totallen))
 #endif
 
+
+#if defined(DEBUG) && !defined(SIM)
+/*
+ * Kernel tracing support for directories.
+ */
+struct uio;
+struct xfs_inode;
+struct xfs_da_intnode;
+struct xfs_dir_leafblock;
+struct xfs_dir_leaf_entry;
+
+#define	XFS_DIR_TRACE_SIZE	4096	/* size of global trace buffer */     
+
+/*
+ * Trace record types.
+ */
+#define	XFS_DIR_KTRACE_G_DU	1	/* dp, uio */
+#define	XFS_DIR_KTRACE_G_DUB	2	/* dp, uio, bno */
+#define	XFS_DIR_KTRACE_G_DUN	3	/* dp, uio, node */
+#define	XFS_DIR_KTRACE_G_DUL	4	/* dp, uio, leaf */
+#define	XFS_DIR_KTRACE_G_DUE	5	/* dp, uio, leaf entry */
+#define	XFS_DIR_KTRACE_G_DUC	6	/* dp, uio, cookie */
+
+void xfs_dir_trace_g_du(char *where, struct xfs_inode *dp, struct uio *uio);
+void xfs_dir_trace_g_dub(char *where, struct xfs_inode *dp, struct uio *uio,
+			      unsigned int bno);
+void xfs_dir_trace_g_dun(char *where, struct xfs_inode *dp, struct uio *uio,
+			      struct xfs_da_intnode *node);
+void xfs_dir_trace_g_dul(char *where, struct xfs_inode *dp, struct uio *uio,
+			      struct xfs_dir_leafblock *leaf);
+void xfs_dir_trace_g_due(char *where, struct xfs_inode *dp, struct uio *uio,
+			      struct xfs_dir_leaf_entry *entry);
+void xfs_dir_trace_g_duc(char *where, struct xfs_inode *dp, struct uio *uio,
+			      off_t cookie);
+void xfs_dir_trace_enter(int type, char *where,
+			     __psunsigned_t a0, __psunsigned_t a1,
+			     __psunsigned_t a2, __psunsigned_t a3,
+			     __psunsigned_t a4, __psunsigned_t a5,
+			     __psunsigned_t a6, __psunsigned_t a7,
+			     __psunsigned_t a8, __psunsigned_t a9,
+			     __psunsigned_t a10, __psunsigned_t a11);
+#else
+#define	xfs_dir_trace_g_du(w,d,u)
+#define	xfs_dir_trace_g_dub(w,d,u,b)
+#define	xfs_dir_trace_g_dun(w,d,u,n)
+#define	xfs_dir_trace_g_dul(w,d,u,l)
+#define	xfs_dir_trace_g_due(w,d,u,e)
+#define	xfs_dir_trace_g_duc(w,d,u,c)
+#endif /* DEBUG && !SIM */
 #endif	/* !XFS_XFS_DIR_SF_H */
