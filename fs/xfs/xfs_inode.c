@@ -1,4 +1,4 @@
-#ident "$Revision: 1.173 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -2730,6 +2730,40 @@ xfs_iflush(
 	 */
 	ip->i_update_core = 0;
 
+	/*
+	 * Make sure the place we're flushing out to really looks
+	 * like an inode!
+	 */
+	if (dip->di_core.di_magic != XFS_DINODE_MAGIC) {
+		cmn_err(CE_PANIC, "xfs_iflush: Bad inode pointer 0x%x",
+			dip);
+	}
+	if (ip->i_d.di_magic != XFS_DINODE_MAGIC) {
+		cmn_err(CE_PANIC, "xfs_iflush: Bad inode  0x%x",
+			ip);
+	}
+	if ((ip->i_d.di_mode & IFMT) == IFREG) {
+		if ((ip->i_d.di_format != XFS_DINODE_FMT_EXTENTS) &&
+		    (ip->i_d.di_format != XFS_DINODE_FMT_BTREE)) {
+			cmn_err(CE_PANIC, "xfs_iflush: Bad reg inode 0x%x\n",
+				ip);
+		}
+	} else if ((ip->i_d.di_mode & IFMT) == IFDIR) {
+		if ((ip->i_d.di_format != XFS_DINODE_FMT_EXTENTS) &&
+		    (ip->i_d.di_format != XFS_DINODE_FMT_BTREE) &&
+		    (ip->i_d.di_format != XFS_DINODE_FMT_LOCAL)) {
+			cmn_err(CE_PANIC, "xfs_iflush: Bad dir inode 0x%x\n",
+				ip);
+		}
+	}
+	if (ip->i_d.di_nextents > ip->i_d.di_nblocks) {
+		cmn_err(CE_PANIC, "xfs_iflush: Bad inode nblocks 0x%x\n",
+			ip);
+	}
+	if (ip->i_d.di_forkoff > mp->m_sb.sb_inodesize) {
+		cmn_err(CE_PANIC, "xfs_iflush: Bad inode forkoff 0x%x\n",
+			ip);
+	}
 	/*
 	 * Copy the dirty parts of the inode into the on-disk
 	 * inode.  We always copy out the core of the inode,
