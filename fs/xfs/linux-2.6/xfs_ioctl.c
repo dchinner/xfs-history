@@ -708,6 +708,8 @@ xfs_ioctl(
 						 * but used in dmi */
 		xfs_fsop_bulkreq_t	bulkreq;
 
+		if (!capable(CAP_SYS_ADMIN))
+			return -EPERM;
 
 		if (copy_from_user(&bulkreq, (xfs_fsop_bulkreq_t *)arg,
 						sizeof(xfs_fsop_bulkreq_t)))
@@ -965,7 +967,7 @@ xfs_ioctl(
                 xfs_fsop_resblks_t inout;
                 __uint64_t in; 
                               
-		error=copy_from_user(&inout, (char *)arg, sizeof(xfs_fsop_resblks_t));
+		error = copy_from_user(&inout, (char *)arg, sizeof(xfs_fsop_resblks_t));
                 if (error)
                         return -error;
                 
@@ -988,6 +990,10 @@ xfs_ioctl(
 
 	case XFS_IOC_FSGROWFSDATA: {
 		xfs_growfs_data_t in;
+
+		if (!capable(CAP_SYS_ADMIN))
+			return -EPERM;
+
 		error = copy_from_user(&in, (char *)arg, sizeof(xfs_growfs_data_t));
 		if (error)
 			return -error;
@@ -999,6 +1005,10 @@ xfs_ioctl(
 
 	case XFS_IOC_FSGROWFSLOG: {
 		xfs_growfs_log_t in;
+
+		if (!capable(CAP_SYS_ADMIN))
+			return -EPERM;
+
 		error = copy_from_user(&in, (char *)arg, sizeof(xfs_growfs_log_t));
 		if (error)
 			return -error;
@@ -1010,6 +1020,10 @@ xfs_ioctl(
 
 	case XFS_IOC_FSGROWFSRT: {
 		xfs_growfs_rt_t in;
+
+		if (!capable(CAP_SYS_ADMIN))
+			return -EPERM;
+
 		error = copy_from_user(&in, (char *)arg, sizeof(xfs_growfs_rt_t));
 		if (error)
 			return -error;
