@@ -2579,7 +2579,6 @@ xfs_iunpin_wait(
 {
 	xfs_inode_log_item_t	*iip;
 	xfs_lsn_t	lsn;
-	DECLARE_WAITQUEUE(wait, current);
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE | MR_ACCESS));
 
@@ -2599,15 +2598,7 @@ xfs_iunpin_wait(
 	 */
 	xfs_log_force(ip->i_mount, lsn, XFS_LOG_FORCE);
 
-	add_wait_queue(&ip->i_ipin_wait, &wait);
-repeat:
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	if (atomic_read(&ip->i_pincount)) {
-		schedule();
-		goto repeat;
-	}
-	remove_wait_queue(&ip->i_ipin_wait, &wait);
-	current->state = TASK_RUNNING;
+	wait_event(ip->i_ipin_wait, (atomic_read(&ip->i_pincount) == 0));
 }
 
 
