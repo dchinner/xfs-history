@@ -4,33 +4,16 @@
  * GROT: figure out how to recover gracefully when bmap returns ENOSPC.
  */
 
-#ifdef SIM
-#define _KERNEL 1
-#endif
 #include <sys/param.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
 #include <sys/errno.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
 #include <sys/kmem.h>
 #include <sys/debug.h>
-#ifdef SIM
-#include <bstring.h>
-#include <stdio.h>
-#else
 #include <sys/systm.h>
-#endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
-#ifdef SIM
-#define _KERNEL
-#endif
 #include <sys/grio.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
@@ -51,9 +34,6 @@
 #include "xfs_attr.h"
 #include "xfs_attr_leaf.h"
 #include "xfs_error.h"
-#ifdef SIM
-#include "sim.h"
-#endif
 
 /*
  * xfs_attr_leaf.c
@@ -167,7 +147,6 @@ xfs_attr_shortform_addname(xfs_trans_t *trans, xfs_da_name_t *args)
 	return(0);
 }
 
-#ifndef SIM
 /*
  * Remove a name from the shortform attribute list structure.
  */
@@ -209,7 +188,6 @@ xfs_attr_shortform_removename(xfs_trans_t *trans, xfs_da_name_t *args)
 
 	return(0);
 }
-#endif	/* !SIM */
 
 /*
  * Look up a name in a shortform attribute list structure.
@@ -337,7 +315,6 @@ out:
 	return(retval);
 }
 
-#ifndef SIM
 /*
  * Print the shortform attribute list.
  */
@@ -515,7 +492,6 @@ out:
 	kmem_free(tmpbuffer, XFS_LBSIZE(dp->i_mount));
 	return(error);
 }
-#endif	/* !SIM */
 
 /*
  * Convert from using a single leaf to a root node and a leaf.
@@ -1091,7 +1067,6 @@ xfs_attr_leaf_figure_balance(xfs_da_state_t *state,
  * Routines used for shrinking the Btree.
  *========================================================================*/
 
-#ifndef SIM
 /*
  * Check a leaf block and its neighbors to see if the block should be
  * collapsed into one or the other neighbor.  Always keep the block
@@ -1462,7 +1437,6 @@ xfs_attr_leaf_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 	 */
 	save_blk->hashval = save_leaf->entries[ save_leaf->hdr.count-1 ].hashval;
 }
-#endif	/* !SIM */
 
 /*========================================================================
  * Routines used for finding things in the Btree.
@@ -1807,7 +1781,6 @@ xfs_attr_leaf_newentsize(xfs_da_name_t *args, int blocksize, int *local)
 	return(size);
 }
 
-#ifndef SIM
 /*
  * Print the contents of a leaf block.
  */
@@ -1930,4 +1903,3 @@ xfs_attr_put_listent(attrlist_t *alist, char *name, int namelen, int valuelen,
 	alist->al_offset[ alist->al_count++ ] = firstused;
 	return(0);
 }
-#endif	/* !SIM */
