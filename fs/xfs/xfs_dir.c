@@ -418,9 +418,6 @@ STATIC int
 xfs_dir_shortform_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_ino_t parent)
 {
 	struct xfs_dir_sf_hdr *hdr;
-	xfs_fsblock_t blkno;
-	int retval;
-	struct xfs_dir_name args;
 
 	ASSERT(dp->i_d.di_size == 0);
 	if (dp->i_d.di_format == XFS_DINODE_FMT_EXTENTS) {
@@ -435,16 +432,9 @@ xfs_dir_shortform_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_ino_t parent)
 	hdr = (struct xfs_dir_sf_hdr *)dp->i_u1.iu_data;
 	bcopy((char *)&parent, hdr->parent, sizeof(xfs_ino_t));
 	hdr->count = 0;
-	args.dp = dp;
-	args.firstblock = NULL;
-	args.flist = NULL;
-	args.total = 0;
-	retval = xfs_dir_grow_inode(trans, &args, sizeof(struct xfs_dir_sf_hdr),
-					   &blkno);
-
-	if (!retval)
-		xfs_trans_log_inode(trans, dp, XFS_ILOG_DATA);
-	return(retval);
+	dp->i_d.di_size = sizeof(*hdr);
+	xfs_trans_log_inode(trans, dp, XFS_ILOG_CORE | XFS_ILOG_DATA);
+	return(0);
 }
 
 /*
@@ -456,8 +446,7 @@ xfs_dir_shortform_addname(xfs_trans_t *trans, struct xfs_dir_name *args)
 {
 	struct xfs_dir_shortform *sf;
 	struct xfs_dir_sf_entry *sfe;
-	int retval, i, offset, size;
-	xfs_fsblock_t blkno;
+	int i, offset, size;
 	xfs_inode_t *dp;
 
 	dp = args->dp;
@@ -484,11 +473,10 @@ xfs_dir_shortform_addname(xfs_trans_t *trans, struct xfs_dir_name *args)
 	bcopy(args->name, sfe->name, sfe->namelen);
 	sf->hdr.count++;
 
-	retval = xfs_dir_grow_inode(trans, args, size, &blkno);
+	dp->i_d.di_size += size;
+	xfs_trans_log_inode(trans, dp, XFS_ILOG_CORE | XFS_ILOG_DATA);
 
-	if (!retval)
-		xfs_trans_log_inode(trans, dp, XFS_ILOG_DATA);
-	return(retval);
+	return(0);
 }
 
 /*
@@ -499,8 +487,7 @@ xfs_dir_shortform_removename(xfs_trans_t *trans, struct xfs_dir_name *args)
 {
 	struct xfs_dir_shortform *sf;
 	struct xfs_dir_sf_entry *sfe;
-	int base, size, retval, i;
-	xfs_fsblock_t blkno;
+	int base, size, i;
 	buf_t *bp;
 	xfs_inode_t *dp;
 
@@ -529,11 +516,10 @@ xfs_dir_shortform_removename(xfs_trans_t *trans, struct xfs_dir_name *args)
 	bzero(&((char *)sf)[dp->i_d.di_size - size], size);
 	sf->hdr.count--;
 
-	retval = xfs_dir_shrink_inode(trans, args, size, &blkno);
+	dp->i_d.di_size -= size;
+	xfs_trans_log_inode(trans, dp, XFS_ILOG_CORE | XFS_ILOG_DATA);
 
-	if (!retval)
-		xfs_trans_log_inode(trans, dp, XFS_ILOG_DATA);
-	return(retval);
+	return(0);
 }
 
 /*
@@ -602,10 +588,16 @@ xfs_dir_shortform_to_leaf(xfs_trans_t *trans, struct xfs_dir_name *iargs)
 	bcopy(sf->hdr.parent, (char *)&inumber, sizeof(xfs_ino_t));
 
 	xfs_idata_realloc(dp, -size);
-	retval = xfs_dir_grow_inode(trans, iargs, XFS_LBSIZE(sbp) - size, &blkno);
-	if (retval)
+	dp->i_d.di_size = 0;
+	retval = xfs_dir_grow_inode(trans, iargs, &blkno);
+	if (retval) {
+		dp->i_d.di_size = size;
+		xfs_idata_realloc(dp, size);
+		bcopy(tmpbuffer, dp->i_u1.iu_data, size);
 		goto out;
+	}
 
+	ASSERT(blkno == 0);
 	bp = xfs_dir_leaf_create(trans, dp, blkno);
 
 	args.name = ".";
@@ -908,7 +900,7 @@ xfs_dir_leaf_to_shortform(xfs_trans_t *trans, struct xfs_dir_name *iargs)
 			entry->nameidx = 0;
 		}
 	}
-	retval = xfs_dir_shrink_inode(trans, iargs, dp->i_d.di_size, &blkno);
+	retval = xfs_dir_shrink_inode(trans, iargs, 0);
 	if (retval)
 		goto out;
 	retval = xfs_dir_shortform_create(trans, dp, parent);
@@ -955,7 +947,7 @@ xfs_dir_leaf_to_node(xfs_trans_t *trans, struct xfs_dir_name *args)
 
 	dp = args->dp;
 	sbp = &dp->i_mount->m_sb;
-	retval = xfs_dir_grow_inode(trans, args, XFS_LBSIZE(sbp), &blkno);
+	retval = xfs_dir_grow_inode(trans, args, &blkno);
 	ASSERT(blkno == 1);
 	if (retval)
 		return(retval);
@@ -1346,39 +1338,28 @@ xfs_dir_hashname(register char *name, register int namelen)
 }
 
 int
-xfs_dir_grow_inode(xfs_trans_t *trans, struct xfs_dir_name *args, int delta,
+xfs_dir_grow_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
 			xfs_fsblock_t *new_blkno)
 {
 	xfs_inode_t *dp;
 	xfs_fsblock_t oldsize, newsize;
 	xfs_sb_t *sbp;
+	xfs_bmbt_irec_t map;
+	int nmap;
+	xfs_fsblock_t bno;
 
 	dp = args->dp;
 	sbp = &dp->i_mount->m_sb;
-	oldsize = dp->i_d.di_size >> XFS_LBLOG(sbp);
-	newsize = (dp->i_d.di_size + delta) >> XFS_LBLOG(sbp);
-	if (newsize >= XFS_DIR_MAXBLK) {
-		return(ENOSPC);
-	}
-
-	while (newsize > oldsize) {
-		xfs_bmbt_irec_t map[XFS_BMAP_MAX_NMAP];
-		int nmap;
-
-		nmap = XFS_BMAP_MAX_NMAP;
-		ASSERT(args->firstblock != NULL);
-		*(args->firstblock) = xfs_bmapi(trans, dp, oldsize,
-						newsize - oldsize,
-						XFS_BMAPI_WRITE,
-						*(args->firstblock),
-						args->total,
-						map, &nmap, args->flist);
-		ASSERT(nmap >= 1);
-		oldsize = map[nmap - 1].br_startoff +
-			  map[nmap - 1].br_blockcount;
-	}
-	*new_blkno = (newsize > 0) ? newsize - 1 : 0;
-	dp->i_d.di_size += delta;
+	bno = xfs_bmap_first_unused(trans, dp);
+	nmap = 1;
+	ASSERT(args->firstblock != NULL);
+	*(args->firstblock) = xfs_bmapi(trans, dp, bno, 1, XFS_BMAPI_WRITE,
+					*(args->firstblock), args->total, &map,
+					&nmap, args->flist);
+	if (nmap < 1)
+		return ENOSPC;
+	*new_blkno = bno;
+	dp->i_d.di_size = xfs_fsb_to_b(sbp, xfs_bmap_last_offset(trans, dp));
 
 	xfs_trans_log_inode(trans, dp, XFS_ILOG_CORE);
 
@@ -1386,31 +1367,20 @@ xfs_dir_grow_inode(xfs_trans_t *trans, struct xfs_dir_name *args, int delta,
 }
 
 int
-xfs_dir_shrink_inode(xfs_trans_t *trans, struct xfs_dir_name *args, int delta,
-			xfs_fsblock_t *new_blkno)
+xfs_dir_shrink_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
+			xfs_fsblock_t dead_blkno)
 {
 	xfs_inode_t *dp;
-	xfs_fsblock_t oldsize, newsize;
 	xfs_sb_t *sbp;
 	int done;
 
 	dp = args->dp;
 	sbp = &dp->i_mount->m_sb;
-
-	oldsize = dp->i_d.di_size >> XFS_LBLOG(sbp);
-	dp->i_d.di_size -= delta;
-	newsize = dp->i_d.di_size >> XFS_LBLOG(sbp);
-
-	if (oldsize > 0) {
-		*(args->firstblock) = xfs_bunmapi(trans, dp, newsize,
-						  oldsize - newsize, 1,
-						  *(args->firstblock),
-						  args->flist, &done);
-		ASSERT(done);
-		*new_blkno = newsize - 1;
-	} else {
-		*new_blkno = 0;
-	}
+	*(args->firstblock) = xfs_bunmapi(trans, dp, dead_blkno, 1, 1,
+					  *(args->firstblock), args->flist,
+					  &done);
+	ASSERT(done);
+	dp->i_d.di_size = xfs_fsb_to_b(sbp, xfs_bmap_last_offset(trans, dp));
 
 	xfs_trans_log_inode(trans, dp, XFS_ILOG_CORE);
 

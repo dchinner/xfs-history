@@ -241,8 +241,7 @@ xfs_dir_root_split(struct xfs_dir_state *state,
 	buf_t *bp;
 	int retval;
 
-	retval = xfs_dir_grow_inode(state->trans, state->args, state->blocksize,
-				    &blkno);
+	retval = xfs_dir_grow_inode(state->trans, state->args, &blkno);
 	if (retval)
 		return(retval);
 	bp = xfs_dir_get_buf(state->trans, state->args->dp, blkno);
@@ -263,12 +262,6 @@ xfs_dir_root_split(struct xfs_dir_state *state,
 	node->btree[1].hashval = blk2->hashval;
 	node->btree[1].before = blk2->blkno;
 	node->hdr.count = 2;
-#ifdef GROT
-	node->hdr.freecount = oldroot->hdr.freecount;
-	node->hdr.freechain = oldroot->hdr.freechain;
-	oldroot->hdr.freecount = 0;
-	oldroot->hdr.freechain = 0;
-#endif
 	xfs_trans_log_buf(state->trans, bp, 0, state->blocksize - 1);
 
 	return(0);
@@ -288,11 +281,9 @@ xfs_dir_leaf_split(struct xfs_dir_state *state,
 
 	/*
 	 * Allocate space for a new leaf node.
-	 * GROT: use a block off the freelist if possible.
 	 */
 	ASSERT(oldblk->leafblk == 1);
-	retval = xfs_dir_grow_inode(state->trans, state->args, state->blocksize,
-				    &blkno);
+	retval = xfs_dir_grow_inode(state->trans, state->args, &blkno);
 	if (retval)
 		return(retval);
 	newblk->bp = xfs_dir_leaf_create(state->trans, state->args->dp, blkno);
@@ -773,11 +764,8 @@ xfs_dir_node_split(struct xfs_dir_state *state,
 		/*
 		 * Allocate a new node, add to the doubly linked chain of
 		 * nodes, then move some of our excess entries into it.
-		 * GROT: use a freelist block.
 		 */
-		retval = xfs_dir_grow_inode(state->trans, state->args,
-							  state->blocksize,
-							  &blkno);
+		retval = xfs_dir_grow_inode(state->trans, state->args, &blkno);
 		if (retval)
 			return(retval);	/* GROT: dir is inconsistent */
 		
@@ -1025,8 +1013,7 @@ out:
 
 /*
  * We have only one entry in the root.  Copy the only remaining child of
- * the old root to block 0 as the new root node, but copy the freelist
- * from the old root before overwriting it.
+ * the old root to block 0 as the new root node.
  */
 STATIC int
 xfs_dir_root_join(struct xfs_dir_state *state,
@@ -1037,7 +1024,6 @@ xfs_dir_root_join(struct xfs_dir_state *state,
 	xfs_fsblock_t blkno;
 	int retval;
 	buf_t *bp;
-	xfs_sb_t *sbp;
 
 	retval = 0;
 	oldroot = (struct xfs_dir_intnode *)drop_blk->bp->b_un.b_addr;
@@ -1052,29 +1038,15 @@ xfs_dir_root_join(struct xfs_dir_state *state,
 		ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
 		ASSERT(leaf->hdr.info.forw == 0);
 		ASSERT(leaf->hdr.info.back == 0);
-		bcopy(bp->b_un.b_addr, drop_blk->bp->b_un.b_addr, state->blocksize);
-		xfs_trans_log_buf(state->trans, drop_blk->bp, 0,
-						state->blocksize - 1);
-		sbp = &state->mp->m_sb;
-		retval = xfs_dir_shrink_inode(state->trans, state->args,
-					      sbp->sb_inodesize - state->blocksize,
-					      &blkno);
 	} else {
 		ASSERT(oldroot->hdr.info.forw == 0);
 		ASSERT(oldroot->hdr.info.back == 0);
 		newroot = (struct xfs_dir_intnode *)bp->b_un.b_addr;
 		ASSERT(newroot->hdr.info.magic == XFS_DIR_NODE_MAGIC);
-#ifdef GROT
-		newroot->hdr.freecount = oldroot->hdr.freecount;
-		newroot->hdr.freechain = oldroot->hdr.freechain;
-#endif
-		bcopy(bp->b_un.b_addr, drop_blk->bp->b_un.b_addr, state->blocksize);
-#ifdef GROT
-		xfs_dir_node_addfreelist(state, drop_blk);
-#endif
-		xfs_trans_log_buf(state->trans, drop_blk->bp, 0,
-						state->blocksize - 1);
 	}
+	bcopy(bp->b_un.b_addr, drop_blk->bp->b_un.b_addr, state->blocksize);
+	xfs_trans_log_buf(state->trans, drop_blk->bp, 0, state->blocksize - 1);
+	retval = xfs_dir_shrink_inode(state->trans, state->args, blkno);
 	return(retval);
 }
 
@@ -1498,9 +1470,6 @@ xfs_dir_node_remove(struct xfs_dir_state *state,
 	}
 	bzero((char *)btree, sizeof(struct xfs_dir_node_entry));
 	node->hdr.count--;
-#ifdef GROT
-	xfs_dir_node_addfreelist(state, nilner);
-#endif
 
 	/*
 	 * Copy the last hash value from the block to propagate upwards.

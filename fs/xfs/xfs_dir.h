@@ -67,7 +67,6 @@ struct xfs_dir_shortform {
  */
 #define XFS_DIR_LEAF_MAGIC	0xfeeb	/* magic number for leaf blocks */
 #define XFS_DIR_NODE_MAGIC	0xfebe	/* magic number for non-leaf blocks */
-#define XFS_DIR_FREE_MAGIC	0xbefe	/* magic number for free blocks */
 
 struct xfs_dir_blkinfo {
 	__uint32_t forw;			/* previous block in list */
@@ -143,12 +142,6 @@ struct xfs_dir_leafblock {
  *
  * Since we have duplicate keys, use a binary search but always follow
  * all match in the block, not just the first match found.
- *
- * The root node only has the hdr.freechain and hdr.freeblks fields set.
- * When directory blocks in the middle of the address space are freed,
- * they are attached to the head of this list and the hdr.freeblks count
- * is incremented.  When the count gets up to XFS_DIR_FREE_CLEANUP, we
- * will garbage collect.
  */
 #define	XFS_DIR_NODE_MAXDEPTH	5	/* max depth of Btree */
 
@@ -156,13 +149,7 @@ struct xfs_dir_intnode {
 	struct xfs_dir_node_hdr {	/* constant-structure header block */
 		struct xfs_dir_blkinfo info;	/* block type, links, etc. */
 		__uint16_t count;	/* count of active entries */
-		__uint8_t  level;	/* level above leaves (leaf == 0) */
-#ifdef GROT
-		__uint16_t freecount;	/* num blks in freechain (root only) */
-		__uint32_t freechain;	/* free block chain (root node only) */
-		__uint8_t  level;	/* level above leaves (leaf == 0) */
-		__uint8_t  pad1[5];
-#endif
+		__uint16_t level;	/* level above leaves (leaf == 0) */
 	} hdr;
 	struct xfs_dir_node_entry {
 		__uint32_t hashval;	/* hash value for this descendant */
@@ -176,30 +163,6 @@ struct xfs_dir_intnode {
 	((XFS_LBSIZE(sbp) - sizeof(struct xfs_dir_node_hdr)) \
 		   / sizeof(struct xfs_dir_node_entry))
 #define XFS_DIR_MAXBLK		0x10000000	/* max hash value */
-
-/*
- * The contents of a free block in the directory.
- *
- * Those directory blocks that are no longer in use, but are in the
- * middle of the address space, have this format.  When the number of
- * such blocks gets up to XFS_DIR_FREE_CLEANUP, we will shuffle the
- * active blocks around in the address space so as to compress out
- * the unused blocks.  Once they are at the end of the address space,
- * the address space is truncated.
- */
-#define XFS_DIR_FREE_CLEANUP	8	/* max free blks before compress */
-
-struct xfs_dir_freeblock {
-	struct xfs_dir_free_hdr {	/* constant-structure header block */
-		struct xfs_dir_blkinfo info;	/* block type, links, etc. */
-		__uint16_t pad;
-	} hdr;
-	__uint32_t free[1];		/* partial list of free blocks */
-};
-
-#define XFS_DIR_FREE_ENTRIES(sbp)	/* how many entries in this block? */ \
-	((XFS_LBSIZE(sbp) - sizeof(struct xfs_dir_free_hdr)) \
-		   / sizeof(__uint32_t))
 
 /*
  * Macros used by directory code to interface to the filesystem.
@@ -244,11 +207,9 @@ buf_t	*xfs_dir_node_create(xfs_trans_t *trans, xfs_inode_t *dp,
  * Utility routines.
  */
 int	xfs_dir_grow_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
-				int delta_in_bytes,
-				xfs_fsblock_t *last_logblk_in_inode);
+				xfs_fsblock_t *new_logblock);
 int	xfs_dir_shrink_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
-				int delta_in_bytes,
-				xfs_fsblock_t *last_logblk_in_inode);
+				xfs_fsblock_t dead_logblock);
 buf_t	*xfs_dir_get_buf(xfs_trans_t *trans, xfs_inode_t *dp,
 				xfs_fsblock_t bno);
 buf_t	*xfs_dir_read_buf(xfs_trans_t *trans, xfs_inode_t *dp,
