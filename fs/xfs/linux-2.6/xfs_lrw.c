@@ -73,7 +73,7 @@ xfs_delalloc_cleanup(
 	xfs_filblks_t	count_fsb);
 
 
-ssize_t
+int				/* error (positive) */
 xfs_read(
         bhv_desc_t      *bdp,
         uio_t           *uiop,
@@ -83,6 +83,7 @@ xfs_read(
         
 {
 	ssize_t		ret;
+	int		error = 0;
 	xfs_fsize_t	n;
 	xfs_inode_t	*ip;
 	struct file	*filp = uiop->uio_fp;
@@ -125,7 +126,7 @@ xfs_read(
 		size = n;
 
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount)) {
-		return -EIO;
+		return EIO;
 	}
 
 	xfs_ilock(ip, XFS_IOLOCK_SHARED);
@@ -136,13 +137,13 @@ xfs_read(
 
 		/*vrwlock_t locktype = VRWLOCK_READ;*/
 
-		ret = xfs_dm_send_data_event(DM_EVENT_READ, bdp,
+		error = xfs_dm_send_data_event(DM_EVENT_READ, bdp,
 					     *offsetp, size,
 					     FILP_DELAY_FLAG(filp),
 					     NULL /*&locktype*/);
-		if (ret) {
+		if (error) {
 			xfs_iunlock(ip, XFS_IOLOCK_SHARED);
-			return -ret;
+			return error;
 		}
 	}
 #endif /* CONFIG_XFS_DMAPI */
@@ -159,10 +160,22 @@ xfs_read(
 		ret = generic_file_read(filp, buf, size, offsetp);
 	}
 
+	/*
+	 * In either case above, ret >= 0 is num bytes read
+	 * ret < 0 is an error.
+	 */
+	if (ret > 0) {
+		uiop->uio_resid = size - ret;
+	} else {
+		/* return positive error */
+		error = -(int)ret;
+	}
+	
 	if (!(filp->f_flags & O_INVISIBLE))
 		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
 
-	return(ret);
+	ASSERT (error >= 0);
+	return error;
 }
 
 /*
@@ -176,7 +189,7 @@ xfs_read(
 #define poff(x) ((x) & (PAGE_CACHE_SIZE - 1))
 
 /* ARGSUSED */
-STATIC int				/* error */
+STATIC int				/* error (positive) */
 xfs_zero_last_block(
 	struct inode	*ip,
 	xfs_iocore_t	*io,
@@ -195,7 +208,7 @@ xfs_zero_last_block(
 	int		zero_len;
 	int		isize_fsb_offset;
 	int		i;
-	int		error;
+	int		error = 0;
 	int		hole;
 	xfs_bmbt_irec_t	imap;
 	loff_t		loff;
@@ -325,7 +338,7 @@ xfs_zero_last_block(
 	 */
 	pb = pagebuf_get(ip, loff, lsize, 0);
 	if (!pb) {
-		error = -ENOMEM;
+		error = ENOMEM;
 		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
 		return error;
 	}
@@ -336,7 +349,8 @@ xfs_zero_last_block(
 			printk("xfs_zero_last_block: unwritten?\n");
 		}
 		if (PBF_NOT_DONE(pb)) {
-			if (error = pagebuf_iostart(pb, PBF_READ)) {
+			/* pagebuf functions return negative errors */
+			if (error = -pagebuf_iostart(pb, PBF_READ)) {
 				pagebuf_rele(pb);
 				goto out_lock;
 			}
@@ -346,7 +360,7 @@ xfs_zero_last_block(
 	}
 
 
-	if (error = pagebuf_iozero(ip, pb, zero_offset, zero_len)) {
+	if (error = -pagebuf_iozero(ip, pb, zero_offset, zero_len)) {
 		pagebuf_rele(pb);
 		goto out_lock;
 	}
@@ -375,6 +389,7 @@ xfs_zero_last_block(
 
 out_lock:
 	XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
+	ASSERT(error >= 0);
 	return error;
 }
 
@@ -389,7 +404,7 @@ out_lock:
  * are left alone as holes.
  */
 
-int					/* error */
+int					/* error (positive) */
 xfs_zero_eof(
 	vnode_t		*vp,
 	xfs_iocore_t	*io,
@@ -512,7 +527,7 @@ xfs_zero_eof(
 
 		pb = pagebuf_get(ip, loff, lsize, 0);
 		if (!pb) {
-			error = -ENOMEM;
+			error = ENOMEM;
 			goto out_lock;
 		}
 
@@ -528,7 +543,8 @@ xfs_zero_eof(
 			}
 		}
 
-		if (error = pagebuf_iozero(ip, pb, 0, lsize)) {
+		/* pagebuf_iozero returns negative error */
+		if (error = -pagebuf_iozero(ip, pb, 0, lsize)) {
 			pagebuf_rele(pb);
 			goto out_lock;
 		}
@@ -557,10 +573,11 @@ xfs_zero_eof(
 out_lock:
 
 	XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
+	ASSERT(error >= 0);
 	return error;
 }
 
-ssize_t
+int				/* error (positive) */
 xfs_write(
         bhv_desc_t      *bdp,
         uio_t           *uiop,
@@ -575,7 +592,7 @@ xfs_write(
 	xfs_mount_t	*mp;
 	xfs_trans_t	*tp;
 	ssize_t		ret;
-	ssize_t		transerror;
+	int		error = 0;
 	xfs_fsize_t     isize;
 	xfs_fsize_t	n, limit = XFS_MAX_FILE_OFFSET;
 	xfs_iocore_t    *io;
@@ -589,8 +606,9 @@ xfs_write(
 	vrwlock_t	locktype;
 	char 		*buf;
 	size_t		size;
+	unsigned int	mode;
 
-                    
+
         ASSERT(uiop);                   /* we only support exactly 1  */
         ASSERT(uiop->uio_iovcnt == 1);  /* iov in a uio on linux      */
         ASSERT(uiop->uio_iov);      
@@ -598,7 +616,7 @@ xfs_write(
 	vp = BHV_TO_VNODE(bdp);
 	xip = XFS_BHVTOI(bdp);
 	if (XFS_FORCED_SHUTDOWN(xip->i_mount)) {
-		return -EIO;
+		return EIO;
 	}
 
         buf = uiop->uio_iov->iov_base;
@@ -641,12 +659,12 @@ start:
 	if ((DM_EVENT_ENABLED_IO(vp->v_vfsp, io, DM_EVENT_WRITE) &&
 	    !(filp->f_flags & O_INVISIBLE) && !eventsent)) {
 
-		ret = xfs_dm_send_data_event(DM_EVENT_WRITE, bdp,
+		error = xfs_dm_send_data_event(DM_EVENT_WRITE, bdp,
 				*offsetp, size,
 				FILP_DELAY_FLAG(filp), &locktype);
-		if (ret) {
+		if (error) {
 			xfs_iunlock(xip, XFS_ILOCK_EXCL|iolock);
-			return -ret;
+			return error;
 		}
 		eventsent = 1;
 	}
@@ -686,11 +704,11 @@ start:
 	
 	if (!direct && (*offsetp > isize && isize)) {
 		io->io_writeio_blocks = mp->m_writeio_blocks;
-		ret = xfs_zero_eof(BHV_TO_VNODE(bdp), io, *offsetp,
+		error = xfs_zero_eof(BHV_TO_VNODE(bdp), io, *offsetp,
 			isize, NULL);
-		if (ret) {
+		if (error) {
 			xfs_iunlock(xip, XFS_ILOCK_EXCL|iolock);
-			return(ret); /* JIMJIM should this be negative? */
+			return(error);
 		}
 	}
 	xfs_iunlock(xip, XFS_ILOCK_EXCL);
@@ -702,6 +720,13 @@ retry:
 		xfs_inval_cached_pages(vp, &xip->i_iocore, *offsetp,
 			(xfs_off_t) size, (void *)vp);
 	}
+
+	/*
+	 * pagebuf_generic_file_write will return positive if bytes
+	 * written, negative if error.  We'll live with (-) error
+	 * for the moment, but flip error sign before we pass it up
+	 */
+
 	ret = pagebuf_generic_file_write(filp, buf, size, offsetp,
 							linvfs_pb_bmap);
 
@@ -711,11 +736,11 @@ retry:
 	    !(filp->f_flags & O_INVISIBLE)) {
 
 		VOP_RWUNLOCK(vp, locktype);
-		ret = dm_send_namesp_event(DM_EVENT_NOSPACE, bdp,
+		error = dm_send_namesp_event(DM_EVENT_NOSPACE, bdp,
 				DM_RIGHT_NULL, bdp, DM_RIGHT_NULL, NULL, NULL,
 				0, 0, 0); /* Delay flag intentionally  unused */
-		if (ret)
-			return -ret;
+		if (error)
+			return error;
 		VOP_RWLOCK(vp, locktype);
 		*offsetp = ip->i_size;
 		goto retry;
@@ -723,23 +748,39 @@ retry:
 	}
 #endif /* CONFIG_XFS_DMAPI */
 
-	/* JIMJIM Lock? around the stuff below if Linux doesn't lock above */
-	if (ret > 0) {
-		unsigned int mode;
-		/* set S_IGID if S_IXGRP is set, and always set S_ISUID */
-		mode = (ip->i_mode & S_IXGRP)*(S_ISGID/S_IXGRP) | S_ISUID;
-
-		/* was any of the uid bits set? */
-		mode &= ip->i_mode;
-		if (mode && !capable(CAP_FSETID)) {
-			ip->i_mode &= ~mode;
-			xfs_write_clear_setuid(xip);
-		}
-		if (*offsetp > xip->i_d.di_size) {
-			XFS_SETSIZE(mp, io, *offsetp);
-		}
+	if (ret <=0) {	/*
+			 * ret from pagebuf_generic_file_write <= 0, it's
+			 * an error, we want to return positive though
+			 * then bail out...
+			 */
+		xfs_rwunlock(bdp, locktype);
+		error = -(int)ret;
+		return(error);
 	}
 
+	/*
+	 * ret > 0 == number of bytes written by pagebuf_generic_file_write()
+	 * Keep track of any unwritten bytes in uio_resid.
+	 */
+
+	uiop->uio_resid = size - ret;
+
+	/* JIMJIM Lock? around the stuff below if Linux doesn't lock above */
+		
+	/* set S_IGID if S_IXGRP is set, and always set S_ISUID */
+	mode = (ip->i_mode & S_IXGRP)*(S_ISGID/S_IXGRP) | S_ISUID;
+
+	/* were any of the uid bits set? */
+	mode &= ip->i_mode;
+	if (mode && !capable(CAP_FSETID)) {
+		ip->i_mode &= ~mode;
+		xfs_write_clear_setuid(xip);
+	}
+	if (*offsetp > xip->i_d.di_size) {
+		XFS_SETSIZE(mp, io, *offsetp);
+	}
+	
+	/* Handle various SYNC-type writes */
 	if (ioflag & PBF_SYNC) {
 
 		/* Flush all inode data buffers */
@@ -751,15 +792,16 @@ retry:
 		 * size, force the log.
 		 */
 
-		if ((mp->m_flags & XFS_MOUNT_OSYNCISDSYNC) && !(xip->i_update_size)) {
+		if ((mp->m_flags & XFS_MOUNT_OSYNCISDSYNC) 
+			&& !(xip->i_update_size)) {
 			/*
 			 * If an allocation transaction occurred
 			 * without extending the size, then we have to force
 			 * the log up the proper point to ensure that the
 			 * allocation is permanent.  We can't count on
 			 * the fact that buffered writes lock out direct I/O
-			 * writes because the direct I/O write could have extended
-			 * the size non-transactionally and then finished just before
+			 * writes - the direct I/O write could have extended
+			 * the size nontransactionally, then finished before
 			 * we started.  xfs_write_file will think that the file
 			 * didn't grow but the update isn't safe unless the
 			 * size change is logged.
@@ -778,11 +820,12 @@ retry:
 			iip = xip->i_itemp;
 			if (iip && iip->ili_last_lsn) {
 				lsn = iip->ili_last_lsn;
-				xfs_log_force(mp, lsn, XFS_LOG_FORCE | XFS_LOG_SYNC);
+				xfs_log_force(mp, lsn, 
+						XFS_LOG_FORCE | XFS_LOG_SYNC);
 			} else if (xfs_ipincount(xip) > 0) { 
-				xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
+				xfs_log_force(mp, (xfs_lsn_t)0, 
+						XFS_LOG_FORCE | XFS_LOG_SYNC);
 			}
-
 
 		} else {
 			/*
@@ -802,12 +845,11 @@ retry:
 			 */
 
 			tp = xfs_trans_alloc(mp, XFS_TRANS_WRITE_SYNC);
-			if (transerror = xfs_trans_reserve(tp, 0,
+			if (error = xfs_trans_reserve(tp, 0,
 						      XFS_SWRITE_LOG_RES(mp),
 						      0, 0, 0)) {
 				/* Transaction reserve failed */
 				xfs_trans_cancel(tp, 0);
-				ret = transerror;
 			} else {
 				/* Transaction reserve successful */
 				xfs_ilock(xip, XFS_ILOCK_EXCL);
@@ -815,13 +857,11 @@ retry:
 				xfs_trans_ihold(tp, xip);
 				xfs_trans_log_inode(tp, xip, XFS_ILOG_CORE);
 				xfs_trans_set_sync(tp);
-				if (transerror = xfs_trans_commit(tp, 0, (xfs_lsn_t)0) ) {
-					ret = transerror;
-				}
+				error = xfs_trans_commit(tp, 0, (xfs_lsn_t)0);
 				xfs_iunlock(xip, XFS_ILOCK_EXCL);
 			}
 		}
-	}	
+	} /* (ioflag & PBF_SYNC) */
 
 	/*
 	 * If we are coming from an nfsd thread then insert into the
@@ -834,7 +874,8 @@ retry:
 	/* Drop lock this way - the old refcache release is in here */
 	xfs_rwunlock(bdp, locktype);
 
-	return(ret);
+	ASSERT(ret >= 0);
+	return(error);
 }
 
 /*
@@ -957,7 +998,6 @@ xfs_strategy(bhv_desc_t	*bdp,
 
 	ip = XFS_BHVTOI(bdp);
 	io = &ip->i_iocore;
-
 	mp = ip->i_mount;
 	ASSERT((ip->i_d.di_mode & IFMT) == IFREG);
 	ASSERT(((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0) ==

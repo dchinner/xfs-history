@@ -87,7 +87,7 @@ STATIC ssize_t linvfs_read(
 {
 	struct inode *inode;
 	vnode_t *vp;
-	int rv;
+	int err;
         uio_t uio;
         iovec_t iov;
 	
@@ -113,10 +113,15 @@ STATIC ssize_t linvfs_read(
 	XFS_STATS_INC(xs_read_calls);
 	XFS_STATS64_ADD(xs_read_bytes, size);
         
-	VOP_READ(vp, &uio, 0, NULL, NULL, rv);
+	VOP_READ(vp, &uio, 0, NULL, NULL, err);
         *offset = uio.uio_offset;
         
-	return(rv);
+	/*
+	 * If we got a return value, it was an error
+	 * Flip to negative & return that
+	 * Otherwise, return bytes actually read
+	 */
+	return(err ? -err : size-uio.uio_resid);
 }
 
 
@@ -188,7 +193,14 @@ STATIC ssize_t linvfs_write(
         
 out:
 	up(&inode->i_sem);
-	return(err);
+
+	/*
+	 * If we got a return value, it was an error
+	 * Flip to negative & return that
+	 * Otherwise, return bytes actually written
+	 */
+
+	return(err ? -err : size-uio.uio_resid);
 }
 
 
@@ -333,7 +345,8 @@ int linvfs_generic_file_mmap(struct file *filp, struct vm_area_struct *vma)
 	vnode_t	*vp;
 	int	ret;
 
-	ret = generic_file_mmap(filp, vma);
+	/* this will return a (-) error so flip */
+	ret = -generic_file_mmap(filp, vma);
 	if (!ret) {
 		vattr_t va, *vap;
 
@@ -346,7 +359,7 @@ int linvfs_generic_file_mmap(struct file *filp, struct vm_area_struct *vma)
 
 		VOP_SETATTR(vp, vap, AT_UPDATIME, NULL, ret);
 	}
-	return(ret);
+	return(-ret);
 }
 
 
@@ -372,8 +385,6 @@ STATIC int linvfs_ioctl(
 	 */
 	return error;
 }
-
-
 
 
 struct file_operations linvfs_file_operations =

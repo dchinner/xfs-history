@@ -99,7 +99,7 @@ vn_reclaim(struct vnode *vp, int flag)
 	if (vp->v_fbhv != NULL) {
 		VOP_RECLAIM(vp, flag, error);
 		if (error)
-			return error;
+			return -error;
 	}
 	ASSERT(vp->v_fbhv == NULL);
 

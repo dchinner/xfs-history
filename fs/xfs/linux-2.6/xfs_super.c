@@ -751,7 +751,7 @@ linvfs_remount(
 				  sys_cred, error);
 		if (error) {
 			sb->s_flags=save;
-			return 1;
+			return -error;
 		}
 		
 		XFS_log_write_unmount_ro(vfsp->vfs_fbhv);
@@ -805,23 +805,28 @@ linvfs_quotactl(
 {
 	xfs_mount_t	*mp;
 	vfs_t		*vfsp;
-	int		sts = -EINVAL;
+	int		error;
 
 	if (!IS_XQM_CMD(cmd))
-		return sts;
+		return -EINVAL;
 
 	if (type == USRQUOTA)
 		type = XFS_DQ_USER;
 	else if (type == GRPQUOTA)
 		type = XFS_DQ_GROUP;
 	else
-		return sts;
+		return -EINVAL;
 
 	vfsp = LINVFS_GET_VFS(sb);
 	mp = XFS_BHVTOM(vfsp->vfs_fbhv);
 	ASSERT(mp);
 
-	return xfs_quotactl(mp, vfsp, cmd, id, type, addr);
+	error = xfs_quotactl(mp, vfsp, cmd, id, type, addr);
+	
+	if (error)
+		return -error;
+		
+	return 0;
 }
 
 

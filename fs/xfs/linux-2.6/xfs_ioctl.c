@@ -1128,7 +1128,7 @@ xfs_ioctl(
 
 		if (error)
 			return -error;
-		return error;
+		return 0;
 
 	}
 
@@ -1197,7 +1197,7 @@ xfs_ioctl(
 		error = xfs_growfs_data(mp, &in);
 		if (error)
 			return -error;
-		return error;
+		return 0;
 	}
 
 	case XFS_IOC_FSGROWFSLOG: {
@@ -1212,7 +1212,7 @@ xfs_ioctl(
 		error = xfs_growfs_log(mp, &in);
 		if (error)
 			return -error;
-		return error;
+		return 0;
 	}
 
 	case XFS_IOC_FSGROWFSRT: {
@@ -1227,7 +1227,7 @@ xfs_ioctl(
 		error = xfs_growfs_rt(mp, &in);
 		if (error)
 			return -error;
-		return error;
+		return 0;
 	}
 
 #if (defined(DEBUG) || defined(INDUCE_IO_ERROR))
@@ -1241,12 +1241,12 @@ xfs_ioctl(
 		if (error) {
 			return -error;
 		}
-		return error;
+		return 0;
 	}
 
 	case XFS_IOC_ERROR_CLEARALL: {
 			error = xfs_errortag_clearall(mp);
-			return error;
+			return -error;
 	}
 #endif /* DEBUG || INDUCE_IO_ERROR */
 

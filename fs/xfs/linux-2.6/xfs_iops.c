@@ -118,7 +118,8 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 			return -ENOMEM;
 		}
 		linvfs_set_inode_ops(ip);
-		error = linvfs_revalidate_core(ip);
+		/* linvfs_revalidate_core returns (-) errors */
+		error = -linvfs_revalidate_core(ip);
 		validate_fields(dir);
 		d_instantiate(dentry, ip);
 	}
@@ -256,7 +257,8 @@ int linvfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname
 			VN_RELE(cvp);
 		} else {
 			linvfs_set_inode_ops(ip);
-			error = linvfs_revalidate_core(ip);
+			/* linvfs_revalidate_core returns (-) errors */
+			error = -linvfs_revalidate_core(ip);
 			d_instantiate(dentry, ip);
 		}
 	}
@@ -312,13 +314,11 @@ int linvfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
 	} else if (S_ISSOCK(mode)) {
 		tp = VSOCK;
 	} else {
-		error = -EINVAL;
-		return(error);
+		return -EINVAL;
 	}
 
-	if (!error) {
-		error = linvfs_common_cr(dir, dentry, mode, tp, rdev);
-	}
+	/* linvfs_common_cr will return (-) errors */
+	error = linvfs_common_cr(dir, dentry, mode, tp, rdev);
 
 	return(error);
 }
@@ -431,12 +431,13 @@ int linvfs_follow_link(struct dentry *dentry,
 	if (error) {
 		kfree(uio);
 		kfree(link);
-		return error;
+		return -error;
 	}
 
 	link[MAXNAMELEN - uio->uio_resid] = '\0';
 	kfree(uio);
 
+	/* vfs_follow_link returns (-) errors */
         error = vfs_follow_link(nd, link);
 	kfree(link);
 	return error;
@@ -581,6 +582,7 @@ int linvfs_revalidate_core(struct inode *inode)
         vp = LINVFS_GET_VP(inode);
 	ASSERT(vp);
 
+	/* vn_revalidate returns (-) error so this is ok */
 	return vn_revalidate(vp, 0);
 }
 
@@ -703,7 +705,8 @@ int linvfs_bmap(struct address_space *mapping, long block)
 		VOP_FLUSH_PAGES(vp, (xfs_off_t)0, -1, 0, FI_REMAPF, error);
 		if (error) {
 			VOP_RWUNLOCK(vp, VRWLOCK_READ);
-			return -1;
+			/* VOP_FLUSH_PAGES currently returns nothing but 0... */
+			return -error;
 		}
 	}
 
@@ -711,7 +714,7 @@ int linvfs_bmap(struct address_space *mapping, long block)
 		&bmap, &nbm, error);
 	VOP_RWUNLOCK(vp, VRWLOCK_READ);
 	if (error)
-		return -1;
+		return -error;
 	return (int)(bmap.pbm_bn + (bmap.pbm_delta >> 9));
 }
  
@@ -730,6 +733,7 @@ STATIC int linvfs_write_full_page_unlock(struct page *page)
 STATIC int linvfs_write_full_page_nounlock(struct page *page)
 {
 	int ret = pagebuf_write_full_page(page, linvfs_pb_bmap);
+	/* In this case return how much we flushed, not errors */
 	return ret < 0 ? 0 : ret;
 }
 
