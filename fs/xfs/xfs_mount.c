@@ -128,7 +128,7 @@ xfs_umount(xfs_mount_t *mp)
 }
 
 /*
- * xfs_mod_sb() can be used to copy arbitray changes to the
+ * xfs_mod_sb() can be used to copy arbitrary changes to the
  * in-core superblock into the superblock buffer to be logged.
  * It does not provide the higher level of locking that is
  * needed to protect the in-core superblock from concurrent
@@ -164,7 +164,7 @@ xfs_mod_sb(xfs_trans_t *tp, int fields)
 		offsetof(xfs_sb_t, sb_sectlog),
 		offsetof(xfs_sb_t, sb_inodelog),
 		offsetof(xfs_sb_t, sb_inopblog),
-		offsetof(xfs_sb_t, sb_smallfiles),
+		offsetof(xfs_sb_t, sb_agblklog),
 		offsetof(xfs_sb_t, sb_icount),
 		offsetof(xfs_sb_t, sb_ifree),
 		offsetof(xfs_sb_t, sb_fdblocks),
