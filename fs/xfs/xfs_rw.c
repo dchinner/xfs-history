@@ -1,4 +1,4 @@
-#ident "$Revision: 1.182 $"
+#ident "$Revision: 1.183 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1692,6 +1692,7 @@ xfs_iomap_write(
 	xfs_bmbt_irec_t	*last_imapp;
 #define	XFS_WRITE_IMAPS	XFS_BMAP_MAX_NMAP
 	xfs_bmbt_irec_t	imap[XFS_WRITE_IMAPS];
+	int		aeof;
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE) != 0);
 	xfs_iomap_enter_trace(XFS_IOMAP_WRITE_ENTER, ip, offset, count);
@@ -1705,6 +1706,7 @@ xfs_iomap_write(
 		isize = ip->i_d.di_size;
 	}
 
+	aeof = 0;
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	last_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)(offset + count)));
 	/*
@@ -1754,10 +1756,28 @@ xfs_iomap_write(
 		aligned_offset = XFS_WRITEIO_ALIGN(mp, (offset + count - 1));
 		ioalign = XFS_B_TO_FSBT(mp, aligned_offset);
 		last_fsb = ioalign + iosize;
+		aeof = 1;
 	}
  write_map:
 	nimaps = XFS_WRITE_IMAPS;
 	firstblock = NULLFSBLOCK;
+
+	/*
+	 * roundup the allocation request to m_dalign boundary if file size
+	 * is greater that 512K and we are allocating past the allocation eof
+	 */
+	if (mp->m_dalign && (ip->i_d.di_size >= 524288) && aeof) {
+		int eof;
+		xfs_fileoff_t new_last_fsb;
+		new_last_fsb = roundup(last_fsb, mp->m_dalign);
+		error = xfs_bmap_eof(ip, new_last_fsb, XFS_DATA_FORK, &eof);
+		if (error) {
+			return error;
+		}
+		if (eof)
+			last_fsb = new_last_fsb;
+	}
+
 	error = xfs_bmapi(NULL, ip, offset_fsb,
 			  (xfs_filblks_t)(last_fsb - offset_fsb),
 			  XFS_BMAPI_DELAY | XFS_BMAPI_WRITE |
