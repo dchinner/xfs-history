@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.15 $"
+#ident	"$Revision: 1.16 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -14,11 +14,11 @@
 #include <sys/uuid.h>
 #include <sys/debug.h>
 #include <sys/errno.h>
+#include <sys/kmem.h>
 #ifdef SIM
 #include <bstring.h>
 #else
 #include <sys/systm.h>
-#include <sys/kmem.h>
 #include <sys/conf.h>
 #endif
 #include <stddef.h>

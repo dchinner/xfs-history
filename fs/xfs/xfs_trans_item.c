@@ -3,8 +3,8 @@
 #include <sys/buf.h>
 #include <sys/vnode.h>
 #include <sys/debug.h>
-#ifndef SIM
 #include <sys/kmem.h>
+#ifndef SIM
 #include <sys/cmn_err.h>
 #endif
 #include "xfs_types.h"

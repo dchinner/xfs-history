@@ -9,10 +9,10 @@
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/debug.h>
+#include <sys/kmem.h>
 #ifdef SIM
 #include <bstring.h>
 #else
-#include <sys/kmem.h>
 #include <sys/systm.h>
 #endif
 #include "xfs_types.h"

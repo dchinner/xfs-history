@@ -1,9 +1,7 @@
 
 #include <sys/types.h>
 #include <sys/param.h>
-#ifndef SIM
-#include <sys/kmem.h>
-#else
+#ifdef SIM
 #define _KERNEL
 #endif
 #include <sys/mode.h>
@@ -18,6 +16,7 @@
 #include <sys/ksa.h>
 #include <sys/debug.h>
 #include <sys/uuid.h>
+#include <sys/kmem.h>
 #ifndef SIM
 #include <sys/systm.h>
 #endif
