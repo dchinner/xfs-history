@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_BTREE_H
 #define	_FS_XFS_BMAP_BTREE_H
 
-#ident "$Revision: 1.34 $"
+#ident "$Revision: 1.35 $"
 
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 
@@ -22,17 +22,21 @@ typedef struct xfs_bmdr_block
 /*
  * Bmap btree record and extent descriptor.
  * For 32-bit kernels,
- *  l0:0-31 and l1:9-31 are startoff.
+ *  l0:31 is an extent flag (value 1 indicates non-normal).
+ *  l0:0-30 and l1:9-31 are startoff.
  *  l1:0-8, l2:0-31, and l3:21-31 are startblock.
  *  l3:0-20 are blockcount.
  * For 64-bit kernels,
- *  l0:9-63 are startoff.
+ *  l0:63 is an extent flag (value 1 indicates non-normal).
+ *  l0:9-62 are startoff.
  *  l0:0-8 and l1:21-63 are startblock.
  *  l1:0-20 are blockcount.
  */
 #define	BMBT_TOTAL_BITLEN	128	/* 128 bits, 16 bytes */
-#define	BMBT_STARTOFF_BITOFF	0
-#define	BMBT_STARTOFF_BITLEN	55
+#define	BMBT_EXNTFLAG_BITOFF	0
+#define	BMBT_EXNTFLAG_BITLEN	1
+#define	BMBT_STARTOFF_BITOFF	(BMBT_EXNTFLAG_BITOFF + BMBT_EXNTFLAG_BITLEN)
+#define	BMBT_STARTOFF_BITLEN	54
 #define	BMBT_STARTBLOCK_BITOFF	(BMBT_STARTOFF_BITOFF + BMBT_STARTOFF_BITLEN)
 #define	BMBT_STARTBLOCK_BITLEN	52
 #define	BMBT_BLOCKCOUNT_BITOFF	\
@@ -93,6 +97,7 @@ xfs_filblks_t startblockval(xfs_fsblock_t x);
 #else
 #define	STARTBLOCKVAL(x)	((xfs_filblks_t)((x) & ~STARTBLOCKMASK))
 #endif
+#define	ISUNWRITTEN(x)		((x) == XFS_EXT_UNWRITTEN)
 
 /*
  * Incore version of above.
@@ -102,6 +107,7 @@ typedef struct xfs_bmbt_irec
 	xfs_fileoff_t	br_startoff;	/* starting file offset */
 	xfs_fsblock_t	br_startblock;	/* starting block number */
 	xfs_filblks_t	br_blockcount;	/* number of blocks */
+	xfs_exntst_t	br_state;	/* extent state */
 } xfs_bmbt_irec_t;
 
 /*
@@ -351,7 +357,7 @@ int xfs_bmap_sanity_check(struct xfs_mount *mp, xfs_bmbt_block_t *bb,
  */
 #define	XFS_BMBT_KTRACE_ARGBI	1
 #define	XFS_BMBT_KTRACE_ARGBII	2
-#define	XFS_BMBT_KTRACE_ARGFFF	3
+#define	XFS_BMBT_KTRACE_ARGFFFI	3
 #define	XFS_BMBT_KTRACE_ARGI	4
 #define	XFS_BMBT_KTRACE_ARGIFK	5
 #define	XFS_BMBT_KTRACE_ARGIFR	6
@@ -416,6 +422,10 @@ xfs_fileoff_t
 xfs_bmbt_get_startoff(
 	xfs_bmbt_rec_t	*r);
 
+xfs_exntst_t
+xfs_bmbt_get_state(
+	xfs_bmbt_rec_t	*r);
+
 int
 xfs_bmbt_increment(
 	struct xfs_btree_cur *,
@@ -425,6 +435,13 @@ xfs_bmbt_increment(
 int
 xfs_bmbt_insert(
 	struct xfs_btree_cur *,
+	int *);	       
+
+int
+xfs_bmbt_insert_many(
+	struct xfs_btree_cur *,
+	int,
+	xfs_bmbt_rec_t *,
 	int *);	       
 
 void
@@ -484,7 +501,8 @@ xfs_bmbt_set_allf(
 	xfs_bmbt_rec_t	*r,
 	xfs_fileoff_t	o,
 	xfs_fsblock_t	b,
-	xfs_filblks_t	c);
+	xfs_filblks_t	c,
+	xfs_exntst_t	v);
 
 void
 xfs_bmbt_set_blockcount(
@@ -502,6 +520,11 @@ xfs_bmbt_set_startoff(
 	xfs_fileoff_t	v);
 
 void
+xfs_bmbt_set_state(
+	xfs_bmbt_rec_t	*r,
+	xfs_exntst_t	v);
+
+void
 xfs_bmbt_to_bmdr(
 	xfs_bmbt_block_t *,
 	int,
@@ -513,6 +536,21 @@ xfs_bmbt_update(
 	struct xfs_btree_cur *,
 	xfs_fileoff_t,
 	xfs_fsblock_t,
-	xfs_filblks_t);
+	xfs_filblks_t,
+	xfs_exntst_t);
+
+#ifdef XFSDEBUG
+/* 
+ * Get the data from the pointed-to record.
+ */
+int
+xfs_bmbt_get_rec(
+	struct xfs_btree_cur *,
+	xfs_fileoff_t *,
+	xfs_fsblock_t *,
+	xfs_filblks_t *,
+	xfs_exntst_t *,
+	int *);
+#endif
 
 #endif	/* _FS_XFS_BMAP_BTREE_H */

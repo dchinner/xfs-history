@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.65 $"
+#ident "$Revision: 1.66 $"
 
 struct getbmap;
 struct xfs_bmbt_irec;
@@ -35,14 +35,17 @@ typedef	struct xfs_bmap_free
 /*
  * Flags for xfs_bmapi
  */
-#define	XFS_BMAPI_WRITE		0x01	/* write operation: allocate space */
-#define	XFS_BMAPI_DELAY		0x02	/* delayed write operation */
-#define	XFS_BMAPI_ENTIRE	0x04	/* return entire extent, not trimmed */
-#define	XFS_BMAPI_METADATA	0x08	/* mapping metadata not user data */
-#define	XFS_BMAPI_EXACT		0x10	/* allocate only to spec'd bounds */
-#define	XFS_BMAPI_ATTRFORK	0x20	/* use attribute fork not data */
-#define	XFS_BMAPI_ASYNC		0x40	/* bunmapi xactions can be async */
-#define XFS_BMAPI_RSVBLOCKS 0x80      /* OK to allocate reserved data blocks */
+#define	XFS_BMAPI_WRITE		0x001	/* write operation: allocate space */
+#define XFS_BMAPI_DELAY		0x002	/* delayed write operation */
+#define XFS_BMAPI_ENTIRE	0x004	/* return entire extent, not trimmed */
+#define XFS_BMAPI_METADATA	0x008	/* mapping metadata not user data */
+#define XFS_BMAPI_EXACT		0x010	/* allocate only to spec'd bounds */
+#define XFS_BMAPI_ATTRFORK	0x020	/* use attribute fork not data */
+#define XFS_BMAPI_ASYNC		0x040	/* bunmapi xactions can be async */
+#define XFS_BMAPI_RSVBLOCKS	0x080	/* OK to alloc. reserved data blocks */
+#define	XFS_BMAPI_PREALLOC	0x100	/* preallocation op: unwritten space */
+#define	XFS_BMAPI_IGSTATE	0x200	/* Ignore state - */
+					/* combine contig. space */
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BMAPI_AFLAG)
 int xfs_bmapi_aflag(int w);

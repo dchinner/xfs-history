@@ -1,4 +1,4 @@
-#ident "$Revision: 1.375 $"
+#ident "$Revision: 1.377 $"
 
 
 #ifdef SIM
@@ -1391,7 +1391,7 @@ xfs_fsync(
 		}
 		ASSERT(syncall == 0 ||
 		       (vp->v_pgcnt == 0 && vp->v_buf == 0));
-	} else if (VN_DIRTY(vp)) {
+	} else if (VN_DIRTY(vp) || ip->i_queued_bufs > 0) {
 		/*
 		 * In the non-invalidating case, calls to fsync() do not
 		 * flush all the dirty mmap'd pages.  That requires a
@@ -6152,6 +6152,7 @@ xfs_alloc_file_space(
 	int			rtextsize;
 	xfs_fileoff_t		startoffset_fsb;
 	xfs_trans_t		*tp;
+	int			xfs_bmapi_flags;
 
 	vn_trace_entry(XFS_ITOV(ip), "xfs_alloc_file_space",
 		       (inst_t *)__return_address);
@@ -6183,6 +6184,8 @@ xfs_alloc_file_space(
 	error = 0;
 	imapp = &imaps[0];
 	reccount = 1;
+	xfs_bmapi_flags = (alloc_type == 0) ? XFS_BMAPI_WRITE :
+				XFS_BMAPI_WRITE | XFS_BMAPI_PREALLOC;
 	startoffset_fsb	= XFS_B_TO_FSBT(mp, offset);
 	allocatesize_fsb = XFS_B_TO_FSB(mp, count);
 
@@ -6263,7 +6266,7 @@ retry:
 	 	 */
 		XFS_BMAP_INIT(&free_list, &firstfsb);
 		error = xfs_bmapi(tp, ip, startoffset_fsb, 
-				  allocatesize_fsb, XFS_BMAPI_WRITE,
+				  allocatesize_fsb, xfs_bmapi_flags,
 				  &firstfsb, 0, imapp, &reccount, &free_list);
 		if (error) {
 			goto error0;

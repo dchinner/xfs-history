@@ -1,4 +1,4 @@
-#ident "$Revision: 1.66 $"
+#ident "$Revision: 1.67 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -1150,6 +1150,7 @@ xfs_buf_item_relse(
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 	bp->b_fsprivate = bip->bli_item.li_bio_list;
 	if ((bp->b_fsprivate == NULL) && (bp->b_iodone != NULL)) {
+		ASSERT((bp->b_flags & B_UNINITIAL) == 0);
 		bp->b_iodone = NULL;
 	}
 

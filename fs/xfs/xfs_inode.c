@@ -1,4 +1,4 @@
-#ident "$Revision: 1.239 $"
+#ident "$Revision: 1.240 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -3283,10 +3283,12 @@ xfs_iprint(
 			xfs_bmbt_irec_t rec;
 
 			xfs_bmbt_get_all(ep, &rec);
-			printf("\t%d: startoff %llu, startblock 0x%llx, blockcount %llu\n",
+			printf("\t%d: startoff %llu, startblock 0x%llx,"
+			" blockcount %llu, state %d\n",
 				i, (xfs_dfiloff_t)rec.br_startoff,
 				(xfs_dfsbno_t)rec.br_startblock,
-				(xfs_dfilblks_t)rec.br_blockcount);
+				(xfs_dfilblks_t)rec.br_blockcount,
+				(int)rec.br_state);
 		}
 	}
 	printf("    i_df.if_broot %x\n", ip->i_df.if_broot);

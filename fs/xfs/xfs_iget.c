@@ -1,4 +1,4 @@
-#ident "$Revision: 1.92 $"
+#ident "$Revision: 1.93 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -560,7 +560,7 @@ xfs_ilock_ra(xfs_inode_t	*ip,
 		mraccess(&ip->i_lock);
 	}
 #ifdef XFS_ILOCK_TRACE
-	xfs_ilock_trace(ip, 1, lock_flags, (inst_t *)__return_address);
+	xfs_ilock_trace(ip, 1, lock_flags, (inst_t *)return_address);
 #endif
 }
 

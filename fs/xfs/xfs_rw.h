@@ -1,7 +1,7 @@
 #ifndef	_XFS_RW_H
 #define	_XFS_RW_H
 
-#ident "$Revision: 1.35 $"
+#ident "$Revision: 1.36 $"
 
 struct bhv_desc;
 struct bdevsw;
@@ -111,6 +111,9 @@ daddr_t xfs_fsb_to_db(struct xfs_inode *ip, xfs_fsblock_t fsb);
 #define	XFS_STRAT_ENTER		1
 #define	XFS_STRAT_FAST		2
 #define	XFS_STRAT_SUB		3
+#define	XFS_STRAT_UNINT		4
+#define	XFS_STRAT_UNINT_DONE	5
+#define	XFS_STRAT_UNINT_CMPL	6
 
 #if defined(XFS_ALL_TRACE)
 #define	XFS_RW_TRACE

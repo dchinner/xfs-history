@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.91 $"
+#ident	"$Revision: 1.92 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -190,6 +190,7 @@ static void	xfsidbg_xsb(xfs_sb_t *);
 static void 	xfsidbg_xstrat_atrace(int);
 static void 	xfsidbg_xstrat_itrace(xfs_inode_t *);
 static void 	xfsidbg_xstrat_strace(xfs_inode_t *);
+static void	xfsidbg_xstrat_btrace(buf_t *);
 #endif
 static void	xfsidbg_xtp(xfs_trans_t *);
 static void	xfsidbg_xtrans_res(xfs_mount_t *);
@@ -303,6 +304,7 @@ static struct xif {
     "xsb",	VD xfsidbg_xsb,		"Dump XFS superblock",
 #ifdef DEBUG
     "xstrata",  VD xfsidbg_xstrat_atrace,"Dump xfs_strat trace for all inodes",
+    "xstratb",  VD xfsidbg_xstrat_btrace,"Dump xfs_strat glbl trace for buffer",
     "xstrati",  VD xfsidbg_xstrat_itrace,"Dump xfs_strat trace for an inode",
     "xstrats",  VD xfsidbg_xstrat_strace,"Dump xfs_strat glbl trace for inode",
 #endif
@@ -382,7 +384,7 @@ static void xfs_btbmap(xfs_bmbt_block_t *bt, int bsz);
 static void xfs_btino(xfs_inobt_block_t *bt, int bsz);
 static void xfs_buf_item_print(xfs_buf_log_item_t *blip, int summary);
 static void xfs_convert_extent(xfs_bmbt_rec_32_t *rp, xfs_dfiloff_t *op,
-			       xfs_dfsbno_t *sp, xfs_dfilblks_t *cp);
+			xfs_dfsbno_t *sp, xfs_dfilblks_t *cp, int *fp);
 static void xfs_dastate_path(xfs_da_state_path_t *p);
 #ifdef DEBUG
 static int xfs_dir_trace_entry(ktrace_entry_t *ktep);
@@ -593,6 +595,7 @@ xfs_bmap_trace_entry(ktrace_entry_t *ktep)
 	xfs_inode_t		*ip;
 	xfs_ino_t		ino;
 	xfs_dfiloff_t		o;
+	int			flag;
 	int			opcode;
 	static char		*ops[] = { "del", "ins", "pre", "post" };
 	xfs_bmbt_rec_32_t	r;
@@ -612,21 +615,21 @@ xfs_bmap_trace_entry(ktrace_entry_t *ktep)
 	r.l1 = (xfs_bmbt_rec_base_t)ktep->val[9];
 	r.l2 = (xfs_bmbt_rec_base_t)ktep->val[10];
 	r.l3 = (xfs_bmbt_rec_base_t)ktep->val[11];
-	xfs_convert_extent(&r, &o, &b, &c);
-	qprintf(" idx %d offset %lld block %s", o,
-		(__psint_t)ktep->val[4],
+	xfs_convert_extent(&r, &o, &b, &c, &flag);
+	qprintf(" idx %d offset %lld block %s", 
+		(__psint_t)ktep->val[4], o,
 		xfs_fmtfsblock((xfs_fsblock_t)b, ip->i_mount));
-	qprintf(" count %lld\n", c);
+	qprintf(" count %lld flag %d\n", c, flag);
 	if ((__psint_t)ktep->val[5] != 2)
 		return 1;
 	r.l0 = (xfs_bmbt_rec_base_t)ktep->val[12];
 	r.l1 = (xfs_bmbt_rec_base_t)ktep->val[13];
 	r.l2 = (xfs_bmbt_rec_base_t)ktep->val[14];
 	r.l3 = (xfs_bmbt_rec_base_t)ktep->val[15];
-	xfs_convert_extent(&r, &o, &b, &c);
+	xfs_convert_extent(&r, &o, &b, &c, &flag);
 	qprintf(" offset %lld block %s", o,
 		xfs_fmtfsblock((xfs_fsblock_t)b, ip->i_mount));
-	qprintf(" count %lld\n", c);
+	qprintf(" count %lld flag %d\n", c, flag);
 	return 1;
 }
 
@@ -667,14 +670,15 @@ xfs_bmbt_trace_entry(
 			(__psint_t)ktep->val[6],
 			(__psint_t)ktep->val[7]);
 		break;
-	case XFS_BMBT_KTRACE_ARGFFF:
-		qprintf(" o 0x%x%08x b 0x%x%08x i 0x%x%08x\n",
+	case XFS_BMBT_KTRACE_ARGFFFI:
+		qprintf(" o 0x%x%08x b 0x%x%08x i 0x%x%08x j %d\n",
 			(__psint_t)ktep->val[5], 
 			(__psint_t)ktep->val[6],
 			(__psint_t)ktep->val[7], 
 			(__psint_t)ktep->val[8],
 			(__psint_t)ktep->val[9],
-			(__psint_t)ktep->val[10]);
+			(__psint_t)ktep->val[10],
+			(__psint_t)ktep->val[11]);
 		break;
 	case XFS_BMBT_KTRACE_ARGI:
 		qprintf(" i 0x%x\n",
@@ -759,8 +763,9 @@ xfs_broot(xfs_inode_t *ip, xfs_ifork_t *f)
 	kp = XFS_BMAP_BROOT_KEY_ADDR(broot, 1, f->if_broot_bytes);
 	pp = XFS_BMAP_BROOT_PTR_ADDR(broot, 1, f->if_broot_bytes);
 	for (i = 1; i <= broot->bb_numrecs; i++)
-		qprintf("\t%d: startoff %lld ptr %llx\n",
-			i, kp[i - 1].br_startoff, pp[i - 1]);
+		qprintf("\t%d: startoff %lld ptr %llx %s\n",
+			i, kp[i - 1].br_startoff, pp[i - 1],
+			xfs_fmtfsblock(pp[i - 1], ip->i_mount));
 }
 
 /*
@@ -818,13 +823,14 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 			xfs_dfiloff_t o;
 			xfs_dfsbno_t s;
 			xfs_dfilblks_t c;
+			int fl;
 
 			r = (xfs_bmbt_rec_32_t *)XFS_BTREE_REC_ADDR(bsz,
 				xfs_bmbt, bt, i, 0);
-			xfs_convert_extent(r, &o, &s, &c);
+			xfs_convert_extent(r, &o, &s, &c, &fl);
 			qprintf("rec %d startoff %lld ", i, o);
 			qprintf("startblock %llx ", s);
-			qprintf("blockcount %lld\n", c);
+			qprintf("blockcount %lld flag %d\n", c, fl);
 		}
 	} else {
 		int mxr;
@@ -930,13 +936,15 @@ xfs_buf_item_print(xfs_buf_log_item_t *blip, int summary)
  */
 static void
 xfs_convert_extent(xfs_bmbt_rec_32_t *rp, xfs_dfiloff_t *op, xfs_dfsbno_t *sp,
-		   xfs_dfilblks_t *cp)
+		   xfs_dfilblks_t *cp, int *fp)
 {
 	xfs_dfiloff_t o;
 	xfs_dfsbno_t s;
 	xfs_dfilblks_t c;
+	int flag;
 
-	o = (((xfs_dfiloff_t)rp->l0) << 23) |
+	flag = (((xfs_dfiloff_t)rp->l0) >> 31) & 1;
+	o = ((((xfs_dfiloff_t)rp->l0) & 0x7fffffff) << 23) |
 	    (((xfs_dfiloff_t)rp->l1) >> 9);
 	s = (((xfs_dfsbno_t)(rp->l1 & 0x000001ff)) << 43) |
 	    (((xfs_dfsbno_t)rp->l2) << 11) |
@@ -945,6 +953,7 @@ xfs_convert_extent(xfs_bmbt_rec_32_t *rp, xfs_dfiloff_t *op, xfs_dfsbno_t *sp,
 	*op = o;
 	*sp = s;
 	*cp = c;
+	*fp = flag;
 }
 
 #ifdef DEBUG
@@ -1647,6 +1656,18 @@ xfs_strat_trace_entry(ktrace_entry_t *ktep)
 		qprintf("STRAT SUB:\n");
 		xfs_strat_sub_trace_entry(ktep);
 		break;
+	case XFS_STRAT_UNINT:
+		qprintf("STRAT UNINT:\n");
+		xfs_strat_enter_trace_entry(ktep);
+		break;
+	case XFS_STRAT_UNINT_DONE:
+		qprintf("STRAT UNINT DONE:\n");
+		xfs_strat_enter_trace_entry(ktep);
+		break;
+	case XFS_STRAT_UNINT_CMPL:
+		qprintf("STRAT UNINT CMPL:\n");
+		xfs_strat_enter_trace_entry(ktep);
+		break;
 	default:
 		return 0;
 	}
@@ -1664,6 +1685,7 @@ xfs_xexlist_fork(xfs_inode_t *ip, int whichfork)
 	xfs_dfiloff_t o;
 	xfs_dfsbno_t s;
 	xfs_dfilblks_t c;
+	int flag;
 	xfs_ifork_t *ifp;
 
 	ifp = XFS_IFORK_PTR(ip, whichfork);
@@ -1674,10 +1696,10 @@ xfs_xexlist_fork(xfs_inode_t *ip, int whichfork)
 		for (i = 0; i < nextents; i++) {
 			xfs_convert_extent(
 				(xfs_bmbt_rec_32_t *)&ifp->if_u1.if_extents[i],
-				&o, &s, &c);
+				&o, &s, &c, &flag);
 			qprintf(
-			"%d: startoff %lld startblock %s blockcount %lld\n",
-				i, o, xfs_fmtfsblock(s, ip->i_mount), c);
+		"%d: startoff %lld startblock %s blockcount %lld flag %d\n",
+				i, o, xfs_fmtfsblock(s, ip->i_mount), c, flag);
 		}
 	}
 }
@@ -2132,10 +2154,12 @@ xfsidbg_xattrtrace(int count)
 static void
 xfsidbg_xbirec(xfs_bmbt_irec_t *r)
 {
-	qprintf("startoff %lld startblock %llx blockcount %lld\n",
+	qprintf(
+	"startoff %lld startblock %llx blockcount %lld state %lld\n",
 		(__uint64_t)r->br_startoff,
 		(__uint64_t)r->br_startblock,
-		(__uint64_t)r->br_blockcount);
+		(__uint64_t)r->br_blockcount,
+		(__uint64_t)r->br_state);
 }
 
 #ifdef DEBUG
@@ -2321,9 +2345,11 @@ xfsidbg_xbrec(xfs_bmbt_rec_32_t *r)
 	xfs_dfiloff_t o;
 	xfs_dfsbno_t s;
 	xfs_dfilblks_t c;
+	int flag;
 
-	xfs_convert_extent(r, &o, &s, &c);
-	qprintf("startoff %lld startblock %llx blockcount %lld\n", o, s, c);
+	xfs_convert_extent(r, &o, &s, &c, &flag);
+	qprintf("startoff %lld startblock %llx blockcount %lld flag %d\n",
+		o, s, c, flag);
 }
 
 /*
@@ -3795,10 +3821,14 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	printflags((int)ip->i_flags, tab_flags, "flags");
 	qprintf("\n");
 	qprintf("update_core 0x%x\n", (int)(ip->i_update_core));
-	qprintf("gen 0x%x qbufs %d delayed blks %d\n",
+	qprintf("gen 0x%x qbufs %d delayed blks %d",
 		ip->i_gen,
 		ip->i_queued_bufs,
 		ip->i_delayed_blks);
+#ifdef	DEBUG
+	qprintf("&traces = 0x%x", &(ip->i_xtrace));
+#endif
+	qprintf("\n");
 	xfs_xnode_fork("data", &ip->i_df);
 	xfs_xnode_fork("attr", ip->i_afp);
 	qprintf("\n");
@@ -4397,6 +4427,33 @@ xfsidbg_xstrat_strace(xfs_inode_t *ip)
 	ktep = ktrace_first(xfs_strat_trace_buf, &kts);
 	while (ktep != NULL) {
 		if ((xfs_inode_t*)(ktep->val[1]) == ip) {
+			qprintf("\n");
+			xfs_strat_trace_entry(ktep);
+		}
+
+		ktep = ktrace_next(xfs_strat_trace_buf, &kts);
+	}
+}
+
+/*
+ * Print global strategy trace entries for a particular buffer.
+ */
+static void
+xfsidbg_xstrat_btrace(struct buf *bp)
+{
+	ktrace_entry_t	*ktep;
+	ktrace_snap_t	kts;
+	extern ktrace_t	*xfs_strat_trace_buf;
+
+	if (xfs_strat_trace_buf == NULL) {
+		qprintf("The strat trace buffer is not initialized\n");
+		return;
+	}
+
+	qprintf("xstratb bp 0x%x\n", bp);
+	ktep = ktrace_first(xfs_strat_trace_buf, &kts);
+	while (ktep != NULL) {
+		if ((struct buf *)(ktep->val[4]) == bp) {
 			qprintf("\n");
 			xfs_strat_trace_entry(ktep);
 		}

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_SB_H
 #define	_FS_XFS_SB_H
 
-#ident	"$Revision: 1.34 $"
+#ident	"$Revision: 1.36 $"
 
 /*
  * Super block
@@ -25,9 +25,11 @@ struct xfs_mount;
 #define	XFS_SB_VERSION_NLINKBIT		0x0020
 #define	XFS_SB_VERSION_QUOTABIT		0x0040
 #define	XFS_SB_VERSION_ALIGNBIT		0x0080
-#define XFS_SB_VERSION_DALIGNBIT	0x0100
-#define XFS_SB_VERSION_SHAREDBIT	0x0200
-#define	XFS_SB_VERSION_OKSASHFBITS	0
+#define	XFS_SB_VERSION_DALIGNBIT	0x0100
+#define	XFS_SB_VERSION_SHAREDBIT	0x0200
+#define	XFS_SB_VERSION_EXTFLGBIT	0x1000
+#define	XFS_SB_VERSION_OKSASHFBITS	\
+	(XFS_SB_VERSION_EXTFLGBIT)
 #define	XFS_SB_VERSION_OKREALFBITS	\
 	(XFS_SB_VERSION_ATTRBIT | \
 	 XFS_SB_VERSION_NLINKBIT | \
@@ -43,11 +45,12 @@ struct xfs_mount;
 	(XFS_SB_VERSION_NUMBITS | \
 	 XFS_SB_VERSION_OKREALFBITS | \
 	 XFS_SB_VERSION_OKSASHFBITS)
-#define	XFS_SB_VERSION_MKFS(ia,dia)	\
-	(((ia) || (dia)) ? \
+#define	XFS_SB_VERSION_MKFS(ia,dia,extflag)	\
+	(((ia) || (dia) | (extflag)) ? \
 		(XFS_SB_VERSION_4 | \
 		 ((ia) ? XFS_SB_VERSION_ALIGNBIT : 0) | \
-		 ((dia) ? XFS_SB_VERSION_DALIGNBIT : 0)) : \
+		 ((dia) ? XFS_SB_VERSION_DALIGNBIT : 0) | \
+		 ((extflag) ? XFS_SB_VERSION_EXTFLGBIT : 0)) : \
 		XFS_SB_VERSION_1)
 
 typedef struct xfs_sb

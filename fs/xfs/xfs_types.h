@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_TYPES_H
 #define	_FS_XFS_TYPES_H
 
-#ident	"$Revision: 1.31 $"
+#ident	"$Revision: 1.32 $"
 
 /*
  * XFS types
@@ -125,5 +125,10 @@ typedef enum {
 	XFS_BTNUM_BNOi, XFS_BTNUM_CNTi, XFS_BTNUM_BMAPi, XFS_BTNUM_INOi,
 	XFS_BTNUM_MAX
 } xfs_btnum_t;
+
+typedef	enum {
+	XFS_EXT_NORM, XFS_EXT_UNWRITTEN,
+	XFS_EXT_DMAPI_OFFLINE
+} xfs_exntst_t;
 
 #endif	/* !_FS_XFS_TYPES_H */
