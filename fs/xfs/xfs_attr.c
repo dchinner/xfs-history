@@ -1,4 +1,4 @@
-#ident "$Revision: 1.48 $"
+#ident "$Revision: 1.49 $"
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/buf.h>
@@ -167,6 +167,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	xfs_fsblock_t 	firstblock;
 	xfs_bmap_free_t flist;
 	int 		error, committed;
+	int		local, size;
 	uint	      	nblks;
 	xfs_mount_t	*mp;
 
@@ -218,9 +219,28 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	args.dp = dp;
 	args.firstblock = &firstblock;
 	args.flist = &flist;
-	nblks = XFS_ATTRSET_SPACE_RES(mp, valuelen);
-	args.total = nblks;
 	args.whichfork = XFS_ATTR_FORK;
+
+	/* Determine space new attribute will use, and if it will be inline
+	 * or out of line.
+	 */
+	size = xfs_attr_leaf_newentsize(&args, mp->m_sb.sb_blocksize, &local);
+
+	nblks = XFS_DAENTER_SPACE_RES(mp, XFS_ATTR_FORK);
+	if (local) {
+		if (size > (mp->m_sb.sb_blocksize >> 1)) {
+			/* Double split possible */
+			nblks <<= 1;
+		}
+	} else {
+		/* Out of line attribute, cannot double split, but make
+		 * room for the attribute value itself.
+		 */
+		size =  XFS_B_TO_FSB(mp, size);
+		nblks += XFS_NEXTENTADD_SPACE_RES(mp, size, XFS_ATTR_FORK);
+	}
+
+	args.total = nblks;
 
 	/*
 	 * Start our first transaction of the day.
@@ -234,7 +254,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	 */
 	args.trans = xfs_trans_alloc(mp, XFS_TRANS_ATTR_SET);
 	if (error = xfs_trans_reserve(args.trans, (uint) nblks,
-				      XFS_ATTRSET_LOG_RES(mp),
+				      XFS_ATTRSET_LOG_RES(mp, nblks),
 				      0, XFS_TRANS_PERM_LOG_RES,
 				      XFS_ATTRSET_LOG_COUNT)) {
 		xfs_trans_cancel(args.trans, 0);
