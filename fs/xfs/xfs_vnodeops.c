@@ -1,4 +1,4 @@
-#ident "$Revision: 1.275 $"
+#ident "$Revision: 1.278 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -5846,14 +5846,22 @@ xfs_frlock(
 	cred_t		*credp)
 {
 	xfs_inode_t	*ip;
-	int		error;
+	int		dolock, error;
 
 	vn_trace_entry(BHV_TO_VNODE(bdp), "xfs_frlock",
 		       (inst_t *)__return_address);
 	ip = XFS_BHVTOI(bdp);
-	xfs_ilock(ip, XFS_IOLOCK_EXCL);
+
+	dolock = !(cmd == F_CHKLK || cmd == F_CHKLKW);
+	if (dolock)
+		xfs_ilock(ip, XFS_IOLOCK_EXCL);
+	else
+		ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) ||
+		       ismrlocked(&ip->i_iolock, MR_ACCESS));
+
 	error = fs_frlock(bdp, cmd, flockp, flag, offset, credp);
-	xfs_iunlock(ip, XFS_IOLOCK_EXCL);
+	if (dolock)
+		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 	return error;
 }
 
