@@ -116,6 +116,7 @@ int
 xfs_trans_reserve(xfs_trans_t	*tp,
 		  uint		blocks,
 		  uint		logspace,
+		  uint		rtextents,
 		  uint		flags)
 {
 	int		status;
@@ -149,6 +150,21 @@ xfs_trans_reserve(xfs_trans_t	*tp,
 #endif
 		tp->t_log_res = logspace;
 	}
+
+	/*
+	 * Attempt to reserve the needed realtime extents by decrementing
+	 * the number needed from the number available.  This will
+	 * fail if the count would go below zero.
+	 */
+	if (rtextents > 0) {
+		status = xfs_mod_incore_sb(tp->t_mountp, XFS_SB_FREXTENTS,
+					   -rtextents);
+		if (status != 0) {
+			return (status);
+		}
+		tp->t_rtx_res = rtextents;
+	}
+
 
 	return (0);
 }
@@ -224,8 +240,8 @@ xfs_trans_mod_sb(xfs_trans_t	*tp,
 		 */
 		if (delta < 0) {
 			sbp = &tp->t_mountp->m_sb;
-			tp->t_blk_res_used += (uint)(-delta * sbp->sb_rextsize);
-			ASSERT(tp->t_blk_res_used <= tp->t_blk_res);
+			tp->t_rtx_res_used += (uint)-delta;
+			ASSERT(tp->t_rtx_res_used <= tp->t_rtx_res);
 		}
 		tp->t_frextents_delta += delta;
 		break;

@@ -168,6 +168,8 @@ typedef struct xfs_trans {
 	unsigned int		t_log_res;	/* amt of log space resvd */	
 	unsigned int		t_blk_res;	/* # of blocks resvd */
 	unsigned int		t_blk_res_used;	/* # of resvd blocks used */
+	unsigned int		t_rtx_res;	/* # of rt extents resvd */
+	unsigned int		t_rtx_res_used;	/* # of resvd rt extents used */
 	xfs_log_ticket_t	t_ticket;	/* log mgr ticket */
 	sema_t			t_sema;		/* sema for commit completion */
 	xfs_lsn_t		t_lsn;		/* log seq num of trans commit*/
@@ -220,7 +222,7 @@ struct xfs_efd_log_item;
  * xFS transaction mechanism exported interfaces.
  */
 xfs_trans_t	*xfs_trans_alloc(struct xfs_mount *, uint);
-int		xfs_trans_reserve(xfs_trans_t *, uint, uint, uint);
+int		xfs_trans_reserve(xfs_trans_t *, uint, uint, uint, uint);
 void		xfs_trans_callback(xfs_trans_t *, void(*)(xfs_trans_t*, void*),
 				   void *);
 void		xfs_trans_mod_sb(xfs_trans_t *, uint, int);
