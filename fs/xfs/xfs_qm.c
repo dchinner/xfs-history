@@ -42,13 +42,23 @@ STATIC void	xfs_qm_list_destroy(xfs_dqlist_t *);
 STATIC int	xfs_qm_quotacheck(xfs_mount_t *);
 
 STATIC int	xfs_qm_init_quotainos(xfs_mount_t *);
-#ifndef __linux__
 STATIC int	xfs_qm_shake(int);
-#endif
 
 #ifdef DEBUG
 extern mutex_t	qcheck_lock;
 #endif
+
+/*
+ * quotacheck can shoot itself in the foot if we're not careful.
+ * In IRIX, low memory conditions are catered for using a shaked
+ * callback - xfs_qm_shake - there is no equivalent in Linux.
+ * For filesystems with lots of unique uid/gid's, quotacheck does
+ * alot of allocs - on Linux, we need to ensure we don't alloc
+ * without bound.
+ */
+#define XQM_CHECK_FREE	do { \
+				if (free_shortage()) { xfs_qm_shake((0)); } \
+			} while (0)
 
 #ifdef QUOTADEBUG
 #define XQM_LIST_PRINT(l, NXT, title) \
@@ -112,15 +122,17 @@ xfs_qm_init(void)
 	xfs_qm_freelist_init(&(xqm->qm_dqfreelist));
 
 	/*
-	 * dquot zone. we register our own shaked callback.
+	 * dquot zone. we register our own low-memory callback.
 	 */
 	if (!qm_dqzone) {
-		xqm->qm_dqzone = kmem_zone_init(sizeof(xfs_dquot_t), "dquots");
+		xqm->qm_dqzone = kmem_zone_init(sizeof(xfs_dquot_t),
+						"xfs_dquots");
 		qm_dqzone = xqm->qm_dqzone;
 	} else
 		xqm->qm_dqzone = qm_dqzone;
 
-#ifndef __linux__
+#ifdef SHAKEMGR_MEMORY	/* not defined in Linux */
+	/* Ideally, we need a more generic low-memory callback facility */
 	shake_register(SHAKEMGR_MEMORY, xfs_qm_shake);
 #endif
 
@@ -128,7 +140,8 @@ xfs_qm_init(void)
 	 * The t_dqinfo portion of transactions.
 	 */
 	if (!qm_dqtrxzone) {
-		xqm->qm_dqtrxzone = kmem_zone_init(sizeof(xfs_dquot_acct_t), "dqtrx");
+		xqm->qm_dqtrxzone = kmem_zone_init(sizeof(xfs_dquot_acct_t),
+						   "xfs_dqtrx");
 		qm_dqtrxzone = xqm->qm_dqtrxzone;
 	} else
 		xqm->qm_dqtrxzone = qm_dqtrxzone;
@@ -1958,6 +1971,9 @@ xfs_qm_quotacheck(
 				     BULKSTAT_FG_IGET|BULKSTAT_FG_VFSLOCKED,
 				     &done)))
 			break;
+
+		XQM_CHECK_FREE;
+
 	} while (! done);
 	
 	/*
@@ -2089,7 +2105,6 @@ xfs_qm_init_quotainos(
 }
 
 
-#ifndef __linux__
 /*
  * Traverse the freelist of dquots and attempt to reclaim a maximum of
  * 'howmany' dquots. This operation races with dqlookup(), and attempts to
@@ -2247,14 +2262,12 @@ xfs_qm_shake_freelist(
 	}
 	xfs_qm_freelist_unlock(xfs_Gqm);
 	return (nreclaimed != howmany);
-
 }
 
 
 /*
  * The shake manager routine called by shaked() when memory is
- * running low. The heuristics here are copied from vn_shake().
- * We are a lot more aggressive than vn_shake though.
+ * running low.
  */
 /* ARGSUSED */
 STATIC int
@@ -2279,7 +2292,6 @@ xfs_qm_shake(int level)
 	
 	return xfs_qm_shake_freelist(MAX(nfree, n));
 }
-#endif /* !__linux__ */
 
 
 /*
@@ -2448,6 +2460,9 @@ xfs_qm_dqalloc_incore(
 		}
 		XFS_STATS_INC(xfsstats.xs_qm_dqreclaim_misses);
 	}
+
+	XQM_CHECK_FREE;
+
 	/*
 	 * Allocate a brand new dquot on the kernel heap and return it
 	 * to the caller to initialize.
