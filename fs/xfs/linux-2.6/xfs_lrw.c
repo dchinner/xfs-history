@@ -206,7 +206,8 @@ xfs_zero_last_block(
 	xfs_bmbt_irec_t	imap;
 	loff_t		loff;
 	size_t		lsize;
-
+	pb_bmap_t	pbmap;
+	int		npbmaps = 1;
 
 	ASSERT(ismrlocked(io->io_lock, MR_UPDATE) != 0);
 	ASSERT(offset > isize);
@@ -355,33 +356,9 @@ xfs_zero_last_block(
 		}
 	}
 
-
-	if ((error = -pagebuf_iozero(ip, pb, zero_offset, zero_len, end_size))) {
-		pagebuf_rele(pb);
-		goto out_lock;
-	}
-
-	/*
-	 * We don't want to start a transaction here, so don't
-	 * push out a buffer over a delayed allocation extent.
-	 * Also, we can get away with it since the space isn't
-	 * allocated so it's faster anyway.
-	 *
-	 * We don't bother to call xfs_b*write here since this is
-	 * just userdata, and we don't want to bring the filesystem
-	 * down if they hit an error. Since these will go through
-	 * xfsstrategy anyway, we have control over whether to let the
-	 * buffer go thru or not, in case of a forced shutdown.
-	 */
-
-	if (imap.br_startblock == DELAYSTARTBLOCK ||
-	    imap.br_state == XFS_EXT_UNWRITTEN) {
-		pagebuf_rele(pb);
-	} else {
-		XFS_BUF_WRITE(pb);
-		XFS_BUF_ASYNC(pb);
-		XFS_bwrite(pb);
-	}
+	npbmaps = _xfs_imap_to_bmap(io, offset, &imap, &pbmap, nimaps, npbmaps);
+	error = -pagebuf_iozero(ip, pb, zero_offset, zero_len, end_size, &pbmap);
+	pagebuf_rele(pb);
 
 out_lock:
 	XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
@@ -425,6 +402,8 @@ xfs_zero_eof(
 	xfs_bmbt_irec_t	imap;
 	loff_t		loff;
 	size_t		lsize;
+	pb_bmap_t	pbmap;
+	int		npbmaps = 1;
 
 	ASSERT(ismrlocked(io->io_lock, MR_UPDATE));
 	ASSERT(ismrlocked(io->io_iolock, MR_UPDATE));
@@ -535,20 +514,12 @@ xfs_zero_eof(
 			}
 		}
 
-		/* pagebuf_iozero returns negative error */
-		if ((error = -pagebuf_iozero(ip, pb, 0, lsize, end_size))) {
-			pagebuf_rele(pb);
-			goto out_lock;
-		}
+		npbmaps = _xfs_imap_to_bmap(io, offset, &imap, &pbmap, nimaps, npbmaps);
 
-		if (imap.br_startblock == DELAYSTARTBLOCK ||
-		    imap.br_state == XFS_EXT_UNWRITTEN) { /* DELWRI */
-			pagebuf_rele(pb);
-		} else {
-			XFS_BUF_WRITE(pb);
-			XFS_BUF_ASYNC(pb);
-			XFS_bwrite(pb);
-		}
+		/* pagebuf_iozero returns negative error */
+		error = -pagebuf_iozero(ip, pb, 0, lsize, end_size, &pbmap);
+		pagebuf_rele(pb);
+
 		if (error) {
 			goto out_lock;
 		}
