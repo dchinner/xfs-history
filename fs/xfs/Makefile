@@ -16,6 +16,11 @@ KERNEL_VERSION = 2.4.0
 
 SGI_VERSION = `cat $(WORKAREA)/SPECS/_sgi_kvers_`
 
+COMMANDS = cmd/attr cmd/xfsprogs cmd/xfsdump
+# COMMANDS += cmd/acl cmd/dmapi
+COMMANDRPMS = attr attr-devel xfsprogs xfsprogs-devel xfsdump
+# COMMANDRPMS += acl acl-devel dmapi dmapi-devel
+
 default all: checkproc tarballs i386kernel i586kernel i686kernel ia64kernel cmds
 
 checkproc:
@@ -26,8 +31,10 @@ checkproc:
 tarballs: xfs-cmds
 	@echo "=== Making $@ `date`"; \
 	cd $(WORKAREA)/SCRIPTS; \
-	./make-tarballs
-	cp $(WORKAREA)/cmd/xfs/build/xfs-cmds-*.src.tar.gz $(WORKAREA)/SOURCES
+	./make-tarballs; \
+	for d in $(COMMANDS); do \
+		cp $(WORKAREA)/$$d/build/*.src.tar.gz $(WORKAREA)/SOURCES; \
+	done
 
 i386kernel:
 	if [[ "i386" == $(ARCH) ]]; then \
@@ -72,18 +79,35 @@ cmds: xfs-cmds
 
 xfs-cmds:
 	echo "=== Making $@ `date`"
-	cd $(WORKAREA)/cmd/xfs && ./Makepkgs verbose
+	for d in $(COMMANDS); do \
+		( cd $(WORKAREA)/$$d && ./Makepkgs verbose ) || exit 1; \
+		( rpm -Uh $(WORKAREA)/$$d/build/rpm/*.$(ARCH).rpm ) || exit 1; \
+	done
+	[ -d $(WORKAREA)/SRPMS ] || mkdir $(WORKAREA)/SRPMS
+	for d in $(COMMANDS); do \
+		( cd $(WORKAREA) && cp $$d/build/rpm/*.src.rpm SRPMS ) \
+	done
+	[ -d $(WORKAREA)/RPMS/$(ARCH) ] || mkdir -p $(WORKAREA)/RPMS/$(ARCH)
+	for d in $(COMMANDS); do \
+		( cd $(WORKAREA) && cp $$d/build/rpm/*.$(ARCH).rpm RPMS/$(ARCH) ) \
+	done
 
 clean:
 	rm -rf RPMS SRPMS BUILD SOURCES/linux-${KERNEL_VERSION}-xfs.patch
-	cd $(WORKAREA)/cmd/xfs && make clean
+	for d in $(COMMANDS); do \
+		( cd $(WORKAREA)/$$d && make clean ) \
+	done
+	for d in $(COMMANDRPMS); do \
+		( rpm -e --nodeps --noscripts $$d >/dev/null 2>&1 || exit 0 ) \
+	done
 
 realclean: clean
 	rm -rf linux-${KERNEL_VERSION}
 	rm -f kern
-	rm -f SOURCES/xfs-cmds-*.tar.gz
+	rm -f SOURCES/linux-${KERNEL_VERSION}.tar.bz2
 	if [ -e SPECS/${KERN_SPEC}.old ] ; then \
 		rm SPECS/${KERN_SPEC}; \
 		mv SPECS/${KERN_SPEC}.old SPECS/${KERN_SPEC}; \
 	fi
-	cd $(WORKAREA)/cmd/xfs && make realclean
+	for d in $(COMMANDRPMS); do rm -f SOURCES/$$d-*; done
+	for d in $(COMMANDS); do ( cd $(WORKAREA)/$$d && make realclean ) done
