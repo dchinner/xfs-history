@@ -1,4 +1,4 @@
-#ident "$Revision: 1.193 $"
+#ident "$Revision: 1.194 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -3296,80 +3296,80 @@ xfs_ichgtime(xfs_inode_t *ip,
 /*
  * xfs_get_inode()
  *
- *      This routine takes the dev_t of a file system and an
- *      inode number on that file system, and returns a pointer
- *      to the corresponding incore xfs inode structure.
+ *	This routine takes the dev_t of a file system and an
+ *	inode number on that file system, and returns a pointer
+ *	to the corresponding incore xfs inode structure.
  *
  * RETURNS:
- *      xfs_inode_t pointer on success
- *      NULL on failure
+ *	xfs_inode_t pointer on success
+ *	NULL on failure
  *
  */
 xfs_inode_t *
 xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
 {
-        struct vfs              *vfsp;
-        bhv_desc_t              *bdp;
-        xfs_inode_t             *ip = NULL ;
-        int                     error;
+	struct vfs              *vfsp;
+	bhv_desc_t              *bdp;
+	xfs_inode_t             *ip = NULL ;
+	int                     error;
 
-        /*
-         * Lookup the vfs structure and mark it busy.
-         * This prevents race conditions with unmount.
-         *
-         * If this returns NULL, the file system may be in the process
-         * of being unmounted. The unmount may succeed or fail.  If the
-         * umount fails, the grio ticket will remain attached to the
-         * inode structure. It will be cleanup when the inode structure is
-         * freed.
-         */
-        vfsp = vfs_busydev( fs_dev );
+	/*
+	 * Lookup the vfs structure and mark it busy.
+	 * This prevents race conditions with unmount.
+	 *
+	 * If this returns NULL, the file system may be in the process
+	 * of being unmounted. The unmount may succeed or fail.  If the
+	 * umount fails, the grio ticket will remain attached to the
+	 * inode structure. It will be cleanup when the inode structure is
+	 * freed.
+	 */
+	vfsp = vfs_busydev( fs_dev );
 
-        if (vfsp) {
+	if (vfsp) {
 
-                /*
-                 * Verify that this is an xfs file system.
-                 */
+		/*
+		 * Verify that this is an xfs file system.
+		 */
 #ifndef SIM
-                if (strncmp(vfssw[vfsp->vfs_fstype].vsw_name, "xfs", 3) == 0)
+		if (strncmp(vfssw[vfsp->vfs_fstype].vsw_name, "xfs", 3) == 0)
 #endif
-                {
+		{
 
-                        bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
-                        error = xfs_iget( XFS_BHVTOM( bdp ),
-                                        NULL, ino, XFS_ILOCK_SHARED, &ip, 0);
+			bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
+			error = xfs_iget( XFS_BHVTOM( bdp ),
+					NULL, ino, XFS_ILOCK_SHARED, &ip, 0);
 
-                        if ( error ) {
-                                ip = NULL;
-                        }
+			if ( error ) {
+				ip = NULL;
+			}
 
-                        if ( (ip == NULL) || (ip->i_d.di_mode == 0) ) {
-                                if (ip) {
-                                        xfs_iunlock( ip, XFS_ILOCK_SHARED );
-                                }
-                                ip = NULL;
-                        }
-#ifdef PRIO_DEBUG
-                        if (!ip)
-                                printf("xfs_get failed on %d \n",ino);
-#endif
-
-                }
-
-                /*
-                 * Decrement the vfs busy count.
-                 */
-                vfs_unbusy( vfsp );
-        }
-#ifdef GRIO_DEBUG
-        else {
-                printf("grio vfs_busydev failed \n");
-        }
-#endif
-
-#ifdef PRIO_DEBUG
-        printf("xfs_get_inode returns: %lx\n", ip);
+			if ( (ip == NULL) || (ip->i_d.di_mode == 0) ) {
+				if (ip) {
+					xfs_iunlock( ip, XFS_ILOCK_SHARED );
+				}
+				ip = NULL;
+			}
+#ifdef DEBUG && PRIO_DEBUG
+			if (!ip)
+				printf("xfs_get failed on %d \n",ino);
 #endif /* PRIO_DEBUG */
-        return( ip );
+
+		}
+
+		/*
+		 * Decrement the vfs busy count.
+		 */
+		vfs_unbusy( vfsp );
+	}
+#ifdef GRIO_DEBUG
+	else {
+		printf("grio vfs_busydev failed \n");
+	}
+#endif
+
+#ifdef DEBUG && PRIO_DEBUG
+	printf("xfs_get_inode returns: %lx\n", ip);
+#endif /* PRIO_DEBUG */
+	return( ip );
 }
 #endif /* SIM */
