@@ -4600,12 +4600,6 @@ xfs_readdir(
                 return XFS_ERROR(ENOTDIR);
         }
 
-	if (error = xfs_iaccess(dp, IEXEC, credp)) {
-		xfs_iunlock_map_shared(dp, lock_mode);
-                return error;
-	}
-
-
 	/* If the directory has been removed after it was opened. */
         if (dp->i_d.di_nlink == 0) {
                 xfs_iunlock_map_shared(dp, lock_mode);
