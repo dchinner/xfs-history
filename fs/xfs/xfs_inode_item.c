@@ -56,7 +56,8 @@
  * inode core, and possibly one for the inode data/extents/b-tree root.
  */
 uint
-xfs_inode_item_size(xfs_inode_log_item_t *iip)
+xfs_inode_item_size(
+	xfs_inode_log_item_t	*iip)
 {
 	uint		nvecs;
 	xfs_inode_t	*ip;
@@ -136,15 +137,12 @@ xfs_inode_item_size(xfs_inode_log_item_t *iip)
  * This is called to fill in the vector of log iovecs for the
  * given inode log item.  It fills the first item with an inode
  * log format structure, the second with the on-disk inode structure,
-
-
-
-
  * and possible a third with the inode data/extents/b-tree root.
  */
 void
-xfs_inode_item_format(xfs_inode_log_item_t	*iip,
-		      xfs_log_iovec_t		*log_vector)
+xfs_inode_item_format(
+	xfs_inode_log_item_t	*iip,
+	xfs_log_iovec_t		*log_vector)
 {
 	uint		nvecs;
 	xfs_log_iovec_t	*vecp;
@@ -285,7 +283,8 @@ xfs_inode_item_format(xfs_inode_log_item_t	*iip,
  * inode pin lock.
  */
 void
-xfs_inode_item_pin(xfs_inode_log_item_t *iip)
+xfs_inode_item_pin(
+	xfs_inode_log_item_t	*iip)
 {
 	ASSERT(ismrlocked(&(iip->ili_inode->i_lock), MR_UPDATE));
 	xfs_ipin(iip->ili_inode);
@@ -298,7 +297,8 @@ xfs_inode_item_pin(xfs_inode_log_item_t *iip)
  * Just call xfs_iunpin() on the inode to do this.
  */
 void
-xfs_inode_item_unpin(xfs_inode_log_item_t *iip)
+xfs_inode_item_unpin(
+	xfs_inode_log_item_t	*iip)
 {
 	xfs_iunpin(iip->ili_inode);
 }
@@ -316,7 +316,8 @@ xfs_inode_item_unpin(xfs_inode_log_item_t *iip)
  * freed.  We use the i_flock for this synchronization.
  */
 uint
-xfs_inode_item_trylock(xfs_inode_log_item_t *iip)
+xfs_inode_item_trylock(
+	xfs_inode_log_item_t	*iip)
 {
 	register xfs_inode_t	*ip;
 
@@ -350,7 +351,8 @@ xfs_inode_item_trylock(xfs_inode_log_item_t *iip)
  * hold flags is set, do not unlock the inode.  
  */
 void
-xfs_inode_item_unlock(xfs_inode_log_item_t *iip)
+xfs_inode_item_unlock(
+	xfs_inode_log_item_t	*iip)
 {
 	uint		hold;
 	uint		iolocked;
@@ -425,7 +427,9 @@ xfs_inode_item_unlock(xfs_inode_log_item_t *iip)
  * given lsn.
  */
 xfs_lsn_t
-xfs_inode_item_committed(xfs_inode_log_item_t *iip, xfs_lsn_t lsn)
+xfs_inode_item_committed(
+	xfs_inode_log_item_t	*iip,
+	xfs_lsn_t		lsn)
 {
 	return (lsn);
 }
@@ -439,7 +443,8 @@ xfs_inode_item_committed(xfs_inode_log_item_t *iip, xfs_lsn_t lsn)
  * just unlock the inode.
  */
 void
-xfs_inode_item_push(xfs_inode_log_item_t *iip)
+xfs_inode_item_push(
+	xfs_inode_log_item_t	*iip)
 {
 	buf_t		*bp;
 	xfs_dinode_t	*dip;
@@ -488,8 +493,9 @@ struct xfs_item_ops xfs_inode_item_ops = {
  * Initialize the inode log item for a newly allocated (in-core) inode.
  */
 void
-xfs_inode_item_init(xfs_inode_t	*ip,
-		    xfs_mount_t	*mp)
+xfs_inode_item_init(
+	xfs_inode_t	*ip,
+	xfs_mount_t	*mp)
 {
 	xfs_inode_log_item_t	*iip;
 
@@ -513,7 +519,9 @@ xfs_inode_item_init(xfs_inode_t	*ip,
  * flush lock.
  */
 void
-xfs_iflush_done(buf_t *bp, xfs_inode_log_item_t *iip)
+xfs_iflush_done(
+	buf_t			*bp,
+	xfs_inode_log_item_t	*iip)
 {
 	xfs_lsn_t	lsn;
 	xfs_inode_t	*ip;
@@ -541,6 +549,12 @@ xfs_iflush_done(buf_t *bp, xfs_inode_log_item_t *iip)
 	}
 	
 	iip->ili_logged = 0;
+
+	/*
+	 * Clear the ili_last_fields bits now that we know that the
+	 * data corresponding to them is safely on disk.
+	 */
+	iip->ili_last_fields = 0;
 
 	/*
 	 * Release the inode's flush lock since we're done with it.

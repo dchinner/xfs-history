@@ -1425,9 +1425,27 @@ xfs_iflush(
 	}
 	
 	/*
-	 * We're done looking at ili_fields, so clear it.  We can do
-	 * this since the lock must be held exclusively in order to
-	 * set bits in this field. Set ili_logged so the flush done
+	 * We've recorded everything logged in the inode, so we'd
+	 * like to clear the ilf_fields bits so we don't log and
+	 * flush things unnecessarily.  However, we can't stop
+	 * logging all this information until the data we've copied
+	 * into the disk buffer is written to disk.  If we did we might
+	 * overwrite the copy of the inode in the log with all the
+	 * data after re-logging only part of it, and in the face of
+	 * a crash we wouldn't have all the data we need to recover.
+	 *
+	 * What we do is move the bits to the ili_last_fields field.
+	 * When logging the inode, these bits are moved back to the
+	 * ilf_fields field.  In the xfs_iflush_done() routine we
+	 * clear ili_last_fields, since we know that the information
+	 * those bits represent is permanently on disk.  As long as
+	 * the flush completes before the inode is logged again, then
+	 * both ilf_fields and ili_last_fields will be cleared.
+	 *
+	 * We can play with the ilf_fields bits here, because the inode
+	 * lock must be held exclusively in order to set bits there
+	 * and the flush lock protects the ili_last_fields bits.
+	 * Set ili_logged so the flush done
 	 * routine can tell whether or not to look in the AIL.
 	 * Also, store the current LSN of the inode so that we can tell
 	 * whether the item has moved in the AIL from xfs_iflush_done().
@@ -1435,13 +1453,15 @@ xfs_iflush(
 	 * it is a 64 bit value that cannot be read atomically.
 	 */
 	if (iip->ili_format.ilf_fields != 0) {
+		iip->ili_last_fields = iip->ili_format.ilf_fields;
 		iip->ili_format.ilf_fields = 0;
 		iip->ili_logged = 1;
+
+		ASSERT(sizeof(xfs_lsn_t) == 8);	/* don't lock if it shrinks */
+		s = AIL_LOCK(mp);
+		iip->ili_flush_lsn = iip->ili_item.li_lsn;
+		AIL_UNLOCK(mp, s);
 	}
-	ASSERT(sizeof(xfs_lsn_t) == 8);	/* don't need lock if it shrinks */
-	s = AIL_LOCK(mp);
-	iip->ili_flush_lsn = iip->ili_item.li_lsn;
-	AIL_UNLOCK(mp, s);
 
 	/*
 	 * Attach the function xfs_iflush_done to the inode's

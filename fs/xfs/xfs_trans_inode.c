@@ -68,10 +68,11 @@
  * This simplifies code which must handle both cases.
  */
 xfs_inode_t *
-xfs_trans_iget(xfs_mount_t	*mp,
-	       xfs_trans_t	*tp,
-	       xfs_ino_t	ino,
-	       uint		lock_flags)
+xfs_trans_iget(
+	xfs_mount_t	*mp,
+	xfs_trans_t	*tp,
+	xfs_ino_t	ino,
+	uint		lock_flags)
 {
 	xfs_inode_log_item_t	*iip;
 	xfs_inode_t		*ip;
@@ -159,9 +160,10 @@ xfs_trans_iget(xfs_mount_t	*mp,
  * unlocked until the transaction commits.
  */
 void
-xfs_trans_iput(xfs_trans_t	*tp,
-	       xfs_inode_t	*ip,
-	       uint		lock_flags)
+xfs_trans_iput(
+	xfs_trans_t	*tp,
+	xfs_inode_t	*ip,
+	uint		lock_flags)
 {
 	xfs_inode_log_item_t	*iip;
 	xfs_log_item_desc_t	*lidp;
@@ -254,9 +256,10 @@ xfs_trans_iput(xfs_trans_t	*tp,
  * on the inode.
  */
 void
-xfs_trans_ijoin(xfs_trans_t	*tp,
-		xfs_inode_t	*ip,
-		uint		lock_flags)
+xfs_trans_ijoin(
+	xfs_trans_t	*tp,
+	xfs_inode_t	*ip,
+	uint		lock_flags)
 {
 	xfs_inode_log_item_t	*iip;
 
@@ -296,8 +299,9 @@ xfs_trans_ijoin(xfs_trans_t	*tp,
  * and associated with the given transaction.
  */
 void
-xfs_trans_ihold(xfs_trans_t	*tp,
-		xfs_inode_t	*ip)
+xfs_trans_ihold(
+	xfs_trans_t	*tp,
+	xfs_inode_t	*ip)
 {
 	ASSERT(ip->i_transp == tp);
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE));
@@ -316,9 +320,10 @@ xfs_trans_ihold(xfs_trans_t	*tp,
  * all of the inline data/extents/b-tree root if any of them has changed.
  */
 void
-xfs_trans_log_inode(xfs_trans_t	*tp,
-		    xfs_inode_t	*ip,
-		    uint	flags)
+xfs_trans_log_inode(
+	xfs_trans_t	*tp,
+	xfs_inode_t	*ip,
+	uint		flags)
 {
 	xfs_inode_log_item_t	*iip;
 	xfs_log_item_desc_t	*lidp;
@@ -332,6 +337,14 @@ xfs_trans_log_inode(xfs_trans_t	*tp,
 	tp->t_flags |= XFS_TRANS_DIRTY;
 	lidp->lid_flags |= XFS_LID_DIRTY;
 
+	/*
+	 * Always OR in the bits from the ili_last_fields field.
+	 * This is to coordinate with the xfs_iflush() and xfs_iflush_done()
+	 * routines in the eventual clearing of the ilf_fields bits.
+	 * See the big comment in xfs_iflush() for an explanation of
+	 * this coorination mechanism.
+	 */
+	flags |= ip->i_item.ili_last_fields;
 	ip->i_item.ili_format.ilf_fields |= flags;
 }
 

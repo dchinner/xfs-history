@@ -23,15 +23,16 @@ typedef struct xfs_inode_log_format {
 } xfs_inode_log_format_t;
 
 typedef struct xfs_inode_log_item {
-	xfs_log_item_t		ili_item;
-	struct xfs_inode	*ili_inode;
-	xfs_lsn_t		ili_flush_lsn;
-	unsigned short		ili_ilock_recur;
-	unsigned short		ili_iolock_recur;
-	unsigned short		ili_flags;
-	unsigned short		ili_logged;
-	struct xfs_bmbt_rec	*ili_extents_buf;
-	xfs_inode_log_format_t	ili_format;
+	xfs_log_item_t		ili_item;	   /* common portion */
+	struct xfs_inode	*ili_inode;	   /* inode ptr */
+	xfs_lsn_t		ili_flush_lsn;	   /* lsn at last flush */
+	unsigned short		ili_ilock_recur;   /* lock recursion count */
+	unsigned short		ili_iolock_recur;  /* lock recursion count */
+	unsigned short		ili_flags;	   /* misc flags */
+	unsigned short		ili_logged;	   /* flushed logged data */
+	unsigned int		ili_last_fields;   /* fields when flushed */
+	struct xfs_bmbt_rec	*ili_extents_buf;  /* array of logged exts */
+	xfs_inode_log_format_t	ili_format;	   /* logged structure */
 } xfs_inode_log_item_t;
 
 #define	XFS_ILI_HOLD		0x1
