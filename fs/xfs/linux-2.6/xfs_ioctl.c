@@ -1067,6 +1067,25 @@ xfs_ioctl(
 		return error;
 	}
 
+#if (defined(DEBUG) || defined(INDUCE_IO_ERROR))
+	case XFS_IOC_ERROR_INJECTION: {
+		xfs_error_injection_t in;
+		error = copy_from_user(&in, (char *)arg, sizeof(xfs_error_injection_t));
+		if (error) {
+			return -error;
+		}
+		error = xfs_errortag_add(in.errtag, mp);
+		if (error) {
+			return -error;
+		}
+		return error;
+	}
+
+	case XFS_IOC_ERROR_CLEARALL: {
+			error = xfs_errortag_clearall(mp);
+			return error;
+	}
+#endif /* DEBUG || INDUCE_IO_ERROR */
 
 	default:
 		return -EINVAL;

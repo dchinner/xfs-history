@@ -115,10 +115,10 @@ extern int	xfs_error_test(int, int *, char *, int, char *, unsigned long);
 			(rf)))
 #endif /* __ANSI_CPP__ */
 
-int		xfs_errortag_add(int error_tag, int fd);
-int		xfs_errortag_clear(int error_tag, int fd);
+int		xfs_errortag_add(int error_tag, xfs_mount_t *mp);
+int		xfs_errortag_clear(int error_tag, xfs_mount_t *mp);
 
-int		xfs_errortag_clearall(int fd);
+int		xfs_errortag_clearall(xfs_mount_t *mp);
 int		xfs_errortag_clearall_umount(int64_t fsid, char *fsname,
 						int loud);
 #else

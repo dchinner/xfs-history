@@ -99,16 +99,14 @@ xfs_error_test(int error_tag, int *fsidp, char *expression,
 }
 
 int
-xfs_errortag_add(int error_tag, int fd)
+xfs_errortag_add(int error_tag, xfs_mount_t *mp)
 {
 	int i;
 	int error;
 	int len;
 	int64_t fsid;
-	char *fsname;
 
-	if ((error = xfs_get_fsinfo(fd, &fsname, &fsid)))
-		return error;
+	bcopy(mp->m_fixedfsid, &fsid, sizeof(fsid_t));
 
 	for (i = 0; i < XFS_NUM_INJECT_ERROR; i++)  {
 		if (xfs_etest_fsid[i] == fsid && xfs_etest[i] == error_tag) {
@@ -123,9 +121,10 @@ xfs_errortag_add(int error_tag, int fd)
 				error_tag);
 			xfs_etest[i] = error_tag;
 			xfs_etest_fsid[i] = fsid;
-			len = strlen(fsname);
+			len = strlen(mp->m_fsname);
 			xfs_etest_fsname[i] = kmem_alloc(len + 1, KM_SLEEP);
-			strcpy(xfs_etest_fsname[i], fsname);
+			strcpy(xfs_etest_fsname[i], mp->m_fsname);
+			mp->m_flags |= XFS_MOUNT_FS_SHUTDOWN;
 			return 0;
 		}
 	}
@@ -136,15 +135,13 @@ xfs_errortag_add(int error_tag, int fd)
 }
 
 int
-xfs_errortag_clear(int error_tag, int fd)
+xfs_errortag_clear(int error_tag, xfs_mount_t *mp)
 {
 	int i;
 	int error;
 	int64_t fsid;
-	char *fsname;
 
-	if ((error = xfs_get_fsinfo(fd, &fsname, &fsid)))
-		return error;
+	bcopy(mp->m_fixedfsid, &fsid, sizeof(fsid_t));
 
 	for (i = 0; i < XFS_NUM_INJECT_ERROR; i++) {
 		if (xfs_etest_fsid[i] == fsid && xfs_etest[i] == error_tag) {
@@ -193,16 +190,14 @@ xfs_errortag_clearall_umount(int64_t fsid, char *fsname, int loud)
 }
 
 int
-xfs_errortag_clearall(int fd)
+xfs_errortag_clearall(xfs_mount_t *mp)
 {
 	int error;
 	int64_t fsid;
-	char *fsname;
 
-	if ((error = xfs_get_fsinfo(fd, &fsname, &fsid)))
-		return error;
+	bcopy(mp->m_fixedfsid, &fsid, sizeof(fsid_t));
 
-	return xfs_errortag_clearall_umount(fsid, fsname, 1);
+	return xfs_errortag_clearall_umount(fsid, mp->m_fsname, 1);
 }
 #endif /* DEBUG || INDUCE_IO_ERROR */
 
