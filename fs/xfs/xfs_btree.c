@@ -39,14 +39,12 @@ __uint32_t xfs_magics[XFS_BTNUM_MAX] =
  * Get a buffer for the block, return it.
  */
 buf_t *
-xfs_btree_bread(xfs_trans_t *tp, xfs_agnumber_t agno, xfs_agblock_t agbno)
+xfs_btree_bread(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno, xfs_agblock_t agbno)
 {
 	daddr_t d;
-	xfs_mount_t *mp;
 	xfs_sb_t *sbp;
 
-	mp = tp->t_mountp;
-	sbp = mp->m_sb;
+	sbp = &mp->m_sb;
 	d = xfs_agb_to_daddr(sbp, agno, agbno);
 	return xfs_trans_bread(tp, mp->m_dev, d, mp->m_bsize);
 }
@@ -126,6 +124,15 @@ xfs_btree_check_rec(xfs_btnum_t btnum, void *ar1, void *ar2)
 void
 xfs_btree_del_cursor(xfs_btree_cur_t *cur)
 {
+	buf_t *buf;
+	int i;
+
+	for (i = 0; i < cur->bc_nlevels; i++) {
+		if (buf = cur->bc_bufs[i])
+			xfs_btree_setbuf(cur, i, 0);
+		else
+			break;
+	}
 	cur->bc_tp = (xfs_trans_t *)xfs_btree_curfreelist;
 	xfs_btree_curfreelist = cur;
 }
@@ -144,8 +151,8 @@ xfs_btree_dup_cursor(xfs_btree_cur_t *cur)
 	xfs_trans_t *tp;
 
 	tp = cur->bc_tp;
-	mp = tp->t_mountp;
-	newcur = xfs_btree_init_cursor(tp, cur->bc_agbuf, cur->bc_agno, cur->bc_btnum, cur->bc_private.b.ip);
+	mp = cur->bc_mp;
+	newcur = xfs_btree_init_cursor(mp, tp, cur->bc_agbuf, cur->bc_agno, cur->bc_btnum, cur->bc_private.b.ip);
 	newcur->bc_rec = cur->bc_rec;
 	for (i = 0; i < newcur->bc_nlevels; i++) {
 		newcur->bc_ptrs[i] = cur->bc_ptrs[i];
@@ -178,22 +185,20 @@ xfs_btree_firstrec(xfs_btree_cur_t *cur, int level)
  * Allocate a new cursor.
  */
 xfs_btree_cur_t *
-xfs_btree_init_cursor(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xfs_btnum_t btnum, xfs_inode_t *ip)
+xfs_btree_init_cursor(xfs_mount_t *mp, xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xfs_btnum_t btnum, xfs_inode_t *ip)
 {
 	xfs_aghdr_t *agp;
 	xfs_btree_cur_t *cur;
-	xfs_mount_t *mp;
 	int nlevels;
 	xfs_sb_t *sbp;
 
 	if (xfs_btree_curfreelist) {
 		cur = xfs_btree_curfreelist;
 		xfs_btree_curfreelist = (xfs_btree_cur_t *)cur->bc_tp;
-		if (tp != cur->bc_tp)
-			bzero(cur->bc_bufs, sizeof(cur->bc_bufs));
 	} else
 		cur = (xfs_btree_cur_t *)kmem_zalloc(sizeof(*cur), 0);
 	cur->bc_tp = tp;
+	cur->bc_mp = mp;
 	cur->bc_agbuf = agbuf;
 	cur->bc_agno = agno;
 	agp = xfs_buf_to_agp(agbuf);
@@ -211,10 +216,10 @@ xfs_btree_init_cursor(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xfs_bt
 	}
 	cur->bc_nlevels = nlevels;
 	cur->bc_btnum = btnum;
+	sbp = &mp->m_sb;
+	cur->bc_blocklog = sbp->sb_blocklog;
 	switch (btnum) {
 	case XFS_BTNUM_BMAP:
-		mp = tp->t_mountp;
-		sbp = mp->m_sb;
 		cur->bc_private.b.inodesize = sbp->sb_inodesize;
 		cur->bc_private.b.ip = ip;
 		break;
@@ -259,27 +264,30 @@ xfs_btree_lastrec(xfs_btree_cur_t *cur, int level)
 int
 xfs_btree_maxrecs(xfs_btree_cur_t *cur, xfs_btree_block_t *block)
 {
-	int bl;
 	int maxrecs;
-	xfs_mount_t *mp;
-	xfs_sb_t *sbp;
-	xfs_trans_t *tp;
 
-	tp = cur->bc_tp;
-	mp = tp->t_mountp;
-	sbp = mp->m_sb;
-	bl = sbp->sb_blocklog;
 	switch (cur->bc_btnum) {
 	case XFS_BTNUM_BNO:
 	case XFS_BTNUM_CNT:
-		maxrecs = XFS_ALLOC_BLOCK_MAXRECS(bl, block->bb_level, cur);
+		maxrecs = XFS_ALLOC_BLOCK_MAXRECS(block->bb_level, cur);
 		break;
 	case XFS_BTNUM_IBT:
-		maxrecs = XFS_IALLOC_BLOCK_MAXRECS(bl, block->bb_level, cur);
+		maxrecs = XFS_IALLOC_BLOCK_MAXRECS(block->bb_level, cur);
 		break;
 	case XFS_BTNUM_BMAP:
-		maxrecs = XFS_BMAP_BLOCK_MAXRECS(bl, block->bb_level, cur);
+		maxrecs = XFS_BMAP_BLOCK_MAXRECS(block->bb_level, cur);
 		break;
 	}
 	return maxrecs;
+}
+
+void
+xfs_btree_setbuf(xfs_btree_cur_t *cur, int lev, buf_t *buf)
+{
+	buf_t *obuf;
+
+	obuf = cur->bc_bufs[lev];
+	if (obuf)
+		xfs_trans_brelse(cur->bc_tp, obuf);
+	cur->bc_bufs[lev] = buf;
 }

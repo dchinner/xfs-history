@@ -23,6 +23,7 @@ typedef struct xfs_btree_block
 typedef struct xfs_btree_cur
 {
 	xfs_trans_t	*bc_tp;	/* links cursors on freelist */
+	xfs_mount_t	*bc_mp;		/* mount struct */
 	buf_t		*bc_agbuf;	/* ag buffer */
 	xfs_agnumber_t	bc_agno;	/* ag number */
 	union {
@@ -34,6 +35,7 @@ typedef struct xfs_btree_cur
 	int		bc_ptrs[XFS_BTREE_MAXLEVELS];
 	int		bc_nlevels;
 	xfs_btnum_t	bc_btnum;
+	int		bc_blocklog;
 	union {
 		struct {
 			int		inodesize;	/* needed for BMAP */
@@ -54,14 +56,15 @@ void xfs_btree_check_rec(xfs_btnum_t, void *, void *);
 #define	xfs_btree_check_rec(a,b,c)
 #endif
 
-buf_t *xfs_btree_bread(xfs_trans_t *, xfs_agnumber_t, xfs_agblock_t);
+buf_t *xfs_btree_bread(xfs_mount_t *, xfs_trans_t *, xfs_agnumber_t, xfs_agblock_t);
 void xfs_btree_del_cursor(xfs_btree_cur_t *);
 xfs_btree_cur_t *xfs_btree_dup_cursor(xfs_btree_cur_t *);
 int xfs_btree_firstrec(xfs_btree_cur_t *, int);
-xfs_btree_cur_t *xfs_btree_init_cursor(xfs_trans_t *, buf_t *, xfs_agnumber_t, xfs_btnum_t, struct xfs_inode *);
+xfs_btree_cur_t *xfs_btree_init_cursor(xfs_mount_t *, xfs_trans_t *, buf_t *, xfs_agnumber_t, xfs_btnum_t, struct xfs_inode *);
 int xfs_btree_islastblock(xfs_btree_cur_t *, int);
 int xfs_btree_lastrec(xfs_btree_cur_t *, int);
 int xfs_btree_maxrecs(xfs_btree_cur_t *, xfs_btree_block_t *);
+void xfs_btree_setbuf(xfs_btree_cur_t *, int, buf_t *);
 
 extern __uint32_t xfs_magics[];
 

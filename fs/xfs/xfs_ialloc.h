@@ -37,33 +37,34 @@ typedef struct xfs_ialloc_rec
  * Real block structures have a size equal to the file system block size.
  */
 
-#define	XFS_IALLOC_BLOCK_SIZE(bl,lev,cur)	(1 << (bl))
+#define	XFS_IALLOC_BLOCK_SIZE(lev,cur)	(1 << (cur)->bc_blocklog)
 
-#define	XFS_IALLOC_BLOCK_MAXRECS(bl,lev,cur)	\
-	XFS_BTREE_BLOCK_MAXRECS(XFS_IALLOC_BLOCK_SIZE(bl,lev,cur), \
+#define	XFS_IALLOC_BLOCK_MAXRECS(lev,cur)	\
+	XFS_BTREE_BLOCK_MAXRECS(XFS_IALLOC_BLOCK_SIZE(lev,cur), \
 				xfs_ialloc_rec_t, lev)
-#define	XFS_IALLOC_BLOCK_MINRECS(bl,lev,cur)	\
-	XFS_BTREE_BLOCK_MINRECS(XFS_IALLOC_BLOCK_SIZE(bl,lev,cur), \
+#define	XFS_IALLOC_BLOCK_MINRECS(lev,cur)	\
+	XFS_BTREE_BLOCK_MINRECS(XFS_IALLOC_BLOCK_SIZE(lev,cur), \
 				xfs_ialloc_rec_t, lev)
 
-#define	XFS_IALLOC_REC_ADDR(bb,i,bl,cur)	\
-	XFS_BTREE_REC_ADDR(XFS_IALLOC_BLOCK_SIZE(bl,(bb)->bb_level,cur), \
+#define	XFS_IALLOC_REC_ADDR(bb,i,cur)	\
+	XFS_BTREE_REC_ADDR(XFS_IALLOC_BLOCK_SIZE((bb)->bb_level,cur), \
 			   xfs_ialloc_rec_t, bb, i)
 
-#define	XFS_IALLOC_PTR_ADDR(bb,i,bl,cur)	\
-	XFS_BTREE_PTR_ADDR(XFS_IALLOC_BLOCK_SIZE(bl,(bb)->bb_level,cur), \
+#define	XFS_IALLOC_PTR_ADDR(bb,i,cur)	\
+	XFS_BTREE_PTR_ADDR(XFS_IALLOC_BLOCK_SIZE((bb)->bb_level,cur), \
 			   xfs_ialloc_rec_t, bb, i)
 
 #define	XFS_IALLOC_MAXLEVELS	5 /* ??? */
 
 #define	xfs_make_iptr(s,b,o) \
-	((xfs_dinode_t *)((caddr_t)xfs_buf_to_block(b) + (o) * (s)->sb_inodesize))
+	((xfs_dinode_t *)((caddr_t)xfs_buf_to_block(b) + ((o) << (s)->sb_inodelog)))
 
 /*
  * Prototypes for per-fs routines.
  */
-xfs_ino_t xfs_ialloc(xfs_trans_t *, xfs_ino_t, int, int);
-xfs_agino_t xfs_ialloc_next_free(xfs_trans_t *, buf_t *, xfs_agino_t);
-int xfs_ifree(xfs_trans_t *, xfs_ino_t);
+xfs_ino_t xfs_dialloc(xfs_trans_t *, xfs_ino_t, int, int);
+xfs_agino_t xfs_dialloc_next_free(xfs_mount_t *, xfs_trans_t *, buf_t *, xfs_agino_t);
+int xfs_difree(xfs_trans_t *, xfs_ino_t);
+int xfs_dilocate(xfs_mount_t *, xfs_trans_t *, xfs_ino_t, xfs_fsblock_t *, int *);
 
 #endif	/* !_FS_XFS_IALLOC_H */
