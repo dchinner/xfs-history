@@ -2,11 +2,20 @@
 #
 # Makefile for SGI xFS
 #
-# $Revision: 1.30 $
+# $Revision: 1.31 $
 DEPTH?=../..
 include ${DEPTH}/kcommondefs
 KPATH=$(TOP)/fs/xfs
 .PATH:$(KPATH)
+
+#if defined(DBOPTS) && !empty(DBOPTS)
+#else
+#
+# when compiling a nondebug kernel, turn off compiler warnings about variables 
+# being set but not used. with DEBUG disabled, the ASSERT statements are gone.
+#
+KWOFF=,1552
+#endif
 
 KCOPTS=-fullwarn $(XFSCOPTS)
 
