@@ -1350,7 +1350,7 @@ xfs_qm_internalqcheck_adjust(
 	}
 
         if (ip->i_d.di_mode == 0) {
-                xfs_iput(ip, lock_flags);
+                xfs_iput_new(ip, lock_flags);
 		*res = BULKSTAT_RV_NOTHING;
                 return XFS_ERROR(ENOENT);
         }

@@ -76,7 +76,7 @@ xfs_bulkstat_one(
 		ASSERT(ip != NULL);
 		ASSERT(ip->i_blkno != (xfs_daddr_t)0);
 		if (ip->i_d.di_mode == 0) {
-			xfs_iput(ip, XFS_ILOCK_SHARED);
+			xfs_iput_new(ip, XFS_ILOCK_SHARED);
 			*stat = BULKSTAT_RV_NOTHING;
 			return XFS_ERROR(ENOENT);
 		}

@@ -491,7 +491,7 @@ retry:
 							lock_flags, ipp, bno);
 			if (error) {
 				make_bad_inode(inode);
-				if (inode->i_state == (I_NEW | I_LOCK))
+				if (inode->i_state & I_NEW)
 					unlock_new_inode(inode);
 				iput(inode);
 			}
@@ -631,6 +631,29 @@ xfs_iput(xfs_inode_t	*ip,
 
 	VN_RELE(vp);
 }
+
+/*
+ * Special iput for brand-new inodes that are still locked
+ */
+void
+xfs_iput_new(xfs_inode_t	*ip,
+	     uint		lock_flags)
+{
+	vnode_t		*vp = XFS_ITOV(ip);
+	struct inode	*inode = LINVFS_GET_IP(vp);
+
+	vn_trace_entry(vp, "xfs_iput_new", (inst_t *)__return_address);
+
+	/* We shouldn't get here without this being true, but just in case */
+	if (inode->i_state & I_NEW) {
+		make_bad_inode(inode);
+		unlock_new_inode(inode);
+	}
+	if (lock_flags)
+		xfs_iunlock(ip, lock_flags);
+	VN_RELE(vp);
+}
+
 
 /*
  * This routine embodies the part of the reclaim code that pulls

@@ -1704,7 +1704,7 @@ xfs_vget(
         }
 
 	if (ip->i_d.di_mode == 0 || (igen && (ip->i_d.di_gen != igen))) {
-		xfs_iput(ip, XFS_ILOCK_SHARED);
+		xfs_iput_new(ip, XFS_ILOCK_SHARED);
 		*vpp = NULL;
 		return XFS_ERROR(ENOENT);
         }

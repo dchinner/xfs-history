@@ -1821,7 +1821,7 @@ xfs_qm_dqusage_adjust(
 	}
 
         if (ip->i_d.di_mode == 0) {
-                xfs_iput(ip, XFS_ILOCK_EXCL);
+                xfs_iput_new(ip, XFS_ILOCK_EXCL);
 		*res = BULKSTAT_RV_NOTHING;
                 return XFS_ERROR(ENOENT);
         }

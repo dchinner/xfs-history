@@ -81,7 +81,6 @@ xfs_dir_lookup_int(
 	xfs_inode_t  		**ipp,
 	uint			*dir_unlocked)
 {
-	vnode_t		*vp;
 	vnode_t		*dir_vp;	   
 	xfs_inode_t	*dp;
 	xfs_ino_t	curr_inum;
@@ -186,9 +185,8 @@ xfs_dir_lookup_int(
 				 * out of here.
 				 */
 				if (dp->i_d.di_nlink == 0) {
-					vp = XFS_ITOV(*ipp);
 					xfs_iunlock(dp, lock_mode);
-					VN_RELE(vp);
+					xfs_iput_new(*ipp, 0);
 					xfs_ilock(dp, lock_mode);
 					return XFS_ERROR(ENOENT);
 				}
@@ -198,9 +196,8 @@ xfs_dir_lookup_int(
 						       &curr_inum);
 
 				if (error || (curr_inum != *inum)) {
-					vp = XFS_ITOV(*ipp);
 					xfs_iunlock(dp, lock_mode);
-					VN_RELE(vp);
+					xfs_iput_new(*ipp, 0);
 					xfs_ilock(dp, lock_mode);
 					if (error) {
 						return error;
@@ -226,14 +223,13 @@ xfs_dir_lookup_int(
 		}
 
 		if ((*ipp)->i_d.di_mode == 0) {
-			vp = XFS_ITOV(*ipp);
 			/*
 			 * The inode has been freed.  Something is
 			 * wrong so just get out of here.
 			 */
-			*ipp = NULL;
 			xfs_iunlock(dp, lock_mode);
-			VN_RELE(vp);
+			xfs_iput_new(*ipp, 0);
+			*ipp = NULL;
 			xfs_ilock(dp, lock_mode);
 			error = XFS_ERROR(ENOENT);
 		} else {
