@@ -8,7 +8,7 @@
  */
 typedef struct xfs_bstat
 {
-	xfs_ino_t	bs_ino;		/* inode number */
+	ino64_t		bs_ino;		/* inode number */
 	mode_t		bs_mode;	/* type and mode */
 	nlink_t		bs_nlink;	/* number of links */
 	uid_t		bs_uid;		/* user id */
@@ -31,11 +31,12 @@ typedef struct xfs_bstat
  */
 typedef struct xfs_inogrp
 {
-	xfs_ino_t	xi_startino;	/* starting inode number */
+	ino64_t		xi_startino;	/* starting inode number */
 	int		xi_alloccount;	/* count of bits set in allocmask */
-	xfs_inofree_t	xi_allocmask;	/* mask of allocated inodes */
+	__uint64_t	xi_allocmask;	/* mask of allocated inodes */
 } xfs_inogrp_t;
 
+#ifdef _KERNEL
 /*
  * Prototypes for visible xfs_itable.c routines.
  */
@@ -61,5 +62,6 @@ xfs_inumbers(
 	ino64_t		*lastino,	/* last inode returned */
 	int		*count,		/* size of buffer/count returned */
 	caddr_t		ubuffer);	/* buffer with inode descriptions */
+#endif	/* _KERNEL */
 
 #endif	/* !_FS_XFS_ITABLE_H */
