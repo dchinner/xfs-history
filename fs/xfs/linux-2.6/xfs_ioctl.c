@@ -305,6 +305,9 @@ xfs_open_by_handle(
 		return -XFS_ERROR(EINVAL);
 	}
 
+#if BITS_PER_LONG != 32
+	hreq.oflags |= O_LARGEFILE;
+#endif
 	/* Put open permission in namei format. */
 	permflag = hreq.oflags;
 	if ((permflag+1) & O_ACCMODE)
