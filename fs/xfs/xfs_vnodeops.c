@@ -1,4 +1,4 @@
-#ident "$Revision: 1.177 $"
+#ident "$Revision: 1.179 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -335,15 +335,61 @@ xfs_close(
 	cred_t		*credp)
 {
 
+	extern 	int	grio_remove_reservation( pid_t, dev_t, gr_ino_t);
+	int		isshd, nofiles, vpcount, i;
+	proc_t		*p = u.u_procp;
+	shaddr_t	*sa = p->p_shaddr;
         xfs_inode_t	*ip;
+	struct file	*fp;
+	struct ufchunk	*ufp;
 
 	vn_trace_entry(vp, "xfs_close");
 	ip = XFS_VTOI(vp);
+
+	/*
+	 * if this is the last close of a file,
+	 * remove any outstanding an i/o rate guarantees
+	 */
+	if ( lastclose && ( ip->i_d.di_flags & XFS_DIFLAG_REALTIME) ) {
+
+		vpcount = 0;
+
+		if (isshd = ISSHDFD(p, sa)) {
+			mrlock(&sa->s_fsync, MR_ACCESS, PZERO);
+			ufp = sa->s_flist;
+			nofiles  = sa->s_nofiles;
+		} else {
+			ufp = u.u_flist;
+			nofiles = u.u_nofiles;
+		}
+
+		for (i = 0 ; i < nofiles; i++ ) {
+			if ((fp = ufgetfast( i,nofiles, ufp))) {
+				if ((fp->f_vnode == vp) && (fp->f_count > 0)) {
+					vpcount++;
+				}
+			}
+		}
+
+		if (isshd) {
+			mrunlock(&sa->s_fsync);
+		}
+
+		/*
+		 * If this process is nolonger accessing
+		 * this file, remove any guarantees that
+		 * were made by this process on this file.
+		 */
+		if (!vpcount) {
+			grio_remove_reservation(p->p_pid,ip->i_dev,ip->i_ino);
+		}
+	}
 
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 	cleanlocks(vp, u.u_procp->p_epid, u.u_procp->p_sysid);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+
 	return 0;
 }
 
