@@ -2229,7 +2229,8 @@ xfs_bmap_read_extents(
 		ASSERT(block->bb_level == level);
 		if (level == 0)
 			break;
-		pp = XFS_BTREE_PTR_ADDR(sbp->sb_blocksize, xfs_bmbt, block, 1);
+		pp = XFS_BTREE_PTR_ADDR(sbp->sb_blocksize, xfs_bmbt, block, 1,
+			mp->m_bmap_dmxr[1]);
 		ASSERT(*pp != NULLDFSBNO &&
 		       XFS_FSB_TO_AGNO(mp, *pp) < mp->m_sb.sb_agcount &&
 		       XFS_FSB_TO_AGBNO(mp, *pp) < mp->m_sb.sb_agblocks);
@@ -2253,7 +2254,8 @@ xfs_bmap_read_extents(
 		/*
 		 * Copy records into the extent list.
 		 */
-		frp = XFS_BTREE_REC_ADDR(sbp->sb_blocksize, xfs_bmbt, block, 1);
+		frp = XFS_BTREE_REC_ADDR(sbp->sb_blocksize, xfs_bmbt, block, 1,
+			mp->m_bmap_dmxr[0]);
 		bcopy(frp, trp, block->bb_numrecs * sizeof(*frp));
 		trp += block->bb_numrecs;
 		i += block->bb_numrecs;

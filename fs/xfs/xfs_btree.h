@@ -96,16 +96,15 @@ extern __uint32_t	xfs_magics[];
  * Given block size, type prefix, block pointer, and index of requested entry
  * (first entry numbered 1).
  */
-#define	XFS_BTREE_REC_ADDR(bsz,t,bb,i)	\
+#define	XFS_BTREE_REC_ADDR(bsz,t,bb,i,mxr)	\
 	((t ## _rec_t *)((char *)(bb) + sizeof(t ## _block_t) + \
 	 ((i) - 1) * sizeof(t ## _rec_t)))
-#define	XFS_BTREE_KEY_ADDR(bsz,t,bb,i)	\
+#define	XFS_BTREE_KEY_ADDR(bsz,t,bb,i,mxr)	\
 	((t ## _key_t *)((char *)(bb) + sizeof(t ## _block_t) + \
 	 ((i) - 1) * sizeof(t ## _key_t)))
-#define	XFS_BTREE_PTR_ADDR(bsz,t,bb,i)	\
+#define	XFS_BTREE_PTR_ADDR(bsz,t,bb,i,mxr)	\
 	((t ## _ptr_t *)((char *)(bb) + sizeof(t ## _block_t) + \
-	 XFS_BTREE_BLOCK_MAXRECS(bsz,t,0) * sizeof(t ## _key_t) + \
-	 ((i) - 1) * sizeof(t ## _ptr_t)))
+	 (mxr) * sizeof(t ## _key_t) + ((i) - 1) * sizeof(t ## _ptr_t)))
 
 #define	XFS_BTREE_MAXLEVELS	8	/* max of all btrees */
 

@@ -103,33 +103,36 @@ typedef	struct xfs_btree_lblock xfs_bmbt_block_t;
 
 #define	XFS_BMAP_REC_DADDR(bb,i,cur) \
 	XFS_BTREE_REC_ADDR(XFS_BMAP_BLOCK_DSIZE((bb)->bb_level,cur), xfs_bmbt, \
-			   bb, i)
+			   bb, i, XFS_BMAP_BLOCK_DMAXRECS((bb)->bb_level, cur))
 #define	XFS_BMAP_REC_IADDR(bb,i,cur) \
 	XFS_BTREE_REC_ADDR(XFS_BMAP_BLOCK_ISIZE((bb)->bb_level,cur), xfs_bmbt, \
-			   bb, i)
+			   bb, i, XFS_BMAP_BLOCK_IMAXRECS((bb)->bb_level, cur))
 
 #define	XFS_BMAP_KEY_DADDR(bb,i,cur) \
 	XFS_BTREE_KEY_ADDR(XFS_BMAP_BLOCK_DSIZE((bb)->bb_level,cur), xfs_bmbt, \
-			   bb, i)
+			   bb, i, XFS_BMAP_BLOCK_DMAXRECS((bb)->bb_level, cur))
 #define	XFS_BMAP_KEY_IADDR(bb,i,cur) \
 	XFS_BTREE_KEY_ADDR(XFS_BMAP_BLOCK_ISIZE((bb)->bb_level,cur), xfs_bmbt, \
-			   bb, i)
+			   bb, i, XFS_BMAP_BLOCK_IMAXRECS((bb)->bb_level, cur))
 
 #define	XFS_BMAP_PTR_DADDR(bb,i,cur) \
 	XFS_BTREE_PTR_ADDR(XFS_BMAP_BLOCK_DSIZE((bb)->bb_level,cur), xfs_bmbt, \
-			   bb, i)
+			   bb, i, XFS_BMAP_BLOCK_DMAXRECS((bb)->bb_level, cur))
 #define	XFS_BMAP_PTR_IADDR(bb,i,cur) \
 	XFS_BTREE_PTR_ADDR(XFS_BMAP_BLOCK_ISIZE((bb)->bb_level,cur), xfs_bmbt, \
-			   bb, i)
+			   bb, i, XFS_BMAP_BLOCK_IMAXRECS((bb)->bb_level, cur))
 
 /*
  * These are to be used when we know the size of the block and
  * we don't have a cursor.
  */
 #define	XFS_BMAP_BROOT_SIZE(isz) ((isz) - sizeof(xfs_dinode_core_t)) 
-#define	XFS_BMAP_BROOT_REC_ADDR(bb,i,isz) XFS_BTREE_REC_ADDR(isz,xfs_bmbt,bb,i)
-#define	XFS_BMAP_BROOT_KEY_ADDR(bb,i,isz) XFS_BTREE_KEY_ADDR(isz,xfs_bmbt,bb,i)
-#define XFS_BMAP_BROOT_PTR_ADDR(bb,i,isz) XFS_BTREE_PTR_ADDR(isz,xfs_bmbt,bb,i)
+#define	XFS_BMAP_BROOT_REC_ADDR(bb,i,sz) \
+	XFS_BTREE_REC_ADDR(sz,xfs_bmbt,bb,i,XFS_BMAP_BROOT_MAXRECS(sz))
+#define	XFS_BMAP_BROOT_KEY_ADDR(bb,i,sz) \
+	XFS_BTREE_KEY_ADDR(sz,xfs_bmbt,bb,i,XFS_BMAP_BROOT_MAXRECS(sz))
+#define XFS_BMAP_BROOT_PTR_ADDR(bb,i,sz) \
+	XFS_BTREE_PTR_ADDR(sz,xfs_bmbt,bb,i,XFS_BMAP_BROOT_MAXRECS(sz))
 
 #define	XFS_BMAP_BROOT_NUMRECS(bb) ((bb)->bb_numrecs)
 #define	XFS_BMAP_BROOT_MAXRECS(sz) XFS_BTREE_BLOCK_MAXRECS(sz,xfs_bmbt,0)

@@ -1296,6 +1296,7 @@ xfs_bmdr_to_bmbt(
 	xfs_bmbt_block_t	*rblock,
 	int			rblocklen)
 {
+	int			dmxr;
 	xfs_bmbt_key_t		*fkp;
 	xfs_bmbt_ptr_t		*fpp;
 	int			i;
@@ -1307,9 +1308,10 @@ xfs_bmdr_to_bmbt(
 	ASSERT(rblock->bb_level > 0);
 	rblock->bb_numrecs = dblock->bb_numrecs;
 	rblock->bb_leftsib = rblock->bb_rightsib = NULLDFSBNO;
-	fkp = XFS_BTREE_KEY_ADDR(dblocklen, xfs_bmdr, dblock, 1);
+	dmxr = XFS_BTREE_BLOCK_MAXRECS(dblocklen, xfs_bmdr, 0);
+	fkp = XFS_BTREE_KEY_ADDR(dblocklen, xfs_bmdr, dblock, 1, dmxr);
 	tkp = XFS_BMAP_BROOT_KEY_ADDR(rblock, 1, rblocklen);
-	fpp = XFS_BTREE_PTR_ADDR(dblocklen, xfs_bmdr, dblock, 1);
+	fpp = XFS_BTREE_PTR_ADDR(dblocklen, xfs_bmdr, dblock, 1, dmxr);
 	tpp = XFS_BMAP_BROOT_PTR_ADDR(rblock, 1, rblocklen);
 	bcopy(fkp, tkp, sizeof(*fkp) * dblock->bb_numrecs);
 	bcopy(fpp, tpp, sizeof(*fpp) * dblock->bb_numrecs);
@@ -1847,6 +1849,7 @@ xfs_bmbt_to_bmdr(
 	xfs_bmdr_block_t	*dblock,
 	int			dblocklen)
 {
+	int			dmxr;
 	xfs_bmbt_key_t		*fkp;
 	xfs_bmbt_ptr_t		*fpp;
 	int			i;
@@ -1859,10 +1862,11 @@ xfs_bmbt_to_bmdr(
 	ASSERT(rblock->bb_level > 0);
 	dblock->bb_level = rblock->bb_level;
 	dblock->bb_numrecs = rblock->bb_numrecs;
+	dmxr = XFS_BTREE_BLOCK_MAXRECS(dblocklen, xfs_bmdr, 0);
 	fkp = XFS_BMAP_BROOT_KEY_ADDR(rblock, 1, rblocklen);
-	tkp = XFS_BTREE_KEY_ADDR(dblocklen, xfs_bmdr, dblock, 1);
+	tkp = XFS_BTREE_KEY_ADDR(dblocklen, xfs_bmdr, dblock, 1, dmxr);
 	fpp = XFS_BMAP_BROOT_PTR_ADDR(rblock, 1, rblocklen);
-	tpp = XFS_BTREE_PTR_ADDR(dblocklen, xfs_bmdr, dblock, 1);
+	tpp = XFS_BTREE_PTR_ADDR(dblocklen, xfs_bmdr, dblock, 1, dmxr);
 	bcopy(fkp, tkp, sizeof(*fkp) * dblock->bb_numrecs);
 	bcopy(fpp, tpp, sizeof(*fpp) * dblock->bb_numrecs);
 }

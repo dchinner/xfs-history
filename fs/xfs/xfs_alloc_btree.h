@@ -64,16 +64,16 @@ typedef	struct xfs_btree_sblock xfs_alloc_block_t;
  * Record, key, and pointer address macros for btree blocks.
  */
 #define	XFS_ALLOC_REC_ADDR(bb,i,cur)	\
-	XFS_BTREE_REC_ADDR(XFS_ALLOC_BLOCK_SIZE((bb)->bb_level,cur), \
-			   xfs_alloc, bb, i)
+	XFS_BTREE_REC_ADDR(XFS_ALLOC_BLOCK_SIZE(0,cur), xfs_alloc, bb, i, \
+		XFS_ALLOC_BLOCK_MAXRECS(0, cur))
 
 #define	XFS_ALLOC_KEY_ADDR(bb,i,cur)	\
-	XFS_BTREE_KEY_ADDR(XFS_ALLOC_BLOCK_SIZE((bb)->bb_level,cur), \
-			   xfs_alloc, bb, i)
+	XFS_BTREE_KEY_ADDR(XFS_ALLOC_BLOCK_SIZE(1,cur), xfs_alloc, bb, i, \
+		XFS_ALLOC_BLOCK_MAXRECS(1, cur))
 
 #define	XFS_ALLOC_PTR_ADDR(bb,i,cur)	\
-	XFS_BTREE_PTR_ADDR(XFS_ALLOC_BLOCK_SIZE((bb)->bb_level,cur), \
-			   xfs_alloc, bb, i)
+	XFS_BTREE_PTR_ADDR(XFS_ALLOC_BLOCK_SIZE(1,cur), xfs_alloc, bb, i, \
+		XFS_ALLOC_BLOCK_MAXRECS(1, cur))
 
 /*
  * Prototypes for externally visible routines.
