@@ -37,7 +37,7 @@
 #include "sim.h"
 #endif
 
-#define	ROUNDUPNBWORD(x)	(((x) + (NBWORD - 1)) & ~NBWORD)
+#define	ROUNDUPNBWORD(x)	(((x) + (NBWORD - 1)) & ~(NBWORD - 1))
 
 /*
  * This lock guards the buf log item bli_refcount fields.
