@@ -47,6 +47,9 @@
 #define page_buffers(page)	((page)->buffers)
 #define page_has_buffers(page)	((page)->buffers)
 #endif
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,67)
+#define blk_run_queues()	run_task_queue(&tq_disk)
+#endif
 
 #ifdef PAGEBUF_LOCK_TRACKING
 #define PB_SET_OWNER(pb)	(pb->pb_last_holder = current->pid)
