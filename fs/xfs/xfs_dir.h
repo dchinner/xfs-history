@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_H
 #define	_FS_XFS_DIR_H
 
-#ident	"$Revision: 1.3 $"
+#ident	"$Revision: 1.10 $"
 
 /*
  * xfs_dir.h
@@ -169,7 +169,6 @@ struct xfs_dir_intnode {
  */
 #define	XFS_LBSIZE(mp)	((mp)->m_sb.sb_blocksize)
 #define	XFS_LBLOG(mp)	((mp)->m_sb.sb_blocklog)
-#define	XFS_LITINO(mp)	((mp)->m_sb.sb_inodesize - sizeof(xfs_dinode_core_t))
 
 /*
  * Macros used to manipulate directory off_t's

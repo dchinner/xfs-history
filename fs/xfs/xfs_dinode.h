@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DINODE_H
 #define	_FS_XFS_DINODE_H
 
-#ident "$Revision: 1.8 $"
+#ident "$Revision: 1.19 $"
 
 #define	XFS_DINODE_VERSION	1
 #define	XFS_DINODE_MAGIC	0x494e	/* 'IN' */
@@ -106,6 +106,11 @@ typedef enum xfs_dinode_fmt
 #define	XFS_DINODE_MAX_LOG	11
 #define	XFS_DINODE_MIN_SIZE	(1 << XFS_DINODE_MIN_LOG)
 #define	XFS_DINODE_MAX_SIZE	(1 << XFS_DINODE_MAX_LOG)
+
+/*
+ * Inode size for given fs.
+ */
+#define	XFS_LITINO(mp)	((mp)->m_sb.sb_inodesize - sizeof(xfs_dinode_core_t))
 
 /*
  * File types (mode field)
