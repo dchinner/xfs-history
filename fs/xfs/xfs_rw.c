@@ -1207,6 +1207,8 @@ xfs_zero_last_block(
 	int		zero_offset;
 	int		zero_len;
 	int		isize_fsb_offset;
+	int		i;
+	pfd_t		*pfdp;
 	xfs_bmbt_irec_t	imap;
 	struct bmapval	bmap;
 
@@ -1275,6 +1277,24 @@ xfs_zero_last_block(
 		bdwrite(bp);
 	} else {
 		bwrite(bp);
+	}
+
+	/*
+	 * If the file system block size is less than the page size,
+	 * then there could be bytes in the last page after the last
+	 * fsblock containing isize which have not been initialized.
+	 * Since if such a page is in memory it will be marked P_DONE
+	 * and my now be fully accessible, we need to zero any part of
+	 * it which is beyond the old file size.  We don't need to send
+	 * this out to disk, we're just iniitializing it to zeroes like
+	 * we would have done in xfs_strat_read() had the size been bigger.
+	 */
+	if ((mp->m_sb.sb_blocksize < NBPP) && ((i = poff(isize)) != 0)) {
+		pfdp = pfind(XFS_ITOV(ip), offtoct(isize), VM_ATTACH);
+		if (pfdp != NULL) {
+			page_zero(pfdp, NOCOLOR, i, (NBPP - i));
+			pagefree(pfdp);
+		}
 	}
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	return;
