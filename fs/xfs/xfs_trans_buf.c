@@ -297,7 +297,7 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
  * If the transaction pointer is NULL, make this just a normal
  * getchunk() call.
  */
-#ifndef SIM
+#if 0
 buf_t *
 xfs_trans_getchunk(xfs_trans_t		*tp,
 		   vnode_t		*vp,
@@ -356,7 +356,7 @@ xfs_trans_getchunk(xfs_trans_t		*tp,
 
 	return (bp);
 }
-#endif /* SIM */
+#endif /* 0 */
 
 
 /*
@@ -376,7 +376,7 @@ xfs_trans_getchunk(xfs_trans_t		*tp,
  * If the transaction pointer is NULL, make this just a normal
  * chunkread() call.
  */
-#ifndef SIM
+#if 0
 buf_t *
 xfs_trans_chunkread(xfs_trans_t		*tp,
 		    vnode_t		*vp,
@@ -453,7 +453,7 @@ xfs_trans_chunkread(xfs_trans_t		*tp,
 
 	return (bp);
 }
-#endif /* SIM */
+#endif /* 0 */
 
 
 /*
