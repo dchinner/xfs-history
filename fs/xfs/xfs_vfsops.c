@@ -95,6 +95,7 @@
 #include "xfs_rw.h"
 #include "xfs_buf_item.h"
 #include "xfs_extfree_item.h"
+#include "xfs_dir.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -309,6 +310,8 @@ xfs_init(
 	xfs_strat_trace_buf = ktrace_alloc(XFS_STRAT_GTRACE_SIZE, 0);
 	xfs_dir_trace_buf = ktrace_alloc(XFS_DIR_TRACE_SIZE, 0);
 #endif
+
+	xfs_dir_startup();
 	
 	/*
 	 * The inode hash table is created on a per mounted
@@ -454,12 +457,17 @@ xfs_cmountfs(
 	 * work of mounting and recovery.  The arg pointer will
 	 * be NULL when we are being called from the root mount code.
 	 */
+#if XFS_BIG_FILESYSTEMS
+	mp->m_inoadd = 0;
+#endif
 	if (ap != NULL) {
 		if (ap->flags & XFSMNT_WSYNC)
 			mp->m_flags |= XFS_MOUNT_WSYNC;
 #if XFS_BIG_FILESYSTEMS
-		if (ap->flags & XFSMNT_INO64)
+		if (ap->flags & XFSMNT_INO64) {
 			mp->m_flags |= XFS_MOUNT_INO64;
+			mp->m_inoadd = XFS_INO64_OFFSET;
+		}
 #endif
 	}
 
@@ -1232,8 +1240,7 @@ xfs_statvfs(
 	statp->f_bfree = statp->f_bavail = sbp->sb_fdblocks;
 	fakeinos = statp->f_bfree << sbp->sb_inopblog;
 #if XFS_BIG_FILESYSTEMS
-	if (mp->m_flags & XFS_MOUNT_INO64)
-		fakeinos += XFS_INO64_OFFSET;
+	fakeinos += mp->m_inoadd;
 #endif
 	statp->f_files = MIN(sbp->sb_icount + fakeinos, XFS_MAXINUMBER);
 	statp->f_ffree = statp->f_favail =
