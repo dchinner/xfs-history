@@ -1,7 +1,7 @@
 #ifndef	_XFS_BUF_ITEM_H
 #define	_XFS_BUF_ITEM_H
 
-#ident "$Revision: 1.16 $"
+#ident "$Revision: 1.17 $"
 
 struct buf;
 struct ktrace;
@@ -10,9 +10,11 @@ struct xfs_mount;
 /*
  * This is the structure used to lay out a buf log item in the
  * log.  The data map describes which 128 byte chunks of the buffer
- * have been logged.
+ * have been logged.  This structure works only on buffers that
+ * reside up to the first TB in the filesystem.  These buffers are
+ * generated only by pre-6.2 systems and are known as XFS_LI_6_1_BUF.
  */
-typedef struct xfs_buf_log_format {
+typedef struct xfs_buf_log_format_v1 {
 	unsigned short	blf_type;	/* buf log item type indicator */
 	unsigned short	blf_size;	/* size of this item */
 	__int32_t	blf_blkno;	/* starting blkno of this buf */
@@ -21,13 +23,13 @@ typedef struct xfs_buf_log_format {
 	unsigned int	blf_map_size;	/* size of data bitmap in words */
 	unsigned int	blf_data_map[1];/* variable size bitmap of */
 					/*   regions of buffer in this item */
-} xfs_buf_log_format_t;
+} xfs_buf_log_format_v1_t;
 
 /*
  * This is a form of the above structure with a 64 bit blkno field.
- * We use this when logging buffers that sit out beyond 1 TB on disk.
+ * For 6.2 and beyond, this is XFS_LI_BUF.  We use this to log everything.
  */
-typedef struct xfs_buf_log_format64 {
+typedef struct xfs_buf_log_format_t {
 	unsigned short	blf_type;	/* buf log item type indicator */
 	unsigned short	blf_size;	/* size of this item */
 	ushort		blf_flags;	/* misc state */
@@ -36,7 +38,7 @@ typedef struct xfs_buf_log_format64 {
 	unsigned int	blf_map_size;	/* size of data bitmap in words */
 	unsigned int	blf_data_map[1];/* variable size bitmap of */
 					/*   regions of buffer in this item */
-} xfs_buf_log_format64_t;
+} xfs_buf_log_format_t;
 
 /*
  * This flag indicates that the buffer contains on disk inodes
@@ -65,9 +67,6 @@ typedef struct xfs_buf_log_item {
 	unsigned int		bli_flags;	/* misc flags */
 	unsigned int		bli_recur;	/* lock recursion count */
 	int			bli_refcount;	/* cnt of tp refs */
-#if XFS_BIG_FILESYSTEMS	
-	xfs_buf_log_format64_t	*bli_format64;	/* 64 bit blf if necessary */
-#endif	
 	struct ktrace		*bli_trace;	/* event trace buf */
 #ifdef DEBUG
 	char			*bli_orig;	/* original buffer copy */
