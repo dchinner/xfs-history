@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.31 $"
+#ident  "$Revision: 1.33 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -184,6 +184,7 @@ xfs_init(vfssw_t	*vswp,
 	extern sema_t	xfs_ancestormon;
 	extern lock_t	xfsd_lock;
 	extern sema_t	xfsd_wait;
+	extern lock_t	xfs_bli_reflock;
 	extern zone_t	*xfs_dir_state_zone;
 	extern zone_t	*xfs_bmap_free_item_zone;
 	extern zone_t	*xfs_btree_cur_zone;
@@ -203,6 +204,7 @@ xfs_init(vfssw_t	*vswp,
 	initnsema(&xfs_ancestormon, 1, "xfs_ancestor");
 	initnlock(&xfsd_lock, "xfsd");
 	initnsema(&xfsd_wait, 0, "xfsd");
+	initnlock(&xfs_bli_reflock, "xfsbli");
 	
 	/*
 	 * Initialize all of the zone allocators we use.
