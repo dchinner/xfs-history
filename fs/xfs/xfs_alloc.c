@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.98 $"
+#ident	"$Revision: 1.99 $"
 
 /*
  * Free space allocation for XFS.
@@ -562,7 +562,7 @@ xfs_alloc_read_agfl(
 
 	ASSERT(agno != NULLAGNUMBER);
 	d = XFS_AG_DADDR(mp, agno, XFS_AGFL_DADDR);
-	error = xfs_trans_read_buf(tp, mp->m_dev, d, 1, 0, &bp);
+	error = xfs_trans_read_buf(mp, tp, mp->m_dev, d, 1, 0, &bp);
 	if (error) {
 		return error;
 	}
@@ -2240,7 +2240,7 @@ xfs_alloc_read_agf(
 
 	ASSERT(agno != NULLAGNUMBER);
 	d = XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR);
-	error = xfs_trans_read_buf(tp, mp->m_dev, d, 1,
+	error = xfs_trans_read_buf(mp, tp, mp->m_dev, d, 1,
 		(flags & XFS_ALLOC_FLAG_TRYLOCK) ? BUF_TRYLOCK : 0U, &bp);
 	if (error) {
 		return error;

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.36 $"
+#ident	"$Revision: 1.40 $"
 
 /*
  * Free space allocation for XFS.
@@ -1063,7 +1063,7 @@ xfs_alloc_lookup(
 			 * Need to get a new buffer.  Read it, then 
 			 * set it in the cursor, releasing the old one.
 			 */
-			error = xfs_trans_read_buf(cur->bc_tp, mp->m_dev, d,
+			error = xfs_trans_read_buf(mp, cur->bc_tp, mp->m_dev, d,
 						   mp->m_bsize, 0, &bp);
 			if (error) {
 				return error;
