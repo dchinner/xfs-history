@@ -63,10 +63,8 @@
 #include "page_buf_internal.h"
 
 #define NBBY		8
-#define SECTOR_SHIFT	9
-#define SECTOR_SIZE	(1<<SECTOR_SHIFT)
-#define SECTOR_MASK	(SECTOR_SIZE - 1)
-#define BN_ALIGN_MASK	((1 << (PAGE_CACHE_SHIFT - SECTOR_SHIFT)) - 1)
+#define BBSHIFT		9
+#define BN_ALIGN_MASK	((1 << (PAGE_CACHE_SHIFT - BBSHIFT)) - 1)
 
 #ifndef GFP_READAHEAD
 #define GFP_READAHEAD	0
@@ -535,7 +533,7 @@ _pagebuf_lookup_pages(
 		return rval;
 
 	rval = pi = 0;
-	blocksize = pb->pb_target->pbr_blocksize;
+	blocksize = pb->pb_target->pbr_bsize;
 
 	/* Enter the pages in the page list */
 	index = (pb->pb_file_offset - pb->pb_offset) >> PAGE_CACHE_SHIFT;
@@ -755,8 +753,14 @@ _pagebuf_find(				/* find buffer for block	*/
 	page_buf_t		*pb;
 	int			not_locked;
 
-	range_base = (ioff << SECTOR_SHIFT);
-	range_length = (isize << SECTOR_SHIFT);
+	range_base = (ioff << BBSHIFT);
+	range_length = (isize << BBSHIFT);
+
+	/* Ensure we never do IOs smaller than the sector size */
+	BUG_ON(range_length < (1 << target->pbr_sshift));
+
+	/* Ensure we never do IOs that are not sector aligned */
+	BUG_ON(range_base & (loff_t)target->pbr_smask);
 
 	hval = _bhash(target->pbr_bdev->bd_dev, range_base);
 	h = &pbhash[hval];
@@ -1069,18 +1073,12 @@ pagebuf_get_no_daddr(
 		} else {
 			kfree(rmem); /* free the mem from the previous try */
 			tlen <<= 1; /* double the size and try again */
-			/*
-			printk(
-			"pb_get_no_daddr NOT block 0x%p mask 0x%p len %d\n",
-				rmem, ((size_t)rmem & (size_t)~SECTOR_MASK),
-				len);
-			*/
 		}
 		if ((rmem = kmalloc(tlen, GFP_KERNEL)) == 0) {
 			pagebuf_free(pb);
 			return NULL;
 		}
-	} while ((size_t)rmem != ((size_t)rmem & (size_t)~SECTOR_MASK));
+	} while ((size_t)rmem != ((size_t)rmem & ~target->pbr_smask));
 
 	if ((rval = pagebuf_associate_memory(pb, rmem, len)) != 0) {
 		kfree(rmem);
@@ -1374,9 +1372,7 @@ pagebuf_iostart(			/* start I/O on a buffer	  */
 	pb->pb_flags &= ~(PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_DELWRI|PBF_READ_AHEAD);
 	pb->pb_flags |= flags & (PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_SYNC|PBF_READ_AHEAD);
 
-	if (pb->pb_bn == PAGE_BUF_DADDR_NULL) {
-		BUG();
-	}
+	BUG_ON(pb->pb_bn == PAGE_BUF_DADDR_NULL);
 
 	/* For writes call internal function which checks for
 	 * filesystem specific callout function and execute it.
@@ -1517,10 +1513,9 @@ _end_io_multi_part(
 STATIC int
 _pagebuf_page_io(
 	struct page		*page,	/* Page structure we are dealing with */
+	pb_target_t		*pbr,	/* device parameters (bsz, ssz, dev) */
 	page_buf_t		*pb,	/* pagebuf holding it, can be NULL */
 	page_buf_daddr_t	bn,	/* starting block number */
-	kdev_t			dev,	/* device for I/O */
-	size_t			blocksize,	/* filesystem block size */
 	off_t			pg_offset,	/* starting offset in page */
 	size_t			pg_length,	/* count of data to process */
 	int			locking,	/* page locking in use */
@@ -1530,11 +1525,12 @@ _pagebuf_page_io(
 	size_t			sector;
 	size_t			blk_length = 0;
 	struct buffer_head	*bh, *head, *bufferlist[MAX_BUF_PER_PAGE];
-	int			multi_ok;
+	int			sector_shift = pbr->pbr_sshift;
 	int			i = 0, cnt = 0, err = 0;
 	int			public_bh = 0;
+	int			multi_ok;
 
-	if ((blocksize < PAGE_CACHE_SIZE) &&
+	if ((pbr->pbr_bsize < PAGE_CACHE_SIZE) &&
 	    !(pb->pb_flags & _PBF_PRIVATE_BH)) {
 		int		cache_ok;
 
@@ -1545,12 +1541,13 @@ _pagebuf_page_io(
 			if (!locking) {
 				lock_page(page);
 				if (!page_has_buffers(page)) {
-					create_empty_buffers(page, dev,
-							SECTOR_SIZE);
+					create_empty_buffers(page, pbr->pbr_kdev,
+							1 << sector_shift);
 				}
 				unlock_page(page);
 			} else {
-				create_empty_buffers(page, dev, SECTOR_SIZE);
+				create_empty_buffers(page, pbr->pbr_kdev,
+							1 << sector_shift);
 			}
 		}
 
@@ -1559,7 +1556,7 @@ _pagebuf_page_io(
 		do {
 			if (buffer_uptodate(bh) && cache_ok)
 				continue;
-			blk_length = i << SECTOR_SHIFT;
+			blk_length = i << sector_shift;
 			if (blk_length < pg_offset)
 				continue;
 			if (blk_length >= pg_offset + pg_length)
@@ -1569,8 +1566,8 @@ _pagebuf_page_io(
 			get_bh(bh);
 			ASSERT(!waitqueue_active(&bh->b_wait));
 
-			bh->b_size = SECTOR_SIZE;
-			bh->b_blocknr = bn + (i - (pg_offset >> SECTOR_SHIFT));
+			bh->b_size = 1 << sector_shift;
+			bh->b_blocknr = bn + (i - (pg_offset >> sector_shift));
 			bufferlist[cnt++] = bh;
 		} while (i++, (bh = bh->b_this_page) != head);
 
@@ -1581,12 +1578,12 @@ _pagebuf_page_io(
 	if (pg_offset) {
 		size_t		block_offset;
 
-		block_offset = pg_offset >> SECTOR_SHIFT;
-		block_offset = pg_offset - (block_offset << SECTOR_SHIFT);
-		blk_length = (pg_length + block_offset + SECTOR_MASK) >>
-								SECTOR_SHIFT;
+		block_offset = pg_offset >> sector_shift;
+		block_offset = pg_offset - (block_offset << sector_shift);
+		blk_length = (pg_length + block_offset + pbr->pbr_smask) >>
+								sector_shift;
 	} else {
-		blk_length = (pg_length + SECTOR_MASK) >> SECTOR_SHIFT;
+		blk_length = (pg_length + pbr->pbr_smask) >> sector_shift;
 	}
 
 	/* This will attempt to make a request bigger than the sector
@@ -1594,20 +1591,20 @@ _pagebuf_page_io(
 	 */
 	switch (pb->pb_target->pbr_flags) {
 	case 0:
-		sector = blk_length << SECTOR_SHIFT;
+		sector = blk_length << sector_shift;
 		blk_length = 1;
 		break;
 	case PBR_ALIGNED_ONLY:
 		if ((pg_offset == 0) && (pg_length == PAGE_CACHE_SIZE) &&
 		    (((unsigned int) bn) & BN_ALIGN_MASK) == 0) {
-			sector = blk_length << SECTOR_SHIFT;
+			sector = blk_length << sector_shift;
 			blk_length = 1;
 			break;
 		}
 	case PBR_SECTOR_ONLY:
 		/* Fallthrough, same as default */
 	default:
-		sector = SECTOR_SIZE;
+		sector = 1 << sector_shift;
 	}
 
 	/* If we are doing I/O larger than the bh->b_size field then
@@ -1633,7 +1630,7 @@ _pagebuf_page_io(
 		memset(bh, 0, sizeof(*bh));
 		bh->b_size = sector;
 		bh->b_blocknr = bn++;
-		bh->b_dev = dev;
+		bh->b_dev = pbr->pbr_kdev;
 		set_bit(BH_Lock, &bh->b_state);
 		set_bh_page(bh, page, pg_offset);
 		init_waitqueue_head(&bh->b_wait);
@@ -1650,8 +1647,7 @@ request:
 			size_t	size = sizeof(pagesync_t);
 
 			psync = (pagesync_t *) kmalloc(size, GFP_NOFS);
-			if (!psync)
-				BUG();	/* Ugh - out of memory condition here */
+			BUG_ON(!psync);	/* Ugh - out of memory condition here */
 			psync->pb = pb;
 			psync->locking = locking;
 			atomic_set(&psync->remain, cnt);
@@ -1715,28 +1711,27 @@ _page_buf_page_apply(
 	int			last)
 {
 	page_buf_daddr_t	bn = pb->pb_bn;
-	kdev_t			dev = pb->pb_target->pbr_kdev;
-	size_t			blocksize = pb->pb_target->pbr_blocksize;
+	pb_target_t		*pbr = pb->pb_target;
 	loff_t			pb_offset;
 	size_t			ret_len = pg_length;
 
 	ASSERT(page);
 
-	if ((blocksize == PAGE_CACHE_SIZE) &&
+	if ((pbr->pbr_bsize == PAGE_CACHE_SIZE) &&
 	    (pb->pb_buffer_length < PAGE_CACHE_SIZE) &&
 	    (pb->pb_flags & PBF_READ) && pb->pb_locked) {
-		bn -= (pb->pb_offset >> SECTOR_SHIFT);
+		bn -= (pb->pb_offset >> pbr->pbr_sshift);
 		pg_offset = 0;
 		pg_length = PAGE_CACHE_SIZE;
 	} else {
 		pb_offset = offset - pb->pb_file_offset;
 		if (pb_offset) {
-			bn += (pb_offset + SECTOR_MASK) >> SECTOR_SHIFT;
+			bn += (pb_offset + pbr->pbr_smask) >> pbr->pbr_sshift;
 		}
 	}
 
 	if (pb->pb_flags & PBF_READ) {
-		_pagebuf_page_io(page, pb, bn, dev, blocksize,
+		_pagebuf_page_io(page, pbr, pb, bn,
 			(off_t)pg_offset, pg_length, pb->pb_locked, READ, 0);
 	} else if (pb->pb_flags & PBF_WRITE) {
 		int locking = (pb->pb_flags & _PBF_LOCKABLE) == 0;
@@ -1744,7 +1739,7 @@ _page_buf_page_apply(
 		/* Check we need to lock pages */
 		if (locking && (pb->pb_locked == 0))
 			lock_page(page);
-		_pagebuf_page_io(page, pb, bn, dev, blocksize,
+		_pagebuf_page_io(page, pbr, pb, bn,
 			(off_t)pg_offset, pg_length, locking, WRITE,
 			last && (pb->pb_flags & PBF_FLUSH));
 	}
