@@ -129,6 +129,13 @@ typedef enum xfs_dinode_fmt
 	(sizeof(xfs_bmbt_block_t) - sizeof(xfs_bmdr_block_t))
 
 /*
+ * Fork identifiers.  Here so utilities can use them without including
+ * xfs_inode.h.
+ */
+#define	XFS_DATA_FORK	0
+#define	XFS_ATTR_FORK	1
+
+/*
  * Inode data & attribute fork sizes, per inode.
  */
 #define	XFS_CFORK_Q(dcp)	((dcp)->di_forkoff != 0)

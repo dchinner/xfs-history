@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.84 $"
+#ident "$Revision: 1.85 $"
 
 struct buf;
 struct cred;
@@ -165,8 +165,6 @@ typedef struct xfs_inode {
 /*
  * Fork handling.
  */
-#define	XFS_DATA_FORK	0
-#define	XFS_ATTR_FORK	1
 /* This knows that the data fork is first... */
 #define	XFS_IFORK_PTR(ip,w)		(&(ip)->i_df + (w))
 #define	XFS_IFORK_Q(ip)			XFS_CFORK_Q(&(ip)->i_d)
