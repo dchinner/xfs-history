@@ -191,6 +191,7 @@ xfs_umount(xfs_mount_t *mp)
 	xfs_iflush_all(mp);
 	/* someone needs to free the inodes' memory */
 	/* also need to give up if vnodes are referenced */
+	bflush(mp->m_dev);
 	bp = xfs_getsb(mp);
 	bp->b_flags &= ~(B_DONE | B_READ);
 	bp->b_flags |= B_WRITE;
@@ -198,7 +199,7 @@ xfs_umount(xfs_mount_t *mp)
 	bdstrat(bmajor(mp->m_dev), bp);
 	error = iowait(bp);
 	ASSERT(error == 0);	
-	bflush(mp->m_dev);
+	brelse(bp);
 	freerbuf(bp);
 	kmem_free(mp, sizeof(*mp));
 }
