@@ -33,10 +33,6 @@
 #define __XFS_SUPER_H__
 
 void
-linvfs_inode_attr_in(
-	struct inode	*inode);
-
-void
 linvfs_release_inode(
 	struct inode	*inode);
 

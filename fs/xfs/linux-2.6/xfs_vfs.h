@@ -241,25 +241,6 @@ extern int      vfs_busy(struct vfs *); /* mark busy for serial sync/unmount */
 extern void     vfs_unbusy(struct vfs *);
 extern vfs_t	*vfs_busydev(dev_t, int);/* to keep dev from unmounting */
 extern vfs_t 	*vfs_devsearch(dev_t, int);/* find vfs given device & opt. type */
-
-/*
- * Set and clear vfs_flag bits.
- */
-#define vfs_setflag(vfsp,f)     { long s = mp_mutex_spinlock(&vfslock); \
-                                  (vfsp)->vfs_flag |= (f); \
-                                  mp_mutex_spinunlock(&vfslock, s); }
-
-
-#define		vfsp_wait(V,P,S)        mp_sv_wait(&(V)->vfs_wait,P,&vfslock,s)
-#define		vfsp_waitsig(V,P,S)     mp_sv_wait_sig(&(V)->vfs_wait,P,&vfslock,s)
-
-extern void     vfs_unbusy_wakeup(struct vfs *);
-extern vfs_t    *vfs_devsearch_nolock(dev_t, int); /* find vfs given device:nolock */
-
-/*
- * Globals
- */
-extern lock_t           vfslock;        /* protects rootvfs and vfs_flag */
-
+extern void	vfs_setflag(struct vfs *, unsigned long);
 
 #endif	/* __XFS_VFS_H__ */

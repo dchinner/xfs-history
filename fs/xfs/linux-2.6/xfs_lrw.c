@@ -66,13 +66,6 @@ xfs_strat_write_check(
 
 #endif /* DEBUG */
 
-STATIC void
-xfs_delalloc_cleanup(
-	xfs_inode_t	*ip,
-	xfs_fileoff_t	start_fsb,
-	xfs_filblks_t	count_fsb);
-
-
 ssize_t				/* error (positive) */
 xfs_read(
         bhv_desc_t      *bdp,
@@ -1702,65 +1695,6 @@ xfs_iomap_write_delay(
 	*npbmaps = 1;
 	return 0;
 }
-
-/*
- * This is called to convert all delayed allocation blocks in the given
- * range back to 'holes' in the file.  It is used when a user's write will not
- * be able to be written out due to disk errors in the allocation calls.
- */
-STATIC void
-xfs_delalloc_cleanup(
-	xfs_inode_t	*ip,
-	xfs_fileoff_t	start_fsb,
-	xfs_filblks_t	count_fsb)
-{
-	xfs_fsblock_t	first_block;
-	int		nimaps;
-	int		done;
-	int		error;
-	int		n;
-#define	XFS_CLEANUP_MAPS	4
-	xfs_bmbt_irec_t	imap[XFS_CLEANUP_MAPS];
-
-	ASSERT(count_fsb < 0xffff000);
-	xfs_ilock(ip, XFS_ILOCK_EXCL);
-	while (count_fsb != 0) {
-		first_block = NULLFSBLOCK;
-		nimaps = XFS_CLEANUP_MAPS;
-		error = xfs_bmapi(NULL, ip, start_fsb, count_fsb, 0,
-				  &first_block, 1, imap, &nimaps, NULL);
-		if (error) {
-			xfs_iunlock(ip, XFS_ILOCK_EXCL);
-			return;
-		}
-
-		ASSERT(nimaps > 0);
-		n = 0;
-		while (n < nimaps) {
-			if (imap[n].br_startblock == DELAYSTARTBLOCK) {
-				if (!XFS_FORCED_SHUTDOWN(ip->i_mount))
-					xfs_force_shutdown(ip->i_mount,
-						XFS_METADATA_IO_ERROR);
-				error = xfs_bunmapi(NULL, ip,
-						    imap[n].br_startoff,
-						    imap[n].br_blockcount,
-						    0, 1, &first_block, NULL,
-						    &done);
-				if (error) {
-					xfs_iunlock(ip, XFS_ILOCK_EXCL);
-					return;
-				}
-				ASSERT(done);
-			}
-			start_fsb += imap[n].br_blockcount;
-			count_fsb -= imap[n].br_blockcount;
-			ASSERT(count_fsb < 0xffff000);
-			n++;
-		}
-	}
-	xfs_iunlock(ip, XFS_ILOCK_EXCL);
-}
-
 
 STATIC int
 xfs_iomap_write_direct(

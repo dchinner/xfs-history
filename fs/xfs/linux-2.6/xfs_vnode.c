@@ -605,8 +605,18 @@ vn_remove(struct vnode *vp)
 
 #ifdef	CONFIG_XFS_VNODE_TRACING
 
-#define	cpuid smp_processor_id
-#define	current_pid() (current->pid)
+#define KTRACE_ENTER(vp, vk, s, line, ra) 			\
+	ktrace_enter(	(vp)->v_trace, 				\
+/*  0 */		(void *)(__psint_t)(vk),		\
+/*  1 */		(void *)(s),				\
+/*  2 */		(void *)(__psint_t) line,		\
+/*  3 */		(void *)((vp)->v_inode ? vn_count((vp)): -9), \
+/*  4 */		(void *)(ra),				\
+/*  5 */		(void *)(__psunsigned_t)(vp)->v_flag,	\
+/*  6 */		(void *)(__psint_t)smp_processor_id(),	\
+/*  7 */		(void *)(__psint_t)(current->pid),	\
+/*  8 */		(void *)__return_address,		\
+/*  9 */		0, 0, 0, 0, 0, 0, 0)
 
 /*
  * Vnode tracing code.
@@ -614,80 +624,30 @@ vn_remove(struct vnode *vp)
 void
 vn_trace_entry(vnode_t *vp, char *func, inst_t *ra)
 {
-	ktrace_enter(	vp->v_trace,
-/*  0 */		(void *)(__psint_t)VNODE_KTRACE_ENTRY,
-/*  1 */		(void *)func,
-/*  2 */		0,
-/*  3 */		(void *)(vp->v_inode ? vn_count(vp): -9),
-/*  4 */		(void *)ra,
-/*  5 */		(void *)(__psunsigned_t)vp->v_flag,
-/*  6 */		(void *)(__psint_t)cpuid(),
-/*  7 */		(void *)(__psint_t)current_pid(),
-/*  8 */		(void *)__return_address,
-/*  9 */		0, 0, 0, 0, 0, 0, 0);
+	KTRACE_ENTER(vp, VNODE_KTRACE_ENTRY, func, 0, ra);
 }
 
 void
 vn_trace_exit(vnode_t *vp, char *func, inst_t *ra)
 {
-	ktrace_enter(	vp->v_trace,
-/*  0 */		(void *)(__psint_t)VNODE_KTRACE_EXIT,
-/*  1 */		(void *)func,
-/*  2 */		0,
-/*  3 */		(void *)(vp->v_inode ? vn_count(vp) : -9),
-/*  4 */		(void *)ra,
-/*  5 */		(void *)(__psunsigned_t)vp->v_flag,
-/*  6 */		(void *)(__psint_t)cpuid(),
-/*  7 */		(void *)(__psint_t)current_pid(),
-/*  8 */		(void *)__return_address,
-/*  9 */		0, 0, 0, 0, 0, 0, 0);
+	KTRACE_ENTER(vp, VNODE_KTRACE_EXIT, func, 0, ra);
 }
 
 void
 vn_trace_hold(vnode_t *vp, char *file, int line, inst_t *ra)
 {
-	ktrace_enter(	vp->v_trace,
-/*  0 */		(void *)(__psint_t)VNODE_KTRACE_HOLD,
-/*  1 */		(void *)file,
-/*  2 */		(void *)(__psint_t)line,
-/*  3 */		(void *)(vp->v_inode ? vn_count(vp) : -9),
-/*  4 */		(void *)ra,
-/*  5 */		(void *)(__psunsigned_t)vp->v_flag,
-/*  6 */		(void *)(__psint_t)cpuid(),
-/*  7 */		(void *)(__psint_t)current_pid(),
-/*  8 */		(void *)__return_address,
-/*  9 */		0, 0, 0, 0, 0, 0, 0);
+	KTRACE_ENTER(vp, VNODE_KTRACE_HOLD, file, line, ra);
 }
 
 void
 vn_trace_ref(vnode_t *vp, char *file, int line, inst_t *ra)
 {
-	ktrace_enter(	vp->v_trace,
-/*  0 */		(void *)(__psint_t)VNODE_KTRACE_REF,
-/*  1 */		(void *)file,
-/*  2 */		(void *)(__psint_t)line,
-/*  3 */		(void *)(vp->v_inode ? vn_count(vp) : -9),
-/*  4 */		(void *)ra,
-/*  5 */		(void *)(__psunsigned_t)vp->v_flag,
-/*  6 */		(void *)(__psint_t)cpuid(),
-/*  7 */		(void *)(__psint_t)current_pid(),
-/*  8 */		(void *)__return_address,
-/*  9 */		0, 0, 0, 0, 0, 0, 0);
+	KTRACE_ENTER(vp, VNODE_KTRACE_REF, file, line, ra);
 }
 
 void
 vn_trace_rele(vnode_t *vp, char *file, int line, inst_t *ra)
 {
-	ktrace_enter(	vp->v_trace,
-/*  0 */		(void *)(__psint_t)VNODE_KTRACE_RELE,
-/*  1 */		(void *)file,
-/*  2 */		(void *)(__psint_t)line,
-/*  3 */		(void *)(vp->v_inode ? vn_count(vp) : -9),
-/*  4 */		(void *)ra,
-/*  5 */		(void *)(__psunsigned_t)vp->v_flag,
-/*  6 */		(void *)(__psint_t)cpuid(),
-/*  7 */		(void *)(__psint_t)current_pid(),
-/*  8 */		(void *)__return_address,
-/*  9 */		0, 0, 0, 0, 0, 0, 0);
+	KTRACE_ENTER(vp, VNODE_KTRACE_RELE, file, line, ra);
 }
 #endif	/* CONFIG_XFS_VNODE_TRACING */

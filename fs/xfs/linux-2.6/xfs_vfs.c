@@ -38,9 +38,10 @@
 /*
  * VFS global data.
  */
-spinlock_t	vfslock;	/* spinlock protecting rootvfs and vfs_flag */
-sema_t 		synclock;	/* sync in progress; initialized in sinit() */
-                                
+STATIC spinlock_t	vfslock;	/* spinlock protecting rootvfs and vfs_flag */
+
+#define		vfsp_wait(V,P,S)        mp_sv_wait(&(V)->vfs_wait,P,&vfslock,s)
+#define		vfsp_waitsig(V,P,S)     mp_sv_wait_sig(&(V)->vfs_wait,P,&vfslock,s)
 
 /*
  * Allocate and initialize a new vfs
@@ -245,20 +246,7 @@ again:
 		return vfsp;
 }
 
-void
-vfs_unbusy(struct vfs *vfsp)
-{
-	long s;
-
-	spin_lock_irqsave(&vfslock, s);
-	ASSERT(!(vfsp->vfs_flag & (VFS_MLOCK|VFS_OFFLINE)));
-	ASSERT(vfsp->vfs_busycnt > 0);
-	if (--vfsp->vfs_busycnt == 0)
-		vfs_unbusy_wakeup(vfsp);
-	spin_unlock_irqrestore(&vfslock, s);
-}
-
-void
+STATIC void
 vfs_unbusy_wakeup(register struct vfs *vfsp)
 {
         /*
@@ -270,43 +258,17 @@ vfs_unbusy_wakeup(register struct vfs *vfsp)
          */
         if (vfsp->vfs_flag & VFS_MWANT) {
                 sv_signal(&vfsp->vfs_wait);
-        } else
-        if (vfsp->vfs_flag & VFS_MWAIT) {
+        } else if (vfsp->vfs_flag & VFS_MWAIT) {
                 vfsp->vfs_flag &= ~VFS_MWAIT;
                 sv_broadcast(&vfsp->vfs_wait);
         }
-}
-
-
-/*
- * Search the vfs list for a specified device.  Returns a pointer to it
- * or NULL if no suitable entry is found.
- *
- * Any calls to this routine (as opposed to vfs_busydev) should
- * considered extremely suspicious.  Once the vfs_spinunlock is done,
- * there is likely to be nothing guaranteeing that the vfs pointer
- * returned continues to point to a vfs.  There are numerous bugs
- * which would quickly become intolerable if the frequency of unmount
- * was to rise above its typically low level.
- */
-struct vfs *
-vfs_devsearch(dev_t dev, int fstype)
-{
-	register struct vfs *vfsp;
-
-	long s;
-
-	spin_lock_irqsave(&vfslock, s);
-	vfsp = vfs_devsearch_nolock(dev, fstype);
-	spin_unlock_irqrestore(&vfslock, s);
-	return vfsp;
 }
 
 /*
  * Same as vfs_devsearch without locking the list.
  * Useful for debugging code, but put it here anyway.
  */
-struct vfs *
+STATIC struct vfs *
 vfs_devsearch_nolock(dev_t dev, int fstype)
 {
         register struct vfs *vfsp;
@@ -327,6 +289,43 @@ vfs_devsearch_nolock(dev_t dev, int fstype)
 	unlock_kernel();
         return NULL;
 }
+
+void
+vfs_unbusy(struct vfs *vfsp)
+{
+	long s;
+
+	spin_lock_irqsave(&vfslock, s);
+	ASSERT(!(vfsp->vfs_flag & (VFS_MLOCK|VFS_OFFLINE)));
+	ASSERT(vfsp->vfs_busycnt > 0);
+	if (--vfsp->vfs_busycnt == 0)
+		vfs_unbusy_wakeup(vfsp);
+	spin_unlock_irqrestore(&vfslock, s);
+}
+
+/*
+ * Search the vfs list for a specified device.  Returns a pointer to it
+ * or NULL if no suitable entry is found.
+ *
+ * Any calls to this routine (as opposed to vfs_busydev) should
+ * considered extremely suspicious.  Once the vfs_spinunlock is done,
+ * there is likely to be nothing guaranteeing that the vfs pointer
+ * returned continues to point to a vfs.  There are numerous bugs
+ * which would quickly become intolerable if the frequency of unmount
+ * was to rise above its typically low level.
+ */
+struct vfs *
+vfs_devsearch(dev_t dev, int fstype)
+{
+	register struct vfs *vfsp;
+	long s;
+
+	spin_lock_irqsave(&vfslock, s);
+	vfsp = vfs_devsearch_nolock(dev, fstype);
+	spin_unlock_irqrestore(&vfslock, s);
+	return vfsp;
+}
+
 
 void
 vfsinit(void)
@@ -359,4 +358,12 @@ vfs_insertbhv(
 	 */
 	bhv_desc_init(bdp, mount, vfsp, vfsops);
 	bhv_insert_initial(&vfsp->vfs_bh, bdp);
+}
+
+void
+vfs_setflag(vfs_t *vfsp, unsigned long f)
+{
+	long s = mp_mutex_spinlock(&vfslock);
+	vfsp->vfs_flag |= f;
+	mp_mutex_spinunlock(&vfslock, s);
 }
