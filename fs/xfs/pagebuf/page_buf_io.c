@@ -721,7 +721,7 @@ int pagebuf_write_full_page(struct page *page, pagebuf_bmap_fn_t bmap)
 	ret = __pb_block_prepare_write_async(inode, page,
 			0, PAGE_CACHE_SIZE, 1, bmap, NULL, pb_flags);
 	if (!ret) {
-		struct buffer_head *bh, *head;
+		struct buffer_head *bh, *head, *next;
 
 		__pb_block_commit_write_async(inode, page, 0);
 		
@@ -745,8 +745,9 @@ int pagebuf_write_full_page(struct page *page, pagebuf_bmap_fn_t bmap)
 		} while (bh != head);
 
 		do {
+			next = bh->b_this_page;
 			submit_bh(WRITE, bh);
-			bh = bh->b_this_page;
+			bh = next;
 		} while (bh != head);
 	}
 
