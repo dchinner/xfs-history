@@ -763,7 +763,7 @@ xfs_attr_leaf_add_work(xfs_trans_t *trans, buf_t *bp, xfs_da_args_t *args,
 		name_rmt = XFS_ATTR_LEAF_NAME_REMOTE(leaf, args->aleaf_index);
 		name_rmt->namelen = args->namelen;
 		bcopy(args->name, (char *)name_rmt->name, args->namelen);
-		name_rmt->valuelen = 0;	/* just in case grow_inode() fails */
+		name_rmt->valuelen = 0;	/* just in case */
 		name_rmt->valueblk = 0;
 		tmp = xfs_bmap_first_unused(trans, args->dp,
 				 (xfs_extlen_t)XFS_B_TO_FSB(mp, args->valuelen),
@@ -1224,19 +1224,6 @@ xfs_attr_leaf_remove(xfs_trans_t *trans, buf_t *bp, xfs_da_args_t *args)
 	ASSERT(entry->nameidx >= hdr->firstused);
 	ASSERT(entry->nameidx < XFS_LBSIZE(mp));
 
-#if 0
-	/*
-	 * GROT: check this code, it is probably not needed.
-	 *
-	 * Set up to deallocate the blocks associated with a "remote"
-	 * attribute's value.  We actually do the deallocation later in
-	 * a separate transaction so that we don't overfill this one.
-	 */
-	if (!(entry->flags & XFS_ATTR_LOCAL)) {
-		entry->flags |= XFS_ATTR_INCOMPLETE;
-	}
-#endif
-
 	/*
 	 * Scan through free region table:
 	 *    check for adjacency of free'd entry with an existing one,
@@ -1587,12 +1574,12 @@ xfs_attr_leaf_getvalue(buf_t *bp, xfs_da_args_t *args)
 		name_rmt = XFS_ATTR_LEAF_NAME_REMOTE(leaf, args->aleaf_index);
 		ASSERT(name_rmt->namelen == args->namelen);
 		ASSERT(bcmp(args->name, name_rmt->name, args->namelen) == 0);
+		args->aleaf_rmtblkno = name_rmt->valueblk;
 		if (args->valuelen < name_rmt->valuelen) {
 			args->valuelen = name_rmt->valuelen;
 			return(E2BIG);
 		}
 		args->valuelen = name_rmt->valuelen;
-		args->aleaf_rmtblkno = name_rmt->valueblk;
 	}
 	return(0);
 }
@@ -1915,11 +1902,11 @@ xfs_attr_leaf_clearflag(xfs_da_args_t *args)
 	 * Set up the transaction envelope.
 	 */
 	dp = args->dp;
-	trans = xfs_trans_alloc(dp->i_mount, XFS_TRANS_MKDIR);
-	if (error = xfs_trans_reserve(trans, 1,
-/* GROT: make attr log_res macros */  XFS_MKDIR_LOG_RES(dp->i_mount),
+	trans = xfs_trans_alloc(dp->i_mount, XFS_TRANS_ATTR_FLAG);
+	if (error = xfs_trans_reserve(trans, 0,
+				      XFS_ATTRFLAG_LOG_RES(dp->i_mount),
 				      0, XFS_TRANS_PERM_LOG_RES,
-				      XFS_MKDIR_LOG_COUNT)) {
+				      XFS_ATTRFLAG_LOG_COUNT)) {
 		xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
 		return(error);
 	}
@@ -1935,6 +1922,50 @@ xfs_attr_leaf_clearflag(xfs_da_args_t *args)
 	ASSERT(args->aleaf_index >= 0);
 	entry = &leaf->entries[ args->aleaf_index ];
 	entry->flags &= ~XFS_ATTR_INCOMPLETE;
+	xfs_trans_log_buf(trans, bp,
+			 XFS_DA_LOGRANGE(leaf, entry, sizeof(*entry)));
+
+	xfs_trans_commit(trans, XFS_TRANS_RELEASE_LOG_RES);
+	return(error);
+}
+
+/*
+ * Set the INCOMPLETE flag on an entry in a leaf block.
+ */
+int
+xfs_attr_leaf_setflag(xfs_da_args_t *args)
+{
+	xfs_attr_leafblock_t *leaf;
+	xfs_attr_leaf_entry_t *entry;
+	xfs_trans_t *trans;
+	xfs_inode_t *dp;
+	buf_t *bp;
+	int error;
+
+	/*
+	 * Set up the transaction envelope.
+	 */
+	dp = args->dp;
+	trans = xfs_trans_alloc(dp->i_mount, XFS_TRANS_ATTR_FLAG);
+	if (error = xfs_trans_reserve(trans, 0,
+				      XFS_ATTRFLAG_LOG_RES(dp->i_mount),
+				      0, XFS_TRANS_PERM_LOG_RES,
+				      XFS_ATTRFLAG_LOG_COUNT)) {
+		xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
+		return(error);
+	}
+	error = xfs_da_read_buf(trans, dp, args->aleaf_blkno, &bp,
+				       XFS_ATTR_FORK);
+	if (error)
+		return(error);
+	ASSERT(bp != NULL);
+
+	leaf = (xfs_attr_leafblock_t *)bp->b_un.b_addr;
+	ASSERT(leaf->hdr.info.magic == XFS_ATTR_LEAF_MAGIC);
+	ASSERT(args->aleaf_index < leaf->hdr.count);
+	ASSERT(args->aleaf_index >= 0);
+	entry = &leaf->entries[ args->aleaf_index ];
+	entry->flags |= XFS_ATTR_INCOMPLETE;
 	xfs_trans_log_buf(trans, bp,
 			 XFS_DA_LOGRANGE(leaf, entry, sizeof(*entry)));
 
