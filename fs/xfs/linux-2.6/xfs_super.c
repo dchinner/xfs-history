@@ -605,7 +605,7 @@ int init_module(void)
 void cleanup_module(void)
 {
 	extern void xfs_cleanup(void);
-	extern void vn_cleanup();
+	extern void vn_cleanup(void);
 
 	xfs_cleanup();
 	vn_cleanup();
