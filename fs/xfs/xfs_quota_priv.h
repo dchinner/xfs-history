@@ -152,12 +152,6 @@ for ((dqp) = (qlist)->qh_next; (dqp) != (xfs_dquot_t *)(qlist); \
         { _LIST_REMOVE(h, dqp, MPL_PREVP, MPL_NEXT); \
 	  (dqp)->q_mount->QI_MPLRECLAIMS++; }
 
-extern int xfs_quotadebug;
-
-#define DQFLAGTO_TYPESTR(d) 	(((d)->dq_flags & XFS_DQ_USER) ? "USR" : \
-				 (((d)->dq_flags & XFS_DQ_PROJ) ? "PRJ" : "???"))
-#define DQFLAGTO_DIRTYSTR(d)	(XFS_DQ_IS_DIRTY(d) ? "DIRTY" : "NOTDIRTY")
-
 #define XFS_DQ_IS_LOGITEM_INITD(dqp)	((dqp)->q_logitem.qli_dquot == (dqp))
 
 #define XFS_QM_DQP_TO_DQACCT(tp, dqp)	(XFS_QM_ISUDQ(dqp) ? \
@@ -165,18 +159,6 @@ extern int xfs_quotadebug;
 					 (tp)->t_dqinfo->dqa_prjdquots)
 #define XFS_IS_SUSER_DQUOT(dqp)		((dqp)->q_core.d_id == 0)
 
-#define XQM_LIST_PRINT(l, NXT, title) \
-{ \
-	  xfs_dquot_t	*dqp; int i = 0;\
-	  printf("%s (#%d)\n", title, (int) (l)->qh_nelems); \
-	  for (dqp = (l)->qh_next; dqp != NULL; dqp = dqp->NXT) { \
-	    printf("\t%d.\t\"%d (%s)\"\t bcnt = %d, icnt = %d refs = %d\n", \
-			 ++i, (int) dqp->q_core.d_id, \
-		         DQFLAGTO_TYPESTR(dqp),      \
-			 (int) dqp->q_core.d_bcount, \
-			 (int) dqp->q_core.d_icount, \
-                         (int) dqp->q_nrefs);  } \
-}
 #define XFS_DO_FLUSH_INODE(ip) \
 	{ \
 	  xfs_ilock(ip, XFS_ILOCK_EXCL); \
@@ -194,6 +176,24 @@ extern int xfs_quotadebug;
 	  vn_purge((vp), &dqvmap);	\
         }
 
+#define DQFLAGTO_TYPESTR(d) 	(((d)->dq_flags & XFS_DQ_USER) ? "USR" : \
+				 (((d)->dq_flags & XFS_DQ_PROJ) ? "PRJ" : "???"))
 
+#ifdef QUOTADEBUG
+#define XQM_LIST_PRINT(l, NXT, title) \
+{ \
+	  xfs_dquot_t	*dqp; int i = 0;\
+	  printf("%s (#%d)\n", title, (int) (l)->qh_nelems); \
+	  for (dqp = (l)->qh_next; dqp != NULL; dqp = dqp->NXT) { \
+	    printf("\t%d.\t\"%d (%s)\"\t bcnt = %d, icnt = %d refs = %d\n", \
+			 ++i, (int) dqp->q_core.d_id, \
+		         DQFLAGTO_TYPESTR(dqp),      \
+			 (int) dqp->q_core.d_bcount, \
+			 (int) dqp->q_core.d_icount, \
+                         (int) dqp->q_nrefs);  } \
+}
+
+#define DQFLAGTO_DIRTYSTR(d)	(XFS_DQ_IS_DIRTY(d) ? "DIRTY" : "NOTDIRTY")
+#endif
 
 #endif
