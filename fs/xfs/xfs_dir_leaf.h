@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_LEAF_H
 #define	_FS_XFS_DIR_LEAF_H
 
-#ident	"$Revision: 1.9 $"
+#ident	"$Revision: 1.10 $"
 
 /*
  * xfs_dir_leaf.h
@@ -83,6 +83,13 @@ typedef struct xfs_dir_leaf_hdr xfs_dir_leaf_hdr_t;
 typedef struct xfs_dir_leaf_map xfs_dir_leaf_map_t;
 typedef struct xfs_dir_leaf_entry xfs_dir_leaf_entry_t;
 typedef struct xfs_dir_leaf_name xfs_dir_leaf_name_t;
+
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_LEAFDIRBLK)
+xfs_dir_leafblock_t *xfs_buf_to_leafdirblk(struct buf *bp);
+#define	XFS_BUF_TO_LEAFDIRBLK(bp)	xfs_buf_to_leafdirblk(bp)
+#else
+#define	XFS_BUF_TO_LEAFDIRBLK(bp) ((xfs_dir_leafblock_t *)((bp)->b_un.b_addr))
+#endif
 
 typedef int (*xfs_dir_put_t)(struct xfs_dir_put_args *pa);
 
