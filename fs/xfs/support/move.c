@@ -30,6 +30,8 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
+#include <linux/string.h>
+#include <linux/errno.h>
 #include <asm/uaccess.h>
 
 #include <xfs_types.h>
