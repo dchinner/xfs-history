@@ -529,6 +529,7 @@ xfs_itruncate(xfs_trans_t	**tp,
 	ASSERT(ip->i_item.ili_flags & XFS_ILI_HOLD);
 
 	mp = (*tp)->t_mountp;
+	sbp = &(mp->m_sb);
 	/*
 	 * Call ptossvp() to get rid of pages and buffers
 	 * overlapping the region being removed.  Make sure
@@ -545,7 +546,6 @@ xfs_itruncate(xfs_trans_t	**tp,
 		ptossvp(XFS_ITOV(ip), toss_start, last_byte);
 	}
 
-	sbp = &(mp->m_sb);
 	first_unmap_block = xfs_b_to_fsb(sbp, new_size);
 	/*
 	 * Subtract 1 from the size so that we get the correct
