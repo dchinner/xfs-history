@@ -115,7 +115,7 @@ int irix5_n32_to_flock(enum xlate_mode, void *, int, xlate_info_t *);
 int flock_to_irix5_n32(void *, int, xlate_info_t *);
 #endif
 
-extern void xfs_lock_inodes (xfs_inode_t **, int);
+extern void xfs_lock_inodes (xfs_inode_t **, int, int, uint);
 /*
  * The maximum pathlen is 1024 bytes. Since the minimum file system
  * blocksize is 512 bytes, we can get a max of 2 extents back from
@@ -3369,7 +3369,7 @@ again:
 
 		ips[0] = ip;
 		ips[1] = dp;
-		xfs_lock_inodes(ips, 2);
+		xfs_lock_inodes(ips, 2, 0, XFS_ILOCK_EXCL);
 
                 /*
                  * Make sure that things are still consistent during
@@ -3442,20 +3442,46 @@ int xfs_lock_delays;
  * in the log.
  */
 void
-xfs_lock_inodes (xfs_inode_t **ips, int inodes)
+xfs_lock_inodes (xfs_inode_t **ips,
+	int inodes,
+	int first_locked,
+	uint lock_mode)
 {
 	int attempts = 0, i, j, try_lock;
 	xfs_log_item_t	*lp;
 
 	ASSERT(ips && (inodes >= 2)); /* we need at least two */
 	
+	if (first_locked) {
+		try_lock = 1;
+		i = 1;
+	} else {
+		try_lock = 0;
+		i = 0;
+	}
+
 again:
-	try_lock = 0;
-	for (i = 0; i < inodes; i++) {
+	for (; i < inodes; i++) {
 		ASSERT(ips[i]);
 
 		if (i && (ips[i] == ips[i-1]))	/* Already locked */
 			continue;
+
+		/*
+		 * If try_lock is not set yet, make sure all locked inodes
+		 * are not in the AIL.
+		 * If any are, set try_lock to be used later.
+		 */
+
+		if (!try_lock) {
+			for (j = (i - 1); j >= 0 && !try_lock; j--) {
+				lp = (xfs_log_item_t *)ips[j]->i_itemp;
+				if (lp && (lp->li_flags & XFS_LI_IN_AIL)) {
+					try_lock++;
+				}
+			}
+		}
+
 		/*
 		 * If any of the previous locks we have locked is in the AIL,
 		 * we must TRY to get the second and subsequent locks. If
@@ -3470,7 +3496,7 @@ again:
 			 * that is in the AIL.
 			 */
 			ASSERT(i != 0);
-			if (!xfs_ilock_nowait(ips[i], XFS_ILOCK_EXCL)) {
+			if (!xfs_ilock_nowait(ips[i], lock_mode)) {
 				attempts++;
 
 				/* 
@@ -3491,7 +3517,7 @@ again:
 								ips[j+1])
 						continue;
 
-					xfs_iunlock(ips[j], XFS_ILOCK_EXCL);
+					xfs_iunlock(ips[j], lock_mode);
 				}
 
 				if ((attempts % 5) == 0) {
@@ -3500,18 +3526,12 @@ again:
 					xfs_lock_delays++;
 #endif
 				}
+				i = 0;
+				try_lock = 0;
 				goto again;
 			}
 		} else {
-			xfs_ilock(ips[i], XFS_ILOCK_EXCL);
-		}
-
-
-		if (!try_lock) {
-			lp = (xfs_log_item_t *)ips[i]->i_itemp;
-			if (lp && (lp->li_flags & XFS_LI_IN_AIL)) {
-				try_lock++;
-			}
+			xfs_ilock(ips[i], lock_mode);
 		}
 	}
 
@@ -3928,7 +3948,7 @@ xfs_link(
 		ips[1] = sip;
 	}
 
-	xfs_lock_inodes(ips, 2);
+	xfs_lock_inodes(ips, 2, 0, XFS_ILOCK_EXCL);
 
 	/*
 	 * Increment vnode ref counts since xfs_trans_commit &
