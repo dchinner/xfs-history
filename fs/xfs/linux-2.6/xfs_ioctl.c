@@ -116,13 +116,14 @@ xfs_find_handle(
 		return -XFS_ERROR(EINVAL);
 	}
 
-	/* we need the vnode */
-	vp = LINVFS_GET_VP(inode);
-	if (!vp || !vp->v_vfsp->vfs_altfsid) {
+	if (inode->i_fop != &linvfs_file_operations) {
 		/* we're not in XFS anymore, Toto */
 		iput(inode);
 		return -XFS_ERROR(EINVAL);
 	}
+
+	/* we need the vnode */
+	vp = LINVFS_GET_VP(inode);
 	if (vp->v_type != VREG && vp->v_type != VDIR && vp->v_type != VLNK) {
 		iput(inode);
 		return -XFS_ERROR(EBADF);
