@@ -59,12 +59,9 @@ struct attr_multiop_kern_64 {
  *========================================================================*/
 
 
-struct attrlist_cursor_kern;
 struct cred;
-struct uio;
 struct vnode;
-struct xfs_da_name;
-struct xfs_bmap_free;
+struct attrlist_cursor_kern;
 
 /*
  * Overall external interface routines.
