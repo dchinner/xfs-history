@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.88 $"
+#ident	"$Revision: 1.89 $"
 
 struct buf;
 struct cred;
@@ -184,6 +184,7 @@ typedef struct xfs_mount {
 #define XFS_METADATA_IO_ERROR	0x1
 #define XFS_LOG_IO_ERROR	0x2
 #define XFS_FORCE_UMOUNT	0x4
+#define XFS_CORRUPT_INCORE	0x8	/* corrupt in-memory data structures */
 
 /*
  * Macros for getting from mount to vfs and back.
