@@ -463,8 +463,6 @@ vn_revalidate(struct vnode *vp, int flags)
 void
 vn_purge(struct vnode *vp, vmap_t *vmap)
 {
-	unsigned	s;
-
 	vn_trace_entry(vp, "vn_purge", (inst_t *)__return_address);
 
 	ASSERT(vp->v_flag & VPURGE);
@@ -498,7 +496,7 @@ again:
 	 * Another process could have raced in and gotten this vnode...
 	 */
 	if (vn_count(vp) > 0) {
-		VN_UNLOCK(vp, s);
+		NESTED_VN_UNLOCK(vp);
 		return;
 	}
 

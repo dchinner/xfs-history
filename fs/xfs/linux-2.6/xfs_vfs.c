@@ -240,8 +240,10 @@ again:
 			vfsp->vfs_busycnt++;
 		}
 		spin_unlock_irqrestore(&vfslock, s);
+		return vfsp;
+	} else {
+		return NULL;
 	}
-	return vfsp;
 }
 
 void

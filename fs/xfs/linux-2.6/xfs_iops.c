@@ -320,6 +320,7 @@ int linvfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
 		tp = VSOCK;
 	} else {
 		error = -EINVAL;
+		return(error);
 	}
 
 	if (!error) {
@@ -773,9 +774,9 @@ int linvfs_bmap(struct address_space *mapping, long block)
 		VOP_RWLOCK(vp, VRWLOCK_READ);
 		VOP_FLUSH_PAGES(vp, (xfs_off_t)0, 0, FI_REMAPF, error);
 		VOP_RWUNLOCK(vp, VRWLOCK_READ);
+		if (error)
+			return -1;
 	}
-	if (error)
-	return -1;
 
 	VOP_BMAP(vp, block << 9, 1, PBF_READ|PBF_BMAP_TRY_ILOCK, 
 		&bmap, &nbm, error);
