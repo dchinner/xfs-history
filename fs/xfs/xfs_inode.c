@@ -704,26 +704,26 @@ xfs_itruncate_finish(
 	xfs_trans_log_inode(*tp, ip, XFS_ILOG_CORE);
 }
 
+
 /*
- * xfs_igrow
+ * xfs_igrow_start
  *
- * This routine is called to extend the size of a file.
- * The inode must have both the iolock and the ilock locked
- * for update and it must be a part of the current transaction.
+ * Do the first part of growing a file: zero any data in the last
+ * block that is beyond the old EOF.  We need to do this before
+ * the inode is joined to the transaction to modify the i_size.
+ * That way we can drop the inode lock and call into the buffer
+ * cache to get the buffer mapping the EOF.
  */
 void
-xfs_igrow(
-	xfs_trans_t	*tp,
+xfs_igrow_start(
 	xfs_inode_t	*ip,
 	xfs_fsize_t	new_size,
-	cred_t	*credp)
+	cred_t		*credp)
 {
 	xfs_fsize_t	isize;
-	timestruc_t	tv;
 
 	ASSERT(ismrlocked(&(ip->i_lock), MR_UPDATE) != 0);
 	ASSERT(ismrlocked(&(ip->i_iolock), MR_UPDATE) != 0);
-	ASSERT(ip->i_transp == tp);
 	ASSERT(new_size > ip->i_d.di_size);
 
 	isize = ip->i_d.di_size;
@@ -734,6 +734,28 @@ xfs_igrow(
 		 */
 		xfs_zero_eof(ip, new_size, isize, credp);
 	}
+}
+
+/*
+ * xfs_igrow_finish
+ *
+ * This routine is called to extend the size of a file.
+ * The inode must have both the iolock and the ilock locked
+ * for update and it must be a part of the current transaction.
+ * The xfs_igrow_start() function must have been called previously.
+ */
+void
+xfs_igrow_finish(
+	xfs_trans_t	*tp,
+	xfs_inode_t	*ip,
+	xfs_fsize_t	new_size)
+{
+	timestruc_t	tv;
+
+	ASSERT(ismrlocked(&(ip->i_lock), MR_UPDATE) != 0);
+	ASSERT(ismrlocked(&(ip->i_iolock), MR_UPDATE) != 0);
+	ASSERT(ip->i_transp == tp);
+	ASSERT(new_size > ip->i_d.di_size);
 
 	/*
 	 * Update the file size and inode change timestamp.
