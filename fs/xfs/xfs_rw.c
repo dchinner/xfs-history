@@ -1,4 +1,4 @@
-#ident "$Revision: 1.230 $"
+#ident "$Revision: 1.231 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1421,18 +1421,11 @@ xfs_read(
 #ifndef SIM
 		if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&
 		    !(ioflag & IO_INVIS)) {
-			vrwlock_t	*lptr;
-			vrwlock_t	locktype;
-
-			if (ioflag & IO_ISLOCKED) {
-				lptr = &locktype;
-				locktype = VRWLOCK_READ;
-			} else
-				lptr = NULL;
+			vrwlock_t	locktype = VRWLOCK_READ;
 
 			error = xfs_dm_send_data_event(DM_EVENT_READ, bdp,
 					offset, count,
-					UIO_DELAY_FLAG(uiop), lptr);
+					UIO_DELAY_FLAG(uiop), &locktype);
 			if (error)
 				goto out;
 		}
@@ -2942,19 +2935,14 @@ start:
 #ifndef SIM
 		if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_WRITE) &&
 		    !(ioflag & IO_INVIS) && !eventsent) {
-			vrwlock_t	*lptr;
 			vrwlock_t	locktype;
 
-			if (ioflag & IO_ISLOCKED) {
-				lptr = &locktype;
-				locktype = (ioflag & IO_DIRECT) ?
-					VRWLOCK_WRITE_DIRECT:VRWLOCK_WRITE;
-			} else
-				lptr = NULL;
+			locktype = (ioflag & IO_DIRECT) ?
+				VRWLOCK_WRITE_DIRECT:VRWLOCK_WRITE;
 
 			error = xfs_dm_send_data_event(DM_EVENT_WRITE, bdp,
 					offset, count,
-					UIO_DELAY_FLAG(uiop), lptr);
+					UIO_DELAY_FLAG(uiop), &locktype);
 			if (error)
 				goto out;
 			eventsent = 1;
@@ -3045,19 +3033,14 @@ retry:
 		if (error == ENOSPC &&
 		    DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_NOSPACE) &&
 		    !(ioflag & IO_INVIS)) {
-			vrwlock_t	*lptr;
 			vrwlock_t	locktype;
 
-			if (ioflag & IO_ISLOCKED) {
-				lptr = &locktype;
-				locktype = (ioflag & IO_DIRECT) ?
-					VRWLOCK_WRITE_DIRECT:VRWLOCK_WRITE;
-			} else
-				lptr = NULL;
+			locktype = (ioflag & IO_DIRECT) ?
+				VRWLOCK_WRITE_DIRECT:VRWLOCK_WRITE;
 
 			error = xfs_dm_send_data_event(DM_EVENT_NOSPACE, bdp,
 					0, 0,
-					UIO_DELAY_FLAG(uiop), lptr);
+					UIO_DELAY_FLAG(uiop), &locktype);
 			if (error)
 				goto out;
 
