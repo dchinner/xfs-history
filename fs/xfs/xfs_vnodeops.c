@@ -1,4 +1,4 @@
-#ident "$Revision: 1.369 $"
+#ident "$Revision: 1.370 $"
 
 
 #ifdef SIM
@@ -1374,7 +1374,7 @@ xfs_fsync(
 
 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
 
-	syncall = error = 0;
+	syncall = error = error2 = 0;
 
 	if (stop == -1)  {
 		ASSERT(start >= 0);
