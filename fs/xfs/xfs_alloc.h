@@ -70,6 +70,7 @@ typedef enum xfs_alloctype
 	XFS_ALLOCTYPE_ANY_AG,	/* allocate anywhere */
 	XFS_ALLOCTYPE_START_AG,	/* anywhere, start in this a.g. */
 	XFS_ALLOCTYPE_THIS_AG,	/* anywhere in this a.g. */
+	XFS_ALLOCTYPE_START_BNO,/* near this block (in a.g.) else anywhere */
 	XFS_ALLOCTYPE_NEAR_BNO,	/* in this a.g. and near this block */
 	XFS_ALLOCTYPE_THIS_BNO	/* at exactly this block */
 } xfs_alloctype_t;
