@@ -1,4 +1,4 @@
-#ident "$Revision: 1.170 $"
+#ident "$Revision: 1.171 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -110,7 +110,8 @@ xfs_zero_last_block(
 	xfs_inode_t	*ip,
 	off_t		offset,
 	xfs_fsize_t	isize,
-	cred_t		*credp);
+	cred_t		*credp,
+	struct pm	*pmp);
 
 STATIC void
 xfs_zero_bp(
@@ -545,7 +546,8 @@ xfs_iomap_extra(
 	off_t		offset,
 	size_t		count,
 	struct bmapval	*bmapp,
-	int		*nbmaps)
+	int		*nbmaps,
+	struct pm	*pmp)
 {
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t	end_fsb;
@@ -578,6 +580,7 @@ xfs_iomap_extra(
 		bmapp->bsize = 0;
 		bmapp->pboff = 0;
 		bmapp->pbsize = 0;
+		bmapp->pmp = pmp;
 		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
 			bmapp->pbdev = mp->m_rtdev;
 		} else {
@@ -620,6 +623,7 @@ xfs_iomap_extra(
 		ASSERT(bmapp->pboff >= 0);
 		bmapp->pbsize = bmapp->bsize - bmapp->pboff;
 		ASSERT(bmapp->pbsize > 0);
+		bmapp->pmp = pmp;
 		if (bmapp->pbsize > count) {
 			bmapp->pbsize = count;
 		}
@@ -650,7 +654,8 @@ xfs_iomap_read(
 	off_t		offset,
 	size_t		count,
 	struct bmapval	*bmapp,
-	int		*nbmaps)
+	int		*nbmaps,
+	struct pm	*pmp)
 {
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t	ioalign;
@@ -702,7 +707,7 @@ xfs_iomap_read(
 		 * that they do not interfere with the normal path
 		 * code.
 		 */
-		error = xfs_iomap_extra(ip, offset, count, bmapp, nbmaps);
+		error = xfs_iomap_extra(ip, offset, count, bmapp, nbmaps, pmp);
 		return error;
 	}
 	/*
@@ -996,6 +1001,7 @@ xfs_iomap_read(
 		if (curr_bmapp->bn != -1) {
 			curr_bmapp->bn = XFS_FSB_TO_DB(ip, curr_bmapp->bn);
 		}
+		curr_bmapp->pmp = pmp;
 	}
 	return 0;
 }				
@@ -1048,7 +1054,7 @@ xfs_read_file(
 		nbmaps = ip->i_mount->m_nreadaheads ;
 		ASSERT(nbmaps <= sizeof(bmaps) / sizeof(bmaps[0]));
 		error = xfs_iomap_read(ip, uiop->uio_offset, uiop->uio_resid,
-				       bmaps, &nbmaps);
+				       bmaps, &nbmaps, uiop->uio_pmp);
 
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
@@ -1334,7 +1340,8 @@ xfs_zero_last_block(
 	xfs_inode_t	*ip,
 	off_t		offset,
 	xfs_fsize_t	isize,
-	cred_t		*credp)
+	cred_t		*credp,
+	struct pm	*pmp)
 {
 	xfs_fileoff_t	last_fsb;
 	xfs_fsblock_t	firstblock;
@@ -1416,6 +1423,7 @@ xfs_zero_last_block(
 		bmap.pbdev = mp->m_dev;
 	}
 	bmap.eof = BMAP_EOF;
+	bmap.pmp = pmp;
 	if (imap.br_startblock != DELAYSTARTBLOCK) {
 		bmap.bn = XFS_FSB_TO_DB(ip, imap.br_startblock);
 	} else {
@@ -1460,7 +1468,8 @@ xfs_zero_eof(
 	xfs_inode_t	*ip,
 	off_t		offset,
 	xfs_fsize_t	isize,
-	cred_t		*credp)
+	cred_t		*credp,
+	struct pm	*pmp)
 {
 	xfs_fileoff_t	start_zero_fsb;
 	xfs_fileoff_t	end_zero_fsb;
@@ -1484,7 +1493,7 @@ xfs_zero_eof(
 	 * First handle zeroing the block on which isize resides.
 	 * We only zero a part of that block so it is handled specially.
 	 */
-	error = xfs_zero_last_block(ip, offset, isize, credp);
+	error = xfs_zero_last_block(ip, offset, isize, credp, pmp);
 	if (error) {
 		return error;
 	}
@@ -1548,6 +1557,7 @@ xfs_zero_eof(
 		bmap.length = XFS_FSB_TO_BB(mp, buf_len_fsb);
 		bmap.bsize = BBTOB(bmap.length);
 		bmap.eof = BMAP_EOF;
+		bmap.pmp = pmp;
 		if (imap.br_startblock == DELAYSTARTBLOCK) {
 			bmap.eof |= BMAP_DELAY;
 			bmap.bn = -1;
@@ -1590,7 +1600,8 @@ xfs_iomap_write(
 	size_t		count,
 	struct bmapval	*bmapp,
 	int		*nbmaps,
-	int		ioflag)		
+	int		ioflag,
+	struct pm	*pmp)
 {
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t	ioalign;
@@ -1920,6 +1931,7 @@ xfs_iomap_write(
 		if (curr_bmapp->bn != -1) {
 			curr_bmapp->bn = XFS_FSB_TO_DB(ip, curr_bmapp->bn);
 		}
+		curr_bmapp->pmp = pmp;
 	}
 
 	/*
@@ -2039,7 +2051,7 @@ xfs_write_file(
 		    (uiop->uio_offset > isize) &&
 		    (isize != 0)) {
 			error = xfs_zero_eof(ip, uiop->uio_offset, isize,
-					     credp);
+					     credp, uiop->uio_pmp);
 			if (error) {
 				goto error0;
 			}
@@ -2049,7 +2061,7 @@ xfs_write_file(
 		nbmaps = sizeof(bmaps) / sizeof(bmaps[0]);
 		error = xfs_iomap_write(ip, uiop->uio_offset,
 					uiop->uio_resid, bmaps, &nbmaps,
-					ioflag);
+					ioflag, uiop->uio_pmp);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
 		if (error || (bmaps[0].pbsize == 0)) {
@@ -2524,11 +2536,13 @@ xfs_bmap(
 
 	if (flags == B_READ) {
 		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
-		error = xfs_iomap_read(ip, offset, count, bmapp, nbmaps);
+		error = xfs_iomap_read(ip, offset, count, bmapp,
+				       nbmaps, NULL);
 	} else {
 		ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
 		ASSERT(ip->i_d.di_size >= (offset + count));
-		error = xfs_iomap_write(ip, offset, count, bmapp, nbmaps, 0);
+		error = xfs_iomap_write(ip, offset, count, bmapp,
+					nbmaps, 0, NULL);
 	}
 
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
