@@ -1,4 +1,4 @@
-#ident "$Revision: 1.365 $"
+#ident "$Revision: 1.366 $"
 
 
 #ifdef SIM
@@ -115,6 +115,7 @@ int irix5_n32_to_flock(enum xlate_mode, void *, int, xlate_info_t *);
 int flock_to_irix5_n32(void *, int, xlate_info_t *);
 #endif
 
+extern void xfs_lock_inodes (xfs_inode_t **, int);
 /*
  * The maximum pathlen is 1024 bytes. Since the minimum file system
  * blocksize is 512 bytes, we can get a max of 2 extents back from
@@ -3202,6 +3203,17 @@ xfs_get_dir_entry(
 	return 0;
 }
 
+#ifdef DEBUG
+
+/*
+ * Some counters to see if (and how often) we are hitting some deadlock
+ * prevention code paths.
+ */
+
+int xfs_rm_locks;
+int xfs_rm_lock_delays;
+int xfs_rm_attempts;
+#endif
 
 /*
  * The following routine will lock the inodes associated with the
@@ -3220,6 +3232,15 @@ xfs_get_dir_entry(
  * directory no longer points to the given inode with the given name,
  * then we drop the directory lock, set the entry_changed parameter to 1,
  * and return.  It is up to the caller to drop the reference to the inode.
+ *
+ * There is a dealock we need to worry about. If the locked directory is
+ * in the AIL, it might be blocking up the log. The next inode we lock
+ * could be already locked by another thread waiting for log space (e.g
+ * a permanent log reservation with a long running transaction (see
+ * xfs_itruncate_finish)). To solve this, we must check if the directory
+ * is in the ail and use lock_nowait. If we can't lock, we need to
+ * drop the inode lock on the directory and try again. xfs_iunlock will
+ * potentially push the tail if we were holding up the log.
  */
 STATIC int
 xfs_lock_dir_and_entry(
@@ -3229,11 +3250,20 @@ xfs_lock_dir_and_entry(
 	int		dir_generation,
 	int		*entry_changed)		       
 {
+	int 			attempts;
 	xfs_ino_t		e_inum;
 	int			error;
 	int			new_dir_gen;
 	struct ncfastdata	fastdata;
+	xfs_inode_t		*ips[2];
+	xfs_log_item_t		*lp;
 
+#ifdef DEBUG
+	xfs_rm_locks++;
+#endif
+	attempts = 0;
+
+again:
 	*entry_changed = 0;
         xfs_ilock(dp, XFS_ILOCK_EXCL);
 
@@ -3288,17 +3318,43 @@ xfs_lock_dir_and_entry(
 		/*
 		 * We are already in the right order, so just 
 		 * lock on the inode of the entry.
+		 * We need to use nowait if dp is in the AIL.
 		 */
-		xfs_ilock(ip, XFS_ILOCK_EXCL);
 
+		lp = (xfs_log_item_t *)dp->i_itemp;
+		if (lp && (lp->li_flags & XFS_LI_IN_AIL)) {
+			if (!xfs_ilock_nowait(ip, XFS_ILOCK_EXCL)) {
+				attempts++;
+#ifdef DEBUG
+				xfs_rm_attempts++;
+#endif
+
+				/* 
+				 * Unlock dp and try again.
+				 * xfs_iunlock will try to push the tail
+				 * if the inode is in the AIL.
+				 */
+
+				xfs_iunlock(dp, XFS_ILOCK_EXCL);
+
+				if ((attempts % 5) == 0) {
+					delay(1); /* Don't just spin the CPU */
+#ifdef DEBUG
+					xfs_rm_lock_delays++;
+#endif
+				}
+				goto again;
+			}
+		} else {
+			xfs_ilock(ip, XFS_ILOCK_EXCL);
+		}
 	} else if (e_inum < dp->i_ino) {
 		new_dir_gen = dp->i_gen;
                 xfs_iunlock(dp, XFS_ILOCK_EXCL);
 
-		xfs_ilock(ip, XFS_ILOCK_EXCL);
-                xfs_ilock(dp, XFS_ILOCK_EXCL);
-
-
+		ips[0] = ip;
+		ips[1] = dp;
+		xfs_lock_inodes(ips, 2);
 
                 /*
                  * Make sure that things are still consistent during
@@ -3351,22 +3407,108 @@ xfs_lock_dir_and_entry(
 	return 0;
 }
 
+#ifdef DEBUG
+int xfs_locked_n;
+int xfs_small_retries;
+int xfs_middle_retries;
+int xfs_lots_retries;
+int xfs_lock_delays;
+#endif
+
 /*
- * The following routine will lock 2 inodes in exclusive mode.
- * Lock ordering is preserved.
+ * The following routine will lock n inodes in exclusive mode.
+ * We assume the caller calls us with the inodes in i_ino order.
+ *
+ * We need to detect deadlock where an inode that we lock
+ * is in the AIL and we start waiting for another inode that is locked
+ * by a thread in a long running transaction (such as truncate). This can
+ * result in deadlock since the long running trans might need to wait
+ * for the inode we just locked in order to push the tail and free space
+ * in the log.
  */
-STATIC void
-xfs_lock_2_inodes (
-	xfs_inode_t	*ip1,
-	xfs_inode_t	*ip2)
+void
+xfs_lock_inodes (xfs_inode_t **ips, int inodes)
 {
-	if (ip1->i_ino < ip2->i_ino) {
-		xfs_ilock(ip1, XFS_ILOCK_EXCL);
-		xfs_ilock(ip2, XFS_ILOCK_EXCL);
-	} else {
-		xfs_ilock(ip2, XFS_ILOCK_EXCL);
-		xfs_ilock(ip1, XFS_ILOCK_EXCL);
+	int attempts = 0, i, j, try_lock;
+	xfs_log_item_t	*lp;
+
+	ASSERT(ips && (inodes >= 2)); /* we need at least two */
+	
+again:
+	try_lock = 0;
+	for (i = 0; i < inodes; i++) {
+		ASSERT(ips[i]);
+
+		if (i && (ips[i] == ips[i-1]))	/* Already locked */
+			continue;
+		/*
+		 * If any of the previous locks we have locked is in the AIL,
+		 * we must TRY to get the second and subsequent locks. If
+		 * we can't get any, we must release all we have
+		 * and try again.
+		 */
+
+		if (try_lock) {
+			/* try_lock must be 0 if i is 0. */
+			/*
+			 * try_lock means we have an inode locked
+			 * that is in the AIL.
+			 */
+			ASSERT(i != 0);
+			if (!xfs_ilock_nowait(ips[i], XFS_ILOCK_EXCL)) {
+				attempts++;
+
+				/* 
+				 * Unlock all previous guys and try again.
+				 * xfs_iunlock will try to push the tail
+				 * if the inode is in the AIL.
+				 */
+
+				for(j = i - 1; j >= 0; j--) {
+
+					/*
+					 * Check to see if we've already
+					 * unlocked this one.
+					 * Not the first one going back,
+					 * and the inode ptr is the same.
+					 */
+					if ((j != (i - 1)) && ips[j] ==
+								ips[j+1])
+						continue;
+
+					xfs_iunlock(ips[j], XFS_ILOCK_EXCL);
+				}
+
+				if ((attempts % 5) == 0) {
+					delay(1); /* Don't just spin the CPU */
+#ifdef DEBUG
+					xfs_lock_delays++;
+#endif
+				}
+				goto again;
+			}
+		} else {
+			xfs_ilock(ips[i], XFS_ILOCK_EXCL);
+		}
+
+
+		if (!try_lock) {
+			lp = (xfs_log_item_t *)ips[i]->i_itemp;
+			if (lp && (lp->li_flags & XFS_LI_IN_AIL)) {
+				try_lock++;
+			}
+		}
 	}
+
+#ifdef DEBUG
+	if (attempts) {
+		if (attempts < 5) xfs_small_retries++;
+		else if (attempts < 100) xfs_middle_retries++;
+		else xfs_lots_retries++;
+	} else {
+		xfs_locked_n++;
+	}
+#endif
 }
 
 int remove_which_error_return = 0;
@@ -3684,6 +3826,7 @@ xfs_link(
 	xfs_ino_t		e_inum;
 	xfs_trans_t		*tp;
 	xfs_mount_t		*mp;
+	xfs_inode_t		*ips[2];
 	int			error;
         xfs_bmap_free_t         free_list;
         xfs_fsblock_t           first_block;
@@ -3762,7 +3905,15 @@ xfs_link(
                 goto error_return;
 	}
 
-	xfs_lock_2_inodes(sip, tdp);
+	if (sip->i_ino < tdp->i_ino) {
+		ips[0] = sip;
+		ips[1] = tdp;
+	} else {
+		ips[1] = tdp;
+		ips[0] = sip;
+	}
+
+	xfs_lock_inodes(ips, 2);
 
 	/*
 	 * Increment vnode ref counts since xfs_trans_commit &

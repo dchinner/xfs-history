@@ -1,4 +1,4 @@
-#ident "$Revision: 1.4 $"
+#ident "$Revision: 1.5 $"
 
 #include <sys/types.h>
 #include <sys/uuid.h>
@@ -42,6 +42,7 @@ mutex_t	xfs_ancestormon;		/* initialized in xfs_init */
 #endif
 
 
+extern void xfs_lock_inodes (xfs_inode_t **, int);
 
 /*
  * Given an array of up to 4 inode pointers, unlock the pointed to inodes.
@@ -64,33 +65,6 @@ xfs_rename_unlock4(
 		 */
 		if (i_tab[i] != i_tab[i-1]) {
 			xfs_iunlock(i_tab[i], XFS_ILOCK_EXCL);
-		}
-	}
-}
-
-/*
- * Given an array of up to 4 inode pointers, lock the pointed to inodes.
- * If there are fewer than 4 entries in the array, the empty entries will
- * be at the end and will have NULL pointers in them.  The array of inodes
- * is already sorted by inode number, so we've already taken care of lock
- * ordering.
- */
-STATIC void
-xfs_rename_relock4(
-	xfs_inode_t	**i_tab)
-{
-	int	i;
-
-	xfs_ilock(i_tab[0], XFS_ILOCK_EXCL);
-	for (i = 1; i < 4; i++) {
-		if (i_tab[i] == NULL) {
-			break;
-		}
-		/*
-		 * Watch out for duplicate entries in the table.
-		 */
-		if (i_tab[i] != i_tab[i-1]) {
-			xfs_ilock(i_tab[i], XFS_ILOCK_EXCL);
 		}
 	}
 }
@@ -146,13 +120,13 @@ xfs_lock_for_rename(
 	xfs_inode_t	**ipp2,	/* inode of new entry, if it 
 		           	   already exists, NULL otherwise. */
 	xfs_inode_t	**i_tab,/* array of inode returned, sorted */
+	int		*num_inodes,  /* number of inodes in array */
 	int		*i_gencounts) /* array of inode gen counts */
 {
 	xfs_inode_t		*ip1, *ip2, *temp;
 	xfs_ino_t		inum1, inum2;
 	unsigned long		dir_gen1, dir_gen2;
 	int			error;
-	int			num_inodes;
 	int			i, j;
 	uint			lock_mode;
 	uint			dir_unlocked;
@@ -238,10 +212,10 @@ xfs_lock_for_rename(
         i_tab[1] = dp2;
         i_tab[2] = ip1;
 	if (inum2 == 0) {
-		num_inodes = 3;
+		*num_inodes = 3;
 		i_tab[3] = NULL;
 	} else {
-		num_inodes = 4;
+		*num_inodes = 4;
         	i_tab[3] = ip2;
 	}
 
@@ -249,8 +223,8 @@ xfs_lock_for_rename(
 	 * Sort the elements via bubble sort.  (Remember, there are at
 	 * most 4 elements to sort, so this is adequate.)
 	 */
-	for (i=0; i < num_inodes; i++) {
-		for (j=1; j < num_inodes; j++) {
+	for (i=0; i < *num_inodes; i++) {
+		for (j=1; j < *num_inodes; j++) {
 			if (i_tab[j]->i_ino < i_tab[j-1]->i_ino) {
 				temp = i_tab[j];
 				i_tab[j] = i_tab[j-1];
@@ -259,15 +233,7 @@ xfs_lock_for_rename(
 		}
 	}
 
-	/*
-	 * Lock all the inodes in exclusive mode. If an inode appears
-	 * twice in the list, it will only be locked once.
-	 */
-	xfs_ilock (i_tab[0], XFS_ILOCK_EXCL);
-	for (i=1; i < num_inodes; i++) {
-		if (i_tab[i] != i_tab[i-1])
-			xfs_ilock(i_tab[i], XFS_ILOCK_EXCL);
-	}
+	xfs_lock_inodes(i_tab, *num_inodes);
 
 	/*
 	 * See if either of the directories was modified during the
@@ -282,11 +248,11 @@ xfs_lock_for_rename(
 		 * thing again.
 		 */
 		xfs_iunlock(i_tab[0], XFS_ILOCK_EXCL);
-		for (i=1; i < num_inodes; i++) {
+		for (i=1; i < *num_inodes; i++) {
 			if (i_tab[i] != i_tab[i-1])
 				xfs_iunlock(i_tab[i], XFS_ILOCK_EXCL);
 		}
-		if (num_inodes == 4) {
+		if (*num_inodes == 4) {
 			IRELE (ip2);
 		}
 		IRELE (ip1);
@@ -299,7 +265,7 @@ xfs_lock_for_rename(
 	 * i_tab in i_gencounts.  Null out any unused entries in i_tab.
 	 */
 	*ipp1 = *ipp2 = NULL;
-	for (i=0; i < num_inodes; i++) {
+	for (i=0; i < *num_inodes; i++) {
 		if (i_tab[i]->i_ino == inum1) {
 			*ipp1 = i_tab[i];
 		}
@@ -656,6 +622,7 @@ xfs_rename(
 	vnode_t 	*src_dir_vp;
 	bhv_desc_t	*target_dir_bdp;
 	int		spaceres;
+	int		num_inodes;
 
 	src_dir_vp = BHV_TO_VNODE(src_dir_bdp);
 	vn_trace_entry(src_dir_vp, "xfs_rename", (inst_t *)__return_address);
@@ -701,7 +668,7 @@ xfs_rename(
 	do {
 		error = xfs_lock_for_rename(src_dp, target_dp, src_name,
 				target_name, &src_ip, &target_ip, inodes,
-				gencounts);
+				&num_inodes, gencounts);
 	} while (error == EAGAIN);
 	if (error) {
 		rename_which_error_return = __LINE__;
@@ -802,7 +769,7 @@ xfs_rename(
 	 * generation counts on the inodes.  If any of them have changed,
 	 * we cancel the transaction and start over from the top.
 	 */
-	xfs_rename_relock4(inodes);
+	xfs_lock_inodes(inodes, num_inodes);
 	if (ancestor_checked) {
 		mutex_unlock(&xfs_ancestormon);
 	}		
