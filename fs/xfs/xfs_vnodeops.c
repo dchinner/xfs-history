@@ -1,4 +1,4 @@
-#ident "$Revision: 1.280 $"
+#ident "$Revision: 1.281 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -26,6 +26,7 @@
 #include <sys/pda.h>
 #include <sys/debug.h>
 #include <sys/uthread.h>
+#include <sys/kmem.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -6988,7 +6989,7 @@ vnodeops_t xfs_vnodeops = {
 	fs_nosys,	/* attr_set */
 	fs_nosys,	/* attr_remove */
 	fs_nosys,	/* attr_list */
-	(int (*)(bhv_desc_t *, struct mounta *, char *, struct vfsops *))fs_noval,	/* link_removed */
+	(int (*)(bhv_desc_t *, struct mounta *, char *, struct cred *))fs_noval,	/* link_removed */
 };
 
 #else
