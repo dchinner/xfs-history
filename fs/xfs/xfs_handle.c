@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.27 $"
+#ident "$Revision: 1.28 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -169,6 +169,7 @@ readlink_by_handle (
 	auio.uio_iov	= &aiov;
 	auio.uio_iovcnt	= 1;
 
+	auio.uio_pmp	= NULL;
 	auio.uio_pio	= 0;
 	auio.uio_pbuf	= 0;
 
