@@ -2,7 +2,6 @@
 #include <sys/errno.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
-#include <sys/uuid.h>
 #include <sys/kmem.h>
 #include <sys/uio.h>
 #include <sys/debug.h>
@@ -24,7 +23,6 @@
 #ifdef SIM
 #define _KERNEL
 #endif
-#include <sys/uuid.h>
 #include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL

@@ -11,7 +11,6 @@
 #include <sys/pfdat.h>
 #include <sys/proc.h>
 #include <sys/user.h>
-#include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/pda.h>
 #ifdef SIM
@@ -31,7 +30,6 @@
 #endif
 #include <sys/kmem.h>
 #include <sys/sema.h>
-#include <sys/uuid.h>
 #include <sys/param.h>
 #include <sys/file.h>
 #include <sys/region.h>

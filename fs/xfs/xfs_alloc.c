@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.54 $"
+#ident	"$Revision: 1.59 $"
 
 /*
  * Free space allocation for xFS.
@@ -13,7 +13,6 @@
 #undef _KERNEL
 #endif
 #include <sys/vnode.h>
-#include <sys/uuid.h>
 #include <sys/debug.h>
 #include <sys/ktrace.h>
 #include <sys/kmem.h>

@@ -1,7 +1,6 @@
 
 #include <sys/param.h>
 #include <sys/debug.h>
-#include <sys/uuid.h>
 #ifdef SIM
 #define _KERNEL
 #endif

@@ -13,13 +13,11 @@
 #endif
 #include <sys/buf.h>
 #include <sys/vnode.h>
-#include <sys/uuid.h>
 #include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
 #include <sys/debug.h>
-#include <sys/uuid.h>
 #ifndef SIM
 #include <sys/systm.h>
 #else

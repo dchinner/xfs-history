@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.34 $"
+#ident	"$Revision: 1.35 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -6,7 +6,6 @@
 
 #include <sys/param.h>
 #include <sys/vnode.h>
-#include <sys/uuid.h>
 #include <sys/debug.h>
 #include <sys/kmem.h>
 #ifdef SIM

@@ -11,7 +11,6 @@
 #undef _KERNEL
 #endif
 #include <sys/debug.h>
-#include <sys/uuid.h>
 #ifndef SIM
 #include <sys/sysinfo.h>
 #include <sys/kmem.h>

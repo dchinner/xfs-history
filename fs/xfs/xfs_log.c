@@ -1,10 +1,9 @@
-#ident	"$Revision: 1.82 $"
+#ident	"$Revision: 1.83 $"
 
 /*
  * High level interface routines for log manager
  */
 
-#include <sys/types.h>
 #include <sys/param.h>
 
 #ifdef SIM
@@ -33,7 +32,6 @@
 #include <sys/proc.h>
 #include <sys/pda.h>		/* depends on proc.h */
 #include <sys/sema.h>
-#include <sys/uuid.h>
 #include <sys/vfs.h>
 
 #include "xfs_inum.h"

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.2 $"
+#ident	"$Revision: 1.9 $"
 
 /*
  * Inode allocation management for xFS.
@@ -13,7 +13,6 @@
 #undef _KERNEL
 #endif
 #include <sys/vnode.h>
-#include <sys/uuid.h>
 #include <sys/debug.h>
 #include <stddef.h>
 #ifdef SIM

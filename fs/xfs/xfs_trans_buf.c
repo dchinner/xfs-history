@@ -11,7 +11,6 @@
 #endif
 #include <sys/vnode.h>
 #include <sys/debug.h>
-#include <sys/uuid.h>
 #ifdef SIM
 #include <bstring.h>
 #else

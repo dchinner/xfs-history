@@ -14,7 +14,6 @@
 #include <sys/dnlc.h>
 #include <sys/sysmacros.h>
 #include <sys/cred.h>
-#include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/pfdat.h>
 #ifdef SIM
@@ -37,7 +36,6 @@
 #include <sys/proc.h>
 #include <sys/sema.h>
 #include <sys/statvfs.h>
-#include <sys/uuid.h>
 #include <sys/region.h>
 #include <fs/specfs/snode.h>
 #include <sys/stat.h>

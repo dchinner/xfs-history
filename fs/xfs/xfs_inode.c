@@ -6,7 +6,6 @@
 #include <sys/vnode.h>
 #include <sys/pfdat.h>
 #include <sys/cred.h>
-#include <sys/uuid.h>
 #include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL

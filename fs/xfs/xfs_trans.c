@@ -12,7 +12,6 @@
 #include <sys/vnode.h>
 #include <sys/debug.h>
 #include <sys/errno.h>
-#include <sys/uuid.h>
 #include <sys/kmem.h>
 #include <stddef.h>
 #ifndef SIM

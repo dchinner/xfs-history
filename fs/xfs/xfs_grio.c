@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.25 1994/05/26 17:04:58 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.26 1994/06/09 19:38:44 wei_hu Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -13,7 +13,6 @@
 #ifdef SIM
 #define _KERNEL
 #endif
-#include <sys/uuid.h>
 #include <sys/vnode.h>
 #include <sys/grio.h>
 #ifdef SIM

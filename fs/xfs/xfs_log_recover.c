@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.8 $"
+#ident	"$Revision: 1.9 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -26,7 +26,6 @@
 #include <sys/debug.h>
 #include <sys/ktrace.h>
 #include <sys/sema.h>
-#include <sys/uuid.h>
 #include <sys/vfs.h>
 
 #include "xfs_inum.h"

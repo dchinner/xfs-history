@@ -1,9 +1,8 @@
-#ident	"$Revision: 1.52 $"
+#ident	"$Revision: 1.53 $"
 
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/vnode.h>
-#include <sys/uuid.h>
 #include <sys/debug.h>
 #include <stddef.h>
 #include "xfs_types.h"
