@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.35 $"
+#ident	"$Revision: 1.36 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -289,8 +289,10 @@ xfs_btree_check_sblock(
 	agf = XFS_BUF_TO_AGF(agbp);
 	ASSERT(block->bb_leftsib == NULLAGBLOCK || 
 	       block->bb_leftsib < agf->agf_length);
+	ASSERT(block->bb_leftsib != 0);
 	ASSERT(block->bb_rightsib == NULLAGBLOCK || 
 	       block->bb_rightsib < agf->agf_length);
+	ASSERT(block->bb_rightsib != 0);
 }
 
 /*
@@ -309,6 +311,7 @@ xfs_btree_check_sptr(
 	agbp = cur->bc_private.a.agbp;
 	agf = XFS_BUF_TO_AGF(agbp);
 	ASSERT(ptr != NULLAGBLOCK);
+	ASSERT(ptr != 0);
 	ASSERT(ptr < agf->agf_length);
 }
 #endif	/* DEBUG */

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.60 $"
+#ident	"$Revision: 1.61 $"
 
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -834,6 +834,7 @@ xfs_ialloc_read_agi(
 	xfs_agi_t	*agi;		/* allocation group header */
 	buf_t		*bp;		/* return value */
 	daddr_t		d;		/* disk block address */
+	int		i;
 	xfs_perag_t	*pag;		/* per allocation group data */
 
 	ASSERT(agno != NULLAGNUMBER);
@@ -847,5 +848,9 @@ xfs_ialloc_read_agi(
 		pag->pagi_init = 1;
 	} else
 		ASSERT(pag->pagi_freecount == agi->agi_freecount);
+#ifdef DEBUG
+	for (i = 0; i < XFS_AGI_UNLINKED_BUCKETS; i++)
+		ASSERT(agi->agi_unlinked[i] != 0);
+#endif
 	return bp;
 }
