@@ -1,4 +1,4 @@
-#ident "$Revision: 1.44 $"
+#ident "$Revision: 1.45 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -43,9 +43,6 @@
 #define	ROUNDUPNBWORD(x)	(((x) + (NBWORD - 1)) & ~(NBWORD - 1))
 
 zone_t	*xfs_buf_item_zone;
-#if XFS_BIG_FILESYSTEMS
-zone_t	*xfs_buf_item64_zone;
-#endif
 
 #if 0
 STATIC void	xfs_buf_item_set_bit(uint *, uint, uint);
@@ -156,35 +153,10 @@ xfs_buf_item_format(xfs_buf_log_item_t	*bip,
 	 * of the bitmap.  We subtract one from the map size, because
 	 * the first element of the bitmap is accounted for in the
 	 * size of the base structure.
-	 *
-	 * In the case that this is a buf log item with a blkno that
-	 * requires 64 bits, we point the transaction at the 64 bit
-	 * structure we're carrying around and copy any data into it
-	 * that might be out of date.
 	 */
-#if XFS_BIG_FILESYSTEMS
-	if (bip->bli_format64 != NULL) {
-		ASSERT(bip->bli_format64->blf_type == XFS_LI_BUF64);
-		ASSERT(bip->bli_format.blf_map_size ==
-		       bip->bli_format64->blf_map_size);
-		ASSERT(bip->bli_format.blf_len == bip->bli_format64->blf_len);
-		base_size = sizeof(xfs_buf_log_format64_t) +
-			((bip->bli_format.blf_map_size - 1) * sizeof(uint));
-		bcopy(bip->bli_format.blf_data_map,
-		      bip->bli_format64->blf_data_map,
-		      (bip->bli_format.blf_map_size * sizeof(uint)));
-		bip->bli_format64->blf_flags = bip->bli_format.blf_flags;
-		vecp->i_addr = (caddr_t)bip->bli_format64;
-	} else {
-		base_size = sizeof(xfs_buf_log_format_t) +
-			((bip->bli_format.blf_map_size - 1) * sizeof(uint));
-		vecp->i_addr = (caddr_t)&bip->bli_format;
-	}
-#else
 	base_size = sizeof(xfs_buf_log_format_t) +
 		((bip->bli_format.blf_map_size - 1) * sizeof(uint));
 	vecp->i_addr = (caddr_t)&bip->bli_format;
-#endif
 	vecp->i_len = base_size;
 	vecp++;
 	nvecs = 1;
@@ -198,11 +170,6 @@ xfs_buf_item_format(xfs_buf_log_item_t	*bip,
 		xfs_buf_item_trace("FORMAT STALE", bip);
 		ASSERT(bip->bli_format.blf_flags & XFS_BLI_CANCEL);
 		bip->bli_format.blf_size = nvecs;
-#if XFS_BIG_FILESYSTEMS
-		if (bip->bli_format64 != NULL) {
-			bip->bli_format64->blf_size = nvecs;
-		}
-#endif
 		return;
 	}
 
@@ -254,11 +221,6 @@ xfs_buf_item_format(xfs_buf_log_item_t	*bip,
 		}
 	}
 	bip->bli_format.blf_size = nvecs;
-#if XFS_BIG_FILESYSTEMS
-	if (bip->bli_format64 != NULL) {
-		bip->bli_format64->blf_size = nvecs;
-	}
-#endif
 
 	/*
 	 * Check to make sure everything is consistent.
@@ -545,9 +507,6 @@ xfs_buf_item_init(buf_t		*bp,
 {
 	xfs_log_item_t		*lip;
 	xfs_buf_log_item_t	*bip;
-#if XFS_BIG_FILESYSTEMS
-	xfs_buf_log_format64_t	*blfp;
-#endif
 	int			chunks;
 	int			map_size;
 
@@ -580,30 +539,11 @@ xfs_buf_item_init(buf_t		*bp,
 	bip->bli_item.li_mountp = mp;
 	bip->bli_buf = bp;
 	bip->bli_format.blf_type = XFS_LI_BUF;
-	bip->bli_format.blf_blkno = (__int32_t)bp->b_blkno;
+	bip->bli_format.blf_blkno = (__int64_t)bp->b_blkno;
 	bip->bli_format.blf_len = BTOBB(bp->b_bcount);
 	bip->bli_format.blf_map_size = map_size;
 #ifndef SIM
 	bip->bli_trace = ktrace_alloc(XFS_BLI_TRACE_SIZE, 0);
-#endif
-	/*
-	 * The original buf log format structure only had 32 bits for
-	 * the blkno of the buffer.  If the blkno of this buffer won't
-	 * fit in 32 bits, allocate a new buf log format 64 bit structure,
-	 * initialize it, and point the buf log item at it.  This will
-	 * be used in xfs_buf_log_item_format() and will be freed when
-	 * we free the buf log item.
-	 */
-#if XFS_BIG_FILESYSTEMS
-	if (bp->b_blkno > INT_MAX) {
-		blfp = (xfs_buf_log_format64_t*)
-			kmem_zone_zalloc(xfs_buf_item64_zone, KM_SLEEP);
-		blfp->blf_type = XFS_LI_BUF64;
-		blfp->blf_blkno = bp->b_blkno;
-		blfp->blf_len = bip->bli_format.blf_len;
-		blfp->blf_map_size = bip->bli_format.blf_map_size;
-		bip->bli_format64 = blfp;
-	}
 #endif
 
 #ifdef XFS_TRANS_DEBUG
@@ -1068,11 +1008,6 @@ xfs_buf_item_relse(buf_t *bp)
 #ifndef SIM
 	ktrace_free(bip->bli_trace);
 #endif
-#if XFS_BIG_FILESYSTEMS
-	if (bip->bli_format64 != NULL) {
-		kmem_zone_free(xfs_buf_item64_zone, bip->bli_format64);
-	}
-#endif
 	kmem_zone_free(xfs_buf_item_zone, bip);
 }
 
@@ -1241,11 +1176,6 @@ xfs_buf_iodone(buf_t			*bp,
 
 #ifndef SIM
 	ktrace_free(bip->bli_trace);
-#endif
-#if XFS_BIG_FILESYSTEMS
-	if (bip->bli_format64 != NULL) {
-		kmem_zone_free(xfs_buf_item64_zone, bip->bli_format64);
-	}
 #endif
 	kmem_zone_free(xfs_buf_item_zone, bip);
 }
