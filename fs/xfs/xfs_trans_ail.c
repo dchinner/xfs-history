@@ -277,14 +277,11 @@ xfs_trans_unlocked_item(
  * cookie returned by AIL_LOCK.
  */
 void
-_xfs_trans_update_ail(
+xfs_trans_update_ail(
 	xfs_mount_t	*mp,
 	xfs_log_item_t	*lip,
-	xfs_lsn_t	lsn
-#if !defined(INTERRUPT_LATENCY_TESTING)
-	,	int	s
-#endif
-	)
+	xfs_lsn_t	lsn,
+	int	s)
 {
 	xfs_ail_entry_t		*ailp;
 	xfs_log_item_t		*dlip=NULL;
@@ -333,14 +330,10 @@ _xfs_trans_update_ail(
  * cookie returned by AIL_LOCK.
  */
 void
-_xfs_trans_delete_ail(
+xfs_trans_delete_ail(
 	xfs_mount_t	*mp,
-	xfs_log_item_t	*lip
-#if !defined(INTERRUPT_LATENCY_TESTING)
-	, int		s
-#endif
-	)
-
+	xfs_log_item_t	*lip,
+	int		s)
 {
 	xfs_ail_entry_t		*ailp;
 	xfs_log_item_t		*dlip;
@@ -374,7 +367,7 @@ _xfs_trans_delete_ail(
 			AIL_UNLOCK(mp, s);
 		else {
 			xfs_cmn_err(XFS_PTAG_AILDELETE, CE_ALERT, mp,
-				"_xfs_trans_delete_ail: attempting to delete a log item that is not in the AIL");
+				"xfs_trans_delete_ail: attempting to delete a log item that is not in the AIL");
 			xfs_force_shutdown(mp, XFS_CORRUPT_INCORE);
 			AIL_UNLOCK(mp, s);
 		}
