@@ -1,7 +1,7 @@
 #ifndef _XFS_DQUOT__H_
 #define _XFS_DQUOT__H_
 
-#ident "$Revision: 1.6 $"
+#ident "$Revision: 1.7 $"
 
 /* 
  * Dquots are structures that hold quota information about a user or a project,
@@ -167,9 +167,16 @@ typedef struct xfs_dquot {
  */
 #define DQUOT_TRACE_SIZE	64
 #define DQUOT_KTRACE_ENTRY	1
-extern void		xfs_dqtrace_entry(xfs_dquot_t *dqp, char *func);
+
+#define xfs_dqtrace_entry_ino(a,b,ip) \
+xfs_dqtrace_entry__((a), (b), (void*)__return_address, (ip))
+#define xfs_dqtrace_entry(a,b) \
+xfs_dqtrace_entry__((a), (b), (void*)__return_address, NULL)
+extern void		xfs_dqtrace_entry__(xfs_dquot_t *dqp, char *func, 
+					    void *, xfs_inode_t *);
 #else
 #define xfs_dqtrace_entry(a,b)	
+#define xfs_dqtrace_entry_ino(a,b,ip)
 #endif
 #ifdef QUOTADEBUG
 extern void 		xfs_qm_dqprint(xfs_dquot_t *);
@@ -180,7 +187,7 @@ extern void 		xfs_qm_dqprint(xfs_dquot_t *);
 extern xfs_dquot_t 	*xfs_qm_dqinit(xfs_mount_t *, xfs_dqid_t, uint);
 extern void		xfs_qm_dqdestroy(xfs_dquot_t *);
 extern int		xfs_qm_dqflush(xfs_dquot_t *, uint);
-extern xfs_dquot_t *	xfs_qm_dqpurge(xfs_dquot_t *);
+extern xfs_dquot_t *	xfs_qm_dqpurge(xfs_dquot_t *, uint);
 extern void		xfs_qm_dqpin(xfs_dquot_t *);
 extern void		xfs_qm_dqunpin(xfs_dquot_t *);
 extern void		xfs_qm_dqunpin_wait(xfs_dquot_t *);
