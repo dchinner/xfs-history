@@ -572,7 +572,7 @@ retry:
 		xfs_inval_cached_pages(vp, &xip->i_iocore, *offset, 1, 1);
 	}
 
-	ret = do_generic_file_write(file, buf, size, offset);
+	ret = generic_file_write_nolock(file, buf, size, offset);
 
 	if ((ret == -ENOSPC) &&
 	    DM_EVENT_ENABLED(vp->v_vfsp, xip, DM_EVENT_NOSPACE) &&
