@@ -1,4 +1,4 @@
-#ident "$Revision: 1.223 $"
+#ident "$Revision: 1.224 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -2962,6 +2962,9 @@ xfs_iflush(
 #ifdef XFS_TRANS_DEBUG
 	int			first;
 #endif
+#ifdef SIM
+	int			needflushdone = 0;
+#endif
 	SPLDECL(s);
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE|MR_ACCESS));
@@ -3185,6 +3188,9 @@ xfs_iflush(
 		}
 		ASSERT(bp->b_fsprivate != NULL);
 		ASSERT(bp->b_iodone != NULL);
+#ifdef SIM
+		needflushdone = 1;
+#endif
 	} else {
 		/*
 		 * We're flushing an inode which is not in the AIL and has
@@ -3230,6 +3236,8 @@ xfs_iflush(
 
 #ifdef SIM
 	error = xfs_bwrite(mp, bp);
+	if (needflushdone && !error)
+		xfs_iflush_done(bp, iip);
 #else
 	if (flags & B_DELWRI) {
 		xfs_bdwrite(mp, bp);
