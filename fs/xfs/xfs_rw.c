@@ -1,4 +1,4 @@
-#ident "$Revision: 1.171 $"
+#ident "$Revision: 1.172 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -65,6 +65,7 @@
 #include "xfs_error.h"
 #include "xfs_bit.h"
 #include "xfs_rw.h"
+#include "xfs_quota.h"
 #include <limits.h>
 
 #ifdef SIM
@@ -1637,6 +1638,8 @@ xfs_iomap_write(
 	xfs_iomap_enter_trace(XFS_IOMAP_WRITE_ENTER, ip, offset, count);
 
 	mp = ip->i_mount;
+	ASSERT(! XFS_NOT_DQATTACHED(mp, ip));
+
 	if (ip->i_new_size > ip->i_d.di_size) {
 		isize = ip->i_new_size;
 	} else {
@@ -1701,11 +1704,15 @@ xfs_iomap_write(
 			  XFS_BMAPI_DELAY | XFS_BMAPI_WRITE |
 			  XFS_BMAPI_ENTIRE, &firstblock, 1, imap,
 			  &nimaps, NULL);
+	/* 
+	 * This can be EDQUOT, if nimaps == 0
+	 */
 	if (error) {
 		return error;
 	}
 	/*
-	 * If bmapi returned us nothing, then we must have run out of space.
+	 * If bmapi returned us nothing, and if we didn't get back EDQUOT,
+	 * then we must have run out of space.
 	 */
 	if (nimaps == 0) {
 		xfs_iomap_enter_trace(XFS_IOMAP_WRITE_NOSPACE,
@@ -1976,6 +1983,15 @@ xfs_write_file(
 	if ((ip->i_d.di_extsize) || 
 	    (ip->i_d.di_flags & XFS_DIFLAG_REALTIME))  {
 		return (XFS_ERROR(EINVAL));
+	}
+		
+	/* 
+	 * Make sure that the dquots are there
+	 */
+	if (XFS_IS_QUOTA_ON(mp)) {
+		if (XFS_NOT_DQATTACHED(mp, ip)) {
+			(void) xfs_qm_dqattach(ip, 0);
+		}
 	}
 
 	error = 0;
@@ -2541,6 +2557,20 @@ xfs_bmap(
 	} else {
 		ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
 		ASSERT(ip->i_d.di_size >= (offset + count));
+
+		/* 
+		 * Make sure that the dquots are there. This doesn't hold 
+		 * the ilock across a disk read.
+		 */
+		if (XFS_IS_QUOTA_ON(ip->i_mount)) {
+			/*
+			 * We don't really care if an error happens here.
+			 * Quotas would have gotten disabled, and life will
+			 * go on as usual, minus disk quotas.
+			 */
+			(void) xfs_qm_dqattach(ip, XFS_QMOPT_ILOCKED);
+		}
+
 		error = xfs_iomap_write(ip, offset, count, bmapp,
 					nbmaps, 0, NULL);
 	}
@@ -3740,6 +3770,17 @@ xfs_strat_write(
 	error = 0;
 	bp->b_flags |= B_STALE;
 
+	if (XFS_IS_QUOTA_ON(mp)) {
+		if (XFS_NOT_DQATTACHED(mp, ip)) {
+			/*
+			 * We don't really care if an error happens here.
+			 * Quotas would have gotten disabled, and life will
+			 * go on as usual, minus disk quotas.
+			 */
+			(void) xfs_qm_dqattach(ip, 0);
+		}
+	}
+
 	/*
 	 * It is possible that the buffer does not start on a block
 	 * boundary in the case where the system page size is less
@@ -4333,20 +4374,22 @@ xfs_diostrat(
 	uint		lock_mode;
 	xfs_fsize_t	new_size;
 	struct bdevsw	*my_bdevsw;
+	boolean_t	quotainprogress;
 
 	CHECK_GRIO_TIMESTAMP(bp, 40);
 
-	dp        = (struct dio_s *)bp->b_private;
-	bdp	  = dp->bdp;
-	vp        = BHV_TO_VNODE(bdp);
-	ip        = XFS_BHVTOI(bdp); 
-	mp 	  = ip->i_mount;
-	base	  = bp->b_un.b_addr;
-	error     = resid = totxfer = end_of_file = 0;
-	offset    = BBTOOFF((off_t)bp->b_blkno);
-	blk_algn  = rt = 0;
+	dp = (struct dio_s *)bp->b_private;
+	bdp = dp->bdp;
+	vp = BHV_TO_VNODE(bdp);
+	ip = XFS_BHVTOI(bdp);
+	mp = ip->i_mount;
+	base = bp->b_un.b_addr;
+	error = resid = totxfer = end_of_file = 0;
+	offset = BBTOOFF((off_t)bp->b_blkno);
+	blk_algn = rt = 0;
 	numrtextents = iprtextsize = sbrtextsize = 0;
-	totresid  = count  = bp->b_bcount;
+	totresid = count = bp->b_bcount;
+	quotainprogress = B_FALSE;
 
 	/*
  	 * Determine if this file is using the realtime volume.
@@ -4370,6 +4413,12 @@ xfs_diostrat(
 		writeflag = 0;
 	} else {
 		writeflag = XFS_BMAPI_WRITE;
+		if (quotainprogress = (boolean_t) XFS_IS_QUOTA_ON(mp)) {
+			if (XFS_NOT_DQATTACHED(mp, ip)) {
+				if (xfs_qm_dqattach(ip, 0)) 
+					quotainprogress = B_FALSE;
+			}
+		}
 	}
 
 	/*
@@ -4490,10 +4539,25 @@ retry:
 					xfs_trans_cancel(tp, 0);
 					xfs_iunlock(ip, XFS_ILOCK_EXCL);
 					break;
-				} else {
-					xfs_trans_ijoin(tp,ip,XFS_ILOCK_EXCL);
-					xfs_trans_ihold(tp, ip);
+				} 
+				/* 
+				 * quota reservations
+				 */
+				if (quotainprogress &&
+				    XFS_IS_QUOTA_ON(mp)) {
+					if (xfs_trans_reserve_blkquota(tp, ip, 
+					  XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) +
+					  datablocks)) {
+						error = EDQUOT;
+						xfs_trans_cancel(tp, 0);
+						xfs_iunlock(ip,
+							    XFS_ILOCK_EXCL);
+						break;
+					}
 				}
+				xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
+				xfs_trans_ihold(tp, ip);
+
 			}
 		} else {
 			/*
@@ -5214,3 +5278,4 @@ xfs_refcache_purge_some(void)
 		VN_RELE(XFS_ITOV(iplist[i]));
 	}
 }
+
