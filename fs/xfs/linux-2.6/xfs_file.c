@@ -37,35 +37,25 @@
 
 
 STATIC ssize_t linvfs_read(
-	struct file *filp,
-	char *buf,
-	size_t size,
-	loff_t *offset)
+	struct file	*filp,
+	char		*buf,
+	size_t		size,
+	loff_t		*offset)
 {
-	struct inode *inode;
-	vnode_t *vp;
-	int err;
-        uio_t uio;
-        iovec_t iov;
-	
-	if (!filp || !filp->f_dentry ||
-			!(inode = filp->f_dentry->d_inode)) {
-		printk("EXIT linvfs_read -EBADF\n");
-		return -EBADF;
-	}
+	vnode_t		*vp;
+	int		err;
+	uio_t		uio;
+	iovec_t		iov;
 
-	inode = filp->f_dentry->d_inode;
-
-	vp = LINVFS_GET_VP(inode);
-
+	vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
 	ASSERT(vp);
 
-        uio.uio_iov = &iov;
-        uio.uio_offset = *offset;
-        uio.uio_fp = filp;
-        uio.uio_iovcnt = 1;
-        uio.uio_iov->iov_base = buf;
-        uio.uio_iov->iov_len = uio.uio_resid = size;
+	uio.uio_iov = &iov;
+	uio.uio_offset = *offset;
+	uio.uio_fp = filp;
+	uio.uio_iovcnt = 1;
+	uio.uio_iov->iov_base = buf;
+	uio.uio_iov->iov_len = uio.uio_resid = size;
 
 	XFS_STATS_INC(xfsstats.xs_read_calls);
 	XFS_STATS_ADD(xfsstats.xs_read_bytes, size);

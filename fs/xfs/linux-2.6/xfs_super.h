@@ -97,6 +97,11 @@ linvfs_fill_buftarg(
 	int		data);
 
 void
+linvfs_bsize_buftarg(
+	struct buftarg	*btp,
+	unsigned int	bsize);
+
+void
 linvfs_release_buftarg(
 	struct buftarg	*btp);
 

@@ -372,6 +372,14 @@ linvfs_fill_buftarg(
 }
 
 void
+linvfs_bsize_buftarg(
+	struct buftarg		*btp,
+	unsigned int		blocksize)
+{
+	pagebuf_target_blocksize(btp->pb_targ, blocksize);
+}
+
+void
 linvfs_release_buftarg(
 	struct buftarg		*btp)
 {
@@ -450,9 +458,9 @@ linvfs_read_super(
 	LINVFS_SET_CVP(sb, cvp);
 	vfsp->vfs_super = sb;
 
-	sb->s_blocksize = 512;
+	sb->s_blocksize = BBSIZE;
 	sb->s_blocksize_bits = ffs(sb->s_blocksize) - 1;
-	set_blocksize(sb->s_dev, 512);
+	set_blocksize(sb->s_dev, BBSIZE);
 	set_posix_acl(sb);
 	set_max_bytes(sb);
 	set_quota_ops(sb);
