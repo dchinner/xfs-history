@@ -72,6 +72,11 @@
 #define GFP_READAHEAD	0
 #endif
 
+static inline void set_cpus_allowed(struct task_struct *p, unsigned long mask)
+{
+
+}
+
 /*
  * Debug code
  */
@@ -2055,9 +2060,12 @@ pagebuf_iodone_daemon(
 	spin_unlock_irq(&current->sigmask_lock);
 
 	/* Migrate to the right CPU */
-	current->cpus_allowed = 1UL << cpu;
+#ifdef SCHED_YIELD			/* XXX: actualy testing for O(1) sched */
 	while (smp_processor_id() != cpu)
 		schedule();
+#else
+	set_cpus_allowed(current, 1UL << cpu);
+#endif
 
 	sprintf(current->comm, "pagebuf_io_CPU%d", bind_cpu);
 	INIT_LIST_HEAD(&pagebuf_iodone_tq[cpu]);
