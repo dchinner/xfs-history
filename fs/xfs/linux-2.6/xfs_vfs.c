@@ -322,13 +322,17 @@ bhv_remove_all_vfsops(
 	int			freebase)
 {
 	struct xfs_mount	*mp;
+	bhv_desc_t		*bdp;
 
 	bhv_remove_vfsops(vfsp, VFS_POSITION_QM);
 	bhv_remove_vfsops(vfsp, VFS_POSITION_DM);
 	bhv_remove_vfsops(vfsp, VFS_POSITION_IO);
 	if (!freebase)
 		return;
-	mp = XFS_BHVTOM(bhv_lookup(VFS_BHVHEAD(vfsp), &xfs_vfsops));
+	bdp = bhv_lookup(VFS_BHVHEAD(vfsp), &xfs_vfsops);
+	if (!bdp)
+		return;
+	mp = XFS_BHVTOM(bdp);
 	VFS_REMOVEBHV(vfsp, &mp->m_bhv);
 	xfs_mount_free(mp, 0);
 }
