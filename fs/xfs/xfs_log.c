@@ -755,43 +755,35 @@ bad_blk:
 /*
  * Start is defined to be the block pointing to the oldest valid log record.
  */
-uint
-xlog_find_oldest(dev_t log_dev,
-		 uint  log_bbnum)
+daddr_t
+xlog_print_find_oldest(xlog_t *log)
 {
-	xlog_rec_header_t	*head;
-	int			block_start = 0;
-	int			block_no = 0;
-	int			cycle_no = 0;
-	int			binary_block_start = 0;
-	buf_t			*bp;
+	buf_t	*bp;
+	daddr_t	first_blk, last_blk;
+	uint	first_half_cycle, last_half_cycle;
 	
-	/* read through all blocks to find start of on-disk log */
-	while (block_no < log_bbnum) {
-		bp = bread(log_dev, block_no, 1);
-		if (bp->b_flags & B_ERROR) {
-			xlog_panic("xlog_find_oldest");
-		}
-		head = (xlog_rec_header_t *)bp->b_dmaaddr;
-		if (head->h_magicno != XLOG_HEADER_MAGIC_NUM) {
-			block_no++;
-			brelse(bp);
-			continue;
-		}
-		if (cycle_no == 0) {
-			cycle_no	= CYCLE_LSN(head->h_lsn);
-			block_start = block_no;
-		} else if (CYCLE_LSN(head->h_lsn) < cycle_no) {
-			cycle_no	= CYCLE_LSN(head->h_lsn);
-			block_start	= block_no;
-			brelse(bp);
-			break;
-		}
-		block_no++;
-		brelse(bp);
+	if (xlog_find_zeroed(log, &first_blk))
+		return 0;
+
+	first_blk = 0;					/* read first block */
+	bp = xlog_get_bp(1);
+	xlog_bread(log, 0, 1, bp);
+	first_half_cycle = GET_CYCLE(bp->b_dmaaddr);
+
+	last_blk = log->l_logBBsize-1;			/* read last block */
+	xlog_bread(log, last_blk, 1, bp);
+	last_half_cycle = GET_CYCLE(bp->b_dmaaddr);
+	ASSERT(last_half_cycle != 0);
+
+	if (first_half_cycle == last_half_cycle) {/* all cycle nos are same */
+		last_blk = 0;
+	} else {		/* have 1st and last; look for middle cycle */
+		last_blk = xlog_find_cycle_start(log, bp, first_blk,
+						 last_blk, last_half_cycle);
 	}
 
-	return (uint)block_start;
+	xlog_put_bp(bp, 1);
+	return last_blk;
 }	/* xlog_find_oldest */
 
 
