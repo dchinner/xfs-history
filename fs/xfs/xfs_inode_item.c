@@ -1,4 +1,4 @@
-#ident "$Revision: 1.53 $"
+#ident "$Revision: 1.54 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -505,7 +505,7 @@ xfs_inode_item_trylock(
 			if (bp != NULL) {
 				if (bp->b_flags & B_DELWRI) {
 					iip->ili_bp = bp;
-					iip->ili_bp_owner = u.u_procp;
+					iip->ili_bp_owner = curprocp;
 					flushed = 1;
 				} else {
 					brelse(bp);
@@ -665,7 +665,7 @@ xfs_inode_item_push(
 	 */
 	bp = iip->ili_bp;
 	ip = iip->ili_inode;
-	if ((bp != NULL) && (iip->ili_bp_owner == u.u_procp)) {
+	if ((bp != NULL) && (iip->ili_bp_owner == curprocp)) {
 		ASSERT(iip->ili_bp->b_flags & B_BUSY);
 		iip->ili_bp = NULL;
 		iip->ili_bp_owner = NULL;

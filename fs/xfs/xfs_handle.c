@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.13 $"
+#ident "$Revision: 1.14 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -49,7 +49,7 @@ copyout_handle (
 	if (copyout (handle, hbuf, (int) hsize))
 		return EFAULT;
 #ifdef _K64U64
-	if (ABI_IS_64BIT(u.u_procp->p_abi))
+	if (ABI_IS_64BIT(curprocp->p_abi))
 		return copyout (&hsize, hlen, sizeof *hlen);
 	else
 #endif
@@ -171,7 +171,7 @@ readlink_by_handle (
 	auio.uio_offset	= 0;
 	auio.uio_segflg	= UIO_USERSPACE;
 	auio.uio_resid	= bufsiz;
-	error = VOP_READLINK (vp, &auio, u.u_cred);
+	error = VOP_READLINK (vp, &auio, curprocp->p_cred);
 out:
 	VN_RELE (vp);
 	rvp->r_val1 = bufsiz - auio.uio_resid;
@@ -288,7 +288,7 @@ vp_open (
 	tvp = vp;
 	VN_HOLD (tvp);
 
-	if (error = VOP_SETFL (vp, 0, filemode, u.u_cred))
+	if (error = VOP_SETFL (vp, 0, filemode, curprocp->p_cred))
 		goto out;
 
 	/*
@@ -310,13 +310,13 @@ vp_open (
 		}
 	}
 	/* Check discretionary permissions. */
-	if (error = VOP_ACCESS (vp, mode, 0, u.u_cred))
+	if (error = VOP_ACCESS (vp, mode, 0, curprocp->p_cred))
 		goto out;
 
 	/*
 	 * Do opening protocol.
 	 */
-	if ((error = VOP_OPEN (&vp, filemode, u.u_cred)) == 0) {
+	if ((error = VOP_OPEN (&vp, filemode, curprocp->p_cred)) == 0) {
 		if (tvp)
 			VN_RELE (tvp);
 	}
