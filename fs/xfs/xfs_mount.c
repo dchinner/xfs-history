@@ -819,17 +819,17 @@ xfs_mountfs(
 	}
 
 	/*
-	 * Set up timer list structure for nfs refcache
-	 */
-	init_timer(&mp->m_sbdirty_timer);
-	mp->m_sbdirty_timer.function = (void (*)(unsigned long)) xfs_refcache_sbdirty;
-
-	/*
 	 * For client case we are done now
 	 */
 	if (mfsi_flags & XFS_MFSI_CLIENT) {
 		return(0);
 	}
+
+	/*
+	 * Set up timer list structure for nfs refcache
+	 */
+	init_timer(&mp->m_sbdirty_timer);
+	mp->m_sbdirty_timer.function = (void (*)(unsigned long)) xfs_refcache_sbdirty;
 
 	/* Initialize the I/O function vector with XFS functions */
 	mp->m_io_ops = xfs_iocore_xfs;
