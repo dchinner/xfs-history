@@ -2,7 +2,7 @@
 #
 # Makefile for SGI XFS File System
 #
-# $Revision: 1.40 $
+# $Revision: 1.41 $
 DEPTH?=../..
 include ${DEPTH}/kcommondefs
 KPATH=$(TOP)/fs/xfs
@@ -122,6 +122,7 @@ HFILES=	xfs_ag.h \
 	xfs_trans_priv.h \
 	xfs_types.h \
 	xfs_dquot.h \
+	xfs_dqblk.h \
 	xfs_qm.h \
 	xfs_quota.h \
 	xfs_quota_priv.h
@@ -138,7 +139,7 @@ $(KCOMMONPREF)install: $(KCOMMONPREF)default
 	${KINSTALL} ${XFS_NAME}
 	${KINSTALL} ${XFSRT_NAME}
 	${KINSTALL} ${XIDBG_NAME}
-	${KINSTALL} -idb std.sw.xfsquotas ${XFSQUOTA_NAME}
+	${KINSTALL} ${XFSQUOTA_NAME}
 	${KDEVINSTALL} ${TARGETS}
 
 headers!
