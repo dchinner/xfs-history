@@ -154,8 +154,8 @@ void	pb_tracking_free(page_buf_t *pb)
  *	File wide globals
  */
 
-kmem_cache_t *pagebuf_cache = NULL;
-STATIC pagebuf_daemon_t *pb_daemon = NULL;
+STATIC kmem_cache_t *pagebuf_cache;
+STATIC pagebuf_daemon_t *pb_daemon;
 STATIC struct list_head pagebuf_iodone_tq[NR_CPUS];
 STATIC wait_queue_head_t pagebuf_iodone_wait[NR_CPUS];
 
@@ -187,6 +187,57 @@ pagebuf_param_t pb_params = {{ HZ, 15 * HZ, 0, 0 }};
  */
 
 struct pbstats pbstats;
+
+/*
+ * Pagebuf allocation / freeing.
+ */
+
+#define pb_to_gfp(flags) \
+	(((flags) & PBF_DONT_BLOCK) ? GFP_NOFS : GFP_KERNEL)
+
+#define pagebuf_allocate(flags) \
+	kmem_cache_alloc(pagebuf_cache, pb_to_gfp(flags))
+#define pagebuf_deallocate(pb) \
+	kmem_cache_free(pagebuf_cache, (pb));
+
+/*
+ * Pagebuf hashing
+ */
+
+#define NBITS	5
+#define NHASH	(1<<NBITS)
+
+typedef struct {
+	struct list_head	pb_hash;
+	int			pb_count;
+	spinlock_t		pb_hash_lock;
+} pb_hash_t;
+
+STATIC pb_hash_t	pbhash[NHASH];
+#define pb_hash(pb)	&pbhash[pb->pb_hash_index]
+
+STATIC int
+_bhash(
+	dev_t			dev,
+	loff_t			base)
+{
+	int			bit, hval;
+
+	base >>= 9;
+	/*
+	 * dev_t is 16 bits, loff_t is always 64 bits
+	 */
+	base ^= dev;
+	for (bit = hval = 0; base != 0 && bit < sizeof(base) * 8; bit += NBITS) {
+		hval ^= (int)base & (NHASH-1);
+		base >>= NBITS;
+	}
+	return hval;
+}
+
+/*
+ * Mapping of multi-page buffers into contingous virtual space
+ */
 
 STATIC void *pagebuf_mapout_locked(page_buf_t *);
 
@@ -252,7 +303,7 @@ purge_addresses(void)
  *	This routine initializes a page_buf_t object
  */
 
-int
+STATIC int
 _pagebuf_initialize(
     page_buf_t *pb,
     pb_target_t *target,
@@ -297,8 +348,7 @@ STATIC int
 _pagebuf_get_pages(page_buf_t * pb, int page_count, int flags)
 {
 
-	int	gpf_mask = (flags & PBF_DONT_BLOCK) ?
-				SLAB_NOFS : SLAB_KERNEL;
+	int	gpf_mask = pb_to_gfp(flags);
 
 	/* assure that we have a page list */
 	if (pb->pb_pages == NULL) {
@@ -393,7 +443,7 @@ void _pagebuf_free_object(
 	}
 
 	pb_tracking_free(pb);
-	kmem_cache_free(pagebuf_cache, pb);
+	pagebuf_deallocate(pb);
 }
 
 
@@ -682,6 +732,117 @@ STATIC inline void _pagebuf_free_bh(struct buffer_head *bh)
  */
 
 /*
+ *	_pagebuf_find
+ *
+ *	Looks up, and creates if absent, a lockable buffer for
+ *	a given range of an inode.  The buffer is returned
+ *	locked.	 If other overlapping buffers exist, they are
+ *	released before the new buffer is created and locked,
+ *	which may imply that this call will block until those buffers
+ *	are unlocked.  No I/O is implied by this call.
+ */
+
+STATIC page_buf_t *
+_pagebuf_find(				/* find buffer for block	*/
+	pb_target_t		*target,/* target for block		*/
+	loff_t			ioff,	/* starting offset of range	*/
+	size_t			isize,	/* length of range		*/
+	page_buf_flags_t	flags,	/* PBF_TRYLOCK			*/
+	page_buf_t		*new_pb)/* newly allocated buffer	*/
+{
+	loff_t			range_base;
+	size_t			range_length;
+	int			hval;
+	pb_hash_t		*h;
+	struct list_head	*p;
+	page_buf_t		*pb;
+	int			not_locked;
+
+	range_base = (ioff << SECTOR_SHIFT);
+	range_length = (isize << SECTOR_SHIFT);
+
+	hval = _bhash(target->pbr_bdev->bd_dev, range_base);
+	h = &pbhash[hval];
+
+	spin_lock(&h->pb_hash_lock);
+	list_for_each(p, &h->pb_hash) {
+		pb = list_entry(p, page_buf_t, pb_hash_list);
+
+		if ((target == pb->pb_target) &&
+		    (pb->pb_file_offset == range_base) &&
+		    (pb->pb_buffer_length == range_length)) {
+			if (pb->pb_flags & PBF_FREED)
+				break;
+			/* If we look at something bring it to the
+			 * front of the list for next time
+			 */
+			list_del(&pb->pb_hash_list);
+			list_add(&pb->pb_hash_list, &h->pb_hash);
+			goto found;
+		}
+	}
+
+	/* No match found */
+	if (new_pb) {
+		_pagebuf_initialize(new_pb, target, range_base,
+				range_length, flags | _PBF_LOCKABLE);
+		new_pb->pb_hash_index = hval;
+		h->pb_count++;
+		list_add(&new_pb->pb_hash_list, &h->pb_hash);
+	} else {
+		PB_STATS_INC(pbstats.pb_miss_locked);
+	}
+
+	spin_unlock(&h->pb_hash_lock);
+	return (new_pb);
+
+found:
+	atomic_inc(&pb->pb_hold);
+	spin_unlock(&h->pb_hash_lock);
+
+	/* Attempt to get the semaphore without sleeping,
+	 * if this does not work then we need to drop the
+	 * spinlock and do a hard attempt on the semaphore.
+	 */
+	not_locked = down_trylock(&PBP(pb)->pb_sema);
+	if (not_locked) {
+		if (!(flags & PBF_TRYLOCK)) {
+			/* wait for buffer ownership */
+			PB_TRACE(pb, PB_TRACE_REC(get_lk), 0);
+			pagebuf_lock(pb);
+			PB_STATS_INC(pbstats.pb_get_locked_waited);
+		} else {
+			/* We asked for a trylock and failed, no need
+			 * to look at file offset and length here, we
+			 * know that this pagebuf at least overlaps our
+			 * pagebuf and is locked, therefore our buffer
+			 * either does not exist, or is this buffer
+			 */
+
+			pagebuf_rele(pb);
+			PB_STATS_INC(pbstats.pb_busy_locked);
+			return (NULL);
+		}
+	} else {
+		/* trylock worked */
+		PB_SET_OWNER(pb);
+	}
+
+	if (pb->pb_flags & PBF_STALE)
+		pb->pb_flags &= PBF_MAPPABLE | \
+				PBF_MAPPED | \
+				_PBF_LOCKABLE | \
+				_PBF_ALL_PAGES_MAPPED | \
+				_PBF_SOME_INVALID_PAGES | \
+				_PBF_ADDR_ALLOCATED | \
+				_PBF_MEM_ALLOCATED;
+	PB_TRACE(pb, PB_TRACE_REC(got_lk), 0);
+	PB_STATS_INC(pbstats.pb_get_locked);
+	return (pb);
+}
+
+
+/*
  *	pagebuf_find
  *
  *	pagebuf_find returns a buffer matching the specified range of
@@ -690,26 +851,18 @@ STATIC inline void _pagebuf_free_bh(struct buffer_head *bh)
  *	some, but not all, of the blocks are in memory.	 Even where
  *	pages are present in the buffer, not all of every page may be
  *	valid.	The file system may use pagebuf_segment to visit the
- *	various segments of the buffer.	 pagebuf_find will return an
- *	empty buffer (with no storage allocated) if the fifth argument
- *	is TRUE.
+ *	various segments of the buffer.
  */
 
-page_buf_t *pagebuf_find(	/* find buffer for block if	*/
-				/* the block is in memory	*/
-    pb_target_t *target,	/* target for block		 */
-    loff_t ioff,		/* starting offset of range	*/
-    size_t isize,		/* length of range		*/
-    page_buf_flags_t flags)	/* PBF_LOCK, PBF_ALWAYS_ALLOC	*/
+page_buf_t *
+pagebuf_find(				/* find buffer for block	*/
+					/* if the block is in memory	*/
+	pb_target_t		*target,/* target for block		*/
+	loff_t			ioff,	/* starting offset of range	*/
+	size_t			isize,	/* length of range		*/
+	page_buf_flags_t	flags)	/* PBF_TRYLOCK			*/
 {
-	page_buf_t *pb = NULL;
-
-	ioff <<= SECTOR_SHIFT;
-	isize <<= SECTOR_SHIFT;
-
-	_pagebuf_find_lockable_buffer(target, ioff, isize, flags, &pb, NULL);
-
-	return (pb);
+	return _pagebuf_find(target, ioff, isize, flags, NULL);
 }
 
 /*
@@ -723,40 +876,40 @@ page_buf_t *pagebuf_find(	/* find buffer for block if	*/
  *	If PBF_READ is set in flags, pagebuf_read
  */
 
-page_buf_t *pagebuf_get(	/* allocate a buffer		*/
-    pb_target_t *target,	/* target for buffer (or NULL)	 */
-    loff_t ioff,		/* starting offset of range	*/
-    size_t isize,		/* length of range		*/
-    page_buf_flags_t flags)	/* PBF_LOCK, PBF_TRYLOCK, PBF_READ, */
-				/* PBF_LONG_TERM, PBF_SEQUENTIAL, */
-				/* PBF_MAPPED */
+page_buf_t *
+pagebuf_get(				/* allocate a buffer		*/
+	pb_target_t		*target,/* target for buffer 		*/
+	loff_t			ioff,	/* starting offset of range	*/
+	size_t			isize,	/* length of range		*/
+	page_buf_flags_t	flags)	/* PBF_TRYLOCK			*/
 {
-	int rval;
-	page_buf_t *pb;
+	page_buf_t		*pb, *new_pb;
+	int			error;
 
-	assert(target);
-
-	isize <<= SECTOR_SHIFT;
-
-	rval = _pagebuf_get_lockable_buffer(target, ioff << SECTOR_SHIFT,
-						isize, flags, &pb);
-
-	if (rval != 0)
+	new_pb = pagebuf_allocate(flags);
+	if (unlikely(!new_pb))
 		return (NULL);
+
+	pb = _pagebuf_find(target, ioff, isize, flags, new_pb);
+	if (pb != new_pb) {
+		pagebuf_deallocate(new_pb);
+		if (unlikely(!pb))
+			return (NULL);
+	}
 
 	PB_STATS_INC(pbstats.pb_get);
 
 	/* fill in any missing pages */
-	rval = _pagebuf_lookup_pages(pb, pb->pb_target->pbr_mapping, flags);
-	if (rval != 0) {
+	error = _pagebuf_lookup_pages(pb, pb->pb_target->pbr_mapping, flags);
+	if (unlikely(error)) {
 		pagebuf_free(pb);
 		return (NULL);
 	}
 
-	/* Always fill in the block number now, the mapped cases can do
+	/*
+	 * Always fill in the block number now, the mapped cases can do
 	 * their own overlay of this later.
 	 */
-
 	pb->pb_bn = ioff;
 	pb->pb_count_desired = pb->pb_buffer_length;
 
@@ -766,7 +919,8 @@ page_buf_t *pagebuf_get(	/* allocate a buffer		*/
 			PB_STATS_INC(pbstats.pb_get_read);
 			pagebuf_iostart(pb, flags);
 		} else if (flags & PBF_ASYNC) {
-			/* Read ahead call which is already satisfied,
+			/*
+			 * Read ahead call which is already satisfied,
 			 * drop the buffer
 			 */
 			if (flags & (PBF_LOCK | PBF_TRYLOCK))
@@ -780,7 +934,6 @@ page_buf_t *pagebuf_get(	/* allocate a buffer		*/
 	}
 
 	PB_TRACE(pb, PB_TRACE_REC(get_obj), flags);
-
 	return (pb);
 }
 
@@ -800,7 +953,7 @@ pagebuf_lookup(
 	int			status;
 
 	flags |= _PBF_PRIVATE_BH;
-	pb = __pagebuf_allocate(flags);
+	pb = pagebuf_allocate(flags);
 	if (pb) {
 		_pagebuf_initialize(pb, target, ioff, isize, flags);
 		if (flags & PBF_ENTER_PAGES) {
@@ -837,7 +990,7 @@ pagebuf_get_empty(pb_target_t *target)
 {
 	page_buf_t *pb;
 
-	pb = __pagebuf_allocate(_PBF_LOCKABLE);
+	pb = pagebuf_allocate(_PBF_LOCKABLE);
 	if (pb)
 		_pagebuf_initialize(pb, target, 0, 0, _PBF_LOCKABLE);
 	return (pb);
@@ -915,7 +1068,7 @@ pagebuf_get_no_daddr(size_t len, pb_target_t *target)
 	if (len > 0x20000)
 		return(NULL);
 
-	pb = __pagebuf_allocate(flags);
+	pb = pagebuf_allocate(flags);
 	if (!pb)
 		return NULL;
 
@@ -1210,7 +1363,7 @@ int pagebuf_iostart(		/* start I/O on a buffer	  */
     page_buf_t * pb,		/* buffer to start		  */
     page_buf_flags_t flags)	/* PBF_LOCK, PBF_ASYNC, PBF_READ, */
 				/* PBF_WRITE, PBF_ALLOCATE,	  */
-				/* PBF_DELWRI, PBF_SEQUENTIAL,	  */
+				/* PBF_DELWRI, 			  */
 				/* PBF_SYNC, PBF_DONT_BLOCK	  */
 				/* PBF_RELEASE			  */
 {
@@ -1721,12 +1874,10 @@ pagebuf_offset(page_buf_t *pb, off_t offset)
  *	The struct page * return value may be set to NULL if the
  *	page is outside of main memory (as in the case of memory on a controller
  *	card).	The page_buf_pgno_t may be set to PAGE_BUF_PGNO_NULL
- *	as well, if the page is not actually allocated, unless the
- *	PBF_ALWAYS_ALLOC flag is set in the page_buf_flags_t,
- *	in which allocation of storage will be forced.
+ *	as well, if the page is not actually allocated.
  */
 
-int pagebuf_segment(		/* return next segment of buffer */
+STATIC int pagebuf_segment(	/* return next segment of buffer */
     page_buf_t * pb,		/* buffer to examine		*/
     loff_t * boff_p,		/* offset in buffer of next	*/
 				/* segment (updated)		*/
@@ -2292,6 +2443,8 @@ static void	pagebuf_shaker(void)
 
 int __init pagebuf_init(void)
 {
+	int i;
+
 	pagebuf_table_header = register_sysctl_table(pagebuf_root_table, 1);
 
 #ifdef	CONFIG_PROC_FS
@@ -2299,25 +2452,27 @@ int __init pagebuf_init(void)
 		create_proc_read_entry("fs/pagebuf/stat", 0, 0, pagebuf_readstats, NULL);
 #endif
 
-	pagebuf_locking_init();
+	pagebuf_cache = kmem_cache_create("page_buf_t",
+			sizeof(page_buf_private_t), 0,
+			SLAB_HWCACHE_ALIGN, NULL, NULL);
 	if (pagebuf_cache == NULL) {
-		pagebuf_cache = kmem_cache_create("page_buf_t",
-		    sizeof(page_buf_private_t),
-		    0, SLAB_HWCACHE_ALIGN, NULL, NULL);
-		if (pagebuf_cache == NULL) {
-			printk("pagebuf: couldn't init pagebuf cache\n");
-			pagebuf_terminate();
-			return (-ENOMEM);
-		}
+		printk("pagebuf: couldn't init pagebuf cache\n");
+		pagebuf_terminate();
+		return (-ENOMEM);
 	}
 
-	if ( _pagebuf_prealloc_bh(NR_RESERVED_BH) < NR_RESERVED_BH) {
+	if (_pagebuf_prealloc_bh(NR_RESERVED_BH) < NR_RESERVED_BH) {
 		printk("pagebuf: couldn't pre-allocate %d buffer heads\n", NR_RESERVED_BH);
 		pagebuf_terminate();
 		return (-ENOMEM);
 	}
 
 	init_waitqueue_head(&pb_resv_bh_wait);
+
+	for (i = 0; i < NHASH; i++) {
+		spin_lock_init(&pbhash[i].pb_hash_lock);
+		INIT_LIST_HEAD(&pbhash[i].pb_hash);
+	}
 
 #ifdef PAGEBUF_TRACE
 	pb_trace.buf = (pagebuf_trace_t *)kmalloc(PB_TRACE_BUFSIZE *
@@ -2344,10 +2499,9 @@ int __init pagebuf_init(void)
 
 void pagebuf_terminate(void)
 {
-	if (pagebuf_cache != NULL)
-		kmem_cache_destroy(pagebuf_cache);
 	pagebuf_daemon_stop();
 
+	kmem_cache_destroy(pagebuf_cache);
 	kmem_shake_deregister(pagebuf_shaker);
 
 	unregister_sysctl_table(pagebuf_table_header);

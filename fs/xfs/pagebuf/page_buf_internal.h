@@ -104,19 +104,6 @@ typedef struct pagebuf_daemon {
 	int			pb_delwri_cnt;
 } pagebuf_daemon_t;
 
-#define NBITS	5
-#define NHASH	(1<<NBITS)
-
-typedef struct {
-	struct list_head	pb_hash;
-	int			pb_count;
-	spinlock_t		pb_hash_lock;
-} pb_hash_t;
-
-extern pb_hash_t	pbhash[];
-
-#define pb_hash(pb)	&pbhash[pb->pb_hash_index]
-
 /*
  * Tunable pagebuf parameters
  */
@@ -161,35 +148,8 @@ struct pbstats {
 };
 
 extern struct pbstats pbstats;
-extern kmem_cache_t	*pagebuf_cache;
 
 #define PB_STATS_INC(count)	( count ++ )
-
-static __inline__ page_buf_t *__pagebuf_allocate(int flags)
-{
-	return kmem_cache_alloc(pagebuf_cache,
-			(flags & PBF_DONT_BLOCK) ? SLAB_NOFS : SLAB_KERNEL);
-}
-
-/*
- * Internal routines
- */
-
-extern int _pagebuf_get_lockable_buffer(
-			pb_target_t *, loff_t, size_t, page_buf_flags_t,
-			page_buf_t **);
-extern int _pagebuf_find_lockable_buffer(
-			pb_target_t *, loff_t, size_t, page_buf_flags_t,
-			page_buf_t **, page_buf_t *);
-
-extern int _pagebuf_initialize(
-			page_buf_t *, pb_target_t *, loff_t,
-			size_t, page_buf_flags_t);
-
-extern int pagebuf_locking_init(void);
-
-extern int pagebuf_init(void);
-extern void pagebuf_terminate(void);
 
 #undef assert
 #ifdef PAGEBUF_DEBUG

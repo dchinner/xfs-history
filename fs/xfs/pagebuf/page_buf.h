@@ -238,14 +238,14 @@ extern page_buf_t *pagebuf_find(	/* find buffer for block if	*/
 		struct pb_target *,	/* inode for block		*/
 		loff_t,			/* starting offset of range	*/
 		size_t,			/* length of range		*/
-		page_buf_flags_t);	/* PBF_LOCK, PBF_ALWAYS_ALLOC	*/
+		page_buf_flags_t);	/* PBF_LOCK			*/
 
 extern page_buf_t *pagebuf_get(		/* allocate a buffer		*/
 		struct pb_target *,	/* inode for buffer		*/
 		loff_t,			/* starting offset of range	*/
 		size_t,			/* length of range		*/
 		page_buf_flags_t);	/* PBF_LOCK, PBF_READ, PBF_ALLOCATE, */
-					/* PBF_ASYNC, PBF_SEQUENTIAL	*/
+					/* PBF_ASYNC,			*/	
 
 extern page_buf_t *pagebuf_lookup(
 		struct pb_target *,
@@ -336,7 +336,7 @@ extern int pagebuf_iostart(		/* start I/O on a buffer	*/
 		page_buf_t *,		/* buffer to start		*/
 		page_buf_flags_t);	/* PBF_LOCK, PBF_ASYNC, PBF_READ, */
 					/* PBF_WRITE, PBF_ALLOCATE,	*/
-					/* PBF_DELWRI, PBF_SEQUENTIAL,	*/
+					/* PBF_DELWRI, 			*/
 					/* PBF_SYNC			*/
 
 extern int pagebuf_iorequest(		/* start real I/O		*/
@@ -356,16 +356,6 @@ extern int pagebuf_iowait(		/* wait for buffer I/O done	*/
 		page_buf_t *);		/* buffer to wait on		*/
 
 extern caddr_t	pagebuf_offset(page_buf_t *, off_t);
-
-extern int pagebuf_segment(		/* return next segment of buffer */
-		page_buf_t *,		/* buffer to examine		*/
-		loff_t *,		/* offset in buffer of next	*/
-					/* segment (updated)		*/
-		struct page **,		/* page (updated)		*/
-					/* (NULL if not in mem_map[])	*/
-		size_t *,		/* offset in page (updated)	*/
-		size_t *,		/* length of segment (updated)	*/
-		page_buf_flags_t);	/* PBF_ALWAYS_ALLOC		*/
 
 extern int pagebuf_iomove(		/* move data in/out of pagebuf	*/
 		page_buf_t *,		/* buffer to manipulate		*/
