@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.13 1994/04/14 15:07:38 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.14 1994/04/14 18:27:24 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -891,6 +891,7 @@ xfs_remove_grio_guarantee(xfs_inode_t *ip, pid_t pid)
 	int		ret;
 	grio_msg_t 	griomsg;
 	extern int	grio_issue_async_grio_req(grio_msg_t *);
+	extern void	bzero( void *, int);
 
 	bzero(&griomsg, sizeof(grio_msg_t));
 
