@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.112 $"
+#ident	"$Revision: 1.113 $"
 
 /*
  * High level interface routines for log manager
@@ -64,7 +64,6 @@
 
 /* Local miscellaneous function prototypes */
 STATIC xfs_lsn_t xlog_commit_record(xfs_mount_t *mp, xlog_ticket_t *ticket);
-STATIC int	 xlog_find_zeroed(xlog_t *log, daddr_t *blk_no);
 STATIC xlog_t *  xlog_alloc_log(xfs_mount_t	*mp,
 				dev_t		log_dev,
 				daddr_t		blk_offset,
@@ -124,7 +123,9 @@ STATIC void		xlog_ticket_put(xlog_t *log, xlog_ticket_t *ticket);
 
 /* local debug functions */
 STATIC void	xlog_verify_dest_ptr(xlog_t *log, __psint_t ptr);
+#ifdef XFSDEBUG
 STATIC void	xlog_verify_disk_cycle_no(xlog_t *log, xlog_in_core_t *iclog);
+#endif
 STATIC void	xlog_verify_grant_head(xlog_t *log, int equals);
 STATIC void	xlog_verify_iclog(xlog_t *log, xlog_in_core_t *iclog,
 				  int count, boolean_t syncing);
@@ -565,8 +566,7 @@ void
 xfs_log_move_tail(xfs_mount_t	*mp,
 		  xfs_lsn_t	tail_lsn)
 {
-	xlog_ticket_t	*tic, *last_tic;
-	xfs_lsn_t	sync_lsn;
+	xlog_ticket_t	*tic;
 	xlog_t		*log = mp->m_log; 
 	int		need_bytes, free_bytes, cycle, bytes, spl;
 
@@ -739,7 +739,6 @@ STATIC void
 xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 			   xlog_t	*log)
 {
-	uint bs;					/* buffer size */
 	int size;
 
 	/*
@@ -854,7 +853,6 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	xlog_in_core_t		**iclogp;
 	xlog_in_core_t		*iclog, *prev_iclog;
 	buf_t			*bp;
-	uint			buf_size;
 	int			i;
 
 	log = mp->m_log = (void *)kmem_zalloc(sizeof(xlog_t), 0);
@@ -1754,7 +1752,6 @@ STATIC void
 xlog_regrant_write_log_space(xlog_t	   *log,
 			     xlog_ticket_t *tic)
 {
-	xlog_ticket_t	*head;
 	int		spl;
 	int		free_bytes, need_bytes;
 	xfs_lsn_t	tail_lsn;
@@ -1863,7 +1860,6 @@ xlog_ungrant_log_space(xlog_t	     *log,
 		       xlog_ticket_t *ticket)
 {
 	int spl;
-	int unused_bytes;
 
 	if (ticket->t_cnt > 0)
 		ticket->t_cnt--;
@@ -1963,7 +1959,6 @@ xlog_state_release_iclog(xlog_t		*log,
 {
 	int		spl;
 	int		sync = 0;	/* do we sync? */
-	int		blocks;
     
 	xlog_assign_tail_lsn(log->l_mp, 0);
 
@@ -2273,8 +2268,6 @@ STATIC void
 xlog_ticket_put(xlog_t		*log,
 		xlog_ticket_t	*ticket)
 {
-	xlog_ticket_t *t_list;
-
 	freesema(&ticket->t_sema);
 
 	/*
@@ -2392,6 +2385,7 @@ xlog_verify_dest_ptr(xlog_t     *log,
 }	/* xlog_verify_dest_ptr */
 
 
+#ifdef XFSDEBUG
 /* check split LR write */
 STATIC void
 xlog_verify_disk_cycle_no(xlog_t	 *log,
@@ -2412,6 +2406,7 @@ xlog_verify_disk_cycle_no(xlog_t	 *log,
 	xlog_put_bp(bp);
     }
 }	/* xlog_verify_disk_cycle_no */
+#endif
 
 
 STATIC void
@@ -2480,15 +2475,13 @@ xlog_verify_iclog(xlog_t	 *log,
 {
 #ifdef DEBUG
 	xlog_op_header_t  *ophead;
-	xlog_rec_header_t *rec;
 	xlog_in_core_t	 *icptr;
 #ifndef _KERNEL
 	xlog_tid_t	 tid;
 #endif
 	caddr_t		 ptr;
 	char		 clientid;
-	int		 len, fd, i, op_len, cycle_no, spl;
-	buf_t		 *bp;
+	int		 len, i, op_len, spl;
 
 	/* check validity of iclog pointers */
 	spl = LOG_LOCK(log);

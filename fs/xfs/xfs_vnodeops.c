@@ -262,6 +262,7 @@ sema_t xfs_ancestormon;		/* initialized in xfs_init */
  * xfs_close
  *
  */
+/*ARGSUSED*/
 STATIC int
 xfs_close(vnode_t	*vp,
 	  int		flag,
@@ -277,7 +278,7 @@ xfs_close(vnode_t	*vp,
 	proc_t		*p  = u.u_procp;
 	shaddr_t	*sa = p->p_shaddr;
 	int		isshd, nofiles;
-	int		i, vpcount, ret;
+	int		i, vpcount;
 
 	vn_trace_entry(vp, "xfs_close");
         ip = XFS_VTOI(vp);
@@ -362,24 +363,9 @@ xfs_close(vnode_t	*vp,
 
 
 /*
- * xfs_ioctl
- *
- */
-STATIC int
-xfs_ioctl(vnode_t	*vp,
-	  int		cmd,
-	  void		*argp,
-	  int		flag,
-	  cred_t	*credp,
-	  int		*rvalp)
-{
-	return XFS_ERROR(ENOTTY);
-}
-
-
-/*
  * xfs_getattr
  */
+/*ARGSUSED*/
 STATIC int
 xfs_getattr(vnode_t	*vp,
 	    vattr_t	*vap,
@@ -887,6 +873,7 @@ error_return:
  * xfs_access
  * Null conversion from vnode mode bits to inode mode bits, as in efs.
  */
+/*ARGSUSED*/
 STATIC int
 xfs_access(vnode_t	*vp,
 	   int		mode,
@@ -916,6 +903,7 @@ xfs_access(vnode_t	*vp,
  * xfs_readlink
  *
  */
+/*ARGSUSED*/
 STATIC int
 xfs_readlink(vnode_t	*vp,
 	     uio_t	*uiop,
@@ -1014,6 +1002,7 @@ error_return:
  * be held while flushing the data, so acquire after we're done
  * with that.
  */
+/*ARGSUSED*/
 STATIC int
 xfs_fsync(vnode_t	*vp,
 	  int		flag,
@@ -1069,6 +1058,7 @@ xfs_fsync(vnode_t	*vp,
  * now be truncated.  Also, we clear all of the read-ahead state
  * kept for the inode here since the file is now closed.
  */
+/*ARGSUSED*/
 STATIC void
 xfs_inactive(vnode_t	*vp,
 	     cred_t	*credp)
@@ -1436,6 +1426,7 @@ xfs_dir_lookup_int (xfs_trans_t  *tp,
  * xfs_lookup
  *
  */
+/*ARGSUSED*/
 STATIC int
 xfs_lookup(vnode_t	*dir_vp,
 	   char		*name,
@@ -1694,7 +1685,6 @@ xfs_create(vnode_t	*dir_vp,
 	boolean_t		truncated;
 	uint			cancel_flags;
 	int			committed;
-	uint			truncate_flag;
 	struct ncfastdata	fastdata;
 
 	vn_trace_entry(dir_vp, "xfs_create");
@@ -2328,10 +2318,8 @@ xfs_remove(vnode_t	*dir_vp,
 {
         xfs_inode_t             *dp, *ip;
         xfs_trans_t             *tp = NULL;
-        xfs_ino_t               e_inum;
 	xfs_mount_t		*mp;
         int                     error = 0;
-	unsigned long		dir_generation;
         xfs_bmap_free_t         free_list;
         xfs_fsblock_t           first_block;
 	int			cancel_flags;
@@ -3390,8 +3378,6 @@ xfs_rmdir(vnode_t	*dir_vp,
         xfs_trans_t             *tp;
         xfs_ino_t               e_inum;
 	xfs_mount_t		*mp;
-        dev_t                   rdev;
-        mode_t                  mode;
         int                     error;
         xfs_bmap_free_t         free_list;
         xfs_fsblock_t           first_block;
@@ -3870,6 +3856,7 @@ xfs_rwunlock(vnode_t	*vp,
  * for overflow is not enough since off_t may be an __int64_t but the
  * file size may be limited to some number of bits between 32 and 64.
  */
+/*ARGSUSED*/
 STATIC int
 xfs_seek(vnode_t	*vp,
 	 off_t		old_offset,
@@ -3953,6 +3940,7 @@ xfs_map(vnode_t	*vp,
  * we do here is record the number of pages mapped in this file so that
  * we can reject record locking while a file is mapped (see xfs_frlock()).
  */
+/*ARGSUSED*/
 STATIC int
 xfs_addmap(vnode_t	*vp,
 	   off_t	offset,
@@ -3983,6 +3971,7 @@ xfs_addmap(vnode_t	*vp,
  * file.  This count is only used in xfs_frlock() in deciding whether
  * to accept a call.
  */
+/*ARGSUSED*/
 STATIC int
 xfs_delmap(vnode_t	*vp,
 	   off_t	offset,
@@ -4015,6 +4004,7 @@ xfs_delmap(vnode_t	*vp,
  * This simplifies the back out code in that all the information we need
  * to back out is in the single bmbt_irec array orig_imap.
  */
+/*ARGSUSED*/
 STATIC int
 xfs_allocstore(vnode_t	*vp,
 	       off_t	offset,
@@ -4142,6 +4132,7 @@ xfs_allocstore(vnode_t	*vp,
 /*
  * xfs_fcntl
  */
+/*ARGSUSED*/
 STATIC int
 xfs_fcntl(vnode_t	*vp,
 	  int		cmd,
@@ -4468,14 +4459,14 @@ struct vnodeops xfs_vnodeops = {
 	fs_nosys,
 	xfs_inactive,
 	fs_nosys,
-	(void (*))fs_nosys,
-	(void (*))fs_nosys,
+	(void (*)(vnode_t *, int))fs_nosys,
+	(void (*)(vnode_t *, int))fs_nosys,
 	fs_nosys,
 	fs_nosys,
 	fs_nosys,
 	fs_nosys,	/* realvp */
 	fs_nosys,
-	(void (*))fs_nosys,
+	(void (*)(vnode_t *, buf_t *))fs_nosys,
 	fs_nosys,
 	fs_nosys,
 	fs_nosys,
@@ -4494,7 +4485,7 @@ struct vnodeops xfs_vnodeops = {
 	xfs_close,
 	xfs_read,
 	xfs_write,
-	fs_nosys,
+	fs_nosys,	/* ioctl */
 	fs_noerr,
 	xfs_getattr,
 	xfs_setattr,

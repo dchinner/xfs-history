@@ -25,6 +25,7 @@
 #include "sim.h"
 #endif
 
+#if 0
 STATIC void
 xfs_ail_ticket_wait(
 	xfs_mount_t		*mp,
@@ -37,6 +38,7 @@ xfs_ail_ticket_wakeup(
 	xfs_mount_t	*mp,
 	xfs_lsn_t	lsn,
 	int		wakeup_equal);
+#endif
 
 STATIC void
 xfs_ail_moved_item(
@@ -245,6 +247,7 @@ xfs_trans_push_ail(
 	return lsn;
 }	/* xfs_trans_push_ail */
 
+#if 0
 /*
  * Insert the ticket into the list of tickets sorted by lsn
  * and go to sleep.  The list is a doubly linked circular
@@ -362,6 +365,7 @@ xfs_ail_ticket_wakeup(
 		head = forw;
 	}
 }	/* xfs_ail_ticket_wakeup */
+#endif
 
 /*
  * This is to be called when an item is unlocked that may have
@@ -640,6 +644,7 @@ xfs_ail_insert(
 /*
  * Delete the given item from the AIL.  Return a pointer to the item.
  */
+/*ARGSUSED*/
 STATIC xfs_log_item_t *
 xfs_ail_delete(
 	xfs_ail_entry_t	*base,

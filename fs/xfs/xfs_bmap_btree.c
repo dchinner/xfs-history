@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.52 $"
+#ident	"$Revision: 1.53 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -116,6 +116,7 @@ xfs_bmbt_delrec(
 	xfs_btree_cur_t		*cur,
 	int			level);
 
+#if 0
 /* 
  * Get the data from the pointed-to record.
  */
@@ -125,6 +126,7 @@ xfs_bmbt_get_rec(
 	xfs_fileoff_t		*off,
 	xfs_fsblock_t		*bno,
 	xfs_extlen_t		*len);
+#endif
 
 /*
  * Insert one record/level.  Return information to the caller
@@ -576,6 +578,7 @@ xfs_bmbt_delrec(
 	return 2;
 }
 
+#if 0
 /* 
  * Get the data from the pointed-to record.
  */
@@ -602,6 +605,7 @@ xfs_bmbt_get_rec(
 	*len = xfs_bmbt_get_blockcount(rp);
 	return 1;
 }
+#endif
 
 /*
  * Insert one record/level.  Return information to the caller
@@ -1740,7 +1744,6 @@ xfs_bmdr_to_bmbt(
 	int			dmxr;
 	xfs_bmbt_key_t		*fkp;
 	xfs_bmbt_ptr_t		*fpp;
-	int			i;
 	xfs_bmbt_key_t		*tkp;
 	xfs_bmbt_ptr_t		*tpp;
 
@@ -2329,7 +2332,6 @@ xfs_bmbt_to_bmdr(
 	int			dmxr;
 	xfs_bmbt_key_t		*fkp;
 	xfs_bmbt_ptr_t		*fpp;
-	int			i;
 	xfs_bmbt_key_t		*tkp;
 	xfs_bmbt_ptr_t		*tpp;
 

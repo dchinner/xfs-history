@@ -544,7 +544,6 @@ xfs_iomap_extra(
 {
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t	end_fsb;
-	xfs_extlen_t	block_off_bb;
 	xfs_fsize_t	nisize;
 	xfs_mount_t	*mp;
 	int		nimaps;
@@ -1200,6 +1199,7 @@ xfs_read(
  * next m_writeio_blocks boundary.  Otherwise make sure that we
  * are confined to the given extent.
  */
+/*ARGSUSED*/
 STATIC void
 xfs_write_bmap(
 	xfs_mount_t	*mp,
@@ -1212,7 +1212,6 @@ xfs_write_bmap(
 	__int64_t	extra_blocks;
 	xfs_fileoff_t	size_diff;
 	xfs_fileoff_t	ext_offset;
-	xfs_fileoff_t	last_file_fsb;
 	xfs_fsblock_t	start_block;
 	
 	if (ioalign < imapp->br_startoff) {
@@ -1278,7 +1277,6 @@ xfs_zero_last_block(
 	xfs_fileoff_t	last_fsb;
 	xfs_mount_t	*mp;
 	buf_t		*bp;
-	int		iosize;
 	int		nimaps;
 	int		zero_offset;
 	int		zero_len;
@@ -2260,6 +2258,7 @@ retry:
  * iolock in at least shared mode for a read mapping
  * and exclusively for a write mapping.
  */
+/*ARGSUSED*/
 int
 xfs_bmap(
 	vnode_t		*vp,
@@ -2757,7 +2756,6 @@ xfs_strat_read(
 	int		block_off;
 	int		data_bytes;
 	int		data_offset;
-	int		data_len;
 	int		nimaps;
 #define	XFS_STRAT_READ_IMAPS	XFS_BMAP_MAX_NMAP
 	xfs_bmbt_irec_t	imap[XFS_STRAT_READ_IMAPS];
@@ -3206,6 +3204,7 @@ xfs_strat_write_relse(
 }
 
 #ifdef DEBUG
+/*ARGSUSED*/
 void
 xfs_check_rbp(
 	xfs_inode_t	*ip,
@@ -3780,11 +3779,11 @@ xfs_diostrat( buf_t *bp)
 	xfs_trans_t	*tp;
 	vnode_t		*vp;
 	xfs_mount_t	*mp;
-	xfs_bmbt_irec_t	imaps[XFS_BMAP_MAX_NMAP], *imapp, *timapp;
+	xfs_bmbt_irec_t	imaps[XFS_BMAP_MAX_NMAP], *imapp;
 	buf_t		*bps[XFS_BMAP_MAX_NMAP], *nbp;
 	xfs_fileoff_t	offset_fsb;
 	xfs_fsblock_t	firstfsb;
-	xfs_extlen_t	count_fsb, total;
+	xfs_extlen_t	count_fsb;
 	xfs_bmap_free_t free_list;
 	caddr_t		base;
 	ssize_t		resid, count, totxfer;

@@ -64,6 +64,7 @@ STATIC void	xfs_efd_item_push(xfs_efd_log_item_t *);
  * We only need 1 iovec for an efi item.  It just logs the efi_log_format
  * structure.
  */
+/*ARGSUSED*/
 STATIC uint
 xfs_efi_item_size(xfs_efi_log_item_t *efip)
 {
@@ -100,6 +101,7 @@ xfs_efi_item_format(xfs_efi_log_item_t	*efip,
 /*
  * Pinning has no meaning for an efi item, so just return.
  */
+/*ARGSUSED*/
 STATIC void
 xfs_efi_item_pin(xfs_efi_log_item_t *efip)
 {
@@ -111,6 +113,7 @@ xfs_efi_item_pin(xfs_efi_log_item_t *efip)
  * Since pinning has no meaning for an efi item, unpinning does
  * not either.
  */
+/*ARGSUSED*/
 STATIC void
 xfs_efi_item_unpin(xfs_efi_log_item_t *efip)
 {
@@ -121,6 +124,7 @@ xfs_efi_item_unpin(xfs_efi_log_item_t *efip)
  * Efi items have no locking or pushing, so return failure
  * so that the caller doesn't bother with us.
  */
+/*ARGSUSED*/
 STATIC uint
 xfs_efi_item_trylock(xfs_efi_log_item_t *efip)
 {
@@ -130,6 +134,7 @@ xfs_efi_item_trylock(xfs_efi_log_item_t *efip)
 /*
  * Efi items have no locking, so just return.
  */
+/*ARGSUSED*/
 STATIC void
 xfs_efi_item_unlock(xfs_efi_log_item_t *efip)
 {
@@ -140,6 +145,7 @@ xfs_efi_item_unlock(xfs_efi_log_item_t *efip)
  * The efi item is logged only once in its lifetime, so always
  * just return the given lsn.
  */
+/*ARGSUSED*/
 STATIC xfs_lsn_t
 xfs_efi_item_committed(xfs_efi_log_item_t *efip, xfs_lsn_t lsn)
 {
@@ -152,6 +158,7 @@ xfs_efi_item_committed(xfs_efi_log_item_t *efip, xfs_lsn_t lsn)
  * stuck waiting for all of its corresponding efd items to be
  * committed to disk.
  */
+/*ARGSUSED*/
 STATIC void
 xfs_efi_item_push(xfs_efi_log_item_t *efip)
 {
@@ -250,6 +257,7 @@ xfs_efi_release(xfs_efi_log_item_t	*efip,
  * We only need 1 iovec for an efd item.  It just logs the efd_log_format
  * structure.
  */
+/*ARGSUSED*/
 STATIC uint
 xfs_efd_item_size(xfs_efd_log_item_t *efdp)
 {
@@ -286,6 +294,7 @@ xfs_efd_item_format(xfs_efd_log_item_t	*efdp,
 /*
  * Pinning has no meaning for an efd item, so just return.
  */
+/*ARGSUSED*/
 STATIC void
 xfs_efd_item_pin(xfs_efd_log_item_t *efdp)
 {
@@ -297,6 +306,7 @@ xfs_efd_item_pin(xfs_efd_log_item_t *efdp)
  * Since pinning has no meaning for an efd item, unpinning does
  * not either.
  */
+/*ARGSUSED*/
 STATIC void
 xfs_efd_item_unpin(xfs_efd_log_item_t *efdp)
 {
@@ -306,6 +316,7 @@ xfs_efd_item_unpin(xfs_efd_log_item_t *efdp)
 /*
  * Efd items have no locking, so just return success.
  */
+/*ARGSUSED*/
 STATIC uint
 xfs_efd_item_trylock(xfs_efd_log_item_t *efdp)
 {
@@ -316,6 +327,7 @@ xfs_efd_item_trylock(xfs_efd_log_item_t *efdp)
  * Efd items have no locking or pushing, so return failure
  * so that the caller doesn't bother with us.
  */
+/*ARGSUSED*/
 STATIC void
 xfs_efd_item_unlock(xfs_efd_log_item_t *efdp)
 {
@@ -329,6 +341,7 @@ xfs_efd_item_unlock(xfs_efd_log_item_t *efdp)
  * return -1 to keep the transaction code from further referencing
  * this item.
  */
+/*ARGSUSED*/
 STATIC xfs_lsn_t
 xfs_efd_item_committed(xfs_efd_log_item_t *efdp, xfs_lsn_t lsn)
 {
@@ -348,6 +361,7 @@ xfs_efd_item_committed(xfs_efd_log_item_t *efdp, xfs_lsn_t lsn)
  * There isn't much you can do to push on an efd item.  It is simply
  * stuck waiting for the log to be flushed to disk.
  */
+/*ARGSUSED*/
 STATIC void
 xfs_efd_item_push(xfs_efd_log_item_t *efdp)
 {

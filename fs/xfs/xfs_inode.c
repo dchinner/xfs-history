@@ -124,7 +124,6 @@ xfs_inotobp(
 	xfs_imap_t	imap;
 	buf_t		*bp;
 	dev_t		dev;
-	int		i;
 
 	/*
 	 * Call the space managment code to find the location of the
@@ -657,18 +656,10 @@ xfs_itruncate_start(
 	uint		flags,		    
 	xfs_fsize_t	new_size)
 {
-	xfs_fsblock_t	first_block;
-	xfs_fsblock_t	first_unmap_block;
-	xfs_fsblock_t	last_block;
 	xfs_fsize_t	last_byte;
 	off_t		toss_start;
-	xfs_extlen_t	unmap_len;
 	xfs_mount_t	*mp;
-	xfs_trans_t	*ntp;
 	vnode_t		*vp;
-	int		done;
-	xfs_bmap_free_t	free_list;
-	timestruc_t	tv;
 
 	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
 	ASSERT((new_size == 0) || (new_size <= ip->i_d.di_size));
@@ -754,7 +745,6 @@ xfs_itruncate_finish(
 	int		done;
 	int		committed;
 	xfs_bmap_free_t	free_list;
-	timestruc_t	tv;
 
 	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE) != 0);

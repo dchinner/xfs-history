@@ -167,6 +167,7 @@ xfs_dir_mount(xfs_mount_t *mp)
 /*
  * Return 1 if directory contains only "." and "..".
  */
+int
 xfs_dir_isempty(xfs_inode_t *dp)
 {
 	struct xfs_dir_sf_hdr *hdr;
@@ -183,6 +184,7 @@ xfs_dir_isempty(xfs_inode_t *dp)
 /*
  * Initialize a directory with its "." and ".." entries.
  */
+int
 xfs_dir_init(xfs_trans_t *trans, xfs_inode_t *dir, xfs_inode_t *parent_dir)
 {
 	ASSERT((dir->i_d.di_mode & IFMT) == IFDIR);
@@ -193,6 +195,7 @@ xfs_dir_init(xfs_trans_t *trans, xfs_inode_t *dir, xfs_inode_t *parent_dir)
  * Generic handler routine to add a name to a directory.
  * Transitions directory from shortform to Btree as necessary.
  */
+int
 xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 		   xfs_ino_t inum, xfs_fsblock_t *firstblock,
 		   xfs_bmap_free_t *flist, xfs_extlen_t total)
@@ -567,6 +570,7 @@ xfs_dir_shortform_removename(xfs_trans_t *trans, struct xfs_dir_name *args)
 /*
  * Look up a name in a shortform directory structure.
  */
+/*ARGSUSED*/
 STATIC int
 xfs_dir_shortform_lookup(xfs_trans_t *trans, struct xfs_dir_name *args)
 {
@@ -681,6 +685,7 @@ out:
 /*
  * Print the shortform directory.
  */
+/*ARGSUSED*/
 STATIC void
 xfs_dir_shortform_print(xfs_trans_t *trans, xfs_inode_t *dp)
 {
@@ -705,6 +710,7 @@ xfs_dir_shortform_print(xfs_trans_t *trans, xfs_inode_t *dp)
 /*
  * Copy out directory entries for getdents(), for shortform directories.
  */
+/*ARGSUSED*/
 STATIC int
 xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 				       int *eofp, dirent_t *dbp)
@@ -930,7 +936,6 @@ xfs_dir_leaf_to_shortform(xfs_trans_t *trans, struct xfs_dir_name *iargs)
 	struct xfs_dir_name args;
 	xfs_inode_t *dp;
 	xfs_ino_t parent;
-	xfs_fsblock_t blkno;
 	char *tmpbuffer;
 	int retval, i;
 	buf_t *bp;
@@ -1458,7 +1463,7 @@ int
 xfs_dir_grow_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
 			       xfs_fsblock_t *new_blkno)
 {
-	xfs_fsblock_t oldsize, newsize, bno;
+	xfs_fsblock_t bno;
 	xfs_bmbt_irec_t map;
 	xfs_inode_t *dp;
 	int nmap;
@@ -1564,6 +1569,7 @@ xfs_dir_log2_roundup(uint i)
  * the kernel does, so do the translation here based on the process'
  * abi.
  */
+/*ARGSUSED*/
 int
 xfs_dir_put_dirent(
 	xfs_mount_t	*mp,

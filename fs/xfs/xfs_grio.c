@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.44 1995/01/29 21:49:42 jwag Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.45 1995/01/31 18:58:53 doucette Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -106,7 +106,6 @@ extern void timestruc_fix( timestruc_t *);
 xfs_inode_t *
 xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
 {
-	int			ret;
         struct vfs		*vfsp;
         xfs_inode_t		*ip = NULL ;
 	extern struct vfs	*vfs_devsearch( dev_t );
@@ -422,8 +421,8 @@ xfs_grio_req( xfs_inode_t *ip,
 	off_t	offset,
 	int rw)
 {
-	int 		sz, ret = 0, remainingio, thisioreq, set_size, s, eof = 0; 
-	int		which_disk, current_disk, num_sec, sec, delay_ticks;
+	int 		ret = 0, remainingio, thisioreq, set_size, s, eof = 0; 
+	int		which_disk, current_disk, sec, delay_ticks;
 	time_t		snap_lbolt;
 	vnode_t 	*vp;
 	timestruc_t	tv, nexttv;

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.12 $"
+#ident	"$Revision: 1.13 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -132,7 +132,6 @@ xfs_bulkstat(
 	int		*done)		/* 1 if there're more stats to get */
 {
 	buf_t		*agbp;
-	xfs_agi_t	*agi;
 	xfs_agino_t	agino;
 	xfs_agnumber_t	agno;
 	int		bcount;
@@ -258,7 +257,6 @@ xfs_inumbers(
 	caddr_t		ubuffer)	/* buffer with inode descriptions */
 {
 	buf_t		*agbp;
-	xfs_agi_t	*agi;
 	xfs_agino_t	agino;
 	xfs_agnumber_t	agno;
 	int		bcount;

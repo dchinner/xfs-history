@@ -701,7 +701,6 @@ xfs_trans_binval(
 {
 	xfs_log_item_desc_t	*lidp;
 	xfs_buf_log_item_t	*bip;
-	xfs_log_item_chunk_t	*licp;
 
 	ASSERT(bp->b_flags & B_BUSY);
 	ASSERT((xfs_trans_t*)(bp->b_fsprivate2) == tp);

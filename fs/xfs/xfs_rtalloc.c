@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.20 $"
+#ident	"$Revision: 1.21 $"
 
 /*
  * Free realtime space allocation for xFS.
@@ -138,12 +138,14 @@ xfs_rtcheck_bit(
 	int		val);
 #endif	/* XFSDEBUG */
 
+#if 0
 STATIC int
 xfs_rtcheck_free_range(
 	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_rtblock_t	bno,
 	xfs_extlen_t	len);
+#endif
 
 STATIC int
 xfs_rtcheck_range(
@@ -317,7 +319,6 @@ xfs_rtallocate_extent_near(
 	xfs_rtblock_t	bbno;
 	int		i;
 	int		j;
-	int		l;
 	int		log2len;
 	xfs_mount_t	*mp;
 	xfs_rtblock_t	n;
@@ -522,6 +523,7 @@ xfs_rtcheck_bit(
 }
 #endif	/* XFSDEBUG */
 
+#if 0
 STATIC int
 xfs_rtcheck_free_range(
 	xfs_mount_t	*mp,
@@ -533,6 +535,7 @@ xfs_rtcheck_free_range(
 
 	return xfs_rtcheck_range(mp, tp, bno, len, 1, &new);
 }
+#endif
 
 STATIC int
 xfs_rtcheck_range(
@@ -842,7 +845,6 @@ xfs_rtmodify_range(
 	xfs_rtword_t	mask;
 	xfs_mount_t	*mp;
 	int		word;
-	int		wval;
 
 	mp = tp->t_mountp;
 	block = XFS_BITTOBLOCK(mp, start);

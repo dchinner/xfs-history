@@ -57,11 +57,11 @@ xfs_trans_id_alloc(
 
 
 
+/*ARGSUSED*/
 int
 xfs_trans_lsn_danger(
 	xfs_mount_t	*mp,
 	xfs_lsn_t	lsn)
-/* ARGSUSED */
 {
 	/*
 	 * XXXajs
@@ -531,18 +531,14 @@ xfs_trans_id(
 }
 
 
+/*ARGSUSED*/
 void
 xfs_trans_commit(
 	xfs_trans_t	*tp,
 	uint		flags)
-/* ARGSUSED */
 {
-	char			*trans_headerp;
-	char			*trans_commitp;
 	xfs_log_iovec_t		*log_vector;
 	int			nvec;
-	xfs_log_item_desc_t	*start_desc;
-	xfs_log_item_desc_t	*desc;
 	xfs_mount_t		*mp;
 	xfs_lsn_t		commit_lsn;
 	int			error;

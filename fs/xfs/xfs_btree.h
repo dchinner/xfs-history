@@ -84,7 +84,7 @@ typedef struct xfs_btree_block
 extern __uint32_t	xfs_magics[];
 
 /*
- * Maximum and minimum recorcs in a btree block.
+ * Maximum and minimum records in a btree block.
  * Given block size, type prefix, and leaf flag.
  */
 #define	XFS_BTREE_BLOCK_MAXRECS(bsz,t,lf)	\

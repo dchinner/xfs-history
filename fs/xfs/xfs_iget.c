@@ -287,10 +287,6 @@ xfs_inode_incore(xfs_mount_t	*mp,
 	xfs_ihash_t	*ih;
 	xfs_inode_t	*ip;
 	xfs_inode_t	*iq;
-	vnode_t		*vp;
-	ulong		version;
-	vmap_t		vmap;
-	int		s;
 
 	ih = XFS_IHASH(mp, ino);
 	XFS_IHLOCK(ih);
@@ -353,7 +349,6 @@ xfs_ireclaim(xfs_inode_t *ip)
 	xfs_ihash_t	*ih;
 	xfs_inode_t	*iq;
 	xfs_mount_t	*mp;
-	int		s;
 
 	/*
 	 * Remove from old hash list.

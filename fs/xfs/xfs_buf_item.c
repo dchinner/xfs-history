@@ -45,7 +45,9 @@
  */
 lock_t	xfs_bli_reflock;
 
+#if 0
 STATIC void	xfs_buf_item_set_bit(uint *, uint, uint);
+#endif
 
 #define		xfs_buf_item_log_debug(x,y,z)
 #define 	xfs_buf_item_log_check(x)
@@ -175,7 +177,7 @@ xfs_buf_item_format(xfs_buf_log_item_t	*bip,
 	ASSERT(first_bit != -1);
 	last_bit = first_bit;
 	nbits = 1;
-	while (1) {
+	for (;;) {
 		/*
 		 * This takes the bit number to start looking from and
 		 * returns the next set bit from there.  It returns -1
@@ -925,7 +927,7 @@ xfs_buf_item_next_bit(uint	*map,
 		 * We know we've got a bit in this word, find it.
 		 */
 		word = *wordp;
-		while (1) {
+		for (;;) {
 			if (word & 1) {
 				return (next_bit);
 			}
@@ -940,14 +942,15 @@ xfs_buf_item_next_bit(uint	*map,
 	return (-1);
 }
 
+#if 0
 /*
  * Set the specified bit in the given bitmap.
  */
+/*ARGSUSED*/
 STATIC void
 xfs_buf_item_set_bit(uint	*map,
 		     uint	size,
 		     uint	bit)
-/* ARGSUSED */
 {
 	uint	*wordp;
 	int	word_bit;
@@ -957,6 +960,7 @@ xfs_buf_item_set_bit(uint	*map,
 
 	*wordp |= 1 << word_bit;
 }
+#endif
 		
 /*
  * Return 1 if the buffer has some data that has been logged (at any

@@ -142,7 +142,7 @@ xfs_bmap_btree_to_extents(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_btree_cur_t		*cur);	/* btree cursor */
 
-#ifdef DEBUG
+#ifdef XFSDEBUG
 /*
  * Check that the extents list for the inode ip is in the right order.
  */
@@ -911,6 +911,7 @@ xfs_bmap_add_extent_delay_real(
  * Called by xfs_bmap_add_extent to handle cases converting a hole
  * to a delayed allocation.
  */
+/*ARGSUSED*/
 STATIC int				/* inode logging flags */
 xfs_bmap_add_extent_hole_delay(
 	xfs_inode_t		*ip,	/* incore inode pointer */
@@ -1593,7 +1594,7 @@ xfs_bmap_btree_to_extents(
 	return XFS_ILOG_CORE | XFS_ILOG_EXT;
 }
 
-#ifdef DEBUG
+#ifdef XFSDEBUG
 /*
  * Check that the extents list for the inode ip is in the right order.
  */
@@ -2473,28 +2474,26 @@ xfs_bmap_compute_maxlevels(
  * Return 1 if the given transaction was committed and a new one
  * started, and 0 otherwise.
  */
+/*ARGSUSED*/
 int
 xfs_bmap_finish(
 	xfs_trans_t		**tp,		/* transaction pointer addr */
 	xfs_bmap_free_t		*flist,		/* i/o: list extents to free */
 	xfs_fsblock_t		firstblock)	/* controlled ag for allocs */
 {
-	unsigned int		blkres;
 	xfs_efd_log_item_t	*efd;
 	xfs_efi_log_item_t	*efi;
-	xfs_agnumber_t		firstag;
 	xfs_bmap_free_item_t	*free;
 	unsigned int		logres;
 	unsigned int		logcount;
 	xfs_bmap_free_item_t	*next;
 	xfs_trans_t		*ntp;
-	xfs_bmap_free_item_t	*prev;
-	unsigned int		rtblkres;
 
 	ASSERT((*tp)->t_flags & XFS_TRANS_PERM_LOG_RES);
 
 #ifdef SIM
 	ASSERT(flist->xbf_count == 0);
+	return 0;
 #else
 	if (flist->xbf_count == 0)
 		return 0;
@@ -3146,7 +3145,6 @@ xfs_bunmapi(
 	xfs_bmbt_rec_t		*ep;
 	xfs_extnum_t		extno;
 	xfs_bmbt_irec_t		got;
-	xfs_extnum_t		i;
 	xfs_extnum_t		lastx;
 	int			logflags;
 	xfs_mount_t		*mp;
@@ -3319,7 +3317,6 @@ xfs_getbmap(
 	int			nex;		/* # of extents can do */
 	int			nmap;		/* number of map entries */
 	struct getbmap		out;		/* output structure */
-	xfs_trans_t		*tp;		/* transaction pointer */
 
 	ip = XFS_VTOI(vp);
 	if (ip->i_d.di_format != XFS_DINODE_FMT_EXTENTS &&

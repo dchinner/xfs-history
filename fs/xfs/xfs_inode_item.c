@@ -460,6 +460,7 @@ xfs_inode_item_unlock(
  * is the only one that matters.  Therefore, simply return the
  * given lsn.
  */
+/*ARGSUSED*/
 xfs_lsn_t
 xfs_inode_item_committed(
 	xfs_inode_log_item_t	*iip,
@@ -481,7 +482,6 @@ xfs_inode_item_push(
 	xfs_inode_log_item_t	*iip)
 {
 	buf_t		*bp;
-	xfs_dinode_t	*dip;
 	xfs_inode_t	*ip;
 
 	ASSERT((iip->ili_bp != NULL) ||
@@ -575,12 +575,12 @@ xfs_inode_item_init(
  * from the AIL if it has not been re-logged, and unlocking the inode's
  * flush lock.
  */
+/*ARGSUSED*/
 void
 xfs_iflush_done(
 	buf_t			*bp,
 	xfs_inode_log_item_t	*iip)
 {
-	xfs_lsn_t	lsn;
 	xfs_inode_t	*ip;
 	int		s;
 

@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.79 $"
+#ident  "$Revision: 1.80 $"
 
 #include <strings.h>
 #include <limits.h>
@@ -307,7 +307,7 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	xfs_mount_t	*mp;
 	struct vnode 	*ddevvp, *rdevvp, *ldevvp;
 	int		error = 0;
-	int		s, vfs_flags;
+	int		vfs_flags;
 	size_t		n;
 	struct vnode 	*makespecvp(dev_t, vtype_t);
 
@@ -504,6 +504,7 @@ xfs_get_vfsmount(struct vfs	*vfsp,
  * This is used with copyin_xlate() to copy a xfs_args structure
  * in from user space from a 32 bit application into a 64 bit kernel.
  */
+/*ARGSUSED*/
 int
 irix5_to_xfs_args(
 	enum xlate_mode	mode,
@@ -539,8 +540,6 @@ xfs_vfsmount(vfs_t		*vfsp,
 	     cred_t		*credp)
 {
 	struct xfs_args	args;			/* xfs mount arguments */
-	xfs_mount_t	*mp;
-	xfs_sb_t	*sbp;
 	dev_t		device;			/* device: block or logical */
 	dev_t		ddev;
 	dev_t		logdev;
@@ -906,6 +905,7 @@ xfs_ibusy(xfs_mount_t *mp)
  *
  * XXX xfs_unmount() needs return code work and more error checking.
  */
+/*ARGSUSED*/
 STATIC int
 xfs_unmount(vfs_t	*vfsp,
 	    int		flags,
@@ -1102,6 +1102,7 @@ xfs_statdevvp(struct statvfs *sp, vnode_t *devvp)
  * the superblock lock in the mount structure to ensure a consistent
  * snapshot of the counters returned.
  */
+/*ARGSUSED*/
 STATIC int
 xfs_statvfs(vfs_t	*vfsp,
 	    statvfs_t	*statp,
@@ -1180,6 +1181,7 @@ xfs_statvfs(vfs_t	*vfsp,
  *		       out otherwise.
  *
  */
+/*ARGSUSED*/
 STATIC int
 xfs_sync(vfs_t		*vfsp,
 	 short		flags,

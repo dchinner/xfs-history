@@ -155,9 +155,9 @@ xfs_trans_free_item(xfs_trans_t	*tp, xfs_log_item_desc_t *lidp)
  * The descriptor pointer is kept in the log item's li_desc field.
  * Just return it.
  */
+/*ARGSUSED*/
 xfs_log_item_desc_t *
 xfs_trans_find_item(xfs_trans_t	*tp, xfs_log_item_t *lip)
-/* ARGSUSED */
 {
 	ASSERT(lip->li_desc != NULL);
 
@@ -219,9 +219,9 @@ xfs_trans_first_item(xfs_trans_t *tp)
  * and then scanning forward in the chunk and the list for the next
  * used descriptor.
  */
+/*ARGSUSED*/
 xfs_log_item_desc_t *
 xfs_trans_next_item(xfs_trans_t *tp, xfs_log_item_desc_t *lidp)
-/* ARGSUSED */
 {
 	xfs_log_item_chunk_t	*licp;
 	int			i;

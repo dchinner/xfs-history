@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.87 $"
+#ident	"$Revision: 1.88 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -688,7 +688,6 @@ int
 xfs_mod_incore_sb_batch(xfs_mount_t *mp, xfs_mod_sb_t *msb, uint nmsb)
 {
 	int		s;
-	int		n;
 	int		status;
 	xfs_mod_sb_t	*msbp;
 

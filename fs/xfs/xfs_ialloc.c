@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.69 $"
+#ident	"$Revision: 1.70 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -299,7 +299,6 @@ xfs_ialloc_ag_select(
 	buf_t		*agbp;		/* allocation group header buffer */
 	xfs_agnumber_t	agcount;	/* number of ag's in the filesystem */
 	xfs_agnumber_t	agno;		/* current ag number */
-	xfs_agi_t	*agi;		/* allocation group header */
 	int		flags;		/* alloc buffer locking flags */
 	xfs_extlen_t	ineed;		/* blocks needed for inode allocation */
 	xfs_extlen_t	longest;	/* longest extent available */
@@ -329,7 +328,7 @@ xfs_ialloc_ag_select(
 	 */
 	agno = pagno;
 	flags = XFS_ALLOC_FLAG_TRYLOCK;
-	while (1) {
+	for (;;) {
 		mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
 		pag = &mp->m_perag[agno];
 		if (!pag->pagi_init)
@@ -413,11 +412,9 @@ xfs_dialloc(
 {
 	xfs_agnumber_t	agcount;	/* number of allocation groups */
 	buf_t		*agbp;		/* allocation group header's buffer */
-	xfs_agino_t	agino;		/* ag-relative inode to be returned */
 	xfs_agnumber_t	agno;		/* allocation group number */
 	xfs_agi_t	*agi;		/* allocation group header structure */
 	xfs_btree_cur_t	*cur;		/* inode allocation btree cursor */
-	int		flags;		/* flags for logging agi */
 	int		i;		/* result code */
 	xfs_ino_t	ino;		/* fs-relative inode to be returned */
 	int		j;		/* result code */
@@ -656,7 +653,7 @@ xfs_dialloc(
 	else {
 		i = xfs_inobt_lookup_ge(cur, 0, 0, 0);
 		ASSERT(i == 1);
-		while (1) {
+		for (;;) {
 			i = xfs_inobt_get_rec(cur, &rec.ir_startino,
 				&rec.ir_freecount, &rec.ir_free);
 			ASSERT(i == 1);
@@ -805,6 +802,7 @@ xfs_difree(
 /*
  * Return the location of the inode in bno/off, for mapping it into a buffer.
  */
+/*ARGSUSED*/
 void
 xfs_dilocate(
 	xfs_mount_t	*mp,	/* file system mount structure */

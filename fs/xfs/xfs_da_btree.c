@@ -344,7 +344,7 @@ xfs_dir_leaf_add(xfs_trans_t *trans, buf_t *bp, struct xfs_dir_name *args,
 	struct xfs_dir_leafblock *leaf;
 	struct xfs_dir_leaf_hdr *hdr;
 	struct xfs_dir_leaf_map *map;
-	int tablesize, i, tmp, retval;
+	int tablesize, i, tmp;
 
 	leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
 	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
@@ -1777,7 +1777,7 @@ xfs_dir_node_lookup_int(struct xfs_dir_state *state)
 	 * contain more entries with the same hashval, shift upward to the
 	 * next leaf and keep searching.
 	 */
-	while (1) {
+	for (;;) {
 		max = xfs_dir_leaf_lookup_int(blk->bp, state->args,
 						       &blk->index);
 		if ((max == ENOENT) && (blk->hashval == state->args->hashval)) {
@@ -1917,8 +1917,8 @@ xfs_dir_blk_link(struct xfs_dir_state *state,
 			struct xfs_dir_state_blk *new_blk)
 {
 	struct xfs_dir_blkinfo *old_info, *new_info, *tmp_info;
-	struct xfs_dir_intnode *old_node, *new_node, *tmp_node;
-	struct xfs_dir_leafblock *old_leaf, *new_leaf, *tmp_leaf;
+	struct xfs_dir_intnode *old_node, *new_node;
+	struct xfs_dir_leafblock *old_leaf, *new_leaf;
 	buf_t *bp;
 	int before;
 
@@ -2175,6 +2175,7 @@ xfs_dir_path_shift(struct xfs_dir_state *state, struct xfs_dir_state_path *path,
 /*
  * Print the contents of a leaf block.
  */
+/*ARGSUSED*/
 void
 xfs_dir_leaf_print_int(buf_t *bp, xfs_inode_t *dp)
 {

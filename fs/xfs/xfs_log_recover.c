@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.46 $"
+#ident	"$Revision: 1.47 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -54,8 +54,6 @@
 
 #ifdef SIM
 #include "sim.h"		/* must be last include file */
-#else
-STATIC int print_data, print_buffer, print_inode;
 #endif
 
 STATIC int	xlog_find_zeroed(xlog_t *log, daddr_t *blk_no);
@@ -270,11 +268,11 @@ xlog_find_head(xlog_t  *log,
 	       daddr_t *head_blk)
 {
     buf_t   *bp, *big_bp;
-    daddr_t new_blk, first_blk, start_blk, mid_blk, last_blk;
+    daddr_t new_blk, first_blk, start_blk, last_blk;
     daddr_t num_scan_bblks;
-    uint    first_half_cycle, mid_cycle, last_half_cycle, cycle;
+    uint    first_half_cycle, last_half_cycle;
     caddr_t ba;
-    int     error, i, log_bbnum = log->l_logBBsize;
+    int     error, log_bbnum = log->l_logBBsize;
 
     /* special case freshly mkfs'ed filesystem; return immediately */
     if ((error = xlog_find_zeroed(log, &first_blk)) == -1) {
@@ -625,11 +623,11 @@ xlog_find_zeroed(xlog_t	 *log,
 		 daddr_t *blk_no)
 {
 	buf_t	*bp, *big_bp;
-	uint	first_cycle, mid_cycle, last_cycle, cycle;
-	daddr_t	new_blk, first_blk, mid_blk, last_blk, start_blk;
+	uint	first_cycle, last_cycle;
+	daddr_t	new_blk, last_blk, start_blk;
 	daddr_t num_scan_bblks;
 	caddr_t	ba;
-	int	error, i, log_bbnum = log->l_logBBsize;
+	int	error, log_bbnum = log->l_logBBsize;
 
 	error = 0;
 	/* check totally zeroed log */
@@ -791,9 +789,7 @@ xlog_recover_add_to_trans(xlog_recover_t	*trans,
 {
 	xfs_inode_log_format_t	 *in_f;			/* any will do */
 	xlog_recover_item_t	 *item;
-	xfs_trans_header_t	 *thead;
 	caddr_t			 ptr;
-	int			 total;
 
 	if (!len)
 		return 0;
@@ -974,16 +970,12 @@ xlog_recover_print_buffer(xlog_recover_item_t *item)
 	    printf("		ver:%d  seq#:%d  len:%d  \n",
 		   agf->agf_versionnum, agf->agf_seqno,
 		   agf->agf_length);
-	    printf("		root BNOi:%d  CNTi:%d  BMAPi:%d  INOi:%d\n",
+	    printf("		root BNO:%d  CNT:%d\n",
 		   agf->agf_roots[XFS_BTNUM_BNOi],
-		   agf->agf_roots[XFS_BTNUM_CNTi],
-		   agf->agf_roots[XFS_BTNUM_BMAPi],
-		   agf->agf_roots[XFS_BTNUM_INOi]);
-	    printf("		level BNOi:%d  CNTi:%d  BMAPi:%d  INOi:%d\n",
+		   agf->agf_roots[XFS_BTNUM_CNTi]);
+	    printf("		level BNO:%d  CNT:%d\n",
 		   agf->agf_roots[XFS_BTNUM_BNOi],
-		   agf->agf_roots[XFS_BTNUM_CNTi],
-		   agf->agf_roots[XFS_BTNUM_BMAPi],
-		   agf->agf_roots[XFS_BTNUM_INOi]);
+		   agf->agf_roots[XFS_BTNUM_CNTi]);
 	    printf("		1st:%d  last:%d  cnt:%d  freeblks:%d  longest:%d\n",
 		   agf->agf_flfirst, agf->agf_fllast, agf->agf_flcount,
 		   agf->agf_freeblks, agf->agf_longest);
@@ -1201,6 +1193,7 @@ xlog_recover_print_item(xlog_recover_item_t *item)
 }	/* xlog_recover_print_item */
 
 
+/*ARGSUSED*/
 STATIC void
 xlog_recover_print_trans(xlog_recover_t	     *trans,
 			 xlog_recover_item_t *itemq,
@@ -1248,6 +1241,7 @@ xlog_recover_insert_item_frontq(xlog_recover_item_t **q,
 }	/* xlog_recover_insert_item_frontq */
 
 
+/*ARGSUSED*/
 STATIC int
 xlog_recover_reorder_trans(xlog_t	  *log,
 			   xlog_recover_t *trans)
@@ -1558,6 +1552,7 @@ xlog_recover_do_inode_buffer(xfs_mount_t		*mp,
  * given buffer.  The bitmap in the buf log format structure indicates
  * where to place the logged data.
  */
+/*ARGSUSED*/
 STATIC void
 xlog_recover_do_reg_buffer(xfs_mount_t		*mp,
 			   xlog_recover_item_t	*item,
@@ -1628,9 +1623,8 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	xfs_buf_log_format_t *buf_f;
 	xfs_mount_t	     *mp;
 	buf_t		     *bp;
-	int		     error, nbits, bit = 0;
+	int		     error;
 	int		     cancel;
-	int		     i = 1;	/* 0 is format structure */
 
 	buf_f = (xfs_buf_log_format_t *)item->ri_buf[0].i_addr;
 
@@ -1969,6 +1963,7 @@ xlog_recover_commit_trans(xlog_t	 *log,
 }	/* xlog_recover_commit_trans */
 
 
+/*ARGSUSED*/
 STATIC int
 xlog_recover_unmount_trans(xlog_recover_t *trans)
 {
@@ -2282,6 +2277,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
  *
  * This routine is also called in xfs_log.c
  */
+/*ARGSUSED*/
 void
 xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog)
 {

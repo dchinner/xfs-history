@@ -73,7 +73,6 @@ xfs_trans_iget(
 	xfs_ino_t	ino,
 	uint		lock_flags)
 {
-	xfs_inode_log_item_t	*iip;
 	xfs_inode_t		*ip;
 
 	/*
@@ -261,8 +260,6 @@ xfs_trans_ijoin(
 	xfs_inode_t	*ip,
 	uint		lock_flags)
 {
-	xfs_inode_log_item_t	*iip;
-
 	ASSERT(ip->i_transp == NULL);
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE));
 	ASSERT(lock_flags & XFS_ILOCK_EXCL);
@@ -325,7 +322,6 @@ xfs_trans_log_inode(
 	xfs_inode_t	*ip,
 	uint		flags)
 {
-	xfs_inode_log_item_t	*iip;
 	xfs_log_item_desc_t	*lidp;
 
 	ASSERT(ip->i_transp == tp);
