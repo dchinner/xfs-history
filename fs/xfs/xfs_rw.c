@@ -199,16 +199,12 @@ xfs_diordwr(
 
 extern int
 xfs_io_is_guaranteed(
-	xfs_inode_t	*,
+	vfile_t *,
 	stream_id_t	*);
 
 extern void
 griostrategy(
 	buf_t	*);
-extern int
-xfs_fp_to_stream(
-	vfile_t		*,
-	stream_id_t	*);
 
 extern int
 grio_monitor_io_start( 
@@ -5334,7 +5330,7 @@ xfs_diordwr(
 		/*
  	 	 * Check if this is a guaranteed rate I/O
 	 	 */
-		if (xfs_fp_to_stream((vfile_t *)uiop->uio_fp, &stream_id)) {
+		if (xfs_io_is_guaranteed((vfile_t *)uiop->uio_fp, &stream_id)) {
 			if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
 				bp->b_flags2 |= B_GR_BUF;
 			else
