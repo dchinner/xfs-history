@@ -4890,6 +4890,10 @@ xfs_bmapi(
 			if (wasdelay && !exact) {
 				alen = (xfs_extlen_t)got.br_blockcount;
 				aoff = got.br_startoff;
+				if (lastx != NULLEXTNUM && lastx) {
+					ep = &ifp->if_u1.if_extents[lastx - 1];
+					xfs_bmbt_get_all(ep, &prev);
+				}
 			} else if (wasdelay) {
 				alen = (xfs_extlen_t)
 					XFS_FILBLKS_MIN(len,
