@@ -51,6 +51,7 @@
 #include <linux/stddef.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
+#include <linux/bitops.h>
 #include <linux/string.h>
 #include <linux/pagemap.h>
 #include <linux/init.h>
