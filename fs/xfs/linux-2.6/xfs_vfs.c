@@ -39,8 +39,8 @@
  */
 STATIC spinlock_t	vfslock;	/* spinlock protecting rootvfs and vfs_flag */
 
-#define		vfsp_wait(V,P,S)        mp_sv_wait(&(V)->vfs_wait,P,&vfslock,s)
-#define		vfsp_waitsig(V,P,S)     mp_sv_wait_sig(&(V)->vfs_wait,P,&vfslock,s)
+#define		vfsp_wait(V,P,S)        sv_wait(&(V)->vfs_wait,P,&vfslock,S)
+#define		vfsp_waitsig(V,P,S)     sv_wait_sig(&(V)->vfs_wait,P,&vfslock,S)
 
 /*
  * Allocate and initialize a new vfs
@@ -85,11 +85,10 @@ STATIC int
 vfs_lock_flags(struct vfs *vfsp, int flags)
 {
 	register int error;
-	long s;
 
-	spin_lock_irqsave(&vfslock, s);
+	spin_lock(&vfslock);
 	if (vfsp->vfs_flag & (VFS_MLOCK|VFS_MWANT)) {
-		spin_unlock_irqrestore(&vfslock, s);
+		spin_unlock(&vfslock);
 		return EBUSY;
 	}
 
@@ -97,9 +96,9 @@ vfs_lock_flags(struct vfs *vfsp, int flags)
 		ASSERT(vfsp->vfs_busycnt > 0);
 		ASSERT(!(vfsp->vfs_flag & (VFS_MLOCK|VFS_OFFLINE)));
 		vfsp->vfs_flag |= VFS_MWAIT|VFS_MWANT;
-		vfsp_waitsig(vfsp, PVFS, s); /* REMOVED setting error. */
+		vfsp_waitsig(vfsp, PVFS, 0); /* REMOVED setting error. */
 		error = 0; /* JIMJIM always no error */
-		spin_lock_irqsave(&vfslock, s);
+		spin_lock(&vfslock);
 		if (error) {
 			ASSERT(vfsp->vfs_flag & VFS_MWANT);
 			vfsp->vfs_flag &= ~VFS_MWANT;
@@ -107,7 +106,7 @@ vfs_lock_flags(struct vfs *vfsp, int flags)
 				vfsp->vfs_flag &= ~VFS_MWAIT;
 				sv_broadcast(&vfsp->vfs_wait);
 			}
-			spin_unlock_irqrestore(&vfslock, s);
+			spin_unlock(&vfslock);
 			return EINTR;
 		}
 		ASSERT(vfsp->vfs_flag & VFS_MWANT);
@@ -121,7 +120,7 @@ vfs_lock_flags(struct vfs *vfsp, int flags)
 		vfsp->vfs_flag |= VFS_MLOCK|flags;
 		error = 0;
 	}
-	spin_unlock_irqrestore(&vfslock, s);
+	spin_unlock(&vfslock);
 	return error;
 }
 
@@ -152,9 +151,7 @@ vfs_lock_offline(struct vfs *vfsp)
 void
 vfs_unlock(register struct vfs *vfsp)
 {
-	long s;
-
-	spin_lock_irqsave(&vfslock, s);
+	spin_lock(&vfslock);
 	ASSERT((vfsp->vfs_flag & (VFS_MWANT|VFS_MLOCK)) == VFS_MLOCK);
 	vfsp->vfs_flag &= ~(VFS_MLOCK|VFS_OFFLINE);
 
@@ -166,7 +163,7 @@ vfs_unlock(register struct vfs *vfsp)
 		vfsp->vfs_flag &= ~VFS_MWAIT;
 		sv_broadcast(&vfsp->vfs_wait);
 	}
-	spin_unlock_irqrestore(&vfslock, s);
+	spin_unlock(&vfslock);
 }
 
 /*
@@ -175,24 +172,22 @@ vfs_unlock(register struct vfs *vfsp)
 int
 vfs_busy(struct vfs *vfsp)
 {
-	long s;
-
-	spin_lock_irqsave(&vfslock, s);
+	spin_lock(&vfslock);
 	ASSERT((vfsp->vfs_flag & (VFS_MLOCK|VFS_OFFLINE)) != VFS_OFFLINE);
 	while (vfsp->vfs_flag & (VFS_MLOCK|VFS_MWANT)) {
 		ASSERT(vfsp->vfs_flag & VFS_MWANT || vfsp->vfs_busycnt == 0);
 		if (vfsp->vfs_flag & VFS_OFFLINE) {
-			spin_unlock_irqrestore(&vfslock, s);
+			spin_unlock(&vfslock);
 			return EBUSY;
 		}
 		vfsp->vfs_flag |= VFS_MWAIT;
-		vfsp_waitsig(vfsp, PVFS, s);	/* JIMJIM this has no sig "nificance". */
-		spin_lock_irqsave(&vfslock, s);
+		vfsp_waitsig(vfsp, PVFS, 0);	/* JIMJIM this has no sig "nificance". */
+		spin_lock(&vfslock);
 	}
 
 	ASSERT(vfsp->vfs_busycnt >= 0);
 	vfsp->vfs_busycnt++;
-	spin_unlock_irqrestore(&vfslock, s);
+	spin_unlock(&vfslock);
 
 	return 0;
 }
@@ -208,7 +203,6 @@ vfs_busy(struct vfs *vfsp)
 struct vfs *
 vfs_busydev(dev_t dev, int type)
 {
-	long s;
 	struct vfs *vfsp;
 	kdev_t	kdev = mk_kdev(MAJOR(dev), MINOR(dev));
 	struct super_block *sb;
@@ -222,12 +216,12 @@ vfs_busydev(dev_t dev, int type)
 	
 	vfsp = LINVFS_GET_VFS(sb);
 again:
-	spin_lock_irqsave(&vfslock, s);
+	spin_lock(&vfslock);
 	if (vfsp->vfs_dev == dev &&
 	    (type == VFS_FSTYPE_ANY || type == vfsp->vfs_fstype)) {
 
 		if (vfsp->vfs_flag & VFS_OFFLINE) {
-			spin_unlock_irqrestore(&vfslock, s);
+			spin_unlock(&vfslock);
 			drop_super(sb);
 			return NULL;
 		}
@@ -235,14 +229,14 @@ again:
 			ASSERT(vfsp->vfs_flag & VFS_MWANT ||
 			       vfsp->vfs_busycnt == 0);
 			vfsp->vfs_flag |= VFS_MWAIT;
-			vfsp_wait(vfsp, 0, s);	 /* JIMJIM removed PZERO */
+			vfsp_wait(vfsp, 0, 0);	 /* JIMJIM removed PZERO */
 			goto again;
 		}
 
 		ASSERT(vfsp->vfs_busycnt >= 0);
 		vfsp->vfs_busycnt++;
 	}
-	spin_unlock_irqrestore(&vfslock, s);
+	spin_unlock(&vfslock);
 	drop_super(sb);
 	return vfsp;
 }
@@ -295,14 +289,12 @@ vfs_devsearch_nolock(dev_t dev, int fstype)
 void
 vfs_unbusy(struct vfs *vfsp)
 {
-	long s;
-
-	spin_lock_irqsave(&vfslock, s);
+	spin_lock(&vfslock);
 	ASSERT(!(vfsp->vfs_flag & (VFS_MLOCK|VFS_OFFLINE)));
 	ASSERT(vfsp->vfs_busycnt > 0);
 	if (--vfsp->vfs_busycnt == 0)
 		vfs_unbusy_wakeup(vfsp);
-	spin_unlock_irqrestore(&vfslock, s);
+	spin_unlock(&vfslock);
 }
 
 /*
@@ -320,11 +312,10 @@ struct vfs *
 vfs_devsearch(dev_t dev, int fstype)
 {
 	register struct vfs *vfsp;
-	long s;
 
-	spin_lock_irqsave(&vfslock, s);
+	spin_lock(&vfslock);
 	vfsp = vfs_devsearch_nolock(dev, fstype);
-	spin_unlock_irqrestore(&vfslock, s);
+	spin_unlock(&vfslock);
 	return vfsp;
 }
 
@@ -362,10 +353,3 @@ vfs_insertbhv(
 	bhv_insert_initial(&vfsp->vfs_bh, bdp);
 }
 
-void
-vfs_setflag(vfs_t *vfsp, unsigned long f)
-{
-	unsigned long s = mutex_spinlock(&vfslock);
-	vfsp->vfs_flag |= f;
-	mutex_spinunlock(&vfslock, s);
-}

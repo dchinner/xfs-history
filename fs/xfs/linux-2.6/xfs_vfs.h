@@ -238,6 +238,5 @@ extern int      vfs_busy(struct vfs *); /* mark busy for serial sync/unmount */
 extern void     vfs_unbusy(struct vfs *);
 extern vfs_t	*vfs_busydev(dev_t, int);/* to keep dev from unmounting */
 extern vfs_t 	*vfs_devsearch(dev_t, int);/* find vfs given device & opt. type */
-extern void	vfs_setflag(struct vfs *, unsigned long);
 
 #endif	/* __XFS_VFS_H__ */

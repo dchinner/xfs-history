@@ -530,12 +530,6 @@ typedef struct vnodeops {
 	rv = _VOP_(vop_flush_pages, vp)((vp)->v_fbhv,first,last,flags,fiopt);\
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
-#define VOP_PAGES_SETHOLE(vp, pfd, cnt, doremap, remapoffset)		\
-{									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
-	_VOP_(vop_pages_sethole, vp)((vp)->v_fbhv,pfd,cnt,doremap,remapoffset);\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
-}
 #define VOP_IOCTL(vp, inode, filp, cmd, arg, rv)			\
 {									\
 	VN_BHV_READ_LOCK(&(vp)->v_bh);					\

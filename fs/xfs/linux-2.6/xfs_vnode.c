@@ -351,10 +351,11 @@ struct vnode *
 vn_hold(struct vnode *vp)
 {
 	struct inode *inode;
+	unsigned long s;
 
 	XFS_STATS_INC(xfsstats.vn_hold);
 
-	VN_LOCK(vp);
+	s = VN_LOCK(vp);
 	inode = LINVFS_GET_IP(vp);
 
 	inode = igrab(inode);

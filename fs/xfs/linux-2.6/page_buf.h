@@ -161,6 +161,7 @@ typedef enum page_buf_flags_e {
 
 	PBF_GRIO = (1 << 26),
 	PBF_FORCEIO = (1 << 27),
+	PBF_FLUSH = (1 << 28),	/* flush disk write cache */ 
 	PBF_FS_RESERVED_3 = (1 << 31)	/* reserved (XFS use: XFS_B_STALE) */
 
 } page_buf_flags_t;
@@ -243,7 +244,8 @@ typedef int (*page_buf_apply_t)(	/* function to apply to segment	*/
 		loff_t,			/* offset in file of segment	*/
 		struct page *,		/* page (NULL if not in mem_map[]) */
 		size_t,			/* offset in page		*/
-		size_t);		/* length of segment		*/
+		size_t,			/* length of segment		*/
+		int);			/* true if last page in pagebuf */ 
 
 /*
  * page_buf module entry points

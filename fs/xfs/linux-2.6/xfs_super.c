@@ -113,6 +113,7 @@ static struct export_operations linvfs_export_ops;
 #define MNTOPT_RW       "rw"            /* read/write */
 #define MNTOPT_NOUUID   "nouuid"	/* Ignore FS uuid */
 #define MNTOPT_IRIXSGID "irixsgid"	/* Irix-style sgid inheritance */
+#define MNTOPT_NOLOGFLUSH	"nologflush"	/* Don't use hard flushes in log writing */
 
 STATIC int
 xfs_parseargs(
@@ -233,6 +234,8 @@ xfs_parseargs(
 			args->flags |= XFSMNT_NOUUID; 
 		} else if (!strcmp(this_char, MNTOPT_IRIXSGID)) {
 			args->flags |= XFSMNT_IRIXSGID;
+		} else if (!strcmp(this_char, MNTOPT_NOLOGFLUSH)) {
+			args->flags |= XFSMNT_NOLOGFLUSH;
 		} else {
 			printk("XFS: unknown mount option [%s].\n", this_char);
 			return rval;

@@ -1473,7 +1473,6 @@ int pagebuf_iomove(			/* move data in/out of buffer	*/
 	return 0;
 }
 
-
 /*
  * Pagebuf delayed write buffer handling
  */
