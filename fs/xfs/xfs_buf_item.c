@@ -380,17 +380,31 @@ struct xfs_item_ops xfs_buf_item_ops = {
 /*
  * Allocate a new buf log item to go with the given buffer.
  * Set the buffer's b_fsprivate field to point to the new
- * buf log item.
+ * buf log item.  If there are other item's attached to the
+ * buffer (see xfs_buf_attach_iodone() below), then put the
+ * buf log item at the front.
  */
 void
 xfs_buf_item_init(buf_t *bp, struct xfs_mount *mp)
 {
+	xfs_log_item_t		*lip;
 	xfs_buf_log_item_t	*bip;
 	int			chunks;
 	int			map_size;
 
-	ASSERT(bp->b_fsprivate == NULL);
-
+	/*
+	 * Check to see if there is already a buf log item for
+	 * this buffer.  If there is, it is guaranteed to be
+	 * the first.  If we do already have one, there is
+	 * nothing to do here so return.
+	 */
+	if (bp->b_fsprivate != NULL) {
+		lip = (xfs_log_item_t *)bp->b_fsprivate;
+		if (lip->li_type == XFS_LI_BUF) {
+			return;
+		}
+	}
+		
 	/*
 	 * chunks is the number of XFS_BLI_CHUNK size pieces
 	 * the buffer can be divided into. Make sure not to
@@ -416,8 +430,12 @@ xfs_buf_item_init(buf_t *bp, struct xfs_mount *mp)
 	bip->bli_map_size = map_size;
 
 	/*
-	 * Point the buffer at the transaction.
+	 * Put the buf item into the list of items attached to the
+	 * buffer at the front.
 	 */
+	if (bp->b_fsprivate != NULL) {
+		bip->bli_item.li_bio_list = (xfs_log_item_t *)bp->b_fsprivate;
+	}
 	bp->b_fsprivate = bip;
 }
 
@@ -674,7 +692,9 @@ xfs_buf_item_dirty(xfs_buf_log_item_t *bip)
 /*
  * This is called when the buf log item is no longer needed.  It should
  * free the buf log item associated with the given buffer and clear
- * the buffer's pointer to the buf log item.
+ * the buffer's pointer to the buf log item.  If there are no more
+ * items in the list, clear the b_iodone field of the buffer (see
+ * xfs_buf_attach_iodone() below).
  */
 void
 xfs_buf_item_relse(buf_t *bp)
@@ -682,31 +702,98 @@ xfs_buf_item_relse(buf_t *bp)
 	xfs_buf_log_item_t	*bip;
 
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
+	bp->b_fsprivate = bip->bli_item.li_bio_list;
+	if ((bp->b_fsprivate == NULL) && (bp->b_iodone != NULL)) {
+		bp->b_iodone = NULL;
+	}
 	kmem_free(bip, sizeof(xfs_buf_log_item_t) +
 		  ((bip->bli_map_size - 1) * sizeof(int)));
-	bp->b_fsprivate = NULL;
 }
 
 
+/*
+ * Add the given log item with it's callback to the list of callbacks
+ * to be called when the buffer's I/O completes.  If it is not set
+ * already, set the buffer's b_iodone() routine to be
+ * xfs_buf_iodone_callbacks() and link the log item into the list of
+ * items rooted at b_fsprivate.  Items are always added as the second
+ * entry in the list if there is a first, because the buf item code
+ * assumes that the buf log item is first.
+ */
+void
+xfs_buf_attach_iodone(buf_t		*bp,
+		      void		(*cb)(buf_t *, xfs_log_item_t *),
+		      xfs_log_item_t	*lip)
+{
+	xfs_log_item_t	*head_lip;
+
+	ASSERT(bp->b_flags & B_BUSY);
+	ASSERT(valusema(&bp->b_lock) <= 0);
+
+	lip->li_cb = cb;
+	if (bp->b_fsprivate != NULL) {
+		head_lip = (xfs_log_item_t *)bp->b_fsprivate;
+		lip->li_bio_list = head_lip->li_bio_list;
+		head_lip->li_bio_list = lip;
+	} else {
+		bp->b_fsprivate = lip;
+	}
+
+	ASSERT((bp->b_iodone == xfs_buf_iodone_callbacks) ||
+	       (bp->b_iodone == NULL));
+	if (bp->b_iodone == NULL) {
+		bp->b_iodone = xfs_buf_iodone_callbacks;
+	}
+}
+
+/*
+ * This is the iodone() function for buffers which have had callbacks
+ * attached to them by xfs_buf_attach_iodone().  It should remove each
+ * log item from the buffer's list and call the callback of each in turn.
+ * When done, the buffer's fsprivate field is set to NULL and the buffer
+ * is unlocked with a call to iodone().
+ */
+void
+xfs_buf_iodone_callbacks(buf_t *bp)
+{
+	xfs_log_item_t	*lip;
+	xfs_log_item_t	*nlip;
+
+	ASSERT(bp->b_fsprivate != NULL);
+
+	lip = (xfs_log_item_t *)bp->b_fsprivate;
+	while (lip != NULL) {
+		nlip = lip->li_bio_list;
+		ASSERT(lip->li_cb != NULL);
+		/*
+		 * Clear the next pointer so we don't have any
+		 * confusion if the item is added to another buf.
+		 * Don't touch the log item after calling its
+		 * callback, because it could have freed itself.
+		 */
+		lip->li_bio_list = NULL;
+		lip->li_cb(bp, lip);
+		lip = nlip;
+	}
+	bp->b_fsprivate = NULL;
+
+	bp->b_iodone = NULL;
+	iodone(bp);
+}
 
 /*
  * This is the iodone() function for buffers which have been
  * logged.  It is called when they are eventually flushed out.
  * It should remove the buf item from the AIL, and free the buf item.
- * It should then clear the b_iodone field of the buffer and 
- * call iodone() with the buffer so that it will receive normal
- * iodone() processing.
+ * It is called by xfs_buf_iodone_callbacks() above which will take
+ * care of cleaning up the buffer itself.
  */ 
 void
-xfs_buf_iodone(buf_t *bp)
+xfs_buf_iodone(buf_t *bp, xfs_buf_log_item_t *bip)
 {
-	xfs_buf_log_item_t	*bip;
 	struct xfs_mount	*mp;
 	int			s;
 
-	ASSERT(bp->b_fsprivate != NULL);
-	
-	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 	ASSERT(bip->bli_buf == bp);
 
 	mp = bip->bli_item.li_mountp;
@@ -716,10 +803,6 @@ xfs_buf_iodone(buf_t *bp)
 
 	kmem_free(bip, sizeof(xfs_buf_log_item_t) +
 		  ((bip->bli_map_size - 1) * sizeof(int)));
-	bp->b_fsprivate = NULL;
-
-	bp->b_iodone = NULL;
-	iodone(bp);
 }
 
 
