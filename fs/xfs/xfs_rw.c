@@ -1,4 +1,4 @@
-#ident "$Revision: 1.227 $"
+#ident "$Revision: 1.228 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -5867,7 +5867,7 @@ xfs_diordwr(
 	if (!(ioflag & IO_PRIORITY)) {
 		bp->b_grio_private = NULL;
 		bp->b_flags &= ~(B_GR_BUF|B_PRIO_BUF);
-	} else if (xfs_io_is_guaranteed((vfile_t *)uiop->uio_fp, &stream_id)) {
+	} else if (xfs_io_is_guaranteed(uiop->uio_fp, &stream_id)) {
 		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
 			bp->b_flags |= B_GR_BUF;
 		else
