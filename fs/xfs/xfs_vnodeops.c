@@ -1,4 +1,4 @@
-#ident "$Revision: 1.264 $"
+#ident "$Revision: 1.265 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -95,9 +95,15 @@
 #endif
 
 /* data pipe functions */
-extern int fspe_store_cookie(void *);
-extern int fspe_destroy_cookie(void *);
-extern int fspe_get_ops(void *);
+extern	int fspe_store_cookie(void *);
+extern	int fspe_destroy_cookie(void *);
+extern	int fspe_get_ops(void *);
+
+extern	xfs_inode_t *xfs_get_inode(dev_t, ino_t);
+extern	int xlv_file_to_disks(dev_t fs_dev, ino_t inode, dev_t *disks, int *disk_count);
+int	xfs_file_to_disks(int, dev_t *, int *);
+int	xfs_get_inumber_fs_dev(int, xfs_ino_t *, dev_t *);
+int	xfs_match_file_open_mode(int , int );
 
 #if _MIPS_SIM == _ABI64
 int irix5_to_flock(enum xlate_mode, void *, int, xlate_info_t *);
@@ -1768,10 +1774,20 @@ xfs_inactive(
 
 			xfs_idestroy_fork(ip, XFS_ATTR_FORK);
 
-			ASSERT(error || (ip->i_d.di_anextents == 0));
+			/*
+			 * XXX - turn this assert back on once
+			 * xfs_attr_inactive() is rewritten
+			 * to always succeed
+			 */
+#if 0
+			ASSERT(error || ip->i_d.di_anextents == 0);
+#else
+			cmn_err(CE_WARN,
+				"File system lost track of some space\n");
+#endif
 		} else if (ip->i_afp)
 			xfs_idestroy_fork(ip, XFS_ATTR_FORK);
-				
+
 		/*
 		 * Free the inode.
 		 */
@@ -6079,6 +6095,19 @@ xfs_fcntl(
 	struct getbmap		bm;
 	struct fsdmidata	d;
 	extern int		scache_linemask;
+	prioAllocReq_t          req_info;
+	dev_t                   *disks;
+	bandwidth_t		*old_req_bw_rd, *old_alloc_bw_rd;
+	bandwidth_t		*old_req_bw_wr, *old_alloc_bw_wr;
+	int                     disk_count = 0;
+	int                     i, j;
+	struct prio_alloc_info  info;
+	pid_t                   holder;
+	vertex_hdl_t            mem_vhdl;
+	bandwidth_t             per_disk_bytesec;
+	bandwidth_t             total_bytesec, bytesec;
+	bandwidth_t		old_req_bandwidth, old_alloc_bandwidth;
+	int			error_on_write=0;
 
 	vp = BHV_TO_VNODE(bdp);
 	vn_trace_entry(vp, "xfs_fcntl", (inst_t *)__return_address);
@@ -6092,7 +6121,300 @@ xfs_fcntl(
 		fspe_store_cookie(arg);
 		break;
 	case F_DESTROYTRANSFER:
-		fspe_destroy_cookie(arg);
+		error = fspe_destroy_cookie(arg);
+		break;
+	case F_SETBW:
+
+		if (arg == NULL) {
+			return (EINVAL);
+		} else {
+			if (copyin((caddr_t) arg, (caddr_t) &req_info,
+					sizeof(prioAllocReq_t)) != 0) {
+				return (EINVAL);
+			}
+		}
+
+		/* Verify file open mode */
+		if (!xfs_match_file_open_mode(req_info.fd, req_info.mode))
+			return (EINVAL);
+
+		/* Bandwidth Allocation makes sense only on newer platforms */
+#if IP30 || IP27
+		disks = (dev_t *)kmem_alloc(MAX_NUM_DISKS * sizeof(dev_t), KM_SLEEP);
+		old_req_bw_rd = (bandwidth_t *)kmem_alloc(MAX_NUM_DISKS * sizeof(bandwidth_t),
+					KM_SLEEP);
+		old_alloc_bw_rd = (bandwidth_t *)kmem_alloc(MAX_NUM_DISKS * sizeof(bandwidth_t),
+					KM_SLEEP);
+		old_req_bw_wr = (bandwidth_t *)kmem_alloc(MAX_NUM_DISKS * sizeof(bandwidth_t),
+					KM_SLEEP);
+		old_alloc_bw_wr = (bandwidth_t *)kmem_alloc(MAX_NUM_DISKS * sizeof(bandwidth_t),
+					KM_SLEEP);
+
+		/* Get the list of disks the file resides on */
+		if (error = xfs_file_to_disks(req_info.fd, disks, &disk_count)) {
+			goto error_return; 
+		}
+
+		/* Copy request information into internal structure to be
+		 * passed to the bandwidth allocator.
+		 */
+		info.fd = req_info.fd;
+		info.pid = req_info.pid;
+
+		/* Now allocate bandwidth */
+
+		/*
+		 * If disk count is greater than 1, grab the bandwidth
+		 * allocation lock so that all the bandwidth allocations
+		 * are done "atomically". Grab lock also in case of
+		 * PRIO_READWRITE_ALLOCATE.
+		 */
+		if ((disk_count > 1) || (req_info.mode == PRIO_READWRITE_ALLOCATE)) {
+			if (prio_alloc_lock(req_info.pid, &holder) != PRIO_SUCCESS) {
+				/* Send back the name of the lock holder */
+				req_info.holder = holder;
+				if (copyout((caddr_t) &req_info, (caddr_t) arg,
+						sizeof(prioAllocReq_t)) != 0) {
+					error = EINVAL;
+					goto error_return;
+				}
+
+			error = ENOLCK;
+			goto error_return;
+			}
+		}
+
+		/* Simplistic for now. An assumption is made here that the file
+		 * is striped uniformly across all the disks. Hence the bandwidth
+		 * allocated to each disk is (requested bandwidth) / (disk_count).
+		 */
+		per_disk_bytesec = req_info.bytesec/disk_count;
+
+		for ( i = 0; i < disk_count; i++) {
+
+			info.req_bw = per_disk_bytesec;
+			info.alloc_bw = per_disk_bytesec; /* Same as req_bw for now */
+
+			mem_vhdl = mem_vhdl_get(disks[i]);
+
+			if (req_info.mode & PRIO_READ_ALLOCATE) {
+				info.src = disks[i];
+				info.sink = mem_vhdl;
+
+				if ((error = prio_alloc_set_bandwidth(&info, &holder,
+					 &old_req_bandwidth, &old_alloc_bandwidth)) != PRIO_SUCCESS) {
+
+					if (error == ENOLCK) { /* This can happen in the single 
+								* disk, single direction case
+								*/
+						/* Send back the name of the lock holder */
+						req_info.holder = holder;
+					}
+
+					break;
+
+				} else {
+					/* Store old bw values. May be needed later */
+					old_req_bw_rd[i] = old_req_bandwidth;
+					old_alloc_bw_rd[i] = old_alloc_bandwidth;
+				}
+			}
+
+			if (req_info.mode & PRIO_WRITE_ALLOCATE) {
+				info.src = mem_vhdl;
+				info.sink = disks[i];
+
+				if ((error = prio_alloc_set_bandwidth(&info, &holder,
+					 &old_req_bandwidth, &old_alloc_bandwidth)) != PRIO_SUCCESS) {
+					if (error == ENOLCK) { /* This can happen in the 
+								* single disk case */
+						/* Send back the name of the lock holder */
+						req_info.holder = holder;
+					}
+
+					error_on_write = 1;
+					break;
+
+				} else {
+					/* Store old bw values. May be needed later */
+					old_req_bw_wr[i] = old_req_bandwidth;
+					old_alloc_bw_wr[i] = old_alloc_bandwidth;
+				}
+			}
+
+		} /* of for */
+
+		/* On error need to walk thru' list of disks again and deallocate
+		 * the allocated bandwidth
+		 */
+		if (error) {
+			for (j =0; j < i; j++) {
+				mem_vhdl = mem_vhdl_get(disks[j]);
+
+				if (req_info.mode & PRIO_READ_ALLOCATE) {
+					info.req_bw = old_req_bw_rd[j];
+					info.alloc_bw = old_alloc_bw_rd[j];
+					info.src = disks[j];
+					info.sink = mem_vhdl;
+
+					if ((error = prio_alloc_set_bandwidth(&info, &holder,
+						&old_req_bandwidth, &old_alloc_bandwidth)) != 
+									PRIO_SUCCESS) {
+						/* This shouldn't happen since we are holding the 
+						 * bandwidth allocation lock. Should we PANIC here?
+						 */
+					} /* of if */
+				}
+
+				if (req_info.mode & PRIO_WRITE_ALLOCATE) {
+					info.req_bw = old_req_bw_wr[j];
+					info.alloc_bw = old_alloc_bw_wr[j];
+					info.src = mem_vhdl;
+					info.sink = disks[j];
+
+					if ((error = prio_alloc_set_bandwidth(&info, &holder,
+						&old_req_bandwidth, &old_alloc_bandwidth)) !=
+									PRIO_SUCCESS) {
+						/* This shouldn't happen since we are holding the
+						 * bandwidth allocation lock. Should we PANIC here?
+						 */
+					} /* of if */
+				}
+
+			} /* of for */
+
+			if ((req_info.mode == PRIO_READWRITE_ALLOCATE) &&
+			    (error_on_write)) {
+				/* Need to deallocate the READ bw for disk[i] */
+				
+				info.req_bw = old_req_bw_rd[i];
+				info.alloc_bw =  old_alloc_bw_rd[i];
+				mem_vhdl = mem_vhdl_get(disks[i]);
+				info.src = disks[i];
+				info.sink = mem_vhdl;
+
+				if ((error = prio_alloc_set_bandwidth(&info, &holder,
+					&old_req_bandwidth, &old_alloc_bandwidth)) !=
+								PRIO_SUCCESS) {
+					/* This shouldn't happen since we are holding the
+					 * bandwidth allocation lock. Should we PANIC here?
+					 */
+				}
+			}
+
+			if (copyout((caddr_t) &req_info, (caddr_t) arg,
+		                           sizeof(prioAllocReq_t)) != 0) {
+				error = EINVAL;
+				if ((disk_count > 1) || (req_info.mode == PRIO_READWRITE_ALLOCATE))
+					prio_alloc_unlock(info.pid);
+				goto error_return;
+			}
+
+		} /* of if error */
+
+		/* Release lock if we had it */
+		if ((disk_count > 1) || (req_info.mode == PRIO_READWRITE_ALLOCATE))
+			prio_alloc_unlock(info.pid);
+
+error_return:
+		kmem_free(disks, MAX_NUM_DISKS * sizeof(dev_t));
+		kmem_free(old_req_bw_rd, MAX_NUM_DISKS * sizeof(bandwidth_t));
+		kmem_free(old_req_bw_wr, MAX_NUM_DISKS * sizeof(bandwidth_t));
+		kmem_free(old_alloc_bw_rd, MAX_NUM_DISKS * sizeof(bandwidth_t));
+		kmem_free(old_alloc_bw_wr, MAX_NUM_DISKS * sizeof(bandwidth_t));
+
+#endif /* IP30 || IP27 */
+
+		/* Before returning, mark the fd as "priority" only if
+		 * non-zero bandwidth has been allocated. This is done
+		 * on all platforms where Priority I/O is supported.
+		 */
+		if (!error) {
+			if (req_info.bytesec)
+				fdt_set_priority_flag(req_info.fd);
+			else
+				fdt_reset_priority_flag(req_info.fd);
+		}
+
+		break;
+
+	case F_GETBW:
+
+		if (arg == NULL) {
+			return (EINVAL);
+		} else {
+			if (copyin((caddr_t) arg, (caddr_t) &req_info,
+		                    sizeof(prioAllocReq_t)) != 0) {
+				return (EINVAL);
+			}
+		}
+
+		if (!fdt_get_priority_flag(req_info.fd)) /* flag not set */
+			return (EINVAL);
+
+		/* The following makes sense only on platforms which support
+		 * bandwidth allocation. For other platforms, the results of
+		 * this call are undefined.
+		 */
+
+#if IP30 || IP27
+		disks = (dev_t *)kmem_alloc(MAX_NUM_DISKS * sizeof(dev_t), KM_SLEEP);
+
+                /* Get the list of disks the file resides on */
+                if (error = xfs_file_to_disks(req_info.fd, disks, &disk_count)) {
+                	goto out;
+                }
+
+		/* req_info.mode can be either PRIO_READ_ALLOCATE or PRIO_WRITE_ALLOCATE
+		 * (Note: it cannot be PRIO_READWRITE_ALLOCATE). The API code asks for
+		 * the information one at a time.
+		 */
+
+		total_bytesec = 0;
+
+		for (i =0; i < disk_count; i++) {
+
+			if ((mem_vhdl = mem_vhdl_get(disks[i])) == GRAPH_VERTEX_NONE) {
+				error = EIO;
+				goto out;
+			}
+
+			if (req_info.mode & PRIO_READ_ALLOCATE) {
+				if (prio_alloc_get_bandwidth(req_info.fd, req_info.pid, disks[i],
+					mem_vhdl, &bytesec) != PRIO_SUCCESS) {
+					error = -1;
+					goto out;
+				}
+			} else { /* PRIO_WRITE_ALLOCATE */
+				if (prio_alloc_get_bandwidth(req_info.fd, req_info.pid, mem_vhdl,
+		                                   disks[i], &bytesec) != PRIO_SUCCESS) {
+					error = -1;
+					goto out;
+				}
+			}
+
+			total_bytesec = total_bytesec + bytesec;
+
+		}
+
+		req_info.bytesec = total_bytesec;
+
+		if (arg == NULL) {
+			error = EINVAL;
+			goto out;
+		} else {
+			if (copyout((caddr_t) &req_info, (caddr_t) arg,
+		                             sizeof(prioAllocReq_t)) != 0) {
+				error = EINVAL;
+				goto out;
+			}
+		}
+
+out:
+		kmem_free(disks, MAX_NUM_DISKS * sizeof (dev_t));
+
+#endif /* IP30 || IP27 */
+
 		break;
 	case F_DIOINFO:
                 /*
@@ -6992,4 +7314,194 @@ vnodeops_t xfs_vnodeops = {
 	fs_noval,	/* link_removed */
 };
 
-#endif	/* SIM */
+/* xfs_match_file_open_mode
+ *	Match the file open mode with the bandwidth allocation request mode.
+ *	Return 0 if there is a mismatch.
+ */
+int
+xfs_match_file_open_mode(int fd, int req_mode)
+{
+	file_t  *fp;
+
+	if ( getf( fd, &fp ) != 0 ) {
+	        return( 0 );
+	}
+
+	if (((req_mode & PRIO_READ_ALLOCATE) && !(fp->f_flag & FREAD)) ||
+	   ((req_mode & PRIO_WRITE_ALLOCATE) && !(fp->f_flag & FWRITE)))
+		return 0;
+
+	return 1;
+}
+
+/* xfs_file_to_disks
+ *	Convert a users file descriptor into a list of disk dev_t's on which the
+ *	file resides.
+ *
+ * RETURNS:
+ *	0 for success, non-zero for error
+ *
+ * CAVEAT:
+ *	this must be called from context of the user process
+ */
+int
+xfs_file_to_disks(int fd, dev_t *disks, int *disk_count)
+{
+	dev_t                   fs_dev;
+	xfs_ino_t               inode;
+
+	/* Get the file inode and the file system dev_t */
+	if (xfs_get_inumber_fs_dev(fd, &inode, &fs_dev) < 0) {
+		return (EINVAL);
+	}
+
+#ifdef DEBUG && PRIO_DEBUG
+	printf("xfs_file_to_disks: fd %d inode %d fs_dev %x\n", (int)fd, 
+			(int)inode, (int)fs_dev);
+
+	printf("FS emajor number: %d\n", emajor(fs_dev));
+#endif /* PRIO_DEBUG */
+
+	if ( emajor(fs_dev) != XLV_MAJOR) {
+#ifdef DEBUG && PRIO_DEBUG
+		cmn_err(CE_WARN, "File system doesn't use XLV\n");
+#endif /* PRIO_DEBUG */
+		disks[0] = fs_dev;
+		*disk_count = 1;
+		return 0;
+	} else {
+		/* Get the list of disks the file resides on */
+		return (xlv_file_to_disks(fs_dev, inode, disks, disk_count));
+	}
+}
+
+/*
+ * xfs_get_inumber_fs_dev
+ *	Convert a users file descriptor to an inode number and file system device.
+ *
+ * RETURNS:
+ *	0 for success, -1 for error
+ *
+ * CAVEAT:
+ *	this must be called from context of the user process
+ */
+int
+xfs_get_inumber_fs_dev( int fdes, xfs_ino_t *ino, dev_t *dev)
+{
+	file_t  *fp;
+	vnode_t *vp;
+	xfs_inode_t     *ip;
+	bhv_desc_t      *bdp;
+	bhv_head_t      *bhp;
+
+	if ( getf( fdes, &fp ) != 0 ) {
+		return( -1 );
+	}
+
+	vp = fp->f_vnode;
+	bhp = VN_BHV_HEAD(vp);
+	BHV_INSERT_PREVENT(bhp);
+	bdp = bhv_lookup(bhp, &xfs_vnodeops);
+	if (bdp == NULL) {
+		*ino = (xfs_ino_t)0;
+		*dev = 0;
+	} else {
+		ip = XFS_BHVTOI(bdp);
+		*ino = ip->i_ino;
+		*dev = ip->i_dev;
+	}
+	BHV_INSERT_ALLOW(bhp);
+	return(0);
+}
+
+/* If error happens here after memory allocation for extents, memory is released */
+int xfs_get_extents_for_file( dev_t fs_dev, ino_t ino, grio_bmbt_irec_t **extents,
+                          int *numextents)
+{
+	xfs_inode_t *ip;
+	int error = 0;
+	int i, recsize;
+	xfs_bmbt_rec_t          *ep;
+	xfs_bmbt_irec_t         thisrec;
+
+	/* Get the inode */
+	if (!(ip = xfs_get_inode( fs_dev, ino ))) {
+		error = ENOENT;
+#ifdef DEBUG && PRIO_DEBUG
+		printf("xfs_get_inode failed\n");
+#endif /* PRIO_DEBUG */
+		return (error);
+	}
+
+	/* Get the number of extents in the file */
+	*numextents = ip->i_d.di_nextents;
+
+	if (*numextents) {
+		/* Copy the extents if they exist. */
+		ASSERT((*numextents) <  XFS_MAX_INCORE_EXTENTS);
+
+		/* Read in the file extents from disk if necessary. */
+		if (!(ip->i_df.if_flags & XFS_IFEXTENTS)) {
+			error = xfs_iread_extents(NULL, ip, XFS_DATA_FORK);
+			if (error) {
+#ifdef DEBUG && PRIO_DEBUG
+				printf("Error in xfs_get_extents_for_file: xfs_iread_extents\n");
+#endif /* PRIO_DEBUG */
+				goto out;
+			}
+		}
+
+		/* Allocate memory for the extents. This will be released by the upper layer 
+		 * if we return successfully. If we encounter an error after memory allocation,
+		 * we release the memory here.
+		 */
+		recsize = sizeof(grio_bmbt_irec_t) * (*numextents);
+		*extents = kmem_alloc(recsize, KM_SLEEP );
+
+		ep = ip->i_df.if_u1.if_extents;
+
+		ASSERT( ep );
+
+		for (i = 0; i < (*numextents); i++, ep++) {
+			/*
+			 * copy extent numbers;
+			 */
+			xfs_bmbt_get_all(ep, &thisrec);
+			(*extents)[i].br_startoff     = thisrec.br_startoff;
+			(*extents)[i].br_startblock   = thisrec.br_startblock;
+			(*extents)[i].br_blockcount   = thisrec.br_blockcount;
+
+#ifdef DEBUG && PRIO_DEBUG
+			printf("extents[%d].br_startoff %lld\n", i, (*extents)[i].br_startoff);
+			printf("extents[%d].br_startblock %lld\n", i, (*extents)[i].br_startblock);
+			printf("extents[%d].br_blockcount %lld\n", i, (*extents)[i].br_blockcount);
+#endif /* PRIO_DEBUG */
+		}
+	}
+
+out:
+	xfs_iunlock( ip, XFS_ILOCK_SHARED );
+	IRELE( ip );
+	return (error);
+}
+
+int xfs_is_file_realtime(dev_t fs_dev, ino_t ino)
+{
+	int inodert = 0;
+	xfs_inode_t *ip;
+
+	/* Get the inode. */
+	if (!(ip = xfs_get_inode( fs_dev, ino ))) {
+		return( -1 );
+	}
+
+	/* Check if the inode is marked as real time */
+	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
+		inodert = 1;
+	}
+
+	xfs_iunlock( ip, XFS_ILOCK_SHARED );
+	IRELE( ip );
+	return( inodert );
+}
+#endif /* SIM */
