@@ -87,7 +87,7 @@ struct buf;
 struct dirent;
 struct uio;
 struct xfs_bmap_free;
-struct xfs_da_name;
+struct xfs_da_args;
 struct xfs_da_state;
 struct xfs_da_state_blk;
 struct xfs_inode;
@@ -99,27 +99,27 @@ struct xfs_trans;
  */
 int xfs_dir_shortform_create(struct xfs_trans *trans, struct xfs_inode *dp,
 					 xfs_ino_t parent_inumber);
-int xfs_dir_shortform_addname(struct xfs_trans *trans, struct xfs_da_name *add);
-int xfs_dir_shortform_lookup(struct xfs_trans *trans, struct xfs_da_name *args);
+int xfs_dir_shortform_addname(struct xfs_trans *trans, struct xfs_da_args *add);
+int xfs_dir_shortform_lookup(struct xfs_trans *trans, struct xfs_da_args *args);
 int xfs_dir_shortform_to_leaf(struct xfs_trans *trans,
-				struct xfs_da_name *args);
+				struct xfs_da_args *args);
 #ifndef SIM
 int xfs_dir_shortform_removename(struct xfs_trans *trans,
-					struct xfs_da_name *remove);
+					struct xfs_da_args *remove);
 int xfs_dir_shortform_getdents(struct xfs_trans *trans, struct xfs_inode *dp,
 					   struct uio *uio, int *eofp,
 					   struct dirent *dbp);
 int xfs_dir_shortform_replace(struct xfs_trans *trans,
-					struct xfs_da_name *args);
+					struct xfs_da_args *args);
 #endif	/* !SIM */
 
 /*
  * Internal routines when dirsize == XFS_LBSIZE(mp).
  */
-int xfs_dir_leaf_to_node(struct xfs_trans *trans, struct xfs_da_name *args);
+int xfs_dir_leaf_to_node(struct xfs_trans *trans, struct xfs_da_args *args);
 #ifndef SIM
 int xfs_dir_leaf_to_shortform(struct xfs_trans *trans,
-					struct xfs_da_name *args);
+					struct xfs_da_args *args);
 #endif	/* !SIM */
 
 /*
@@ -132,10 +132,10 @@ int	xfs_dir_leaf_split(struct xfs_da_state *state,
 					  struct xfs_da_state_blk *oldblk,
 					  struct xfs_da_state_blk *newblk);
 int	xfs_dir_leaf_add(struct xfs_trans *trans, struct buf *leaf_buffer,
-				     struct xfs_da_name *args,
+				     struct xfs_da_args *args,
 				     int insertion_index);
-int	xfs_dir_leaf_addname(struct xfs_trans *trans, struct xfs_da_name *args);
-int	xfs_dir_leaf_lookup_int(struct buf *leaf_buffer, struct xfs_da_name *args,
+int	xfs_dir_leaf_addname(struct xfs_trans *trans, struct xfs_da_args *args);
+int	xfs_dir_leaf_lookup_int(struct buf *leaf_buffer, struct xfs_da_args *args,
 				      int *index_found_at);
 #ifndef SIM
 int	xfs_dir_leaf_remove(struct xfs_trans *trans, struct buf *leaf_buffer,

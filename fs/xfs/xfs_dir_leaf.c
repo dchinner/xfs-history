@@ -71,7 +71,7 @@
  * Routines used for growing the Btree.
  */
 STATIC void xfs_dir_leaf_add_work(xfs_trans_t *trans, buf_t *leaf_buffer,
-					      xfs_da_name_t *args,
+					      xfs_da_args_t *args,
 					      int insertion_index,
 					      int freemap_index);
 STATIC void xfs_dir_leaf_compact(xfs_trans_t *trans, buf_t *leaf_buffer);
@@ -129,7 +129,7 @@ xfs_dir_shortform_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_ino_t parent)
  * Overflow from the inode has already been checked for.
  */
 int
-xfs_dir_shortform_addname(xfs_trans_t *trans, xfs_da_name_t *args)
+xfs_dir_shortform_addname(xfs_trans_t *trans, xfs_da_args_t *args)
 {
 	xfs_dir_shortform_t *sf;
 	xfs_dir_sf_entry_t *sfe;
@@ -171,7 +171,7 @@ xfs_dir_shortform_addname(xfs_trans_t *trans, xfs_da_name_t *args)
  * Remove a name from the shortform directory structure.
  */
 int
-xfs_dir_shortform_removename(xfs_trans_t *trans, xfs_da_name_t *args)
+xfs_dir_shortform_removename(xfs_trans_t *trans, xfs_da_args_t *args)
 {
 	xfs_dir_shortform_t *sf;
 	xfs_dir_sf_entry_t *sfe;
@@ -215,7 +215,7 @@ xfs_dir_shortform_removename(xfs_trans_t *trans, xfs_da_name_t *args)
  */
 /*ARGSUSED*/
 int
-xfs_dir_shortform_lookup(xfs_trans_t *trans, xfs_da_name_t *args)
+xfs_dir_shortform_lookup(xfs_trans_t *trans, xfs_da_args_t *args)
 {
 	xfs_dir_shortform_t *sf;
 	xfs_dir_sf_entry_t *sfe;
@@ -252,12 +252,12 @@ xfs_dir_shortform_lookup(xfs_trans_t *trans, xfs_da_name_t *args)
  * Convert from using the shortform to the leaf.
  */
 int
-xfs_dir_shortform_to_leaf(xfs_trans_t *trans, xfs_da_name_t *iargs)
+xfs_dir_shortform_to_leaf(xfs_trans_t *trans, xfs_da_args_t *iargs)
 {
 	xfs_inode_t *dp;
 	xfs_dir_shortform_t *sf;
 	xfs_dir_sf_entry_t *sfe;
-	xfs_da_name_t args;
+	xfs_da_args_t args;
 	xfs_ino_t inumber;
 	char *tmpbuffer;
 	int retval, i, size;
@@ -409,7 +409,7 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
  * Look up a name in a shortform directory structure, replace the inode number.
  */
 int
-xfs_dir_shortform_replace(xfs_trans_t *trans, xfs_da_name_t *args)
+xfs_dir_shortform_replace(xfs_trans_t *trans, xfs_da_args_t *args)
 {
 	xfs_dir_shortform_t *sf;
 	xfs_dir_sf_entry_t *sfe;
@@ -450,13 +450,13 @@ xfs_dir_shortform_replace(xfs_trans_t *trans, xfs_da_name_t *args)
  * Convert a leaf directory to shortform structure
  */
 int
-xfs_dir_leaf_to_shortform(xfs_trans_t *trans, xfs_da_name_t *iargs)
+xfs_dir_leaf_to_shortform(xfs_trans_t *trans, xfs_da_args_t *iargs)
 {
 	xfs_dir_leafblock_t *leaf;
 	xfs_dir_leaf_hdr_t *hdr;
 	xfs_dir_leaf_entry_t *entry;
 	xfs_dir_leaf_name_t *namest;
-	xfs_da_name_t args;
+	xfs_da_args_t args;
 	xfs_inode_t *dp;
 	xfs_ino_t parent;
 	char *tmpbuffer;
@@ -489,8 +489,7 @@ xfs_dir_leaf_to_shortform(xfs_trans_t *trans, xfs_da_name_t *iargs)
 			bcopy(namest->inumber, (char *)&parent,
 					       sizeof(xfs_ino_t));
 			entry->nameidx = 0;
-		}
-		if ((entry->namelen == 1) && (namest->name[0] == '.')) {
+		} else if ((entry->namelen == 1) && (namest->name[0] == '.')) {
 			entry->nameidx = 0;
 		}
 	}
@@ -531,7 +530,7 @@ out:
  * Convert from using a single leaf to a root node and a leaf.
  */
 int
-xfs_dir_leaf_to_node(xfs_trans_t *trans, xfs_da_name_t *args)
+xfs_dir_leaf_to_node(xfs_trans_t *trans, xfs_da_args_t *args)
 {
 	xfs_dir_leafblock_t *leaf;
 	xfs_da_intnode_t *node;
@@ -667,7 +666,7 @@ xfs_dir_leaf_split(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
  * Add a name to the leaf directory structure.
  */
 int
-xfs_dir_leaf_add(xfs_trans_t *trans, buf_t *bp, xfs_da_name_t *args, int index)
+xfs_dir_leaf_add(xfs_trans_t *trans, buf_t *bp, xfs_da_args_t *args, int index)
 {
 	xfs_dir_leafblock_t *leaf;
 	xfs_dir_leaf_hdr_t *hdr;
@@ -735,7 +734,7 @@ xfs_dir_leaf_add(xfs_trans_t *trans, buf_t *bp, xfs_da_name_t *args, int index)
  * Add a name to a leaf directory structure.
  */
 STATIC void
-xfs_dir_leaf_add_work(xfs_trans_t *trans, buf_t *bp, xfs_da_name_t *args,
+xfs_dir_leaf_add_work(xfs_trans_t *trans, buf_t *bp, xfs_da_args_t *args,
 				  int index, int mapindex)
 {
 	xfs_dir_leafblock_t *leaf;
@@ -1455,7 +1454,7 @@ xfs_dir_leaf_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
  * Don't change the args->inumber unless we find the filename.
  */
 int
-xfs_dir_leaf_lookup_int(buf_t *bp, xfs_da_name_t *args, int *index)
+xfs_dir_leaf_lookup_int(buf_t *bp, xfs_da_args_t *args, int *index)
 {
 	xfs_dir_leafblock_t *leaf;
 	xfs_dir_leaf_entry_t *entry;

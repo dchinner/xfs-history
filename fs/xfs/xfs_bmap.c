@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.145 $"
+#ident	"$Revision: 1.146 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -467,7 +467,7 @@ xfs_bmap_add_attrfork_local(
 	xfs_bmap_free_t		*flist,		/* blocks to free at commit */
 	int			*flags)		/* inode logging flags */
 {
-	xfs_da_name_t		dargs;
+	xfs_da_args_t		dargs;
 	int			error;
 
 	if (ip->i_df.if_bytes <= XFS_IFORK_DSIZE(ip))

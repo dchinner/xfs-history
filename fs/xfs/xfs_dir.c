@@ -69,28 +69,28 @@
 /*
  * Internal routines when dirsize == XFS_LBSIZE(mp).
  */
-STATIC int xfs_dir_leaf_lookup(xfs_trans_t *trans, xfs_da_name_t *args);
+STATIC int xfs_dir_leaf_lookup(xfs_trans_t *trans, xfs_da_args_t *args);
 #ifndef SIM
-STATIC int xfs_dir_leaf_removename(xfs_trans_t *trans, xfs_da_name_t *args,
+STATIC int xfs_dir_leaf_removename(xfs_trans_t *trans, xfs_da_args_t *args,
 					       int *number_entries,
 					       int *total_namebytes);
 STATIC int xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					     uio_t *uio, int *eofp,
 					     dirent_t *dbp);
-STATIC int xfs_dir_leaf_replace(xfs_trans_t *trans, xfs_da_name_t *args);
+STATIC int xfs_dir_leaf_replace(xfs_trans_t *trans, xfs_da_args_t *args);
 #endif	/* !SIM */
 
 /*
  * Internal routines when dirsize > XFS_LBSIZE(mp).
  */
-STATIC int xfs_dir_node_addname(xfs_trans_t *trans, xfs_da_name_t *args);
-STATIC int xfs_dir_node_lookup(xfs_trans_t *trans, xfs_da_name_t *args);
+STATIC int xfs_dir_node_addname(xfs_trans_t *trans, xfs_da_args_t *args);
+STATIC int xfs_dir_node_lookup(xfs_trans_t *trans, xfs_da_args_t *args);
 #ifndef SIM
-STATIC int xfs_dir_node_removename(xfs_trans_t *trans, xfs_da_name_t *args);
+STATIC int xfs_dir_node_removename(xfs_trans_t *trans, xfs_da_args_t *args);
 STATIC int xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					     uio_t *uio, int *eofp,
 					     dirent_t *dbp);
-STATIC int xfs_dir_node_replace(xfs_trans_t *trans, xfs_da_name_t *args);
+STATIC int xfs_dir_node_replace(xfs_trans_t *trans, xfs_da_args_t *args);
 #endif	/* !SIM */
 
 /*
@@ -160,7 +160,7 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 		   xfs_ino_t inum, xfs_fsblock_t *firstblock,
 		   xfs_bmap_free_t *flist, xfs_extlen_t total)
 {
-	xfs_da_name_t args;
+	xfs_da_args_t args;
 	int retval, newsize, namelen;
 
 #ifdef XFSDADEBUG
@@ -230,7 +230,7 @@ xfs_dir_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 		   xfs_fsblock_t *firstblock, xfs_bmap_free_t *flist,
 		   xfs_extlen_t total)
 {
-	xfs_da_name_t args;
+	xfs_da_args_t args;
 	int count, totallen, newsize, retval, namelen;
 
 #ifdef XFSDADEBUG
@@ -289,7 +289,7 @@ int							/* error */
 xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 				   xfs_ino_t *inum)
 {
-	xfs_da_name_t args;
+	xfs_da_args_t args;
 	int retval;
 
 #ifdef XFSDADEBUG
@@ -391,7 +391,7 @@ int							/* error */
 xfs_dir_replace(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 				    xfs_ino_t inum)
 {
-	xfs_da_name_t args;
+	xfs_da_args_t args;
 	int retval;
 
 #ifdef XFSDADEBUG
@@ -447,7 +447,7 @@ xfs_dir_replace(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
  * This is the external routine.
  */
 int
-xfs_dir_leaf_addname(xfs_trans_t *trans, xfs_da_name_t *args)
+xfs_dir_leaf_addname(xfs_trans_t *trans, xfs_da_args_t *args)
 {
 	int index, retval;
 	buf_t *bp;
@@ -471,7 +471,7 @@ xfs_dir_leaf_addname(xfs_trans_t *trans, xfs_da_name_t *args)
  * This is the external routine.
  */
 STATIC int
-xfs_dir_leaf_removename(xfs_trans_t *trans, xfs_da_name_t *args,
+xfs_dir_leaf_removename(xfs_trans_t *trans, xfs_da_args_t *args,
 				    int *count, int *totallen)
 {
 	xfs_dir_leafblock_t *leaf;
@@ -500,7 +500,7 @@ xfs_dir_leaf_removename(xfs_trans_t *trans, xfs_da_name_t *args,
  * This is the external routine.
  */
 STATIC int
-xfs_dir_leaf_lookup(xfs_trans_t *trans, xfs_da_name_t *args)
+xfs_dir_leaf_lookup(xfs_trans_t *trans, xfs_da_args_t *args)
 {
 	int index, retval;
 	buf_t *bp;
@@ -547,7 +547,7 @@ xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
  * This is the external routine.
  */
 STATIC int
-xfs_dir_leaf_replace(xfs_trans_t *trans, xfs_da_name_t *args)
+xfs_dir_leaf_replace(xfs_trans_t *trans, xfs_da_args_t *args)
 {
 	int index, retval;
 	buf_t *bp;
@@ -590,7 +590,7 @@ xfs_dir_leaf_replace(xfs_trans_t *trans, xfs_da_name_t *args)
  * the root node (a special case of an intermediate node).
  */
 STATIC int
-xfs_dir_node_addname(xfs_trans_t *trans, xfs_da_name_t *args)
+xfs_dir_node_addname(xfs_trans_t *trans, xfs_da_args_t *args)
 {
 	xfs_da_state_t *state;
 	xfs_da_state_blk_t *blk;
@@ -646,7 +646,7 @@ xfs_dir_node_addname(xfs_trans_t *trans, xfs_da_name_t *args)
  * the root node (a special case of an intermediate node).
  */
 STATIC int
-xfs_dir_node_removename(xfs_trans_t *trans, xfs_da_name_t *args)
+xfs_dir_node_removename(xfs_trans_t *trans, xfs_da_args_t *args)
 {
 	xfs_da_state_t *state;
 	xfs_da_state_blk_t *blk;
@@ -697,7 +697,7 @@ xfs_dir_node_removename(xfs_trans_t *trans, xfs_da_name_t *args)
  * Use an internal routine to actually do all the work.
  */
 STATIC int
-xfs_dir_node_lookup(xfs_trans_t *trans, xfs_da_name_t *args)
+xfs_dir_node_lookup(xfs_trans_t *trans, xfs_da_args_t *args)
 {
 	xfs_da_state_t *state;
 	int retval, error, i;
@@ -809,7 +809,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
  * Use an internal routine to actually do the lookup.
  */
 STATIC int
-xfs_dir_node_replace(xfs_trans_t *trans, xfs_da_name_t *args)
+xfs_dir_node_replace(xfs_trans_t *trans, xfs_da_args_t *args)
 {
 	xfs_da_state_t *state;
 	xfs_da_state_blk_t *blk;

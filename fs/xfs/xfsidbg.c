@@ -111,7 +111,7 @@ void	idbg_xattrsf(xfs_attr_shortform_t *);
 void	idbg_xdirleaf(xfs_dir_leafblock_t *);
 void	idbg_xdirsf(xfs_dir_shortform_t *);
 void	idbg_xdanode(xfs_da_intnode_t *);
-void	idbg_xdaname(xfs_da_name_t *);
+void	idbg_xdaargs(xfs_da_args_t *);
 void	idbg_xdastate(xfs_da_state_t *);
 void	idbg_xexlist(xfs_inode_t *);
 void	idbg_xflist(xfs_bmap_free_t *);
@@ -196,7 +196,7 @@ static struct xif {
     "xdirlf",	VD idbg_xdirleaf,	"Dump XFS directory leaf block",
     "xdirsf",	VD idbg_xdirsf,		"Dump XFS directory shortform",
     "xdanode",	VD idbg_xdanode,	"Dump XFS dir/attr node block",
-    "xdaname",	VD idbg_xdaname,	"Dump XFS dir/attr name structure",
+    "xdaargs",	VD idbg_xdaargs,	"Dump XFS dir/attr args structure",
     "xdastate",	VD idbg_xdastate,	"Dump XFS dir/attr state_blk struct",
     "xexlist",	VD idbg_xexlist,	"Dump XFS bmap extents in inode",
     "xflist",	VD idbg_xflist,		"Dump XFS to-be-freed extent list",
@@ -2056,10 +2056,10 @@ idbg_xdanode(struct xfs_da_intnode *node)
 }
 
 /*
- * Print an xfs_da_name structure.
+ * Print an xfs_da_args structure.
  */
 void
-idbg_xdaname(xfs_da_name_t *n)
+idbg_xdaargs(xfs_da_args_t *n)
 {
 	int i;
 
@@ -2112,7 +2112,7 @@ idbg_xdastate(xfs_da_state_t *s)
 	qprintf("args 0x%x mp 0x%x trans 0x%x blocksize %d inleaf %d\n",
 		s->args, s->mp, s->trans, s->blocksize, s->inleaf);
 	if (s->args)
-		idbg_xdaname(s->args);
+		idbg_xdaargs(s->args);
 	xfs_dastate_path("path", &s->path);
 	xfs_dastate_path("altpath", &s->altpath);
 }
