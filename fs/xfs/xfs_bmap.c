@@ -3457,7 +3457,6 @@ xfs_bmap_validate_ret(
 
 #endif /* DEBUG */
 
-
 /*
  * Map file blocks to filesystem blocks.
  * File range is given by the bno/len pair.
@@ -3883,6 +3882,54 @@ xfs_bmapi(
 	xfs_bmap_validate_ret(orig_bno, orig_len, orig_flags, orig_mval,
 		orig_nmap, *nmap);
 	kmem_check();
+	return 0;
+}
+
+/*
+ * Map file blocks to filesystem blocks, simple version.
+ * One block only, read-only.
+ * For flags, only the XFS_BMAPI_ATTRFORK flag is examined.
+ * For the other flag values, the effect is as if XFS_BMAPI_METADATA
+ * was set and all the others were clear.
+ */
+int						/* error */
+xfs_bmapi_single(
+	xfs_trans_t	*tp,		/* transaction pointer */
+	xfs_inode_t	*ip,		/* incore inode */
+	int		whichfork,	/* data or attr fork */
+	xfs_fsblock_t	*fsb,		/* output: mapped block */
+	xfs_fileoff_t	bno)		/* starting file offs. mapped */
+{
+	int		eof;		/* we've hit the end of extent list */
+	int		error;		/* error return */
+	xfs_bmbt_irec_t	got;		/* current extent list record */
+	xfs_ifork_t	*ifp;		/* inode fork pointer */
+	xfs_extnum_t	lastx;		/* last useful extent number */
+	xfs_bmbt_irec_t	prev;		/* previous extent list record */
+
+	ifp = XFS_IFORK_PTR(ip, whichfork);
+	ASSERT(XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_BTREE ||
+	       XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_EXTENTS);
+	XFSSTATS.xs_blk_mapr++;
+	if (!(ifp->if_flags & XFS_IFEXTENTS)) {
+		error = xfs_iread_extents(tp, ip, whichfork);
+		if (error)
+			return error;
+	}
+	(void)xfs_bmap_search_extents(ip, bno, whichfork, &eof, &lastx, &got,
+		&prev);
+	/* 
+	 * Reading past eof, act as though there's a hole
+	 * up to end.
+	 */
+	if (eof || got.br_startoff > bno) {
+		*fsb = NULLFSBLOCK;
+		return 0;
+	}
+	ASSERT(!ISNULLSTARTBLOCK(got.br_startblock));
+	ASSERT(bno < got.br_startoff + got.br_blockcount);
+	*fsb = got.br_startblock + (bno - got.br_startoff);
+	ifp->if_lastex = lastx;
 	return 0;
 }
 
