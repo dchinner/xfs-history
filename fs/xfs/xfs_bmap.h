@@ -89,6 +89,7 @@ typedef struct xfs_bmalloca {
 typedef struct xfs_bmapi_locals {
 	int			orig_nmap; /* original value of *nmap */
 	char			delay;	/* this request is for delayed alloc */
+	char			exact;	/* don't do all of wasdelayed extent */
 	char			inhole;	/* current location is hole in file */
 	char			lowspace; /* using the low-space algorithm */
 	char			trim;	/* output trimmed to match range */

@@ -2724,6 +2724,7 @@ xfs_bmapi(
 	l->delay = (flags & XFS_BMAPI_DELAY) != 0;
 	l->trim = (flags & XFS_BMAPI_ENTIRE) == 0;
 	l->userdata = (flags & XFS_BMAPI_METADATA) == 0;
+	l->exact = (flags & XFS_BMAPI_EXACT) != 0;
 	ASSERT(l->wr || !l->delay);
 	l->logflags = 0;
 	l->lowspace = 0;
@@ -2778,16 +2779,22 @@ xfs_bmapi(
 			 * allocate the stuff asked for in this bmap call
 			 * but that wouldn't be as good.
 			 */
-			if (l->wasdelay) {
+			if (l->wasdelay && !l->exact) {
 				l->alen = l->got.br_blockcount;
 				l->aoff = l->got.br_startoff;
-				if (l->lowspace) {
+				if (l->lowspace)
 					l->minlen = 1;
-				} else {
+				else {
 					l->minlen =
 					    (XFS_FILEOFF_MAX(bno, l->obno) -
 					     l->aoff) + 1;
 				}
+			} else if (l->wasdelay) {
+				l->alen = XFS_EXTLEN_MIN(len,
+					(l->got.br_startoff +
+					 l->got.br_blockcount) - bno); 
+				l->aoff = bno;
+				l->minlen = 1;
 			} else {
 				l->alen = XFS_EXTLEN_MIN(len, MAXEXTLEN);
 				if (!l->eof)
