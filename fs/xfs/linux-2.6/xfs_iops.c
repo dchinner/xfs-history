@@ -90,6 +90,17 @@
 static struct dentry_operations linvfs_dops;
 
 /*
+ * assign dentry ops to a dentry to prevent reference leak on dput
+ */
+
+void
+linvfs_set_dentry_ops(struct dentry *dentry)
+{
+    ASSERT(dentry);
+    dentry->d_op = &linvfs_dops;
+}
+
+/*
  * Pull the link count and size up from the xfs inode to the linux inode
  */
 
@@ -164,13 +175,12 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 		linvfs_set_inode_ops(ip);
 		error = linvfs_revalidate_core(ip);
 		validate_fields(dir);
-		dentry->d_op = &linvfs_dops;
+                linvfs_set_dentry_ops(dentry);
 		d_instantiate(dentry, ip);
 	}
 
 	return -error;
 }
-
 
 /*
  * Create a new file in dir using mode.
@@ -212,7 +222,7 @@ struct dentry * linvfs_lookup(struct inode *dir, struct dentry *dentry)
 			VN_RELE(cvp);
 			return ERR_PTR(-EACCES);
 		}
-		dentry->d_op = &linvfs_dops;
+                linvfs_set_dentry_ops(dentry);
 		linvfs_set_inode_ops(ip);
 		error = linvfs_revalidate_core(ip);
 	}
@@ -244,7 +254,7 @@ int linvfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *den
 		ip->i_ctime = CURRENT_TIME;
 		VN_HOLD(vp);
 		validate_fields(ip);
-		dentry->d_op = &linvfs_dops;
+                linvfs_set_dentry_ops(dentry);
 		d_instantiate(dentry, ip);
 	}
 	return -error;
@@ -315,7 +325,7 @@ int linvfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname
 		} else {
 			linvfs_set_inode_ops(ip);
 			error = linvfs_revalidate_core(ip);
-			dentry->d_op = &linvfs_dops;
+                        linvfs_set_dentry_ops(dentry);
 			d_instantiate(dentry, ip);
 		}
 	}

@@ -45,6 +45,7 @@ extern int linvfs_revalidate(struct dentry *);
 extern int linvfs_revalidate_core(struct inode *);
 
 extern void linvfs_set_inode_ops(struct inode *);
+extern void linvfs_set_dentry_ops(struct dentry *);
 
 #endif  /*  XFS_LINUX_OPS_INODE_DOT_H  */
 

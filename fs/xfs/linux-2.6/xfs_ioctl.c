@@ -448,6 +448,7 @@ xfs_open_by_handle(
 	     	put_unused_fd(new_fd);
 		return -XFS_ERROR(ENOMEM);
 	}
+        linvfs_set_dentry_ops(dentry);
 
 	/*
 	 * Keep nfsd happy.
