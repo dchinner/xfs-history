@@ -1,4 +1,4 @@
-#ident "$Revision: 1.206 $"
+#ident "$Revision: 1.207 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1563,7 +1563,10 @@ xfs_itruncate_finish(
 			xfs_trans_set_sync(ntp);
 		}
 	}
-		
+	ASSERT(fork == XFS_DATA_FORK ||
+		(fork == XFS_ATTR_FORK &&
+			((sync && !(mp->m_flags & XFS_MOUNT_WSYNC)) ||
+			 (sync == 0 && (mp->m_flags & XFS_MOUNT_WSYNC)))));
 
 	/*
 	 * Since it is possible for space to become allocated beyond
@@ -1586,11 +1589,22 @@ xfs_itruncate_finish(
 		/*
 		 * Free up up to XFS_ITRUNC_MAX_EXTENTS.  xfs_bunmapi()
 		 * will tell us whether it freed the entire range or
-		 * not.
+		 * not.  If this is a synchronous mount (wsync),
+		 * then we can tell bunmapi to keep all the
+		 * transactions asynchronous since the unlink
+		 * transaction that made this inode inactive has
+		 * already hit the disk.  There's no danger of
+		 * the freed blocks being reused, there being a
+		 * crash, and the reused blocks suddenly reappearing
+		 * in this file with garbage in them once recovery
+		 * runs.
 		 */
 		XFS_BMAP_INIT(&free_list, &first_block);
 		error = xfs_bunmapi(ntp, ip, first_unmap_block,
-				    unmap_len, XFS_BMAPI_AFLAG(fork),
+				    unmap_len,
+				    XFS_BMAPI_AFLAG(fork) |
+				      ((mp->m_flags & XFS_MOUNT_WSYNC)
+				       ? XFS_BMAPI_ASYNC : 0),
 				    XFS_ITRUNC_MAX_EXTENTS,
 				    &first_block, &free_list, &done);
 		if (error) {
