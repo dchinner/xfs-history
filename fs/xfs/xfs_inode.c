@@ -1028,16 +1028,6 @@ xfs_iread(
 		ip->i_d.di_projid = 0;
 	}
 
-	/*
-	 * IRIX and older Linux Kernel initialized di_gen to zero when
-	 * creating new inodes, but the NFSD uses i_generation = 0 as
-	 * a wildcard.  We bump di_gen here to avoid that problem for new
-	 * exports, and filehandles created by an older kernel using
-	 * the same filesystem are still valid as the wildcard matches it.
-	 */
-	if (unlikely(ip->i_d.di_gen == 0))
-		ip->i_d.di_gen++;
-
 	ip->i_delayed_blks = 0;
 
 	/*
@@ -2380,17 +2370,11 @@ xfs_ifree(
 		XFS_IFORK_DSIZE(ip) / (uint)sizeof(xfs_bmbt_rec_t);
 	ip->i_d.di_format = XFS_DINODE_FMT_EXTENTS;
 	ip->i_d.di_aformat = XFS_DINODE_FMT_EXTENTS;
-
 	/*
 	 * Bump the generation count so no one will be confused
-	 * by reincarnations of this inode.  Note that we have to
-	 * skip 0 as that would confuse the NFS server, and we
-	 * have to do it here because the XFS inode might be
-	 * around for a while after deletion (unlike the normal
-	 * Linux inode semantics).
+	 * by reincarnations of this inode.
 	 */
-	if (++ip->i_d.di_gen == 0)
-		ip->i_d.di_gen++;
+	ip->i_d.di_gen++;
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 
 	if (delete) {
