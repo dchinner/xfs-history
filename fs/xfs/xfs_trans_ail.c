@@ -8,6 +8,7 @@
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/debug.h>
+#include <sys/cmn_err.h>
 #include <sys/ksa.h>
 #ifdef SIM
 #undef _KERNEL
@@ -25,6 +26,7 @@
 #include "xfs_mount.h"
 #include "xfs_log.h"
 #include "xfs_trans_priv.h"
+#include "xfs_error.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -386,7 +388,12 @@ _xfs_trans_delete_ail(
 		 */
 		if (XFS_FORCED_SHUTDOWN(mp))
 			AIL_UNLOCK(mp, s);
-		
+		else {
+			xfs_cmn_err(XFS_PTAG_AILDELETE, CE_ALERT, mp,
+				"_xfs_trans_delete_ail: attempting to delete a log item that is not in the AIL");
+			xfs_force_shutdown(mp, XFS_CORRUPT_INCORE);
+			AIL_UNLOCK(mp, s);
+		}
 	}
 }
 

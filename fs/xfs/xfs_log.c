@@ -1870,23 +1870,40 @@ xlog_state_clean_log(xlog_t *log)
 	}
 }	/* xlog_state_clean_log */
 
-
 STATIC void
 xlog_state_do_callback(
 	xlog_t 		*log,
 	int		aborted,
 	xlog_in_core_t	*ciclog)
 {
-	xlog_in_core_t	   *iclog, *first_iclog;
+	xlog_in_core_t	   *iclog, *first_iclog, *lsn_log;
 	xfs_log_callback_t *cb, *cb_next;
 	int		   spl;
 	int		   flushcnt = 0;
 	int		   done = 0;
+	xfs_lsn_t	   lowest_lsn, lsn;	/* Lowest lsn in any iclog */
 
 	spl = LOG_LOCK(log);
 	first_iclog = iclog = log->l_iclog;
 
 retry:
+	/*
+	 * First find the lowest lsn in any iclog that is not active or dirty.
+	 * This is used later to prevent calling callbacks out of order.
+	 */
+	
+	lsn_log = log->l_iclog;
+	lowest_lsn = 0;
+	do {
+	    if (!(lsn_log->ic_state & (XLOG_STATE_ACTIVE|XLOG_STATE_DIRTY))) {
+		lsn = lsn_log->ic_header.h_lsn;
+		if ((lsn && !lowest_lsn) || (lsn < lowest_lsn)) {
+			lowest_lsn = lsn;
+		}
+	    }
+	    lsn_log = lsn_log->ic_next;
+	} while (lsn_log != log->l_iclog);
+
 	do {
 		/* skip all iclogs in the ACTIVE & DIRTY states */
 		if (iclog->ic_state & (XLOG_STATE_ACTIVE|XLOG_STATE_DIRTY)) {
@@ -1916,6 +1933,24 @@ retry:
 						XLOG_STATE_DONE_SYNC))
 				    	ciclog->ic_state = XLOG_STATE_DO_CALLBACK; 
 				goto clean;
+			}
+
+			/*
+			 * We now have an iclog that is in either the DO_CALLBACK
+			 * or DONE_SYNC states. The other states (WANT_SYNC,
+			 * SYNCING, or CALLBACK were caught by the above if
+			 * and are going to clean (i.e. we aren't doing their
+			 * callbacks) see the above if.
+			 */
+
+			/*
+			 * We will do one more check here to see if we have chased
+			 * our tail around.
+			 */
+			
+			if (lowest_lsn && (lowest_lsn < iclog->ic_header.h_lsn)) {
+				iclog = iclog->ic_next;
+				continue; /* Leave this guy for someone later */
 			}
 
 			iclog->ic_state = XLOG_STATE_CALLBACK;
