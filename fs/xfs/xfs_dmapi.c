@@ -935,19 +935,16 @@ static struct dentry *dmapi_dget(struct inode *inode)
 }
 
 
-/* This routine started as a copy of routines rwv() and rdwr(), and then all
-   unnecessary code was removed.  The copy was required because we need to
-   be able to select various combinations of FINVIS, FNONBLOCK, FDIRECT, and
-   FSYNC,  yet we don't have a file descriptor and we don't have the file's
-   pathname.  All we have is a handle.  Hopefully someday rdwr() and rwv()
-   can be restructured such that all the file descriptor code stays in rwv().
-   That way we could call rdwr() directly from here.
+/* We need to be able to select various combinations of FINVIS, O_NONBLOCK,
+   O_DIRECT, and O_SYNC, yet we don't have a file descriptor and we don't have
+   the file's pathname.  All we have is a handle.
 */
 
 STATIC int
 xfs_dm_rdwr(
 	bhv_desc_t	*bdp,
 	uint		fflag,
+	mode_t		fmode,
 	dm_off_t	off,
 	dm_size_t	len,
 	void		*bufp,
@@ -976,7 +973,7 @@ xfs_dm_rdwr(
 	if (vp->v_flag & VISSWAP && vp->v_type == VREG)
 		return EACCES;
 
-	if (fflag & FMODE_READ) {
+	if (fmode & FMODE_READ) {
 	        XFS_STATS_INC(xfsstats.xs_read_calls);
 		oflags = O_RDONLY;
 	} else {
@@ -984,19 +981,18 @@ xfs_dm_rdwr(
 		oflags = O_WRONLY;
 	}
 
-	/* Build file descriptor flags and I/O flags.  FNONBLOCK is needed so
+	/* Build file descriptor flags and I/O flags.  O_NONBLOCK is needed so
 	   that we don't block on mandatory file locks.  FINVIS is needed so
 	   that we don't change any file timestamps.
 	*/
 
-	oflags |= O_INVISIBLE | O_NONBLOCK;
+	fmode |= FINVIS;
+	oflags |= O_NONBLOCK;
 	if (xfs_dm_direct_ok(bdp, off, len, bufp))
 		oflags |= O_DIRECT;
 
-/* XXX  when will this be available in linux/XFS?
-	if (fflag & FSYNC)
-		fflags |= FSYNC;
-*/
+	if (fflag & O_SYNC)
+		oflags |= O_SYNC;
 
 	ip = LINVFS_GET_IP(vp);
 	if( ip->i_fop == NULL ){
@@ -1013,8 +1009,7 @@ xfs_dm_rdwr(
 		return(EINVAL);
 	}
 
-	error = init_private_file( &file, dentry,
-				  (fflag&FMODE_READ ? FMODE_READ:FMODE_WRITE));
+	error = init_private_file( &file, dentry, fmode );
 	if(error){
 		dput(dentry);
 		return(EINVAL);
@@ -1028,8 +1023,8 @@ xfs_dm_rdwr(
 	uio.uio_iov->iov_base = bufp;
 	uio.uio_iov->iov_len = uio.uio_resid = len;
 
-	if (fflag & FMODE_READ) {
-		VOP_READ(vp, &uio, file.f_flags, NULL, NULL, error);
+	if (fmode & FMODE_READ) {
+		VOP_READ(vp, &uio, 0, NULL, NULL, error);
 	} else {
 		VOP_WRITE(vp, &uio, file.f_flags, NULL, NULL, error);
 	}
@@ -1041,7 +1036,7 @@ xfs_dm_rdwr(
 
 	*rvp = xfer = len - uio.uio_resid;
 
-	if (fflag & FMODE_READ) {
+	if (fmode & FMODE_READ) {
 	        XFS_STATS_ADD(xfsstats.xs_read_bytes, xfer);
 	} else {
 	        XFS_STATS_ADD(xfsstats.xs_write_bytes, xfer);
@@ -2196,13 +2191,10 @@ xfs_dm_read_invis_rvp(
 	void		*bufp,
 	int		*rvp)
 {
-	int		fflag;
-
 	if (right < DM_RIGHT_SHARED)
 		return(EACCES);
 
-	fflag = FMODE_READ;
-	return(xfs_dm_rdwr(bdp, fflag, off, len, bufp, rvp));
+	return(xfs_dm_rdwr(bdp, 0, FMODE_READ, off, len, bufp, rvp));
 }
 
 
@@ -2577,18 +2569,14 @@ xfs_dm_write_invis_rvp(
 	void		*bufp,
 	int		*rvp)
 {
-	int		fflag;
+	int		fflag = 0;
 
 	if (right < DM_RIGHT_EXCL)
 		return(EACCES);
 
-	fflag = FMODE_WRITE;
-	if (flags & DM_WRITE_SYNC){
-/* XXX when will this be available in linux/XFS? */
-/*		fflag |= FSYNC;*/
-		printk("%s/%d: xfs FSYNC not implemented yet\n", __FUNCTION__, __LINE__);
-	}
-	return(xfs_dm_rdwr(bdp, fflag, off, len, bufp, rvp));
+	if (flags & DM_WRITE_SYNC)
+		fflag |= O_SYNC;
+	return(xfs_dm_rdwr(bdp, fflag, FMODE_WRITE, off, len, bufp, rvp));
 }
 
 

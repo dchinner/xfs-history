@@ -62,10 +62,6 @@
  *	dm_send_xxxx_event flag DM_FLAGS_NDELAY.
  */
 
-#ifdef CELL_CAPABLE
-#define	UIO_DELAY_FLAG(uiop) ((uiop->uio_fmode&(FNDELAY|FNONBLOCK)) ? \
-			DM_FLAGS_NDELAY : 0)
-#endif
 #define	FILP_DELAY_FLAG(filp) ((filp->f_flags&(O_NDELAY|O_NONBLOCK)) ? \
 			DM_FLAGS_NDELAY : 0)
 #define AT_DELAY_FLAG(f) ((f&ATTR_NONBLOCK) ? DM_FLAGS_NDELAY : 0)
