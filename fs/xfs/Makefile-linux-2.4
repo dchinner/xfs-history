@@ -30,7 +30,7 @@
 # http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
 #
 
-EXTRA_CFLAGS +=  -I. -funsigned-char
+EXTRA_CFLAGS +=  -I. -I linux-2.4 -funsigned-char
 
 ifeq ($(CONFIG_XFS_DEBUG),y)
 	EXTRA_CFLAGS += -g -DSTATIC="" -DDEBUG -DXFSDEBUG
@@ -119,14 +119,16 @@ obj-y				+= xfs_alloc.o \
 				   xfs_vfsops.o \
 				   xfs_vnodeops.o \
 				   xfs_refcache.o \
-				   xfs_rw.o
+				   xfs_rw.o \
+				   xfs_iomap.o \
+				   xfs_behavior.o
+
 
 # Objects not built in this directory
-obj-y				+= pagebuf/pagebuf.o \
-				   linux/linux_xfs.o \
+obj-y				+= linux-2.4/linux_xfs.o \
 				   support/support_xfs.o
 
-subdir-$(CONFIG_XFS_FS)		+= pagebuf linux support
+subdir-$(CONFIG_XFS_FS)		+= linux-2.4 support
 
 ifeq ($(CONFIG_XFS_DMAPI),y)
   subdir-$(CONFIG_XFS_FS)	+= dmapi

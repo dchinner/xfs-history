@@ -139,21 +139,20 @@ xfs-y				+= xfs_alloc.o \
 				   xfs_vfsops.o \
 				   xfs_vnodeops.o \
 				   xfs_rw.o
+				   xfs_behavior.o \
+				   xfs_iomap.o
+
 
 xfs-$(CONFIG_XFS_TRACE)		+= xfs_dir2_trace.o
 
-# Objects in pagebuf/
-xfs-y				+= pagebuf/page_buf.o
 
 # Objects in linux/
-xfs-y				+= $(addprefix linux/, \
+xfs-y				+= $(addprefix linux-2.6/, \
 				   xfs_aops.o \
-				   xfs_behavior.o \
 				   xfs_file.o \
 				   xfs_fs_subr.o \
 				   xfs_globals.o \
 				   xfs_ioctl.o \
-				   xfs_iomap.o \
 				   xfs_iops.o \
 				   xfs_lrw.o \
 				   xfs_super.o \

@@ -30,7 +30,7 @@
 # http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
 #
 
-EXTRA_CFLAGS += -I $(TOPDIR)/fs/xfs
+EXTRA_CFLAGS += -I $(TOPDIR)/fs/xfs -I $(TOPDIR)/fs/xfs/linux-2.4
 
 ifeq ($(CONFIG_XFS_DEBUG),y)
 	EXTRA_CFLAGS += -g -DDEBUG -DXFSDEBUG
