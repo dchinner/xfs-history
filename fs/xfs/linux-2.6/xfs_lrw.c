@@ -794,14 +794,12 @@ xfs_bmap(bhv_desc_t	*bdp,
 		return XFS_ERROR(EIO);
 
 	if (flags & PBF_READ) {
-		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
 		unlocked = 0;
 		lockmode = xfs_ilock_map_shared(ip);
 		error = xfs_iomap_read(&ip->i_iocore, offset, count,
 				 XFS_BMAPI_ENTIRE, pbmapp, npbmaps, NULL);
 		xfs_iunlock_map_shared(ip, lockmode);
 	} else { /* PBF_WRITE */
-		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
 		ASSERT(flags & PBF_WRITE);
 		vp = BHV_TO_VNODE(bdp);
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
@@ -875,6 +873,7 @@ xfs_strategy(bhv_desc_t	*bdp,
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t	end_fsb;
 	xfs_fileoff_t	map_start_fsb;
+	xfs_fileoff_t	last_block;
 	xfs_fsblock_t	first_block;
 	xfs_bmap_free_t	free_list;
 	xfs_filblks_t	count_fsb;
@@ -966,12 +965,37 @@ xfs_strategy(bhv_desc_t	*bdp,
 						XFS_EXTSIZE_WR);
 			}
 
+
 			/*
 			 * Allocate the backing store for the file.
 			 */
 			XFS_BMAP_INIT(&(free_list),
 					&(first_block));
 			nimaps = XFS_STRAT_WRITE_IMAPS;
+
+			/*
+			 * Ensure we don't go beyond eof - it is possible
+			 * the extents changed since we did the read call,
+			 * we dropped the ilock in the interim.
+			 */
+
+			end_fsb = XFS_B_TO_FSB(mp, XFS_SIZE(mp, io));
+			xfs_bmap_last_offset(NULL, ip, &last_block,
+				XFS_DATA_FORK);
+			last_block = XFS_FILEOFF_MAX(last_block, end_fsb);
+			if ((map_start_fsb + count_fsb) > last_block) {
+				count_fsb = last_block - map_start_fsb;
+				if (count_fsb == 0) {
+					xfs_bmap_cancel(&free_list);
+					xfs_trans_cancel(tp,
+						(XFS_TRANS_RELEASE_LOG_RES |
+						 XFS_TRANS_ABORT));
+					XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL |
+							    XFS_EXTSIZE_WR);
+					return XFS_ERROR(EAGAIN);
+				}
+			}
+
 			error = XFS_BMAPI(mp, tp, io, map_start_fsb, count_fsb,
 					XFS_BMAPI_WRITE, &first_block, 1,
 					imap, &nimaps, &free_list);
@@ -1055,9 +1079,6 @@ xfs_strategy(bhv_desc_t	*bdp,
 	if (error) {
 		ASSERT(count_fsb != 0);
 		ASSERT(is_xfs || XFS_FORCED_SHUTDOWN(mp));
-		if (is_xfs) {
-			xfs_delalloc_cleanup(ip, map_start_fsb, count_fsb);
-		}
 	}
 			
 	return XFS_ERROR(error);

@@ -42,7 +42,7 @@
 
 static __inline__ unsigned int flag_convert(int flags)
 {
-	return (flags & KM_NOSLEEP) ? GFP_ATOMIC : GFP_KERNEL;
+	return (flags & KM_NOSLEEP) ? GFP_ATOMIC : GFP_BUFFER;
 }
 
 
@@ -101,11 +101,8 @@ kmem_alloc(size_t size, int flags)
 
 repeat:
 	if (MAX_SLAB_SIZE < size) {
-				/* not fully debug... leave for the moment */
-		printk("kmem_alloc doing a vmalloc %d size & PAGE_SIZE %ld",
-						size, size & PAGE_SIZE);
-		rval = vmalloc(size);
-		printk(" rval=0x%p\n",rval);
+		/* Avoid doing filesystem sensitive stuff to get this */
+		rval = __vmalloc(size, GFP_BUFFER, PAGE_KERNEL);
 	} else {
 		rval = kmalloc(size, flag_convert(flags));
 	}
@@ -148,8 +145,6 @@ void
 kmem_free(void *ptr, size_t size)
 {
 	if (MAX_SLAB_SIZE < size){
-			/* this isn't fully debug... leave in for now */
-		printk("Size %d doing a vfree 0x%p\n",size,ptr);
 		vfree(ptr);
 	} else {
 		kfree(ptr);

@@ -701,64 +701,6 @@ linvfs_pb_bmap(struct inode *inode,
 	return -error;
 }
 
-int
-linvfs_read_full_page(
-	struct file *filp,
-	mem_map_t *page)
-{
-	vnode_t		*vp;
-	struct inode	*inode = (struct inode*)page->mapping->host;
-	int		error;
-
-	if (!PageLocked(page))
-		BUG();
-
-	vp = LINVFS_GET_VP(inode);
-	ASSERT(vp);
-
-	VN_BHV_READ_LOCK(&(vp)->v_bh);
-	if (!VOP_RWLOCK_TRY(vp, VRWLOCK_TRY_READ)) {
-		VN_BHV_READ_UNLOCK(&(vp)->v_bh);
-		UnlockPage(page);
-		VOP_RWLOCK(vp, VRWLOCK_READ);
-		lock_page(page); /* We can wait for the page with inode I/O lock */
-		if (Page_Uptodate(page)) {
-			UnlockPage(page);
-			VOP_RWUNLOCK(vp, VRWLOCK_READ);
-			return 0;
-		}
-	}
-	error = pagebuf_read_full_page(filp, page);
-	VOP_RWUNLOCK(vp, VRWLOCK_READ);
-	return error;
-}
-
-STATIC int
-linvfs_write_full_page(
-	struct page *page)
-{
-	vnode_t		*vp;
-	struct inode	*inode = (struct inode*)page->mapping->host;
-	int		error;
-
-	vp = LINVFS_GET_VP(inode);
-	ASSERT(vp);
-
-	VN_BHV_READ_LOCK(&(vp)->v_bh);
-	if (!VOP_RWLOCK_TRY(vp, VRWLOCK_TRY_WRITE)) {
-		VN_BHV_READ_UNLOCK(&(vp)->v_bh);
-
-		ASSERT(atomic_read(&page->count));
-		UnlockPage(page);
-		VOP_RWLOCK(vp, VRWLOCK_WRITE);
-		lock_page(page); /* Wait for the page with inode I/O lock */
-	}
-	error = pagebuf_write_full_page(page);
-	UnlockPage(page);
-	VOP_RWUNLOCK(vp, VRWLOCK_WRITE);
-	return error;
-}
-
 void linvfs_file_read(
 	struct file *filp,
 	void * desc)
@@ -813,8 +755,8 @@ int linvfs_bmap(struct address_space *mapping, long block)
  
 
 struct address_space_operations linvfs_aops = {
-  readpage:		linvfs_read_full_page,
-  writepage:		linvfs_write_full_page,
+  readpage:		pagebuf_read_full_page,
+  writepage:		pagebuf_write_full_page,
   sync_page:		block_sync_page,
   bmap:			linvfs_bmap,
   convertpage:		pagebuf_convert_page,
