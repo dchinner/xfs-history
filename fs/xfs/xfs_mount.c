@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.67 $"
+#ident	"$Revision: 1.69 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -86,9 +86,7 @@ xfs_mount_init(void)
  *	- init mount struct realtime fields
  *	- allocate inode hash table for fs
  *	- init directory manager
- * Note:
- *	- does not handle remounts
- *	- does not start the log manager
+ *	- perform recovery and init the log manager
  */
 int
 xfs_mountfs(vfs_t *vfsp, dev_t dev)
@@ -101,7 +99,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	xfs_inode_t	*rip;
 	vnode_t		*rvp = 0;
 
-	if (vfsp->vfs_flag & VFS_REMOUNT)
+	if (vfsp->vfs_flag & VFS_REMOUNT)   /* Can't remount xFS filesystems */
 		return 0;
 
 	mp = XFS_VFSTOM(vfsp);
@@ -131,12 +129,17 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	}
 
 	/*
-	 * Initialize the mount structure from the superblock.
+	 * Initialize the mount structure from the superblock.  If the log
+	 * device and data device have the same device number, the log is
+	 * internal.  Consequently, the sb_logstart should be non-zero.  If
+	 * we have a zero sb_logstart in this case, we may be trying to mount
+	 * a volume filesystem in a non-volume manner.
 	 */
 	sbp = XFS_BUF_TO_SBP(bp);
-	if ((sbp->sb_magicnum != XFS_SB_MAGIC) ||
-	    (sbp->sb_versionnum != XFS_SB_VERSION)) {
-		error = XFS_ERROR(EINVAL);
+	if ((sbp->sb_magicnum != XFS_SB_MAGIC)		||
+	    (sbp->sb_versionnum != XFS_SB_VERSION)	||
+	    (sbp->sb_logstart == 0 && mp->m_logdev == mp->m_dev)) {
+		error = XFS_ERROR(EINVAL);		/* or EIO ? */
 		goto bad;
 	}
 	mp->m_sb_bp = bp;
@@ -218,41 +221,28 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	xfs_ihash_init(mp);
 
 	/*
-	 * Allocate and initialize the per-ag data.
-	 */
-	mp->m_perag = kmem_zalloc(sbp->sb_agcount * sizeof(xfs_perag_t),
-		KM_SLEEP);
-
-	/*
-	 * Call the log's mount-time initialization.
-	 * xfs_log_mount() always does XFS_LOG_RECOVER.
+	 * Call the log's mount-time initialization.  Will perform recovery
+	 * if needed.
 	 */
 	if (sbp->sb_logblocks > 0) {		/* check for volume case */
 		error = xfs_log_mount(mp, mp->m_logdev,
-			      XFS_FSB_TO_DADDR(mp, sbp->sb_logstart),
-			      XFS_FSB_TO_BB(mp, sbp->sb_logblocks));
+				      XFS_FSB_TO_DADDR(mp, sbp->sb_logstart),
+				      XFS_FSB_TO_BB(mp, sbp->sb_logblocks));
 		if (error > 0) {
-			/*
-			 * XXX	log recovery failure - What action should be 
-			 * taken?  Translate log error to something user 
-			 * understandable
-			 */
-			error = XFS_ERROR(EBUSY); 
+			error = XFS_ERROR(error);
+			return error;
 		}
-	} else {
-		/*
-		 * No log has been defined.
-		 */
+	} else {	/* No log has been defined */
 		error = XFS_ERROR(EINVAL);
+		return error;
 	}
 
-	if (error)  {
-		/*
-		 * XXX memory that has been allocated for the 
-		 * mount structure needs to be freed.
-		 */
-		return(error);
-	}
+	/*
+	 * Allocate and initialize the per-ag data.
+	 */
+	mp->m_perag =
+		kmem_zalloc(sbp->sb_agcount * sizeof(xfs_perag_t), KM_SLEEP);
+
 
 #ifdef SIM
 	/*
@@ -279,6 +269,8 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 
 			error = XFS_ERROR(EINVAL);
 			xfs_iunlock(rip, XFS_ILOCK_EXCL);
+			kmem_free(mp->m_perag,
+				  sbp->sb_agcount * sizeof(xfs_perag_t));
 			return (error);
 		}
 		s = VN_LOCK(rvp);
