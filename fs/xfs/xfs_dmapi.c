@@ -2971,3 +2971,28 @@ xfs_dm_fcntl(
 	}
 	return(ENOSYS);
 }
+
+
+int
+xfs_dm_mount(
+	vfs_t		*vfsp,
+	vnode_t		*mvp,
+	char		*dir_name,
+	char		*fsname)
+{
+	vnode_t		*rootvp;
+	bhv_desc_t	*mbdp, *rootbdp;
+	int		error;
+
+	VFS_ROOT(vfsp, &rootvp, error);
+	if (error)
+		return error;
+
+	mbdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(mvp), &xfs_vnodeops);
+	rootbdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(rootvp), &xfs_vnodeops);
+	VN_RELE(rootvp);
+	error = dm_send_mount_event(vfsp, DM_RIGHT_NULL, mbdp, DM_RIGHT_NULL,
+				    rootbdp, DM_RIGHT_NULL, dir_name,
+				    fsname);
+	return error;
+}

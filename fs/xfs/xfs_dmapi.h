@@ -75,6 +75,13 @@
 
 
 extern int
+xfs_dm_mount(
+	vfs_t		*vfsp,
+	vnode_t		*mvp,
+	char		*dir_name,
+	char		*fsname);
+
+extern int
 xfs_dm_send_data_event(
 	dm_eventtype_t	event, 
 	bhv_desc_t	*bdp,
