@@ -118,8 +118,7 @@ _bhash(kdev_t d, loff_t b)
 /*
  *	_pagebuf_registration_free
  *
- *	Free a page_buf_registration_t object.  The caller must hold
- *	the pagebuf_registered_inodes_lock.
+ *	Free a page_buf_registration_t object.
  */
 
 static void
@@ -155,7 +154,7 @@ _pagebuf_find_lockable_buffer(pb_target_t *target,
 	page_buf_t		*pb;
 	int			not_locked;
 
-	spin_lock_irq(&h->pb_hash_lock);
+	spin_lock(&h->pb_hash_lock);
 	list_for_each(p, &h->pb_hash) {
 		pb = list_entry(p, page_buf_t, pb_hash_list);
 
@@ -184,13 +183,13 @@ _pagebuf_find_lockable_buffer(pb_target_t *target,
 		PB_STATS_INC(pbstats.pb_miss_locked);
 	}
 
-	spin_unlock_irq(&h->pb_hash_lock);
+	spin_unlock(&h->pb_hash_lock);
 	*pb_p = new_pb;
 	return 0;
 
 found:
 	atomic_inc(&pb->pb_hold);
-	spin_unlock_irq(&h->pb_hash_lock);
+	spin_unlock(&h->pb_hash_lock);
 
 	/* Attempt to get the semaphore without sleeping,
 	 * if this does not work then we need to drop the

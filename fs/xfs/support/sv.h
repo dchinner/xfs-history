@@ -66,7 +66,6 @@
 
 typedef struct sv_s {
 	wait_queue_head_t waiters;
-	spinlock_t lock;
 } sv_t;
 
 void _sv_init(sv_t *sv);

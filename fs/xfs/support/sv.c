@@ -43,33 +43,20 @@
 void _sv_init( sv_t *sv)
 {
 	init_waitqueue_head( &sv->waiters );
-	spin_lock_init(&sv->lock);
 }
 
 void _sv_wait( sv_t *sv, spinlock_t *lock, unsigned long s, int intr, struct timespec *timeout)
 {
 	DECLARE_WAITQUEUE( wait, current );
 
-	spin_lock(&sv->lock);	/* No need to do interrupts since	
-						they better be disabled */
-	
-	/* Don't restore interrupts until we are done with both locks */
-	spin_unlock( lock );
 	add_wait_queue_exclusive( &sv->waiters, &wait );
-#if 0
-	if (intr) {
-		set_current_state(TASK_INTERRUPTIBLE | TASK_EXCLUSIVE);
-	} else {
-		set_current_state(TASK_UNINTERRUPTIBLE | TASK_EXCLUSIVE);
-	}
-#endif
 	if (intr) {
 		set_current_state(TASK_INTERRUPTIBLE );
 	} else {
 		set_current_state(TASK_UNINTERRUPTIBLE );
 	}
-	spin_unlock_irqrestore( & sv->lock, (long)s );
-        
+	spin_unlock( lock );
+ 
         if (timeout) {
 	        schedule_timeout(timespec_to_jiffies(timeout));
         } else {
@@ -83,12 +70,7 @@ void _sv_wait( sv_t *sv, spinlock_t *lock, unsigned long s, int intr, struct tim
 void
 _sv_broadcast(sv_t *sv)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&sv->lock, flags);
-
 	wake_up_all(&sv->waiters );
-	spin_unlock_irqrestore(&sv->lock, flags);
 }
 
 /*
@@ -98,9 +80,5 @@ _sv_broadcast(sv_t *sv)
 void
 _sv_signal(sv_t *svp)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&svp->lock, flags);
 	wake_up(&svp->waiters);
-	spin_unlock_irqrestore(&svp->lock, flags);
 }

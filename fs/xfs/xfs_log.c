@@ -2660,6 +2660,16 @@ xlog_state_put_ticket(xlog_t	    *log,
 	LOG_UNLOCK(log, s);
 }	/* xlog_state_put_ticket */
 
+void xlog_sync_sched(
+	void	*v)
+{
+	xlog_in_core_t	*iclog = (xlog_in_core_t *)v; 
+	xlog_t		*log  = iclog->ic_log;
+
+	xlog_sync(log, iclog, 0);
+}
+
+int xlog_mode = 1;
 
 /*
  * Flush iclog to disk if this is the last reference to the given iclog and
@@ -2700,7 +2710,7 @@ xlog_state_release_iclog(xlog_t		*log,
 	}
 	
 	LOG_UNLOCK(log, s);
-	
+
 	/*
 	 * We let the log lock go, so it's possible that we hit a log I/O
 	 * error or someother SHUTDOWN condition that marks the iclog
@@ -2709,7 +2719,21 @@ xlog_state_release_iclog(xlog_t		*log,
 	 * flags after this point.
 	 */
 	if (sync) {
-		return (xlog_sync(log, iclog, 0));
+		INIT_TQUEUE(&iclog->ic_write_sched,
+			xlog_sync_sched, (void *) iclog);
+		switch (xlog_mode) {
+		case 0:
+			return xlog_sync(log, iclog, 0);
+/***
+		case 1:
+			if (current_is_keventd())
+				return (xlog_sync(log, iclog, 0));
+			schedule_task(&iclog->ic_write_sched);
+			break;
+***/
+		case 1:
+			pagebuf_queue_task(&iclog->ic_write_sched);
+		}
 	}
 	return (0);
 

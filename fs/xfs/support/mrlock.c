@@ -67,10 +67,8 @@ mrlock_init(mrlock_t *mrp, int lock_type, char *name, long sequence)
  * Macros to lock/unlock the mrlock_t.
  */
 
-#define MRLOCK_INT(m, s)	spin_lock_irqsave(&(m)->mr_lock, s);
-#define MRUNLOCK_INT(m, s)	spin_unlock_irqrestore(&(m)->mr_lock, s);
-#define MRLOCK(m)		spin_lock_irq(&(m)->mr_lock);
-#define MRUNLOCK(m)		spin_unlock_irq(&(m)->mr_lock);
+#define MRLOCK(m)		spin_lock(&(m)->mr_lock);
+#define MRUNLOCK(m)		spin_unlock(&(m)->mr_lock);
 
 
 /*
@@ -101,19 +99,19 @@ lock_wait(wait_queue_head_t *q, spinlock_t *lock, int rw)
 	}
 
 	wq_write_unlock(&q->lock);
-	spin_unlock_irq(lock); /* Interrupts reenabled */
+	spin_unlock(lock);
 
 	schedule();
 
 	set_current_state(TASK_RUNNING);
 
-	wq_write_lock_irq(&q->lock);
+	wq_write_lock(&q->lock);
 	__remove_wait_queue(q, &wait);
 	wq_write_unlock(&q->lock);
 
 	spin_lock(lock);
 
-	/* return with interrupts off and lock held */
+	/* return with lock held */
 }
 
 /* ARGSUSED */
@@ -169,53 +167,47 @@ mrupdatef(mrlock_t *mrp, int flags)
 int
 mrtryaccess(mrlock_t *mrp)
 {
-	long	s;
-
-	MRLOCK_INT(mrp, s);
+	MRLOCK(mrp);
 	/*
 	 * If anyone is waiting for update access or the lock is held for update
 	 * fail the request.
 	 */
 	if(mrp->mr_writes_waiting > 0 || mrp->mr_count < 0) {
-		MRUNLOCK_INT(mrp, s);
+		MRUNLOCK(mrp);
 		return 0;
 	}
 	mrp->mr_count++;
-	MRUNLOCK_INT(mrp, s);
+	MRUNLOCK(mrp);
 	return 1;
 }
 
 int
 mrtrypromote(mrlock_t *mrp)
 {
-	long	s;
-
-	MRLOCK_INT(mrp, s);
+	MRLOCK(mrp);
 
 	if(mrp->mr_count == 1) { /* We are the only thread with the lock */
 		mrp->mr_count = -1; /* writer on it */
-		MRUNLOCK_INT(mrp, s);
+		MRUNLOCK(mrp);
 		return 1;
 	}
 
-	MRUNLOCK_INT(mrp, s);
+	MRUNLOCK(mrp);
 	return 0;
 }
 
 int
 mrtryupdate(mrlock_t *mrp)
 {
-	long	s;
-
-	MRLOCK_INT(mrp, s);
+	MRLOCK(mrp);
 
 	if(mrp->mr_count) {
-		MRUNLOCK_INT(mrp, s);
+		MRUNLOCK(mrp);
 		return 0;
 	}
 
 	mrp->mr_count = -1; /* writer on it */
-	MRUNLOCK_INT(mrp, s);
+	MRUNLOCK(mrp);
 	return 1;
 }
 
@@ -236,27 +228,23 @@ static __inline__ void mrwake(mrlock_t *mrp)
 void
 mraccunlock(mrlock_t *mrp)
 {
-	long	s;
-
-	MRLOCK_INT(mrp, s);
+	MRLOCK(mrp);
 	mrp->mr_count--;
 	mrwake(mrp);
-	MRUNLOCK_INT(mrp, s);
+	MRUNLOCK(mrp);
 }
 
 void
 mrunlock(mrlock_t *mrp)
 {
-	long	s;
-
-	MRLOCK_INT(mrp, s);
+	MRLOCK(mrp);
 	if (mrp->mr_count < 0) {
 		mrp->mr_count = 0;
 	} else {
 		mrp->mr_count--;
 	}
 	mrwake(mrp);
-	MRUNLOCK_INT(mrp, s);
+	MRUNLOCK(mrp);
 }
 
 int

@@ -161,6 +161,8 @@ void	pb_tracking_free(page_buf_t *pb)
 
 kmem_cache_t *pagebuf_cache = NULL;
 STATIC pagebuf_daemon_t *pb_daemon = NULL;
+STATIC struct list_head pagebuf_iodone_tq[NR_CPUS];
+STATIC wait_queue_head_t pagebuf_iodone_wait[NR_CPUS];
 
 /*
  *	For pre-allocated buffer head pool
@@ -206,31 +208,29 @@ STATIC  int		as_list_len;
 STATIC void
 free_address(void *addr)
 {
-	unsigned long flags;
 	a_list_t	*aentry;
 
-	spin_lock_irqsave(&as_lock, flags);
+	spin_lock(&as_lock);
 	aentry = kmalloc(sizeof(a_list_t), GFP_ATOMIC);
 	aentry->next = as_free_head;
 	aentry->vm_addr = addr;
 	as_free_head = aentry;
 	as_list_len++;
-	spin_unlock_irqrestore(&as_lock, flags);
+	spin_unlock(&as_lock);
 }
 
 STATIC void
 purge_addresses(void)
 {
-	unsigned long flags;
 	a_list_t	*aentry, *old;
 
 	if (as_free_head == NULL) return;
 
-	spin_lock_irqsave(&as_lock, flags); 
+	spin_lock(&as_lock); 
 	aentry = as_free_head;
 	as_free_head = NULL;
 	as_list_len = 0;
-	spin_unlock_irqrestore(&as_lock, flags);
+	spin_unlock(&as_lock);
 
 	while ((old = aentry) != NULL) {
 		vfree(aentry->vm_addr);
@@ -357,8 +357,7 @@ STATIC inline void _pagebuf_freepages(page_buf_t *pb)
 
 void _pagebuf_free_object(
 	pb_hash_t	*hash,	/* hash bucket for buffer	*/
-	page_buf_t	*pb,	/* buffer to deallocate         */
-	unsigned long	flags)	/* interrupt state to restore	*/
+	page_buf_t	*pb)	/* buffer to deallocate         */
 {
 	int	pb_flags = pb->pb_flags;
 
@@ -370,7 +369,7 @@ void _pagebuf_free_object(
 			hash->pb_count--;
 			list_del_init(&pb->pb_hash_list);
 		}
-		spin_unlock_irqrestore(&hash->pb_hash_lock, flags);
+		spin_unlock(&hash->pb_hash_lock);
 	}
 	
 	if (!(pb_flags & PBF_FREED)) {
@@ -1003,14 +1002,12 @@ void pagebuf_hold(page_buf_t * pb)
 void pagebuf_free(	/* deallocate a buffer          */
     page_buf_t * pb)	/* buffer to deallocate           */
 {
-	unsigned long	flags;
-
 	if (pb->pb_flags & _PBF_LOCKABLE) {
 		pb_hash_t	*h = pb_hash(pb);
-		spin_lock_irqsave(&h->pb_hash_lock, flags);
-		_pagebuf_free_object(h, pb, flags);
+		spin_lock(&h->pb_hash_lock);
+		_pagebuf_free_object(h, pb);
 	} else {
-		_pagebuf_free_object(NULL, pb, 0);
+		_pagebuf_free_object(NULL, pb);
 	}
 }
 
@@ -1024,16 +1021,14 @@ void pagebuf_free(	/* deallocate a buffer          */
 
 void pagebuf_rele(page_buf_t * pb)
 {
-	unsigned long	flags;
 	pb_hash_t	*h;
 
 	PB_TRACE(pb, PB_TRACE_REC(rele), pb->pb_relse);
 	if (pb->pb_flags & _PBF_LOCKABLE) {
 		h = pb_hash(pb);
-		spin_lock_irqsave(&h->pb_hash_lock, flags);
+		spin_lock(&h->pb_hash_lock);
 	} else {
 		h = NULL;
-		flags = 0;
 	}
 
 	if (atomic_dec_and_test(&pb->pb_hold)) {
@@ -1041,7 +1036,7 @@ void pagebuf_rele(page_buf_t * pb)
 		if (pb->pb_relse) {
 			atomic_inc(&pb->pb_hold);
 			if (h)
-				spin_unlock_irqrestore(&h->pb_hash_lock, flags);
+				spin_unlock(&h->pb_hash_lock);
 			(*(pb->pb_relse)) (pb);
 			do_free = 0;
 		}
@@ -1049,20 +1044,20 @@ void pagebuf_rele(page_buf_t * pb)
 			pb->pb_flags |= PBF_ASYNC;
 			atomic_inc(&pb->pb_hold);
 			if (h && do_free)
-				spin_unlock_irqrestore(&h->pb_hash_lock, flags);
+				spin_unlock(&h->pb_hash_lock);
 			pagebuf_delwri_queue(pb, 0);
 			do_free = 0;
 		} else if (pb->pb_flags & PBF_FS_MANAGED) {
 			if (h)
-				spin_unlock_irqrestore(&h->pb_hash_lock, flags);
+				spin_unlock(&h->pb_hash_lock);
 			do_free = 0;
 		}
 
 		if (do_free) {
-			_pagebuf_free_object(h, pb, flags);
+			_pagebuf_free_object(h, pb);
 		}
 	} else if (h) {
-		spin_unlock_irqrestore(&h->pb_hash_lock, flags);
+		spin_unlock(&h->pb_hash_lock);
 	}
 }
 
@@ -1146,6 +1141,14 @@ static inline void	_pagebuf_wait_unpin(page_buf_t * pb)
 	current->state = TASK_RUNNING;
 }
 
+
+void pagebuf_queue_task(
+    struct tq_struct *task)
+{
+	queue_task(task, &pagebuf_iodone_tq[smp_processor_id()]);
+	wake_up(&pagebuf_iodone_wait[smp_processor_id()]);
+}
+
 /*
  * 	Buffer Utility Routines 
  */
@@ -1158,6 +1161,23 @@ static inline void	_pagebuf_wait_unpin(page_buf_t * pb)
  *	present, will be called as a side-effect. 
  */
 
+void pagebuf_iodone_sched(
+    void * v)
+{
+	page_buf_t * pb = (page_buf_t *)v;
+
+	if (pb->pb_iodone) {
+		(*(pb->pb_iodone)) (pb);
+		return;
+	}
+
+	if (pb->pb_flags & PBF_ASYNC) {
+		if ((pb->pb_flags & _PBF_LOCKABLE) && !pb->pb_relse)
+			pagebuf_unlock(pb);
+		pagebuf_rele(pb);
+	}
+}
+
 void pagebuf_iodone(		/* mark buffer I/O complete     */
     page_buf_t * pb)		/* buffer to mark 	        */
 {
@@ -1169,15 +1189,13 @@ void pagebuf_iodone(		/* mark buffer I/O complete     */
 
 	PB_TRACE(pb, PB_TRACE_REC(done), pb->pb_iodone);
 
-	if (pb->pb_iodone) {
-		(*(pb->pb_iodone)) (pb);
-		return;
-	}
+	if ((pb->pb_iodone) || (pb->pb_flags & PBF_ASYNC)) {
+		INIT_TQUEUE(&pb->pb_iodone_sched,
+			pagebuf_iodone_sched, (void *)pb);
 
-	if (pb->pb_flags & PBF_ASYNC) {
-		if ((pb->pb_flags & _PBF_LOCKABLE) && !pb->pb_relse)
-			pagebuf_unlock(pb);
-		pagebuf_rele(pb);
+		queue_task(&pb->pb_iodone_sched,
+				&pagebuf_iodone_tq[smp_processor_id()]);
+		wake_up(&pagebuf_iodone_wait[smp_processor_id()]);
 	} else {
 		up(&pb->pb_iodonesema);
 	}
@@ -1899,6 +1917,59 @@ pagebuf_delwri_dequeue(page_buf_t *pb)
 	spin_unlock(&pb_daemon->pb_delwrite_lock);
 }
 
+
+/* The pagebuf iodone daemon */
+int	pb_daemons[NR_CPUS];
+
+STATIC int
+pagebuf_iodone_daemon(void *__bind_cpu)
+{
+	int bind_cpu = (int) (long) __bind_cpu;
+	int cpu = cpu_logical_map(bind_cpu);
+	DECLARE_WAITQUEUE(wait, current);
+
+	/*  Set up the thread  */
+	daemonize();
+
+	/* Avoid signals */
+	spin_lock_irq(&current->sigmask_lock);	
+	sigfillset(&current->blocked);
+	recalc_sigpending(current);
+	spin_unlock_irq(&current->sigmask_lock);
+
+	/* Migrate to the right CPU */
+	current->cpus_allowed = 1UL << cpu;
+	while (smp_processor_id() != cpu)
+		schedule();
+
+	sprintf(current->comm, "pagebuf_io_CPU%d", bind_cpu);
+	INIT_LIST_HEAD(&pagebuf_iodone_tq[cpu]);
+	init_waitqueue_head(&pagebuf_iodone_wait[cpu]);
+	__set_current_state(TASK_INTERRUPTIBLE);
+	mb();
+
+	pb_daemons[cpu] = 1;
+
+	for (;;) {
+		add_wait_queue(&pagebuf_iodone_wait[cpu],
+				&wait);
+
+		if (TQ_ACTIVE(pagebuf_iodone_tq[cpu]))
+			__set_task_state(current, TASK_RUNNING);
+		schedule();
+		remove_wait_queue(&pagebuf_iodone_wait[cpu],
+				&wait);
+		run_task_queue(&pagebuf_iodone_tq[cpu]);
+		if (pb_daemons[cpu] == 0)
+			break;
+		__set_current_state(TASK_INTERRUPTIBLE);
+	}
+
+	pb_daemons[cpu] = -1;
+	wake_up_interruptible(&pagebuf_iodone_wait[cpu]);
+	return 0;
+}
+
 /* Defines for page buf daemon */
 DECLARE_WAIT_QUEUE_HEAD(pbd_waitq);
 
@@ -1930,14 +2001,11 @@ pagebuf_daemon(void *data)
 
 	/* Avoid signals */
 	spin_lock_irq(&current->sigmask_lock);	
-	flush_signals(current);
 	sigfillset(&current->blocked);
 	recalc_sigpending(current);
 	spin_unlock_irq(&current->sigmask_lock);
 
-	current->session = 1;
-	current->pgrp = 1;
-	strcpy(current->comm, "pagebuf_daemon");
+	strcpy(current->comm, "pagebufd");
 	current->flags |= PF_MEMALLOC;
 
 	INIT_LIST_HEAD(&tmp);
@@ -2088,6 +2156,7 @@ pagebuf_delwri_flush(pb_target_t *target, u_long flags, int *pinptr)
 
 static int pagebuf_daemon_start(void)
 {
+	int	cpu;
   
 	if (!pb_daemon){
 		pb_daemon = (pagebuf_daemon_t *)
@@ -2097,16 +2166,25 @@ static int pagebuf_daemon_start(void)
 		}
 
 		pb_daemon->active = 1;
+		pb_daemon->io_active = 1;
 		pb_daemon->pb_delwri_cnt = 0;
 		pb_daemon->pb_delwrite_lock = SPIN_LOCK_UNLOCKED;
 
 		INIT_LIST_HEAD(&pb_daemon->pb_delwrite_l);
 
-		if (0 > kernel_thread(pagebuf_daemon, (void *)pb_daemon,
-				CLONE_FS|CLONE_FILES|CLONE_SIGHAND)) {
-			printk("Can't start pagebuf daemon\n");
-			kfree(pb_daemon);
-			return -1; /* error */
+		kernel_thread(pagebuf_daemon, (void *)pb_daemon,
+				CLONE_FS|CLONE_FILES|CLONE_VM);
+		for (cpu = 0; cpu < smp_num_cpus; cpu++) {
+			if (kernel_thread(pagebuf_iodone_daemon,
+					(void *)(long) cpu,
+					CLONE_FS|CLONE_FILES|CLONE_VM) < 0) {
+				printk("pagebuf_daemon_start failed\n");
+			} else {
+				while (!pb_daemons[cpu_logical_map(cpu)]) {
+					current->policy |= SCHED_YIELD;
+					schedule();
+				}
+			}
 		}
 	}
 	return 0;
@@ -2116,13 +2194,23 @@ static int pagebuf_daemon_start(void)
 
 static int pagebuf_daemon_stop(void)
 {
+	int	cpu;
+
 	if (pb_daemon) {
 		pb_daemon->active = 0;
+		pb_daemon->io_active = 0;
 
 		wake_up_interruptible(&pbd_waitq);
-
 		while (pb_daemon->active == 0) {
 			interruptible_sleep_on(&pbd_waitq);
+		}
+		for (cpu = 0; cpu < smp_num_cpus; cpu++) {
+			pb_daemons[cpu_logical_map(cpu)] = 0;
+			wake_up(&pagebuf_iodone_wait[cpu_logical_map(cpu)]);
+			while (pb_daemons[cpu_logical_map(cpu)] != -1) {
+				interruptible_sleep_on(
+					&pagebuf_iodone_wait[cpu_logical_map(cpu)]);
+			}
 		}
 
 		kfree(pb_daemon);

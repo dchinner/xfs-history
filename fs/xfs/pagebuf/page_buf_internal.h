@@ -98,6 +98,7 @@ struct pagebuf_trace_buf {
 
 typedef struct pagebuf_daemon {
 	int			active;
+	int			io_active;
 	spinlock_t		pb_delwrite_lock;
 	struct list_head	pb_delwrite_l;
 	int			pb_delwri_cnt;

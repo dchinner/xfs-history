@@ -78,15 +78,11 @@ void _mutex_destroy( mutex_t *mutex);
 
 static __inline__ unsigned long mutex_spinlock(spinlock_t *l)
 {
-	unsigned long flags;
-	spin_lock_irqsave(l, flags);
-	return(flags);
+	spin_lock(l);
+	return 0;
 }
 
-#define mutex_spinunlock(lockp,flags)		spin_unlock_irqrestore(lockp, flags)
-
-#define mp_mutex_spinlock(lockp)		mutex_spinlock(lockp)
-#define mp_mutex_spinunlock(lockp,flags)	spin_unlock_irqrestore(lockp, flags)
+#define mutex_spinunlock(lockp,flags)		spin_unlock(lockp)
 
 
 /*
