@@ -76,7 +76,7 @@ STATIC uuid_t	*xfs_uuidtab;
 void	xfs_uuid_unmount(xfs_mount_t *);
 #endif	/* !SIM */
 
-STATIC void xfs_xlatesb(buf_t *, xfs_sb_t *, int, xfs_arch_t, __int64_t);
+STATIC void xfs_xlatesb(xfs_buf_t *, xfs_sb_t *, int, xfs_arch_t, __int64_t);
 
 static struct {
     short offset;
@@ -302,7 +302,7 @@ xfs_mount_validate_sb(
  *     fields - which fields to copy (bitmask)
  */
 STATIC void
-xfs_xlatesb(buf_t *buf, xfs_sb_t *sb, int dir, xfs_arch_t arch, 
+xfs_xlatesb(xfs_buf_t *buf, xfs_sb_t *sb, int dir, xfs_arch_t arch, 
             __int64_t fields)
 {
     caddr_t src,dst;
@@ -317,13 +317,13 @@ xfs_xlatesb(buf_t *buf, xfs_sb_t *sb, int dir, xfs_arch_t arch,
         return;
     
     if (dir>0) {
-        src=(caddr_t)(buf->b_un.b_addr);
+        src=XFS_BUF_PTR(buf);
         dst=(caddr_t)sb;
         src_arch=arch;
         dst_arch=XFS_ARCH_NATIVE;  
     } else {
         src=(caddr_t)sb;
-        dst=(caddr_t)(buf->b_un.b_addr);
+        dst=XFS_BUF_PTR(buf);
         src_arch=XFS_ARCH_NATIVE;
         dst_arch=arch;  
     }
