@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.137 $"
+#ident  "$Revision: 1.138 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -773,7 +773,7 @@ xfs_isdev(
 	if (error == 0) {
 		sbp = XFS_BUF_TO_SBP(bp);
 		error = (sbp->sb_magicnum != XFS_SB_MAGIC) ||
-			(!XFS_SB_GOOD_VERSION(sbp->sb_versionnum)) ||
+			(!XFS_SB_GOOD_VERSION(sbp)) ||
 			(sbp->sb_inprogress != 0);
 	}
 
@@ -1264,7 +1264,7 @@ xfs_statdevvp(
 	if (error = devvptoxfs(devvp, &bp, &sbp, get_current_cred()))
 		return error;
 	if (sbp->sb_magicnum == XFS_SB_MAGIC &&
-	    XFS_SB_GOOD_VERSION(sbp->sb_versionnum) &&
+	    XFS_SB_GOOD_VERSION(sbp) &&
 	    sbp->sb_inprogress == 0) {
 		sp->f_bsize = sbp->sb_blocksize;
 		sp->f_frsize = sbp->sb_blocksize;
