@@ -429,6 +429,8 @@ xfs_buf_item_trylock(
 	if (bp->av_forw != NULL) {
 		notavail(bp);
 	}
+#else
+	pagebuf_hold(bp);
 #endif
 
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
