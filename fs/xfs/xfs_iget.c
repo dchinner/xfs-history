@@ -1,4 +1,4 @@
-#ident "$Revision: 1.83 $"
+#ident "$Revision: 1.84 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -234,7 +234,7 @@ again:
 	vn_bhv_insert_initial(VN_BHV_HEAD(vp), &(ip->i_bhv_desc));
 
 	mrlock_init(&ip->i_lock, MRLOCK_DEFAULT, "xfsino", (long)vp->v_number);
-	mrlock_init(&ip->i_iolock, MRLOCK_DEFAULT, "xfsio", (long)vp->v_number);
+	mrlock_init(&ip->i_iolock, MRLOCK_BARRIER, "xfsio", (long)vp->v_number);
 #ifdef NOTYET
 	mutex_init(&ip->i_range_lock.r_spinlock, MUTEX_SPIN, "xrange");
 #endif /* NOTYET */
