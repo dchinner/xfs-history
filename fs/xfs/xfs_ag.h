@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_AG_H
 #define	_FS_XFS_AG_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.9 $"
 
 /*
  * Allocation group header
@@ -34,16 +34,16 @@ typedef struct xfs_agf
 	xfs_extlen_t	agf_longest;	/* longest free space */
 } xfs_agf_t;
 
-#define	XFS_AGF_MAGICNUM	0x0001
-#define	XFS_AGF_VERSIONNUM	0x0002
-#define	XFS_AGF_SEQNO		0x0004
-#define	XFS_AGF_LENGTH		0x0008
-#define	XFS_AGF_ROOTS		0x0010
-#define	XFS_AGF_LEVELS		0x0020
-#define	XFS_AGF_FREELIST	0x0040
-#define	XFS_AGF_FREECOUNT	0x0080
-#define	XFS_AGF_FREEBLKS	0x0100
-#define	XFS_AGF_LONGEST		0x0200
+#define	XFS_AGF_MAGICNUM	0x00000001
+#define	XFS_AGF_VERSIONNUM	0x00000002
+#define	XFS_AGF_SEQNO		0x00000004
+#define	XFS_AGF_LENGTH		0x00000008
+#define	XFS_AGF_ROOTS		0x00000010
+#define	XFS_AGF_LEVELS		0x00000020
+#define	XFS_AGF_FREELIST	0x00000040
+#define	XFS_AGF_FREECOUNT	0x00000080
+#define	XFS_AGF_FREEBLKS	0x00000100
+#define	XFS_AGF_LONGEST		0x00000200
 #define	XFS_AGF_NUM_BITS	10
 #define	XFS_AGF_ALL_BITS	((1 << XFS_AGF_NUM_BITS) - 1)
 
@@ -72,15 +72,15 @@ typedef struct xfs_agi
 	xfs_agino_t	agi_freecount;	/* number of free inodes */
 } xfs_agi_t;
 
-#define	XFS_AGI_MAGICNUM	0x0001
-#define	XFS_AGI_VERSIONNUM	0x0002
-#define	XFS_AGI_SEQNO		0x0004
-#define	XFS_AGI_LENGTH		0x0008
-#define	XFS_AGI_COUNT		0x0010
-#define	XFS_AGI_FIRST		0x0020
-#define	XFS_AGI_LAST		0x0040
-#define	XFS_AGI_FREELIST	0x0080
-#define	XFS_AGI_FREECOUNT	0x0100
+#define	XFS_AGI_MAGICNUM	0x00000001
+#define	XFS_AGI_VERSIONNUM	0x00000002
+#define	XFS_AGI_SEQNO		0x00000004
+#define	XFS_AGI_LENGTH		0x00000008
+#define	XFS_AGI_COUNT		0x00000010
+#define	XFS_AGI_FIRST		0x00000020
+#define	XFS_AGI_LAST		0x00000040
+#define	XFS_AGI_FREELIST	0x00000080
+#define	XFS_AGI_FREECOUNT	0x00000100
 #define	XFS_AGI_NUM_BITS	9
 #define	XFS_AGI_ALL_BITS	((1 << XFS_AGI_NUM_BITS) - 1)
 
@@ -94,22 +94,25 @@ typedef struct xfs_agi
 #define	XFS_AG_MIN_BLOCKS(bl)	((xfs_extlen_t)(XFS_AG_MIN_BYTES >> bl))
 #define	XFS_AG_MAX_BLOCKS(bl)	((xfs_extlen_t)(XFS_AG_MAX_BYTES >> bl))
 
-#define	XFS_MIN_FREELIST(a)	(2 * (((a)->agf_levels[XFS_BTNUM_BNO]) + ((a)->agf_levels[XFS_BTNUM_CNT]) + 1))
+#define	XFS_MIN_FREELIST(a)	(2 * (((a)->agf_levels[XFS_BTNUM_BNOi]) + ((a)->agf_levels[XFS_BTNUM_CNTi]) + 1))
 
 #define	xfs_agb_mask(k)	((1 << (k)) - 1)
 #define	xfs_agb_to_fsb(s,agno,agbno) \
-	(((xfs_fsblock_t)(agno) << (s)->sb_agblklog) | (agbno))
+	(((xfs_fsblock_t)(agno) << (xfs_fsblock_t)(s)->sb_agblklog) | \
+	 (xfs_fsblock_t)(agbno))
 #define	xfs_fsb_to_agno(s,fsbno) \
-	((xfs_agnumber_t)((fsbno) >> (s)->sb_agblklog))
+	((xfs_agnumber_t)((fsbno) >> (xfs_fsblock_t)(s)->sb_agblklog))
 #define	xfs_fsb_to_agbno(s,fsbno) \
-	((xfs_agblock_t)((fsbno) & xfs_agb_mask((s)->sb_agblklog)))
+	((xfs_agblock_t)((fsbno) & \
+			 (xfs_fsblock_t)xfs_agb_mask((s)->sb_agblklog)))
 
 #define	xfs_agb_to_daddr(s,agno,agbno) \
-	(xfs_btod(s, (xfs_fsblock_t)(agno) * (s)->sb_agblocks + (agbno)))
+	(xfs_btod(s, (xfs_fsblock_t)(agno) * (xfs_fsblock_t)(s)->sb_agblocks + \
+	 (xfs_fsblock_t)(agbno)))
 #define	xfs_daddr_to_agno(s,d) \
-	((xfs_agnumber_t)(xfs_dtobt(s, d) / (s)->sb_agblocks))
+	((xfs_agnumber_t)(xfs_dtobt(s, d) / (xfs_fsblock_t)(s)->sb_agblocks))
 #define	xfs_daddr_to_agbno(s,d) \
-	((xfs_agblock_t)(xfs_dtobt(s, d) % (s)->sb_agblocks))
+	((xfs_agblock_t)(xfs_dtobt(s, d) % (xfs_fsblock_t)(s)->sb_agblocks))
 
 #define	xfs_ag_daddr(s,agno,d)	(xfs_agb_to_daddr(s, agno, 0) + (d))
 
