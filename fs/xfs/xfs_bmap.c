@@ -5636,7 +5636,9 @@ xfs_getbmap(
 	int			lock;		/* lock state */
 	xfs_bmbt_irec_t		*map;		/* buffer for user's data */
 	xfs_mount_t		*mp;		/* file system mount point */
-	int			nex;		/* # of extents can do */
+	int			nex;		/* # of user extents can do */
+	int			nexleft;	/* # of user extents left */
+	int			subnex;		/* # of bmapi's can do */
 	int			nmap;		/* number of map entries */
 	struct getbmap		out;		/* output structure */
 	int			whichfork;	/* data or attr fork */
@@ -5649,7 +5651,8 @@ xfs_getbmap(
 
 	ip = XFS_BHVTOI(bdp);
 	vp = BHV_TO_VNODE(bdp);
-	whichfork = interface&BMV_IF_ATTRFORK ?
+
+	whichfork = interface & BMV_IF_ATTRFORK ?
 				XFS_ATTR_FORK : XFS_DATA_FORK;
 	sh_unwritten = (interface & BMV_IF_PREALLOC) != 0;
 	
@@ -5667,9 +5670,10 @@ xfs_getbmap(
 	 *	could misinterpret holes in a DMAPI file as true holes,
 	 *	when in fact they may represent offline user data.
 	 */
-	if ( (interface&BMV_IF_NO_DMAPI_READ) == 0 &&
-		DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&
-		whichfork == XFS_DATA_FORK) {
+	if (   (interface & BMV_IF_NO_DMAPI_READ) == 0
+	    && DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ)
+	    && whichfork == XFS_DATA_FORK) {
+
 		error = xfs_dm_send_data_event(DM_EVENT_READ, bdp, 
 				0, 0, 0, NULL);
 		if (error)
@@ -5689,7 +5693,9 @@ xfs_getbmap(
 		   ip->i_d.di_format != XFS_DINODE_FMT_BTREE &&
 		   ip->i_d.di_format != XFS_DINODE_FMT_LOCAL)
 		return XFS_ERROR(EINVAL);
+
 	mp = ip->i_mount;
+
 	if (whichfork == XFS_DATA_FORK) {
 		if (ip->i_d.di_flags & XFS_DIFLAG_PREALLOC) {
 			prealloced = 1;
@@ -5702,6 +5708,7 @@ xfs_getbmap(
 		prealloced = 0;
 		fixlen = 1LL << 32;
 	}
+
 	if (bmv->bmv_length == -1) {
 		fixlen = XFS_FSB_TO_BB(mp, XFS_B_TO_FSB(mp, fixlen));
 		bmv->bmv_length = MAX(fixlen - bmv->bmv_offset, 0);
@@ -5711,57 +5718,87 @@ xfs_getbmap(
 		bmv->bmv_entries = 0;
 		return 0;
 	}
+
 	nex = bmv->bmv_count - 1;
-	ASSERT(nex > 0);
+
+	if (nex <= 0)
+		return XFS_ERROR(EINVAL);
+
 	bmvend = bmv->bmv_offset + bmv->bmv_length;
+
 	xfs_ilock(ip, XFS_IOLOCK_SHARED);
+
 	if (whichfork == XFS_DATA_FORK && ip->i_delayed_blks) {
 		last_byte = xfs_file_last_byte(ip);
+
 		VOP_FLUSH_PAGES(vp, (off_t)0, (off_t)last_byte - 1, 0, 
-			FI_REMAPF, error);
+							FI_REMAPF, error);
 	}
+
 	ASSERT(whichfork == XFS_ATTR_FORK || ip->i_delayed_blks == 0);
+
 	lock = xfs_ilock_map_shared(ip);
+
 	/*
 	 * Don't let nex be bigger than the number of extents
 	 * we can have assuming alternating holes and real extents.
 	 */
 	if (nex > XFS_IFORK_NEXTENTS(ip, whichfork) * 2 + 1)
 		nex = XFS_IFORK_NEXTENTS(ip, whichfork) * 2 + 1;
+
 	bmapi_flags = XFS_BMAPI_AFLAG(whichfork) |
 			((sh_unwritten) ? 0 : XFS_BMAPI_IGSTATE);
+
+	subnex = 16;	/* XXXjtk - need a #define?	*/
+
 	/*
-	 * This is potentially a lot of memory.
-	 * We need to put this whole thing in a loop, to limit the memory.
+	 * Allocate enough space to handle "subnex" maps at a time.
 	 */
-	map = kmem_alloc(nex * sizeof(*map), KM_SLEEP);
+	map = kmem_alloc(subnex * sizeof(*map), KM_SLEEP);
+
 	bmv->bmv_entries = 0;
-	if (XFS_IFORK_NEXTENTS(ip, whichfork) == 0)
-		nmap = error = 0;
-	else {
-		nmap = nex;
-		firstblock = NULLFSBLOCK;
-		error = xfs_bmapi(NULL, ip, XFS_BB_TO_FSBT(mp, bmv->bmv_offset),
-				XFS_BB_TO_FSB(mp, bmv->bmv_length), bmapi_flags,
-				&firstblock, 0, map, &nmap, NULL);
+
+	if (XFS_IFORK_NEXTENTS(ip, whichfork) == 0) {
+		error = 0;
+		goto unlock_and_return;
 	}
-	xfs_iunlock_map_shared(ip, lock);
-	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
-	ASSERT(nmap <= nex);
-	if (error)
-		goto error0;
-	for (error = i = 0; i < nmap && bmv->bmv_length; i++) {
+
+	firstblock = NULLFSBLOCK;
+
+	nexleft = nex;
+
+	do {
+	    if (nexleft > subnex)
+		    nmap = subnex;
+	    else
+		    nmap = nexleft;
+
+	    error = xfs_bmapi(NULL, ip, XFS_BB_TO_FSBT(mp, bmv->bmv_offset),
+					XFS_BB_TO_FSB(mp, bmv->bmv_length),
+					bmapi_flags, &firstblock, 0,
+					map, &nmap, NULL);
+	    ASSERT(nmap <= subnex);
+
+	    if (error)
+		    goto unlock_and_return;
+
+	    for (error = i = 0; i < nmap && nexleft && bmv->bmv_length; i++) {
+		nexleft--;
+
 		oflags = 0;
+
 		out.bmv_offset = XFS_FSB_TO_BB(mp, map[i].br_startoff);
 		out.bmv_length = XFS_FSB_TO_BB(mp, map[i].br_blockcount);
+
 		ASSERT(map[i].br_startblock != DELAYSTARTBLOCK);
-		if (prealloced && 
-		    map[i].br_startblock == HOLESTARTBLOCK &&
-		    out.bmv_offset + out.bmv_length == bmvend) {
+
+		if (   prealloced
+		    && map[i].br_startblock == HOLESTARTBLOCK
+		    && out.bmv_offset + out.bmv_length == bmvend) {
 			/*
 			 * came to hole at end of file
 			 */
-			break;
+			goto unlock_and_return;
 		} else {
 			if (map[i].br_startblock == HOLESTARTBLOCK)
 				out.bmv_block = -1;
@@ -5771,33 +5808,44 @@ xfs_getbmap(
 
 			/* return either a getbmap or a getbmapx structure. */
 
-			if (interface&BMV_IF_EXTENDED) {
+			if (interface & BMV_IF_EXTENDED) {
 				struct	getbmapx 	outx;
 
 				GETBMAP_CONVERT(out,outx);
+
 				outx.bmv_oflags = oflags;
 				outx.bmv_unused1 = outx.bmv_unused2 = 0;
+
 				if (copyout(&outx, ap, sizeof(outx))) {
 					error = XFS_ERROR(EFAULT);
-					break;
+					goto unlock_and_return;
 				}
 			} else {
 				if (copyout(&out, ap, sizeof(out))) {
 					error = XFS_ERROR(EFAULT);
-					break;
+					goto unlock_and_return;
 				}
 			}
+
 			bmv->bmv_offset = out.bmv_offset + out.bmv_length;
 			bmv->bmv_length = MAX(0, bmvend - bmv->bmv_offset);
+
 			bmv->bmv_entries++;
-			if (interface&BMV_IF_EXTENDED)
+
+			if (interface & BMV_IF_EXTENDED)
 				ap = (void *)((struct getbmapx *)ap + 1);
 			else
 				ap = (void *)((struct getbmap *)ap + 1);
 		}
-	}
-error0:
-	kmem_free(map, nex * sizeof(*map));
+	    }
+} while (nmap && nexleft && bmv->bmv_length);
+
+unlock_and_return:
+	xfs_iunlock_map_shared(ip, lock);
+	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+
+	kmem_free(map, subnex * sizeof(*map));
+
 	return error;
 }
 #endif	/* !SIM */
