@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.58 $"
+#ident  "$Revision: 1.60 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -147,14 +147,14 @@ STATIC int	xfs_cmountfs(struct vfs	*vfsp,
 			     struct xfs_args	*ap,
 			     struct cred	*cr);
 
-STATIC xfs_mount_t *_xfs_get_vfsmount(struct vfs	*vfsp,
-				      dev_t		ddev,
-				      dev_t		logdev,
-				      dev_t		rtdev);
+STATIC xfs_mount_t *xfs_get_vfsmount(struct vfs	*vfsp,
+				     dev_t		ddev,
+				     dev_t		logdev,
+				     dev_t		rtdev);
 
-STATIC int	_spectodev(char *spec, dev_t *devp);
-STATIC int	_xfs_isdev(dev_t dev);
-STATIC int	_xfs_ibusy(xfs_mount_t *mp);
+STATIC int	spectodev(char *spec, dev_t *devp);
+STATIC int	xfs_isdev(dev_t dev);
+STATIC int	xfs_ibusy(xfs_mount_t *mp);
 #endif	/* !SIM */
 
 
@@ -267,7 +267,7 @@ xfs_init(vfssw_t	*vswp,
  * Resolve path name of special file to its device.
  */
 STATIC int
-_spectodev(char	 *spec,
+spectodev(char	 *spec,
 	   dev_t *devp)
 {
 	struct vnode *bvp;
@@ -313,7 +313,7 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	if (vfsp->vfs_flag & VFS_REMOUNT)
 		return 0;
 	
-	mp = _xfs_get_vfsmount(vfsp, ddev, logdev, rtdev);
+	mp = xfs_get_vfsmount(vfsp, ddev, logdev, rtdev);
 
 	/*
  	 * Open the data and real time devices now.
@@ -416,13 +416,13 @@ xfs_cmountfs(struct vfs 	*vfsp,
 
 
 /*
- * _xfs_get_vfsmount() ensures that the given vfs struct has an
+ * xfs_get_vfsmount() ensures that the given vfs struct has an
  * associated mount struct. If a mount struct doesn't exist, as
  * is the case during the initial mount, a mount structure is
  * created and initialized.
  */
 STATIC xfs_mount_t *
-_xfs_get_vfsmount(struct vfs	*vfsp,
+xfs_get_vfsmount(struct vfs	*vfsp,
 		  dev_t		ddev,
 		  dev_t		logdev,
 		  dev_t		rtdev)
@@ -492,8 +492,8 @@ xfs_vfsmount(vfs_t		*vfsp,
 		return XFS_ERROR(EPERM);
 	if (mvp->v_type != VDIR)
 		return XFS_ERROR(ENOTDIR);
-	if ((uap->flags & MS_REMOUNT) == 0
-	    && (mvp->v_count != 1 || (mvp->v_flag & VROOT)))
+	if (((uap->flags & MS_REMOUNT) == 0) &&
+	    ((mvp->v_count != 1) || (mvp->v_flag & VROOT)))
 		return XFS_ERROR(EBUSY);
 
 	/*
@@ -506,7 +506,7 @@ xfs_vfsmount(vfs_t		*vfsp,
 	/*
 	 * Resolve path name of special file being mounted.
 	 */
-	if (error = _spectodev(uap->spec, &device))
+	if (error = spectodev(uap->spec, &device))
 		return error;
 	if (emajor(device) == XLV_MAJOR) {
 		/*
@@ -564,18 +564,6 @@ xfs_vfsmount(vfs_t		*vfsp,
 
 
 /*
- * Clean the given file system.
- * This function should be called when unmounting.
- */
-STATIC int
-xfs_cleanfs(xfs_mount_t *mp)
-{
-	/* XXX xfs_cleanfs() is a stub */
-	return 0;
-}
-
-
-/*
  * This function determines whether or not the given device has a
  * XFS file system. It reads a XFS superblock from the device and
  * checks the magic and version numbers.
@@ -583,7 +571,7 @@ xfs_cleanfs(xfs_mount_t *mp)
  * Return 0 if device has a XFS file system.
  */
 STATIC int
-_xfs_isdev(dev_t dev)
+xfs_isdev(dev_t dev)
 {
 	xfs_sb_t *sbp;
 	buf_t	 *bp;
@@ -630,8 +618,11 @@ xfs_mountroot(vfs_t		*vfsp,
 	int		error = ENOSYS;
 	static int	xfsrootdone;
 	struct cred	*cr = u.u_cred;
-	extern dev_t	rootdev;		/* from sys/systm.h */
 	dev_t		ddev, logdev, rtdev;
+	xfs_mount_t	*mp;
+	buf_t		*bp;
+	extern dev_t	rootdev;		/* from sys/systm.h */
+
 
 	/*
 	 * Check that the root device holds an XFS file system.
@@ -639,9 +630,9 @@ xfs_mountroot(vfs_t		*vfsp,
 	 * If the device is an XLV volume, cannot check for an
 	 * XFS superblock because the device is not yet open.
 	 */
-	if ( (why == ROOT_INIT) 		&& 
-	     (emajor(rootdev) != XLV_MAJOR)	&&
-	     (_xfs_isdev(rootdev))) {
+	if ((why == ROOT_INIT) && 
+	     (emajor(rootdev) != XLV_MAJOR) &&
+	     (xfs_isdev(rootdev))) {
 		return XFS_ERROR(ENOSYS);
 	}
 	
@@ -657,13 +648,72 @@ xfs_mountroot(vfs_t		*vfsp,
 		vfs_setflag(vfsp, VFS_REMOUNT);
 		break;
 	  case ROOT_UNMOUNT:
-		/*
-		 * XXX copied from efs_mountroot() - Is this right?
-		 */
-		error = xfs_cleanfs(XFS_VFSTOM(vfsp));
-		xfs_log_unmount(XFS_VFSTOM(vfsp));
-		binval(rootdev);
-		pflushinvalvfsp(vfsp);
+		mp = XFS_VFSTOM(vfsp);
+		if (xfs_ibusy(mp)) {
+			/*
+			 * There are still busy vnodes in the file system.
+			 * Flush what we can and then get out without
+			 * unmounting cleanly.  This will force recovery
+			 * to run when we reboot.  We return an error
+			 * even though nobody looks at it since we're
+			 * going down.
+			 *
+			 * It turns out that we always take this path,
+			 * because init and the uadmin command still have
+			 * files open when we get here.  We just try to
+			 * flush everything so that we'll be clean
+			 * anyway.
+			 *
+			 * First try the inodes.  xfs_sync() will try to
+			 * flush even those inodes which are currently
+			 * being referenced.  xfs_iflush_all() will purge
+			 * and flush all the unreferenced vnodes.
+			 */
+			xfs_sync(vfsp,
+				 (SYNC_WAIT | SYNC_CLOSE |
+				  SYNC_ATTR | SYNC_FSDATA),
+				 cr);
+			xfs_iflush_all(mp, XFS_FLUSH_ALL);
+
+			/*
+			 * Force the log to unpin as many buffers as
+			 * possible and then sync them out.
+			 */
+			xfs_log_force(mp, (xfs_lsn_t)0,
+				      XFS_LOG_FORCE | XFS_LOG_SYNC);
+			bflush(mp->m_dev);
+			if (mp->m_rtdev) {
+				bflush(mp->m_dev);
+			}
+
+			/*
+			 * Force the log again to sync out any changes
+			 * caused by any delayed allocation buffers just
+			 * getting flushed out now.  Even though it seems
+			 * silly, flush the file system device again so that
+			 * any meta-data in the log gets flushed.
+			 */
+			xfs_log_force(mp, (xfs_lsn_t)0,
+				      XFS_LOG_FORCE | XFS_LOG_SYNC);
+			bflush(mp->m_dev);
+
+			/*
+			 * Finally, try to flush out the superblock.  If
+			 * it is pinned at this point we can't, because
+			 * we don't want to get stuck waiting for it to
+			 * be unpinned.  It should be unpinned normally
+			 * because of the log flushes above.
+			 */
+			bp = xfs_getsb(mp, 0);
+			if (bp->b_pincount == 0) {
+				bp->b_flags &= ~(B_DONE | B_READ);
+				bp->b_flags |= B_WRITE;
+				bdstrat(bmajor(mp->m_dev), bp);
+				(void) iowait(bp);
+			}
+			return EBUSY;
+		}
+		error = xfs_unmount(vfsp, 0, NULL);
 		return error;
 	}
 	error = vfs_lock(vfsp);
@@ -723,7 +773,7 @@ xfs_mountroot(vfs_t		*vfsp,
 	}
 	vfs_add(NULL, vfsp, (vfsp->vfs_flag & VFS_RDONLY) ? MS_RDONLY : 0);
 	vfs_unlock(vfsp);
-	return 0;
+	return(0);
 bad:
 	cmn_err(CE_WARN, "%s of root device 0x%x failed with errno %d\n",
 		whymount[why], rootdev, error);
@@ -733,12 +783,12 @@ bad:
 
 
 /*
- * _xfs_ibusy searches for a busy inode in the mounted file system.
+ * xfs_ibusy searches for a busy inode in the mounted file system.
  *
  * Return 0 if there are no active inodes otherwise return 1.
  */
 STATIC int
-_xfs_ibusy(xfs_mount_t *mp)
+xfs_ibusy(xfs_mount_t *mp)
 {
 	xfs_inode_t	*ip;
 	vnode_t		*vp;
@@ -807,15 +857,9 @@ xfs_unmount(vfs_t	*vfsp,
 	/*
 	 * Make sure there are no active users.
 	 */
-	if (_xfs_ibusy(mp))
+	if (xfs_ibusy(mp))
 		return XFS_ERROR(EBUSY);
 	
-	/*
-	 * Get rid of root inode (vnode) first, if we can.
-	 *
-	 * Does this prevent another process from traversing 
-	 * into this file system?
-	 */
 	rip = mp->m_rootip;
 	xfs_ilock(rip, XFS_ILOCK_EXCL);
 	xfs_iflock(rip);
@@ -856,21 +900,13 @@ xfs_unmount(vfs_t	*vfsp,
 	vn_purge(rvp, &vmap);
 
 	/*
-	 * XXX Okay to call xfs_unmountfs() after deleting the root inode?
-	 *
 	 * Call common unmount function to flush to disk
 	 * and free the super block buffer & mount structures.
 	 */
 	vfs_flags = (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE;
 	xfs_unmountfs(mp, vfs_flags, credp);	
 
-	/*
-	 * The mp structure is freed in xfs_unmountfs(), this assert
-	 * has been moved to xfs_unmountfs().
-	 * 	ASSERT(mp->m_inodes == NULL);
-	 */
-
-	return 0;	/* XXX Must determine unmount return value. */
+	return 0;
 }
 
 
