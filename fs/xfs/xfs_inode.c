@@ -1343,7 +1343,7 @@ xfs_idestroy(
 	}
 	mrfree(&ip->i_lock);
 	mrfree(&ip->i_iolock);
-	mrfree(&ip->i_ticketlock);
+	freesplock(ip->i_ticketlock);
 	freesema(&ip->i_flock);
 	freesema(&ip->i_pinsema);
 #ifndef SIM

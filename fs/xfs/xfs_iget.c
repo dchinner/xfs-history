@@ -213,7 +213,7 @@ again:
 
 	mrinit(&ip->i_lock, makesname(name, "xino", (int)vp->v_number));
 	mrinit(&ip->i_iolock, makesname(name, "xio", (int)vp->v_number));
-	mrinit(&ip->i_ticketlock, makesname(name, "xtck", (int)vp->v_number));
+	initnlock(&ip->i_ticketlock, "xtck");
 	initnsema(&ip->i_flock, 1, makesname(name, "fino", vp->v_number));
 	initnsema(&ip->i_pinsema, 0, makesname(name, "pino", vp->v_number));
 	xfs_inode_item_init(ip, mp);
