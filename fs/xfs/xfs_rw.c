@@ -377,6 +377,18 @@ xfs_iomap_extra(
 	}
 }
 
+/*
+ * xfs_iomap_read()
+ *
+ * This is the main I/O policy routine for reads.  It fills in
+ * the given bmapval structures to indicate what I/O requests
+ * should be used to read in the portion of the file for the given
+ * offset and count.
+ *
+ * The inode's I/O lock may be held SHARED here, but the inode lock
+ * must be held EXCL because it protects the read ahead state variables
+ * in the inode.
+ */
 void
 xfs_iomap_read(
 	xfs_inode_t	*ip,
@@ -412,6 +424,8 @@ xfs_iomap_read(
 	xfs_bmbt_irec_t	*last_imapp;
 	xfs_bmbt_irec_t	*imap;
 #define	XFS_READ_IMAPS	XFS_BMAP_MAX_NMAP
+
+	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE) != 0);
 
 	mp = ip->i_mount;
 	nisize = ip->i_new_size;
@@ -577,6 +591,7 @@ xfs_iomap_read(
 			filled_bmaps++;
 			curr_bmapp = next_bmapp;
 			next_bmapp++;
+			ASSERT(curr_bmapp->length > 0);
 		       
 			/*
 			 * Make sure to fill in the pboff and pbsize
@@ -682,6 +697,7 @@ xfs_iomap_read(
 		}
 		curr_bmapp->offset = XFS_FSB_TO_BB(mp, curr_bmapp->offset);
 		curr_bmapp->length = XFS_FSB_TO_BB(mp, curr_bmapp->length);
+		ASSERT(curr_bmapp->length > 0);
 		ASSERT((x == 0) ||
 		       ((bmapp[x - 1].offset + bmapp[x - 1].length) ==
 			curr_bmapp->offset));
@@ -711,7 +727,6 @@ xfs_read_file(
 	int		buffer_bytes_ok;
 	xfs_inode_t	*ip;
 	int		error;
-	uint		lock_mode;
 
 	ip = XFS_VTOI(vp);
 	error = 0;
@@ -722,17 +737,18 @@ xfs_read_file(
 	 * Loop until uio->uio_resid, which is the number of bytes the
 	 * caller has requested, goes to 0 or we get an error.  Each
 	 * call to xfs_iomap_read tries to map as much of the request
-	 * plus read-ahead as it can.
+	 * plus read-ahead as it can.  We must hold the inode lock
+	 * exclusively when calling xfs_iomap_read.
 	 */
 	do {
-		lock_mode = xfs_ilock_map_shared(ip);
+		xfs_ilock(ip, XFS_ILOCK_EXCL);
 
 		/*
 		 * We've fallen off the end of the file, so
 		 * just return with what we've done so far.
 		 */
 		if (uiop->uio_offset >= ip->i_d.di_size) {
-			xfs_iunlock_map_shared(ip, lock_mode);
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 			break;
 		}
  
@@ -740,7 +756,7 @@ xfs_read_file(
 		xfs_iomap_read(ip, uiop->uio_offset, uiop->uio_resid,
 			       bmaps, &nbmaps);
 
-		xfs_iunlock_map_shared(ip, lock_mode);
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
 		if (error || (bmaps[0].pbsize == 0)) {
 			break;
@@ -748,6 +764,7 @@ xfs_read_file(
 
 		bmapp = &bmaps[0];
 		read_bmaps = nbmaps;
+		ASSERT(BBTOB(bmapp->offset) <= uiop->uio_offset);
 		/*
 		 * The first time through this loop we kick off I/O on
 		 * all the bmaps described by the iomap_read call.
@@ -1579,7 +1596,8 @@ xfs_write(
  * beyond the end of the file.
  *
  * The caller is required to be holding the inode's
- * iolock in at least shared mode.
+ * iolock in at least shared mode for a read mapping
+ * and exclusively for a write mapping.
  */
 int
 xfs_bmap(
@@ -1592,25 +1610,25 @@ xfs_bmap(
 	int		*nbmaps)
 {
 	xfs_inode_t	*ip;
-	uint		lock_mode;
 	int		error;
 
 	ip = XFS_VTOI(vp);
 	ASSERT((ip->i_d.di_mode & IFMT) == IFREG);
-	ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
 	ASSERT((flags == B_READ) || (flags == B_WRITE));
 
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+
 	if (flags == B_READ) {
-		lock_mode = xfs_ilock_map_shared(ip);
+		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
 		xfs_iomap_read(ip, offset, count, bmapp, nbmaps);
-		xfs_iunlock_map_shared(ip, lock_mode);
 		error = 0;
 	} else {
-		xfs_ilock(ip, XFS_ILOCK_EXCL);
+		ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
 		ASSERT(ip->i_d.di_size >= (offset + count));
 		error = xfs_iomap_write(ip, offset, count, bmapp, nbmaps);
-		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	}
+
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
 	return error;
 }
