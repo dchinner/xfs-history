@@ -1,4 +1,4 @@
-#ident "$Revision: 1.247 $"
+#ident "$Revision: 1.248 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -3118,8 +3118,8 @@ start:
 		 */
 		if (((ip->i_d.di_mode & ISUID) ||
 		    ((ip->i_d.di_mode & (ISGID | (IEXEC >> 3))) ==
-			(ISGID | (IEXEC >> 3))) &&
-		     (credp->cr_uid != 0)) &&
+			(ISGID | (IEXEC >> 3)))) &&
+		     (credp->cr_uid != 0) &&
 		    !(vp->v_flag & VISSWAP)) {
 			error = xfs_write_clear_setuid(ip);
 			if (error) {
