@@ -5529,12 +5529,17 @@ xfs_set_uiosize(
 
 	if (flags == 2) {
 		/*
-		 * reset the io sizes to the filesystem default values
+		 * reset the io sizes to the filesystem default values.
+		 * leave the maxio size alone since it won't have changed.
 		 */
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 
 		ip->i_readio_log = mp->m_readio_log;
+		ip->i_readio_blocks = 1 << (int) (ip->i_readio_log -
+						mp->m_sb.sb_blocklog);
 		ip->i_writeio_log = mp->m_writeio_log;
+		ip->i_writeio_blocks = 1 << (int) (ip->i_writeio_log -
+						mp->m_sb.sb_blocklog);
 		ip->i_flags &= ~XFS_IUIOSZ;
 
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
@@ -5558,7 +5563,7 @@ xfs_set_uiosize(
 	    min_iosizelog < memlimit ||
 	    min_iosizelog < XFS_MIN_IO_LOG ||
 	    max_iosizelog > XFS_MAX_IO_LOG ||
-	    flags > 2)
+	    flags >= 2)
 		return XFS_ERROR(EINVAL);
 
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
@@ -5571,30 +5576,24 @@ xfs_set_uiosize(
 		ip->i_writeio_blocks = 1 << (int) (ip->i_writeio_log -
 						mp->m_sb.sb_blocklog);
 		ip->i_flags |= XFS_IUIOSZ;
-		ip->i_max_io_log = MAX(ip->i_max_io_log,
-					MAX(mp->m_readio_log,
-					    ip->i_readio_log));
+		ip->i_max_io_log = MAX(max_iosizelog, ip->i_max_io_log);
 	} else {
 		/*
 		 * if inode already has non-default values set,
 		 * only allow the values to get smaller unless
-		 * explictly overridden
+		 * explictly overridden (flags == 1)
 		 */
 		if (read_iosizelog < ip->i_readio_log || flags == 1) {
 			ip->i_readio_log = (uchar_t) read_iosizelog;
 			ip->i_readio_blocks = 1 << (int) (ip->i_readio_log -
 							mp->m_sb.sb_blocklog);
-			ip->i_max_io_log = MAX(ip->i_max_io_log,
-						MAX(mp->m_readio_log,
-						    ip->i_readio_log));
+			ip->i_max_io_log = MAX(max_iosizelog, ip->i_max_io_log);
 		}
 		if (write_iosizelog < ip->i_writeio_log || flags == 1) {
 			ip->i_writeio_log = (uchar_t) write_iosizelog;
 			ip->i_writeio_blocks = 1 << (int) (ip->i_writeio_log -
 							mp->m_sb.sb_blocklog);
-			ip->i_max_io_log = MAX(ip->i_max_io_log,
-						MAX(mp->m_writeio_log,
-						    ip->i_writeio_log));
+			ip->i_max_io_log = MAX(max_iosizelog, ip->i_max_io_log);
 		}
 	}
 
