@@ -155,4 +155,12 @@ typedef enum xfs_dinode_fmt
 
 #define	XFS_BUF_TO_DINODE(bp)	((xfs_dinode_t *)(bp->b_un.b_addr))
 
+/*
+ * Values for di_flags
+ * There should be a one-to-one correspondence between these flags and the
+ * XFS_XFLAG_s.
+ */
+#define XFS_DIFLAG_REALTIME     0x1     /* file's blocks come from rt area */
+#define XFS_DIFLAG_ALL  (XFS_DIFLAG_REALTIME)
+
 #endif	/* _FS_XFS_DINODE_H */
