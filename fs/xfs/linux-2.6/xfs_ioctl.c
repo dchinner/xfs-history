@@ -163,10 +163,9 @@ xfs_find_handle(
 	int			hsize;
 	xfs_handle_t		handle;
 	xfs_fsop_handlereq_t	hreq;
+        struct inode            *inode;
         struct vnode            *vp;
-        xfs_inode_t             *ip;
         int                     only_fsid;
-	bhv_desc_t	        *bdp;
 
         /* read handle request from user */
 	if (copy_from_user(&hreq, (struct xfs_fsop_handlereq *)arg,
@@ -176,6 +175,7 @@ xfs_find_handle(
         /* zero our handle */
 	bzero((char *)&handle, sizeof(handle));
         
+        /* now we need the inode in question */
         only_fsid=0;
         switch (cmd) {
 	    case XFS_IOC_PATH_TO_FSHANDLE:
@@ -183,26 +183,26 @@ xfs_find_handle(
                 /* fallthrough */
 	    case XFS_IOC_PATH_TO_HANDLE: {
                 struct nameidata        nd;
-                char                    path[PATH_MAX+1];
+                char                    *path;
                 int                     error;
                 
                 /* we need the path */
-                error = strncpy_from_user(path, hreq.path, PATH_MAX);
-                if (error<0)
-                        return error;
+                path = getname(hreq.path);
+                if (IS_ERR(path))
+                        return PTR_ERR(path);
                 
                 /* traverse the path */
-                if (path_init(path, 0, &nd))
+                error = 0;
+                if (path_init(path, LOOKUP_POSITIVE, &nd))
                         error = path_walk(path, &nd);
+                putname(path);
                 if (error)
                         return error;
-                
+
+                /* XXX dxm - is locking here ok? */                
                 ASSERT(nd.dentry);
-                
-                /* XXX dxm locking here? */
-                vp = LINVFS_GET_VP(nd.dentry->d_inode);
-                ASSERT(vp);
-                
+                ASSERT(nd.dentry->d_inode);
+                inode = igrab(nd.dentry->d_inode);
                 path_release(&nd);
                 
                 break;
@@ -215,12 +215,10 @@ xfs_find_handle(
                 if (!file)
                     return -EBADF;
                 
+                /* XXX dxm - is locking here ok? */
                 ASSERT(file->f_dentry);
-                
-                /* XXX dxm locking here? */
-                vp = LINVFS_GET_VP(file->f_dentry->d_inode);
-                ASSERT(vp);
-                
+                ASSERT(file->f_dentry->d_inode);
+                inode = igrab(file->f_dentry->d_inode);
                 fput(file);
                 
                 break;
@@ -231,57 +229,59 @@ xfs_find_handle(
                 return -XFS_ERROR(EINVAL);
         }
         
+        /* we need the vnode */
+	vp = LINVFS_GET_VP(inode);
+        if (!vp || !vp->v_vfsp->vfs_altfsid) {
+            /* we're not in XFS anymore, Toto */
+            iput(inode);
+            return -XFS_ERROR(EINVAL);
+        }
+        if (vp->v_type != VREG && vp->v_type != VDIR && vp->v_type != VLNK) {
+            iput(inode);
+            return -XFS_ERROR(EBADF);
+        }
         
-        /* we need an xfs inode */
-	bdp = VNODE_TO_FIRST_BHV(vp);
-	ASSERT(bdp);
-        
-        if (!BHV_IS_XFS(bdp))
-            return -EINVAL;
-        
-	ip = XFS_BHVTOI(bdp);
-        
-
-        /* check our vnode */
-        ASSERT(vp);
-        ASSERT(vp->v_vfsp);
-	if (vp->v_vfsp->vfs_altfsid == NULL)
-		return -XFS_ERROR(EINVAL);
-	
-	switch(vp->v_type) {
-		case VREG:
-		case VDIR:
-		case VLNK:
-			break;
-		default:
-			return -XFS_ERROR(EBADF);
-	}
+        /* now we can grab the fsid */
+        memcpy(&handle.ha_fsid, vp->v_vfsp->vfs_altfsid, sizeof(xfs_fsid_t));
+        hsize = sizeof(xfs_fsid_t);
         
         if (!only_fsid) {
-	    /* fill in fid section of handle from inode ip and vnode vp */
+            xfs_inode_t             *ip;
+            int                     error;
+	    bhv_desc_t	            *bhv;
+            int                     lock_mode;
+            
+            /* we need to get access to the xfs_inode to read the generation */
+            
+            VN_BHV_READ_LOCK(&(vp)->v_bh);
+            bhv = VNODE_TO_FIRST_BHV(vp);
+            ASSERT(bhv);
+            ip = XFS_BHVTOI(bhv);
+            ASSERT(ip);
+            lock_mode = xfs_ilock_map_shared(ip);
+            
+	    /* fill in fid section of handle from inode */
 
 	    handle.ha_fid.xfs_fid_len = sizeof(xfs_fid_t) - 
                                             sizeof(handle.ha_fid.xfs_fid_len);
 	    handle.ha_fid.xfs_fid_pad = 0;
 	    handle.ha_fid.xfs_fid_gen = ip->i_d.di_gen;
             handle.ha_fid.xfs_fid_ino = ip->i_ino;
+            
+            xfs_iunlock_map_shared(ip, lock_mode);
+            VN_BHV_READ_UNLOCK(&(vp)->v_bh);
+            
+            hsize = XFS_HSIZE(handle);
         }
         
-        /* copy in fsid */
-	bcopy (vp->v_vfsp->vfs_altfsid,
-			&handle.ha_fsid, sizeof (xfs_fsid_t));
-        
-        /* how big is our handle? */
-        hsize = only_fsid ? sizeof(xfs_fsid_t) : XFS_HSIZE(handle);
-
         /* now copy our handle into the user buffer & write out the size */
-	if (copy_to_user((xfs_handle_t *)hreq.ohandle, &handle, hsize))
+	if (copy_to_user((xfs_handle_t *)hreq.ohandle, &handle, hsize) ||
+	    copy_to_user(hreq.ohandlen, &hsize, sizeof(__s32))) {
+                iput(inode);
 		return -XFS_ERROR(EFAULT);
-
-	if (copy_to_user((__s32 *)hreq.ohandlen, &hsize,
-						sizeof(__s32)))
-		return -XFS_ERROR(EFAULT);
-
+        }
+        
+        iput(inode);
 	return 0;
 }
 
@@ -424,26 +424,20 @@ xfs_open_by_handle(
 	down(&parinode->i_sem);
 
 	dentry = d_lookup(pardentry, &sqstr);	/* There already? */
-
-	if (! dentry) {
+	if (!dentry) {
 		dentry = d_alloc(pardentry, &sqstr);
 
 		if (! dentry) {
 			up(&parinode->i_sem);
-
 			return -ENOMEM;
 		}
-	}
+        }
 
 	up(&parinode->i_sem);
-
-	/*
-	 * Handle 'negative' & 'new' dentries.
-	 */
 	inode = dentry->d_inode;
 
 	/*
-	 * Get the XFS inode, building a vnode to go with it.
+	 * Get the XFS inode, building a vnode to go with it 
 	 */
 	error = xfs_iget(mp, NULL, inode?inode->i_ino:ino, XFS_ILOCK_SHARED, &ip, 0);
 
@@ -472,9 +466,8 @@ xfs_open_by_handle(
 
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
-
 	if (inode == NULL) {
-		inode = vp->v_inode;
+		inode = igrab(vp->v_inode);
 
 		if (! inode) {
 			error = -EACCES;
@@ -592,6 +585,8 @@ xfs_open_by_handle(
 	klocked = 0;
 
 	fd_install(newfd, filp);
+        
+        iput(inode);
 
 	return newfd;
 
@@ -609,6 +604,8 @@ cleanup_fd:
 		put_unused_fd(newfd);
 
 cleanup_dentry:
+        if (inode)
+            iput(inode);
 	dput(dentry);
 
 	if (klocked)
