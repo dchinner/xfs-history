@@ -1,4 +1,4 @@
-#ident "$Revision: 1.33 $"
+#ident "$Revision: 1.34 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -83,7 +83,6 @@ xfs_trans_tail_ail(
 
 	return lsn;
 }
-
 
 /*
  * xfs_trans_push_ail
