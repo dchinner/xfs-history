@@ -81,6 +81,8 @@ int uiodbg_writeiolog[XFS_UIO_MAX_WRITEIO_LOG - XFS_UIO_MIN_WRITEIO_LOG + 1] =
 int uiodbg_switch = 0;
 #endif
 
+#define XFS_NUMVNMAPS 10	    /* number of uacc maps to pass to VM */
+
 extern int xfs_nfs_io_units;
 
 /*
@@ -1960,13 +1962,12 @@ xfs_read(
 	vasid_t			vasid;
 	as_verifyvnmap_t	vnmap_args;
 	as_verifyvnmapres_t	vnmap_res;
-	const int		numvnmaps = 10;
-	vnmap_t			vnmaps[numvnmaps];
+	vnmap_t			vnmaps[XFS_NUMVNMAPS];
 	vnmap_t			*rvnmaps;
 	int			num_rvnmaps;
 	int			rvnmap_flags;
 	int			rvnmap_size = 0;
-	xfs_uaccmap_t		uaccmap_array[numvnmaps];
+	xfs_uaccmap_t		uaccmap_array[XFS_NUMVNMAPS];
 	xfs_uaccmap_t		*uaccmaps;
 	xfs_fsize_t		isize;
 
@@ -2023,7 +2024,7 @@ xfs_read(
 		vnmap_args.as_offstart = uiop->uio_offset;
 		vnmap_args.as_offend = uiop->uio_offset + uiop->uio_resid;
 		vnmap_args.as_vnmap = vnmaps;
-		vnmap_args.as_nmaps = numvnmaps;
+		vnmap_args.as_nmaps = XFS_NUMVNMAPS;
 
 		if (error = VAS_VERIFYVNMAP(vasid, &vnmap_args, &vnmap_res)) {
 			VAS_UNLOCK(vasid);
@@ -2039,7 +2040,7 @@ xfs_read(
 			rvnmap_flags = vnmap_res.as_rescodes;
 			num_rvnmaps = vnmap_res.as_nmaps;
 			rvnmap_size = vnmap_res.as_mapsize;
-			if (num_rvnmaps <= numvnmaps)
+			if (num_rvnmaps <= XFS_NUMVNMAPS)
 				uaccmaps = uaccmap_array;
 			else if ((uaccmaps = kmem_alloc(num_rvnmaps *
 						sizeof(xfs_uaccmap_t),
@@ -2289,7 +2290,7 @@ out:
 	if (rvnmap_size > 0)
 		kmem_free(rvnmaps, rvnmap_size);
 
-	if (num_rvnmaps > numvnmaps)
+	if (num_rvnmaps > XFS_NUMVNMAPS)
 		kmem_free(uaccmaps, num_rvnmaps * sizeof(xfs_uaccmap_t));
 
 	if (!(ioflag & IO_ISLOCKED))
@@ -3778,15 +3779,14 @@ xfs_write(
 	vnode_t 	*vp;
 	xfs_lsn_t	commit_lsn;
 	vasid_t		vasid;
-	const int	numvnmaps = 10;
-	vnmap_t		vnmaps[numvnmaps];
+	vnmap_t		vnmaps[XFS_NUMVNMAPS];
 	vnmap_t		*rvnmaps;
 	vnmap_t		*map;
 	int		num_rvnmaps;
 	int		rvnmap_flags;
 	int		rvnmap_size = 0;
 	int		i;
-	xfs_uaccmap_t		uaccmap_array[numvnmaps];
+	xfs_uaccmap_t		uaccmap_array[XFS_NUMVNMAPS];
 	xfs_uaccmap_t		*uaccmaps;
 	as_verifyvnmap_t	vnmap_args;
 	as_verifyvnmapres_t	vnmap_res;
@@ -3848,7 +3848,7 @@ xfs_write(
 		vnmap_args.as_offstart = uiop->uio_offset;
 		vnmap_args.as_offend = uiop->uio_offset + uiop->uio_resid;
 		vnmap_args.as_vnmap = vnmaps;
-		vnmap_args.as_nmaps = numvnmaps;
+		vnmap_args.as_nmaps = XFS_NUMVNMAPS;
 
 		if (error = VAS_VERIFYVNMAP(vasid, &vnmap_args, &vnmap_res)) {
 			VAS_UNLOCK(vasid);
@@ -3865,7 +3865,7 @@ xfs_write(
 			num_rvnmaps = vnmap_res.as_nmaps;
 			rvnmap_size = vnmap_res.as_mapsize;
 
-			if (num_rvnmaps <= numvnmaps)
+			if (num_rvnmaps <= XFS_NUMVNMAPS)
 				uaccmaps = uaccmap_array;
 			else if ((uaccmaps = kmem_alloc(num_rvnmaps *
 						sizeof(xfs_uaccmap_t),
@@ -4213,7 +4213,7 @@ out:
 	if (rvnmap_size > 0)
 		kmem_free(rvnmaps, rvnmap_size);
 
-	if (num_rvnmaps > numvnmaps)
+	if (num_rvnmaps > XFS_NUMVNMAPS)
 		kmem_free(uaccmaps, num_rvnmaps * sizeof(xfs_uaccmap_t));
 
 	if (!(ioflag & IO_ISLOCKED))
