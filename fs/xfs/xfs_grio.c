@@ -1,4 +1,4 @@
-#ident "$Revision: 1.48 $"
+#ident "$Revision: 1.49 $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -955,19 +955,18 @@ xfs_remove_tickets_from_fs(vfs_t *vfsp)
 int
 xfs_remove_all_tickets()
 {
-	int 		s;
 	vfs_t		*vfsp;
 	extern int	xfs_type;
 	extern vfs_t	*rootvfs;
-	extern lock_t	vfslock;
 	extern int	xfs_fstype;
+	int		s;
 
 	/*
  	 * For each file system on the machine.
 	 */
 loop:
 #ifndef SIM
-	s = splock(vfslock);
+	s = vfs_spinlock();
 #endif
 	for (vfsp = rootvfs; vfsp != NULL; vfsp = vfsp->vfs_next) {
 		/*
@@ -982,16 +981,13 @@ loop:
                         	ASSERT(vfsp->vfs_flag & VFS_MWANT ||
                                		vfsp->vfs_busycnt == 0);
                         	vfsp->vfs_flag |= VFS_MWAIT;
-                        	if (spunlock_psema(vfslock, s, 
-					&vfsp->vfs_wait, PZERO)) {
-                                	return EINTR;
-                        	}
+				vfsp_waitsig(vfsp, PZERO, s);
                         	goto loop;
 			} else {
 
 #ifndef SIM
 				vfsp->vfs_busycnt++;
-				spunlock(vfslock, s);
+				vfs_spinunlock(s);
 #endif
 
 				/*
@@ -1001,7 +997,7 @@ loop:
 
 
 #ifndef SIM
-				s = splock(vfslock);
+				s = vfs_spinlock();
 			        ASSERT(!(vfsp->vfs_flag & (VFS_MLOCK|VFS_OFFLINE)));
         			ASSERT(vfsp->vfs_busycnt > 0);
         			if (--vfsp->vfs_busycnt == 0) {
@@ -1016,11 +1012,10 @@ loop:
 					 * waiting for the lock to clear.
 					 */
        			 		if (vfsp->vfs_flag & VFS_MWANT) {
-  		              			vsema(&vfsp->vfs_wait);
+  		              			sv_signal(&vfsp->vfs_wait);
         				} else if (vfsp->vfs_flag & VFS_MWAIT) {
                 				vfsp->vfs_flag &= ~VFS_MWAIT;
-                				while (cvsema(&vfsp->vfs_wait))
-                        				;
+  		              			sv_broadcast(&vfsp->vfs_wait);
         				}
 
 				}
@@ -1030,7 +1025,7 @@ loop:
 		}
 	}
 #ifndef SIM
-	spunlock(vfslock, s);
+	vfs_spinunlock(s);
 #endif
 	return(0);
 }
