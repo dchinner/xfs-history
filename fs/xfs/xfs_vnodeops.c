@@ -1,4 +1,4 @@
-#ident "$Revision: 1.371 $"
+#ident "$Revision: 1.372 $"
 
 
 #ifdef SIM
@@ -804,10 +804,6 @@ xfs_setattr(
                 if (vp->v_type == VDIR) {
                         code = XFS_ERROR(EISDIR);
                         goto error_return;
-                } else if (vp->v_type == VBLK || vp->v_type == VCHR ||
-			   vp->v_type == VFIFO) {
-			code = 0;
-			goto error_return;
 		} else if (vp->v_type != VREG) {
 			code = XFS_ERROR(EINVAL);
 			goto error_return;
