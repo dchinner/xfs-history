@@ -3437,8 +3437,14 @@ xfs_iaccess(
 	if ((error = _MAC_XFS_IACCESS(ip, mode, cr)))
 		return XFS_ERROR(error);
 	
-   	if ((mode & IWRITE) && !WRITEALLOWED(XFS_ITOV(ip)))
-		return XFS_ERROR(EROFS);
+   	if (mode & IWRITE) {
+		struct inode	*inode = LINVFS_GET_IP(XFS_ITOV(ip));
+		umode_t		mode = inode->i_mode;
+
+		if (IS_RDONLY(inode) &&
+		    (S_ISREG(mode) || S_ISDIR(mode) || S_ISLNK(mode)))
+			return XFS_ERROR(EROFS);
+	}
 
 	/*
 	 * If there's an Access Control List it's used instead of
