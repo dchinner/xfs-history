@@ -589,12 +589,16 @@ linvfs_write_inode(
         int             sync)
 {
 	vnode_t	*vp = LINVFS_GET_VP(inode);
+	int	error;
 
 	if (vp) {
 		vn_trace_entry(vp, "linvfs_write_inode",
 					(inst_t *)__return_address);
+
+		VOP_IFLUSH(vp, error);
+		if (error == EAGAIN)
+			inode->i_sb->s_dirt = 1;
 	}
-	inode->i_sb->s_dirt = 1;
 }
 
 void

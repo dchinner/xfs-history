@@ -140,6 +140,8 @@ linvfs_common_create(
 		validate_fields(dir);
 		mark_inode_dirty(ip);
 		d_instantiate(dentry, ip);
+		mark_inode_dirty_sync(ip);
+		mark_inode_dirty_sync(dir);
 	}
 
 	if (!error && have_default_acl) {
@@ -221,11 +223,10 @@ linvfs_link(
 	VOP_LINK(tdvp, vp, dentry, NULL, error);
 	if (!error) {
 		VMODIFY(tdvp);
-		ip->i_ctime = CURRENT_TIME;
 		VN_HOLD(vp);
 		validate_fields(ip);
 		d_instantiate(dentry, ip);
-		mark_inode_dirty(ip);
+		mark_inode_dirty_sync(ip);
 	}
 	return -error;
 }
@@ -246,14 +247,10 @@ linvfs_unlink(
 	VOP_REMOVE(dvp, dentry, NULL, error);
 
 	if (!error) {
-		dir->i_ctime = dir->i_mtime = CURRENT_TIME;
-		dir->i_version = ++event;
-
-		inode->i_ctime = dir->i_ctime;
 		validate_fields(dir);	/* For size only */
 		validate_fields(inode);
-		mark_inode_dirty(inode);
-		mark_inode_dirty(LINVFS_GET_IP(dvp));
+		mark_inode_dirty_sync(inode);
+		mark_inode_dirty_sync(dir);
 	}
 
 	return -error;
@@ -293,8 +290,8 @@ linvfs_symlink(
 			error = -linvfs_revalidate_core(ip, ATTR_COMM);
 			d_instantiate(dentry, ip);
 			validate_fields(dir);
-			mark_inode_dirty(ip);
-			mark_inode_dirty(dir);
+			mark_inode_dirty_sync(ip);
+			mark_inode_dirty_sync(dir);
 		}
 	}
 	return -error;
@@ -324,10 +321,8 @@ linvfs_rmdir(
 	if (!error) {
 		validate_fields(inode);
 		validate_fields(dir);
-		inode->i_version = ++event;
-		inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
-		mark_inode_dirty(inode);
-		mark_inode_dirty(dir);
+		mark_inode_dirty_sync(inode);
+		mark_inode_dirty_sync(dir);
 	}
 	return -error;
 }
@@ -378,14 +373,9 @@ linvfs_rename(
 	if (error)
 		return -error;
 
-	ndir->i_version = ++event;
-	odir->i_version = ++event;
 	if (new_inode) {
-		new_inode->i_ctime = CURRENT_TIME;
 		validate_fields(new_inode);
 	}
-
-	odir->i_ctime = odir->i_mtime = CURRENT_TIME;
 
 	validate_fields(odir);
 	if (ndir != odir)

@@ -217,6 +217,7 @@ typedef	void	(*vop_vnode_change_t)(bhv_desc_t *, vchange_t, __psint_t);
 typedef	void	(*vop_ptossvp_t)(bhv_desc_t *, xfs_off_t, xfs_off_t, int);
 typedef	void	(*vop_pflushinvalvp_t)(bhv_desc_t *, xfs_off_t, xfs_off_t, int);
 typedef	int	(*vop_pflushvp_t)(bhv_desc_t *, xfs_off_t, xfs_off_t, uint64_t, int);
+typedef	int	(*vop_iflush_t)(bhv_desc_t *);
 
 
 typedef struct vnodeops {
@@ -265,6 +266,7 @@ typedef struct vnodeops {
 	vop_pflushinvalvp_t	vop_flushinval_pages;
 	vop_pflushvp_t		vop_flush_pages;
 	vop_release_t		vop_release;
+	vop_iflush_t		vop_iflush;
 } vnodeops_t;
 
 /*
@@ -519,6 +521,12 @@ typedef struct vnodeops {
 {									\
 	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_ioctl, vp)((vp)->v_fbhv,inode,filp,cmd,arg);	\
+	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
+}
+#define VOP_IFLUSH(vp, rv)						\
+{									\
+	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
+	rv = _VOP_(vop_iflush, vp)((vp)->v_fbhv);			\
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 
