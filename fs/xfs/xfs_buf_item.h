@@ -1,7 +1,7 @@
 #ifndef	_XFS_BUF_ITEM_H
 #define	_XFS_BUF_ITEM_H
 
-#ident "$Revision: 1.22 $"
+#ident "$Revision$"
 
 struct buf;
 struct ktrace;
@@ -78,7 +78,7 @@ typedef struct xfs_buf_log_item {
 #endif
 #ifdef XFS_TRANS_DEBUG
 	char			*bli_orig;	/* original buffer copy */
-	char			*bli_logged;	/* bytes to be logged */
+	char			*bli_logged;	/* bytes logged (bitmap) */
 #endif
 	xfs_buf_log_format_t	bli_format;	/* in-log header */
 } xfs_buf_log_item_t;

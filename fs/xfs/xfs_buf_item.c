@@ -1,4 +1,4 @@
-#ident "$Revision: 1.67 $"
+#ident "$Revision$"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -75,7 +75,7 @@ STATIC void	xfs_buf_error_relse(buf_t *bp);
  * given buf log item.
  *
  * It calculates this as 1 iovec for the buf log format structure
- * and 1 or each stretch of non-contiguous chunks to be logged.
+ * and 1 for each stretch of non-contiguous chunks to be logged.
  * Contiguous chunks are logged in a single iovec.
  *
  * If the XFS_BLI_STALE flag has been set, then log nothing.
@@ -518,7 +518,7 @@ xfs_buf_item_unlock(
  * inodes.  These buffers are only relogged with the XFS_BLI_INODE_BUF
  * flag set, indicating that only the di_next_unlinked fields from the
  * inodes in the buffers will be replayed during recovery.  If the
- * origianal newly allocated inode images have not yet been flushed
+ * original newly allocated inode images have not yet been flushed
  * when the buffer is so relogged, then we need to make sure that we
  * keep the old images in the 'active' portion of the log.  We do this
  * by returning the original lsn of that transaction here rather than
@@ -664,13 +664,13 @@ xfs_buf_item_init(
 	 * Allocate the arrays for tracking what needs to be logged
 	 * and what our callers request to be logged.  bli_orig
 	 * holds a copy of the original, clean buffer for comparison
-	 * against, and bli_logged keeps a 1 byte flag per byte in
+	 * against, and bli_logged keeps a 1 bit flag per byte in
 	 * the buffer to indicate which bytes the callers have asked
 	 * to have logged.
 	 */
 	bip->bli_orig = (char *)kmem_alloc(bp->b_bcount, KM_SLEEP);
 	bcopy(bp->b_un.b_addr, bip->bli_orig, bp->b_bcount);
-	bip->bli_logged = (char *)kmem_zalloc(bp->b_bcount, KM_SLEEP);
+	bip->bli_logged = (char *)kmem_zalloc(bp->b_bcount / NBBY, KM_SLEEP);
 #endif
 
 	/*
@@ -789,7 +789,6 @@ xfs_buf_item_log_debug(
 	uint			first,
 	uint			last)
 {
-	char	*logged;
 	uint	x;
 	uint	byte;
 	uint	nbytes;
@@ -798,22 +797,18 @@ xfs_buf_item_log_debug(
 	uint	bit_num;
 	uint	bit_set;
 	uint	*wordp;
-	
 
 	ASSERT(bip->bli_logged != NULL);
-	logged = bip->bli_logged + first;	/* pointer arithmetic */
 	byte = first;
 	nbytes = last - first + 1;
+	bfset(bip->bli_logged, first, nbytes);
 	for (x = 0; x < nbytes; x++) { 
-		*logged = 1;
 		chunk_num = byte >> XFS_BLI_SHIFT;
-		word_num = 0xdeadbeaf;
 		word_num = chunk_num >> BIT_TO_WORD_SHIFT;
 		bit_num = chunk_num & (NBWORD - 1);
 		wordp = &(bip->bli_format.blf_data_map[word_num]);
 		bit_set = *wordp & (1 << bit_num);
 		ASSERT(bit_set);
-		logged++;
 		byte++;
 	}
 }
@@ -830,8 +825,6 @@ xfs_buf_item_flush_log_debug(
 	uint	last)
 {
 	xfs_buf_log_item_t	*bip;
-	char			*logged;
-	uint			x;
 	uint			nbytes;
 
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
@@ -840,12 +833,8 @@ xfs_buf_item_flush_log_debug(
 	}
 
 	ASSERT(bip->bli_logged != NULL);
-	logged = bip->bli_logged + first;	/* pointer arithmetic */
 	nbytes = last - first + 1;
-	for (x = 0; x < nbytes; x++) { 
-		*logged = 1;
-		logged++;
-	}
+	bfset(bip->bli_logged, first, nbytes);
 }
 
 /*
@@ -861,7 +850,6 @@ STATIC void
 xfs_buf_item_log_check(
 	xfs_buf_log_item_t	*bip)
 {
-	char	*logged;
 	char	*orig;
 	char	*buffer;
 	int	x;
@@ -873,16 +861,13 @@ xfs_buf_item_log_check(
 	bp = bip->bli_buf;
 	ASSERT(bp->b_bcount > 0);
 	ASSERT(bp->b_un.b_addr != NULL);
-	logged = bip->bli_logged;
 	orig = bip->bli_orig;
 	buffer = bp->b_un.b_addr;
 	for (x = 0; x < bp->b_bcount; x++) {
-		if (*orig != *buffer) {
-			ASSERT(*logged == 1);
-		}
-		orig++;
-		buffer++;
-		logged++;
+		if (orig[x] != buffer[x] && !btst(bip->bli_logged, x))
+			cmn_err(CE_PANIC,
+	"xfs_buf_item_log_check bip %x buffer %x orig %x index %d",
+				bip, bp, orig, x);
 	}
 }
 #endif /* XFS_TRANS_DEBUG */
@@ -1157,7 +1142,7 @@ xfs_buf_item_relse(
 #ifdef XFS_TRANS_DEBUG
 	kmem_free(bip->bli_orig, bp->b_bcount);
 	bip->bli_orig = NULL;
-	kmem_free(bip->bli_logged, bp->b_bcount);
+	kmem_free(bip->bli_logged, bp->b_bcount / NBBY);
 	bip->bli_logged = NULL;
 #endif /* XFS_TRANS_DEBUG */
 
@@ -1415,7 +1400,7 @@ xfs_buf_iodone(
 #ifdef XFS_TRANS_DEBUG
 	kmem_free(bip->bli_orig, bp->b_bcount);
 	bip->bli_orig = NULL;
-	kmem_free(bip->bli_logged, bp->b_bcount);
+	kmem_free(bip->bli_logged, bp->b_bcount / NBBY);
 	bip->bli_logged = NULL;
 #endif /* XFS_TRANS_DEBUG */
 
