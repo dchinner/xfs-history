@@ -1,4 +1,4 @@
-#ident "$Revision: 1.1 $"
+#ident "$Revision: 1.2 $"
 
 #include <sys/types.h>
 #include <sys/sema.h>
@@ -18,7 +18,7 @@
 #include "xfs_inode.h"
 
 /*
- * Return the Inode number from the xfs fid structure.
+ * Return 32 bits of the Inode number from the xfs fid structure.
  */
 unsigned int
 xfs_get_fid_ino(struct fid *fidp)
@@ -37,7 +37,7 @@ xfs_get_fid_gen(struct fid *fidp)
 
 /*
  * Initialize the fid structure field with values for inode and generation
- * numbers.
+ * numbers. (Only works for 32-bit inode numbers!)
  */
 void
 xfs_set_fid_fields(struct fid *fidp, unsigned int ino, unsigned int gen)
