@@ -1,4 +1,4 @@
-#ident "$Revision: 1.347 $"
+#ident "$Revision: 1.348 $"
 
 
 #ifdef SIM
@@ -564,7 +564,6 @@ xfs_setattr(
 	int		code;
 	uint		lock_flags;
 	uint		commit_flags;
-	boolean_t	ip_held;
 	uid_t		uid, iuid;
 	gid_t		gid, igid;
 	int		timeflags = 0;
@@ -949,7 +948,10 @@ xfs_setattr(
 	}
 
         xfs_trans_ijoin(tp, ip, lock_flags);
-	ip_held = B_FALSE;
+	xfs_trans_ihold(tp, ip);
+
+	/* determine whether mandatory locking mode changes */
+	mandlock_before = MANDLOCK(vp, ip->i_d.di_mode);
 
 	/*
          * Truncate file.  Must have write permission and not be a directory.
@@ -958,7 +960,6 @@ xfs_setattr(
 		if (vap->va_size > ip->i_d.di_size) {
 			xfs_igrow_finish(tp, ip, vap->va_size);
 		} else if (vap->va_size < ip->i_d.di_size) {
-			xfs_trans_ihold(tp, ip);
 			/*
 			 * signal a sync transaction unless
 			 * we're truncating an already unlinked
@@ -970,7 +971,6 @@ xfs_setattr(
 					    ((ip->i_d.di_nlink != 0 ||
 					      !(mp->m_flags & XFS_MOUNT_WSYNC))
 					     ? 1 : 0));
-			ip_held = B_TRUE;
 			if (code) {
 				goto abort_return;
 			}
@@ -985,21 +985,11 @@ xfs_setattr(
          * Change file access modes.
          */
         if (mask & AT_MODE) {
-		/* determine whether mandatory locking mode changes */
-		mandlock_before = MANDLOCK(vp, ip->i_d.di_mode);
-
                 ip->i_d.di_mode &= IFMT;
                 ip->i_d.di_mode |= vap->va_mode & ~IFMT;
 
 		xfs_trans_log_inode (tp, ip, XFS_ILOG_CORE);
 		timeflags |= XFS_ICHGTIME_CHG;
-
-		mandlock_after = MANDLOCK(vp, ip->i_d.di_mode);
-		if (mandlock_before != mandlock_after &&
-		    ip_held == B_FALSE) {
-			xfs_trans_ihold(tp, ip);
-			ip_held = B_TRUE;
-		}
         }
 
 	/*
@@ -1115,9 +1105,6 @@ xfs_setattr(
 
 	XFSSTATS.xs_ig_attrchg++;
 
-	if (!ip_held)
-		IHOLD (ip);
-
 	/*
 	 * If this is a synchronous mount, make sure that the
 	 * transaction goes to disk before returning to the user.
@@ -1138,14 +1125,13 @@ xfs_setattr(
 	 * notify the vnode.  We do this under the inode lock to prevent
 	 * racing calls to vop_vnode_change.
 	 */
-	if ((mask & AT_MODE) && mandlock_before != mandlock_after) {
+	mandlock_after = MANDLOCK(vp, ip->i_d.di_mode);
+	if (mandlock_before != mandlock_after) {
 		VOP_VNODE_CHANGE(vp, VCHANGE_FLAGS_ENF_LOCKING, 
 				 mandlock_after);
 	}
 
-	if (ip_held) {
-		xfs_iunlock(ip, lock_flags);
-	}
+	xfs_iunlock(ip, lock_flags);
 	
 	/* 
 	 * release any dquot(s) inode had kept before chown
@@ -5826,6 +5812,14 @@ xfs_change_file_space(
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 	xfs_trans_ihold(tp, ip);
 	ip->i_d.di_mode &= ~ISUID;
+
+	/*
+	 * Note that we don't have to worry about mandatory
+	 * file locking being disabled here because we only
+	 * clear the ISGID bit if the Group execute bit is
+	 * on, but if it was on then mandatory locking wouldn't
+	 * have been enabled.
+	 */
 	if (ip->i_d.di_mode & (IEXEC >> 3))
 		ip->i_d.di_mode &= ~ISGID;
 	xfs_ichgtime(ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
