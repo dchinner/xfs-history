@@ -536,8 +536,10 @@ xfs_iunlock(xfs_inode_t	*ip,
 	       (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL));
 	ASSERT((lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) !=
 	       (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
-	ASSERT((lock_flags & ~(XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL |
-		XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) == 0);
+	ASSERT((lock_flags &
+		~(XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL |
+		  XFS_ILOCK_SHARED | XFS_ILOCK_EXCL |
+		  XFS_IUNLOCK_NONOTIFY)) == 0);
 	ASSERT(lock_flags != 0);
 
 	if (lock_flags & (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL)) {
@@ -552,9 +554,13 @@ xfs_iunlock(xfs_inode_t	*ip,
 
 	/*
 	 * Let the AIL know that this item has been unlocked in case
-	 * it is in the AIL and anyone is waiting on it.
+	 * it is in the AIL and anyone is waiting on it.  Don't do
+	 * this if the caller has asked us not to.
 	 */
-	xfs_trans_unlocked_item(ip->i_mount, (xfs_log_item_t*)&(ip->i_item));
+	if (!(lock_flags & XFS_IUNLOCK_NONOTIFY)) {
+		xfs_trans_unlocked_item(ip->i_mount,
+					(xfs_log_item_t*)&(ip->i_item));
+	}
 }
 
 /*
