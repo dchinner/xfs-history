@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 1999 Silicon Graphics, Inc.  All Rights Reserved.
  * 
@@ -16,19 +15,12 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-/*
- *  fs/xfs/xfs_super.c
- *
- */
-
 
 #define FSID_T /* wrapper hack... border files have type problems */
 #include <sys/types.h> 
 
 #include <linux/module.h>
 #include <linux/errno.h>
-
-#include "xfs_coda_oops.h"
 
 #include <linux/xfs_to_linux.h>
 #include <config/page/buf/meta.h>	/* CONFIG_PAGE_BUF_META */
@@ -47,7 +39,6 @@
 #include <sys/systm.h>
 #include <sys/sysmacros.h>
 #include <sys/capability.h>
-#include <sys/cred.h>
 #include <sys/vfs.h>
 #include <sys/pvfs.h>
 #include <sys/vnode.h>
@@ -56,6 +47,8 @@
 #include <asm/uaccess.h>
 #include <linux/init.h>
 #include <linux/page_buf.h>
+
+#include <linux/xfs_cred.h>
 
 #define	MS_DATA		0x04
 

@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 1999 Silicon Graphics, Inc.  All Rights Reserved.
  * 
@@ -16,15 +15,14 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.10 $"
+#ident "$Revision$"
 
 /*
  * XFS v2 directory implmentation.
  * Top-level and utility routines.
  */
-#if defined(__linux__)
+
 #include <xfs_linux.h>
-#endif
 
 #ifdef SIM
 #define _KERNEL 1
@@ -35,7 +33,6 @@
 #ifdef SIM
 #undef _KERNEL
 #endif /* SIM */
-#include <sys/errno.h>
 #include <sys/vnode.h>
 #include <sys/kabi.h>
 #include <sys/kmem.h>
@@ -48,12 +45,8 @@
 #include <sys/fcntl.h>
 #ifdef SIM
 #undef _KERNEL
-#include <bstring.h>
 #else
 #include <sys/systm.h>
-#ifdef CELL_CAPABLE
-#include <sys/kthread.h>
-#endif
 #endif
 #include "xfs_macros.h"
 #include "xfs_types.h"

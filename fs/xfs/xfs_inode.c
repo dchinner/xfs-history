@@ -1,7 +1,7 @@
 #ident "$Revision$"
-#if defined(__linux__)
+
 #include <xfs_linux.h>
-#endif
+#include <linux/xfs_cred.h>
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -9,7 +9,6 @@
 #include <sys/param.h>
 #include "xfs_buf.h"
 #include <sys/vnode.h>
-#include <sys/cred.h>
 #include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/debug.h>
@@ -20,8 +19,6 @@
 #undef _KERNEL
 #endif
 #include <sys/vfs.h>
-#include <sys/errno.h>
-#include <sys/stat.h>
 #include <sys/mode.h>
 #include <sys/kmem.h>
 #include <sys/ktrace.h>
@@ -29,13 +26,11 @@
 #include <sys/pda.h>
 #include <sys/ksa.h>
 #ifdef SIM
-#include <bstring.h>
 #include <stdio.h>
+#include <string.h>
+#include <sys/stat.h>
 #else
 #include <sys/systm.h>
-#ifdef XFS_ILOCK_TRACE
-#include <ksys/vproc.h>	/* current_pid() */
-#endif
 #endif
 #include <stddef.h>
 #include "xfs_macros.h"
@@ -3655,6 +3650,7 @@ xfs_ichgtime(xfs_inode_t *ip,
 	     int flags)
 {
 	timespec_t	tv;
+	extern void	nanotime_syscall(timespec_t *);
 
 	/*
 	 * We're not supposed to change timestamps in readonly-mounted

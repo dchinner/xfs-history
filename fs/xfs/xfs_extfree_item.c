@@ -41,8 +41,6 @@
 #include <sys/uuid.h>
 #ifndef SIM
 #include <sys/systm.h>
-#else
-#include <bstring.h>
 #endif
 #include "xfs_macros.h"
 #include "xfs_types.h"

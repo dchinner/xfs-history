@@ -15,12 +15,11 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.6 $"
+#ident	"$Revision: 1.7 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/vnode.h>
-#include <sys/errno.h>
 #include <sys/debug.h>
 #include <sys/mac_label.h>
 #include <sys/systm.h>

@@ -30,7 +30,6 @@
 #endif
 #include <sys/param.h>
 #include "xfs_buf.h"
-#include <sys/time.h>
 #include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/debug.h>
@@ -38,11 +37,9 @@
 #ifdef SIM
 #undef _KERNEL
 #endif
-#include <sys/errno.h>
 #include <stddef.h>
 #ifdef SIM
 #include <stdlib.h>
-#include <bstring.h>
 #include <stdio.h>
 #else
 #include <sys/kmem.h>

@@ -22,22 +22,18 @@
 #define _KERNEL 1
 #endif
 
-#if defined(__linux__)
 #include <xfs_linux.h>
-#endif
 
 #include <sys/param.h>
 #include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
+#include <string.h>
 #endif
 #include <sys/vnode.h>
 #include <sys/kmem.h>
-#include <sys/errno.h>
 #include <stddef.h>
-#ifdef SIM
-#include <bstring.h>
-#else
+#ifndef SIM
 #include <sys/systm.h>
 #endif
 #include "xfs_macros.h"

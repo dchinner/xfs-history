@@ -21,9 +21,8 @@
 /*
  * High level interface routines for log manager
  */
-#if defined(__linux__)
+
 #include <xfs_linux.h>
-#endif
 
 #include <sys/param.h>
 
@@ -38,10 +37,8 @@
 
 #ifdef SIM
 #undef _KERNEL
-#include <bstring.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #else
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -51,12 +48,10 @@
 #include <sys/kmem.h>
 #include <sys/ktrace.h>
 #include <sys/debug.h>
-#include <sys/sema.h>
+#include <linux/xfs_sema.h>
 #include <sys/sysmacros.h>
 #include <sys/vfs.h>
 #include <sys/uuid.h>
-#include <sys/errno.h>
-#include <ksys/vproc.h>
 
 #include "xfs_macros.h"
 #include "xfs_types.h"

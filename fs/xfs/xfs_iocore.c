@@ -18,10 +18,7 @@
  */
 #ident "$Revision$"
 
-#if defined(__linux__)
 #include <xfs_linux.h>
-#endif
-
 
 #ifdef SIM
 #define _KERNEL 1
@@ -31,7 +28,6 @@
 #include <sys/uio.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
-#include <sys/cred.h>
 #include <sys/sysmacros.h>
 #include <sys/uuid.h>
 #include <sys/major.h>
@@ -43,18 +39,16 @@
 #endif
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
-#include <sys/errno.h> 
 #include <sys/fcntl.h>
 #include <sys/var.h>
 #ifdef SIM
-#include <bstring.h>
 #include <stdio.h>
 #else
 #include <sys/conf.h>
 #include <sys/systm.h>
 #endif
 #include <sys/kmem.h>
-#include <sys/sema.h>
+#include <linux/xfs_sema.h>
 #include <ksys/vfile.h>
 #ifndef SIM
 #include <sys/flock.h>
@@ -62,8 +56,6 @@
 #include <sys/fs_subr.h>
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
-#include <sys/schedctl.h>
-#include <sys/atomic_ops.h>
 #include <sys/ktrace.h>
 #include <sys/ksa.h>
 #include <ksys/sthread.h>
@@ -97,7 +89,6 @@
 #include "xfs_quota.h"
 #include "xfs_trans_space.h"
 #include "xfs_dmapi.h"
-#include <limits.h>
 
 #ifdef SIM
 #include "sim.h"

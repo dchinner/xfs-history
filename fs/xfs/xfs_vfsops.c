@@ -19,33 +19,33 @@
  */
 #ident  "$Revision$"
 
-#include <xfs_linux.h>
+#include <linux/xfs_linux.h>
 
-#ifdef SIM
+#ifndef SIM
+#define FSID_T
+#include <linux/xfs_to_linux.h>
+#include <linux/fs.h>
+#include <linux/linux_to_xfs.h>
+#else
 #define _KERNEL	1
 #endif
-#include <sys/types.h>
 #include "xfs_buf.h"
-#include <sys/cred.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/dmi_kern.h>
-#include <sys/fs/spec_lsnode.h>
 #include <sys/kmem.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
-#include <sys/errno.h>
 #include <sys/fs_subr.h>
 #include <sys/kabi.h>
 #include <sys/sysmacros.h>
 #include <ksys/vfile.h>
 #ifdef SIM
-#include <bstring.h>
 #include <stdio.h>
 #else
 #include <sys/systm.h>
@@ -54,17 +54,11 @@
 #include <sys/major.h>
 #include <sys/mount.h>
 #include <sys/param.h>
-#include <sys/pathname.h>
-#include <sys/sema.h>
+#include <linux/xfs_sema.h>
 #include <sys/statvfs.h>
 #include <sys/uio.h>
 #include <sys/dirent.h>
 #include <sys/ktrace.h>
-#ifndef SIM
-#include <sys/xlv_base.h>
-#include <sys/xlv_tab.h>
-#include <sys/xlv_lock.h>
-#endif
 #include <sys/xlate.h>
 #include <sys/capability.h>
 

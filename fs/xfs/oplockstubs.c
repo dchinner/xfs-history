@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 1999 Silicon Graphics, Inc.  All Rights Reserved.
  * 
@@ -18,7 +17,7 @@
  */
 /* oplocks are not included in Mini Root */
 
-#include <sys/errno.h>
+#include <linux/errno.h>
 
 int
 oplock_fcntl(void)

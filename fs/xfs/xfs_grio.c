@@ -16,18 +16,16 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.80 2000/06/09 00:03:30 cattelan Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.81 2000/06/09 01:50:04 nathans Exp $"
 
 #include <sys/types.h>
-#include <string.h>
 #include <sys/param.h>
-#include <sys/errno.h>
 #ifndef SIM
 #include <sys/systm.h>
 #endif
 #include <sys/debug.h>
 #include "xfs_buf.h"
-#include <sys/sema.h>
+#include <linux/xfs_sema.h>
 #include <sys/lock.h>
 #ifdef SIM
 #define _KERNEL 1
@@ -42,9 +40,6 @@
 #endif
 #include <sys/vfs.h>
 #include <sys/kmem.h>
-#include <sys/cred.h>
-#include <sys/ktime.h>
-#include <ksys/vproc.h>
 #include <sys/fs/xfs_macros.h>
 #include <sys/fs/xfs_types.h>
 #include <sys/fs/xfs_log.h>

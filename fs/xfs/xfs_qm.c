@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.45 $"
+#ident "$Revision: 1.46 $"
 
 
 #include <sys/param.h>
@@ -25,17 +25,13 @@
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/capability.h>
-#include <sys/errno.h>
 #include <sys/kmem.h>
 #include <sys/debug.h>
 #include <sys/cmn_err.h>
-#include <sys/cred.h>
 #include <sys/vfs.h>
-#include <sys/atomic_ops.h>
 #include <sys/systm.h>
 #include <sys/ktrace.h>
 #include <sys/quota.h>
-#include <limits.h>
 
 #include "xfs_macros.h"
 #include "xfs_types.h"

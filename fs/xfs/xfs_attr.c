@@ -17,14 +17,12 @@
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
 #ident "$Revision$"
-#if defined(__linux__)
+
 #include <xfs_linux.h>
-#endif
 
 #include <sys/param.h>
-#include <sys/errno.h>
 #include "xfs_buf.h"
-#include <sys/cred.h>
+#include <linux/xfs_cred.h>
 #include <sys/kmem.h>
 #include <sys/uio.h>
 #include <sys/debug.h>

@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 2000 Silicon Graphics, Inc.  All Rights Reserved.
  * 
@@ -16,12 +15,8 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-/*
- * xfs_da_btree.c
- */
-#if defined(__linux__)
+
 #include <xfs_linux.h>
-#endif
 
 #ifdef SIM
 #define _KERNEL 1
@@ -31,14 +26,13 @@
 #include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
+#include <string.h>
 #endif
-#include <sys/errno.h>
 #include <sys/vnode.h>
 #include <sys/kmem.h>
 #include <sys/dirent.h>
 #include <sys/uuid.h>
 #ifdef SIM
-#include <bstring.h>
 #include <stdio.h>
 #include <sys/attributes.h>
 #else

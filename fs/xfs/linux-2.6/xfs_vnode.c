@@ -22,25 +22,18 @@
 #ifdef SIM
 #include <stdio.h>
 #define _KERNEL 1
-#else
-#define FSID_T
-#include <limits.h>
 #endif
 #include <sys/types.h>
-#include <sys/cred.h>
 #include <sys/debug.h>
-#include <sys/errno.h>
 #include <sys/file.h>
 #include <sys/flock.h>
 #include <sys/fs_subr.h>
 #include <ksys/kern_heap.h>
 #include <sys/param.h>
 #include <sys/pathname.h>
-#include <sys/sema.h>
-#include <sys/stat.h> 
+#include <linux/xfs_sema.h>
 #include <sys/systm.h>
 #include <sys/uio.h>
-#include <sys/proc.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -50,10 +43,8 @@
 #include <sys/dnlc.h>
 #include <sys/sysmacros.h>
 #include <sys/pda.h>
-#include <sys/sat.h>
 #include <sys/imon.h>
 #include <sys/cmn_err.h>
-#include <sys/atomic_ops.h>
 #ifdef SIM
 #include "sim.h"
 #endif

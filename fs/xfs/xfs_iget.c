@@ -1,14 +1,13 @@
 #ident "$Revision$"
-#if defined(__linux__)
+
 #include <xfs_linux.h>
-#endif
+#include <linux/stat.h>
 
 #ifdef SIM
 #define _KERNEL 1
 #endif
 #include <sys/param.h>
 #include <sys/mode.h>
-#include <sys/stat.h>
 #include "xfs_buf.h"
 #include <sys/sysmacros.h>
 #include <sys/vnode.h>
@@ -18,7 +17,6 @@
 #include <sys/ksa.h>
 #include <sys/debug.h>
 #include <sys/imon.h>
-#include <sys/cred.h>
 #include <sys/cmn_err.h>
 
 #ifdef SIM

@@ -21,12 +21,10 @@
  *
  * GROT: figure out how to recover gracefully when bmap returns ENOSPC.
  */
-#if defined(__linux__)
+
 #include <xfs_linux.h>
-#endif
 
 #include <sys/param.h>
-#include <sys/errno.h>
 #include "xfs_buf.h"
 #include <sys/vnode.h>
 #include <sys/kmem.h>

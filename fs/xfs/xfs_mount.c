@@ -1,10 +1,6 @@
 #ident	"$Revision$"
 
-#if defined(__linux__)
 #include <xfs_linux.h>
-#else
-#include <limits.h>
-#endif
 
 #ifdef SIM
 #define _KERNEL	1
@@ -20,15 +16,10 @@
 #ifdef SIM
 #undef _KERNEL
 #endif /* SIM */
-#include <sys/errno.h>
 #include <sys/kmem.h>
-#include <sys/sema.h>
-#include <sys/open.h>
-#include <sys/cred.h>
+#include <linux/xfs_sema.h>
 #include <sys/cmn_err.h>
-#ifdef SIM
-#include <bstring.h>
-#else
+#ifndef SIM
 #include <sys/systm.h>
 #include <sys/conf.h>
 #include <sys/var.h>

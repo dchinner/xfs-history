@@ -1,4 +1,4 @@
-#ident "$Revision: 1.34 $"
+#ident "$Revision: 1.35 $"
 
 #include <sys/param.h>
 #include "xfs_buf.h"
@@ -6,17 +6,13 @@
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/capability.h>
-#include <sys/cred.h>
-#include <sys/errno.h>
 #include <sys/kmem.h>
 #include <sys/debug.h>
 #include <sys/cmn_err.h>
 #include <sys/vfs.h>
-#include <sys/atomic_ops.h>
 #include <sys/systm.h>
 #include <sys/ktrace.h>
 #include <sys/quota.h>
-#include <limits.h>
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -890,11 +886,7 @@ xfs_qm_scall_qwarn(
 	 * (changes the filesystem), it shouldn't work in a read-only
 	 * filesystem.  That has to be enforced in xfs_qm_sysent().
 	 */
-#ifdef _IRIX62_XFS_ONLY
 	return XFS_ERROR(ENOTSUP);
-#else
-	return XFS_ERROR(ENOTSUP); /* temp */
-#endif
 }
 	   
 STATIC int

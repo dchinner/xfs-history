@@ -40,7 +40,6 @@
 #include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
-#include <bstring.h>
 #else
 #include <sys/systm.h>
 #endif

@@ -16,12 +16,10 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-
 #ident	"$Revision$"
-#if defined(__linux__)
-#include <xfs_linux.h>
-#endif
 
+#include <xfs_linux.h>
+#include <linux/stat.h>
 
 #ifdef SIM
 #define _KERNEL	1
@@ -37,13 +35,7 @@
 #endif
 #ifndef SIM
 #include <sys/systm.h>
-#else
-#include <bstring.h>
 #endif
-#include <sys/stat.h>
-#include <sys/errno.h>
-#include <sys/atomic_ops.h>
-#include <stddef.h>
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"

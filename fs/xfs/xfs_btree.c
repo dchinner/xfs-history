@@ -37,12 +37,6 @@
 #ifdef SIM
 #undef _KERNEL
 #endif
-#include <sys/errno.h>
-#ifdef SIM
-#include <bstring.h>
-#else
-#endif
-
 
 #include "xfs_macros.h"
 #include "xfs_types.h"

@@ -18,6 +18,8 @@
  */
 #ident "$Revision$"
 
+#include <linux/errno.h>
+
 #include <sys/types.h>
 #include "xfs_buf.h"
 #include <sys/uuid.h>
@@ -27,8 +29,6 @@
 #include <sys/dnlc.h>
 #include <sys/param.h>
 #include <sys/pathname.h>
-#include <sys/cred.h>
-#include <sys/errno.h>
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
 #include <sys/cmn_err.h>

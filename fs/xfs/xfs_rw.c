@@ -17,16 +17,13 @@
  */
 #ident "$Revision$"
 
-#if defined(__linux__)
 #include <xfs_linux.h>
-#endif
 
 #include <sys/param.h>
 #include "xfs_buf.h"
 #include <sys/uio.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
-#include <sys/cred.h>
 #include <sys/sysmacros.h>
 #include <sys/uuid.h>
 #include <sys/major.h>
@@ -35,7 +32,6 @@
 #include <sys/dmi_kern.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
-#include <sys/errno.h> 
 #include <sys/fcntl.h>
 #include <sys/var.h>
 #include <sys/conf.h>
@@ -43,14 +39,12 @@
 #include <sys/uthread.h>
 #include <ksys/as.h>
 #include <sys/kmem.h>
-#include <sys/sema.h>
+#include <linux/xfs_sema.h>
 #include <ksys/vfile.h>
 #include <sys/flock.h>
 #include <sys/fs_subr.h>
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
-#include <sys/schedctl.h>
-#include <sys/atomic_ops.h>
 #include <sys/ktrace.h>
 #include <sys/ksa.h>
 #include <ksys/sthread.h>
@@ -85,7 +79,6 @@
 #include "xfs_trans_space.h"
 #include "xfs_dmapi.h"
 #include "xfs_cxfs.h"
-#include <limits.h>
 
 /*
  * turning on UIOSZ_DEBUG in a DEBUG kernel causes each xfs_write/xfs_read

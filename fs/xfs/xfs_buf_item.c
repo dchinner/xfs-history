@@ -25,27 +25,20 @@
  * transaction routines.
  */
 
-#if defined(__linux__)
 #include <xfs_linux.h>
-#else
-#include <limits.h>
-#endif
 
 #ifdef SIM
 #define _KERNEL 1
 #endif
 #include <sys/param.h>
 #include "xfs_buf.h"
-#include <sys/atomic_ops.h>
 #include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
 #include <sys/vnode.h>
 #include <sys/kmem.h>
-#include <sys/errno.h>
 #ifdef SIM
-#include <bstring.h>
 #include <stdio.h>
 #else
 #include <sys/systm.h>
@@ -1003,7 +996,7 @@ xfs_buf_item_contig_bits(
 		 * Cycle through bits left in word.  If the low bit is
 		 * set, we've found a 'contingous' bit.
 		 */
-		for (cnt = (int)(NBPW*NBBY-word_bit); cnt > 0; cnt--) {
+		for (cnt = (int)(sizeof(int)*NBBY-word_bit); cnt > 0; cnt--) {
 			if (cwordp & 0x1)
 				bits++;
 			else

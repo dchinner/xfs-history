@@ -17,9 +17,8 @@
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
 #ident "$Revision$"
-#if defined(__linux__)
+
 #include <xfs_linux.h>
-#endif
 
 #ifdef SIM
 #define _KERNEL 1
@@ -33,7 +32,6 @@
 #undef _KERNEL
 #endif
 #include <sys/vnode.h>
-#include <sys/errno.h>
 #include <sys/kmem.h>
 #include <sys/cmn_err.h>
 #include <sys/uuid.h>

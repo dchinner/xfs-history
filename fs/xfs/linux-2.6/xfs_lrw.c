@@ -24,7 +24,6 @@
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <linux/errno.h>
-#include "xfs_coda_oops.h"
 
 #include <linux/xfs_to_linux.h>
 

@@ -19,7 +19,9 @@
 #ifndef _FS_XFS_DMAPI_H
 #define _FS_XFS_DMAPI_H
 
-#ident  "$Revision: 1.4 $"
+#ident  "$Revision$"
+
+#include <linux/xfs_cred.h>
 
 /*	Values used to define the on-disk version of dm_attrname_t. All
  *	on-disk attribute names start with the 8-byte string "SGI_DMI_".

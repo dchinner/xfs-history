@@ -18,40 +18,29 @@
  */
 #ident	"$Revision$"
 
-#include <xfs_linux.h>
+#include <linux/xfs_linux.h>
+#include <linux/xfs_cred.h>
+
 #include <sys/types.h>
 #undef sysinfo
 #include <linux/kernel.h> /* for printk... remove later if needed */
 #include <linux/page_buf.h>
 #include <ksys/as.h>
 #include <sys/cmn_err.h>
-#include <sys/cred.h>
 #include <sys/debug.h>
-#include <sys/errno.h>
 #include <sys/fcntl.h>
 #include <ksys/vfile.h>
 #include <sys/flock.h>
 #include <sys/fs_subr.h>
 #include <sys/kabi.h>
-#include <sys/mman.h>
 #include <sys/param.h>
 #include <sys/poll.h>
 #include <sys/statvfs.h>
 #include <sys/sysmacros.h>
 #include <sys/systm.h>
-#include <sys/unistd.h>
 #include <sys/vfs.h>
 #include <sys/pvfs.h>
 #include <sys/vnode.h>
-#include <sys/dirent.h>
-#include <string.h>
-#include <limits.h>
-
-#include <sys/sat.h>		/* all these for fs_mount */
-#include <sys/mount.h>
-#include <sys/kmem.h>
-#include <sys/dnlc.h>
-#include <sys/imon.h>
 
 /*
  * Implementation for VFS_DOUNMOUNT.

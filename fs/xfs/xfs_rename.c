@@ -17,9 +17,8 @@
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
 #ident "$Revision$"
-#if defined(__linux__)
+
 #include <xfs_linux.h>
-#endif
 
 #include <sys/types.h>
 #include <sys/uuid.h>
@@ -29,8 +28,6 @@
 #include <sys/dnlc.h>
 #include <sys/param.h>
 #include <sys/pathname.h>
-#include <sys/cred.h>
-#include <sys/errno.h>
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
 #include "xfs_buf.h"

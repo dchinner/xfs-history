@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.15 $"
+#ident "$Revision: 1.16 $"
 
 #include <sys/param.h>
 #include "xfs_buf.h"
@@ -27,10 +27,8 @@
 #include <sys/debug.h>
 #include <sys/kabi.h>
 #endif
-#include <sys/errno.h>
 #include <sys/vfs.h>
 #include <sys/systm.h>
-#include <sys/atomic_ops.h>
 
 #include "xfs_macros.h"
 #include "xfs_types.h"

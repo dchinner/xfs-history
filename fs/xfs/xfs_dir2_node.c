@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 2000 Silicon Graphics, Inc.  All Rights Reserved.
  * 
@@ -23,9 +22,8 @@
  * XFS directory implementation, version 2, node form files
  * See data structures in xfs_dir2_node.h and xfs_da_btree.h.
  */
-#if defined(__linux__)
+
 #include <xfs_linux.h>
-#endif
 
 #ifdef SIM
 #define _KERNEL 1
@@ -37,12 +35,11 @@
 #ifdef SIM
 #undef _KERNEL
 #endif
-#include <sys/errno.h>
 #include <sys/vnode.h>
 #include <sys/dirent.h>
 #ifdef SIM
-#include <bstring.h>
 #include <stdio.h>
+#include <string.h>
 #else
 #include <sys/systm.h>
 #endif

@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.3 $"
+#ident "$Revision$"
 
 /*
  * xfs_dir2_data.c
@@ -37,10 +37,8 @@
 #ifdef SIM
 #undef _KERNEL
 #endif
-#include <sys/errno.h>
 #include <sys/vnode.h>
 #ifdef SIM
-#include <bstring.h>
 #include <stdio.h>
 #else
 #include <sys/systm.h>

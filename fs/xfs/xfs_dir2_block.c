@@ -23,10 +23,8 @@
  * XFS V2 directory implementation, single-block form.
  * See xfs_dir2_block.h for the format.
  */
-#if defined(__linux__)
-#include <xfs_linux.h>
-#endif
 
+#include <xfs_linux.h>
 
 #ifdef SIM
 #define _KERNEL 1
@@ -37,14 +35,12 @@
 #include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
+#include <string.h>
 #endif
-#include <sys/errno.h>
 #include <sys/vnode.h>
 #include <sys/dirent.h>
 #include <stddef.h>
-#ifdef SIM
-#include <bstring.h>
-#else
+#ifndef SIM
 #include <sys/systm.h>
 #endif
 #include "xfs_macros.h"

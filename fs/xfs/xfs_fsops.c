@@ -16,18 +16,16 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.41 $"
-#if defined(__linux__)
+#ident	"$Revision$"
+
 #include <xfs_linux.h>
-#endif
 
 #include <sys/param.h>
 #include "xfs_buf.h"
 #include <sys/debug.h>
-#include <sys/errno.h>
 #include <ksys/vfile.h>
 #include <sys/kmem.h>
-#include <sys/sema.h>
+#include <linux/xfs_sema.h>
 #include <sys/systm.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>

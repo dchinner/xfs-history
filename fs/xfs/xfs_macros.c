@@ -29,14 +29,13 @@
 #endif
 #include <sys/param.h>
 #include "xfs_buf.h"
-#include <sys/sema.h>
+#include <linux/xfs_sema.h>
 #include <sys/debug.h>
 #include <sys/vnode.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
 #include <sys/vfs.h>
-#include <sys/pvnode.h>
 #include <sys/uuid.h>
 #include <stddef.h>
 #include "xfs_macros.h"

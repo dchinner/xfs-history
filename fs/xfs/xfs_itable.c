@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 1999 Silicon Graphics, Inc.  All Rights Reserved.
  * 
@@ -17,32 +16,22 @@
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
 #ident	"$Revision$"
-#if defined(__linux__)
+
 #include <xfs_linux.h>
 #include <sys/sysmacros.h>
-#endif
 
 #include <sys/param.h>
 #include "xfs_buf.h"
-#include <sys/errno.h>
 #include <sys/vnode.h>
 #include <sys/systm.h>
-#include <sys/sema.h>
+#include <linux/xfs_sema.h>
 #include <sys/kmem.h>
-#include <sys/time.h>
 #include <sys/debug.h>
 #include <ksys/vfile.h>
 #include <ksys/fdt.h>
 #include <sys/vfs.h>
-#if defined(__sgi__)
-#include <sys/syssgi.h>
-#endif
 #include <sys/capability.h>
-#include <sys/kthread.h>
 #include <sys/uuid.h>
-#if defined(__sgi__)
-#include <sys/hwgraph.h>
-#endif
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"

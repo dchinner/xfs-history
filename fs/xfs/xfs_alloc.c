@@ -21,9 +21,7 @@
 /*
  * Free space allocation for XFS.
  */
-#if defined(__linux__)
 #include <xfs_linux.h>
-#endif
 
 #ifdef SIM
 #define _KERNEL 1
@@ -38,13 +36,11 @@
 #include <sys/vnode.h>
 #include <sys/ktrace.h>
 #include <sys/kmem.h>
-#include <sys/errno.h>
 #include <sys/uuid.h>
 
 #include <stddef.h>
 #ifdef SIM
 #include <stdlib.h>
-#include <bstring.h>
 #else
 #include <sys/systm.h>
 #endif

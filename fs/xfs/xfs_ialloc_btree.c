@@ -17,7 +17,7 @@
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
 
-#ident	"$Revision: 1.46 $"
+#ident	"$Revision$"
 
 /*
  * Inode allocation management for XFS.
@@ -40,7 +40,7 @@
 #include <stddef.h>
 #ifdef SIM
 #include <stdlib.h>
-#include <bstring.h>
+#include <string.h>
 #else
 #include <sys/systm.h>
 #endif

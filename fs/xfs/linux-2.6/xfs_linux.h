@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 1999 Silicon Graphics, Inc.  All Rights Reserved.
  * 
@@ -75,10 +74,16 @@
 #include <sys/types.h>
 
 #ifndef SIM
+#include <linux/types.h>
+#include <linux/errno.h>
 #include <linux/string.h>   /* to get memcpy, and friends */
+#else
+#include <time.h>
+#include <stdio.h>
 #endif
 
 #include <asm/page.h>
+#include <asm/param.h>
 #include <asm/byteorder.h>
 #define _PAGESZ		PAGE_SIZE
 #define NBPP		PAGE_SIZE 
@@ -91,12 +96,12 @@
 #include <sys/ksa.h>
 
 
-/* sys/errno.h */
-#define EFSCORRUPTED    1010    /* Filesystem is corrupted */
+#ifndef SIM
+#define ENOTSUP		1008	/* Not supported (POSIX 1003.1b) */
+#endif
 #define ENOATTR         1009    /* Attribute not found */
+#define EFSCORRUPTED    1010    /* Filesystem is corrupted */
 #define	EWRONGFS	1011	/* Mount with wrong filesystem type */
-
-
 
 
 #define ENTER(x) printk("Entering %s\n",x);
@@ -112,15 +117,6 @@ extern int   kdb(int reason, int error_code, struct pt_regs *);
 extern int get_thread_id(void);
 #endif
 
-#if 0
-/* This is major wrong.... fix me FIX ME  RMC */
-#ifndef __ARCH_I386_POSIX_TYPES_H
-typedef long            __kernel_clock_t; 
-#endif
-#endif
-
-/* #define stat64 stat */
-
 #ifndef _LINUX_SCHED_H
 extern unsigned long volatile jiffies;
 #endif
@@ -134,18 +130,8 @@ extern unsigned long volatile jiffies;
 
 #define LONGLONG_MAX        9223372036854775807LL /* max "long long int" */
 
-/* stropts.h */
-/*
- * Stream buffer structure for putmsg and getmsg system calls
- */
-struct strbuf {
-	int	maxlen;			/* no. of bytes in buffer */
-	int	len;			/* no. of bytes returned */
-	char	*buf;			/* pointer to data */
-};
-
+#define _DIOC_(x) (('d'<<8) | x)
 #define DIOCGETVOLDEV	_DIOC_(36)	/* NEW: retrieve subvolume devices */
-
 
 typedef long int            irix5_off_t;
 
@@ -162,14 +148,6 @@ extern ksa_t *ksaptr;
 #endif
 
 
-
-/* XXX should be fairly private - see sys/ddmap.h */
-struct __vhandl_s {
-	struct pregion	*v_preg;	/* Pointer to the pregion.	*/
-	uvaddr_t	v_addr;		/* Virtual address of region.	*/
-};
-
-
 #define findrawpath(x) x
 #define findblockpath(x) x
 
@@ -184,7 +162,6 @@ struct __vhandl_s {
 #define COPYIN_XLATE(from,to,size,func,abi,count) \
 	copyin(from, to, size)
 
-// extern void kmem_free(void *, size_t);
 extern void *kern_malloc(size_t);
 #define bcmp(s1,s2,l) memcmp(s1,s2,l)    
 

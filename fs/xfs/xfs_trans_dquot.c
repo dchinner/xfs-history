@@ -16,16 +16,14 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.21 $"
+#ident	"$Revision: 1.22 $"
 #include <sys/param.h>
 #include "xfs_buf.h"
 #include <sys/vnode.h>
 #include <sys/uuid.h>
-#include <sys/errno.h>
 #include <sys/kmem.h>
 #include <sys/debug.h>
 #include <sys/cmn_err.h>	
-#include <sys/atomic_ops.h>
 #include <sys/systm.h>
 #ifdef _SHAREII
 #include <sys/shareIIstubs.h>

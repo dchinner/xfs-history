@@ -23,6 +23,11 @@
  * $Id$
  *
  * $Log$
+ * Revision 1.11  2000/03/25 01:29:53  nathans
+ * Merge of 2.3.42-xfs:slinx:46428a by ananth.
+ *
+ *   remove unused include files.
+ *
  * Revision 1.10  2000/03/25 01:15:49  lord
  * use linux security mechanisms
  * Merge of 2.3.42-xfs:slinx:46379a by ananth.
@@ -36,6 +41,9 @@
  * Merge of 2.3.42-xfs:slinx:44186a by ananth.
  *
  *   Copied GPL from slinx-xfs tree.
+ *
+ * Revision 1.11  2000/03/20 07:37:34  nathans
+ * remove unused include files.
  *
  * Revision 1.10  2000/03/18 22:51:26  lord
  * use linux security mechanisms
@@ -74,7 +82,7 @@
 #include <sys/types.h>
 #include <sys/var.h>
 #include <sys/vfs.h>
-#include <sys/cred.h>
+#include <linux/xfs_cred.h>
 
 int    		xfs_refcache_percent = 100;
 int		mac_enabled = 0;

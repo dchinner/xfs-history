@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 2000 Silicon Graphics, Inc.  All Rights Reserved.
  * 
@@ -17,21 +16,18 @@
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
 #ident "$Id$"
-#if defined(__linux__)
+
 #include <xfs_linux.h>
-#endif
+#include <linux/xfs_cred.h>
 
 #include <sys/param.h>
 #include "xfs_buf.h"
-#include <sys/sema.h>
+#include <linux/xfs_sema.h>
 #include <sys/debug.h>
 #include <sys/kmem.h>
-#include <sys/errno.h>
 #include <sys/systm.h>
 #include <sys/vnode.h>
-#include <sys/cred.h>
 
-#include <sys/time.h>
 #include <sys/kabi.h>
 #include <ksys/vfile.h>
 #include <ksys/fdt.h>

@@ -18,11 +18,25 @@
  */
 /*
  *
- * $Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfsquotasstubs.c,v 1.4 2000/01/30 09:59:06 kenmcd Exp $
- * $Author: kenmcd $
- * $Id: xfsquotasstubs.c,v 1.4 2000/01/30 09:59:06 kenmcd Exp $
+ * $Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfsquotasstubs.c,v 1.5 2000/06/09 01:50:04 nathans Exp $
+ * $Author: nathans $
+ * $Id: xfsquotasstubs.c,v 1.5 2000/06/09 01:50:04 nathans Exp $
  *
  * $Log: xfsquotasstubs.c,v $
+ * Revision 1.5  2000/06/09 01:50:04  nathans
+ * Merge of 2.3.99pre2-xfs:slinx:46428a by ananth.
+ *
+ *   Merge of 2.3.42-xfs:slinx:46428a by ananth.
+ *   remove unused include files.
+ *
+ * Revision 1.5  2000/03/25 01:29:53  nathans
+ * Merge of 2.3.42-xfs:slinx:46428a by ananth.
+ *
+ *   remove unused include files.
+ *
+ * Revision 1.5  2000/03/20 07:37:34  nathans
+ * remove unused include files.
+ *
  * Revision 1.4  2000/01/30 09:59:06  kenmcd
  * Encumbrance review done.
  * Add copyright and license words consistent with GPL.
@@ -45,10 +59,7 @@
 #include <sys/systm.h>
 #include <sys/quota.h>
 #include <sys/fs/xfs_types.h>
-
-#ifdef __linux__
-#include <sys/sema.h>	/* To get mutex_t */
-#endif
+#include <linux/xfs_sema.h>
 
 struct xfs_qm *xfs_Gqm = NULL;
 mutex_t	xfs_Gqm_lock;

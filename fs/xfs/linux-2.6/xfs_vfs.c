@@ -35,7 +35,6 @@
 #define FSID_T
 #include <sys/types.h>
 #include <linux/errno.h>
-#include "xfs_coda_oops.h"
 
 #include <linux/xfs_to_linux.h>
 

@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 1999 Silicon Graphics, Inc.  All Rights Reserved.
  * 
@@ -16,16 +15,14 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.7 $"
+#ident "$Revision$"
 
 /*
  * xfs_dir2_sf.c
  * Shortform directory implementation for v2 directories.
  */
-#if defined(__linux__)
-#include <xfs_linux.h>
-#endif
 
+#include <xfs_linux.h>
 
 #ifdef SIM
 #define _KERNEL 1
@@ -36,15 +33,13 @@
 #include <sys/uuid.h>
 #ifdef SIM
 #undef _KERNEL
+#include <string.h>
 #endif
-#include <sys/errno.h>
 #include <sys/vnode.h>
 #include <sys/kmem.h>
 #include <sys/dirent.h>
 #include <stddef.h>
-#ifdef SIM
-#include <bstring.h>
-#else
+#ifndef SIM
 #include <sys/systm.h>
 #endif
 #include "xfs_macros.h"

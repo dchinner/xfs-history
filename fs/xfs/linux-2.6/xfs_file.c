@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 1999 Silicon Graphics, Inc.  All Rights Reserved.
  * 
@@ -16,33 +15,16 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-/*
- *  fs/xfs/xfs_linux_ops_file.c
- *
- */
+
 #define FSID_T
-#include <sys/types.h>
-#include <sys/cred.h>
-#include <linux/errno.h>
-
-#include "xfs_coda_oops.h"
-
 #include <linux/xfs_to_linux.h>
-
-#undef NODEV
+#include <linux/sched.h>
 #include <linux/fs.h>
 #include <linux/dcache.h>
-#include <linux/sched.h>	/* To get current */
-
 #include <linux/linux_to_xfs.h>
-
-#include "xfs_file.h"
-#include <sys/flock.h>
+#include <linux/xfs_linux.h>
+#include <linux/xfs_cred.h>
 #include <sys/vnode.h>
-#include <sys/mode.h>
-#include <sys/uuid.h>
-#include <sys/flock.h>
-#include <xfs_linux.h>
 
 static long long linvfs_file_lseek(
 	struct file *file,

@@ -18,25 +18,21 @@
 #ident "$Revision$"
 
 #include <xfs_linux.h>
+#include <asm/fcntl.h>
+#include <linux/xfs_cred.h>
 
 #ifdef SIM
 #define _KERNEL 1
 #endif
 #include <sys/types.h>
-#include <sys/time.h>
-#include <sys/timers.h>
 #include "xfs_buf.h"
 #include <sys/uio.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
-#include <sys/fs/spec_lsnode.h>
 #include <sys/systm.h>
 #include <sys/dnlc.h>
 #include <sys/sysmacros.h>
-#include <sys/prctl.h>
-#include <sys/cred.h>
 #include <sys/uuid.h>
-#include <sys/unistd.h>
 #include <sys/grio.h>
 #include <sys/ksa.h>
 #include <sys/dmi.h>
@@ -50,27 +46,19 @@
 #ifdef SIM
 #undef _KERNEL
 #endif
-#include <sys/cred.h>
-#include <sys/errno.h>
+#include <sys/fcntl.h>
 #include <sys/flock.h>
 #include <sys/fs_subr.h>
-#ifndef SIM
-#include <sys/fcntl.h>
-#endif
 #include <sys/ktrace.h>
-#ifdef SIM
-#include <bstring.h>
-#else
+#ifndef SIM
 #include <sys/conf.h>
 #endif
 #include <sys/kabi.h>
 #include <sys/kmem.h>
-#include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/pathname.h>
-#include <sys/sema.h>
+#include <linux/xfs_sema.h>
 #include <sys/statvfs.h>
-#include <sys/stat.h>
 #include <ksys/vfile.h>
 #include <sys/mode.h>
 #include <sys/var.h>
@@ -122,10 +110,6 @@
 #include <fs/fs_bhv_id.h>
 #include <fs/specfs/spec_lsnode.h>
 
-/*
- * Here so that we do not need to include vproc.h -> vpgrp.h ->
- * space.h -> vpag.h.
- */
 extern prid_t dfltprid;
 
 #ifdef DATAPIPE
@@ -5619,9 +5603,6 @@ xfs_fcntl(
 	int			error = 0;
 	xfs_mount_t		*mp;
 	struct flock		bf;
-#if !defined(__linux__)
-	struct irix5_flock	i5_bf;
-#endif
 	vnode_t 		*vp;
 	xfs_inode_t		*ip;
 	struct biosize		bs;

@@ -23,10 +23,8 @@
  *
  * GROT: figure out how to recover gracefully when bmap returns ENOSPC.
  */
-#if defined(__linux__)
-#include <xfs_linux.h>
-#endif
 
+#include <xfs_linux.h>
 
 #ifdef SIM
 #define _KERNEL 1
@@ -39,13 +37,12 @@
 #include <sys/cmn_err.h>
 #ifdef SIM
 #undef _KERNEL
+#include <string.h>
 #endif
-#include <sys/errno.h>
 #include <sys/vnode.h>
 #include <sys/kmem.h>
 #include <sys/dirent.h>
 #ifdef SIM
-#include <bstring.h>
 #include <stdio.h>
 #else
 #include <sys/systm.h>

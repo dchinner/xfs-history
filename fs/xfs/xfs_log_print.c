@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.10 $"
+#ident	"$Revision: 1.11 $"
 
 /*
  * This is meant to be used by only the user level log-print code, and
@@ -32,14 +32,13 @@
 
 #include <sys/sysmacros.h>
 #include "xfs_buf.h"
-#include <sys/sema.h>
+#include <linux/xfs_sema.h>
 #include <sys/vnode.h>
 #include <sys/debug.h>
 
 #ifdef SIM
 #undef _KERNEL
 #undef __KERNEL__
-#include <bstring.h>
 #include <stdio.h>
 #include <stdlib.h>
 #else
@@ -47,7 +46,6 @@
 #include <sys/conf.h>
 #endif
 
-#include <sys/errno.h>
 #include <sys/kmem.h>
 #include <sys/ktrace.h>
 #include <sys/vfs.h>

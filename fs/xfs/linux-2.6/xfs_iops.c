@@ -27,7 +27,6 @@
 #define FSID_T
 #include <sys/types.h>
 #include <linux/errno.h>
-#include "xfs_coda_oops.h"
 
 #include <linux/xfs_to_linux.h>
 
@@ -42,16 +41,14 @@
 
 #include <sys/sysmacros.h>
 #include <sys/capability.h>
-#include <sys/cred.h>
 #include <sys/vfs.h>
 #include <sys/pvfs.h>
 #include <sys/vnode.h>
 #include <ksys/behavior.h>
 #include <sys/mode.h>
-#include <xfs_linux.h>
-
+#include <linux/xfs_linux.h>
+#include <linux/xfs_cred.h>
 #include <linux/xfs_file.h>
-
 #include <linux/page_buf.h>
 #include <xfs_buf.h>
 
@@ -549,7 +546,7 @@ int
 linvfs_pb_bmap(struct inode *inode, 
 			   loff_t offset,
 			   size_t count,
-			   pb_bmap_t *pbmapp,
+			   struct page_buf_bmap_s *pbmapp,
 			   int maxpbbm, 
 			   int *retpbbm, 
 			   int flags/* page_buf_flags_t */)

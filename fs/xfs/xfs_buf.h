@@ -32,7 +32,7 @@
 
 #ifdef _USING_BUF_T
 #include <sys/buf.h>
-#include <sys/sema.h>
+#include <linux/xfs_sema.h>
 #include <sys/kmem.h>
 #ifndef SIM
 #include <linux/page_buf.h>
@@ -271,7 +271,7 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #endif /* _USING_BUF_T */
 
 #ifdef _USING_PAGEBUF_T
-#include <sys/sema.h>
+#include <linux/xfs_sema.h>
 #include <sys/kmem.h>
 #include <linux/page_buf.h>
 

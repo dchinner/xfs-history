@@ -34,15 +34,13 @@
 
 #include <sys/param.h>
 #include "xfs_buf.h"
-#include <sys/cred.h>
 #include <sys/debug.h>
 #include <sys/dirent.h>
 #include <sys/ktrace.h>
-#include <sys/sema.h>
+#include <linux/xfs_sema.h>
 #include <sys/systm.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
-#include <sys/pvnode.h>
 #include <sys/kmem.h>
 #include <sys/attributes.h>
 #include <sys/uuid.h>

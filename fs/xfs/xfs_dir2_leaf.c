@@ -25,9 +25,8 @@
  * These directories have multiple XFS_DIR2_DATA blocks and one
  * XFS_DIR2_LEAF1 block containing the hash table and freespace map.
  */
-#if defined(__linux__)
+
 #include <xfs_linux.h>
-#endif
 
 #ifdef SIM
 #define _KERNEL 1
@@ -38,15 +37,13 @@
 #include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
+#include <string.h>
 #endif
 #include <sys/kmem.h>
-#include <sys/errno.h>
 #include <sys/vnode.h>
 #include <sys/dirent.h>
 #include <stddef.h>
-#ifdef SIM
-#include <bstring.h>
-#else
+#ifndef SIM
 #include <sys/systm.h>
 #endif
 #include "xfs_macros.h"
