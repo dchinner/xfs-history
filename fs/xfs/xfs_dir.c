@@ -1,4 +1,4 @@
-#ident "$Revision: 1.90 $"
+#ident "$Revision: 1.93 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -825,9 +825,15 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 				xfs_trans_brelse(trans, bp);
 				bp = NULL;
 			}
-			if (leaf->entries[0].hashval >= cookhash) {
-				xfs_dir_trace_g_dub("node: leaf hash too small",
+			if (leaf->entries[0].hashval > cookhash) {
+				xfs_dir_trace_g_dub("node: leaf hash too large",
 							   dp, uio, bno);
+				xfs_trans_brelse(trans, bp);
+				bp = NULL;
+			}
+			if (cookhash > leaf->entries[leaf->hdr.count - 1].hashval) {
+				xfs_dir_trace_g_dub("node: leaf hash too small",
+							dp, uio, bno);
 				xfs_trans_brelse(trans, bp);
 				bp = NULL;
 			}
@@ -854,11 +860,6 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 				break;
 			btree = &node->btree[0];
 			xfs_dir_trace_g_dun("node: node detail", dp, uio, node);
-			if (uio->uio_offset == (off_t)0) {
-				bno = btree->before;
-				xfs_trans_brelse(trans, bp);
-				continue;
-			}
 			for (i = 0; i < node->hdr.count; btree++, i++) {
 				if (btree->hashval >= cookhash) {
 					bno = btree->before;
