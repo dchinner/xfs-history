@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.12 1994/04/12 01:16:43 doucette Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.13 1994/04/14 15:07:38 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -61,13 +61,14 @@ extern int	grio_debug;
 #define GRIO_DBPRNT(s1, s2 )
 #endif
 
-int xfs_grio_add_ticket( int, dev_t, int, char *);
-int xfs_grio_remove_ticket( int, dev_t, char *);
+int xfs_grio_add_ticket( file_id_t *, int, char *);
+int xfs_grio_remove_ticket( file_id_t *, char *);
 xfs_inode_t *xfs_get_inode ( dev_t, int);
 int xfs_add_ticket_to_inode( xfs_inode_t *, int, struct reservation_id *);
 void xfs_remove_ticket_from_inode( xfs_inode_t *, struct reservation_id *);
 grio_ticket_t *xfs_io_is_guaranteed( xfs_inode_t *, struct reservation_id *);
 STATIC int xfs_grio_issue_io( vnode_t *, uio_t *,int, cred_t *,int);
+STATIC int xfs_crack_file_id(file_id_t *, dev_t *, xfs_ino_t *);
 
 void ticket_lock_shared( xfs_inode_t *);
 void ticket_lock_exclusive( xfs_inode_t *);
@@ -96,8 +97,8 @@ extern int strncmp(char *, char *, int);
 xfs_inode_t *
 xfs_get_inode(  dev_t fs_dev, int ino)
 {
-        struct vfs *vfsp;
-        xfs_inode_t *ip = NULL ;
+        struct vfs 	*vfsp;
+        xfs_inode_t 	*ip = NULL ;
 	extern struct vfs *vfs_devsearch( dev_t );
 
         vfsp = vfs_devsearch( fs_dev );
@@ -172,12 +173,23 @@ xfs_add_ticket_to_inode( xfs_inode_t *ip, int sz, struct reservation_id *id )
  *	-1 on failure
  */
 int
-xfs_grio_add_ticket( int ino, dev_t fs_dev, int sz, char *idptr)
+xfs_grio_add_ticket( file_id_t *fileidp, int sz, char *idptr)
 {
+	xfs_ino_t	ino;
+	dev_t		fs_dev;
 	int ret = -1;
 	xfs_inode_t *ip;
 	struct reservation_id id;
 
+
+	xfs_crack_file_id( fileidp, &fs_dev, &ino);
+
+#ifdef DEBUG
+	if (grio_debug)
+		printf("add ticket: ino = %llx, dev = %x \n",
+					(__int64_t)ino, fs_dev);
+#endif
+	
 
 	if (copyin(idptr, (caddr_t)&id, sizeof(id))) {
 #ifdef DEBUG
@@ -218,7 +230,6 @@ xfs_grio_add_ticket( int ino, dev_t fs_dev, int sz, char *idptr)
 	return(ret);
 }
 
-
 /*
  * xfs_remove_ticket_from_inode()
  *
@@ -253,7 +264,6 @@ xfs_remove_ticket_from_inode( xfs_inode_t *ip, struct reservation_id *id)
 		}
 	}
 	ticket_unlock( ip );
-	
 }
 
 /*
@@ -267,10 +277,20 @@ xfs_remove_ticket_from_inode( xfs_inode_t *ip, struct reservation_id *id)
  *	-1 on failure
  */
 int
-xfs_grio_remove_ticket( int ino, dev_t fs_dev, char *idptr)
+xfs_grio_remove_ticket( file_id_t *fileidp, char *idptr)
 {
+	xfs_ino_t	ino;
+	dev_t		fs_dev;
 	xfs_inode_t *ip;
 	struct reservation_id id;
+
+	xfs_crack_file_id( fileidp, &fs_dev, &ino);
+#ifdef DEBUG
+	if (grio_debug) {
+		printf("remove ticket: ino = %llx, dev = %x \n",
+				(__int64_t)ino, fs_dev);
+	}
+#endif
 
 	if (copyin(idptr, (caddr_t)&id, sizeof(id))) {
 #ifdef DEBUG
@@ -468,9 +488,9 @@ xfs_grio_req( xfs_inode_t *ip,
 	cred_t *credp,
 	int rw)
 {
-	grio_ticket_t *ticket;
-	int sz, ret = 0, remainingio;
-	vnode_t *vp;
+	int 		sz, ret = 0, remainingio;
+	vnode_t 	*vp;
+	grio_ticket_t 	*ticket;
 
         /*
          * Determine if this request has a guaranteed rate of I/O.
@@ -533,12 +553,16 @@ xfs_grio_req( xfs_inode_t *ip,
 
 /*
  * xfs_grio_issue_io()
+ *	This routine issues the actual I/O request using the file 
+ *	type and I/O operation.
  *
- *
+ * RETURNS:
+ *	0 on success
+ *	-1 on failure
  */
 STATIC int
-xfs_grio_issue_io( vnode_t *vp,
-		   uio_t   *uiop,
+xfs_grio_issue_io( vnode_t *vp, 
+		   uio_t   *uiop, 
 		   int     ioflag,
 		   cred_t  *credp,
 		   int     rw)
@@ -551,7 +575,7 @@ xfs_grio_issue_io( vnode_t *vp,
 	if ((ioflag & IO_GRIO) && (!(ioflag & IO_DIRECT))) {
 		ret = -1;
 #ifdef DEBUG
-		printf("file is rate guaranteed - cannot user buffer cache.\n");
+		printf("File is rate guaranteed - cannot user buffer cache.\n");
 #endif
 		return( ret );
 	}
@@ -575,6 +599,8 @@ xfs_grio_issue_io( vnode_t *vp,
  * ticket_lock_shared()
  *      Locks the per inode ticket lock in shared mode.
  *
+ * RETURNS:
+ *	none
  */
 void
 ticket_lock_shared(xfs_inode_t *ip)
@@ -588,6 +614,8 @@ ticket_lock_shared(xfs_inode_t *ip)
  * ticket_lock_exclusive()
  *      Locks the per inode ticket lock in exclusive mode.
  *
+ * RETURNS:
+ *	none
  */
 void
 ticket_lock_exclusive(xfs_inode_t *ip)
@@ -601,6 +629,8 @@ ticket_lock_exclusive(xfs_inode_t *ip)
  * ticket_unlock()
  *      Unlocks the per inode ticket lock.
  *
+ * RETURNS:
+ *	none
  */
 void
 ticket_unlock(xfs_inode_t *ip)
@@ -613,6 +643,8 @@ ticket_unlock(xfs_inode_t *ip)
 
 /*
  * xfs_get_file_extents()
+ *	This routine creates the cononical forms of all the extents
+ *	for the given file and returns them to the user.
  *
  *
  *
@@ -621,36 +653,47 @@ ticket_unlock(xfs_inode_t *ip)
  *	~0 on failure
  */
 int
-xfs_get_file_extents(dev_t fsdev, 
-		int ino, 
-		xfs_bmbt_irec_t extents[], 
-		int *count)
+xfs_get_file_extents(file_id_t *fileidp, xfs_bmbt_irec_t extents[], int *count)
 {
-	xfs_inode_t *ip;
-	xfs_bmbt_rec_t *ep;
-	xfs_bmbt_irec_t *rec;
-	int	i, recsize, num_extents = 0, ret = 0;
+	dev_t			fs_dev;
+	xfs_ino_t		ino;
+	xfs_inode_t 		*ip;
+	xfs_bmbt_rec_t 		*ep;
+	xfs_bmbt_irec_t 	thisrec;
+	grio_bmbt_irec_t	*grec;
+	int			i, recsize, num_extents = 0, ret = 0;
+
+	xfs_crack_file_id( fileidp, &fs_dev, &ino);
+
+#ifdef DEBUG
+	if (grio_debug) {
+		printf("get file extents: ino = %llx, dev = %x \n",
+				(__int64_t)ino, fs_dev);
+	}
+#endif
 
 	/*
- 	 * get inode
+ 	 * Get the inode.
 	 */
-	if (!(ip = xfs_get_inode( fsdev, ino ))) {
+	if (!(ip = xfs_get_inode( fs_dev, ino ))) {
+		ret = ENOENT;
 		if (copyout( &num_extents, count, sizeof( num_extents))) {
 			ret = EFAULT;
 		}
-		return( 1 );
+		return( ret );
 	}
 
 	num_extents = ip->i_bytes / sizeof(*ep);
 	if (num_extents) {
+
 		/*
 		 * Copy the extents if they exist.
 		 */
 		ASSERT(num_extents <  XFS_MAX_INCORE_EXTENTS);
 
-		recsize = sizeof(xfs_bmbt_irec_t) * num_extents;
-		rec = kmem_alloc(recsize, KM_SLEEP );
-		ASSERT(rec);
+		recsize = sizeof(grio_bmbt_irec_t) * num_extents;
+		grec = kmem_alloc(recsize, KM_SLEEP );
+		ASSERT(grec);
 
 		ep = ip->i_u1.iu_extents;
 
@@ -658,13 +701,16 @@ xfs_get_file_extents(dev_t fsdev,
 			/*
  			 * copy extent numbers;
  			 */
-			xfs_bmbt_get_all(ep, &rec[i]);
+			xfs_bmbt_get_all(ep, &thisrec);
+			grec[i].br_startoff 	= thisrec.br_startoff;
+			grec[i].br_startblock 	= thisrec.br_startblock;
+			grec[i].br_blockcount 	= thisrec.br_blockcount;
 		}
 
-		if (copyout(rec, extents, recsize )) {
+		if (copyout(grec, extents, recsize )) {
 			ret = EFAULT;
 		}
-		kmem_free(rec, 0 );
+		kmem_free(grec, 0 );
 	}
 
 	/* 
@@ -678,24 +724,48 @@ xfs_get_file_extents(dev_t fsdev,
 	return( ret );
 }
 
-xfs_get_file_rt( dev_t fsdev, int ino, int *rt)
+/*
+ * xfs_get_file_rt()
+ *	This routine determines if the given file has real time
+ *	extents. If so a 1 is written to the user memory pointed at
+ *	by rt, if not a 0 is written.
+ *
+ *
+ * 
+ */
+xfs_get_file_rt( file_id_t *fileidp, int *rt)
 {
-	xfs_inode_t *ip;
-	int inodert = 0, ret = 0;
+	int 		inodert = 0, ret = 0;
+	dev_t		fs_dev;
+	xfs_ino_t	ino;
+	xfs_inode_t 	*ip;
+
+	xfs_crack_file_id( fileidp, &fs_dev, &ino);
+
+#ifdef DEBUG
+	if (grio_debug) {
+		printf("get file rt: ino = %llx, dev = %x \n",
+				(__int64_t)ino, fs_dev);
+	}
+#endif
 
 	/*
- 	 * get inode
+ 	 * Get the inode.
 	 */
-	if (!(ip = xfs_get_inode( fsdev, ino ))) {
-		if (copyout( &inodert, rt, sizeof( rt))) {
-			ret = EFAULT;
-		}
-		return( 1 );
+	if (!(ip = xfs_get_inode( fs_dev, ino ))) {
+		return( ENOENT );
 	}
+
+	/*
+	 * Check if the inode is marked as real time.
+	 */
 	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
 		inodert = 1;
 	}
 
+	/*
+ 	 * Copy the results to user space.
+ 	 */
 	if (copyout( &inodert, rt, sizeof( rt))) {
 		ret = EFAULT;
 	}
@@ -706,10 +776,19 @@ xfs_get_file_rt( dev_t fsdev, int ino, int *rt)
 }
 
 
+/*
+ * xfs_get_block_size()
+ *	This routine determines the block size of the given
+ *	file system copies it to the user memory pointed at by fs_size.
+ *
+ * RETURNS:
+ *	0 on success
+ *	-1 on failure
+ */
 xfs_get_block_size(dev_t fsdev, int *fs_size)
 {
-	int ret = 0;
-	struct vfs *vfsp = NULL;
+	int 		ret = 0;
+	struct vfs	*vfsp;
 
 	vfsp = vfs_devsearch( fsdev );
 	if ( vfsp ) {
@@ -723,11 +802,22 @@ xfs_get_block_size(dev_t fsdev, int *fs_size)
 }
 
 
+/*
+ * xfs_remove_all_tickets()
+ *	This routine is called by the xfs_remove_all_tickets() routine
+ *	to remove the rate guarantee tickets from the inodes on a 
+ *	specific file system. This routine removes the guarantee tickets
+ *	and frees the memory space.
+ *
+ * RETURNS:
+ *	none
+ */
+STATIC void
 xfs_remove_tickets_from_fs(vfs_t *vfsp)
 {
-	xfs_mount_t *mp;
-	xfs_inode_t *ip;
-	grio_ticket_t *ticket, *nextticket;
+	xfs_mount_t 	*mp;
+	xfs_inode_t 	*ip;
+	grio_ticket_t	*ticket, *nextticket;
 
 
 	mp = XFS_VFSTOM(vfsp);
@@ -742,34 +832,185 @@ xfs_remove_tickets_from_fs(vfs_t *vfsp)
 }
 	
 
+/*
+ * xfs_remove_all_tickets()
+ *	This routine is called when the guarantee granting daemon
+ *	is started to remove and previous guarantees that it does
+ *	not know about. This only has meaning when the daemon crashes
+ *	and needs to be restarted.
+ *
+ * RETURNS:
+ * 	always returns 0
+ */
 int
 xfs_remove_all_tickets()
 {
+	int 		s;
+	vfs_t		*vfsp;
 	extern vfs_t	*rootvfs;
 	extern lock_t	vfslock;
 	extern int	xfs_type;
-	vfs_t		*vfsp;
-	int 		s;
 
 	/*
- 	 * for each xfs file system on the machine
+ 	 * For each file system on the machine.
 	 */
-	/*
- 	 * remove the tickets from the inodes
- 	 */
 #ifndef SIM
 	s = splock(vfslock);
 #endif
 	for (vfsp = rootvfs; vfsp != NULL; vfsp = vfsp->vfs_next) {
 		/*
- 		 * Is this an xfs system ?
+ 		 * If is is an xfs file system ?
 		 */
 		if (vfsp->vfs_fstype == xfs_type) {
+			/*
+ 	 		 * Remove the tickets from the inodes.
+ 	 		 */
 			xfs_remove_tickets_from_fs(vfsp);
 		}
 	}
 #ifndef SIM
 	spunlock(vfslock, s);
 #endif
+	return(0);
+}
+
+/*
+ * xfs_remove_grio_guarantee()
+ *	This routine constructs a grio msg structure to send to 
+ *	the guarantee granting daemon which instructs it to remove 
+ *	the rate guarantee for the given pid and inode. The message is
+ * 	sent asynchronously.
+ *
+ * RETURNS:
+ *	0 on success
+ *	non zero on failure
+ */
+int
+xfs_remove_grio_guarantee(xfs_inode_t *ip, pid_t pid)
+{
+	int		ret;
+	grio_msg_t 	griomsg;
+	extern int	grio_issue_async_grio_req(grio_msg_t *);
+
+	bzero(&griomsg, sizeof(grio_msg_t));
+
+	griomsg.pid 			= pid;
+	griomsg.grioblk.resv_type 	= GRIO_UNRESV_FILE_ASYNC;
+	griomsg.grioblk.procid 		= pid;
+	griomsg.grioblk.ino		= ip->i_ino;
+	griomsg.grioblk.fs_dev		= ip->i_dev;
+
+	/*
+ 	 * Issue the message, do not wait for completion.
+ 	 */
+	ret = grio_issue_async_grio_req(&griomsg);
+	return( ret );
+}
+
+/*
+ * xfs_mark_inode_grio()
+ *	This routine sets the XFS_IGRIO flag from the incore
+ *	inode structure of the file described by fileidp.
+ *
+ * RETURNS:
+ *	0 on success
+ *	1 on failure
+ */
+xfs_mark_inode_grio( file_id_t *fileidp)
+{
+	dev_t		fs_dev;
+	xfs_ino_t	ino;
+	xfs_inode_t	*ip;
+
+	xfs_crack_file_id(fileidp, &fs_dev, &ino);
+
+#ifdef DEBUG
+	if (grio_debug) {
+		printf("mark inode: ino = %llx, dev = %x \n",
+			(__int64_t)ino, fs_dev);
+	}
+#endif
+	/*
+ 	 * get inode
+	 */
+	if (!(ip = xfs_get_inode( fs_dev, ino ))) {
+		return( 1 );
+	}
+
+	if (!(ip->i_flags & XFS_IGRIO)) {
+		ip->i_flags |= XFS_IGRIO;
+	} 
+
+	xfs_iunlock( ip, XFS_ILOCK_EXCL );
+	return( 0 );
+
+}
+
+/*
+ * xfs_clear_inode_grio()
+ *	This routine clears the XFS_IGRIO flag from the incore
+ *	inode structure of the file described by fileidp.
+ *
+ * RETURNS:
+ *	0 on success
+ *	1 on failure
+ */
+int
+xfs_clear_inode_grio( file_id_t *fileidp)
+{
+	dev_t		fs_dev;
+	xfs_ino_t	ino;
+	xfs_inode_t	*ip;
+
+	xfs_crack_file_id(fileidp, &fs_dev, &ino);
+#ifdef DEBUG
+	if (grio_debug) {
+		printf("clear inode: ino = %llx, dev = %x \n",
+			(__int64_t)ino, fs_dev);
+	}
+#endif
+
+	/*
+ 	 * get inode
+	 */
+	if (!(ip = xfs_get_inode( fs_dev, ino ))) {
+		return( 1 );
+	}
+
+	if (ip->i_flags & XFS_IGRIO) {
+		ip->i_flags &= ~XFS_IGRIO;
+	} 
+	xfs_iunlock( ip, XFS_ILOCK_EXCL );
+	return( 0 );
+}
+
+/*
+ * xfs_crack_file_id()
+ *	This routine takes the guarantee granting daemon's version of
+ *	the file inode number and the file system dev_t, and coverts
+ *	them to the kernel's version. The ggd handles all inode numbers
+ *	as 64 bit quantities, the kernel may use 32 or 64 bits to define
+ *	inode numbers.
+ *	The 
+ *
+ * RETURNS:
+ *	0 on success
+ *	non 0 no failure
+ */
+STATIC int
+xfs_crack_file_id(file_id_t *ufile_idp, dev_t *fs_devp, xfs_ino_t *inop)
+{
+	file_id_t	file_id;
+	
+	if (copyin((char *)ufile_idp, (caddr_t)&file_id, sizeof(file_id))) {
+#ifdef DEBUG
+		printf("Could not access user memory.\n");
+		ASSERT(0);
+#endif
+		return( EFAULT );
+	}
+
+	*fs_devp = file_id.fs_dev;
+	*inop    = file_id.ino;
 	return(0);
 }
