@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.13 $"
+#ident	"$Revision: 1.15 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -11,6 +11,7 @@
 #include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <sys/cmn_err.h>
+#include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.51 $"
+#ident "$Revision: 1.52 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -26,6 +26,7 @@
 #include <bstring.h>
 #endif
 #include <sys/kmem.h>
+#include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"

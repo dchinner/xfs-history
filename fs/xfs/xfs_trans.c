@@ -22,6 +22,7 @@
 #include <sys/user.h>
 #include <sys/systm.h>
 #endif
+#include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"

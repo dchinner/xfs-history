@@ -16,6 +16,7 @@
 #include <sys/syssgi.h>
 #include <sys/capability.h>
 #include <sys/kthread.h>
+#include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.30 $"
+#ident	"$Revision: 1.32 $"
 
 /*
  * Free space allocation for XFS.
@@ -24,6 +24,7 @@
 #else
 #include <sys/systm.h>
 #endif
+#include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"

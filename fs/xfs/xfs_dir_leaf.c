@@ -25,6 +25,7 @@
 #else
 #include <sys/systm.h>
 #endif
+#include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #ifdef SIM

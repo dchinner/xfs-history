@@ -16,6 +16,7 @@
 #include <sys/debug.h>
 #include <sys/errno.h>
 #include <stddef.h>
+#include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
