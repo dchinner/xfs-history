@@ -348,11 +348,6 @@ xfs_iomap_read(xfs_inode_t	*ip,
 	offset_fsb = xfs_b_to_fsbt(sbp, offset);
 	nimaps = XFS_READ_IMAPS;
 	last_fsb = xfs_b_to_fsb(sbp, nisize);
-	if (xfs_fsb_to_b(sbp, last_fsb) < nisize) {
-		debug(0);
-		last_fsb = xfs_b_to_fsb(sbp, nisize);
-	}
-	ASSERT(xfs_fsb_to_b(sbp, last_fsb) >= nisize);
 	if (last_fsb <= offset_fsb) {
 		/*
 		 * One of the pages beyond the EOF created by the
@@ -362,16 +357,6 @@ xfs_iomap_read(xfs_inode_t	*ip,
 		 * than the page size then this may even be only a
 		 * part of a page.
 		 */
-#ifdef DEBUG
-		if (offset < nisize) {
-			printf("xfs_iomap_read: offset %d nisize %d offset_fsb %d last_fsb %d\n", offset, (int)nisize, (int)offset_fsb, (int)last_fsb);
-#ifdef SIM
-			abort(0);
-#else
-			debug(0);
-#endif
-		}
-#endif
 		xfs_iomap_extra(ip, offset, count, bmapp, nbmaps);
 		return;
 	}
@@ -983,6 +968,11 @@ xfs_zero_eof(xfs_inode_t	*ip,
 	bmap.bsize = BBTOB(bmap.length);
 	bmap.pboff = 0;
 	bmap.pbsize = bmap.bsize;
+	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
+		bmap.pbdev = mp->m_rtdev;
+	} else {
+		bmap.pbdev = mp->m_dev;
+	}
 	bmap.eof = BMAP_EOF;
 	if (imap.br_startblock != DELAYSTARTBLOCK) {
 		bmap.bn = xfs_fsb_to_daddr(sbp, imap.br_startblock);
@@ -1037,10 +1027,6 @@ xfs_iomap_write(xfs_inode_t	*ip,
 	offset_fsb = xfs_b_to_fsbt(sbp, offset);
 	nimaps = XFS_WRITE_IMAPS;
 	last_fsb = xfs_b_to_fsb(sbp, offset + count);
-	if (xfs_fsb_to_b(sbp, last_fsb) < (offset + count)) {
-		debug(0);
-		last_fsb = xfs_b_to_fsb(sbp, offset + count);
-	}
 	(void) xfs_bmapi(NULL, ip, offset_fsb,
 			 (xfs_extlen_t)(last_fsb - offset_fsb),
 			 XFS_BMAPI_DELAY | XFS_BMAPI_WRITE |
