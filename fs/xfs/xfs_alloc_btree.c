@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.16 $"
+#ident	"$Revision: 1.17 $"
 
 /*
  * Free space allocation for xFS.
@@ -364,6 +364,7 @@ xfs_alloc_delrec(
 			 */
 			xfs_alloc_put_freelist(cur->bc_tp,
 				cur->bc_private.a.agbp, NULL, bno);
+			xfs_trans_agbtree_delta(cur->bc_tp, -1);
 			xfs_alloc_log_agf(cur->bc_tp, cur->bc_private.a.agbp,
 				XFS_AGF_ROOTS | XFS_AGF_LEVELS);
 			/*
@@ -621,6 +622,7 @@ xfs_alloc_delrec(
 	 * Free the deleting block by putting it on the freelist.
 	 */
 	xfs_alloc_put_freelist(cur->bc_tp, cur->bc_private.a.agbp, NULL, rbno);
+	xfs_trans_agbtree_delta(cur->bc_tp, -1);
 	xfs_alloc_rcheck(cur);
 	kmem_check();
 	/* 
@@ -1362,6 +1364,7 @@ xfs_alloc_newroot(
 	 */
 	if (nbno == NULLAGBLOCK)
 		return 0;
+	xfs_trans_agbtree_delta(cur->bc_tp, 1);
 	nbp = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp, 
 		cur->bc_private.a.agno, nbno, 0);
 	new = XFS_BUF_TO_ALLOC_BLOCK(nbp);
@@ -1728,6 +1731,7 @@ xfs_alloc_split(
 		kmem_check();
 		return 0;
 	}
+	xfs_trans_agbtree_delta(cur->bc_tp, 1);
 	rbp = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
 		cur->bc_private.a.agno, rbno, 0);
 	/*
