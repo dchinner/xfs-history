@@ -1,4 +1,4 @@
-#ident "$Revision: 1.60 $"
+#ident "$Revision: 1.62 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -269,7 +269,6 @@ xfs_inode_item_format(
 			ip->i_d.di_version = XFS_DINODE_VERSION_2;
 			ip->i_d.di_onlink = 0;
 			bzero(&(ip->i_d.di_pad[0]), sizeof(ip->i_d.di_pad));
-			ASSERT(ip->i_d.di_projid == 0);
 		}
 	}
 
