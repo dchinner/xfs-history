@@ -92,7 +92,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	buf_t		*bp;
 	xfs_sb_t	*sbp;
 	int		error;
-	int		s;
+	int		s, i, brsize;
 	xfs_mount_t	*mp;
 	xfs_inode_t	*rip;
 	vnode_t		*rvp = 0;
@@ -144,6 +144,26 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	mp->m_blockmask = sbp->sb_blocksize - 1;
 	mp->m_blockwsize = sbp->sb_blocksize >> XFS_WORDLOG;
 	mp->m_blockwmask = mp->m_blockwsize - 1;
+	for (i = 0; i < 2; i++) {
+		mp->m_alloc_mxr[i] = XFS_BTREE_BLOCK_MAXRECS(sbp->sb_blocksize,
+			xfs_alloc, i);
+		mp->m_alloc_mnr[i] = XFS_BTREE_BLOCK_MINRECS(sbp->sb_blocksize,
+			xfs_alloc, i);
+	}
+	brsize = XFS_BMAP_BROOT_SIZE(sbp->sb_inodesize);
+	mp->m_bmap_ext_mxr = brsize / sizeof(xfs_bmbt_rec_t);
+	for (i = 0; i < 2; i++) {
+		mp->m_bmap_dmxr[i] = XFS_BTREE_BLOCK_MAXRECS(sbp->sb_blocksize,
+			xfs_bmbt, i);
+		mp->m_bmap_dmnr[i] = XFS_BTREE_BLOCK_MINRECS(sbp->sb_blocksize,
+			xfs_bmbt, i);
+	}
+	for (i = 0; i < 2; i++) {
+		mp->m_bmap_dmxr[i + 2] = XFS_BTREE_BLOCK_MAXRECS(brsize,
+			xfs_bmdr, i);
+		mp->m_bmap_dmnr[i + 2] = XFS_BTREE_BLOCK_MINRECS(brsize,
+			xfs_bmdr, i);
+	}
 	mp->m_bsize = xfs_btod(mp, 1);
 	vfsp->vfs_bsize = xfs_fsb_to_b(mp, 1);
 
