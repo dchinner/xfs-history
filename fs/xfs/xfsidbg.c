@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.52 $"
+#ident	"$Revision: 1.53 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -57,6 +57,7 @@
 #include "xfs_rw.h"
 #include "xfs_bit.h"
 #include "xfs_quota.h"
+#include "xfs_dqblk.h"
 #include "xfs_dquot.h"
 #include "xfs_qm.h"
 #include "xfs_quota_priv.h"
@@ -3319,16 +3320,20 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	static char *xmount_flags[] = {
 		"WSYNC",	/* 0x1 */
 		"INO64",	/* 0x2 */
-		"UQ",		/* 0x4 */
-		"UQE", 		/* 0x8 */
-		"UQCHKD",     	/* 0x10 */
-		"PQ",		/* 0x20 */
-		"PQE", 		/* 0x40 */
-		"PQCHKD",     	/* 0x80 */
-		"UQACTV",	/* 0x100 */
-		"PQACTV",	/* 0x200 */
 		0
-		};
+	};
+
+	static char *quota_flags[] = {
+		"UQ",		/* 0x0001 */
+		"UQE", 		/* 0x0002 */
+		"UQCHKD",     	/* 0x0004 */
+		"PQ",		/* 0x0008 */
+		"PQE", 		/* 0x0010 */
+		"PQCHKD",     	/* 0x0020 */
+		"UQACTV",	/* 0x0040 */
+		"PQACTV",	/* 0x0080 */
+		0
+	};
 
 	qprintf("xfs_mount at 0x%x\n", mp);
 	qprintf("vfsp 0x%x tid 0x%x ail_lock 0x%x &ail 0x%x\n",
@@ -3393,6 +3398,7 @@ xfsidbg_xmount(xfs_mount_t *mp)
 			mp->m_quotainfo->qi_pquotaip);
 	else 
 		qprintf("quotainfo NULL\n");
+	printflags(mp->m_qflags, quota_flags,"quotaflags");
 }
 
 
@@ -4063,9 +4069,8 @@ xfsidbg_xtp(xfs_trans_t *tp)
 		"dirty",	/* 0x1 */
 		"sb_dirty",	/* 0x2 */
 		"perm_log_res",	/* 0x4 */
-		"first",	/* 0x08 */
-		"second",	/* 0x10 */
-		"continued",	/* 0x20 */
+		"sync",         /* 0x08 */
+		"dq_dirty",     /* 0x10 */
 		0
 		};
 	static char *lid_flags[] = {
