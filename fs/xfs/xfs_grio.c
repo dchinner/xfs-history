@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.41 1994/12/31 02:28:40 rcc Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.42 1995/01/17 20:34:04 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -68,9 +68,9 @@ extern int	grio_debug;
 
 #define IRELE(ip)	VN_RELE(XFS_ITOV(ip))
 
-int xfs_grio_add_ticket( file_id_t *, int, char *);
-int xfs_grio_remove_ticket( file_id_t *, char *);
-int xfs_add_ticket_to_inode( xfs_inode_t *, int, struct reservation_id *);
+int xfs_grio_add_ticket( sysarg_t , sysarg_t, sysarg_t );
+int xfs_grio_remove_ticket( sysarg_t, sysarg_t );
+int xfs_add_ticket_to_inode( xfs_inode_t *, int , struct reservation_id *);
 void xfs_remove_ticket_from_inode( xfs_inode_t *, struct reservation_id *);
 int ticket_lock( xfs_inode_t *);
 void ticket_unlock( xfs_inode_t *, int);
@@ -80,7 +80,7 @@ extern int xfs_diordwr(vnode_t *,uio_t *, int, cred_t *,int);
 extern int strncmp(char *, char *, int);
 extern struct vfs *vfs_devsearch( dev_t );
 STATIC int xfs_grio_issue_io( vnode_t *, uio_t *,int, cred_t *,int);
-STATIC int xfs_crack_file_id(file_id_t *, dev_t *, xfs_ino_t *);
+STATIC int xfs_crack_file_id(sysarg_t, dev_t *, xfs_ino_t *);
 xfs_inode_t *xfs_get_inode ( dev_t, xfs_ino_t);
 grio_ticket_t *xfs_io_is_guaranteed( xfs_inode_t *, struct reservation_id *, int *);
 
@@ -222,9 +222,9 @@ xfs_add_ticket_to_inode( xfs_inode_t *ip, int sz, struct reservation_id *id )
  *	-1 on failure
  */
 int
-xfs_grio_add_ticket( file_id_t *fileidp, int sz, char *idptr)
+xfs_grio_add_ticket( sysarg_t fileidp, sysarg_t sysarg_sz, sysarg_t idptr)
 {
-	int			ret = -1;
+	int			ret = -1, sz;
 	dev_t			fs_dev;
 	xfs_ino_t		ino;
 	xfs_inode_t		*ip;
@@ -239,13 +239,15 @@ xfs_grio_add_ticket( file_id_t *fileidp, int sz, char *idptr)
 					(__int64_t)ino, fs_dev);
 #endif
 
-	if (copyin(idptr, (caddr_t)&id, sizeof(id))) {
+	if (copyin((void *)idptr, (caddr_t)&id, sizeof(id))) {
 #ifdef DEBUG
 		printf("COULD NOT GET ID \n");
 #endif
 		ret = EFAULT;
 		return( ret );
 	}
+
+	sz = (int)sysarg_sz;
 
         /*
          * Lock the inode IOLOCK_EXCL so that the i_ticket
@@ -314,7 +316,7 @@ xfs_remove_ticket_from_inode( xfs_inode_t *ip, struct reservation_id *id)
  *	-1 on failure
  */
 int
-xfs_grio_remove_ticket( file_id_t *fileidp, char *idptr)
+xfs_grio_remove_ticket( sysarg_t fileidp, sysarg_t idptr)
 {
 	dev_t			fs_dev;
 	xfs_ino_t		ino;
@@ -330,7 +332,7 @@ xfs_grio_remove_ticket( file_id_t *fileidp, char *idptr)
 	}
 #endif
 
-	if (copyin(idptr, (caddr_t)&id, sizeof(id))) {
+	if (copyin((void *)idptr, (caddr_t)&id, sizeof(id))) {
 #ifdef DEBUG
 		printf("COULD NOT GET ID \n");
 #endif
@@ -724,7 +726,7 @@ ticket_unlock(xfs_inode_t *ip, int s)
  *	~0 on failure
  */
 int
-xfs_get_file_extents(file_id_t *fileidp, xfs_bmbt_irec_t extents[], int *count)
+xfs_get_file_extents(sysarg_t fileidp, sysarg_t extents, sysarg_t count)
 {
 	int			i, recsize, num_extents = 0, ret = 0;
 	dev_t			fs_dev;
@@ -747,7 +749,10 @@ xfs_get_file_extents(file_id_t *fileidp, xfs_bmbt_irec_t extents[], int *count)
 	 */
 	if (!(ip = xfs_get_inode( fs_dev, ino ))) {
 		ret = ENOENT;
-		if (copyout( &num_extents, count, sizeof( num_extents))) {
+		if (copyout( 	&num_extents, 
+				(caddr_t)count, 
+				sizeof( num_extents))) {
+
 			ret = EFAULT;
 		}
 		return( ret );
@@ -788,7 +793,7 @@ xfs_get_file_extents(file_id_t *fileidp, xfs_bmbt_irec_t extents[], int *count)
 			grec[i].br_blockcount 	= thisrec.br_blockcount;
 		}
 
-		if (copyout(grec, extents, recsize )) {
+		if (copyout(grec, (caddr_t)extents, recsize )) {
 			ret = EFAULT;
 		}
 		kmem_free(grec, recsize);
@@ -797,7 +802,7 @@ xfs_get_file_extents(file_id_t *fileidp, xfs_bmbt_irec_t extents[], int *count)
 	/* 
 	 * copyout to user space along with count.
  	 */
-	if (copyout( &num_extents, count, sizeof( num_extents))) {
+	if (copyout( &num_extents, (caddr_t)count, sizeof( num_extents))) {
 		ret = EFAULT;
 	}
 
@@ -815,7 +820,7 @@ xfs_get_file_extents(file_id_t *fileidp, xfs_bmbt_irec_t extents[], int *count)
  *
  * 
  */
-xfs_get_file_rt( file_id_t *fileidp, int *rt)
+xfs_get_file_rt( sysarg_t fileidp, sysarg_t rt)
 {
 	int 		inodert = 0, ret = 0;
 	dev_t		fs_dev;
@@ -848,7 +853,7 @@ xfs_get_file_rt( file_id_t *fileidp, int *rt)
 	/*
  	 * Copy the results to user space.
  	 */
-	if (copyout( &inodert, rt, sizeof( rt))) {
+	if ( copyout( &inodert, (caddr_t)rt, sizeof(int)) ) {
 		ret = EFAULT;
 	}
 
@@ -868,13 +873,19 @@ xfs_get_file_rt( file_id_t *fileidp, int *rt)
  *	0 on success
  *	-1 on failure
  */
-xfs_get_block_size(dev_t fsdev, int *fs_size)
+xfs_get_block_size(sysarg_t sysarg_fsdev, sysarg_t fs_size)
 {
 	int 		ret = 0;
+	dev_t		fsdev;
 	struct vfs	*vfsp;
 
-	if (vfsp = vfs_devsearch( fsdev )) {
-		if (copyout(&(vfsp->vfs_bsize), fs_size, sizeof(*fs_size))) {
+
+	fsdev = (dev_t)sysarg_fsdev;
+	if ( vfsp = vfs_devsearch( fsdev ) ) {
+		if ( copyout(	&(vfsp->vfs_bsize), 
+				(caddr_t)fs_size, 
+				sizeof(u_int)) ) {
+
 			ret = EFAULT;
 		}
 	} else {
@@ -1057,7 +1068,7 @@ xfs_remove_grio_guarantee(xfs_inode_t *ip, pid_t pid)
  *	0 on success
  *	1 on failure
  */
-xfs_mark_inode_grio( file_id_t *fileidp)
+xfs_mark_inode_grio( sysarg_t fileidp)
 {
 	dev_t		fs_dev;
 	xfs_ino_t	ino;
@@ -1096,7 +1107,7 @@ xfs_mark_inode_grio( file_id_t *fileidp)
  *	1 on failure
  */
 int
-xfs_clear_inode_grio( file_id_t *fileidp)
+xfs_clear_inode_grio( sysarg_t fileidp)
 {
 	dev_t		fs_dev;
 	xfs_ino_t	ino;
@@ -1139,11 +1150,11 @@ xfs_clear_inode_grio( file_id_t *fileidp)
  *	non 0 no failure
  */
 STATIC int
-xfs_crack_file_id(file_id_t *ufile_idp, dev_t *fs_devp, xfs_ino_t *inop)
+xfs_crack_file_id(sysarg_t ufile_idp, dev_t *fs_devp, xfs_ino_t *inop)
 {
 	file_id_t	file_id;
 	
-	if (copyin((char *)ufile_idp, (caddr_t)&file_id, sizeof(file_id))) {
+	if (copyin((caddr_t)ufile_idp, (caddr_t)&file_id, sizeof(file_id))) {
 #ifdef DEBUG
 		printf("Could not access user memory.\n");
 		ASSERT(0);
