@@ -32,7 +32,9 @@
 
 #include <xfs.h>
 
+#ifdef CONFIG_PROC_FS
 struct xfsstats xfsstats;
+#endif
 
 /*
  * Test the sticky attribute of a directory.  We can unlink from a sticky
