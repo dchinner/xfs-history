@@ -1996,3 +1996,4 @@ pagebuf_terminate(void)
  *	Module management (for kernel debugger module)
  */
 EXPORT_SYMBOL(pagebuf_offset);
+EXPORT_SYMBOL(pbd_delwrite_queue);
