@@ -378,8 +378,7 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 		   (uio->uio_iov[0].iov_len & alignment) == 0) {
 		dbp = NULL;
 		if (!useracc((lockaddr = uio->uio_iov[0].iov_base),
-			     (locklen = uio->uio_iov[0].iov_len),
-			     B_READ|B_PHYS))
+			     (locklen = uio->uio_iov[0].iov_len), B_READ))
 			return curthreadp->k_error ?
 				curthreadp->k_error : EFAULT;
 	} else
@@ -397,7 +396,7 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	if (dbp != NULL)
 		kmem_free(dbp, sizeof(*dbp) + MAXNAMELEN);
 	else if (locklen)
-		unuseracc(lockaddr, locklen, B_READ|B_PHYS);
+		unuseracc(lockaddr, locklen, B_READ);
 #ifdef XFSDADEBUG
 	xfsda_t_reinit("getdents", "return value", retval);
 #endif /* XFSDADEBUG */

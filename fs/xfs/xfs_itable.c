@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.22 $"
+#ident	"$Revision: 1.23 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -177,7 +177,7 @@ xfs_bulkstat(
 		(XFS_INODE_CLUSTER_SIZE >> mp->m_sb.sb_inodelog);
 	nimask = ~(nicluster - 1);
 	nbcluster = nicluster >> mp->m_sb.sb_inopblog;
-	if (!useracc(buffer, bcount * statstruct_size, B_READ|B_PHYS))
+	if (!useracc(buffer, bcount * statstruct_size, B_READ))
 		return curthreadp->k_error ? curthreadp->k_error : EFAULT;
 	if (agino != 0) {
 		mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
@@ -317,7 +317,7 @@ xfs_bulkstat(
 		i++;
 		left--;
 	}
-	unuseracc(buffer, bcount * statstruct_size, B_READ|B_PHYS);
+	unuseracc(buffer, bcount * statstruct_size, B_READ);
 	*count = bcount - left;
 	*lastino = XFS_AGINO_TO_INO(mp, agno, agino);
 	if (agno >= mp->m_sb.sb_agcount)
