@@ -5,7 +5,7 @@
 #define	XFS_LSN_CMP(x,y)	((x) - (y))
 #define	XFS_LSN_DIFF(x,y)	((x) - (y))
 
-#ifndef LOG_DEBUG
+#ifndef _LOG_DEBUG
 caddr_t         xfs_log_alloc(size_t, uint, xfs_lsn_t*);
 void            xfs_log_free(caddr_t, size_t);
 void            xfs_log_notify(void(*)(void*), void*, xfs_lsn_t);
@@ -84,5 +84,10 @@ int  xfs_log_write(xfs_mount_t *mp, xfs_log_iovec_t region[], int nentries,
 /* Log manager utility interfaces */
 void xfs_log_print(xfs_mount_t *mp, dev_t log_dev);
 
-#endif /* LOG_DEBUG */
+#define XFS_ERECOVER	1	/* Failure to recover log */
+#define XFS_ELOGSTAT	2	/* Failure to stat log in user space */
+#define XFS_ENOLOGSPACE	3	/* Reservation too large */
+#define XFS_ENOTSUP	4
+
+#endif /* _LOG_DEBUG */
 #endif	/* _XFS_LOG_H */
