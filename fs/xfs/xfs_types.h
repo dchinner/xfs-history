@@ -75,8 +75,6 @@ typedef __uint64_t __psunsigned_t;
 #error BITS_PER_LONG must be 32 or 64
 #endif
 
-#endif	/* __KERNEL__ */
-
 /*
  * Some types are conditional depending on the target system.
  * XFS_BIG_BLKNOS needs block layer disk addresses to be 64 bits.
@@ -94,6 +92,8 @@ typedef __uint64_t __psunsigned_t;
 # define XFS_BIG_BLKNOS	0
 # define XFS_BIG_INUMS	0
 #endif
+
+#endif	/* __KERNEL__ */
 
 typedef __uint32_t	xfs_agblock_t;	/* blockno in alloc. group */
 typedef	__uint32_t	xfs_extlen_t;	/* extent length in blocks */
@@ -213,4 +213,4 @@ typedef enum {
 
 #define XFS_DEV_TO_KDEVT(dev)	mk_kdev(XFS_DEV_MAJOR(dev),XFS_DEV_MINOR(dev))
 
-#endif	/* !__XFS_TYPES_H */
+#endif	/* __XFS_TYPES_H__ */
