@@ -1,13 +1,12 @@
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/buf.h>
+#include <sys/cred.h>
 #include <sys/kmem.h>
 #include <sys/uio.h>
 #include <sys/debug.h>
-#include <sys/proc.h>
 #include <sys/vnode.h>
 #include <sys/dirent.h>
-#include <sys/user.h>
 #include <sys/grio.h>
 #include <sys/ktrace.h>
 #include <sys/sysinfo.h>
