@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.98 $"
+#ident	"$Revision: 1.99 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1170,6 +1170,9 @@ xlog_recover_add_to_trans(xlog_recover_t	*trans,
 
 	if (item->ri_total == 0) {		/* first region to be added */
 		item->ri_total	= in_f->ilf_size;
+		ASSERT(item->ri_total <= XLOG_MAX_REGIONS_IN_ITEM);
+		item->ri_buf = kmem_zalloc((item->ri_total *
+					    sizeof(xfs_log_iovec_t)), 0);
 	}
 	ASSERT(item->ri_total > item->ri_cnt);
 	/* Description region is ri_buf[0] */
@@ -2132,10 +2135,7 @@ xlog_recover_do_reg_buffer(xfs_mount_t		*mp,
 	}
 
 	/* Shouldn't be any more regions */
-	if (i < XLOG_MAX_REGIONS_IN_ITEM) {
-		ASSERT(item->ri_buf[i].i_addr == 0);
-		ASSERT(item->ri_buf[i].i_len == 0);
-	}
+	ASSERT(i == item->ri_total);
 }	/* xlog_recover_do_reg_buffer */
 
 
@@ -2845,6 +2845,8 @@ xlog_recover_free_trans(xlog_recover_t      *trans)
 				  free_item->ri_buf[i].i_len);
 		}
 		/* Free the item itself */
+		kmem_free(free_item->ri_buf,
+			  (free_item->ri_total * sizeof(xfs_log_iovec_t)));
 		kmem_free(free_item, sizeof(xlog_recover_item_t));
 	} while (first_item != item);
 	/* Free the transaction recover structure */
@@ -3323,7 +3325,7 @@ xlog_unpack_data(xlog_rec_header_t *rhead,
 		*(uint *)dp = *(uint *)&rhead->h_cycle_data[i];
 		dp += BBSIZE;
 	}
-#ifdef DEBUG
+#if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
 	/* divide length by 4 to get # words */
 	for (i=0; i < rhead->h_len >> 2; i++) {
 		chksum ^= *up;
@@ -3340,7 +3342,7 @@ xlog_unpack_data(xlog_rec_header_t *rhead,
 		    log->l_flags |= XLOG_CHKSUM_MISMATCH;
 	    }
         }
-#endif /* DEBUG */
+#endif /* DEBUG && XFS_LOUD_RECOVERY */
 }	/* xlog_unpack_data */
 
 
@@ -3618,7 +3620,7 @@ xlog_recover(xlog_t *log)
 		tail_blk = TAIL_BLK;
 #endif
 #ifdef _KERNEL
-#ifdef DEBUG
+#if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
 		cmn_err(CE_NOTE,
 			"Starting XFS recovery on filesystem: %s (dev: %d/%d)",
 			log->l_mp->m_fsname, emajor(log->l_dev),
@@ -3672,7 +3674,7 @@ xlog_recover_finish(xlog_t *log)
 		xlog_recover_process_iunlinks(log);
 		xlog_recover_check_summary(log);
 #endif /* _KERNEL */
-#ifdef DEBUG
+#if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
 		cmn_err(CE_NOTE,
 			"Ending XFS recovery for filesystem: %s (%s)",
 			log->l_mp->m_fsname, dev_to_name(log->l_dev, devnm, MAXDEVNAME));
@@ -3683,15 +3685,9 @@ xlog_recover_finish(xlog_t *log)
 #endif
 		log->l_flags &= ~XLOG_RECOVERY_NEEDED;
 	} else {
-#ifdef DEBUG
-		cmn_err(CE_NOTE,
-			"Ending clean XFS mount for filesystem: %s",
-			log->l_mp->m_fsname);
-#else
 		cmn_err(CE_NOTE,
 			"!Ending clean XFS mount for filesystem: %s",
 			log->l_mp->m_fsname);
-#endif
 	}
 	return 0;
 }	/* xlog_recover_finish */
@@ -3747,6 +3743,7 @@ xlog_recover_check_summary(xlog_t	*log)
 	}
 
 	sbbp = xfs_getsb(mp, 0);
+#ifdef XFS_LOUD_RECOVERY
 	sbp = XFS_BUF_TO_SBP(sbbp);
 	cmn_err(CE_NOTE,
 		"xlog_recover_check_summary: sb_icount %lld itotal %lld",
@@ -3757,6 +3754,7 @@ xlog_recover_check_summary(xlog_t	*log)
 	cmn_err(CE_NOTE,
 		"xlog_recover_check_summary: sb_fdblocks %lld freeblks %lld",
 		sbp->sb_fdblocks, freeblks);
+#endif
 #if 0
 	/*
 	 * This is turned off until I account for the allocation
