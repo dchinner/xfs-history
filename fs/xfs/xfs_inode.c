@@ -1484,8 +1484,7 @@ xfs_itruncate_finish(
 		(ip->i_vnode->v_buf == NULL)));
 	ASSERT((new_size != 0) ||
 	       (fork == XFS_ATTR_FORK) ||
-	       ((ip->i_d.di_nblocks == 0) &&	
-		(ip->i_d.di_nextents == 0)));
+	       (ip->i_d.di_nextents == 0));
 	xfs_itrunc_trace(XFS_ITRUNC_FINISH2, ip, 0, new_size, 0, 0);
 	return 0;
 }
