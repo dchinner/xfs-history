@@ -560,13 +560,10 @@ int
 xfs_vn_iget(
 	struct vnode	*vp,
 	xfs_mount_t	*mp,
-	xfs_trans_t	*tp,
 	xfs_ino_t	ino,
-	uint		lock_flags,
-	xfs_inode_t	**ipp,
-	xfs_daddr_t	bno)
+	xfs_inode_t	**ipp)
 {
-	return xfs_iget_core(vp, mp, tp, ino, lock_flags, ipp, bno);
+	return xfs_iget_core(vp, mp, NULL, ino, 0, ipp, 0);
 }
 
 

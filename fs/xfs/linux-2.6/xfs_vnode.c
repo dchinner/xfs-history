@@ -198,8 +198,7 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 	if (from_readinode) {
 		mp = XFS_BHVTOM(vfsp->vfs_fbhv);	ASSERT(mp);
 
-		if (xfs_vn_iget(vp, mp, NULL, (xfs_ino_t)inode->i_ino,
-								0, &ip, 0)) {
+		if (xfs_vn_iget(vp, mp, (xfs_ino_t)inode->i_ino, &ip)) {
 			panic("vn_initialize: vp/0x%p inode/0x%p bad xfs_iget!",
 								vp, inode);
 		}
