@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.29 $"
+#ident	"$Revision: 1.30 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -72,6 +72,15 @@ xfs_mount_init(void)
 	
 /*
  * xfs_mountfs		XXXjleong Needs more error checking
+ *
+ * This function does the following on an initial mount of a file system:
+ *	- reads the superblock from disk and init the mount struct
+ *	- init mount struct realtime fields
+ *	- allocate inode hash table for fs
+ *	- init directory manager
+ * Note:
+ *	- does not handle remounts
+ *	- does not start the log manager
  */
 int
 xfs_mountfs(vfs_t *vfsp, dev_t dev)
@@ -81,7 +90,12 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	int		error;
 	xfs_mount_t	*mp;
 
+	if (vfsp->vfs_flag & VFS_REMOUNT)
+		return 0;
+
 	mp = XFS_VFSTOM(vfsp);
+
+	ASSERT(mp->m_sb_bp == 0);
 
 	/*
 	 * Allocate a (locked) buffer to hold the superblock.
@@ -101,12 +115,20 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	bp->b_flags |= B_READ;
 	bdstrat(bmajor(dev), bp);
 	error = iowait(bp);
-	ASSERT(error == 0);
+	if (error) {
+		ASSERT(error == 0);
+		goto bad;
+	}
 
 	/*
 	 * Initialize the mount structure from the superblock.
 	 */
 	sbp = xfs_buf_to_sbp(bp);
+	if ((sbp->sb_magicnum != XFS_SB_MAGIC) ||
+	    (sbp->sb_versionnum != XFS_SB_VERSION)) {
+		error = EINVAL;		/* or EIO ? */
+		goto bad;
+	}
 	mp->m_sb_bp = bp;
 	mp->m_sb = *sbp;
 	mp->m_bsize = xfs_btod(sbp, 1);
@@ -128,7 +150,6 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		mp->m_writeio_log = XFS_WRITEIO_LOG;
 	}
 	mp->m_writeio_blocks = 1 << (mp->m_writeio_log - sbp->sb_blocklog);
-
 
 	/*
 	 * Initialize realtime fields in the mount structure
@@ -153,11 +174,9 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	 * Initialize realtime inode pointers in the mount structure
 	 */
 	if (sbp->sb_rbmino != NULLFSINO) {
-		mp->m_rbmip = xfs_iget(mp, NULL, sbp->sb_rbmino, XFS_ILOCK_SHARED);
-		xfs_iunlock(mp->m_rbmip, XFS_ILOCK_SHARED);
+		mp->m_rbmip = xfs_iget(mp, NULL, sbp->sb_rbmino, NULL);
 		ASSERT(sbp->sb_rsumino != NULLFSINO);
-		mp->m_rsumip = xfs_iget(mp, NULL, sbp->sb_rsumino, XFS_ILOCK_SHARED);
-		xfs_iunlock(mp->m_rsumip, XFS_ILOCK_SHARED);
+		mp->m_rsumip = xfs_iget(mp, NULL, sbp->sb_rsumino, NULL);
 	}
 
 	/*
@@ -165,10 +184,18 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	 */
 	xfs_dir_mount(mp);
 
+	return 0;
+bad:
+	brelse(bp);
+	freerbuf(bp);
 	return error;
 }
 
 #ifdef SIM
+/*
+ * xfs_mount is the function used by the simulation environment
+ * to start the file system.
+ */
 xfs_mount_t *
 xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 {
@@ -187,6 +214,11 @@ xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 	vfsp->vfs_dev = dev;
 
         error = xfs_mountfs(vfsp, dev);
+	ASSERT(error == 0);
+	if (error) {
+		kmem_free(mp, sizeof(*mp));
+		return 0;
+	}
 
 	/*
 	 * Call the log's mount-time initialization.
@@ -211,6 +243,7 @@ xfs_umount(xfs_mount_t *mp)
 	xfs_iflush_all(mp);
 	/* someone needs to free the inodes' memory */
 	/* also need to give up if vnodes are referenced */
+
 	bflush(mp->m_dev);
 	bp = xfs_getsb(mp);
 	bp->b_flags &= ~(B_DONE | B_READ);
@@ -218,8 +251,10 @@ xfs_umount(xfs_mount_t *mp)
 	bwait_unpin(bp);
 	bdstrat(bmajor(mp->m_dev), bp);
 	error = iowait(bp);
-	ASSERT(error == 0);	
+	ASSERT(error == 0);
+	
 	xfs_log_unmount(mp);			/* Done! No more fs ops. */
+
 	brelse(bp);
 	freerbuf(bp);
 	kmem_free(mp, sizeof(*mp));
