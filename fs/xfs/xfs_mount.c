@@ -148,23 +148,23 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	mp->m_blockwmask = mp->m_blockwsize - 1;
 	for (i = 0; i < 2; i++) {
 		mp->m_alloc_mxr[i] = XFS_BTREE_BLOCK_MAXRECS(sbp->sb_blocksize,
-			xfs_alloc, i);
+			xfs_alloc, i == 0);
 		mp->m_alloc_mnr[i] = XFS_BTREE_BLOCK_MINRECS(sbp->sb_blocksize,
-			xfs_alloc, i);
+			xfs_alloc, i == 0);
 	}
 	brsize = XFS_BMAP_BROOT_SIZE(sbp->sb_inodesize);
 	mp->m_bmap_ext_mxr = brsize / sizeof(xfs_bmbt_rec_t);
 	for (i = 0; i < 2; i++) {
 		mp->m_bmap_dmxr[i] = XFS_BTREE_BLOCK_MAXRECS(sbp->sb_blocksize,
-			xfs_bmbt, i);
+			xfs_bmbt, i == 0);
 		mp->m_bmap_dmnr[i] = XFS_BTREE_BLOCK_MINRECS(sbp->sb_blocksize,
-			xfs_bmbt, i);
+			xfs_bmbt, i == 0);
 	}
 	for (i = 0; i < 2; i++) {
 		mp->m_bmap_dmxr[i + 2] = XFS_BTREE_BLOCK_MAXRECS(brsize,
-			xfs_bmdr, i);
+			xfs_bmdr, i == 0);
 		mp->m_bmap_dmnr[i + 2] = XFS_BTREE_BLOCK_MINRECS(brsize,
-			xfs_bmdr, i);
+			xfs_bmdr, i == 0);
 	}
 	xfs_alloc_compute_maxlevels(mp);
 	xfs_bmap_compute_maxlevels(mp);
