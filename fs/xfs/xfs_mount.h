@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.42 $"
+#ident	"$Revision: 1.43 $"
 
 struct cred;
 struct xfs_ihash;
@@ -18,6 +18,7 @@ typedef struct xfs_mount {
 	xfs_sb_t		m_sb;		/* copy of fs superblock */
 	lock_t			m_sb_lock;	/* sb counter mutex */
 	buf_t			*m_sb_bp;	/* buffer for superblock */
+	char			*m_fsname; /* filesystem name */
 	dev_t			m_dev;		/* dev of fs meta-data */
 	dev_t			m_logdev;	/* dev of fs log data */
 	dev_t			m_rtdev;	/* dev of fs realtime data */
