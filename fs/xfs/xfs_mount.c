@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.171 $"
+#ident	"$Revision: 1.172 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -65,7 +65,7 @@
 #endif /* SIM */
 
 
-STATIC int	xfs_mod_incore_sb_unlocked(xfs_mount_t *, xfs_sb_field_t, int);
+STATIC int	xfs_mod_incore_sb_unlocked(xfs_mount_t *, xfs_sb_field_t, int, int);
 STATIC void	xfs_sb_relse(buf_t *);
 #ifndef SIM
 STATIC void	xfs_mount_reset_sbqflags(xfs_mount_t *);
@@ -1131,7 +1131,8 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
  * The SB_LOCK must be held when this routine is called.
  */
 STATIC int
-xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, xfs_sb_field_t field, int delta)
+xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, xfs_sb_field_t field, 
+                          int delta, int rsvd)
 {
 	int		scounter;	/* short counter for 32 bit fields */
 	long long	lcounter;	/* long counter for 64 bit fields */
@@ -1164,9 +1165,25 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, xfs_sb_field_t field, int delta)
 	case XFS_SBS_FDBLOCKS:
 		lcounter = mp->m_sb.sb_fdblocks;
 		lcounter += delta;
+
+		/*
+		 * If were out of blocks, use any available reserved blocks if 
+		 * were allowed to.
+		 */
+
 		if (lcounter < 0) {
-			return (XFS_ERROR(ENOSPC));
-		}
+			if (rsvd) {
+				lcounter = mp->m_resblks_avail + delta;
+				if (lcounter < 0) {
+					return (XFS_ERROR(ENOSPC));
+				}
+				mp->m_resblks_avail = lcounter;
+				return (0);
+			} else { 	/* not reserved */
+				return (XFS_ERROR(ENOSPC));
+			}
+		} 
+
 		mp->m_sb.sb_fdblocks = lcounter;
 		return (0);
 	case XFS_SBS_FREXTENTS:
@@ -1262,13 +1279,13 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, xfs_sb_field_t field, int delta)
  * routine to do the work.
  */
 int
-xfs_mod_incore_sb(xfs_mount_t *mp, xfs_sb_field_t field, int delta)
+xfs_mod_incore_sb(xfs_mount_t *mp, xfs_sb_field_t field, int delta, int rsvd)
 {
 	int	s;
 	int	status;
 
 	s = XFS_SB_LOCK(mp);
-	status = xfs_mod_incore_sb_unlocked(mp, field, delta);
+	status = xfs_mod_incore_sb_unlocked(mp, field, delta, rsvd);
 	XFS_SB_UNLOCK(mp, s);
 	return (status);
 }
@@ -1287,7 +1304,7 @@ xfs_mod_incore_sb(xfs_mount_t *mp, xfs_sb_field_t field, int delta)
  * will be backed out and EINVAL will be returned.
  */
 int
-xfs_mod_incore_sb_batch(xfs_mount_t *mp, xfs_mod_sb_t *msb, uint nmsb)
+xfs_mod_incore_sb_batch(xfs_mount_t *mp, xfs_mod_sb_t *msb, uint nmsb, int rsvd)
 {
 	int		s;
 	int		status;
@@ -1309,7 +1326,7 @@ xfs_mod_incore_sb_batch(xfs_mount_t *mp, xfs_mod_sb_t *msb, uint nmsb)
 		 * below.
 		 */
 		status = xfs_mod_incore_sb_unlocked(mp, msbp->msb_field,
-						    msbp->msb_delta);
+						    msbp->msb_delta, rsvd);
 		if (status != 0) {
 			break;
 		}
@@ -1327,7 +1344,7 @@ xfs_mod_incore_sb_batch(xfs_mount_t *mp, xfs_mod_sb_t *msb, uint nmsb)
 		msbp--;
 		while (msbp >= msb) {
 			status = xfs_mod_incore_sb_unlocked(mp,
-				    msbp->msb_field, -(msbp->msb_delta));
+				    msbp->msb_field, -(msbp->msb_delta), rsvd);
 			ASSERT(status == 0);
 			msbp--;
 		}
@@ -1335,7 +1352,7 @@ xfs_mod_incore_sb_batch(xfs_mount_t *mp, xfs_mod_sb_t *msb, uint nmsb)
 	XFS_SB_UNLOCK(mp, s);
 	return (status);
 }
-				
+
 		
 /*
  * xfs_getsb() is called to obtain the buffer for the superblock.
