@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.21 $"
+#ident "$Revision$"
 
 #include <sys/types.h>
 #include "xfs_buf.h"
@@ -782,7 +782,8 @@ xfs_pre_rename( struct vnode *vp )
         if (vp->v_flag & VISSWAP && vp->v_type == VREG) {
                 return EBUSY;
         }
-        if (vp->v_vfsmountedhere || vp->v_flag & VMOUNTING) {
+	/* JIMJIM - investigate need to check if inode/dentry is mounted on */
+        if (vp->v_flag & VMOUNTING) {
                 return EBUSY;
         }
         return 0;
@@ -802,7 +803,8 @@ xfs_pre_remove( struct vnode *vp )
         if (vp->v_flag & VISSWAP && vp->v_type == VREG) {
                 return EBUSY;
         }
-        if (vp->v_vfsmountedhere || vp->v_flag & VMOUNTING) {
+	/* JIMJIM - investigate need to check if inode/dentry is mounted on */
+        if (vp->v_flag & VMOUNTING) {
                 return EBUSY;
         }
         return 0;
@@ -856,7 +858,8 @@ int
 xfs_pre_rmdir( struct vnode *vp )
 {
         if (vp->v_type != VDIR) { return EPERM; }
-        if (vp->v_vfsmountedhere || vp->v_flag & VMOUNTING) {
+	/* JIMJIM - investigate need to check if inode/dentry is mounted on */
+        if (vp->v_flag & VMOUNTING) {
                 return EBUSY;
         }
         return 0;
