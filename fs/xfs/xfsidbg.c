@@ -4253,6 +4253,7 @@ xfs_prdinode_core(xfs_dinode_core_t *dip, int convert)
 		"sync",			/* XFS_DIFLAG_SYNC */
 		"noatime",		/* XFS_DIFLAG_NOATIME */
 		"nodump",		/* XFS_DIFLAG_NODUMP */
+		"rtinherit",		/* XFS_DIFLAG_RTINHERIT */
 		NULL
 	};
 
