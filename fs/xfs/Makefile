@@ -36,6 +36,7 @@ kernel:
 ifeq ($(ARCH),i386)
 	rpm -ba --target=i586 $(WORKAREA)/SPECS/${KERN_SPEC};
 	rpm -ba --target=i686 $(WORKAREA)/SPECS/${KERN_SPEC};
+	rpm -ba $(WORKAREA)/SPECS/kernel-pcmcia-cs.spec;
 endif
 	echo "=== Done Making $@ `date`";
 
