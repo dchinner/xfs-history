@@ -645,8 +645,6 @@ xfs_mountfs(
 	xfs_bmap_compute_maxlevels(mp, XFS_ATTR_FORK);
 	xfs_ialloc_compute_maxlevels(mp);
 
-	vfsp->vfs_bsize = (u_int)XFS_FSB_TO_B(mp, 1);
-
 	if (sbp->sb_imax_pct) {
 		__uint64_t	icount;
 

@@ -514,9 +514,7 @@ xfs_get_vfsmount(
 	 */
 	mp = xfs_mount_init();
 
-	/* vfsp->vfs_bsize filled in later from superblock */
 	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);
-	vfsp->vfs_dev = ddev;
 	/* vfsp->vfs_fsid is filled in later from superblock */
 
 	return mp;
