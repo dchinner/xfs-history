@@ -757,7 +757,7 @@ xfs_dir2_leaf_compact_x1(
 	 * Remember the low/high stale value only in the "right"
 	 * direction.
 	 */
-	if (lowstale >= index)
+	if (lowstale >= newindex)
 		lowstale = -1;
 	else
 		highstale = leaf->hdr.count;
