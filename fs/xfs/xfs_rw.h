@@ -43,6 +43,24 @@ typedef struct xfs_strat_write_locals {
 } xfs_strat_write_locals_t;
 
 /*
+ * This structure is used to communicate which extents of a file
+ * were holes when a write started from xfs_write_file() to
+ * xfs_strat_read().  This is necessary so that we can know which
+ * blocks need to be zeroed when they are read in in xfs_strat_read()
+ * if they weren\'t allocated when the buffer given to xfs_strat_read()
+ * was mapped.
+ *
+ * We keep a list of these attached to the inode.  The list is
+ * protected by the inode lock and the fact that the io lock is
+ * held exclusively by writers.
+ */
+typedef struct xfs_gap {
+	struct xfs_gap	*xg_next;
+	xfs_fileoff_t	xg_offset_fsb;
+	xfs_extlen_t	xg_count_fsb;
+} xfs_gap_t;
+
+/*
  * Count of bmaps allocated in one call to the xfs_bmap_zone
  * allocator.
  */

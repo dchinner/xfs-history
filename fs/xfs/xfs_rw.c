@@ -132,6 +132,7 @@ xfs_retrieved(
 #define	xfs_strat_write_check(ip,off,count,imap,nimap)
 #define	xfs_check_rbp(ip,bp,rbp,locked)
 #define	xfs_check_bp(ip,bp)
+#define	xfs_check_gap_list(ip)
 
 #else /* DEBUG */
 
@@ -155,7 +156,32 @@ xfs_check_bp(
 	xfs_inode_t	*ip,
 	buf_t		*bp);
 
+STATIC void
+xfs_check_gap_list(
+	xfs_inode_t	*ip);
+
 #endif /* DEBUG */		      
+
+STATIC void
+xfs_build_gap_list(
+	xfs_inode_t	*ip,
+	off_t		offset,
+	size_t		count);
+
+STATIC void
+xfs_free_gap_list(
+	xfs_inode_t	*ip);
+
+STATIC void
+xfs_cmp_gap_list_and_zero(
+	xfs_inode_t	*ip,
+	buf_t		*bp);
+
+STATIC void
+xfs_delete_gap_list(
+	xfs_inode_t	*ip,
+	xfs_fileoff_t	offset_fsb,
+	xfs_extlen_t	count_fsb);
 
 STATIC int
 xfsd(void);
@@ -210,7 +236,7 @@ xfs_rw_enter_trace(
 	ktrace_enter(ip->i_rwtrace,
 		     (void*)tag,
 		     (void*)ip, 
-		     (void*)((ip->i_d.di_size > 32) & 0xffffffff),
+		     (void*)((ip->i_d.di_size >> 32) & 0xffffffff),
 		     (void*)(ip->i_d.di_size & 0xffffffff),
 		     (void*)(((__uint64_t)uiop->uio_offset > 32) & 0xffffffff),
 		     (void*)(uiop->uio_offset & 0xffffffff),
@@ -240,18 +266,18 @@ xfs_iomap_enter_trace(
 	ktrace_enter(ip->i_rwtrace,
 		     (void*)tag,
 		     (void*)ip, 
-		     (void*)((ip->i_d.di_size > 32) & 0xffffffff),
+		     (void*)((ip->i_d.di_size >> 32) & 0xffffffff),
 		     (void*)(ip->i_d.di_size & 0xffffffff),
-		     (void*)(((__uint64_t)offset > 32) & 0xffffffff),
+		     (void*)(((__uint64_t)offset >> 32) & 0xffffffff),
 		     (void*)(offset & 0xffffffff),
 		     (void*)count,
-		     (void*)((ip->i_next_offset > 32) & 0xffffffff),
+		     (void*)((ip->i_next_offset >> 32) & 0xffffffff),
 		     (void*)(ip->i_next_offset & 0xffffffff),
-		     (void*)((ip->i_io_offset > 32) & 0xffffffff),
+		     (void*)((ip->i_io_offset >> 32) & 0xffffffff),
 		     (void*)(ip->i_io_offset & 0xffffffff),
 		     (void*)(ip->i_io_size),
 		     (void*)(ip->i_last_req_sz),
-		     (void*)((ip->i_new_size > 32) & 0xffffffff),
+		     (void*)((ip->i_new_size >> 32) & 0xffffffff),
 		     (void*)(ip->i_new_size & 0xffffffff),
 		     (void*)0);
 }
@@ -272,12 +298,12 @@ xfs_iomap_map_trace(
 	ktrace_enter(ip->i_rwtrace,
 		     (void*)tag,
 		     (void*)ip, 
-		     (void*)((ip->i_d.di_size > 32) & 0xffffffff),
+		     (void*)((ip->i_d.di_size >> 32) & 0xffffffff),
 		     (void*)(ip->i_d.di_size & 0xffffffff),
-		     (void*)(((__uint64_t)offset > 32) & 0xffffffff),
+		     (void*)(((__uint64_t)offset >> 32) & 0xffffffff),
 		     (void*)(offset & 0xffffffff),
 		     (void*)count,
-		     (void*)((bmapp->offset > 32) & 0xffffffff),
+		     (void*)((bmapp->offset >> 32) & 0xffffffff),
 		     (void*)(bmapp->offset & 0xffffffff),
 		     (void*)(bmapp->length),
 		     (void*)(bmapp->pboff),
@@ -1677,10 +1703,13 @@ xfs_write_file(
 	xfs_inode_t	*ip;
 	int		error;
 	int		eof_zeroed;
+	int		gaps_mapped;
 	xfs_fsize_t	isize;
 	xfs_fsize_t	new_size;
+	xfs_mount_t	*mp;
 
 	ip = XFS_VTOI(vp);
+	mp = ip->i_mount;
 	/*
 	 * If the file has fixed size extents, buffered 
 	 * I/O cannot be performed.
@@ -1693,6 +1722,7 @@ xfs_write_file(
 	error = 0;
 	buffer_bytes_ok = 0;
 	eof_zeroed = 0;
+	gaps_mapped = 0;
 	bmaps = (struct bmapval *)kmem_zone_alloc(xfs_bmap_zone, KM_SLEEP);
 
 
@@ -1731,6 +1761,25 @@ xfs_write_file(
 		}
 
 		xfs_rw_enter_trace(XFS_WRITE_ENTER, ip, uiop, ioflag);
+
+		/*
+		 * If this is the first pass through the loop, then map
+		 * out all of the holes we might fill in with this write
+		 * and list them in the inode's gap list.  This is for
+		 * use by xfs_strat_read() in determining if the real
+		 * blocks underlying a delalloc buffer have been initialized
+		 * or not.  Since writes are single threaded, if the blocks
+		 * were holes when we started and xfs_strat_read() is asked
+		 * to read one in while we're still here in xfs_write_file(),
+		 * then the block is not initialized.  Only we can
+		 * initialize it and once we write out a buffer we remove
+		 * any entries in the gap list which overlap that buffer.
+		 */
+		if (!gaps_mapped) {
+			xfs_build_gap_list(ip, uiop->uio_offset,
+					   uiop->uio_resid);
+			gaps_mapped = 1;
+		}
 
 		/*
 		 * If we've seeked passed the EOF to do this write,
@@ -1887,6 +1936,20 @@ xfs_write_file(
 				xfs_iunlock(ip, XFS_ILOCK_EXCL);
 			}
 
+			/*
+			 * Make sure that any gap list entries overlapping
+			 * the buffer being written are removed now that
+			 * we know that the blocks underlying the buffer
+			 * will be initialized.  We don't need the inode
+			 * lock to manipulate the gap list here, because
+			 * we have the io lock held exclusively so noone
+			 * else can get to xfs_strat_read() where we look
+			 * at the list.
+			 */
+			xfs_delete_gap_list(ip,
+					    XFS_BB_TO_FSBT(mp, bp->b_offset),
+					    XFS_B_TO_FSBT(mp, bp->b_bcount));
+
 			if (ioflag & IO_SYNC) {
 				bwrite(bp);
 			} else {
@@ -1900,13 +1963,12 @@ xfs_write_file(
 	} while ((uiop->uio_resid > 0) && !error);
 
 	/*
-	 * XXXajs
-	 * Regrettably, we need the inode lock held exclusively
-	 * in order to clear i_new_size.  This needs more thought.
-	 * Could it simply be left set and only cleared when the
-	 * file is truncated since it only matters if new_size > size?
+	 * Free up any remaining entries in the gap list, because the 
+	 * list only applies to this write call.  Also clear the new_size
+	 * field of the inode while we've go it locked.
 	 */
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	xfs_free_gap_list(ip);
 	ip->i_new_size = 0;
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	ip->i_write_offset = 0;
@@ -2191,6 +2253,11 @@ xfs_zero_bp(
 	caddr_t	page_addr;
 	int	len;
 
+	if (BP_ISMAPPED(bp)) {
+		bzero(bp->b_un.b_addr + data_offset, data_len);
+		return;
+	}
+
 	data_offset += BBTOOFF(dpoff(bp->b_offset));
 	pfdp = NULL;
 	pfdp = getnextpg(bp, pfdp);
@@ -2212,6 +2279,323 @@ xfs_zero_bp(
 		pfdp = getnextpg(bp, pfdp);
 	}
 }
+
+/*
+ * Verify that the gap list is properly sorted and that no entries
+ * overlap.
+ */
+#ifdef DEBUG
+STATIC void
+xfs_check_gap_list(
+	xfs_inode_t	*ip)
+{
+	xfs_gap_t	*last_gap;
+	xfs_gap_t	*curr_gap;
+	int		loops;
+
+	last_gap = NULL;
+	curr_gap = ip->i_gap_list;
+	loops = 0;
+	while (curr_gap != NULL) {
+		ASSERT(curr_gap->xg_count_fsb > 0);
+		if (last_gap != NULL) {
+			ASSERT((last_gap->xg_offset_fsb +
+				last_gap->xg_count_fsb) <
+			       curr_gap->xg_offset_fsb);
+		}
+		last_gap = curr_gap;
+		curr_gap = curr_gap->xg_next;
+		ASSERT(loops++ < 1000);
+	}
+}
+#endif
+
+/*
+ * For the given inode, offset, and count of bytes, build a list
+ * of xfs_gap_t structures in the inode's gap list describing the
+ * holes in the file in the range described by the offset and count.
+ *
+ * The list must be empty when we start, and the inode lock must
+ * be held exclusively.
+ */
+STATIC void
+xfs_build_gap_list(
+	xfs_inode_t	*ip,
+	off_t		offset,
+	size_t		count)
+{
+	xfs_fileoff_t	offset_fsb;
+	xfs_fileoff_t	last_fsb;
+	xfs_extlen_t	count_fsb;
+	xfs_gap_t	*new_gap;
+	xfs_gap_t	*last_gap;
+	xfs_mount_t	*mp;
+	int		i;
+	int		nimaps;
+#define	XFS_BGL_NIMAPS	8
+	xfs_bmbt_irec_t	imaps[XFS_BGL_NIMAPS];
+	xfs_bmbt_irec_t	*imapp;
+
+	ASSERT(ismrlocked(&(ip->i_lock), MR_UPDATE) != 0);
+	ASSERT(ip->i_gap_list == NULL);
+
+	mp = ip->i_mount;
+	offset_fsb = XFS_B_TO_FSBT(mp, offset);
+	last_fsb = XFS_B_TO_FSB(mp, (offset + count));
+	count_fsb = (xfs_extlen_t)(last_fsb - offset_fsb);
+	ASSERT(count_fsb > 0);
+
+	last_gap = NULL;
+	while (count_fsb > 0) {
+		nimaps = XFS_BGL_NIMAPS;
+		(void) xfs_bmapi(NULL, ip, offset_fsb, count_fsb,
+				 0, NULLFSBLOCK, 0, imaps, &nimaps, NULL);
+		ASSERT(nimaps != 0);
+
+		/*
+		 * Look for the holes in the mappings returned by bmapi.
+		 * Decrement count_fsb and increment offset_fsb as we go.
+		 */
+		for (i = 0; i < nimaps; i++) {
+			imapp = &imaps[i];
+			count_fsb -= imapp->br_blockcount;
+			ASSERT(count_fsb >= 0);
+			ASSERT(offset_fsb == imapp->br_startoff);
+			offset_fsb += imapp->br_blockcount;
+			ASSERT(offset_fsb <= last_fsb);
+			ASSERT((offset_fsb < last_fsb) || (count_fsb == 0));
+
+			/*
+			 * Skip anything that is not a hole.
+			 */
+			if (imapp->br_startblock != HOLESTARTBLOCK) {
+				continue;
+			}
+
+			/*
+			 * We found a hole.  Now add an entry to the inode's
+			 * gap list corresponding to it.  The list is
+			 * a singly linked, NULL terminated list.  We add
+			 * each entry to the end of the list so that it is
+			 * sorted by file offset.
+			 */
+			new_gap = kmem_alloc(sizeof(xfs_gap_t), KM_SLEEP);
+			new_gap->xg_offset_fsb = imapp->br_startoff;
+			new_gap->xg_count_fsb = imapp->br_blockcount;
+			new_gap->xg_next = NULL;
+
+			if (last_gap == NULL) {
+				ip->i_gap_list = new_gap;
+			} else {
+				last_gap->xg_next = new_gap;
+			}
+			last_gap = new_gap;
+		}
+	}
+	xfs_check_gap_list(ip);
+}
+
+/*
+ * Remove or trim any entries in the inode's gap list which overlap
+ * the given range.  I'm going to assume for now that we never give
+ * a range which is actually in the middle of an entry (i.e. we'd need
+ * to split it in two).  This is a valid assumption for now given the
+ * use of this in xfs_write_file() where we start at the front and
+ * move sequentially forward.
+ */
+STATIC void
+xfs_delete_gap_list(
+	xfs_inode_t	*ip,
+	xfs_fileoff_t	offset_fsb,
+	xfs_extlen_t	count_fsb)
+{
+	xfs_gap_t	*curr_gap;
+	xfs_gap_t	*last_gap;
+	xfs_gap_t	*next_gap;
+	xfs_fileoff_t	gap_offset_fsb;
+	xfs_extlen_t	gap_count_fsb;
+	xfs_fileoff_t	gap_end_fsb;
+	xfs_fileoff_t	end_fsb;
+
+	last_gap = NULL;
+	curr_gap = ip->i_gap_list;
+	while (curr_gap != NULL) {
+		gap_offset_fsb = curr_gap->xg_offset_fsb;
+		gap_count_fsb = curr_gap->xg_count_fsb;
+
+		/*
+		 * The entries are sorted by offset, so if we see
+		 * one beyond our range we're done.
+		 */
+		end_fsb = offset_fsb + count_fsb;
+		if (gap_offset_fsb >= end_fsb) {
+			return;
+		}
+
+		gap_end_fsb = gap_offset_fsb + gap_count_fsb;
+		if (gap_end_fsb <= offset_fsb) {
+			/*
+			 * This shouldn't be able to happen for now.
+			 */
+			ASSERT(0);
+			last_gap = curr_gap;
+			curr_gap = curr_gap->xg_next;
+			continue;
+		}
+
+		/*
+		 * We've go an overlap.  If the gap is entirely contained
+		 * in the region then remove it.  If not, then shrink it
+		 * by the amount overlapped.
+		 */
+		if (gap_end_fsb > end_fsb) {
+			/*
+			 * The region does not extend to the end of the gap.
+			 * Shorten the gap by the amount in the region,
+			 * and then we're done since we've reached the
+			 * end of the region.
+			 */
+			ASSERT(gap_offset_fsb >= offset_fsb);
+			curr_gap->xg_offset_fsb = end_fsb;
+			curr_gap->xg_count_fsb = gap_end_fsb - end_fsb;
+			return;
+		}
+
+		next_gap = curr_gap->xg_next;
+		if (last_gap == NULL) {
+			ip->i_gap_list = next_gap;
+		} else {
+			ASSERT(0);
+			ASSERT(last_gap->xg_next == curr_gap);
+			last_gap->xg_next = next_gap;
+		}
+		kmem_free(curr_gap, sizeof(xfs_gap_t));
+		curr_gap = next_gap;
+	}
+}		    
+/*
+ * Free up all of the entries in the inode's gap list.  This requires
+ * the inode lock to be held exclusively.
+ */
+STATIC void
+xfs_free_gap_list(
+	xfs_inode_t	*ip)
+{
+	xfs_gap_t	*curr_gap;
+	xfs_gap_t	*next_gap;
+
+	ASSERT(ismrlocked(&(ip->i_lock), MR_UPDATE) != 0);
+	xfs_check_gap_list(ip);
+
+	curr_gap = ip->i_gap_list;
+	while (curr_gap != NULL) {
+		next_gap = curr_gap->xg_next;
+		kmem_free(curr_gap, sizeof(xfs_gap_t));
+		curr_gap = next_gap;
+	}
+	ip->i_gap_list = NULL;
+}
+
+/*
+ * Zero the parts of the buffer which overlap gaps in the inode's gap list.
+ * Deal with everything in BBs since the buffer is not guaranteed to be block
+ * aligned.
+ */
+STATIC void
+xfs_cmp_gap_list_and_zero(
+	xfs_inode_t	*ip,
+	buf_t		*bp)
+{
+	off_t		bp_offset_bb;
+	int		bp_len_bb;
+	off_t		gap_offset_bb;
+	int		gap_len_bb;
+	int		zero_offset_bb;
+	int		zero_len_bb;
+	xfs_gap_t	*curr_gap;
+	xfs_mount_t	*mp;
+
+	ASSERT(ismrlocked(&(ip->i_lock), MR_UPDATE | MR_ACCESS) != 0);
+	xfs_check_gap_list(ip);
+
+	bp_offset_bb = bp->b_offset;
+	bp_len_bb = BTOBB(bp->b_bcount);
+	mp = ip->i_mount;
+	curr_gap = ip->i_gap_list;
+	while (curr_gap != NULL) {
+		gap_offset_bb = XFS_FSB_TO_BB(mp, curr_gap->xg_offset_fsb);
+		gap_len_bb = XFS_FSB_TO_BB(mp, curr_gap->xg_count_fsb);
+
+		/*
+		 * Check to see if this gap is before the buffer starts.
+		 */
+		if ((gap_offset_bb + gap_len_bb) <= bp_offset_bb) {
+			curr_gap = curr_gap->xg_next;
+			continue;
+		}
+
+		/*
+		 * Check to see if this gap is after th buffer ends.
+		 * If it is then we're done since the list is sorted
+		 * by gap offset.
+		 */
+		if (gap_offset_bb >= (bp_offset_bb + bp_len_bb)) {
+			break;
+		}
+
+		/*
+		 * We found a gap which overlaps the buffer.  Zero
+		 * the portion of the buffer overlapping the gap.
+		 */
+		if (gap_offset_bb < bp_offset_bb) {
+			/*
+			 * The gap starts before the buffer, so we start
+			 * zeroing from the start of the buffer.
+			 */
+			zero_offset_bb = 0;
+			/*
+			 * To calculate the amount of overlap.  First
+			 * subtract the portion of the gap which is before
+			 * the buffer.  If the length is still longer than
+			 * the buffer, then just zero the entire buffer.
+			 */
+			zero_len_bb = gap_len_bb -
+				      (bp_offset_bb - gap_offset_bb);
+			if (zero_len_bb > bp_len_bb) {
+				zero_len_bb = bp_len_bb;
+			}
+			ASSERT(zero_len_bb > 0);
+		} else {
+			/*
+			 * The gap starts at the beginning or in the middle
+			 * of the buffer.  The offset into the buffer is
+			 * the difference between the two offsets.
+			 */
+			zero_offset_bb = gap_offset_bb - bp_offset_bb;
+			/*
+			 * Figure out the length of the overlap.  If the
+			 * gap extends beyond the end of the buffer, then
+			 * just zero to the end of the buffer.  Otherwise
+			 * just zero the length of the gap.
+			 */
+			if ((gap_offset_bb + gap_len_bb) >
+			    (bp_offset_bb + bp_len_bb)) {
+				zero_len_bb = bp_len_bb - zero_offset_bb;
+			} else {
+				zero_len_bb = gap_len_bb;
+			}
+		}
+
+		/*
+		 * Now that we've calculated the range of the buffer to
+		 * zero, do it.
+		 */
+		xfs_zero_bp(bp, BBTOB(zero_offset_bb), BBTOB(zero_len_bb));
+
+		curr_gap = curr_gap->xg_next;
+	}
+}
+
 
 /*
  * "Read" in a buffer whose b_blkno is -1.  This means that
@@ -2436,6 +2820,13 @@ xfs_strat_read(
 					bp->b_error = XFS_ERROR(rbp->b_error);
 					ASSERT(bp->b_error != EINVAL);
 				}
+
+				/*
+				 * Check to see if the block extent (or parts
+				 * of it) have not yet been initialized and
+				 * should therefore be zeroed.
+				 */
+				xfs_cmp_gap_list_and_zero(ip, rbp);
 
 				if (BP_ISMAPPED(rbp)) {
 					bp_mapout(rbp);
