@@ -105,7 +105,7 @@ linvfs_mknod(
 	va.va_type = IFTOVT(mode);
 	va.va_mode = mode;
 
-	switch (mode) {
+	switch (mode & S_IFMT) {
 	case S_IFCHR: case S_IFBLK: case S_IFIFO: case S_IFSOCK:
 		va.va_rdev = rdev;
 		va.va_mask |= AT_RDEV;
@@ -170,7 +170,7 @@ linvfs_mkdir(
 	struct dentry	*dentry,
 	int		mode)
 {
-	return linvfs_mknod(dir, dentry, mode, 0);
+	return linvfs_mknod(dir, dentry, mode|S_IFDIR, 0);
 }
 
 
