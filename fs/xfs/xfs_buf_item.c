@@ -1014,78 +1014,39 @@ xfs_buf_item_next_bit(
 	uint	size,
 	uint	start_bit)
 {
-	int	next_bit;
-	uint	*wordp;
-	uint	*end_map;
-	int	word_bit;
-	uint	word;
+        uint * p = ((unsigned int *) map) + (start_bit >> BIT_TO_WORD_SHIFT);
+        uint result = start_bit & ~(NBWORD - 1);
+        uint tmp;
 
-	end_map = map + size;
-	wordp = map + (start_bit >> BIT_TO_WORD_SHIFT);
-	word_bit = start_bit & (int)(NBWORD - 1);
+	size <<= BIT_TO_WORD_SHIFT;
 
-	/*
-	 * If the caller has stepped beyond the end of the bitmap,
-	 * return -1.
-	 */
-	if (wordp >= end_map) {
-		return (-1);
-	}
-
-	next_bit = start_bit;
-
-	/*
-	 * If the start_bit does not start on a word boundary,
-	 * check the remainder of the starting word first.
-	 */
-	if (word_bit != 0) {
-		word = *wordp >> word_bit;
-		while (word != 0) {
-			if (word & 1) {
-				return (next_bit);
-			}
-			word = word >> 1;
-			next_bit++;	
-		}
-		/*
-		 * Since we don't know how many bits we looked at before
-		 * word became 0, just set next_bit to the start of the
-		 * next word.
-		 */
-		wordp++;
-		next_bit = (int)ROUNDUPNBWORD(start_bit); 
-	}
-
-	/*
-	 * Do word at a time checking for bits until the end of the map.
-	 */
-	while (wordp < end_map) {
-		/*
-		 * If the current word is empty, skip it.
-		 */
-		if (*wordp == 0) {
-			wordp++;
-			next_bit += NBWORD;
-			continue;
-		}
-
-		/*
-		 * We know we've got a bit in this word, find it.
-		 */
-		word = *wordp;
-		for (;;) {
-			if (word & 1) {
-				return (next_bit);
-			}
-			next_bit++;
-			word = word >> 1;
-		}
-	}
-
-	/*
-	 * If there were no more bits in the bitmap, return -1.
-	 */
-	return (-1);
+        if (start_bit >= size) 
+                return -1;
+        size -= result;
+        start_bit &= (NBWORD - 1);
+        if (start_bit) {
+                tmp = *p++;
+                /* set to zero first offset bits */
+                tmp &= ~(~0UL >> (NBWORD-start_bit));
+                if (size < NBWORD)
+                        goto found_first;
+                if (tmp != 0U)
+                        goto found_middle;
+                size -= NBWORD;
+                result += NBWORD;
+        }
+        while (size >= NBWORD) {
+                if ((tmp = *p++) != 0U)
+                        goto found_middle;
+                result += NBWORD;
+                size -= NBWORD;
+        }
+        if (!size) 
+                return -1;
+        tmp = *p;
+found_first:
+found_middle:
+        return result + ffs(tmp) - 1;
 }
 
 /*
