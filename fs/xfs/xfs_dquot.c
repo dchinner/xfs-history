@@ -50,6 +50,13 @@
 
 STATIC void 		xfs_qm_dqflush_done(xfs_buf_t *, xfs_dq_logitem_t *);
 
+#ifdef DEBUG
+int xfs_do_dqerror = 0;
+int xfs_dqreq_num = 0;
+int xfs_dqerror_mod = 33;
+dev_t xfs_dqerror_dev = 0;
+#endif
+
 /*
  * Allocate and initialize a dquot. We don't always allocate fresh memory;
  * we try to reclaim a free dquot if the number of incore dquots are above
@@ -863,8 +870,19 @@ xfs_qm_dqget(
 	}
 	h = XFS_DQ_HASH(mp, id, type);
 
+#ifdef DEBUG
+	if (xfs_do_dqerror) {
+		if (xfs_dqerror_dev == mp->m_dev &&
+		    (xfs_dqreq_num++ % xfs_dqerror_mod) == 0) {
+			printk("Returning error in dqget\n");
+			return (EIO);
+		}
+	}
+#endif
+
  again:
 
+#ifdef DEBUG
 	ASSERT(type == XFS_DQ_USER || type == XFS_DQ_GROUP);
 	if (ip) {
 		ASSERT(XFS_ISLOCKED_INODE_EXCL(ip));
@@ -873,6 +891,7 @@ xfs_qm_dqget(
 		else
 			ASSERT(ip->i_gdquot == NULL);
 	}
+#endif
 	XFS_DQ_HASH_LOCK(h);
 	
 	/*
