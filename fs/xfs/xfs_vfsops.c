@@ -96,7 +96,11 @@ int
 xfs_init(vfssw_t	*vswp,
 	 int		fstype)
 {
+	extern lock_t	xfs_strat_lock;
+
 	xfs_type = fstype;
+
+	initnlock(&xfs_strat_lock, "xfsstrat");
 	return 0;
 }
 
