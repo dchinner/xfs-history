@@ -211,8 +211,10 @@ typedef struct irix5_dirent {	/* Irix5 view of dirent structure */
  */
 #define ENOTSUP		ENOTSUPP	/* Not supported (POSIX 1003.1b) */
 #define ENOATTR         ENODATA /* Attribute not found */
-#define EFSCORRUPTED    EIO     /* Filesystem is corrupted */
-#define	EWRONGFS	ENOSYS	/* Mount with wrong filesystem type */
+
+/* XXX also note these need to be < 1000 and fairly unique on linux */
+#define EFSCORRUPTED    990     /* Filesystem is corrupted */
+#define	EWRONGFS	991	/* Mount with wrong filesystem type */
 
 #define SYNCHRONIZE()	((void)0)
 #define lbolt		jiffies
