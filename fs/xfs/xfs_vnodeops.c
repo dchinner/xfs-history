@@ -53,6 +53,7 @@
 #include "xfs_ialloc.h"
 #include "xfs_ag.h"
 #include "xfs_bmap_btree.h"
+#include "xfs_bmap.h"
 #include "xfs_btree.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
@@ -383,6 +384,11 @@ xfs_inactive(vnode_t	*vp,
 #define IHOLD(ip)	VN_HOLD(XFS_ITOV(ip))
 
 /*
+ * Max number of extents needed for directory create + symlink.
+ */
+#define MAX_EXT_NEEDED 9
+
+/*
  * xfs_dir_lookup_int flags.
  */
 
@@ -671,6 +677,9 @@ xfs_create(vnode_t	*dir_vp,
 	dev_t			rdev;
 	unsigned long   	dir_generation;
         int                     error;
+        xfs_bmap_free_t 	free_list;
+        xfs_fsblock_t   	first_block;
+
 
         dp = XFS_VTOI(dir_vp);
 
@@ -710,13 +719,20 @@ try_again:
 		ASSERT (ismrlocked (&ip->i_lock, MR_UPDATE));
 
 		xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
+
 		/*
 		 * XXX Need to sanity check namelen.
 		 */
-		if (error = xfs_dir_createname (tp, dp, name, ip->i_ino)) {
+		first_block = NULLFSBLOCK;
+		free_list.xbf_first = NULL;
+		free_list.xbf_count = 0;
+
+		if (error = xfs_dir_createname (tp, &first_block, 
+			MAX_EXT_NEEDED, &free_list, dp, name, ip->i_ino)) {
 			xfs_droplink (tp, ip);
 			goto error_return;
 		}
+		xfs_bmap_finish (&tp, &free_list, first_block);
 
 		dnlc_enter(dir_vp, name, XFS_ITOV(ip), NOCRED);
 
@@ -1215,6 +1231,9 @@ xfs_link(vnode_t	*target_dir_vp,
 	xfs_ino_t		e_inum;
 	xfs_trans_t		*tp;
 	int			error;
+        xfs_bmap_free_t         free_list;
+        xfs_fsblock_t           first_block;
+
 
 	/*
 	 * Get the real vnode.
@@ -1247,10 +1266,16 @@ xfs_link(vnode_t	*target_dir_vp,
 	xfs_trans_ijoin (tp, sip, XFS_ILOCK_EXCL);
         xfs_trans_ijoin (tp, tdp, XFS_ILOCK_EXCL);
 
-	if (error = xfs_dir_createname (tp, tdp, target_name, sip->i_ino)) {
+	first_block = NULLFSBLOCK;
+	free_list.xbf_first = NULL;
+	free_list.xbf_count = 0;
+
+	if (error = xfs_dir_createname (tp, &first_block, MAX_EXT_NEEDED,
+		&free_list, tdp, target_name, sip->i_ino)) {
 		xfs_trans_cancel (tp, 0);
 		return error;
 	}
+	xfs_bmap_finish (&tp, &free_list, first_block);
 
 	tdp->i_gen++;
 	xfs_trans_log_inode (tp, tdp, XFS_ILOG_CORE);
@@ -1294,6 +1319,9 @@ xfs_rename(vnode_t	*src_dir_vp,
 	boolean_t	new_parent;		/* moving to a new dir */
 	boolean_t	src_is_directory;	/* src_name is a directory */
 	int		error;		
+        xfs_bmap_free_t free_list;
+        xfs_fsblock_t   first_block;
+
 
 	src_dp = XFS_VTOI(src_dir_vp);
 	target_dp = XFS_VTOI(target_dir_vp);
@@ -1407,10 +1435,16 @@ xfs_rename(vnode_t	*src_dir_vp,
 		 * adjust the target directory link count to account for the
 		 * ".." reference from the new entry.
 		 */
+		first_block = NULLFSBLOCK;
+		free_list.xbf_first = NULL;
+		free_list.xbf_count = 0;
 
-		if (error = xfs_dir_createname (tp, target_dp,
+		if (error = xfs_dir_createname (tp, &first_block,
+			MAX_EXT_NEEDED, &free_list, target_dp,
 				target_name, src_ip->i_ino))
 			goto trans_error_return;
+
+		xfs_bmap_finish (&tp, &free_list, first_block);
 			
 		if (new_parent && src_is_directory)
 			xfs_bumplink(tp, target_dp);
@@ -1470,9 +1504,15 @@ xfs_rename(vnode_t	*src_dir_vp,
 		ASSERT ((! error) || (error == ENOENT));
 		error = 0;
 
-		error = xfs_dir_createname (tp, target_dp, 
+                first_block = NULLFSBLOCK;
+                free_list.xbf_first = NULL;
+                free_list.xbf_count = 0;
+
+		error = xfs_dir_createname (tp, &first_block, MAX_EXT_NEEDED,
+				&free_list, target_dp, 
 				target_name, target_ip->i_ino);
 		ASSERT (! error);	
+                xfs_bmap_finish (&tp, &free_list, first_block);
 
 		dnlc_enter (src_dir_vp, target_name, XFS_ITOV(src_ip), credp);
 
@@ -1614,6 +1654,9 @@ xfs_mkdir(vnode_t	*dir_vp,
 	mode_t			mode;
         struct xfs_mount        *mp;
         int                     code;
+        xfs_bmap_free_t         free_list;
+        xfs_fsblock_t           first_block;
+
 
         dp = XFS_VTOI(dir_vp);
 
@@ -1661,8 +1704,15 @@ xfs_mkdir(vnode_t	*dir_vp,
 	 */
 	xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
 
-	if (code = xfs_dir_createname (tp, dp, dir_name, cdp->i_ino)) 
+	first_block = NULLFSBLOCK;
+	free_list.xbf_first = NULL;
+	free_list.xbf_count = 0;
+
+	if (code = xfs_dir_createname (tp, &first_block, MAX_EXT_NEEDED,
+				&free_list, dp, dir_name, cdp->i_ino)) 
  		ASSERT (0);
+	xfs_bmap_finish (&tp, &free_list, first_block);
+
 	dnlc_enter (dir_vp, dir_name, XFS_ITOV(cdp), NOCRED);
 	
 	if (code = xfs_dir_init(tp, cdp, dp))
@@ -1805,6 +1855,7 @@ error_return:
 }
 
 
+
 /*
  * xfs_readdir
  *
@@ -1819,10 +1870,23 @@ xfs_readdir(vnode_t	*dir_vp,
 	return 0;
 }
 
+
+/*
+ * The maximum pathlen is 1024 bytes. Since the minimum file system
+ * blocksize is 512 bytes, we can get a max of 2 extents back from
+ * bmapi.
+ */
+#define SYMLINK_MAPS 2
+
+/*
+ * XXX The number of blocks that the directory code requires for
+ * the createname operation.
+ */
+#define dir_needs 7
+
 /*
  * xfs_symlink
  *
- * This is a stub.
  */
 STATIC int
 xfs_symlink(vnode_t	*dir_vp,
@@ -1838,6 +1902,9 @@ xfs_symlink(vnode_t	*dir_vp,
         struct pathname cpn, ccpn;
 	xfs_ino_t	e_inum;
 	dev_t		rdev;
+	xfs_sb_t        *sbp;
+	xfs_bmap_free_t free_list;
+	xfs_fsblock_t   first_block;
 
 	/*
 	 * Check component lengths of the target path name.
@@ -1867,14 +1934,24 @@ xfs_symlink(vnode_t	*dir_vp,
         dp = XFS_VTOI(dir_vp);
 	xfs_ilock (dp, XFS_ILOCK_EXCL);
 
-        if (error = xfs_dir_lookup_int(NULL, dir_vp, 0, link_name, NULL,
-                                       &e_inum, NULL))
+        error = xfs_dir_lookup_int(NULL, dir_vp, 0, link_name, NULL,
+                                       &e_inum, NULL);
+	if (error != ENOENT) {
+		error = EEXIST;
                 goto error_return;
+	}
 
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
 	tp = xfs_trans_alloc (mp, XFS_TRANS_WAIT);
 	if (error = xfs_trans_reserve (tp, 10, 10, 0, 0))
 		goto error_return;
+
+	/*
+	 * Initialize the bmap freelist prior to calling either
+	 * bmapi or the directory create code.
+	 */
+	free_list.xbf_first = NULL;
+	free_list.xbf_count = 0;
 
 	/*
 	 * Allocate an inode for the symlink.
@@ -1886,70 +1963,75 @@ xfs_symlink(vnode_t	*dir_vp,
 	if (error)
 		goto error_return;
 
+	sbp = &mp->m_sb;
+
 	/*
-	 * If the symlink is short, write it inline.
+	 * If the symlink will fit into the inode, write it inline.
 	 */
-	if (pathlen <= sizeof(ip->i_u2.iu_inline_data)) {	/* 32 bytes? */
+	if (pathlen <= XFS_LITINO(sbp)) {
 		xfs_idata_realloc (ip, pathlen);
 		bcopy(target_path, ip->i_u1.iu_data, pathlen);
+
+		/*
+		 * The inode was initially created in extent format.
+		 */
+		ip->i_flags &= ~(XFS_IEXTENTS | XFS_IBROOT);
 		ip->i_flags |= XFS_IINLINE;
+
+		/*
+		 * XXX This is temporary, should be removed later.
+		 */
+		ip->i_d.di_mode = (ip->i_d.di_mode & ~IFMT) | IFLNK;
 
 		xfs_trans_ijoin (tp, ip, XFS_ILOCK_EXCL);
 		xfs_trans_log_inode (tp, ip, XFS_ILOG_DATA | XFS_ILOG_CORE);
 	}
-#if 0
 	else {
-		xfs_sb_t        *sbp;
-		xfs_fsblock_t   first_fsb, last_fsb;
-		int		nmap;
-		xfs_fsblock_t	first_block;
-		xfs_extlen_t	blocks;
-		xfs_bmbt_irec_t mval;
-		unsigned int	pathlen_in_blocks;
-		xfs_bmap_free_t	flist;
+                xfs_fsblock_t   first_fsb;
+                xfs_extlen_t    fs_blocks;
+                int             nmaps;
+                xfs_bmbt_irec_t mval [SYMLINK_MAPS];
+                daddr_t         d;
+                char            *cur_chunk;
+                int             byte_cnt, n;
+		struct 		buf *bp;
 
-		sbp = &mp->m_sb;
-		first_fsb = xfs_b_to_fsbt(sbp, 0);
+		first_fsb = 0;
+		fs_blocks = xfs_b_to_fsb(sbp, pathlen);
+		nmaps = SYMLINK_MAPS;
 
-		pathlen_in_blocks = pathlen / sbp->sb_blocksize;
-		if (pathlen % sbp->sb_blocksize)
-			pathlen_in_blocks++;
-		last_fsb = xfs_b_to_fsb(sbp, blocks);
-		nmaps = 1;
-		blocks = (xfs_extlen_t)(last_fsb - first_fsb);
-		bzero (&flist, sizeof(xfs_bmap_free_t));
+		first_block = xfs_bmapi (tp, ip, first_fsb, fs_blocks,
+                         XFS_BMAPI_WRITE, NULLFSBLOCK, fs_blocks+dir_needs, 
+			 mval, &nmaps, &free_list);
 
-		first_block = xfs_bmapi(tp, ip, first_fsb, blocks,
-                         XFS_BMAPI_WRITE, NULLFSBLOCK, blocks, &mval,
-                         &nmap, &flist);
+		cur_chunk = target_path;
+		for (n = 0; n < nmaps; n++) {
+			d = xfs_fsb_to_daddr(sbp, mval[n].br_startblock);
+			byte_cnt = xfs_fsb_to_b(sbp, mval[n].br_blockcount);
+			bp = xfs_trans_get_buf (tp, mp->m_dev, d, 
+				BTOBB(byte_cnt), 0);
+			if (pathlen < byte_cnt)
+				byte_cnt = pathlen;
+			pathlen -= byte_cnt;
 
-			??? xfs_btree_get_bufl 
-			??? xfs_dir_get_buf/ read_get_buf?:
+			bcopy (cur_chunk, bp->b_un.b_addr, byte_cnt);
+			cur_chunk += byte_cnt;
 
-		if (bmv.pbsize == bmv.bsize) {
-			bp = xfs_trans_get_buf(tp, mval.pbdev, 
-				mval.br_startblock,
-			       mval.br_blockcount, 0);
-		}
-		else {
-			bp = xfs_trans_bread(tp, mval.pbdev, mval.bn,
-                                       mval.length, 0);
+			xfs_trans_log_buf (tp, bp, 0, byte_cnt);
 		}
 
-		bp = xfs_trans_get_buf(tp, mval.pbdev, mval.bn,
-				       mval.length, 0);
-
-		xfs_bmap_finish (&tp, &flist, first_block);
 	}
-
-#endif
 
 	/*
 	 * Create the directory entry for the symlink.
 	 */
-	if (error = xfs_dir_createname (tp, dp, link_name, ip->i_ino))
+	if (error = xfs_dir_createname (tp, &first_block, MAX_EXT_NEEDED,
+			&free_list, dp, link_name, ip->i_ino))
                 ASSERT (0);
         dnlc_enter (dir_vp, link_name, XFS_ITOV(ip), NOCRED);
+
+	/* Defer this to after directory code. */
+	xfs_bmap_finish (&tp, &free_list, first_block);
 
 	xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
 	xfs_trans_ijoin (tp, ip, XFS_ILOCK_EXCL);
