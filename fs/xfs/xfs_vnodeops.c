@@ -267,7 +267,8 @@ STATIC int 	xfs_change_file_space( vnode_t *,
 
 STATIC void	xfs_itruncate_cleanup(xfs_trans_t	**tpp,
 				      xfs_inode_t	*ip,
-				      int		commit_flags);
+				      int		commit_flags,
+				      int		fork);
 
 STATIC void	xfs_inactive(vnode_t	*vp,
 			     cred_t	*credp);
@@ -774,7 +775,8 @@ xfs_setattr(
 		} else if (vap->va_size < ip->i_d.di_size) {
 			xfs_trans_ihold(tp, ip);
 			code = xfs_itruncate_finish(&tp, ip,
-					    (xfs_fsize_t)vap->va_size);
+					    (xfs_fsize_t)vap->va_size,
+					    XFS_DATA_FORK, 0);
 			ip_held = B_TRUE;
 			if (code) {
 				goto abort_return;
@@ -1138,13 +1140,16 @@ STATIC void
 xfs_itruncate_cleanup(
 	xfs_trans_t	**tpp,
 	xfs_inode_t	*ip,
-	int		commit_flags)
+	int		commit_flags,
+	int		fork)
 {
 	xfs_mount_t	*mp;
 	int		error;
 
-	mp = (*tpp)->t_mountp;
-	xfs_trans_cancel(*tpp, commit_flags | XFS_TRANS_ABORT);
+	mp = ip->i_mount;
+	if (*tpp) {
+		xfs_trans_cancel(*tpp, commit_flags | XFS_TRANS_ABORT);
+	}
 	xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 	*tpp = xfs_trans_alloc(mp, XFS_TRANS_INACTIVE);
 	error = xfs_trans_reserve(*tpp, 0, XFS_IFREE_LOG_RES(mp), 0, 0,
@@ -1155,41 +1160,15 @@ xfs_itruncate_cleanup(
 	xfs_trans_ijoin(*tpp, ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 	xfs_trans_ihold(*tpp, ip);
 
-	if (ip->i_df.if_broot != NULL) {
-		kmem_free(ip->i_df.if_broot, ip->i_df.if_broot_bytes);
-		ip->i_df.if_broot = NULL;
-		ip->i_df.if_broot_bytes = 0;
-	}
+	xfs_idestroy_fork(ip, fork);
 
-	/*
-	 * If the format is local, then we can't have an extents
-	 * array so just look for an inline data array.  If we're
-	 * not local then we may or may not have an extents list,
-	 * so check and free it up if we do.
-	 */
-	if (ip->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
-		if ((ip->i_df.if_u1.if_data != ip->i_df.if_u2.if_inline_data) &&
-		    (ip->i_df.if_u1.if_data != NULL)) {
-			ASSERT(ip->i_df.if_real_bytes != 0);
-			kmem_free(ip->i_df.if_u1.if_data, ip->i_df.if_real_bytes);
-			ip->i_df.if_u1.if_data = NULL;
-			ip->i_df.if_real_bytes = 0;
-		}
-	} else if ((ip->i_df.if_flags & XFS_IFEXTENTS) &&
-		   (ip->i_df.if_u1.if_extents != NULL) &&
-		   (ip->i_df.if_u1.if_extents != ip->i_df.if_u2.if_inline_ext)) {
-		ASSERT(ip->i_df.if_real_bytes != 0);
-		kmem_free(ip->i_df.if_u1.if_extents, ip->i_df.if_real_bytes);
-		ip->i_df.if_u1.if_extents = NULL;
-		ip->i_df.if_real_bytes = 0;
+	if (fork == XFS_DATA_FORK) {
+		ip->i_d.di_nblocks = 0;
+		ip->i_d.di_nextents = 0;
+		ip->i_d.di_size = 0;
+	} else {
+		ip->i_d.di_anextents = 0;
 	}
-	ASSERT(ip->i_df.if_u1.if_extents == NULL ||
-	       ip->i_df.if_u1.if_extents == ip->i_df.if_u2.if_inline_ext);
-	ASSERT(ip->i_df.if_real_bytes == 0);
-	
-	ip->i_d.di_nblocks = 0;
-	ip->i_d.di_nextents = 0;
-	ip->i_d.di_size = 0;
 	xfs_trans_log_inode(*tpp, ip, XFS_ILOG_CORE);
 }
 
@@ -1216,6 +1195,7 @@ xfs_inactive(
 	int		done;
 	int		committed;
 	int		commit_flags;
+	int		unlink_synced;
 	xfs_fsblock_t	first_block;
 	xfs_bmap_free_t	free_list;
 	xfs_fileoff_t	end_fsb;
@@ -1258,6 +1238,16 @@ xfs_inactive(
 	ASSERT(ip->i_d.di_nlink >= 0);
 	mp = ip->i_mount;
 	if (ip->i_d.di_nlink == 0) {
+		/*
+		 * Keep track of whether or not we know that the unlink
+		 * has been synced to the on disk log so that we can
+		 * avoid multiple sync transactions below.
+		 */
+		if (mp->m_flags & XFS_MOUNT_WSYNC) {
+			unlink_synced = 1;
+		} else {
+			unlink_synced = 0;
+		}
 		tp = xfs_trans_alloc(mp, XFS_TRANS_INACTIVE);
 
 		if (truncate) {
@@ -1281,7 +1271,8 @@ xfs_inactive(
 					XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 			xfs_trans_ihold(tp, ip);
 
-			error = xfs_itruncate_finish(&tp, ip, 0);
+			error = xfs_itruncate_finish(&tp, ip, 0,
+						     XFS_DATA_FORK, 0);
 			commit_flags = XFS_TRANS_RELEASE_LOG_RES;
 
 			if (error) {
@@ -1292,11 +1283,24 @@ xfs_inactive(
 				 * by freeing the inode.
 				 */
 				commit_flags |= XFS_TRANS_ABORT;
-				xfs_itruncate_cleanup(&tp, ip, commit_flags);
+				xfs_itruncate_cleanup(&tp, ip, commit_flags,
+						      XFS_DATA_FORK);
 				commit_flags = 0;
+			} else {
+				/*
+				 * We know for sure that the unlink has been
+				 * synced out because we do it in
+				 * xfs_itruncate_finish().
+				 */
+				unlink_synced = 1;
 			}
 		} else if ((ip->i_d.di_mode & IFMT) == IFLNK) {
 
+			/*
+			 * If we get an error while cleaning up a
+			 * symlink we jump to freeing the attribute fork
+			 * of the inode.
+			 */
 			if (ip->i_d.di_size > XFS_IFORK_DSIZE(ip)) {
 				/*
 				 * We're freeing a symlink that has some
@@ -1330,8 +1334,9 @@ xfs_inactive(
 					xfs_bmap_cancel(&free_list);
 					xfs_itruncate_cleanup(&tp, ip,
 						 (XFS_TRANS_RELEASE_LOG_RES |
-						  XFS_TRANS_ABORT));
-					goto free_inode;
+						  XFS_TRANS_ABORT),
+						 XFS_DATA_FORK);
+					goto free_attrs;
 				}
 				ASSERT(done);
 				error = xfs_bmap_finish(&tp, &free_list,
@@ -1340,8 +1345,9 @@ xfs_inactive(
 					xfs_bmap_cancel(&free_list);
 					xfs_itruncate_cleanup(&tp, ip,
 						(XFS_TRANS_RELEASE_LOG_RES |
-						 XFS_TRANS_ABORT));
-					goto free_inode;
+						 XFS_TRANS_ABORT),
+						XFS_DATA_FORK);
+					goto free_attrs;
 				}
 				if (committed) {
 					/*
@@ -1377,6 +1383,7 @@ xfs_inactive(
 					       0, XFS_TRANS_PERM_LOG_RES,
 					       XFS_ITRUNCATE_LOG_COUNT);
 				ASSERT(error == 0);
+				unlink_synced = 1;
 
 			} else {
 				/*
@@ -1418,7 +1425,73 @@ xfs_inactive(
 			commit_flags = 0;
 		}
 
-free_inode:
+		/*
+		 * If there are attributes associated with the file
+		 * then blow them away now.  The code here is just
+		 * like that above for truncating the file but it gets
+		 * the other fork and uses xfs_atruncate_start() rather
+		 * than xfs_itruncate_start().  We need to just commit
+		 * the current transaction because we can't use it
+		 * for xfs_atruncate_start().
+		 */
+ free_attrs:
+		if (ip->i_d.di_anextents > 0) {
+			ASSERT(ip->i_d.di_forkoff != 0);
+			error = xfs_trans_commit(tp, commit_flags);
+			if (error) {
+				xfs_iunlock(ip,
+					    XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
+				goto out;
+			}
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
+			error = xfs_atruncate_start(ip);
+			/*
+			 * If we can't clean up the attribute fork properly,
+			 * then just blow it away and free the inode.
+			 */
+			if (error) {
+				xfs_ilock(ip, XFS_ILOCK_EXCL);
+				tp = NULL;
+				xfs_itruncate_cleanup(&tp, ip, 0,
+						      XFS_ATTR_FORK);
+				goto free_inode;
+			}
+
+			tp = xfs_trans_alloc(mp, XFS_ATRUNCATE);
+			error = xfs_trans_reserve(tp, 0,
+					XFS_ITRUNCATE_LOG_RES(mp),
+					0, XFS_TRANS_PERM_LOG_RES,
+					XFS_ITRUNCATE_LOG_COUNT);
+			ASSERT(error == 0);
+
+			xfs_ilock(ip, XFS_ILOCK_EXCL);
+			xfs_trans_ijoin(tp, ip,
+					XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
+			xfs_trans_ihold(tp, ip);
+
+			error = xfs_itruncate_finish(&tp, ip, 0,
+						     XFS_ATTR_FORK,
+						     unlink_synced);
+			commit_flags = XFS_TRANS_RELEASE_LOG_RES;
+
+			if (error) {
+				/*
+				 * If we get an error while trying to
+				 * truncate the file, abort the truncation
+				 * transaction and just try to continue
+				 * by freeing the inode.
+				 */
+				commit_flags |= XFS_TRANS_ABORT;
+				xfs_itruncate_cleanup(&tp, ip, commit_flags,
+						      XFS_ATTR_FORK);
+				commit_flags = 0;
+			} else {
+				xfs_idestroy_fork(ip, XFS_ATTR_FORK);
+			}
+			ASSERT(error || (ip->i_d.di_anextents == 0));
+		}
+				
+ free_inode:
 		/*
 		 * Free the inode.
 		 */
@@ -1489,7 +1562,9 @@ free_inode:
 				xfs_trans_ihold(tp, ip);
 
 				error = xfs_itruncate_finish(&tp, ip,
-							     ip->i_d.di_size);
+							     ip->i_d.di_size,
+							     XFS_DATA_FORK,
+							     0);
 				/*
 				 * If we get an error at this point we
 				 * simply don't bother truncating the file.
@@ -1509,6 +1584,7 @@ free_inode:
 	}
 #endif	/* !SIM */
 
+ out:
 	/*
 	 * Clear all the inode's read-ahead state.  We don't need the
 	 * lock for this because the inode is inactive.  Noone can
@@ -2223,7 +2299,8 @@ xfs_create(
 				xfs_ctrunc_trace(XFS_CTRUNC5, ip);
 				xfs_trans_ihold(tp, ip);
 				error = xfs_itruncate_finish(&tp, ip,
-							     (xfs_fsize_t)0);
+							     (xfs_fsize_t)0,
+							     XFS_DATA_FORK, 0);
 				if (error) {
 					ASSERT(ip->i_transp == tp);
 					xfs_trans_ihold_release(tp, ip);
@@ -2659,7 +2736,8 @@ xfs_truncate_file(
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 	xfs_trans_ihold(tp, ip);
-	error = xfs_itruncate_finish(&tp, ip, (xfs_fsize_t)0);
+	error = xfs_itruncate_finish(&tp, ip, (xfs_fsize_t)0,
+				     XFS_DATA_FORK, 0);
 	if (error) {
 		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES |
 				 XFS_TRANS_ABORT);
@@ -5235,7 +5313,8 @@ xfs_free_file_space(
         xfs_trans_ihold(tp, ip);
 	ip->i_d.di_flags &= ~XFS_DIFLAG_PREALLOC;
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
-        error = xfs_itruncate_finish(&tp, ip, (xfs_fsize_t)offset);
+        error = xfs_itruncate_finish(&tp, ip, (xfs_fsize_t)offset,
+				     XFS_DATA_FORK, 0);
 	if (error) {
 		xfs_trans_cancel(tp, (XFS_TRANS_RELEASE_LOG_RES |
 				 XFS_TRANS_ABORT));
