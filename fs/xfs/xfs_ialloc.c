@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.136 $"
+#ident	"$Revision: 1.137 $"
 
 #include <xfs_os_defs.h>
 #include <linux/stat.h>
@@ -130,7 +130,6 @@ xfs_ialloc_log_di(
 	int		off,		/* index of inode in buffer */
 	int		fields)		/* bitmask of fields to log */
 {
-	xfs_dinode_t		*dip;		/* disk inode */
 	int			first;		/* first byte number */
 	int			ioffset;	/* off in bytes */
 	int			last;		/* last byte number */
@@ -166,13 +165,11 @@ xfs_ialloc_log_di(
 		offsetof(xfs_dinode_t, di_a),
 		sizeof(xfs_dinode_t)
 	};
-        xfs_arch_t              arch;
         
 
 	ASSERT(offsetof(xfs_dinode_t, di_core) == 0);
 	ASSERT((fields & (XFS_DI_U|XFS_DI_A)) == 0);
 	mp = tp->t_mountp;
-        arch = ARCH_CONVERT;
 	/*
 	 * Get the inode-relative first and last bytes for these fields
 	 */
@@ -180,8 +177,7 @@ xfs_ialloc_log_di(
 	/*
 	 * Convert to buffer offsets and log it.
 	 */
-	dip = XFS_MAKE_IPTR(mp, bp, off);
-	ioffset = (int)((xfs_caddr_t)dip - (xfs_caddr_t)XFS_BUF_TO_DINODE(bp));
+	ioffset = off << mp->m_sb.sb_inodelog;
 	first += ioffset;
 	last += ioffset;
 	xfs_trans_log_buf(tp, bp, first, last);
