@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.39 $"
+#ident	"$Revision: 1.40 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -8,10 +8,13 @@
 #define _KERNEL 1
 #endif
 #include <sys/param.h>
+#include <sys/buf.h>
+#include <sys/uuid.h>
+#include <sys/vnode.h>
+#include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
-#include <sys/vnode.h>
 #include <sys/debug.h>
 #include <sys/kmem.h>
 #ifdef SIM
@@ -21,15 +24,6 @@
 #endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
-#ifdef SIM
-#define _KERNEL
-#endif
-#include <sys/buf.h>
-#include <sys/uuid.h>
-#include <sys/grio.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
@@ -40,6 +34,7 @@
 #include "xfs_ialloc_btree.h"
 #include "xfs_btree.h"
 #include "xfs_ialloc.h"
+#include "xfs_dir.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
