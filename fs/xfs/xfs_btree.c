@@ -22,7 +22,7 @@
 #include "xfs_sb.h"
 #include "xfs_ag.h"
 #include "xfs_mount.h"
-#include "xfs_alloc.h"
+#include "xfs_alloc_btree.h"
 #include "xfs_ialloc.h"
 #include "xfs_bmap_btree.h"
 #include "xfs_btree.h"
