@@ -2510,7 +2510,7 @@ xfs_dm_punch_hole(
 		cmd = XFS_IOC_FREESP; /* truncate */
 	error = xfs_change_file_space(xbdp, cmd, &bf, (xfs_off_t)off,
 				      sys_cred,
-				      ATTR_DMI);
+				      ATTR_DMI|ATTR_NOLOCK);
 
 	/* If truncate, grow it back to its original size. */
 	if ((error == 0) && (len == 0)) {
@@ -2518,7 +2518,7 @@ xfs_dm_punch_hole(
 
 		va.va_mask = XFS_AT_SIZE;
 		va.va_size = realsize;
-		error = xfs_setattr(xbdp, &va, ATTR_DMI,
+		error = xfs_setattr(xbdp, &va, ATTR_DMI|ATTR_NOLOCK,
 				    sys_cred);
 	}
 
