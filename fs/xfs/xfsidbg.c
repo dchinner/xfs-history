@@ -1990,6 +1990,7 @@ printflags(register uint64_t flags,
 
 static void printbhv(bhv_desc_t *bdp)
 {
+	int maxbhv = 20; /* if you get 20 bhvs you're in trouble already */
 	kdb_symtab_t	 symtab;
 
 	if (bdp == NULL) {
@@ -1998,7 +1999,7 @@ static void printbhv(bhv_desc_t *bdp)
 	}
 
 	kdb_printf("bhv at 0x%p\n", bdp);
-	while (bdp) {
+	while (bdp && maxbhv--) {
 		if (kdbnearsym((unsigned long)bdp->bd_ops, &symtab))
 			kdb_printf("  ops %s", symtab.sym_name);
 		else
