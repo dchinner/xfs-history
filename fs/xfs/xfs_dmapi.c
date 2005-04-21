@@ -3090,7 +3090,7 @@ xfs_mm_hash_index(
 	return ((int)((unsigned long)(inode) % XFS_MM_HASHSZ));
 }
 
-static struct xfs_dm_mm {
+struct xfs_dm_mm {
 	struct inode		*dm_inode;	/* inode we're mapping */
 	struct list_head	dm_list;	/* hash list */
 	int			dm_ref;		/* number of refs */
