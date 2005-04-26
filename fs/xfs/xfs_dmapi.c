@@ -2525,6 +2525,7 @@ xfs_dm_punch_hole(
 	/* Let threads in send_data_event know we punched the file. */
 	xip->i_iocore.io_dmstate++;
 	xfs_iunlock(xip, XFS_IOLOCK_EXCL);
+	VMODIFY(vp);
 
 up_and_out:
 	up_rw_sems(inode, DM_SEM_FLAG_WR);
