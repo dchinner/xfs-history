@@ -38,6 +38,7 @@ ifeq ($(CONFIG_XFS_DEBUG),y)
 endif
 ifeq ($(CONFIG_XFS_TRACE),y)
 	EXTRA_CFLAGS += -DXFS_DQUOT_TRACE
+	EXTRA_CFLAGS += -DXFS_VNODE_TRACE
 endif
 
 O_TARGET			:= xfs_quota.o
