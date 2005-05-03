@@ -57,7 +57,9 @@
 #include <linux/smp_lock.h>
 
 static struct vm_operations_struct linvfs_file_vm_ops;
-
+#ifdef CONFIG_XFS_DMAPI
+static struct vm_operations_struct linvfs_dmapi_file_vm_ops;
+#endif
 
 STATIC inline ssize_t
 __linvfs_read(
@@ -309,6 +311,33 @@ linvfs_fsync(
 
 #define nextdp(dp)      ((struct xfs_dirent *)((char *)(dp) + (dp)->d_reclen))
 
+#ifdef CONFIG_XFS_DMAPI
+
+STATIC struct page *
+linvfs_filemap_nopage(
+	struct vm_area_struct	*area,
+	unsigned long		address,
+	int			unused)
+{
+	struct inode	*inode = area->vm_file->f_dentry->d_inode;
+	vnode_t		*vp = LINVFS_GET_VP(inode);
+	struct page	*page;
+	xfs_mount_t	*mp = XFS_VFSTOM(vp->v_vfsp);
+	int		error;
+
+	ASSERT_ALWAYS(vp->v_vfsp->vfs_flag & VFS_DMI);
+
+	error = XFS_SEND_MMAP(mp, area, 0);
+	if (error)
+		return NULL;
+
+	page = filemap_nopage(area, address, unused);
+	return page;
+}
+
+#endif /* CONFIG_XFS_DMAPI */
+
+
 STATIC int
 linvfs_readdir(
 	struct file	*filp,
@@ -399,15 +428,18 @@ linvfs_file_mmap(
 	vattr_t		va = { .va_mask = XFS_AT_UPDATIME };
 	int		error;
 
+	vma->vm_ops = &linvfs_file_vm_ops;
+
+#ifdef CONFIG_XFS_DMAPI
 	if (vp->v_vfsp->vfs_flag & VFS_DMI) {
 		xfs_mount_t	*mp = XFS_VFSTOM(vp->v_vfsp);
 
 		error = XFS_SEND_MMAP(mp, vma, 0);
 		if (error)
 			return error;
+		vma->vm_ops = &linvfs_dmapi_file_vm_ops;
 	}
-
-	vma->vm_ops = &linvfs_file_vm_ops;
+#endif /* CONFIG_XFS_DMAPI */
 
 	VOP_SETATTR(vp, &va, XFS_AT_UPDATIME, NULL, error);
 	if (!error)
@@ -461,6 +493,7 @@ linvfs_ioctl_invis(
 	return error;
 }
 
+#ifdef CONFIG_XFS_DMAPI
 #ifdef HAVE_VMOP_MPROTECT
 STATIC int
 linvfs_mprotect(
@@ -481,6 +514,7 @@ linvfs_mprotect(
 	return error;
 }
 #endif /* HAVE_VMOP_MPROTECT */
+#endif /* CONFIG_XFS_DMAPI */
 
 #ifdef HAVE_FOP_OPEN_EXEC
 /* If the user is attempting to execute a file that is offline then
@@ -613,3 +647,13 @@ static struct vm_operations_struct linvfs_file_vm_ops = {
 	.mprotect	= linvfs_mprotect,
 #endif
 };
+
+#ifdef CONFIG_XFS_DMAPI
+static struct vm_operations_struct linvfs_dmapi_file_vm_ops = {
+	.nopage		= linvfs_filemap_nopage,
+	.populate	= filemap_populate,
+#ifdef HAVE_VMOP_MPROTECT
+	.mprotect	= linvfs_mprotect,
+#endif
+};
+#endif /* CONFIG_XFS_DMAPI */
