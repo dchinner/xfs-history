@@ -79,9 +79,6 @@ xfs_setattr(
 	int		flags,
 	cred_t		*credp);
 
-struct xfs_dm_mm;
-static struct xfs_dm_mm *xfs_dm_mm_lookup(struct inode *);
-
 #define XFS_BHV_LOOKUP(vp, xbdp)  \
 	xbdp = vn_bhv_lookup(VN_BHV_HEAD(vp), &xfs_vnodeops); \
 	ASSERT(xbdp);
@@ -2459,6 +2456,8 @@ xfs_dm_punch_hole(
 
 	if (right < DM_RIGHT_EXCL)
 		return -EACCES;
+	if (VN_MAPPED(vp))
+		return -EBUSY;
 
 	/* Make sure there are no leases. */
 	error = BREAK_LEASE(inode, FMODE_WRITE);
@@ -2485,14 +2484,6 @@ xfs_dm_punch_hole(
 	down_rw_sems(inode, DM_SEM_FLAG_WR);
 
 	xfs_ilock(xip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
-
-	if(xfs_dm_mm_lookup(inode)) {
-		/* This region is currently mmapped, or marked for mmap */
-		xfs_iunlock(xip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
-		error = -EBUSY;
-		goto up_and_out;
-	}
-
 	if ((off >= xip->i_d.di_size) || ((off+len) > xip->i_d.di_size)) {
 		xfs_iunlock(xip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 		error = -E2BIG;
@@ -3083,119 +3074,6 @@ xfs_dm_get_fsys_vector(
 }
 
 
-#define XFS_MM_HASHSZ	97
-static __inline int
-xfs_mm_hash_index(
-	struct inode	*inode)
-{
-	return ((int)((unsigned long)(inode) % XFS_MM_HASHSZ));
-}
-
-struct xfs_dm_mm {
-	struct inode		*dm_inode;	/* inode we're mapping */
-	struct list_head	dm_list;	/* hash list */
-	int			dm_ref;		/* number of refs */
-};
-typedef struct xfs_dm_mm xfs_dm_mm_t;
-
-static struct {
-	struct list_head	dmh_list;
-	spinlock_t		dmh_lock;
-} xfs_dm_mm_hash[XFS_MM_HASHSZ];
-
-static void
-xfs_dm_mm_hash_init(void)
-{
-	static int initialized = 0;
-	int i;
-
-	if (initialized)
-		return;
-	initialized = 1;
-	for (i = 0; i < XFS_MM_HASHSZ; i++) {
-		INIT_LIST_HEAD(&xfs_dm_mm_hash[i].dmh_list);
-		spin_lock_init(&xfs_dm_mm_hash[i].dmh_lock);
-	}
-}
-
-static xfs_dm_mm_t *
-xfs_dm_mm_lookup_locked(
-	struct inode	*inode)
-{
-	struct list_head	*entry;
-	xfs_dm_mm_t		*xfs_mm;
-	int			index;
-
-	index = xfs_mm_hash_index(inode);
-	list_for_each(entry, &xfs_dm_mm_hash[index].dmh_list) {
-		xfs_mm = list_entry(entry, xfs_dm_mm_t, dm_list);
-		if (xfs_mm->dm_inode == inode) {
-			return xfs_mm;
-		}
-	}
-	return NULL;
-}
-
-static xfs_dm_mm_t *
-xfs_dm_mm_lookup(
-	struct inode	*inode)
-{
-	xfs_dm_mm_t	*m;
-	int		index;
-
-	index = xfs_mm_hash_index(inode);
-	spin_lock(&xfs_dm_mm_hash[index].dmh_lock);
-	m = xfs_dm_mm_lookup_locked(inode);
-	spin_unlock(&xfs_dm_mm_hash[index].dmh_lock);
-	return m;
-}
-
-int
-xfs_dm_mm_get(
-	struct vm_area_struct	*vma)
-{
-	xfs_dm_mm_t	*xfs_mm, *m;
-	int		index;
-	struct inode	*inode = vma->vm_file->f_dentry->d_inode;
-
-	xfs_mm = kmem_alloc(sizeof(*xfs_mm), KM_SLEEP);
-	index = xfs_mm_hash_index(inode);
-	spin_lock(&xfs_dm_mm_hash[index].dmh_lock);
-	if ((m = xfs_dm_mm_lookup_locked(inode))) {
-		m->dm_ref++;
-		spin_unlock(&xfs_dm_mm_hash[index].dmh_lock);
-		kmem_free(xfs_mm, sizeof(*xfs_mm));
-		return 1;
-	}
-	xfs_mm->dm_inode = inode;
-	xfs_mm->dm_ref = 1;
-	list_add_tail(&xfs_mm->dm_list, &xfs_dm_mm_hash[index].dmh_list);
-	spin_unlock(&xfs_dm_mm_hash[index].dmh_lock);
-	return 0;
-}
-
-void
-xfs_dm_mm_put(
-	struct vm_area_struct	*vma)
-{
-	xfs_dm_mm_t	*xfs_mm;
-	int		index;
-	struct inode	*inode = vma->vm_file->f_dentry->d_inode;
-
-	index = xfs_mm_hash_index(inode);
-	spin_lock(&xfs_dm_mm_hash[index].dmh_lock);
-	xfs_mm = xfs_dm_mm_lookup_locked(inode);
-	if (xfs_mm && --xfs_mm->dm_ref == 0) {
-		list_del(&xfs_mm->dm_list);
-		spin_unlock(&xfs_dm_mm_hash[index].dmh_lock);
-		kmem_free(xfs_mm, sizeof(*xfs_mm));
-	}
-	else {
-		spin_unlock(&xfs_dm_mm_hash[index].dmh_lock);
-	}
-}
-
-
 /*	xfs_dm_send_mmap_event - send events needed for memory mapping a file.
  *
  *	This is a workaround called for files that are about to be
@@ -3302,10 +3180,7 @@ xfs_dm_send_mmap_event(
 		error = xfs_dm_send_data_event(DM_EVENT_READ, vp, offset,
 					       evsize, 0, &locktype);
 	}
-
 out_unlock:
-	if (!error)
-		xfs_dm_mm_get(vma);
 	xfs_iunlock(ip, iolock);
 
 	return -error; /* Return negative error to linvfs layer */
@@ -3597,7 +3472,6 @@ void
 xfs_dm_init(
 	struct file_system_type *fstype)
 {
-	xfs_dm_mm_hash_init();
 	vfs_bhv_set_custom(&xfs_dmops, &xfs_dmcore_xfs);
 	bhv_module_init(XFS_DMOPS, THIS_MODULE, &xfs_dmops);
 	dmapi_register(fstype, &xfs_dmapiops);
@@ -3611,6 +3485,3 @@ xfs_dm_exit(
 	bhv_module_exit(XFS_DMOPS);
 	vfs_bhv_clr_custom(&xfs_dmops);
 }
-
-EXPORT_SYMBOL(xfs_dm_mm_get);
-EXPORT_SYMBOL(xfs_dm_mm_put);

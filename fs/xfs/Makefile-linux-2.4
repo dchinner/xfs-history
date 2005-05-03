@@ -143,9 +143,6 @@ ifeq ($(CONFIG_XFS_FS)$(CONFIG_XFS_QUOTA),yy)
 endif
 
 export-objs			:= xfs_acl.o
-ifneq ($(CONFIG_XFS_DMAPI),)
-  export-objs			+= xfs_dmapi.o
-endif
 
 # If both xfs and kdb modules are built in then xfsidbg is built in.  If xfs is
 # a module and kdb modules are being compiled then xfsidbg must be a module, to
