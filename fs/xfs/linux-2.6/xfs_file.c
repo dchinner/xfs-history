@@ -317,11 +317,10 @@ STATIC struct page *
 linvfs_filemap_nopage(
 	struct vm_area_struct	*area,
 	unsigned long		address,
-	int			unused)
+	int			*type)
 {
 	struct inode	*inode = area->vm_file->f_dentry->d_inode;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
-	struct page	*page;
 	xfs_mount_t	*mp = XFS_VFSTOM(vp->v_vfsp);
 	int		error;
 
@@ -331,8 +330,7 @@ linvfs_filemap_nopage(
 	if (error)
 		return NULL;
 
-	page = filemap_nopage(area, address, unused);
-	return page;
+	return filemap_nopage(area, address, type);
 }
 
 #endif /* CONFIG_XFS_DMAPI */
