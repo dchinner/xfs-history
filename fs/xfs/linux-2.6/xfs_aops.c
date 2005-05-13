@@ -886,7 +886,7 @@ xfs_page_state_convert(
 		SetPageUptodate(page);
 
 	if (startio) {
-		WARN_ON(page_dirty);
+		WARN_ON(page_dirty && wbc->sync_mode != WB_SYNC_NONE);
 		xfs_submit_page(page, wbc, bh_arr, cnt, 0, !page_dirty);
 	}
 
