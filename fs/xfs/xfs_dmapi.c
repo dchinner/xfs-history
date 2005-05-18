@@ -3258,7 +3258,7 @@ static int
 xfs_dm_fh_to_inode(
 	struct super_block	*sb,
 	struct inode		**ip,
-	struct dm_fsfid		*dmfsfid)
+	dm_fid_t		*dmfid)
 {
 	vnode_t	*vp = NULL;
 	vfs_t	*vfsp = LINVFS_GET_VFS(sb);
@@ -3268,7 +3268,7 @@ xfs_dm_fh_to_inode(
 	/* Returns negative errors to DMAPI */
 
 	*ip = NULL;
-	memcpy(&fid, dmfsfid, sizeof(*dmfsfid));
+	memcpy(&fid, dmfid, sizeof(*dmfid));
 	if (fid.fid_len) {	/* file object handle */
 		VFS_VGET(vfsp, &vp, &fid, error);
 	}
@@ -3283,7 +3283,7 @@ xfs_dm_fh_to_inode(
 static int
 xfs_dm_inode_to_fh(
 	struct inode		*ip,
-	struct dm_fsfid		*dmfsfid,
+	dm_fid_t		*dmfid,
 	dm_fsid_t		*dmfsid)
 {
 	vnode_t	*vp = LINVFS_GET_VP(ip);
@@ -3297,7 +3297,8 @@ xfs_dm_inode_to_fh(
 	VOP_FID2(vp, &fid, error);
 	if (error)
 		return -error; /* Return negative error to DMAPI */
-	memcpy(dmfsfid, &fid, sizeof(*dmfsfid));
+
+	memcpy(dmfid, &fid, sizeof(*dmfid));
 	memcpy(dmfsid, vp->v_vfsp->vfs_altfsid, sizeof(*dmfsid));
 	return 0;
 }
