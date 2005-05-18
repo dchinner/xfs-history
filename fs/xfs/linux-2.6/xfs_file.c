@@ -430,11 +430,6 @@ linvfs_file_mmap(
 
 #ifdef CONFIG_XFS_DMAPI
 	if (vp->v_vfsp->vfs_flag & VFS_DMI) {
-		xfs_mount_t	*mp = XFS_VFSTOM(vp->v_vfsp);
-
-		error = XFS_SEND_MMAP(mp, vma, 0);
-		if (error)
-			return error;
 		vma->vm_ops = &linvfs_dmapi_file_vm_ops;
 	}
 #endif /* CONFIG_XFS_DMAPI */
