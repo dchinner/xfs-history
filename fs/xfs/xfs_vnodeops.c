@@ -4028,7 +4028,7 @@ xfs_finish_reclaim_all(xfs_mount_t *mp, int noblock)
  *      errno on error
  *
  */
-int
+STATIC int
 xfs_alloc_file_space(
 	xfs_inode_t		*ip,
 	xfs_off_t		offset,
