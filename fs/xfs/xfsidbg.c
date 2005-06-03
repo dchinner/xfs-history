@@ -5332,7 +5332,8 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 	} else if ((dqb = d)->d_magic == XFS_DQUOT_MAGIC) {
 #define XFSIDBG_DQTYPESTR(d)     \
 	((INT_GET((d)->d_flags, ARCH_CONVERT) & XFS_DQ_USER) ? "USR" : \
-	((INT_GET((d)->d_flags, ARCH_CONVERT) & XFS_DQ_GROUP) ? "GRP" : "???"))
+	((INT_GET((d)->d_flags, ARCH_CONVERT) & XFS_DQ_GROUP) ? "GRP" : \
+	((INT_GET((d)->d_flags, ARCH_CONVERT) & XFS_DQ_PROJ) ? "PRJ" : "???")))
 		kdb_printf("Quota blk starting ID [%d], type %s at 0x%p\n",
 			INT_GET(dqb->d_id, ARCH_CONVERT), XFSIDBG_DQTYPESTR(dqb), dqb);
 
@@ -6540,7 +6541,8 @@ xfsidbg_xlog_buf_logitem(xlog_recover_item_t *item)
 	if (buf_f->blf_flags & XFS_BLI_INODE_BUF) {
 		kdb_printf("\tINODE BUF <blkno=0x%Lx, len=0x%x>\n",
 			buf_f->blf_blkno, buf_f->blf_len);
-	} else if (buf_f->blf_flags & (XFS_BLI_UDQUOT_BUF | XFS_BLI_GDQUOT_BUF)) {
+	} else if (buf_f->blf_flags &
+		  (XFS_BLI_UDQUOT_BUF|XFS_BLI_PDQUOT_BUF|XFS_BLI_GDQUOT_BUF)) {
 		kdb_printf("\tDQUOT BUF <blkno=0x%Lx, len=0x%x>\n",
 			buf_f->blf_blkno, buf_f->blf_len);
 	} else {
@@ -7157,7 +7159,7 @@ xfsidbg_xqm(void)
 		return;
 	}
 
-	kdb_printf("usrhtab 0x%p\tgrphtab 0x%p\tndqfree 0x%x\thashmask 0x%x\n",
+	kdb_printf("usrhtab 0x%p grphtab 0x%p  ndqfree 0x%x  hashmask 0x%x\n",
 		xfs_Gqm->qm_usr_dqhtable,
 		xfs_Gqm->qm_grp_dqhtable,
 		xfs_Gqm->qm_dqfreelist.qh_nelems,
@@ -7190,20 +7192,21 @@ xfsidbg_xqm_diskdq(xfs_disk_dquot_t *d)
 		(int)INT_GET(d->d_itimer, ARCH_CONVERT));
 }
 
+static char *xdq_flags[] = {
+	"USER",		/* XFS_DQ_USER */
+	"PROJ",		/* XFS_DQ_PROJ */
+	"GROUP",	/* XFS_DQ_GROUP */
+	"FLKD",		/* XFS_DQ_FLOCKED */
+	"DIRTY",	/* XFS_DQ_DIRTY */
+	"WANT",		/* XFS_DQ_WANT */
+	"INACT",	/* XFS_DQ_INACTIVE */
+	"MARKER",	/* XFS_DQ_MARKER */
+	NULL
+};
+
 static void
 xfsidbg_xqm_dquot(xfs_dquot_t *dqp)
 {
-	static char *qflags[] = {
-		"USR",
-		"GRP",
-		"LCKD",
-		"FLKD",
-		"DIRTY",
-		"WANT",
-		"INACT",
-		"MARKER",
-		NULL
-	};
 	kdb_printf("mount 0x%p hash 0x%p gdquotp 0x%p HL_next 0x%p HL_prevp 0x%p\n",
 		dqp->q_mount,
 		dqp->q_hash,
@@ -7218,7 +7221,7 @@ xfsidbg_xqm_dquot(xfs_dquot_t *dqp)
 
 	kdb_printf("nrefs 0x%x, res_bcount %d, ",
 		dqp->q_nrefs, (int) dqp->q_res_bcount);
-	printflags(dqp->dq_flags, qflags, "flags:");
+	printflags(dqp->dq_flags, xdq_flags, "flags:");
 	kdb_printf("\nblkno 0x%llx\tboffset 0x%x\n",
 		(unsigned long long) dqp->q_blkno, (int) dqp->q_bufoffset);
 	kdb_printf("qlock 0x%p  flock 0x%p (%s) pincount 0x%x\n",
@@ -7320,7 +7323,7 @@ xfsidbg_xqm_htab(void)
 	for (i = 0; i <= xfs_Gqm->qm_dqhashmask; i++) {
 		h = &xfs_Gqm->qm_grp_dqhtable[i];
 		if (h->qh_next) {
-			kdb_printf("GRP %d: ", i);
+			kdb_printf("GRP/PRJ %d: ", i);
 			XQMIDBG_LIST_PRINT(h, HL_NEXT);
 		}
 	}
@@ -7331,19 +7334,6 @@ xfsidbg_xqm_htab(void)
 static int
 xfsidbg_xqm_pr_dqentry(ktrace_entry_t *ktep)
 {
-	static char *xdq_flags[] = {
-		"USR",	  /* 0x1 */
-		"PRJ",	  /* 0x2 */
-		"LCKD",	 /* 0x4 */
-		"GRP",	  /* 0x8 */
-		"FLOCKD",       /* 0x08 */
-		"DIRTY",	/* 0x10 */
-		"WANT",	 /* 0x20 */
-		"INACT",	/* 0x40 */
-		"MARKER",       /* 0x80 */
-		NULL
-	};
-
 	if ((__psint_t)ktep->val[0] == 0)
 		return 0;
 	switch ((__psint_t)ktep->val[0]) {
@@ -7471,10 +7461,9 @@ xfsidbg_xqm_tpdqinfo(xfs_trans_t *tp)
 		}
 		if (j == 0) {
 			qa = tp->t_dqinfo->dqa_grpdquots;
-			kdb_printf("GRP: \n");
+			kdb_printf("GRP/PRJ: \n");
 		}
 	}
-
 }
 
 #ifdef XFS_RW_TRACE
