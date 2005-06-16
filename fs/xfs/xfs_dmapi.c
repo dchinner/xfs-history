@@ -244,42 +244,28 @@ prohibited_mr_events(
 {
 	struct address_space *mapping = LINVFS_GET_IP(vp)->i_mapping;
 	int prohibited = (1 << DM_EVENT_READ);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 	struct vm_area_struct *vma = NULL;
+#endif
 
 	if (!VN_MAPPED(vp))
 		return 0;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-	/*
-	 * This block copied from IBM's version, with slight adjustments.
-	 */
 	spin_lock(&mapping->i_mmap_lock);
-	if (!prio_tree_empty(&mapping->i_mmap)) {
-		struct prio_tree_iter iter;
-		while ((vma = vma_prio_tree_next(vma, &iter)) != NULL) {
-			/* SPECIAL CASE: all events prohibited if any mmap
-			 * areas with VM_EXEC
-			 */
-			if (vma->vm_flags & VM_EXEC) {
-				prohibited |= ((1 << DM_EVENT_READ) |
-					       (1 << DM_EVENT_WRITE) |
-					       (1 << DM_EVENT_TRUNCATE));
-				break;
-			}
-
-			if (vma->vm_flags & VM_READ) {
-				prohibited |= 1 << DM_EVENT_READ;
-			}
-			if (vma->vm_flags & VM_WRITE) {
-				prohibited |= 1 << DM_EVENT_WRITE;
-			}
-		}
-	}
+	if (mapping_writably_mapped(mapping))
+		prohibited |= (1 << DM_EVENT_WRITE);
 	spin_unlock(&mapping->i_mmap_lock);
 #else
 	spin_lock(&mapping->i_shared_lock);
 	for (vma = mapping->i_mmap_shared; vma; vma = vma->vm_next_share) {
-		if (!(vma->vm_flags & VM_DENYWRITE)) {
+		if (vma->vm_flags & VM_WRITE) {
+			prohibited |= (1 << DM_EVENT_WRITE);
+			break;
+		}
+	}
+	for (vma = mapping->i_mmap; vma; vma = vma->vm_next_share) {
+		if (vma->vm_flags & VM_WRITE) {
 			prohibited |= (1 << DM_EVENT_WRITE);
 			break;
 		}
@@ -2456,8 +2442,6 @@ xfs_dm_punch_hole(
 
 	if (right < DM_RIGHT_EXCL)
 		return -EACCES;
-	if (VN_MAPPED(vp))
-		return -EBUSY;
 
 	/* Make sure there are no leases. */
 	error = BREAK_LEASE(inode, FMODE_WRITE);
@@ -2842,8 +2826,6 @@ xfs_dm_set_region(
 		if (region.rg_flags & DM_REGION_TRUNCATE)
 			new_mask |= 1 << DM_EVENT_TRUNCATE;
 	}
-	if ((new_mask & prohibited_mr_events(vp)) != 0)
-		return(-EBUSY);
 	mr_mask = (1 << DM_EVENT_READ) | (1 << DM_EVENT_WRITE) | (1 << DM_EVENT_TRUNCATE);
 
 	/* Get the file's existing event mask, clear the old managed region
@@ -2851,8 +2833,19 @@ xfs_dm_set_region(
 	*/
 
 	XFS_BHV_LOOKUP(vp, xbdp);
-
 	ip = XFS_BHVTOI(xbdp);
+
+	if (new_mask & prohibited_mr_events(vp)) {
+		/* If the change is simply to remove the READ
+		 * bit, then that's always okay.  Otherwise, it's busy.
+		 */
+		dm_eventset_t m1;
+		m1 = ip->i_iocore.io_dmevmask & ~(1 << DM_EVENT_READ);
+		if (m1 != new_mask) {
+			return -EBUSY;
+		}
+	}
+
 	mp = ip->i_mount;
 	tp = xfs_trans_alloc(mp, XFS_TRANS_SET_DMATTRS);
 	error = xfs_trans_reserve(tp, 0, XFS_ICHANGE_LOG_RES (mp), 0, 0, 0);
