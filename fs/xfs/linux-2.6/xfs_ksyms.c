@@ -208,7 +208,6 @@ EXPORT_SYMBOL(bhv_lookup_range);
 EXPORT_SYMBOL(bhv_remove_vfsops);
 EXPORT_SYMBOL(bhv_remove_all_vfsops);
 EXPORT_SYMBOL(bhv_remove_not_first);
-EXPORT_SYMBOL(doass);
 EXPORT_SYMBOL(fs_flush_pages);
 EXPORT_SYMBOL(fs_flushinval_pages);
 EXPORT_SYMBOL(fs_tosspages);
