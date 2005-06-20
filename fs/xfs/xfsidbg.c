@@ -7418,16 +7418,18 @@ xfsidbg_xqm_qinfo(xfs_mount_t *mp)
 		&mp->m_quotainfo->qi_pinlock,
 		&mp->m_quotainfo->qi_dqlist);
 
-	kdb_printf("nreclaims %d, btmlimit 0x%x, itmlimit 0x%x, RTbtmlim 0x%x\n",
-		(int)mp->m_quotainfo->qi_dqreclaims,
+	kdb_printf("btmlimit 0x%x, itmlimit 0x%x, RTbtmlim 0x%x\n",
 		(int)mp->m_quotainfo->qi_btimelimit,
 		(int)mp->m_quotainfo->qi_itimelimit,
 		(int)mp->m_quotainfo->qi_rtbtimelimit);
 
-	kdb_printf("bwarnlim 0x%x, iwarnlim 0x%x, &qofflock 0x%p, "
-		"chunklen 0x%x, dqperchunk 0x%x\n",
+	kdb_printf("bwarnlim 0x%x, iwarnlim 0x%x, RTbwarnlim 0x%x\n",
 		(int)mp->m_quotainfo->qi_bwarnlimit,
 		(int)mp->m_quotainfo->qi_iwarnlimit,
+		(int)mp->m_quotainfo->qi_rtbwarnlimit);
+
+	kdb_printf("nreclaims %d, &qofflock 0x%p, chunklen 0x%x, dqperchunk 0x%x\n",
+		(int)mp->m_quotainfo->qi_dqreclaims,
 		&mp->m_quotainfo->qi_quotaofflock,
 		(int)mp->m_quotainfo->qi_dqchunklen,
 		(int)mp->m_quotainfo->qi_dqperchunk);
