@@ -64,7 +64,6 @@
 #include <sema.h>
 #include <time.h>
 
-#include <support/qsort.h>
 #include <support/ktrace.h>
 #include <support/debug.h>
 #include <support/move.h>
@@ -88,6 +87,7 @@
 #include <linux/list.h>
 #include <linux/proc_fs.h>
 #include <linux/version.h>
+#include <linux/sort.h>
 
 #include <asm/page.h>
 #include <asm/div64.h>
@@ -372,5 +372,7 @@ static inline __uint64_t roundup_64(__uint64_t x, __uint32_t y)
 	do_div(x, y);
 	return(x * y);
 }
+
+#define qsort(a, n, s, cmp) sort(a, n, s, cmp, NULL)
 
 #endif /* __XFS_LINUX__ */

@@ -495,6 +495,7 @@ xfssyncd(
 	for (;;) {
 		set_current_state(TASK_INTERRUPTIBLE);
 		timeleft = schedule_timeout(timeleft);
+		/* swsusp */
 		try_to_freeze(PF_FREEZE);
 		if (vfsp->vfs_flag & VFS_UMOUNT)
 			break;
