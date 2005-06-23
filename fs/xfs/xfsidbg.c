@@ -4423,6 +4423,10 @@ xfs_rw_trace_entry(ktrace_entry_t *ktep)
 		qprintf("PAGE RELEASE:\n");
 		xfs_page_trace_entry(ktep);
 		break;
+	case XFS_INVALIDPAGE_ENTER:
+		qprintf("PAGE INVALIDATE:\n");
+		xfs_page_trace_entry(ktep);
+		break;
 	case XFS_IOMAP_ALLOC_ENTER:
 		qprintf("ALLOC ENTER:\n");
 		xfs_iomap_enter_trace_entry(ktep);
