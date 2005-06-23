@@ -300,6 +300,98 @@ vfs_insertbhv(
 	bhv_insert_initial(&vfsp->vfs_bh, bdp);
 }
 
+/*
+ * Implementation for behaviours-as-modules
+ */
+
+typedef struct bhv_module_list {
+	struct list_head	bm_list;
+	struct module *		bm_module;
+	const char *		bm_name;
+	void *			bm_ops;
+} bhv_module_list_t;
+STATIC DEFINE_SPINLOCK(bhv_lock);
+STATIC struct list_head bhv_list = LIST_HEAD_INIT(bhv_list);
+
+void
+bhv_module_init(
+	const char		*name,
+	struct module		*module,
+	const void		*ops)
+{
+	bhv_module_list_t	*bm, *entry, *n;
+
+	bm = kmem_alloc(sizeof(struct bhv_module_list), KM_SLEEP);
+	INIT_LIST_HEAD(&bm->bm_list);
+	bm->bm_module = module;
+	bm->bm_name = name;
+	bm->bm_ops = (void *)ops;
+
+	spin_lock(&bhv_lock);
+	list_for_each_entry_safe(entry, n, &bhv_list, bm_list)
+		BUG_ON(strcmp(entry->bm_name, name) == 0);
+	list_add(&bm->bm_list, &bhv_list);
+	spin_unlock(&bhv_lock);
+}
+
+void
+bhv_module_exit(
+	const char		*name)
+{
+	bhv_module_list_t	*entry, *n;
+
+	spin_lock(&bhv_lock);
+	list_for_each_entry_safe(entry, n, &bhv_list, bm_list)
+		if (strcmp(entry->bm_name, name) == 0)
+			list_del(&entry->bm_list);
+	spin_unlock(&bhv_lock);
+}
+
+STATIC void *
+bhv_insert_module(
+	const char		*name,
+	const char		*modname)
+{
+	bhv_module_list_t	*entry, *n;
+	void			*ops = NULL;
+
+	spin_lock(&bhv_lock);
+	list_for_each_entry_safe(entry, n, &bhv_list, bm_list)
+		if (strcmp(entry->bm_name, name) == 0 &&
+		    try_module_get(entry->bm_module))
+			ops = entry->bm_ops;
+	spin_unlock(&bhv_lock);
+	return ops;
+}
+
+STATIC void
+bhv_remove_module(
+	const char		*name)
+{
+	bhv_module_list_t	*entry, *n;
+
+	spin_lock(&bhv_lock);
+	list_for_each_entry_safe(entry, n, &bhv_list, bm_list)
+		if (strcmp(entry->bm_name, name) == 0)
+		    module_put(entry->bm_module);
+	spin_unlock(&bhv_lock);
+}
+
+STATIC void *
+bhv_lookup_module(
+	const char		*name,
+	const char		*module)
+{
+	void			*ops;
+
+	ops = bhv_insert_module(name, module);
+	if (!ops && module) {
+		request_module("%s", module);
+		ops = bhv_insert_module(name, module);
+	}
+	return ops;
+}
+
 void
 bhv_remove_vfsops(
 	struct vfs		*vfsp,

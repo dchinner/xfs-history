@@ -233,13 +233,8 @@ extern void vfs_deallocate(vfs_t *);
 extern void vfs_insertops(vfs_t *, bhv_vfsops_t *);
 extern void vfs_insertbhv(vfs_t *, bhv_desc_t *, vfsops_t *, void *);
 
-#define bhv_lookup_module(n,m)	( (m) ? \
-				inter_module_get_request(n, m) : \
-				inter_module_get(n) )
-#define bhv_remove_module(n)	inter_module_put(n)
-#define bhv_module_init(n,m,op)	inter_module_register(n,m,op)
-#define bhv_module_exit(n)	inter_module_unregister(n)
-
+extern void bhv_module_init(const char *, struct module *, const void *);
+extern void bhv_module_exit(const char *);
 extern void bhv_get_vfsops(struct vfs *, const char *, const char *);
 extern void bhv_insert_all_vfsops(struct vfs *);
 extern void bhv_remove_all_vfsops(struct vfs *, int);
