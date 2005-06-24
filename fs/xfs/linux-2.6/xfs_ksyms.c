@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2004-2005 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -205,6 +205,8 @@ EXPORT_SYMBOL(bhv_insert);
 EXPORT_SYMBOL(bhv_insert_initial);
 EXPORT_SYMBOL(bhv_lookup);
 EXPORT_SYMBOL(bhv_lookup_range);
+EXPORT_SYMBOL(bhv_module_init);
+EXPORT_SYMBOL(bhv_module_exit);
 EXPORT_SYMBOL(bhv_remove_vfsops);
 EXPORT_SYMBOL(bhv_remove_all_vfsops);
 EXPORT_SYMBOL(bhv_remove_not_first);
