@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2005 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -2587,7 +2587,7 @@ kdbm_pbdelay(int argc, const char **argv, const char **envp,
 			print_pagebuf(&bp, addr);
 		} else {
 			kdb_printf("%4d  0x%lx   %d   %ld\n",
-				count++, addr, 
+				count++, addr,
 				bp.pb_pin_count.counter,
 				bp.pb_queuetime);
 		}
@@ -2612,15 +2612,47 @@ kdbm_iomap(int argc, const char **argv, const char **envp,
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)) ||
-	    (diag = kdb_getarea(iomap, addr)))
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)))
+		return diag;
+	if ((diag = kdb_getarea(iomap, addr)))
+		return diag;
 
 	kdb_printf("iomap_t at 0x%lx\n", addr);
-	kdb_printf("  iomap_bn 0x%llx iomap_offset 0x%Lx iomap_delta 0x%lx iomap_bsize 0x%llx\n",
+	kdb_printf("  bn 0x%llx offset 0x%Lx delta 0x%lx bsize 0x%llx\n",
 		(long long) iomap.iomap_bn, iomap.iomap_offset,
 		(unsigned long)iomap.iomap_delta, (long long)iomap.iomap_bsize);
+	kdb_printf("  iomap_flags %s\n",
+		map_flags(iomap.iomap_flags, iomap_flag_vals));
 
-	kdb_printf("  iomap_flags %s\n", map_flags(iomap.iomap_flags, iomap_flag_vals));
+	return 0;
+}
+
+static int
+kdbm_i2vnode(int argc, const char **argv, const char **envp,
+	struct pt_regs *regs)
+{
+	struct vnode vp;
+	struct inode *ip;
+	unsigned long addr;
+	long offset=0;
+	int nextarg;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	nextarg = 1;
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)))
+		return diag;
+	ip = (struct inode *)addr;
+	if ((diag = kdb_getarea(vp, (unsigned long)LINVFS_GET_VP(ip))))
+		return diag;
+
+	kdb_printf("--> Inode @ 0x%p\n", ip);
+	printinode(ip);
+
+	kdb_printf("--> Vnode @ 0x%p\n", LINVFS_GET_VP(ip));
+	printvnode(&vp, (unsigned long)LINVFS_GET_VP(ip));
 
 	return 0;
 }
@@ -2944,7 +2976,8 @@ static struct xif xfsidbg_funcs[] = {
 static struct xif pb_funcs[] = {
   {  "pb",	kdbm_pb,	"<vaddr>",	"Display xfs_buf_t" },
   {  "pbflags",	kdbm_pb_flags,	"<flags>",	"Display page_buf flags" },
-  {  "iomapap",	kdbm_iomap,	"<iomap_t *>",	"Display IOmap" },
+  {  "xiomap",	kdbm_iomap,	"<xfs_iomap_t *>",	"Display IOmap" },
+  {  "i2vnode",	kdbm_i2vnode,	"<inode *>",	"Display Vnode" },
   {  "pbdelay",	kdbm_pbdelay,	"0|1",		"Display delwri pagebufs" },
 #ifdef PAGEBUF_TRACE
   {  "pbtrace",	kdbm_pbtrace,	"<vaddr>|<count>",	"xfs_buf_t trace" },
