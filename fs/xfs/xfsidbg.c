@@ -6447,6 +6447,51 @@ xfsidbg_xlog(xlog_t *log)
 #endif
 }	/* xfsidbg_xlog */
 
+static void
+xfsidbg_print_trans_type(unsigned int t_type)
+{
+	switch (t_type) {
+	case XFS_TRANS_SETATTR_NOT_SIZE: kdb_printf("SETATTR_NOT_SIZE");break;
+	case XFS_TRANS_SETATTR_SIZE:	kdb_printf("SETATTR_SIZE");	break;
+	case XFS_TRANS_INACTIVE:	kdb_printf("INACTIVE");		break;
+	case XFS_TRANS_CREATE:		kdb_printf("CREATE");		break;
+	case XFS_TRANS_CREATE_TRUNC:	kdb_printf("CREATE_TRUNC");	break;
+	case XFS_TRANS_TRUNCATE_FILE:	kdb_printf("TRUNCATE_FILE");	break;
+	case XFS_TRANS_REMOVE:		kdb_printf("REMOVE");		break;
+	case XFS_TRANS_LINK:		kdb_printf("LINK");		break;
+	case XFS_TRANS_RENAME:		kdb_printf("RENAME");		break;
+	case XFS_TRANS_MKDIR:		kdb_printf("MKDIR");		break;
+	case XFS_TRANS_RMDIR:		kdb_printf("RMDIR");		break;
+	case XFS_TRANS_SYMLINK:		kdb_printf("SYMLINK");		break;
+	case XFS_TRANS_SET_DMATTRS:	kdb_printf("SET_DMATTRS");	break;
+	case XFS_TRANS_GROWFS:		kdb_printf("GROWFS");		break;
+	case XFS_TRANS_STRAT_WRITE:	kdb_printf("STRAT_WRITE");	break;
+	case XFS_TRANS_DIOSTRAT:	kdb_printf("DIOSTRAT");		break;
+	case XFS_TRANS_WRITE_SYNC:	kdb_printf("WRITE_SYNC");	break;
+	case XFS_TRANS_WRITEID:		kdb_printf("WRITEID");		break;
+	case XFS_TRANS_ADDAFORK:	kdb_printf("ADDAFORK");		break;
+	case XFS_TRANS_ATTRINVAL:	kdb_printf("ATTRINVAL");	break;
+	case XFS_TRANS_ATRUNCATE:	kdb_printf("ATRUNCATE");	break;
+	case XFS_TRANS_ATTR_SET:	kdb_printf("ATTR_SET");		break;
+	case XFS_TRANS_ATTR_RM:		kdb_printf("ATTR_RM");		break;
+	case XFS_TRANS_ATTR_FLAG:	kdb_printf("ATTR_FLAG");	break;
+	case XFS_TRANS_CLEAR_AGI_BUCKET:kdb_printf("CLEAR_AGI_BUCKET");	break;
+	case XFS_TRANS_QM_SBCHANGE:	kdb_printf("QM_SBCHANGE");	break;
+	case XFS_TRANS_QM_QUOTAOFF:	kdb_printf("QM_QUOTAOFF");	break;
+	case XFS_TRANS_QM_DQALLOC:	kdb_printf("QM_DQALLOC");	break;
+	case XFS_TRANS_QM_SETQLIM:	kdb_printf("QM_SETQLIM");	break;
+	case XFS_TRANS_QM_DQCLUSTER:	kdb_printf("QM_DQCLUSTER");	break;
+	case XFS_TRANS_QM_QINOCREATE:	kdb_printf("QM_QINOCREATE");	break;
+	case XFS_TRANS_QM_QUOTAOFF_END:	kdb_printf("QM_QOFF_END");	break;
+	case XFS_TRANS_SB_UNIT:		kdb_printf("SB_UNIT");		break;
+	case XFS_TRANS_FSYNC_TS:	kdb_printf("FSYNC_TS");		break;
+	case XFS_TRANS_GROWFSRT_ALLOC:	kdb_printf("GROWFSRT_ALLOC");	break;
+	case XFS_TRANS_GROWFSRT_ZERO:	kdb_printf("GROWFSRT_ZERO");	break;
+	case XFS_TRANS_GROWFSRT_FREE:	kdb_printf("GROWFSRT_FREE");	break;
+	default:			kdb_printf("unknown(0x%x)", t_type); break;
+	}
+}
+
 #ifdef XFS_LOG_TRACE
 /*
  * Print grant trace for a log.
@@ -6457,6 +6502,8 @@ xfsidbg_xlog_granttrace(xlog_t *log)
 	ktrace_entry_t  *ktep;
 	ktrace_snap_t   kts;
 	ktrace_t	*kt;
+	int		i = 0;
+	unsigned long	cnts,t_ocnt, t_cnt;
 
 	if (((__psint_t)log) == ((__psint_t)-1)) {
 		qprintf("Usage: xl_grtr <log>\n");
@@ -6470,7 +6517,18 @@ xfsidbg_xlog_granttrace(xlog_t *log)
 	}
 	ktep = ktrace_first(kt, &kts);
 	while (ktep != NULL) {
-		qprintf("%s\n", (char *)ktep->val[11]);
+		/* split cnts into two parts: cnt and ocnt */
+		cnts = (unsigned long)ktep->val[13];
+		t_ocnt = 0xff & cnts;
+		t_cnt =  cnts >> 8;
+
+		qprintf("%d: %s [", i++, (char *)ktep->val[11]);
+		xfsidbg_print_trans_type((unsigned long)ktep->val[12]);
+		qprintf("]\n");
+		qprintf("  t_ocnt = %lu, t_cnt = %lu, t_curr_res = %lu, "
+			"t_unit_res = %lu\n", 
+			t_ocnt, t_cnt, (unsigned long)ktep->val[14],
+			(unsigned long)ktep->val[15]);
 		qprintf("  tic:0x%p resQ:0x%p wrQ:0x%p ",
 			ktep->val[0], ktep->val[1], ktep->val[2]);
 		qprintf("  GrResC:%ld GrResB:%ld GrWrC:%ld GrWrB:%ld \n",
@@ -6644,6 +6702,9 @@ xfsidbg_xlog_tic(xlog_ticket_t *tic)
 	kdb_printf("clientid: %c  \n", tic->t_clientid);
 	printflags(tic->t_flags, t_flags,"ticket");
 	kdb_printf("\n");
+	qprintf("trans type: ");
+	xfsidbg_print_trans_type(tic->t_trans_type);
+	qprintf("\n");
 }	/* xfsidbg_xlog_tic */
 
 /*
@@ -7588,7 +7649,7 @@ xfsidbg_xtp(xfs_trans_t *tp)
 		"dirty",	/* 0x1 */
 		"sb_dirty",	/* 0x2 */
 		"perm_log_res",	/* 0x4 */
-		"sync",		 /* 0x08 */
+		"sync",		/* 0x08 */
 		"dq_dirty",     /* 0x10 */
 		NULL
 		};
@@ -7601,46 +7662,7 @@ xfsidbg_xtp(xfs_trans_t *tp)
 		};
 
 	kdb_printf("tp 0x%p type ", tp);
-	switch (tp->t_type) {
-	case XFS_TRANS_SETATTR_NOT_SIZE: kdb_printf("SETATTR_NOT_SIZE");break;
-	case XFS_TRANS_SETATTR_SIZE:	kdb_printf("SETATTR_SIZE");	break;
-	case XFS_TRANS_INACTIVE:	kdb_printf("INACTIVE");		break;
-	case XFS_TRANS_CREATE:		kdb_printf("CREATE");		break;
-	case XFS_TRANS_CREATE_TRUNC:	kdb_printf("CREATE_TRUNC");	break;
-	case XFS_TRANS_TRUNCATE_FILE:	kdb_printf("TRUNCATE_FILE");	break;
-	case XFS_TRANS_REMOVE:		kdb_printf("REMOVE");		break;
-	case XFS_TRANS_LINK:		kdb_printf("LINK");		break;
-	case XFS_TRANS_RENAME:		kdb_printf("RENAME");		break;
-	case XFS_TRANS_MKDIR:		kdb_printf("MKDIR");		break;
-	case XFS_TRANS_RMDIR:		kdb_printf("RMDIR");		break;
-	case XFS_TRANS_SYMLINK:		kdb_printf("SYMLINK");		break;
-	case XFS_TRANS_SET_DMATTRS:	kdb_printf("SET_DMATTRS");	break;
-	case XFS_TRANS_GROWFS:		kdb_printf("GROWFS");		break;
-	case XFS_TRANS_STRAT_WRITE:	kdb_printf("STRAT_WRITE");	break;
-	case XFS_TRANS_DIOSTRAT:	kdb_printf("DIOSTRAT");		break;
-	case XFS_TRANS_WRITE_SYNC:	kdb_printf("WRITE_SYNC");	break;
-	case XFS_TRANS_WRITEID:		kdb_printf("WRITEID");		break;
-	case XFS_TRANS_ADDAFORK:	kdb_printf("ADDAFORK");		break;
-	case XFS_TRANS_ATTRINVAL:	kdb_printf("ATTRINVAL");	break;
-	case XFS_TRANS_ATRUNCATE:	kdb_printf("ATRUNCATE");	break;
-	case XFS_TRANS_ATTR_SET:	kdb_printf("ATTR_SET");		break;
-	case XFS_TRANS_ATTR_RM:		kdb_printf("ATTR_RM");		break;
-	case XFS_TRANS_ATTR_FLAG:	kdb_printf("ATTR_FLAG");	break;
-	case XFS_TRANS_CLEAR_AGI_BUCKET:kdb_printf("CLEAR_AGI_BUCKET");	break;
-	case XFS_TRANS_QM_SBCHANGE:	kdb_printf("QM_SBCHANGE");	break;
-	case XFS_TRANS_QM_QUOTAOFF:	kdb_printf("QM_QUOTAOFF");	break;
-	case XFS_TRANS_QM_DQALLOC:	kdb_printf("QM_DQALLOC");	break;
-	case XFS_TRANS_QM_SETQLIM:	kdb_printf("QM_SETQLIM");	break;
-	case XFS_TRANS_QM_DQCLUSTER:	kdb_printf("QM_DQCLUSTER");	break;
-	case XFS_TRANS_QM_QINOCREATE:	kdb_printf("QM_QINOCREATE");	break;
-	case XFS_TRANS_QM_QUOTAOFF_END:	kdb_printf("QM_QOFF_END");	break;
-	case XFS_TRANS_SB_UNIT:		kdb_printf("SB_UNIT");		break;
-	case XFS_TRANS_FSYNC_TS:	kdb_printf("FSYNC_TS");		break;
-	case XFS_TRANS_GROWFSRT_ALLOC:	kdb_printf("GROWFSRT_ALLOC");	break;
-	case XFS_TRANS_GROWFSRT_ZERO:	kdb_printf("GROWFSRT_ZERO");	break;
-	case XFS_TRANS_GROWFSRT_FREE:	kdb_printf("GROWFSRT_FREE");	break;
-	default:			kdb_printf("0x%x", tp->t_type);	break;
-	}
+	xfsidbg_print_trans_type(tp->t_type);
 	kdb_printf(" mount 0x%p\n", tp->t_mountp);
 	kdb_printf("flags ");
 	printflags(tp->t_flags, xtp_flags,"xtp");
