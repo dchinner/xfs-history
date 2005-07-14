@@ -1957,11 +1957,6 @@ char *tab_vflags[] = {
 	NULL
 };
 
-
-static char *vnode_type[] = {
-	"VNON", "VREG", "VDIR", "VBLK", "VLNK", "VFIFO", "VBAD", "VSOCK"
-};
-
 static void
 printflags(register uint64_t flags,
 	register char **strings,
@@ -2015,11 +2010,7 @@ static void printbhv(bhv_desc_t *bdp)
 
 static void	printvnode(vnode_t *vp, unsigned long addr)
 {
-	kdb_printf("vnode: 0x%lx type ", addr);
-	if ((size_t)vp->v_type >= sizeof(vnode_type)/sizeof(vnode_type[0]))
-		kdb_printf("out of range 0x%x", vp->v_type);
-	else
-		kdb_printf("%s", vnode_type[vp->v_type]);
+	kdb_printf("vnode: 0x%lx\n", addr);
 	kdb_printf(" v_bh 0x%p\n", &vp->v_bh);
 
 	printbhv(vp->v_fbhv);

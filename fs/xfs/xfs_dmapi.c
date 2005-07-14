@@ -373,27 +373,17 @@ xfs_ip_to_stat(
 	buf->dt_uid = ip->i_d.di_uid;
 	buf->dt_gid = ip->i_d.di_gid;
 	buf->dt_nlink = ip->i_d.di_nlink;
-	/*
-	 * Minor optimization, check the common cases first.
-	 */
-	if ((vp->v_type == VREG) || (vp->v_type == VDIR)) {
-		buf->dt_rdev = 0;
-	} else if ((vp->v_type == VCHR) || (vp->v_type == VBLK) ) {
-		buf->dt_rdev = XFS_TO_LINUX_RDEVT(ip,inode);
-	} else {
-		buf->dt_rdev = 0;	/* not a b/c spec. */
-	}
-
 	buf->dt_atime = ip->i_d.di_atime.t_sec;
 	buf->dt_mtime = ip->i_d.di_mtime.t_sec;
 	buf->dt_ctime = ip->i_d.di_ctime.t_sec;
 
 	switch (ip->i_d.di_mode & S_IFMT) {
-	  case S_IFBLK:
-	  case S_IFCHR:
+	case S_IFBLK:
+	case S_IFCHR:
 		buf->dt_blksize = BLKDEV_IOSIZE;
+		buf->dt_rdev = XFS_TO_LINUX_RDEVT(ip,inode);
 		break;
-	  default:
+	default:
 		/*
 		 * We use the read buffer size as a recommended I/O
 		 * size.  This should always be larger than the
@@ -401,6 +391,7 @@ xfs_ip_to_stat(
 		 * The value returned is in bytes.
 		 */
 		buf->dt_blksize = 1 << mp->m_readio_log;
+		buf->dt_rdev = 0;
 		break;
 	}
 
@@ -924,7 +915,7 @@ xfs_dm_f_set_eventlist(
 	max_mask = (1 << maxevent) - 1;
 
 	vp = BHV_TO_VNODE(bdp);
-	if (vp->v_type == VDIR) {
+	if (VN_ISDIR(vp)) {
 		valid_events = DM_XFS_VALID_DIRECTORY_EVENTS;
 	} else {	/* file or symlink */
 		valid_events = DM_XFS_VALID_FILE_EVENTS;
@@ -3103,7 +3094,8 @@ xfs_dm_send_mmap_event(
 	vp = LINVFS_GET_VP(vma->vm_file->f_dentry->d_inode);
 	ASSERT(vp);
 
-	if ((vp->v_type != VREG) || !(vp->v_vfsp->vfs_flag & VFS_DMI))
+	if (!S_ISREG(vma->vm_file->f_dentry->d_inode->i_mode) ||
+	    !(vp->v_vfsp->vfs_flag & VFS_DMI))
 		return 0;
 
 	/* If they specifically asked for 'read', then give it to them.
