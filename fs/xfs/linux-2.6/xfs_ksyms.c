@@ -347,6 +347,7 @@ EXPORT_SYMBOL(xfs_log_unmount_write);
 EXPORT_SYMBOL(xfs_mod_sb);
 EXPORT_SYMBOL(xfs_mount_free);
 EXPORT_SYMBOL(xfs_mount_init);
+EXPORT_SYMBOL(xfs_mount_reset_sbqflags);
 EXPORT_SYMBOL(xfs_mountfs);
 EXPORT_SYMBOL(xfs_qm_dqcheck);
 EXPORT_SYMBOL(xfs_readsb);
