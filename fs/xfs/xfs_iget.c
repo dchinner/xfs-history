@@ -538,7 +538,7 @@ retry:
 			    ((bdp = vn_bhv_lookup(VN_BHV_HEAD(vp),
 						  &xfs_vnodeops)) == NULL)) {
 				iput(inode);
-				msleep(1);
+				delay(1);
 				goto retry;
 			}
 
