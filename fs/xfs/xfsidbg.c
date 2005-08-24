@@ -2675,7 +2675,7 @@ kdbm_pbtrace_offset(int argc, const char **argv, const char **envp,
 	struct pt_regs *regs)
 {
 	long		mask = 0;
-	unsigned long	offset = 0;
+	unsigned long	got_offset = 0, offset = 0;
 	int		diag;
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
@@ -2687,6 +2687,7 @@ kdbm_pbtrace_offset(int argc, const char **argv, const char **envp,
 		diag = kdbgetularg(argv[1], &offset);
 		if (diag)
 			return diag;
+		got_offset = 1;		/* allows tracing offset zero */
 	}
 
 	if (argc > 1) {
@@ -2696,17 +2697,18 @@ kdbm_pbtrace_offset(int argc, const char **argv, const char **envp,
 	}
 
 	ktep = ktrace_first(pagebuf_trace_buf, &kts);
-	while (ktep != NULL) {
+	do {
 		unsigned long long daddr;
 
+		if (ktep == NULL)
+			break;
 		daddr = ((unsigned long long)(unsigned long)ktep->val[8] << 32)
 			| ((unsigned long long)(unsigned long)ktep->val[9]);
-		if (offset && ((daddr & ~mask) != offset))
+		if (got_offset && ((daddr & ~mask) != offset))
 			continue;
 		if (pagebuf_trace_entry(ktep))
 			kdb_printf("\n");
-		ktep = ktrace_next(pagebuf_trace_buf, &kts);
-	}
+	} while ((ktep = ktrace_next(pagebuf_trace_buf, &kts)) != NULL);
 	return 0;
 }
 
@@ -2741,15 +2743,17 @@ kdbm_pbtrace(int argc, const char **argv, const char **envp,
 	}
 
 	ktep = ktrace_first(pagebuf_trace_buf, &kts);
-	while (ktep != NULL) {
+	do {
+		if (ktep == NULL)
+			break;
 		if (addr && (ktep->val[0] != (void *)addr))
 			continue;
 		if (event_match && strcmp((char *)ktep->val[1], event_match))
 			continue;
 		if (pagebuf_trace_entry(ktep))
 			qprintf("\n");
-		ktep = ktrace_next(pagebuf_trace_buf, &kts);
-	}
+	} while ((ktep = ktrace_next(pagebuf_trace_buf, &kts)) != NULL);
+
 	return 0;
 }
 #endif
