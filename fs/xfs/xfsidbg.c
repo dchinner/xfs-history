@@ -2420,7 +2420,7 @@ static char	*pb_flag_vals[] = {
 /*  5 */ "NONE", "DELWRI",  "STALE", "FS_MANAGED", "FS_DATAIOD",
 /* 10 */ "FORCEIO", "FLUSH", "READ_AHEAD", "DIRECTIO", "LOCK",
 /* 15 */ "TRYLOCK", "DONT_BLOCK", "PAGE_CACHE", "KMEM_ALLOC", "RUN_QUEUES",
-/* 20 */ "PRIVATE_BH",
+/* 20 */ "PRIVATE_BH", "DELWRI_Q",
 	 NULL };
 
 static char	*iomap_flag_vals[] = {
