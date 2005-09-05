@@ -148,10 +148,10 @@ static inline void set_buffer_unwritten_io(struct buffer_head *bh)
 #define xfs_inherit_nosymlinks	xfs_params.inherit_nosym.val
 #define xfs_rotorstep		xfs_params.rotorstep.val
 
-#ifndef __smp_processor_id
-#define __smp_processor_id()	smp_processor_id()
+#ifndef raw_smp_processor_id
+#define raw_smp_processor_id()	smp_processor_id()
 #endif
-#define current_cpu()		__smp_processor_id()
+#define current_cpu()		raw_smp_processor_id()
 #define current_pid()		(current->pid)
 #define current_fsuid(cred)	(current->fsuid)
 #define current_fsgid(cred)	(current->fsgid)
@@ -257,11 +257,18 @@ static inline void set_buffer_unwritten_io(struct buffer_head *bh)
 #define MAX(a,b)	(max(a,b))
 #define howmany(x, y)	(((x)+((y)-1))/(y))
 #define roundup(x, y)	((((x)+((y)-1))/(y))*(y))
+#define qsort(a,n,s,fn)	sort(a,n,s,fn,NULL)
 
+/*
+ * Various platform dependent calls that don't fit anywhere else
+ */
 #define xfs_stack_trace()	dump_stack()
-
 #define xfs_itruncate_data(ip, off)	\
 	(-vmtruncate(LINVFS_GET_IP(XFS_ITOV(ip)), (off)))
+#define xfs_statvfs_fsid(statp, mp)	\
+	({ u64 id = huge_encode_dev((mp)->m_dev);	\
+	   __kernel_fsid_t *fsid = &(statp)->f_fsid;	\
+	(fsid->val[0] = (u32)id, fsid->val[1] = (u32)(id >> 32)); })
 
 
 /* Move the kernel do_div definition off to one side */
@@ -373,7 +380,5 @@ static inline __uint64_t roundup_64(__uint64_t x, __uint32_t y)
 	do_div(x, y);
 	return(x * y);
 }
-
-#define qsort(a, n, s, cmp) sort(a, n, s, cmp, NULL)
 
 #endif /* __XFS_LINUX__ */
