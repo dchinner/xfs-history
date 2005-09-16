@@ -780,6 +780,18 @@ linvfs_show_options(
 }
 
 STATIC int
+linvfs_quotasync(
+	struct super_block	*sb,
+	int			type)
+{
+	struct vfs		*vfsp = LINVFS_GET_VFS(sb);
+	int			error;
+
+	VFS_QUOTACTL(vfsp, Q_XQUOTASYNC, 0, (caddr_t)NULL, error);
+	return -error;
+}
+
+STATIC int
 linvfs_getxstate(
 	struct super_block	*sb,
 	struct fs_quota_stat	*fqs)
@@ -947,6 +959,7 @@ STATIC struct super_operations linvfs_sops = {
 };
 
 STATIC struct quotactl_ops linvfs_qops = {
+	.quota_sync		= linvfs_quotasync,
 	.get_xstate		= linvfs_getxstate,
 	.set_xstate		= linvfs_setxstate,
 	.get_xquota		= linvfs_getxquota,

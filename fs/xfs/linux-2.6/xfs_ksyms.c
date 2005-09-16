@@ -356,6 +356,7 @@ EXPORT_SYMBOL(xfs_rwlock);
 EXPORT_SYMBOL(xfs_rwunlock);
 EXPORT_SYMBOL(xfs_setsize_buftarg);
 EXPORT_SYMBOL(xfs_syncsub);
+EXPORT_SYMBOL(xfs_sync_inodes);
 EXPORT_SYMBOL(xfs_trans_add_item);
 EXPORT_SYMBOL(xfs_trans_alloc);
 EXPORT_SYMBOL(xfs_trans_bhold);
