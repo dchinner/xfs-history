@@ -29,43 +29,40 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-
 #include "xfs.h"
-
 #include "xfs_fs.h"
+#include "xfs_bit.h"
 #include "xfs_buf.h"
-#include "xfs_macros.h"
-#include "xfs_inum.h"
 #include "xfs_log.h"
+#include "xfs_imap.h"
+#include "xfs_inum.h"
 #include "xfs_clnt.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
 #include "xfs_dir.h"
 #include "xfs_dir2.h"
-#include "xfs_imap.h"
 #include "xfs_alloc.h"
 #include "xfs_dmapi.h"
 #include "xfs_quota.h"
 #include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
+#include "xfs_da_btree.h"
 #include "xfs_bmap_btree.h"
+#include "xfs_alloc_btree.h"
 #include "xfs_ialloc_btree.h"
-#include "xfs_btree.h"
-#include "xfs_ialloc.h"
-#include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
 #include "xfs_dir2_sf.h"
+#include "xfs_attr_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode.h"
+#include "xfs_btree.h"
+#include "xfs_ialloc.h"
 #include "xfs_bmap.h"
-#include "xfs_bit.h"
 #include "xfs_rtalloc.h"
 #include "xfs_error.h"
 #include "xfs_itable.h"
 #include "xfs_rw.h"
 #include "xfs_refcache.h"
-#include "xfs_da_btree.h"
 #include "xfs_dir_leaf.h"
 #include "xfs_dir2_data.h"
 #include "xfs_dir2_leaf.h"
@@ -124,10 +121,10 @@ EXPORT_SYMBOL(xfs_bmbt_trace_buf);
 #endif
 #ifdef XFS_ATTR_TRACE
 EXPORT_SYMBOL(xfs_attr_trace_buf);
-#endif  
+#endif
 #ifdef XFS_DIR2_TRACE
 EXPORT_SYMBOL(xfs_dir2_trace_buf);
-#endif   
+#endif
 #ifdef XFS_DIR_TRACE
 EXPORT_SYMBOL(xfs_dir_trace_buf);
 #endif
@@ -152,44 +149,7 @@ EXPORT_SYMBOL(xfs_bmbt_disk_get_all);
 #if defined(CONFIG_XFS_DEBUG)
 extern struct list_head pbd_delwrite_queue;
 EXPORT_SYMBOL(pbd_delwrite_queue);
-
-EXPORT_SYMBOL(xfs_fileoff_max);
-EXPORT_SYMBOL(xfs_bhvtom);
-EXPORT_SYMBOL(xfs_fsb_to_agno);
-EXPORT_SYMBOL(xfs_fsb_to_agbno);
-EXPORT_SYMBOL(xfs_dir2_data_unused_tag_p);
-EXPORT_SYMBOL(xfs_attr_leaf_name_remote);
-EXPORT_SYMBOL(xfs_lic_slot);
-EXPORT_SYMBOL(xfs_dir2_sf_firstentry);
-EXPORT_SYMBOL(xfs_ino_to_agno);
-EXPORT_SYMBOL(xfs_dir2_sf_get_inumber);
-EXPORT_SYMBOL(xfs_dir2_data_entry_tag_p);
-EXPORT_SYMBOL(xfs_dir2_sf_inumberp);
-EXPORT_SYMBOL(xfs_dir2_data_entsize);
-EXPORT_SYMBOL(xfs_lic_isfree);
-EXPORT_SYMBOL(xfs_attr_leaf_name_local);
-EXPORT_SYMBOL(xfs_bmap_broot_ptr_addr);
-EXPORT_SYMBOL(xfs_dir_sf_get_dirino);
-EXPORT_SYMBOL(xfs_ino_to_agbno);
-EXPORT_SYMBOL(xfs_dir2_leaf_bests_p);
-EXPORT_SYMBOL(xfs_dir2_sf_get_offset);
-EXPORT_SYMBOL(startblockval);
-EXPORT_SYMBOL(xfs_attr_sf_nextentry);
-EXPORT_SYMBOL(xfs_bmap_broot_key_addr);
-EXPORT_SYMBOL(xfs_dir2_block_leaf_p);
-EXPORT_SYMBOL(xfs_dir_leaf_namestruct);
-EXPORT_SYMBOL(xfs_ino_to_offset);
-EXPORT_SYMBOL(isnullstartblock);
-EXPORT_SYMBOL(xfs_lic_are_all_free);
-EXPORT_SYMBOL(xfs_dir_sf_nextentry);
-EXPORT_SYMBOL(xfs_dir2_sf_nextentry);
-
-EXPORT_SYMBOL(xfs_da_cookie_entry);
-EXPORT_SYMBOL(xfs_da_cookie_bno);
-EXPORT_SYMBOL(xfs_da_cookie_hash);
 #endif
-EXPORT_SYMBOL(xfs_xlate_dinode_core);
-EXPORT_SYMBOL(xfs_xlatesb);
 
 
 /*
@@ -313,9 +273,6 @@ EXPORT_SYMBOL(xfs_freesb);
 EXPORT_SYMBOL(xfs_fs_cmn_err);
 EXPORT_SYMBOL(xfs_highbit32);
 EXPORT_SYMBOL(xfs_highbit64);
-#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_IALLOC_BLOCKS)
-EXPORT_SYMBOL(xfs_ialloc_blocks);
-#endif
 EXPORT_SYMBOL(xfs_idestroy);
 EXPORT_SYMBOL(xfs_iextract);
 EXPORT_SYMBOL(xfs_iflock);
@@ -384,49 +341,7 @@ EXPORT_SYMBOL(xfs_unmountfs_writesb);
 EXPORT_SYMBOL(xfs_vfsops);
 EXPORT_SYMBOL(xfs_vnodeops);
 EXPORT_SYMBOL(xfs_write_clear_setuid);
+EXPORT_SYMBOL(xfs_xlate_dinode_core);
+EXPORT_SYMBOL(xfs_xlatesb);
 EXPORT_SYMBOL(xfs_zero_eof);
 EXPORT_SYMBOL(xlog_recover_process_iunlinks);
-
-
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BHVTOI)
-EXPORT_SYMBOL(xfs_bhvtoi);
-#endif
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_VFSTOM)
-EXPORT_SYMBOL(xfs_vfstom);
-#endif
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BM_MAXLEVELS)
-EXPORT_SYMBOL(xfs_bm_maxlevels);
-#endif
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BMAP_INIT)
-EXPORT_SYMBOL(xfs_bmap_init);
-#endif
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_FILBLKS_MIN)
-EXPORT_SYMBOL(xfs_filblks_min);
-#endif
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_FSB_TO_DADDR)
-EXPORT_SYMBOL(xfs_fsb_to_daddr);
-#endif
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_IFORK_PTR)
-EXPORT_SYMBOL(xfs_ifork_ptr);
-#endif
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_IFORK_Q)
-EXPORT_SYMBOL(xfs_ifork_q);
-#endif
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_IN_MAXLEVELS)
-EXPORT_SYMBOL(xfs_in_maxlevels);
-#endif
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_ITOBHV)
-EXPORT_SYMBOL(xfs_itobhv);
-#endif
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_ITOV)
-EXPORT_SYMBOL(xfs_itov);
-#endif
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_MTOVFS)
-EXPORT_SYMBOL(xfs_mtovfs);
-#endif
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_ADDQUOTA)
-EXPORT_SYMBOL(xfs_sb_version_addquota);
-#endif
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_HASQUOTA)
-EXPORT_SYMBOL(xfs_sb_version_hasquota);
-#endif
