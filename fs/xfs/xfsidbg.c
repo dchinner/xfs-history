@@ -6872,21 +6872,27 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	static char *xmount_flags[] = {
 		"WSYNC",	/* 0x0001 */
 		"INO64",	/* 0x0002 */
-		"RQCHK",	/* 0x0004 */
-		"FSCLEAN",	/* 0x0008 */
-		"FSSHUTDN",	/* 0x0010 */
+		"UNUSED_4",	/* 0x0004 */
+		"UNUSED_8",	/* 0x0008 */
+		"FSSHUTDOWN",	/* 0x0010 */
 		"NOATIME",	/* 0x0020 */
 		"RETERR",	/* 0x0040 */
 		"NOALIGN",	/* 0x0080 */
-		"UNSHRD",	/* 0x0100 */
-		"RGSTRD",	/* 0x0200 */
-		"NORECVR",	/* 0x0400 */
-		"SHRD",		/* 0x0800 */
-		"IOSZ",		/* 0x1000 */
-		"OSYNC",	/* 0x2000 */
-		"NOUUID",	/* 0x4000 */
-		"32BIT",	/* 0x8000 */
-		"BARRIER",	/* 0x10000 */
+		"COMPAT_ATTR",	/* 0x0100 */
+		"UNUSED_200",	/* 0x0200 */
+		"NORECOVERY",	/* 0x0400 */
+		"SHARED",	/* 0x0800 */
+		"DFLT_IOSIZE",	/* 0x1000 */
+		"OSYNCISOSYNC",	/* 0x2000 */
+		"32BITINODES",	/* 0x4000 */
+		"32BITINOOPT",	/* 0x8000 */
+		"NOUUID",	/* 0x10000 */
+		"BARRIER",	/* 0x20000 */
+		"IDELETE",	/* 0x40000 */
+		"SWALLOC",	/* 0x80000 */
+		"IHASHSIZE",	/* 0x100000 */
+		"DIRSYNC",	/* 0x200000 */
+		"COMPAT_IOSIZE",/* 0x400000 */
 		NULL
 	};
 
@@ -6894,7 +6900,7 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		"UQ",		/* 0x0001 */
 		"UQE",		/* 0x0002 */
 		"UQCHKD",	/* 0x0004 */
-		"PQ",		/* 0x0008 (IRIX ondisk) */
+		"PQ",		/* 0x0008 */
 		"GQE",		/* 0x0010 */
 		"GQCHKD",	/* 0x0020 */
 		"GQ",		/* 0x0040 */
