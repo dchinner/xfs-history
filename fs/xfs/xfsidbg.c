@@ -5346,13 +5346,13 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 			/* SB in a buffer - we need to convert */
 			xfsidbg_xsb_convert(sb);
 		}
-	} else if ((dqb = d)->d_magic == XFS_DQUOT_MAGIC) {
+	} else if ((dqb = d)->d_magic == cpu_to_be16(XFS_DQUOT_MAGIC)) {
 #define XFSIDBG_DQTYPESTR(d)     \
-	((INT_GET((d)->d_flags, ARCH_CONVERT) & XFS_DQ_USER) ? "USR" : \
-	((INT_GET((d)->d_flags, ARCH_CONVERT) & XFS_DQ_GROUP) ? "GRP" : \
-	((INT_GET((d)->d_flags, ARCH_CONVERT) & XFS_DQ_PROJ) ? "PRJ" : "???")))
+	(((d)->d_flags & XFS_DQ_USER) ? "USR" : \
+	(((d)->d_flags & XFS_DQ_GROUP) ? "GRP" : \
+	(((d)->d_flags & XFS_DQ_PROJ) ? "PRJ" : "???")))
 		kdb_printf("Quota blk starting ID [%d], type %s at 0x%p\n",
-			INT_GET(dqb->d_id, ARCH_CONVERT), XFSIDBG_DQTYPESTR(dqb), dqb);
+			be32_to_cpu(dqb->d_id), XFSIDBG_DQTYPESTR(dqb), dqb);
 
 	} else if (INT_GET((d2block = d)->hdr.magic, ARCH_CONVERT) == XFS_DIR2_BLOCK_MAGIC) {
 		if (summary) {
@@ -7259,21 +7259,19 @@ static void
 xfsidbg_xqm_diskdq(xfs_disk_dquot_t *d)
 {
 	kdb_printf("magic 0x%x\tversion 0x%x\tID 0x%x (%d)\t\n",
-		INT_GET(d->d_magic, ARCH_CONVERT),
-		INT_GET(d->d_version, ARCH_CONVERT),
-		INT_GET(d->d_id, ARCH_CONVERT),
-		INT_GET(d->d_id, ARCH_CONVERT));
+		be16_to_cpu(d->d_magic), d->d_version,
+		be32_to_cpu(d->d_id), be32_to_cpu(d->d_id));
 	kdb_printf("bhard 0x%llx\tbsoft 0x%llx\tihard 0x%llx\tisoft 0x%llx\n",
-		(unsigned long long)INT_GET(d->d_blk_hardlimit, ARCH_CONVERT),
-		(unsigned long long)INT_GET(d->d_blk_softlimit, ARCH_CONVERT),
-		(unsigned long long)INT_GET(d->d_ino_hardlimit, ARCH_CONVERT),
-		(unsigned long long)INT_GET(d->d_ino_softlimit, ARCH_CONVERT));
+		be64_to_cpu(d->d_blk_hardlimit),
+		be64_to_cpu(d->d_blk_softlimit),
+		be64_to_cpu(d->d_ino_hardlimit),
+		be64_to_cpu(d->d_ino_softlimit));
 	kdb_printf("bcount 0x%llx icount 0x%llx\n",
-		(unsigned long long)INT_GET(d->d_bcount, ARCH_CONVERT),
-		(unsigned long long)INT_GET(d->d_icount, ARCH_CONVERT));
+		be64_to_cpu(d->d_bcount),
+		be64_to_cpu(d->d_icount));
 	kdb_printf("btimer 0x%x itimer 0x%x \n",
-		(int)INT_GET(d->d_btimer, ARCH_CONVERT),
-		(int)INT_GET(d->d_itimer, ARCH_CONVERT));
+		be32_to_cpu(d->d_btimer),
+		be32_to_cpu(d->d_itimer));
 }
 
 static char *xdq_flags[] = {
@@ -7330,10 +7328,10 @@ xfsidbg_xqm_dquot(xfs_dquot_t *dqp)
 	  for (dqp = (l)->qh_next; dqp != NULL; dqp = dqp->NXT) {\
 	   kdb_printf( \
 	      "\t%d. [0x%p] \"%d (%s)\"\t blks = %d, inos = %d refs = %d\n", \
-			 ++i, dqp, (int) INT_GET(dqp->q_core.d_id, ARCH_CONVERT), \
+			 ++i, dqp, (int) be32_to_cpu(dqp->q_core.d_id), \
 			 DQFLAGTO_TYPESTR(dqp),      \
-			 (int) INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT), \
-			 (int) INT_GET(dqp->q_core.d_icount, ARCH_CONVERT), \
+			 (int) be64_to_cpu(dqp->q_core.d_bcount), \
+			 (int) be64_to_cpu(dqp->q_core.d_icount), \
 			 (int) dqp->q_nrefs); }\
 	  kdb_printf("\n"); \
 }
@@ -7370,10 +7368,10 @@ xfsidbg_xqm_freelist_print(xfs_frlist_t *qlist, char *title)
 	FOREACH_DQUOT_IN_FREELIST(dq, qlist) {
 		kdb_printf("\t%d.\t\"%d (%s:0x%p)\"\t bcnt = %d, icnt = %d "
 		       "refs = %d\n",
-		       ++i, (int) INT_GET(dq->q_core.d_id, ARCH_CONVERT),
+		       ++i, (int) be32_to_cpu(dq->q_core.d_id),
 		       DQFLAGTO_TYPESTR(dq), dq,
-		       (int) INT_GET(dq->q_core.d_bcount, ARCH_CONVERT),
-		       (int) INT_GET(dq->q_core.d_icount, ARCH_CONVERT),
+		       (int) be64_to_cpu(dq->q_core.d_bcount),
+		       (int) be64_to_cpu(dq->q_core.d_icount),
 		       (int) dq->q_nrefs);
 	}
 }
@@ -7537,7 +7535,7 @@ xfsidbg_xqm_tpdqinfo(xfs_trans_t *tp)
 			q = &qa[i];
 			kdb_printf(
   "\"%d\"[0x%p]: bres %d, bres-used %d, bdelta %d, del-delta %d, icnt-delta %d\n",
-				(int) q->qt_dquot->q_core.d_id,
+				(int) be32_to_cpu(q->qt_dquot->q_core.d_id),
 				q->qt_dquot,
 				(int) q->qt_blk_res,
 				(int) q->qt_blk_res_used,
