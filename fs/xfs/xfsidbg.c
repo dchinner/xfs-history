@@ -3441,10 +3441,13 @@ xfs_broot(xfs_inode_t *ip, xfs_ifork_t *f)
 	}
 	broot = f->if_broot;
 	kdb_printf("block @0x%p magic %x level %d numrecs %d\n",
-		broot, INT_GET(broot->bb_magic, ARCH_CONVERT), INT_GET(broot->bb_level, ARCH_CONVERT), INT_GET(broot->bb_numrecs, ARCH_CONVERT));
+		broot,
+		be32_to_cpu(broot->bb_magic),
+		be16_to_cpu(broot->bb_level),
+		be16_to_cpu(broot->bb_numrecs));
 	kp = XFS_BMAP_BROOT_KEY_ADDR(broot, 1, f->if_broot_bytes);
 	pp = XFS_BMAP_BROOT_PTR_ADDR(broot, 1, f->if_broot_bytes);
-	for (i = 1; i <= INT_GET(broot->bb_numrecs, ARCH_CONVERT); i++)
+	for (i = 1; i <= be16_to_cpu(broot->bb_numrecs); i++)
 		kdb_printf("\t%d: startoff %Ld ptr %Lx %s\n",
 			i, INT_GET(kp[i - 1].br_startoff, ARCH_CONVERT), INT_GET(pp[i - 1], ARCH_CONVERT),
 			xfs_fmtfsblock(INT_GET(pp[i - 1], ARCH_CONVERT), ip->i_mount));
@@ -3459,28 +3462,36 @@ xfs_btalloc(xfs_alloc_block_t *bt, int bsz)
 	int i;
 
 	kdb_printf("magic 0x%x level %d numrecs %d leftsib 0x%x rightsib 0x%x\n",
-		INT_GET(bt->bb_magic, ARCH_CONVERT), INT_GET(bt->bb_level, ARCH_CONVERT), INT_GET(bt->bb_numrecs, ARCH_CONVERT),
-		INT_GET(bt->bb_leftsib, ARCH_CONVERT), INT_GET(bt->bb_rightsib, ARCH_CONVERT));
+		be32_to_cpu(bt->bb_magic),
+		be16_to_cpu(bt->bb_level),
+		be16_to_cpu(bt->bb_numrecs),
+		be32_to_cpu(bt->bb_leftsib),
+		be32_to_cpu(bt->bb_rightsib));
 	if (!bt->bb_level) {
-		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_CONVERT); i++) {
+		for (i = 1; i <= be16_to_cpu(bt->bb_numrecs); i++) {
 			xfs_alloc_rec_t *r;
 
 			r = XFS_BTREE_REC_ADDR(bsz, xfs_alloc, bt, i, 0);
 			kdb_printf("rec %d startblock 0x%x blockcount %d\n",
-				i, INT_GET(r->ar_startblock, ARCH_CONVERT), INT_GET(r->ar_blockcount, ARCH_CONVERT));
+				i,
+				be32_to_cpu(r->ar_startblock),
+				be32_to_cpu(r->ar_blockcount));
 		}
 	} else {
 		int mxr;
 
 		mxr = XFS_BTREE_BLOCK_MAXRECS(bsz, xfs_alloc, 0);
-		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_CONVERT); i++) {
+		for (i = 1; i <= be16_to_cpu(bt->bb_numrecs); i++) {
 			xfs_alloc_key_t *k;
 			xfs_alloc_ptr_t *p;
 
 			k = XFS_BTREE_KEY_ADDR(bsz, xfs_alloc, bt, i, mxr);
 			p = XFS_BTREE_PTR_ADDR(bsz, xfs_alloc, bt, i, mxr);
 			kdb_printf("key %d startblock 0x%x blockcount %d ptr 0x%x\n",
-				i, INT_GET(k->ar_startblock, ARCH_CONVERT), INT_GET(k->ar_blockcount, ARCH_CONVERT), *p);
+				i,
+				be32_to_cpu(k->ar_startblock),
+				be32_to_cpu(k->ar_blockcount),
+				be32_to_cpu(*p));
 		}
 	}
 }
@@ -3493,14 +3504,14 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 {
 	int i;
 
-	kdb_printf("magic 0x%x level %d numrecs %d leftsib %Lx ",
-		INT_GET(bt->bb_magic, ARCH_CONVERT),
-		INT_GET(bt->bb_level, ARCH_CONVERT),
-		INT_GET(bt->bb_numrecs, ARCH_CONVERT),
-		INT_GET(bt->bb_leftsib, ARCH_CONVERT));
-	kdb_printf("rightsib %Lx\n", INT_GET(bt->bb_rightsib, ARCH_CONVERT));
+	kdb_printf("magic 0x%x level %d numrecs %d leftsib %Lx rightsib %Lx\n",
+		be32_to_cpu(bt->bb_magic),
+		be16_to_cpu(bt->bb_level),
+		be16_to_cpu(bt->bb_numrecs),
+		be64_to_cpu(bt->bb_leftsib),
+		be64_to_cpu(bt->bb_rightsib));
 	if (!bt->bb_level) {
-		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_CONVERT); i++) {
+		for (i = 1; i <= be16_to_cpu(bt->bb_numrecs); i++) {
 			xfs_bmbt_rec_t *r;
 			xfs_bmbt_irec_t	irec;
 
@@ -3517,7 +3528,7 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 		int mxr;
 
 		mxr = XFS_BTREE_BLOCK_MAXRECS(bsz, xfs_bmbt, 0);
-		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_CONVERT); i++) {
+		for (i = 1; i <= be16_to_cpu(bt->bb_numrecs); i++) {
 			xfs_bmbt_key_t *k;
 			xfs_bmbt_ptr_t *p;
 
@@ -3539,13 +3550,13 @@ xfs_btino(xfs_inobt_block_t *bt, int bsz)
 	int i;
 
 	kdb_printf("magic 0x%x level %d numrecs %d leftsib 0x%x rightsib 0x%x\n",
-		INT_GET(bt->bb_magic, ARCH_CONVERT),
-		INT_GET(bt->bb_level, ARCH_CONVERT),
-		INT_GET(bt->bb_numrecs, ARCH_CONVERT),
-		INT_GET(bt->bb_leftsib, ARCH_CONVERT),
-		INT_GET(bt->bb_rightsib, ARCH_CONVERT));
+		be32_to_cpu(bt->bb_magic),
+		be16_to_cpu(bt->bb_level),
+		be16_to_cpu(bt->bb_numrecs),
+		be32_to_cpu(bt->bb_leftsib),
+		be32_to_cpu(bt->bb_rightsib));
 	if (!bt->bb_level) {
-		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_CONVERT); i++) {
+		for (i = 1; i <= be16_to_cpu(bt->bb_numrecs); i++) {
 			xfs_inobt_rec_t *r;
 
 			r = XFS_BTREE_REC_ADDR(bsz, xfs_inobt, bt, i, 0);
@@ -3558,7 +3569,7 @@ xfs_btino(xfs_inobt_block_t *bt, int bsz)
 		int mxr;
 
 		mxr = XFS_BTREE_BLOCK_MAXRECS(bsz, xfs_inobt, 0);
-		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_CONVERT); i++) {
+		for (i = 1; i <= be16_to_cpu(bt->bb_numrecs); i++) {
 			xfs_inobt_key_t *k;
 			xfs_inobt_ptr_t *p;
 
@@ -3566,7 +3577,7 @@ xfs_btino(xfs_inobt_block_t *bt, int bsz)
 			p = XFS_BTREE_PTR_ADDR(bsz, xfs_inobt, bt, i, mxr);
 			kdb_printf("key %d startino 0x%x ptr 0x%x\n",
 				i, INT_GET(k->ir_startino, ARCH_CONVERT),
-				INT_GET(*p, ARCH_CONVERT));
+				be32_to_cpu(*p));
 		}
 	}
 }
@@ -4535,21 +4546,21 @@ static void
 xfsidbg_xagf(xfs_agf_t *agf)
 {
 	kdb_printf("magicnum 0x%x versionnum 0x%x seqno 0x%x length 0x%x\n",
-		INT_GET(agf->agf_magicnum, ARCH_CONVERT),
-		INT_GET(agf->agf_versionnum, ARCH_CONVERT),
-		INT_GET(agf->agf_seqno, ARCH_CONVERT),
-		INT_GET(agf->agf_length, ARCH_CONVERT));
+		be32_to_cpu(agf->agf_magicnum),
+		be32_to_cpu(agf->agf_versionnum),
+		be32_to_cpu(agf->agf_seqno),
+		be32_to_cpu(agf->agf_length));
 	kdb_printf("roots b 0x%x c 0x%x levels b %d c %d\n",
-		INT_GET(agf->agf_roots[XFS_BTNUM_BNO], ARCH_CONVERT),
-		INT_GET(agf->agf_roots[XFS_BTNUM_CNT], ARCH_CONVERT),
-		INT_GET(agf->agf_levels[XFS_BTNUM_BNO], ARCH_CONVERT),
-		INT_GET(agf->agf_levels[XFS_BTNUM_CNT], ARCH_CONVERT));
+		be32_to_cpu(agf->agf_roots[XFS_BTNUM_BNO]),
+		be32_to_cpu(agf->agf_roots[XFS_BTNUM_CNT]),
+		be32_to_cpu(agf->agf_levels[XFS_BTNUM_BNO]),
+		be32_to_cpu(agf->agf_levels[XFS_BTNUM_CNT]));
 	kdb_printf("flfirst %d fllast %d flcount %d freeblks %d longest %d\n",
-		INT_GET(agf->agf_flfirst, ARCH_CONVERT),
-		INT_GET(agf->agf_fllast, ARCH_CONVERT),
-		INT_GET(agf->agf_flcount, ARCH_CONVERT),
-		INT_GET(agf->agf_freeblks, ARCH_CONVERT),
-		INT_GET(agf->agf_longest, ARCH_CONVERT));
+		be32_to_cpu(agf->agf_flfirst),
+		be32_to_cpu(agf->agf_fllast),
+		be32_to_cpu(agf->agf_flcount),
+		be32_to_cpu(agf->agf_freeblks),
+		be32_to_cpu(agf->agf_longest));
 }
 
 /*
@@ -4562,24 +4573,24 @@ xfsidbg_xagi(xfs_agi_t *agi)
 	int	j;
 
 	kdb_printf("magicnum 0x%x versionnum 0x%x seqno 0x%x length 0x%x\n",
-		INT_GET(agi->agi_magicnum, ARCH_CONVERT),
-		INT_GET(agi->agi_versionnum, ARCH_CONVERT),
-		INT_GET(agi->agi_seqno, ARCH_CONVERT),
-		INT_GET(agi->agi_length, ARCH_CONVERT));
+		be32_to_cpu(agi->agi_magicnum),
+		be32_to_cpu(agi->agi_versionnum),
+		be32_to_cpu(agi->agi_seqno),
+		be32_to_cpu(agi->agi_length));
 	kdb_printf("count 0x%x root 0x%x level 0x%x\n",
-		INT_GET(agi->agi_count, ARCH_CONVERT),
-		INT_GET(agi->agi_root, ARCH_CONVERT),
-		INT_GET(agi->agi_level, ARCH_CONVERT));
+		be32_to_cpu(agi->agi_count),
+		be32_to_cpu(agi->agi_root),
+		be32_to_cpu(agi->agi_level));
 	kdb_printf("freecount 0x%x newino 0x%x dirino 0x%x\n",
-		INT_GET(agi->agi_freecount, ARCH_CONVERT),
-		INT_GET(agi->agi_newino, ARCH_CONVERT),
-		INT_GET(agi->agi_dirino, ARCH_CONVERT));
+		be32_to_cpu(agi->agi_freecount),
+		be32_to_cpu(agi->agi_newino),
+		be32_to_cpu(agi->agi_dirino));
 
 	kdb_printf("unlinked buckets\n");
 	for (i = 0; i < XFS_AGI_UNLINKED_BUCKETS; i++) {
 		for (j = 0; j < 4; j++, i++) {
 			kdb_printf("0x%08x ",
-				INT_GET(agi->agi_unlinked[i], ARCH_CONVERT));
+				be32_to_cpu(agi->agi_unlinked[i]));
 		}
 		kdb_printf("\n");
 	}
@@ -5259,50 +5270,50 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 	xfs_dir2_free_t *d2free;
 
 	d = XFS_BUF_PTR(bp);
-	if (INT_GET((agf = d)->agf_magicnum, ARCH_CONVERT) == XFS_AGF_MAGIC) {
+	if (be32_to_cpu((agf = d)->agf_magicnum) == XFS_AGF_MAGIC) {
 		if (summary) {
 			kdb_printf("freespace hdr for AG %d (at 0x%p)\n",
-				INT_GET(agf->agf_seqno, ARCH_CONVERT), agf);
+				be32_to_cpu(agf->agf_seqno), agf);
 		} else {
 			kdb_printf("buf 0x%p agf 0x%p\n", bp, agf);
 			xfsidbg_xagf(agf);
 		}
-	} else if (INT_GET((agi = d)->agi_magicnum, ARCH_CONVERT) == XFS_AGI_MAGIC) {
+	} else if (be32_to_cpu((agi = d)->agi_magicnum) == XFS_AGI_MAGIC) {
 		if (summary) {
 			kdb_printf("Inode hdr for AG %d (at 0x%p)\n",
-			       INT_GET(agi->agi_seqno, ARCH_CONVERT), agi);
+			       be32_to_cpu(agi->agi_seqno), agi);
 		} else {
 			kdb_printf("buf 0x%p agi 0x%p\n", bp, agi);
 			xfsidbg_xagi(agi);
 		}
-	} else if (INT_GET((bta = d)->bb_magic, ARCH_CONVERT) == XFS_ABTB_MAGIC) {
+	} else if (be32_to_cpu((bta = d)->bb_magic) == XFS_ABTB_MAGIC) {
 		if (summary) {
 			kdb_printf("Alloc BNO Btree blk, level %d (at 0x%p)\n",
-				       INT_GET(bta->bb_level, ARCH_CONVERT), bta);
+				       be16_to_cpu(bta->bb_level), bta);
 		} else {
 			kdb_printf("buf 0x%p abtbno 0x%p\n", bp, bta);
 			xfs_btalloc(bta, XFS_BUF_COUNT(bp));
 		}
-	} else if (INT_GET((bta = d)->bb_magic, ARCH_CONVERT) == XFS_ABTC_MAGIC) {
+	} else if (be32_to_cpu((bta = d)->bb_magic) == XFS_ABTC_MAGIC) {
 		if (summary) {
 			kdb_printf("Alloc COUNT Btree blk, level %d (at 0x%p)\n",
-				       INT_GET(bta->bb_level, ARCH_CONVERT), bta);
+				       be16_to_cpu(bta->bb_level), bta);
 		} else {
 			kdb_printf("buf 0x%p abtcnt 0x%p\n", bp, bta);
 			xfs_btalloc(bta, XFS_BUF_COUNT(bp));
 		}
-	} else if (INT_GET((btb = d)->bb_magic, ARCH_CONVERT) == XFS_BMAP_MAGIC) {
+	} else if (be32_to_cpu((btb = d)->bb_magic) == XFS_BMAP_MAGIC) {
 		if (summary) {
 			kdb_printf("Bmap Btree blk, level %d (at 0x%p)\n",
-				      INT_GET(btb->bb_level, ARCH_CONVERT), btb);
+				      be16_to_cpu(btb->bb_level), btb);
 		} else {
 			kdb_printf("buf 0x%p bmapbt 0x%p\n", bp, btb);
 			xfs_btbmap(btb, XFS_BUF_COUNT(bp));
 		}
-	} else if (INT_GET((bti = d)->bb_magic, ARCH_CONVERT) == XFS_IBT_MAGIC) {
+	} else if (be32_to_cpu((bti = d)->bb_magic) == XFS_IBT_MAGIC) {
 		if (summary) {
 			kdb_printf("Inode Btree blk, level %d (at 0x%p)\n",
-				       INT_GET(bti->bb_level, ARCH_CONVERT), bti);
+				       be16_to_cpu(bti->bb_level), bti);
 		} else {
 			kdb_printf("buf 0x%p inobt 0x%p\n", bp, bti);
 			xfs_btino(bti, XFS_BUF_COUNT(bp));
