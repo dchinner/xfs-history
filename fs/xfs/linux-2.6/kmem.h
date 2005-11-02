@@ -136,7 +136,7 @@ kmem_shake_deregister(kmem_shaker_t shrinker)
 }
 
 static __inline int
-kmem_shake_allow(unsigned int gfp_mask)
+kmem_shake_allow(gfp_t gfp_mask)
 {
 	return (gfp_mask & __GFP_WAIT);
 }
