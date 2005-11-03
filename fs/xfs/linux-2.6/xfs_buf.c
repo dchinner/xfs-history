@@ -33,7 +33,7 @@
 
 STATIC kmem_cache_t *pagebuf_zone;
 STATIC kmem_shaker_t pagebuf_shake;
-STATIC int xfsbufd_wakeup(int, unsigned int);
+STATIC int xfsbufd_wakeup(int, gfp_t);
 STATIC void pagebuf_delwri_queue(xfs_buf_t *, int);
 
 STATIC struct workqueue_struct *xfslogd_workqueue;
@@ -1685,7 +1685,7 @@ STATIC int xfsbufd_force_sleep;
 STATIC int
 xfsbufd_wakeup(
 	int			priority,
-	unsigned int		mask)
+	gfp_t			mask)
 {
 	if (xfsbufd_force_sleep)
 		return 0;
@@ -1716,9 +1716,10 @@ xfsbufd(
 		}
 
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout((xfs_buf_timer_centisecs * HZ) / 100);
+		schedule_timeout_interruptible(
+			xfs_buf_timer_centisecs * msecs_to_jiffies(10));
 
-		age = (xfs_buf_age_centisecs * HZ) / 100;
+		age = xfs_buf_age_centisecs * msecs_to_jiffies(10);
 		spin_lock(&pbd_delwrite_lock);
 		list_for_each_entry_safe(pb, n, &pbd_delwrite_queue, pb_list) {
 			PB_TRACE(pb, "walkq1", (long)pagebuf_ispin(pb));
