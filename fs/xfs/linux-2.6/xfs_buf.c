@@ -1715,7 +1715,6 @@ xfsbufd(
 			xfsbufd_force_sleep = 0;
 		}
 
-		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout_interruptible(
 			xfs_buf_timer_centisecs * msecs_to_jiffies(10));
 
