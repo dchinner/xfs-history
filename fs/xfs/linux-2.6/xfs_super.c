@@ -246,8 +246,6 @@ xfs_get_inode(
 {
 	struct vfs	*vfsp = bhvtovfs(bdp);
 
-	if (flags & IGET_NOALLOC)
-		return ilookup(vfsp->vfs_super, ino);
 	return iget_locked(vfsp->vfs_super, ino);
 }
 

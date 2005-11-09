@@ -94,8 +94,6 @@ typedef enum {
 #define SYNC_REMOUNT		0x0080  /* remount readonly, no dummy LRs */
 #define SYNC_QUIESCE		0x0100  /* quiesce fileystem for a snapshot */
 
-#define IGET_NOALLOC		0x0001	/* vfs_get_inode may return NULL */
-
 typedef int	(*vfs_mount_t)(bhv_desc_t *,
 				struct xfs_mount_args *, struct cred *);
 typedef int	(*vfs_parseargs_t)(bhv_desc_t *, char *,
