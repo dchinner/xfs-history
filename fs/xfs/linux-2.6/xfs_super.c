@@ -317,6 +317,7 @@ xfs_mountfs_check_barriers(xfs_mount_t *mp)
 		xfs_fs_cmn_err(CE_NOTE, mp,
 		  "Disabling barriers, not supported with external log device");
 		mp->m_flags &= ~XFS_MOUNT_BARRIER;
+		return;
 	}
 
 	if (mp->m_ddev_targp->pbr_bdev->bd_disk->queue->ordered ==
@@ -324,6 +325,7 @@ xfs_mountfs_check_barriers(xfs_mount_t *mp)
 		xfs_fs_cmn_err(CE_NOTE, mp,
 		  "Disabling barriers, not supported by the underlying device");
 		mp->m_flags &= ~XFS_MOUNT_BARRIER;
+		return;
 	}
 
 	error = xfs_barrier_test(mp);
@@ -331,6 +333,7 @@ xfs_mountfs_check_barriers(xfs_mount_t *mp)
 		xfs_fs_cmn_err(CE_NOTE, mp,
 		  "Disabling barriers, trial barrier write failed");
 		mp->m_flags &= ~XFS_MOUNT_BARRIER;
+		return;
 	}
 }
 
