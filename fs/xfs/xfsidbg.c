@@ -3032,7 +3032,7 @@ static void xfs_dquot_item_print(xfs_dq_logitem_t *lip, int summary);
 static void xfs_efd_item_print(xfs_efd_log_item_t *efdp, int summary);
 static void xfs_efi_item_print(xfs_efi_log_item_t *efip, int summary);
 static char *xfs_fmtformat(xfs_dinode_fmt_t f);
-static char *xfs_fmtfsblock(xfs_fsblock_t bno, xfs_mount_t *mp);
+char *xfs_fmtfsblock(xfs_fsblock_t bno, xfs_mount_t *mp);
 static char *xfs_fmtino(xfs_ino_t ino, xfs_mount_t *mp);
 static char *xfs_fmtlsn(xfs_lsn_t *lsnp);
 static char *xfs_fmtmode(int m);
@@ -3905,7 +3905,7 @@ xfs_fmtformat(xfs_dinode_fmt_t f)
 /*
  * Format fsblock number into a static buffer & return it.
  */
-static char *
+char *
 xfs_fmtfsblock(xfs_fsblock_t bno, xfs_mount_t *mp)
 {
 	static char rval[50];
@@ -4275,6 +4275,8 @@ xfs_prdinode_core(xfs_dinode_core_t *dip)
 		"rtinherit",		/* XFS_DIFLAG_RTINHERIT */
 		"projinherit",		/* XFS_DIFLAG_PROJINHERIT */
 		"nosymlinks",		/* XFS_DIFLAG_NOSYMLINKS */
+		"extsize",		/* XFS_DIFLAG_EXTSIZE */
+		"extszinherit",		/* XFS_DIFLAG_EXTSZINHERIT */
 		NULL
 	};
 
@@ -5044,9 +5046,9 @@ xfsidbg_xbmalla(xfs_bmalloca_t *a)
 	kdb_printf("off %s wasdel %d userdata %d minlen %d\n",
 		xfs_fmtfsblock(a->off, a->ip->i_mount), a->wasdel,
 		a->userdata, a->minlen);
-	kdb_printf("minleft %d low %d rval %s aeof %d\n",
+	kdb_printf("minleft %d low %d rval %s aeof %d conv %d\n",
 		a->minleft, a->low, xfs_fmtfsblock(a->rval, a->ip->i_mount),
-		a->aeof);
+		a->aeof, a->conv);
 }
 
 #ifdef XFS_BMAP_TRACE
