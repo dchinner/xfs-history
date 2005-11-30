@@ -6891,7 +6891,7 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		"NOATIME",	/* 0x0020 */
 		"RETERR",	/* 0x0040 */
 		"NOALIGN",	/* 0x0080 */
-		"COMPAT_ATTR",	/* 0x0100 */
+		"ATTR2",	/* 0x0100 */
 		"UNUSED_200",	/* 0x0200 */
 		"NORECOVERY",	/* 0x0400 */
 		"SHARED",	/* 0x0800 */
