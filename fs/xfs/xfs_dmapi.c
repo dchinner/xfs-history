@@ -72,12 +72,14 @@ xfs_setattr(
 	ASSERT(xbdp);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-#define MAX_DIO_SIZE(mp)	(64 * PAGE_CACHE_SIZE)
+#define MIN_DIO_SIZE(mp)		((mp)->m_sb.sb_sectsize)
+#define MAX_DIO_SIZE(mp)		INT_MAX
 #define XFS_TO_LINUX_RDEVT(xip,ip)	(new_encode_dev((ip)->i_rdev))
 #define XFS_TO_LINUX_DEVT(xip,ip)	(new_encode_dev((ip)->i_sb->s_dev))
 #define BREAK_LEASE(inode,flag)		break_lease(inode,flag)
 #else
-#define MAX_DIO_SIZE(mp)	XFS_B_TO_FSBT((mp), KIO_MAX_ATOMIC_IO << 10)
+#define MIN_DIO_SIZE(mp)		((mp)->m_sb.sb_blocksize)
+#define MAX_DIO_SIZE(mp)		INT_MAX
 #define XFS_TO_LINUX_RDEVT(xip,ip)	(kdev_t_to_nr(XFS_DEV_TO_KDEVT((xip)->i_df.if_u2.if_rdev)))
 #define XFS_TO_LINUX_DEVT(xip,ip)	((xip)->i_mount->m_dev)
 #define BREAK_LEASE(inode,flag)		get_lease(inode,flag)
@@ -1779,20 +1781,9 @@ xfs_dm_get_dioinfo(
 	ip = XFS_BHVTOI(xbdp);
 	mp = ip->i_mount;
 
-	/*
-	 * this only really needs to be BBSIZE.
-	 * it is set to the file system block size to
-	 * avoid having to do block zeroing on short writes.
-	 */
-	dio.d_miniosz = mp->m_sb.sb_blocksize;
+	dio.d_miniosz = dio.d_mem = MIN_DIO_SIZE(mp);
 	dio.d_maxiosz = MAX_DIO_SIZE(mp);
-	dio.d_mem = mp->m_sb.sb_blocksize;
-
-	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
-		dio.d_dio_only = DM_TRUE;
-	} else {
-		dio.d_dio_only = DM_FALSE;
-	}
+	dio.d_dio_only = DM_FALSE;
 
 	if (copy_to_user(diop, &dio, sizeof(dio)))
 		return(-EFAULT);
