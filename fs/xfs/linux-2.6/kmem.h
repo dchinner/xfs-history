@@ -30,10 +30,10 @@
 #define KM_NOFS		0x0004u
 #define KM_MAYFAIL	0x0008u
 
-#define	kmem_zone	kmem_cache_s
-#define kmem_zone_t	kmem_cache_t
+#define	kmem_zone	kmem_cache
+#define kmem_zone_t	struct kmem_cache
 
-typedef unsigned long xfs_pflags_t;
+typedef unsigned long	xfs_pflags_t;
 
 #define PFLAGS_TEST_NOIO()              (current->flags & PF_NOIO)
 #define PFLAGS_TEST_FSTRANS()           (current->flags & PF_FSTRANS)
