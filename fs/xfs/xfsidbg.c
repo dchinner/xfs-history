@@ -7314,11 +7314,13 @@ xfsidbg_xqm_dquot(xfs_dquot_t *dqp)
 		dqp->dq_flnext,
 		dqp->dq_flprev);
 
-	kdb_printf("nrefs 0x%x, res_bcount %d, ",
-		dqp->q_nrefs, (int) dqp->q_res_bcount);
+	kdb_printf("nrefs 0x%x blkno 0x%llx boffset 0x%x ", dqp->q_nrefs,
+		(unsigned long long)dqp->q_blkno, dqp->q_bufoffset);
 	printflags(dqp->dq_flags, xdq_flags, "flags:");
-	kdb_printf("\nblkno 0x%llx\tboffset 0x%x\n",
-		(unsigned long long) dqp->q_blkno, (int) dqp->q_bufoffset);
+	kdb_printf("res_bcount %llu res_icount %llu res_rtbcount %llu\n",
+		(unsigned long long)dqp->q_res_bcount,
+		(unsigned long long)dqp->q_res_icount,
+		(unsigned long long)dqp->q_res_rtbcount);
 	kdb_printf("qlock 0x%p  flock 0x%p (%s) pincount 0x%x\n",
 		&dqp->q_qlock,
 		&dqp->q_flock,
