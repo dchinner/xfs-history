@@ -331,3 +331,4 @@ EXPORT_SYMBOL(xfs_xlate_dinode_core);
 EXPORT_SYMBOL(xfs_xlatesb);
 EXPORT_SYMBOL(xfs_zero_eof);
 EXPORT_SYMBOL(xlog_recover_process_iunlinks);
+EXPORT_SYMBOL(xfs_ichgtime_fast);
