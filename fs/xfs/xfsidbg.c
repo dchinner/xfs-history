@@ -2533,13 +2533,12 @@ kdbm_pbdelay(int argc, const char **argv, const char **envp,
 	struct pt_regs *regs)
 {
 #ifdef DEBUG
-	unsigned long	verbose = 0;
-	int	count = 0;
+	extern struct list_head xfs_buftarg_list;
 	struct list_head	*curr, *next;
-	xfs_buf_t	bp;
-	unsigned long addr;
-	int diag;
-	extern struct list_head pbd_delwrite_queue;
+	xfs_buftarg_t		*tp, *n;
+	xfs_buf_t		bp;
+	unsigned long		addr, verbose = 0;
+	int			diag, count = 0;
 
 	if (argc > 1)
 		return KDB_ARGCOUNT;
@@ -2554,22 +2553,25 @@ kdbm_pbdelay(int argc, const char **argv, const char **envp,
 		kdb_printf("index pb       pin   queuetime\n");
 	}
 
-	list_for_each_safe(curr, next, &pbd_delwrite_queue) {
-		addr = (unsigned long)list_entry(curr, xfs_buf_t, pb_list);
-		if ((diag = kdb_getarea(bp, addr)))
-			return diag;
 
-		if (verbose) {
-			print_pagebuf(&bp, addr);
-		} else {
-			kdb_printf("%4d  0x%lx   %d   %ld\n",
-				count++, addr,
-				bp.pb_pin_count.counter,
-				bp.pb_queuetime);
+	list_for_each_entry_safe(tp, n, &xfs_buftarg_list, bt_list) {
+		list_for_each_safe(curr, next, &tp->bt_delwrite_queue) {
+			addr = (unsigned long)list_entry(curr, xfs_buf_t, pb_list);
+			if ((diag = kdb_getarea(bp, addr)))
+				return diag;
+
+			if (verbose) {
+				print_pagebuf(&bp, addr);
+			} else {
+				kdb_printf("%4d  0x%lx   %d   %ld\n",
+					count++, addr,
+					bp.pb_pin_count.counter,
+					bp.pb_queuetime);
+			}
 		}
 	}
 #else
-	kdb_printf("pbd_delwrite_queue inaccessible (non-debug)\n");
+	kdb_printf("bt_delwrite_queue inaccessible (non-debug)\n");
 #endif
 	return 0;
 }

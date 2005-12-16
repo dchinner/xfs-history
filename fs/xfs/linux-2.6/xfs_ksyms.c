@@ -133,10 +133,9 @@ EXPORT_SYMBOL(xfs_bmbt_disk_get_all);
 #endif
 
 #if defined(CONFIG_XFS_DEBUG)
-extern struct list_head pbd_delwrite_queue;
-EXPORT_SYMBOL(pbd_delwrite_queue);
+extern struct list_head xfs_buftarg_list;
+EXPORT_SYMBOL(xfs_buftarg_list);
 #endif
-
 
 /*
  * Export symbols used by XFS behavior modules.
