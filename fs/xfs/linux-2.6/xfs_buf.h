@@ -94,7 +94,7 @@ typedef struct xfs_buftarg {
 	struct list_head	bt_list;
 	struct list_head	bt_delwrite_queue;
 	spinlock_t		bt_delwrite_lock;
-	uint			bt_flags;
+	unsigned long		bt_flags;
 #define BT_FORCE_SLEEP		1
 #define BT_FORCE_FLUSH		2
 } xfs_buftarg_t;
