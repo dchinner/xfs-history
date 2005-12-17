@@ -81,7 +81,7 @@ xfs_setattr(
 #define MIN_DIO_SIZE(mp)		((mp)->m_sb.sb_blocksize)
 #define MAX_DIO_SIZE(mp)		(INT_MAX & ~(MIN_DIO_SIZE(mp) - 1))
 #define XFS_TO_LINUX_RDEVT(xip,ip)	(kdev_t_to_nr(XFS_DEV_TO_KDEVT((xip)->i_df.if_u2.if_rdev)))
-#define XFS_TO_LINUX_DEVT(xip,ip)	((xip)->i_mount->m_dev)
+#define XFS_TO_LINUX_DEVT(xip,ip)	((xip)->i_mount->m_ddev_targp->bt_dev)
 #define BREAK_LEASE(inode,flag)		get_lease(inode,flag)
 #endif
 

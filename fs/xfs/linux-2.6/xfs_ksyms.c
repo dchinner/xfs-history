@@ -115,9 +115,9 @@ EXPORT_SYMBOL(xfs_dir2_trace_buf);
 EXPORT_SYMBOL(xfs_dir_trace_buf);
 #endif
 
-#ifdef PAGEBUF_TRACE
-extern ktrace_t *pagebuf_trace_buf;
-EXPORT_SYMBOL(pagebuf_trace_buf);
+#ifdef XFS_BUF_TRACE
+extern ktrace_t *xfs_buf_trace_buf;
+EXPORT_SYMBOL(xfs_buf_trace_buf);
 #endif
 
 
@@ -180,17 +180,17 @@ EXPORT_SYMBOL(linvfs_file_inode_operations);
 EXPORT_SYMBOL(linvfs_file_operations);
 EXPORT_SYMBOL(linvfs_invis_file_operations);
 EXPORT_SYMBOL(linvfs_symlink_inode_operations);
-EXPORT_SYMBOL(pagebuf_delwri_dequeue);
-EXPORT_SYMBOL(_pagebuf_find);
-EXPORT_SYMBOL(pagebuf_iostart);
-EXPORT_SYMBOL(pagebuf_ispin);
+EXPORT_SYMBOL(xfs_buf_delwri_dequeue);
+EXPORT_SYMBOL(_xfs_buf_find);
+EXPORT_SYMBOL(xfs_buf_iostart);
+EXPORT_SYMBOL(xfs_buf_ispin);
 #ifdef DEBUG
-EXPORT_SYMBOL(pagebuf_lock_value);
+EXPORT_SYMBOL(xfs_buf_lock_value);
 #endif
-EXPORT_SYMBOL(pagebuf_offset);
-EXPORT_SYMBOL(pagebuf_rele);
-EXPORT_SYMBOL(pagebuf_readahead);
-EXPORT_SYMBOL(pagebuf_unlock);
+EXPORT_SYMBOL(xfs_buf_offset);
+EXPORT_SYMBOL(xfs_buf_rele);
+EXPORT_SYMBOL(xfs_buf_readahead);
+EXPORT_SYMBOL(xfs_buf_unlock);
 #if ((defined(DEBUG) || defined(INDUCE_IO_ERROR)) && !defined(NO_WANT_RANDOM))
 EXPORT_SYMBOL(random);
 #endif
