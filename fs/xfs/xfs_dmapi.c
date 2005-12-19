@@ -1815,7 +1815,6 @@ xfs_dm_get_dirattrs_rvp(
 	int		error = 0;
 	dm_attrloc_t	loc;
 	dm_attrloc_t	prev_loc;
-	bhv_desc_t	*xbdp;
 	bhv_desc_t	*mp_bdp;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	vfs_t		*vfsp = vp->v_vfsp;
@@ -1839,11 +1838,10 @@ xfs_dm_get_dirattrs_rvp(
 
 	mp_bdp = bhv_lookup(VFS_BHVHEAD(vfsp), &xfs_vfsops);
 	ASSERT(mp_bdp);
-	xbdp = vn_bhv_lookup(VN_BHV_HEAD(vp), &xfs_vnodeops);
-	ASSERT(xbdp);
+	dp = xfs_vtoi(vp);
+	ASSERT(dp);
 
 	mp = XFS_BHVTOM(mp_bdp);
-	dp = XFS_BHVTOI(xbdp);
 
 	if (buflen < DM_STAT_SIZE(dm_stat_t, 0)) {
 		*rvp = 1; /* tell caller to try again */
@@ -3327,7 +3325,7 @@ xfs_dm_mount(
 	struct xfs_mount_args	*args,
 	struct cred		*cr)
 {
-	struct bhv_desc		*rootbdp;
+	struct xfs_inode	*rootip;
 	struct vnode		*rootvp;
 	struct vfs		*vfsp = bhvtovfs(bhv);
 	int			error = 0;
@@ -3341,10 +3339,9 @@ xfs_dm_mount(
 	if (args->flags & XFSMNT_DMAPI) {
 		VFS_ROOT(vfsp, &rootvp, error);
 		if (!error) {
-			rootbdp = vn_bhv_lookup_unlocked(
-					VN_BHV_HEAD(rootvp), &xfs_vnodeops);
+			rootip = xfs_vtoi(rootvp);
 			VN_RELE(rootvp);
-			if (rootbdp != NULL) {
+			if (rootip != NULL) {
 			    vfsp->vfs_flag |= VFS_DMI;
 			    error = dm_send_mount_event(vfsp->vfs_super,
 					DM_RIGHT_NULL, NULL,

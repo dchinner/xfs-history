@@ -56,6 +56,22 @@
 #include <linux/security.h>
 
 /*
+ * Get a XFS inode from a given vnode.
+ */
+xfs_inode_t *
+xfs_vtoi(
+	struct vnode	*vp)
+{
+	bhv_desc_t      *bdp;
+
+	bdp = bhv_lookup_range(VN_BHV_HEAD(vp),
+			VNODE_POSITION_XFS, VNODE_POSITION_XFS);
+	if (unlikely(bdp == NULL))
+		return NULL;
+	return XFS_BHVTOI(bdp);
+}
+
+/*
  * Bring the atime in the XFS inode uptodate.
  * Used before logging the inode to disk or when the Linux inode goes away.
  */
