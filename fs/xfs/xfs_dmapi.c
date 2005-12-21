@@ -363,8 +363,7 @@ xfs_ip_to_stat(
 	buf->dt_uid = ip->i_d.di_uid;
 	buf->dt_gid = ip->i_d.di_gid;
 	buf->dt_nlink = ip->i_d.di_nlink;
-	/* atime is only kept uptodate in the Linux inode */
-	buf->dt_atime = inode->i_atime.tv_sec;
+	vn_atime_to_time_t(vp, &buf->dt_atime);
 	buf->dt_mtime = ip->i_d.di_mtime.t_sec;
 	buf->dt_ctime = ip->i_d.di_ctime.t_sec;
 

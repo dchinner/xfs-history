@@ -226,6 +226,7 @@ EXPORT_SYMBOL(xfs_acl_inherit);
 #endif
 EXPORT_SYMBOL(xfs_alloc_buftarg);
 EXPORT_SYMBOL(xfs_flush_buftarg);
+EXPORT_SYMBOL(xfs_free_buftarg);
 EXPORT_SYMBOL(xfs_bdstrat_cb);
 EXPORT_SYMBOL(xfs_bmap_cancel);
 EXPORT_SYMBOL(xfs_bmap_do_search_extents);
