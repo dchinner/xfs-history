@@ -159,9 +159,6 @@ EXPORT_SYMBOL(fs_flush_pages);
 EXPORT_SYMBOL(fs_flushinval_pages);
 EXPORT_SYMBOL(fs_tosspages);
 EXPORT_SYMBOL(fs_noval);
-#if ((defined(DEBUG) || defined(INDUCE_IO_ERROR)) && !defined(NO_WANT_RANDOM))
-EXPORT_SYMBOL(get_thread_id);
-#endif
 EXPORT_SYMBOL(icmn_err);
 EXPORT_SYMBOL(kmem_alloc);
 EXPORT_SYMBOL(kmem_free);
