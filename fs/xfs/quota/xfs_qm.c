@@ -78,7 +78,7 @@ STATIC int	xfs_qm_dqhashlock_nowait(xfs_dquot_t *);
 
 STATIC int	xfs_qm_init_quotainos(xfs_mount_t *);
 STATIC int	xfs_qm_init_quotainfo(xfs_mount_t *);
-STATIC int	xfs_qm_shake(int, unsigned int);
+STATIC int	xfs_qm_shake(int, gfp_t);
 
 #ifdef DEBUG
 extern mutex_t	qcheck_lock;
@@ -167,7 +167,7 @@ xfs_Gqm_init(void)
 	xqm->qm_dqfree_ratio = XFS_QM_DQFREE_RATIO;
 	xqm->qm_nrefs = 0;
 #ifdef DEBUG
-	mutex_init(&qcheck_lock, MUTEX_DEFAULT, "qchk");
+	mutex_init(&qcheck_lock);
 #endif
 	return xqm;
 }
@@ -1166,7 +1166,7 @@ xfs_qm_init_quotainfo(
 	qinf->qi_dqreclaims = 0;
 
 	/* mutex used to serialize quotaoffs */
-	mutex_init(&qinf->qi_quotaofflock, MUTEX_DEFAULT, "qoff");
+	mutex_init(&qinf->qi_quotaofflock);
 
 	/* Precalc some constants */
 	qinf->qi_dqchunklen = XFS_FSB_TO_BB(mp, XFS_DQUOT_CLUSTER_SIZE_FSB);
@@ -1285,7 +1285,7 @@ xfs_qm_list_init(
 	char		*str,
 	int		n)
 {
-	mutex_init(&list->qh_lock, MUTEX_DEFAULT, str);
+	mutex_init(&list->qh_lock);
 	list->qh_next = NULL;
 	list->qh_version = 0;
 	list->qh_nelems = 0;
@@ -2197,7 +2197,7 @@ xfs_qm_shake_freelist(
  */
 /* ARGSUSED */
 STATIC int
-xfs_qm_shake(int nr_to_scan, unsigned int gfp_mask)
+xfs_qm_shake(int nr_to_scan, gfp_t gfp_mask)
 {
 	int	ndqused, nfree, n;
 
@@ -2766,7 +2766,7 @@ STATIC void
 xfs_qm_freelist_init(xfs_frlist_t *ql)
 {
 	ql->qh_next = ql->qh_prev = (xfs_dquot_t *) ql;
-	mutex_init(&ql->qh_lock, MUTEX_DEFAULT, "dqf");
+	mutex_init(&ql->qh_lock);
 	ql->qh_version = 0;
 	ql->qh_nelems = 0;
 }
@@ -2776,7 +2776,7 @@ xfs_qm_freelist_destroy(xfs_frlist_t *ql)
 {
 	xfs_dquot_t	*dqp, *nextdqp;
 
-	mutex_lock(&ql->qh_lock, PINOD);
+	mutex_lock(&ql->qh_lock);
 	for (dqp = ql->qh_next;
 	     dqp != (xfs_dquot_t *)ql; ) {
 		xfs_dqlock(dqp);

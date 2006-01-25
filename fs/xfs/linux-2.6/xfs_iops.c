@@ -51,6 +51,7 @@
 #include "xfs_buf_item.h"
 #include "xfs_utils.h"
 
+#include <linux/capability.h>
 #include <linux/xattr.h>
 #include <linux/namei.h>
 #include <linux/security.h>
@@ -210,7 +211,7 @@ validate_fields(
 		ip->i_nlink = va.va_nlink;
 		ip->i_blocks = va.va_nblocks;
 
-		/* we're under i_sem so i_size can't change under us */
+		/* we're under i_mutex so i_size can't change under us */
 		if (i_size_read(ip) != va.va_size)
 			i_size_write(ip, va.va_size);
 	}

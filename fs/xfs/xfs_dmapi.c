@@ -90,8 +90,8 @@ static void up_rw_sems(struct inode *ip, int flags)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	if (flags & DM_FLAGS_IALLOCSEM_WR)
 		up_write(&ip->i_alloc_sem);
-	if (flags & DM_FLAGS_ISEM)
-		up(&ip->i_sem);
+	if (flags & DM_FLAGS_IMUX)
+		mutex_unlock(&ip->i_mutex);
 #endif
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)) && \
     (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,22))
@@ -111,8 +111,8 @@ static void up_rw_sems(struct inode *ip, int flags)
 static void down_rw_sems(struct inode *ip, int flags)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-	if (flags & DM_FLAGS_ISEM)
-		down(&ip->i_sem);
+	if (flags & DM_FLAGS_IMUX)
+		mutex_lock(&ip->i_mutex);
 	if (flags & DM_FLAGS_IALLOCSEM_WR)
 		down_write(&ip->i_alloc_sem);
 #endif
@@ -1392,12 +1392,12 @@ xfs_dm_get_bulkall_rvp(
 	statstruct_sz = DM_STAT_SIZE(dm_xstat_t, 0);
 	statstruct_sz = (statstruct_sz+(DM_STAT_ALIGN-1)) & ~(DM_STAT_ALIGN-1);
 
-	nelems = buflen / statstruct_sz; 
+	nelems = buflen / statstruct_sz;
 	if (nelems < 1) {
 		if (put_user( statstruct_sz, rlenp ))
 			return(-EFAULT);
 		return(-E2BIG);
-	} 
+	}
 
 	mp_bdp = bhv_lookup(VFS_BHVHEAD(vfsp), &xfs_vfsops);
 	ASSERT(mp_bdp);
@@ -1411,17 +1411,17 @@ xfs_dm_get_bulkall_rvp(
 	dmb.attrname.dan_chars[sizeof(dmb.attrname.dan_chars) - 1] = '\0';
 
 	/*
-	 * fill the buffer with dm_xstat_t's 
+	 * fill the buffer with dm_xstat_t's
 	 */
 
 	dmb.laststruct = NULL;
 	dmb.bulkall = 1;
 	error = xfs_bulkstat(mp, (xfs_ino_t *)&loc,
-			     &nelems, 
+			     &nelems,
 			     xfs_dm_bulkstat_one,
 			     (void*)&dmb,
 			     statstruct_sz,
-			     bufp, 
+			     bufp,
 			     BULKSTAT_FG_IGET,
 			     &done);
 

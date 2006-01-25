@@ -363,7 +363,7 @@ xfs_qm_init(void)
 		KERN_INFO "SGI XFS Quota Management subsystem\n";
 
 	printk(message);
-	mutex_init(&xfs_Gqm_lock, MUTEX_DEFAULT, "xfs_qmlock");
+	mutex_init(&xfs_Gqm_lock);
 	vfs_bhv_set_custom(&xfs_qmops, &xfs_qmcore_xfs);
 	bhv_module_init(XFS_QMOPS, THIS_MODULE, &xfs_qmops);
 	xfs_qm_init_procfs();
