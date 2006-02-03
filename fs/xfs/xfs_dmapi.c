@@ -95,7 +95,7 @@ static void up_rw_sems(struct inode *ip, int flags)
 #endif
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)) && \
     (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,22))
-	if (flags & DM_FLAGS_ISEM)
+	if (flags & DM_FLAGS_IMUX)
 		up(&ip->i_sem);
 	if (flags & DM_FLAGS_IALLOCSEM_RD)
 		up_read(&ip->i_alloc_sem);
@@ -103,7 +103,7 @@ static void up_rw_sems(struct inode *ip, int flags)
 		up_write(&ip->i_alloc_sem);
 #endif
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,4,21)
-	if (flags & DM_FLAGS_ISEM)
+	if (flags & DM_FLAGS_IMUX)
 		up(&ip->i_sem);
 #endif
 }
@@ -122,11 +122,11 @@ static void down_rw_sems(struct inode *ip, int flags)
 		down_read(&ip->i_alloc_sem);
 	else if (flags & DM_FLAGS_IALLOCSEM_WR)
 		down_write(&ip->i_alloc_sem);
-	if (flags & DM_FLAGS_ISEM)
+	if (flags & DM_FLAGS_IMUX)
 		down(&ip->i_sem);
 #endif
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,4,21)
-	if (flags & DM_FLAGS_ISEM)
+	if (flags & DM_FLAGS_IMUX)
 		down(&ip->i_sem);
 #endif
 }
