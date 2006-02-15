@@ -117,10 +117,11 @@ obj-y				+= linux-2.4/linux_xfs.o \
 				   support/support_xfs.o
 
 subdir-$(CONFIG_XFS_FS)		+= linux-2.4 support
+subdir-$(CONFIG_XFS_DMAPI)	+= dmapi
 subdir-$(CONFIG_XFS_QUOTA)	+= quota
 
-ifneq ($(CONFIG_XFS_DMAPI),)
-  obj-y				+= xfs_dmapi.o
+ifeq ($(CONFIG_XFS_FS)$(CONFIG_XFS_DMAPI),yy)
+  obj-y				+= dmapi/xfs_dmapi.o
 endif
 
 ifeq ($(CONFIG_XFS_FS)$(CONFIG_XFS_QUOTA),yy)
