@@ -37,9 +37,6 @@ ifeq ($(CONFIG_XFS_TRACE),y)
 	EXTRA_CFLAGS += -DXFS_BUF_TRACE
 	EXTRA_CFLAGS += -DXFS_VNODE_TRACE
 endif
-ifeq ($(CONFIG_XFS_DMAPI),y)
-	EXTRA_CFLAGS += -I $(TOPDIR)/fs/dmapi
-endif
 
 # fs/Makefile enters fs/xfs twice if CONFIG_XFS_FS is y, once for kernel and
 # once for modules.  This is necessary because xfsidbg can be built as a module
