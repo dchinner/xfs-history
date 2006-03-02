@@ -2879,7 +2879,7 @@ static struct xif xfsidbg_funcs[] = {
   {  "xexlist",	kdbm_xfs_xexlist,	"<xfs_inode_t>",
 				"Dump XFS bmap extents in inode"},
   {  "xflist",	kdbm_xfs_xflist,	"<xfs_bmap_free_t>",
-				"Dump XFS to-be-freed extent list"},
+				"Dump XFS to-be-freed extent records"},
   {  "xhelp",	kdbm_xfs_xhelp,		"",
 				"Print idbg-xfs help"},
   {  "xicall",	kdbm_xfs_xiclogall,	"<xlog_in_core_t>",
@@ -4476,7 +4476,7 @@ xfs_rw_trace_entry(ktrace_entry_t *ktep)
 #endif
 
 /*
- * Print xfs extent list for a fork.
+ * Print xfs extent records for a fork.
  */
 static void
 xfs_xexlist_fork(xfs_inode_t *ip, int whichfork)
@@ -4487,11 +4487,12 @@ xfs_xexlist_fork(xfs_inode_t *ip, int whichfork)
 
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	if (ifp->if_flags & XFS_IFEXTENTS) {
-		nextents = ifp->if_bytes / sizeof(xfs_bmbt_rec_64_t);
+		nextents = ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t);
 		kdb_printf("inode 0x%p %cf extents 0x%p nextents 0x%x\n",
-			ip, "da"[whichfork], ifp->if_u1.if_extents, nextents);
+			ip, "da"[whichfork], xfs_iext_get_ext(ifp, 0),
+			nextents);
 		for (i = 0; i < nextents; i++) {
-			xfs_bmbt_get_all(&ifp->if_u1.if_extents[i], &irec);
+			xfs_bmbt_get_all(xfs_iext_get_ext(ifp, i), &irec);
 			kdb_printf(
 		"%d: startoff %Ld startblock %s blockcount %Ld flag %d\n",
 			i, irec.br_startoff,
@@ -6149,7 +6150,7 @@ xfsidbg_xdir2itrace(xfs_inode_t *ip)
 #endif
 
 /*
- * Print xfs extent list.
+ * Print xfs extent records.
  */
 static void
 xfsidbg_xexlist(xfs_inode_t *ip)
@@ -6160,7 +6161,7 @@ xfsidbg_xexlist(xfs_inode_t *ip)
 }
 
 /*
- * Print an xfs free-extent list.
+ * Print an xfs free-extent records.
  */
 static void
 xfsidbg_xflist(xfs_bmap_free_t *flist)
