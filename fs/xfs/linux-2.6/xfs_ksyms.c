@@ -262,6 +262,7 @@ EXPORT_SYMBOL(xfs_iextract);
 EXPORT_SYMBOL(xfs_iext_add);
 EXPORT_SYMBOL(xfs_iext_destroy);
 EXPORT_SYMBOL(xfs_iext_get_ext);
+EXPORT_SYMBOL(xfs_iext_idx_to_irec);
 EXPORT_SYMBOL(xfs_iext_insert);
 EXPORT_SYMBOL(xfs_iext_remove);
 EXPORT_SYMBOL(xfs_iflock);
