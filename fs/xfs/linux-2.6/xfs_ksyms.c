@@ -170,7 +170,7 @@ EXPORT_SYMBOL(kmem_zone_alloc);
 EXPORT_SYMBOL(kmem_zone_free);
 EXPORT_SYMBOL(kmem_zone_init);
 EXPORT_SYMBOL(kmem_zone_zalloc);
-EXPORT_SYMBOL(linvfs_aops);
+EXPORT_SYMBOL(xfs_address_space_operations);
 EXPORT_SYMBOL(linvfs_dir_inode_operations);
 EXPORT_SYMBOL(linvfs_dir_operations);
 EXPORT_SYMBOL(linvfs_file_inode_operations);
