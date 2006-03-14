@@ -502,7 +502,7 @@ xfs_reserve_blocks(
 	if (inval == (__uint64_t *)NULL) {
 		outval->resblks = mp->m_resblks;
 		outval->resblks_avail = mp->m_resblks_avail;
-		return(0);
+		return 0;
 	}
 
 	request = *inval;
@@ -538,7 +538,7 @@ xfs_reserve_blocks(
 	outval->resblks = mp->m_resblks;
 	outval->resblks_avail = mp->m_resblks_avail;
 	XFS_SB_UNLOCK(mp, s);
-	return(0);
+	return 0;
 }
 
 void
