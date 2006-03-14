@@ -1460,4 +1460,5 @@ struct address_space_operations xfs_address_space_operations = {
 	.commit_write		= generic_commit_write,
 	.bmap			= xfs_vm_bmap,
 	.direct_IO		= xfs_vm_direct_IO,
+	.migratepage		= buffer_migrate_page,
 };
