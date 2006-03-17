@@ -2344,7 +2344,7 @@ static void	printinode(struct inode *ip)
 					addr + offsetof(struct inode, i_data),
 					ip->i_data.nrpages);
 
-	kdb_printf("  vnode ptr 0x%p\n", LINVFS_GET_VP(ip));
+	kdb_printf("  vnode ptr 0x%p\n", vn_from_inode(ip));
 }
 
 
@@ -2375,7 +2375,7 @@ static int	kdbm_vn(
 	if ((diag = kdb_getarea(vp, addr)))
 		return diag;
 
-	ip = LINVFS_GET_IP((vnode_t *)addr);
+	ip = vn_to_inode((vnode_t *)addr);
 	kdb_printf("--> Inode @ 0x%p\n", ip);
 	printinode(ip);
 
@@ -2621,14 +2621,14 @@ kdbm_i2vnode(int argc, const char **argv, const char **envp,
 	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)))
 		return diag;
 	ip = (struct inode *)addr;
-	if ((diag = kdb_getarea(vp, (unsigned long)LINVFS_GET_VP(ip))))
+	if ((diag = kdb_getarea(vp, (unsigned long)vn_from_inode(ip))))
 		return diag;
 
 	kdb_printf("--> Inode @ 0x%p\n", ip);
 	printinode(ip);
 
-	kdb_printf("--> Vnode @ 0x%p\n", LINVFS_GET_VP(ip));
-	printvnode(&vp, (unsigned long)LINVFS_GET_VP(ip));
+	kdb_printf("--> Vnode @ 0x%p\n", vn_from_inode(ip));
+	printvnode(&vp, (unsigned long)vn_from_inode(ip));
 
 	return 0;
 }
