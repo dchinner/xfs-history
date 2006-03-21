@@ -188,6 +188,59 @@ static void	xfs_convert_extent(xfs_bmbt_rec_32_t *, xfs_dfiloff_t *,
 				xfs_dfsbno_t *, xfs_dfilblks_t *, int *);
 #endif
 
+/*
+ * Prototypes for static functions.
+ */
+#ifdef XFS_ALLOC_TRACE
+static int	xfs_alloc_trace_entry(ktrace_entry_t *ktep);
+#endif
+#ifdef XFS_ATTR_TRACE
+static int	xfs_attr_trace_entry(ktrace_entry_t *ktep);
+#endif
+#ifdef XFS_BMAP_TRACE
+static int	xfs_bmap_trace_entry(ktrace_entry_t *ktep);
+#endif
+#ifdef XFS_BMAP_TRACE
+static int	xfs_bmbt_trace_entry(ktrace_entry_t *ktep);
+#endif
+#ifdef XFS_DIR_TRACE
+static int	xfs_dir_trace_entry(ktrace_entry_t *ktep);
+#endif
+#ifdef XFS_DIR2_TRACE
+static int	xfs_dir2_trace_entry(ktrace_entry_t *ktep);
+#endif
+#ifdef XFS_RW_TRACE
+static void	xfs_bunmap_trace_entry(ktrace_entry_t   *ktep);
+static void	xfs_rw_enter_trace_entry(ktrace_entry_t *ktep);
+static void	xfs_page_trace_entry(ktrace_entry_t *ktep);
+static int	xfs_rw_trace_entry(ktrace_entry_t *ktep);
+#endif
+static void	xfs_broot(xfs_inode_t *ip, xfs_ifork_t *f);
+static void	xfs_btalloc(xfs_alloc_block_t *bt, int bsz);
+static void	xfs_btbmap(xfs_bmbt_block_t *bt, int bsz);
+static void	xfs_btino(xfs_inobt_block_t *bt, int bsz);
+static void	xfs_buf_item_print(xfs_buf_log_item_t *blip, int summary);
+static void	xfs_dastate_path(xfs_da_state_path_t *p);
+static void	xfs_dir2data(void *addr, int size);
+static void	xfs_dir2leaf(xfs_dir2_leaf_t *leaf, int size);
+static void	xfs_dquot_item_print(xfs_dq_logitem_t *lip, int summary);
+static void	xfs_efd_item_print(xfs_efd_log_item_t *efdp, int summary);
+static void	xfs_efi_item_print(xfs_efi_log_item_t *efip, int summary);
+static char *	xfs_fmtformat(xfs_dinode_fmt_t f);
+char *		xfs_fmtfsblock(xfs_fsblock_t bno, xfs_mount_t *mp);
+static char *	xfs_fmtino(xfs_ino_t ino, xfs_mount_t *mp);
+static char *	xfs_fmtlsn(xfs_lsn_t *lsnp);
+static char *	xfs_fmtmode(int m);
+static char *	xfs_fmtsize(size_t i);
+static char *	xfs_fmtuuid(uuid_t *);
+static void	xfs_inode_item_print(xfs_inode_log_item_t *ilip, int summary);
+static void	xfs_inodebuf(xfs_buf_t *bp);
+static void	xfs_prdinode_core(xfs_dinode_core_t *dip);
+static void	xfs_qoff_item_print(xfs_qoff_logitem_t *lip, int summary);
+static void	xfs_xexlist_fork(xfs_inode_t *ip, int whichfork);
+static void	xfs_xnode_fork(char *name, xfs_ifork_t *f);
+
+
 /* kdb wrappers */
 
 static int	kdbm_xfs_xagf(
@@ -716,7 +769,7 @@ static int	kdbm_xfs_xrwtrace(
 	ip = (xfs_inode_t *) addr;
 	if (ip->i_rwtrace == NULL) {
 		qprintf("The inode trace buffer is not initialized\n");
-		return;
+		return 0;
 	}
 	qprintf("i_rwtrace = 0x%p\n", ip->i_rwtrace);
 	ktep = ktrace_first(ip->i_rwtrace, &kts);
@@ -3008,59 +3061,6 @@ static char *xfs_alloctype[] = {
 	"start_bno", "near_bno", "this_bno"
 };
 
-static int xargument = 0;
-
-/*
- * Prototypes for static functions.
- */
-#ifdef XFS_ALLOC_TRACE
-static int xfs_alloc_trace_entry(ktrace_entry_t *ktep);
-#endif
-#ifdef XFS_ATTR_TRACE
-static int xfs_attr_trace_entry(ktrace_entry_t *ktep);
-#endif
-#ifdef XFS_BMAP_TRACE
-static int xfs_bmap_trace_entry(ktrace_entry_t *ktep);
-#endif
-#ifdef XFS_BMAP_TRACE
-static int xfs_bmbt_trace_entry(ktrace_entry_t *ktep);
-#endif
-static void xfs_broot(xfs_inode_t *ip, xfs_ifork_t *f);
-static void xfs_btalloc(xfs_alloc_block_t *bt, int bsz);
-static void xfs_btbmap(xfs_bmbt_block_t *bt, int bsz);
-static void xfs_btino(xfs_inobt_block_t *bt, int bsz);
-static void xfs_buf_item_print(xfs_buf_log_item_t *blip, int summary);
-static void xfs_dastate_path(xfs_da_state_path_t *p);
-#ifdef XFS_DIR_TRACE
-static int xfs_dir_trace_entry(ktrace_entry_t *ktep);
-#endif
-#ifdef XFS_DIR2_TRACE
-static int xfs_dir2_trace_entry(ktrace_entry_t *ktep);
-#endif
-static void xfs_dir2data(void *addr, int size);
-static void xfs_dir2leaf(xfs_dir2_leaf_t *leaf, int size);
-static void xfs_dquot_item_print(xfs_dq_logitem_t *lip, int summary);
-static void xfs_efd_item_print(xfs_efd_log_item_t *efdp, int summary);
-static void xfs_efi_item_print(xfs_efi_log_item_t *efip, int summary);
-static char *xfs_fmtformat(xfs_dinode_fmt_t f);
-char *xfs_fmtfsblock(xfs_fsblock_t bno, xfs_mount_t *mp);
-static char *xfs_fmtino(xfs_ino_t ino, xfs_mount_t *mp);
-static char *xfs_fmtlsn(xfs_lsn_t *lsnp);
-static char *xfs_fmtmode(int m);
-static char *xfs_fmtsize(size_t i);
-static char *xfs_fmtuuid(uuid_t *);
-static void xfs_inode_item_print(xfs_inode_log_item_t *ilip, int summary);
-static void xfs_inodebuf(xfs_buf_t *bp);
-static void xfs_prdinode_core(xfs_dinode_core_t *dip);
-static void xfs_qoff_item_print(xfs_qoff_logitem_t *lip, int summary);
-#ifdef XFS_RW_TRACE
-static void xfs_rw_enter_trace_entry(ktrace_entry_t *ktep);
-static void xfs_page_trace_entry(ktrace_entry_t *ktep);
-static int xfs_rw_trace_entry(ktrace_entry_t *ktep);
-#endif
-static void xfs_xexlist_fork(xfs_inode_t *ip, int whichfork);
-static void xfs_xnode_fork(char *name, xfs_ifork_t *f);
-
 /*
  * Static functions.
  */
@@ -4245,9 +4245,8 @@ xfs_bunmap_trace_entry(ktrace_entry_t   *ktep)
 		(unsigned int)(long)ktep->val[5],
 		(unsigned int)(long)ktep->val[6],
 		(long)ktep->val[8]);
-	qprintf("ra 0x%p ", ktep->val[9]);
+	qprintf("ra 0x%p pid %d ", ktep->val[9], (int)(long)ktep->val[10]);
 	printflags((__psint_t)ktep->val[7], bunmapi_flags, "flags");
-	qprintf("pid %d\n", ktep->val[10]);
 }
 
 /*
@@ -4792,6 +4791,8 @@ xfsidbg_xalttrace(int tag)
 	}
 }
 #endif
+
+static int xargument = 0;
 
 /*
  * Set xtra argument, used by xchksum.
