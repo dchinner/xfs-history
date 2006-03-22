@@ -212,6 +212,7 @@ EXPORT_SYMBOL(vfs_quotactl);
 EXPORT_SYMBOL(vfs_get_inode);
 EXPORT_SYMBOL(vfs_init_vnode);
 EXPORT_SYMBOL(vfs_force_shutdown);
+EXPORT_SYMBOL(vfs_from_sb);
 EXPORT_SYMBOL(vn_hold);
 EXPORT_SYMBOL(vn_initialize);
 EXPORT_SYMBOL(vn_revalidate);
