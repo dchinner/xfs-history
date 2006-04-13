@@ -227,6 +227,7 @@ EXPORT_SYMBOL(xfs_flush_buftarg);
 EXPORT_SYMBOL(xfs_free_buftarg);
 EXPORT_SYMBOL(xfs_bdstrat_cb);
 EXPORT_SYMBOL(xfs_bmap_cancel);
+EXPORT_SYMBOL(xfs_bmap_count_blocks);
 EXPORT_SYMBOL(xfs_bmap_finish);
 EXPORT_SYMBOL(xfs_bmap_search_multi_extents);
 EXPORT_SYMBOL(xfs_bmapi);

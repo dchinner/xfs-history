@@ -4440,8 +4440,8 @@ xfs_rw_trace_entry(ktrace_entry_t *ktep)
 		qprintf("CTRUNC6:\n");
 		xfs_ctrunc_trace_entry(ktep);
 		break;
-	case XFS_BUNMAPI:
-		qprintf("BUNMAPI:\n");
+	case XFS_BUNMAP:
+		qprintf("BUNMAP:\n");
 		xfs_bunmap_trace_entry(ktep);
 		break;
 	case XFS_INVAL_CACHED:
