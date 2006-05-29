@@ -362,14 +362,10 @@ xfs_vm_nopage(
 {
 	struct inode	*inode = area->vm_file->f_dentry->d_inode;
 	vnode_t		*vp = vn_from_inode(inode);
-	xfs_mount_t	*mp = XFS_VFSTOM(vp->v_vfsp);
-	int		error;
 
 	ASSERT_ALWAYS(vp->v_vfsp->vfs_flag & VFS_DMI);
-	error = XFS_SEND_MMAP(XFS_VFSTOM(vp->v_vfsp), area, 0);
-	if (error)
+	if (XFS_SEND_MMAP(XFS_VFSTOM(vp->v_vfsp), area, 0))
 		return NULL;
-
 	return filemap_nopage(area, address, type);
 }
 #endif /* CONFIG_XFS_DMAPI */
