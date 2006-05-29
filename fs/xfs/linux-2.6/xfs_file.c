@@ -566,7 +566,7 @@ open_exec_out:
 }
 #endif /* HAVE_FOP_OPEN_EXEC */
 
-struct file_operations xfs_file_operations = {
+const struct file_operations xfs_file_operations = {
 	.llseek		= generic_file_llseek,
 	.read		= do_sync_read,
 	.write		= do_sync_write,
@@ -590,7 +590,7 @@ struct file_operations xfs_file_operations = {
 #endif
 };
 
-struct file_operations xfs_invis_file_operations = {
+const struct file_operations xfs_invis_file_operations = {
 	.llseek		= generic_file_llseek,
 	.read		= do_sync_read,
 	.write		= do_sync_write,
@@ -612,7 +612,7 @@ struct file_operations xfs_invis_file_operations = {
 };
 
 
-struct file_operations xfs_dir_file_operations = {
+const struct file_operations xfs_dir_file_operations = {
 	.read		= generic_read_dir,
 	.readdir	= xfs_file_readdir,
 	.unlocked_ioctl	= xfs_file_ioctl,
