@@ -195,6 +195,9 @@ extern void vfs_init_vnode(bhv_desc_t *, struct bhv_vnode *, bhv_desc_t *, int);
 extern void vfs_force_shutdown(bhv_desc_t *, int, char *, int);
 extern void vfs_freeze(bhv_desc_t *);
 
+#define vfs_test_for_freeze(vfs)	((vfs)->vfs_super->s_frozen)
+#define vfs_wait_for_freeze(vfs, lvl)	vfs_check_frozen((vfs)->vfs_super, (lvl))
+
 #define XFS_DMOPS		"xfs_dm_operations"	/* Data Migration */
 #define XFS_QMOPS		"xfs_qm_operations"	/* Quota Manager  */
 #define XFS_IOOPS		"xfs_io_operations"	/* I/O subsystem  */
@@ -230,9 +233,5 @@ extern void bhv_get_vfsops(struct bhv_vfs *, const char *, const char *);
 extern void bhv_insert_all_vfsops(struct bhv_vfs *);
 extern void bhv_remove_all_vfsops(struct bhv_vfs *, int);
 extern void bhv_remove_vfsops(struct bhv_vfs *, int);
-
-#define fs_frozen(vfsp)		((vfsp)->vfs_super->s_frozen)
-#define fs_check_frozen(vfsp, level) \
-	vfs_check_frozen(vfsp->vfs_super, level);
 
 #endif	/* __XFS_VFS_H__ */
