@@ -60,7 +60,7 @@ void
 xfs_refcache_insert(
 	xfs_inode_t	*ip)
 {
-	vnode_t		*vp;
+	bhv_vnode_t	*vp;
 	xfs_inode_t	*release_ip;
 	xfs_inode_t	**refcache;
 
@@ -179,8 +179,7 @@ void
 xfs_refcache_purge_ip(
 	xfs_inode_t	*ip)
 {
-	vnode_t	*vp;
-	int	error;
+	bhv_vnode_t	*vp;
 
 	/*
 	 * If we're not pointing to our entry in the cache, then
@@ -209,7 +208,7 @@ xfs_refcache_purge_ip(
 
 	vp = XFS_ITOV(ip);
 	/* ASSERT(vp->v_count > 1); */
-	VOP_RELEASE(vp, error);
+	bhv_vop_release(vp);
 	VN_RELE(vp);
 }
 
@@ -223,13 +222,12 @@ void
 xfs_refcache_purge_mp(
 	xfs_mount_t	*mp)
 {
-	vnode_t		*vp;
-	int		error, i;
+	bhv_vnode_t	*vp;
 	xfs_inode_t	*ip;
+	int		i;
 
-	if (xfs_refcache == NULL) {
+	if (xfs_refcache == NULL)
 		return;
-	}
 
 	spin_lock(&xfs_refcache_lock);
 	/*
@@ -248,7 +246,7 @@ xfs_refcache_purge_mp(
 			ASSERT(xfs_refcache_count >= 0);
 			spin_unlock(&xfs_refcache_lock);
 			vp = XFS_ITOV(ip);
-			VOP_RELEASE(vp, error);
+			bhv_vop_release(vp);
 			VN_RELE(vp);
 			spin_lock(&xfs_refcache_lock);
 		}
@@ -268,9 +266,8 @@ xfs_refcache_purge_mp(
 void
 xfs_refcache_purge_some(xfs_mount_t *mp)
 {
-	int		error, i;
 	xfs_inode_t	*ip;
-	int		iplist_index;
+	int		iplist_index, i;
 	xfs_inode_t	**iplist;
 
 	if ((xfs_refcache == NULL) || (xfs_refcache_count == 0)) {
@@ -313,12 +310,11 @@ xfs_refcache_purge_some(xfs_mount_t *mp)
 	 * Now drop the inodes we collected.
 	 */
 	for (i = 0; i < iplist_index; i++) {
-		VOP_RELEASE(XFS_ITOV(iplist[i]), error);
+		bhv_vop_release(XFS_ITOV(iplist[i]));
 		VN_RELE(XFS_ITOV(iplist[i]));
 	}
 
-	kmem_free(iplist, xfs_refcache_purge_count *
-			  sizeof(xfs_inode_t *));
+	kmem_free(iplist, xfs_refcache_purge_count * sizeof(xfs_inode_t *));
 }
 
 /*
@@ -341,7 +337,6 @@ xfs_refcache_resize(int xfs_refcache_new_size)
 	xfs_inode_t	*ip;
 	int		iplist_index = 0;
 	xfs_inode_t	**iplist;
-	int		error;
 
 	/*
 	 * If the new size is smaller than the current size,
@@ -382,7 +377,7 @@ xfs_refcache_resize(int xfs_refcache_new_size)
 		 * Now drop the inodes we collected.
 		 */
 		for (i = 0; i < iplist_index; i++) {
-			VOP_RELEASE(XFS_ITOV(iplist[i]), error);
+			bhv_vop_release(XFS_ITOV(iplist[i]));
 			VN_RELE(XFS_ITOV(iplist[i]));
 		}
 
@@ -401,7 +396,6 @@ xfs_refcache_iunlock(
 	uint		lock_flags)
 {
 	xfs_inode_t	*release_ip;
-	int		error;
 
 	release_ip = ip->i_release;
 	ip->i_release = NULL;
@@ -409,7 +403,7 @@ xfs_refcache_iunlock(
 	xfs_iunlock(ip, lock_flags);
 
 	if (release_ip != NULL) {
-		VOP_RELEASE(XFS_ITOV(release_ip), error);
+		bhv_vop_release(XFS_ITOV(release_ip));
 		VN_RELE(XFS_ITOV(release_ip));
 	}
 }

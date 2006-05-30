@@ -2057,12 +2057,12 @@ static void printbhv(bhv_desc_t *bdp)
 }
 
 
-static void	printvnode(vnode_t *vp, unsigned long addr)
+static void	printvnode(bhv_vnode_t *vp, unsigned long addr)
 {
 	kdb_printf("vnode: 0x%lx\n", addr);
 	kdb_printf(" v_bh 0x%p\n", &vp->v_bh);
 
-	printbhv(vp->v_fbhv);
+	printbhv(VNHEAD(vp));
 
 	printflags((__psunsigned_t)vp->v_flag, tab_vflags, "flag =");
 	kdb_printf("\n");
@@ -2085,7 +2085,7 @@ static int	kdbm_vnode(
 	int nextarg = 1;
 	long offset = 0;
 	int diag;
-	vnode_t		vp;
+	bhv_vnode_t vp;
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
@@ -2111,7 +2111,7 @@ print_vfs(bhv_vfs_t *vfs, unsigned long addr)
 	kdb_printf(" vfs_super 0x%p", vfs->vfs_super);
 	kdb_printf(" vfs_bh 0x%p\n", &vfs->vfs_bh);
 
-	printbhv(vfs->vfs_fbhv);
+	printbhv(VFSHEAD(vfs));
 }
 
 static int	kdbm_bhv(
@@ -2291,7 +2291,7 @@ static int	kdbm_vntrace(
 	int		nextarg = 1;
 	long		offset = 0;
 	unsigned long	addr;
-	vnode_t		*vp;
+	bhv_vnode_t	*vp;
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
 
@@ -2304,7 +2304,7 @@ static int	kdbm_vntrace(
 	if (diag)
 		return diag;
 
-	vp = (vnode_t *)addr;
+	vp = (bhv_vnode_t *)addr;
 
 	if (vp->v_trace == NULL) {
 		kdb_printf("The vnode trace buffer is not initialized\n");
@@ -2423,7 +2423,7 @@ static int	kdbm_vn(
 	long		offset = 0;
 	unsigned long	addr;
 	struct inode	*ip;
-	vnode_t		vp;
+	bhv_vnode_t	vp;
 #ifdef	XFS_VNODE_TRACE
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
@@ -2439,7 +2439,7 @@ static int	kdbm_vn(
 	if ((diag = kdb_getarea(vp, addr)))
 		return diag;
 
-	ip = vn_to_inode((vnode_t *)addr);
+	ip = vn_to_inode((bhv_vnode_t *)addr);
 	kdb_printf("--> Inode @ 0x%p\n", ip);
 	printinode(ip);
 
@@ -2671,7 +2671,7 @@ static int
 kdbm_i2vnode(int argc, const char **argv, const char **envp,
 	struct pt_regs *regs)
 {
-	struct vnode vp;
+	bhv_vnode_t vp;
 	struct inode *ip;
 	unsigned long addr;
 	long offset=0;
