@@ -3018,14 +3018,14 @@ static struct xif xfsidbg_funcs[] = {
 };
 
 static struct xif xfsbuf_funcs[] = {
-  {  "bp",	kdbm_bp,	"<vaddr>",	"Display xfs_buf_t" },
-  {  "bpflags",	kdbm_bp_flags,	"<flags>",	"Display xfs_buf flags" },
+  {  "xbp",	kdbm_bp,	"<vaddr>",	"Display xfs_buf_t" },
+  {  "xbpflags",kdbm_bp_flags,	"<flags>",	"Display xfs_buf flags" },
   {  "xiomap",	kdbm_iomap,	"<xfs_iomap_t *>",	"Display IOmap" },
-  {  "i2vnode",	kdbm_i2vnode,	"<inode *>",	"Display Vnode" },
-  {  "bpdelay",	kdbm_bpdelay,	"0|1",		"Display delwri buffers" },
+  {  "xi2vnode",kdbm_i2vnode,	"<inode *>",	"Display Vnode" },
+  {  "xbpdelay",kdbm_bpdelay,	"0|1",		"Display delwri buffers" },
 #ifdef XFS_BUF_TRACE
-  {  "bptrace",	kdbm_bptrace,	"<vaddr>|<count>",	"xfs_buf_t trace" },
-  {  "bpoffset",kdbm_bptrace_offset, "<daddr> [<mask>]","xfs_buf_t trace" },
+  {  "xbptrace",kdbm_bptrace,	"<vaddr>|<count>",	"xfs_buf_t trace" },
+  {  "xbptroff",kdbm_bptrace_offset, "<daddr> [<mask>]","xfs_buf_t trace" },
 #endif
   {  NULL,		NULL,	NULL }
 };
