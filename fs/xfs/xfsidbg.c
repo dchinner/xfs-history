@@ -2104,7 +2104,7 @@ static int	kdbm_vnode(
 }
 
 static void
-print_vfs(vfs_t	*vfs, unsigned long addr)
+print_vfs(bhv_vfs_t *vfs, unsigned long addr)
 {
 	kdb_printf("vfsp at 0x%lx", addr);
 	kdb_printf(" vfs_flag 0x%x\n", vfs->vfs_flag);
@@ -2151,7 +2151,7 @@ static int	kdbm_vfs(
 	int nextarg = 1;
 	long offset = 0;
 	int diag;
-	vfs_t		vfs;
+	bhv_vfs_t vfs;
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
