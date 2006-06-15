@@ -224,7 +224,6 @@ typedef struct bhv_module {
 extern bhv_vfs_t *vfs_allocate(struct super_block *);
 extern bhv_vfs_t *vfs_from_sb(struct super_block *);
 extern void vfs_deallocate(bhv_vfs_t *);
-extern void vfs_insertops(bhv_vfs_t *, bhv_vfsops_t *);
 extern void vfs_insertbhv(bhv_vfs_t *, bhv_desc_t *, bhv_vfsops_t *, void *);
 
 extern void bhv_module_init(const char *, struct module *, const void *);

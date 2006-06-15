@@ -276,18 +276,6 @@ vfs_deallocate(
 }
 
 void
-vfs_insertops(
-	struct bhv_vfs		*vfsp,
-	struct bhv_vfsops	*vfsops)
-{
-	struct bhv_desc		*bdp;
-
-	bdp = kmem_alloc(sizeof(struct bhv_desc), KM_SLEEP);
-	bhv_desc_init(bdp, NULL, vfsp, vfsops);
-	bhv_insert(&vfsp->vfs_bh, bdp);
-}
-
-void
 vfs_insertbhv(
 	struct bhv_vfs		*vfsp,
 	struct bhv_desc		*bdp,
