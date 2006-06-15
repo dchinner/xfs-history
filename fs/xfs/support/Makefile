@@ -30,6 +30,7 @@ endif
 obj-y				:= debug.o \
 				   move.o \
 				   qsort.o \
+				   radix-tree.o \
 				   uuid.o
 
 obj-$(CONFIG_XFS_TRACE)		+= ktrace.o
