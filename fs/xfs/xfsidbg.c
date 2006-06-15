@@ -32,7 +32,6 @@
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
-#include "xfs_dir.h"
 #include "xfs_dir2.h"
 #include "xfs_dmapi.h"
 #include "xfs_mount.h"
@@ -41,7 +40,6 @@
 #include "xfs_alloc_btree.h"
 #include "xfs_bmap_btree.h"
 #include "xfs_ialloc_btree.h"
-#include "xfs_dir_sf.h"
 #include "xfs_dir2_sf.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dinode.h"
@@ -54,7 +52,6 @@
 #include "xfs_bmap.h"
 #include "xfs_attr.h"
 #include "xfs_attr_leaf.h"
-#include "xfs_dir_leaf.h"
 #include "xfs_dir2_data.h"
 #include "xfs_dir2_leaf.h"
 #include "xfs_dir2_block.h"
@@ -100,9 +97,6 @@ static void	xfsidbg_xbxstrace(xfs_inode_t *);
 static void	xfsidbg_xilock_trace(xfs_inode_t *);
 static void	xfsidbg_xailock_trace(int);
 #endif
-#ifdef XFS_DIR_TRACE
-static void	xfsidbg_xdirtrace(int);
-#endif
 #ifdef XFS_DIR2_TRACE
 static void	xfsidbg_xdir2atrace(int);
 static void	xfsidbg_xdir2itrace(xfs_inode_t *);
@@ -142,8 +136,6 @@ static void	xfsidbg_xdaargs(xfs_da_args_t *);
 static void	xfsidbg_xdabuf(xfs_dabuf_t *);
 static void	xfsidbg_xdanode(xfs_da_intnode_t *);
 static void	xfsidbg_xdastate(xfs_da_state_t *);
-static void	xfsidbg_xdirleaf(xfs_dir_leafblock_t *);
-static void	xfsidbg_xdirsf(xfs_dir_shortform_t *);
 static void	xfsidbg_xdir2free(xfs_dir2_free_t *);
 static void	xfsidbg_xdir2sf(xfs_dir2_sf_t *);
 static void	xfsidbg_xexlist(xfs_inode_t *);
@@ -202,9 +194,6 @@ static int	xfs_bmap_trace_entry(ktrace_entry_t *ktep);
 #endif
 #ifdef XFS_BMAP_TRACE
 static int	xfs_bmbt_trace_entry(ktrace_entry_t *ktep);
-#endif
-#ifdef XFS_DIR_TRACE
-static int	xfs_dir_trace_entry(ktrace_entry_t *ktep);
 #endif
 #ifdef XFS_DIR2_TRACE
 static int	xfs_dir2_trace_entry(ktrace_entry_t *ktep);
@@ -598,30 +587,6 @@ static int	kdbm_xfs_xdir2itrace(
 		return diag;
 
 	xfsidbg_xdir2itrace((xfs_inode_t *) addr);
-	return 0;
-}
-#endif
-
-#ifdef XFS_DIR_TRACE
-static int	kdbm_xfs_xdirtrace(
-	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
-{
-	unsigned long addr;
-	int nextarg = 1;
-	long offset = 0;
-	int diag;
-
-	if (argc != 1)
-		return KDB_ARGCOUNT;
-
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
-	if (diag)
-		return diag;
-
-	xfsidbg_xdirtrace((int) addr);
 	return 0;
 }
 #endif
@@ -1225,48 +1190,6 @@ static int	kdbm_xfs_xdastate(
 		return diag;
 
 	xfsidbg_xdastate((xfs_da_state_t *) addr);
-	return 0;
-}
-
-static int	kdbm_xfs_xdirleaf(
-	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
-{
-	unsigned long addr;
-	int nextarg = 1;
-	long offset = 0;
-	int diag;
-
-	if (argc != 1)
-		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
-	if (diag)
-		return diag;
-
-	xfsidbg_xdirleaf((xfs_dir_leafblock_t *) addr);
-	return 0;
-}
-
-static int	kdbm_xfs_xdirsf(
-	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
-{
-	unsigned long addr;
-	int nextarg = 1;
-	long offset = 0;
-	int diag;
-
-	if (argc != 1)
-		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
-	if (diag)
-		return diag;
-
-	xfsidbg_xdirsf((xfs_dir_shortform_t *) addr);
 	return 0;
 }
 
@@ -2918,16 +2841,8 @@ static struct xif xfsidbg_funcs[] = {
 				"Dump XFS dir/attr state_blk struct"},
   {  "xdelay",	kdbm_xfs_delayed_blocks,	"<xfs_mount_t>",
 				"Dump delayed block totals"},
-  {  "xdirlf",	kdbm_xfs_xdirleaf,	"<xfs_dir_leafblock_t>",
-				"Dump XFS directory leaf block"},
-  {  "xdirsf",	kdbm_xfs_xdirsf,	"<xfs_dir_shortform_t>",
-				"Dump XFS directory shortform"},
   {  "xdir2sf",	kdbm_xfs_xdir2sf,	"<xfs_dir2_sf_t>",
 				"Dump XFS directory v2 shortform"},
-#ifdef XFS_DIR_TRACE
-  {  "xdirtrc",	kdbm_xfs_xdirtrace,	"<count>",
-				"Dump XFS directory getdents() trace" },
-#endif
   {  "xdiskdq",	kdbm_xfs_xqm_diskdq,	"<xfs_disk_dquot_t>",
 				"Dump XFS ondisk dquot (quota) struct"},
   {  "xdqatt",	kdbm_xfs_xqm_dqattached_inos,	"<xfs_mount_t>",
@@ -3695,80 +3610,12 @@ xfs_dastate_path(xfs_da_state_path_t *p)
 			p->blk[i].index, (uint_t)p->blk[i].hashval);
 		switch(p->blk[i].magic) {
 		case XFS_DA_NODE_MAGIC:		kdb_printf("NODE\n");	break;
-		case XFS_DIR_LEAF_MAGIC:	kdb_printf("DIR\n");	break;
 		case XFS_ATTR_LEAF_MAGIC:	kdb_printf("ATTR\n");	break;
 		case XFS_DIR2_LEAFN_MAGIC:	kdb_printf("DIR2\n");	break;
 		default:			kdb_printf("type ?\n");	break;
 		}
 	}
 }
-
-#ifdef XFS_DIR_TRACE
-/*
- * Print a xfs directory trace buffer entry.
- */
-static int
-xfs_dir_trace_entry(ktrace_entry_t *ktep)
-{
-	xfs_mount_t *mp;
-	__uint32_t hash;
-	xfs_off_t cookie;
-
-	if (!ktep->val[0] || !ktep->val[1])
-		return 0;
-
-	mp = (xfs_mount_t *)ktep->val[3];
-	cookie = (__psunsigned_t)ktep->val[4];
-	cookie <<= 32;
-	cookie |= (__psunsigned_t)ktep->val[5];
-	qprintf("%s -- dp=0x%p b/e/h=%ld/%ld/0x%08lx resid=0x%lx ",
-		    (char *)ktep->val[1],
-		    (xfs_inode_t *)ktep->val[2],
-		    (long)XFS_DA_COOKIE_BNO(mp, cookie),
-		    (long)XFS_DA_COOKIE_ENTRY(mp, cookie),
-		    (unsigned long)XFS_DA_COOKIE_HASH(mp, cookie),
-		    (long)ktep->val[6]);
-
-	switch ((__psint_t)ktep->val[0]) {
-	case XFS_DIR_KTRACE_G_DU:
-		break;
-	case XFS_DIR_KTRACE_G_DUB:
-		qprintf("bno=%ld", (long)ktep->val[7]);
-		break;
-	case XFS_DIR_KTRACE_G_DUN:
-		qprintf("forw=%ld, cnt=%ld, 0x%08lx - 0x%08lx",
-			      (long)ktep->val[7],
-			      (long)ktep->val[8],
-			      (unsigned long)ktep->val[9],
-			      (unsigned long)ktep->val[10]);
-		break;
-	case XFS_DIR_KTRACE_G_DUL:
-		qprintf("forw=%ld, cnt=%ld, 0x%08lx - 0x%08lx",
-			      (long)ktep->val[7],
-			      (long)ktep->val[8],
-			      (unsigned long)ktep->val[9],
-			      (unsigned long)ktep->val[10]);
-		break;
-	case XFS_DIR_KTRACE_G_DUE:
-		qprintf("entry hashval 0x%08lx", (unsigned long)ktep->val[7]);
-		break;
-	case XFS_DIR_KTRACE_G_DUC:
-		cookie = (__psunsigned_t)ktep->val[7];
-		cookie <<= 32;
-		cookie |= (__psunsigned_t)ktep->val[8];
-		hash = XFS_DA_COOKIE_HASH(mp, cookie);
-		qprintf("b/e/h=%ld/%ld/0x%08x",
-		    (long)XFS_DA_COOKIE_BNO(mp, cookie),
-		    (long)XFS_DA_COOKIE_ENTRY(mp, cookie),
-		    hash);
-		break;
-	default:
-		qprintf("unknown dir trace record format");
-		break;
-	}
-	return 1;
-}
-#endif
 
 #ifdef XFS_DIR2_TRACE
 /*
@@ -5280,7 +5127,6 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 	xfs_bmbt_block_t *btb;
 	xfs_inobt_block_t *bti;
 	xfs_attr_leafblock_t *aleaf;
-	xfs_dir_leafblock_t *dleaf;
 	xfs_da_intnode_t *node;
 	xfs_dinode_t *di;
 	xfs_disk_dquot_t *dqb;
@@ -5345,14 +5191,6 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 		} else {
 			kdb_printf("buf 0x%p attr leaf 0x%p\n", bp, aleaf);
 			xfsidbg_xattrleaf(aleaf);
-		}
-	} else if (INT_GET((dleaf = d)->hdr.info.magic, ARCH_CONVERT) == XFS_DIR_LEAF_MAGIC) {
-		if (summary) {
-			kdb_printf("Dir Leaf, 1st hash 0x%x (at 0x%p)\n",
-				     dleaf->entries[0].hashval, dleaf);
-		} else {
-			kdb_printf("buf 0x%p dir leaf 0x%p\n", bp, dleaf);
-			xfsidbg_xdirleaf(dleaf);
 		}
 	} else if (INT_GET((node = d)->hdr.info.magic, ARCH_CONVERT) == XFS_DA_NODE_MAGIC) {
 		if (summary) {
@@ -5835,44 +5673,6 @@ xfsidbg_xdastate(xfs_da_state_t *s)
 }
 
 /*
- * Print a directory leaf block.
- */
-static void
-xfsidbg_xdirleaf(xfs_dir_leafblock_t *leaf)
-{
-	xfs_dir_leaf_hdr_t *h;
-	xfs_da_blkinfo_t *i;
-	xfs_dir_leaf_map_t *m;
-	xfs_dir_leaf_entry_t *e;
-	xfs_dir_leaf_name_t *n;
-	int j, k;
-	xfs_ino_t ino;
-
-	h = &leaf->hdr;
-	i = &h->info;
-	kdb_printf("hdr info forw 0x%x back 0x%x magic 0x%x\n",
-		INT_GET(i->forw, ARCH_CONVERT), INT_GET(i->back, ARCH_CONVERT), INT_GET(i->magic, ARCH_CONVERT));
-	kdb_printf("hdr count %d namebytes %d firstused %d holes %d\n",
-		INT_GET(h->count, ARCH_CONVERT), INT_GET(h->namebytes, ARCH_CONVERT), INT_GET(h->firstused, ARCH_CONVERT), h->holes);
-	for (j = 0, m = h->freemap; j < XFS_DIR_LEAF_MAPSIZE; j++, m++) {
-		kdb_printf("hdr freemap %d base %d size %d\n",
-			j, INT_GET(m->base, ARCH_CONVERT), INT_GET(m->size, ARCH_CONVERT));
-	}
-	for (j = 0, e = leaf->entries; j < INT_GET(h->count, ARCH_CONVERT); j++, e++) {
-		n = XFS_DIR_LEAF_NAMESTRUCT(leaf, INT_GET(e->nameidx, ARCH_CONVERT));
-		XFS_DIR_SF_GET_DIRINO(&n->inumber, &ino);
-		kdb_printf("leaf %d hashval 0x%x nameidx %d inumber %llu ",
-			j, (uint_t)INT_GET(e->hashval, ARCH_CONVERT),
-			INT_GET(e->nameidx, ARCH_CONVERT),
-			(unsigned long long)ino);
-		kdb_printf("namelen %d name \"", e->namelen);
-		for (k = 0; k < e->namelen; k++)
-			kdb_printf("%c", n->name[k]);
-		kdb_printf("\"\n");
-	}
-}
-
-/*
  * Print a directory v2 data block, single or multiple.
  */
 static void
@@ -5983,32 +5783,6 @@ xfs_dir2leaf(xfs_dir2_leaf_t *leaf, int size)
 }
 
 /*
- * Print a shortform directory.
- */
-static void
-xfsidbg_xdirsf(xfs_dir_shortform_t *s)
-{
-	xfs_dir_sf_hdr_t *sfh;
-	xfs_dir_sf_entry_t *sfe;
-	xfs_ino_t ino;
-	int i, j;
-
-	sfh = &s->hdr;
-	XFS_DIR_SF_GET_DIRINO(&sfh->parent, &ino);
-	kdb_printf("hdr parent %llu", (unsigned long long)ino);
-	kdb_printf(" count %d\n", sfh->count);
-	for (i = 0, sfe = s->list; i < sfh->count; i++) {
-		XFS_DIR_SF_GET_DIRINO(&sfe->inumber, &ino);
-		kdb_printf("entry %d inumber %llu", i, (unsigned long long)ino);
-		kdb_printf(" namelen %d name \"", sfe->namelen);
-		for (j = 0; j < sfe->namelen; j++)
-			kdb_printf("%c", sfe->name[j]);
-		kdb_printf("\"\n");
-		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
-	}
-}
-
-/*
  * Print a shortform v2 directory.
  */
 static void
@@ -6051,52 +5825,6 @@ xfsidbg_xdir2free(xfs_dir2_free_t *f)
 			i, i + INT_GET(f->hdr.firstdb, ARCH_CONVERT), INT_GET(f->bests[i], ARCH_CONVERT));
 	}
 }
-
-#ifdef XFS_DIR_TRACE
-/*
- * Print out the last "count" entries in the directory trace buffer.
- */
-static void
-xfsidbg_xdirtrace(int count)
-{
-	ktrace_entry_t  *ktep;
-	ktrace_snap_t   kts;
-	int	     nentries;
-	int	     skip_entries;
-
-	if (xfs_dir_trace_buf == NULL) {
-		qprintf("The xfs directory trace buffer is not initialized\n");
-		return;
-	}
-	nentries = ktrace_nentries(xfs_dir_trace_buf);
-	if (count == -1) {
-		count = nentries;
-	}
-	if ((count <= 0) || (count > nentries)) {
-		qprintf("Invalid count.  There are %d entries.\n", nentries);
-		return;
-	}
-
-	ktep = ktrace_first(xfs_dir_trace_buf, &kts);
-	if (count != nentries) {
-		/*
-		 * Skip the total minus the number to look at minus one
-		 * for the entry returned by ktrace_first().
-		 */
-		skip_entries = nentries - count - 1;
-		ktep = ktrace_skip(xfs_dir_trace_buf, skip_entries, &kts);
-		if (ktep == NULL) {
-			qprintf("Skipped them all\n");
-			return;
-		}
-	}
-	while (ktep != NULL) {
-		if (xfs_dir_trace_entry(ktep))
-			qprintf("\n");
-		ktep = ktrace_next(xfs_dir_trace_buf, &kts);
-	}
-}
-#endif
 
 #ifdef XFS_DIR2_TRACE
 /*
@@ -7016,8 +6744,7 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		mp->m_attr_magicpct, mp->m_dir_magicpct);
 	kdb_printf("mk_sharedro %d inode_quiesce %d sectbb_log %d\n",
 		mp->m_mk_sharedro, mp->m_inode_quiesce, mp->m_sectbb_log);
-	kdb_printf("dirversion %d dirblkfsbs %d &dirops 0x%p\n",
-		mp->m_dirversion, mp->m_dirblkfsbs, &mp->m_dirops);
+	kdb_printf("dirblkfsbs %d\n", mp->m_dirblkfsbs);
 	kdb_printf("dirblksize %d dirdatablk 0x%Lx dirleafblk 0x%Lx dirfreeblk 0x%Lx\n",
 		mp->m_dirblksize,
 		(xfs_dfiloff_t)mp->m_dirdatablk,

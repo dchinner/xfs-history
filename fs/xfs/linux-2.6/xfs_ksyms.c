@@ -26,7 +26,6 @@
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
-#include "xfs_dir.h"
 #include "xfs_dir2.h"
 #include "xfs_alloc.h"
 #include "xfs_dmapi.h"
@@ -36,7 +35,6 @@
 #include "xfs_bmap_btree.h"
 #include "xfs_alloc_btree.h"
 #include "xfs_ialloc_btree.h"
-#include "xfs_dir_sf.h"
 #include "xfs_dir2_sf.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dinode.h"
@@ -49,7 +47,6 @@
 #include "xfs_itable.h"
 #include "xfs_rw.h"
 #include "xfs_refcache.h"
-#include "xfs_dir_leaf.h"
 #include "xfs_dir2_data.h"
 #include "xfs_dir2_leaf.h"
 #include "xfs_dir2_block.h"
@@ -110,9 +107,6 @@ EXPORT_SYMBOL(xfs_attr_trace_buf);
 #endif
 #ifdef XFS_DIR2_TRACE
 EXPORT_SYMBOL(xfs_dir2_trace_buf);
-#endif
-#ifdef XFS_DIR_TRACE
-EXPORT_SYMBOL(xfs_dir_trace_buf);
 #endif
 
 #ifdef XFS_BUF_TRACE

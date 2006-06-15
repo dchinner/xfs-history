@@ -30,7 +30,6 @@ ifeq ($(CONFIG_XFS_TRACE),y)
 	EXTRA_CFLAGS += -DXFS_BLI_TRACE
 	EXTRA_CFLAGS += -DXFS_BMAP_TRACE
 	EXTRA_CFLAGS += -DXFS_BMBT_TRACE
-	EXTRA_CFLAGS += -DXFS_DIR_TRACE
 	EXTRA_CFLAGS += -DXFS_DIR2_TRACE
 	EXTRA_CFLAGS += -DXFS_DQUOT_TRACE
 	EXTRA_CFLAGS += -DXFS_ILOCK_TRACE
@@ -61,14 +60,12 @@ xfs-y				+= xfs_alloc.o \
 				   xfs_btree.o \
 				   xfs_buf_item.o \
 				   xfs_da_btree.o \
-				   xfs_dir.o \
 				   xfs_dir2.o \
 				   xfs_dir2_block.o \
 				   xfs_dir2_data.o \
 				   xfs_dir2_leaf.o \
 				   xfs_dir2_node.o \
 				   xfs_dir2_sf.o \
-				   xfs_dir_leaf.o \
 				   xfs_error.o \
 				   xfs_extfree_item.o \
 				   xfs_fsops.o \
