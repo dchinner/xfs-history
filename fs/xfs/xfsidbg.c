@@ -6862,7 +6862,7 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		&ip->i_lock,
 		&ip->i_iolock);
 	kdb_printf("&flock 0x%p (%d) pincount 0x%x\n",
-		&ip->i_flock, valusema(&ip->i_flock),
+		&ip->i_flock, issemalocked(&ip->i_flock),
 		xfs_ipincount(ip));
 	kdb_printf("udquotp 0x%p gdquotp 0x%p\n",
 		ip->i_udquot, ip->i_gdquot);
@@ -7067,9 +7067,8 @@ xfsidbg_xqm_dquot(xfs_dquot_t *dqp)
 		(unsigned long long)dqp->q_res_icount,
 		(unsigned long long)dqp->q_res_rtbcount);
 	kdb_printf("qlock 0x%p  flock 0x%p (%s) pincount 0x%x\n",
-		&dqp->q_qlock,
-		&dqp->q_flock,
-		(valusema(&dqp->q_flock) <= 0) ? "LCK" : "UNLKD",
+		&dqp->q_qlock, &dqp->q_flock,
+		issemalocked(&dqp->q_flock) ? "LCKD" : "UNLKD",
 		dqp->q_pincount);
 #ifdef XFS_DQUOT_TRACE
 	qprintf("dqtrace 0x%p\n", dqp->q_trace);
