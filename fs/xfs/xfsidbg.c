@@ -7390,12 +7390,10 @@ xfsidbg_xtp(xfs_trans_t *tp)
 
 	kdb_printf("tp 0x%p type ", tp);
 	xfsidbg_print_trans_type(tp->t_type);
-	kdb_printf(" mount 0x%p\n", tp->t_mountp);
+	kdb_printf(" mount 0x%p callback 0x%p\n", tp->t_mountp, &tp->t_logcb);
 	kdb_printf("flags ");
-	printflags(tp->t_flags, xtp_flags,"xtp");
+	printflags(tp->t_flags, xtp_flags, "xtp");
 	kdb_printf("\n");
-	kdb_printf("callback 0x%p forw 0x%p back 0x%p\n",
-		&tp->t_logcb, tp->t_forw, tp->t_back);
 	kdb_printf("log res %d block res %d block res used %d\n",
 		tp->t_log_res, tp->t_blk_res, tp->t_blk_res_used);
 	kdb_printf("rt res %d rt res used %d\n", tp->t_rtx_res,
