@@ -7410,9 +7410,11 @@ xfsidbg_xtp(xfs_trans_t *tp)
 		tp->t_fdblocks_delta, tp->t_res_fdblocks_delta);
 	kdb_printf("rt delta %ld res rt delta %ld\n",
 		tp->t_frextents_delta, tp->t_res_frextents_delta);
+#ifdef DEBUG
 	kdb_printf("ag freeblks delta %ld ag flist delta %ld ag btree delta %ld\n",
 		tp->t_ag_freeblks_delta, tp->t_ag_flist_delta,
 		tp->t_ag_btree_delta);
+#endif
 	kdb_printf("dblocks delta %ld agcount delta %ld imaxpct delta %ld\n",
 		tp->t_dblocks_delta, tp->t_agcount_delta, tp->t_imaxpct_delta);
 	kdb_printf("rextsize delta %ld rbmblocks delta %ld\n",
