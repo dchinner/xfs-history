@@ -4197,7 +4197,7 @@ xfs_page_trace_entry(ktrace_entry_t *ktep)
 {
 	qprintf("ip 0x%p inode 0x%p page 0x%p\n",
 		ktep->val[1], ktep->val[2], ktep->val[3]);
-	qprintf("mask 0x%x di_size 0x%x%x isize 0x%x%x offset 0x%x%x\n",
+	qprintf("pgoff 0x%x di_size 0x%x%x isize 0x%x%x offset 0x%x%x\n",
 		(unsigned int)(long)ktep->val[4],
 		(unsigned int)(long)ktep->val[5],
 		(unsigned int)(long)ktep->val[6],
