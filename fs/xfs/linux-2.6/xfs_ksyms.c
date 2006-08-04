@@ -142,7 +142,6 @@ EXPORT_SYMBOL(bhv_get_vfsops);
 EXPORT_SYMBOL(bhv_head_destroy);
 EXPORT_SYMBOL(bhv_insert);
 EXPORT_SYMBOL(bhv_insert_initial);
-EXPORT_SYMBOL(bhv_lookup);
 EXPORT_SYMBOL(bhv_lookup_range);
 EXPORT_SYMBOL(bhv_module_init);
 EXPORT_SYMBOL(bhv_module_exit);
