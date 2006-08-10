@@ -152,11 +152,7 @@ BUFFER_FNS(PrivateStart, unwritten);
 		(current->flags = ((current->flags & ~(f)) | (*(sp) & (f))))
 
 #define NBPP		PAGE_SIZE
-#define DPPSHFT		(PAGE_SHIFT - 9)
 #define NDPP		(1 << (PAGE_SHIFT - 9))
-#define dtop(DD)	(((DD) + NDPP - 1) >> DPPSHFT)
-#define dtopt(DD)	((DD) >> DPPSHFT)
-#define dpoff(DD)	((DD) & (NDPP-1))
 
 #define NBBY		8		/* number of bits per byte */
 #define	NBPC		PAGE_SIZE	/* Number of bytes per click */
@@ -176,8 +172,6 @@ BUFFER_FNS(PrivateStart, unwritten);
 #define	btoct(x)	((__psunsigned_t)(x)>>BPCSHIFT)
 #define	btoc64(x)	(((__uint64_t)(x)+(NBPC-1))>>BPCSHIFT)
 #define	btoct64(x)	((__uint64_t)(x)>>BPCSHIFT)
-#define	io_btoc(x)	(((__psunsigned_t)(x)+(IO_NBPC-1))>>IO_BPCSHIFT)
-#define	io_btoct(x)	((__psunsigned_t)(x)>>IO_BPCSHIFT)
 
 /* off_t bytes to clicks */
 #define offtoc(x)       (((__uint64_t)(x)+(NBPC-1))>>BPCSHIFT)
@@ -190,7 +184,6 @@ BUFFER_FNS(PrivateStart, unwritten);
 #define	ctob(x)		((__psunsigned_t)(x)<<BPCSHIFT)
 #define btoct(x)        ((__psunsigned_t)(x)>>BPCSHIFT)
 #define	ctob64(x)	((__uint64_t)(x)<<BPCSHIFT)
-#define	io_ctob(x)	((__psunsigned_t)(x)<<IO_BPCSHIFT)
 
 /* bytes to clicks */
 #define btoc(x)         (((__psunsigned_t)(x)+(NBPC-1))>>BPCSHIFT)
