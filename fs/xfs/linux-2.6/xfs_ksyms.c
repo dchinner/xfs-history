@@ -160,6 +160,7 @@ EXPORT_SYMBOL(kmem_shake_deregister);
 EXPORT_SYMBOL(kmem_shake_register);
 EXPORT_SYMBOL(kmem_zalloc);
 EXPORT_SYMBOL(kmem_zone_alloc);
+EXPORT_SYMBOL(kmem_zalloc_greedy);
 EXPORT_SYMBOL(kmem_zone_free);
 EXPORT_SYMBOL(kmem_zone_init);
 EXPORT_SYMBOL(kmem_zone_zalloc);
