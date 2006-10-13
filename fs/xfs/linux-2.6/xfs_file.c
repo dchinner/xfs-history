@@ -299,7 +299,8 @@ xfs_file_open(
 
 STATIC int
 xfs_file_close(
-	struct file	*filp)
+	struct file	*filp,
+	fl_owner_t	id)
 {
 	return -bhv_vop_close(vn_from_inode(filp->f_dentry->d_inode), 0,
 				file_count(filp) > 1 ? L_FALSE : L_TRUE, NULL);
@@ -369,7 +370,7 @@ xfs_file_readdir(
 
 	/* Try fairly hard to get memory */
 	do {
-		if ((read_buf = (caddr_t)kmalloc(rlen, GFP_KERNEL)))
+		if ((read_buf = kmalloc(rlen, GFP_KERNEL)))
 			break;
 		rlen >>= 1;
 	} while (rlen >= 1024);

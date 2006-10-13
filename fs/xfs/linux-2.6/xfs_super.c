@@ -171,7 +171,6 @@ xfs_revalidate_inode(
 		break;
 	}
 
-	inode->i_blksize = xfs_preferred_iosize(mp);
 	inode->i_generation = ip->i_d.di_gen;
 	i_size_write(inode, ip->i_d.di_size);
 	inode->i_blocks =
@@ -702,10 +701,11 @@ xfs_fs_sync_super(
 
 STATIC int
 xfs_fs_statfs(
-	struct super_block	*sb,
+	struct dentry		*dentry,
 	struct kstatfs		*statp)
 {
-	return -bhv_vfs_statvfs(vfs_from_sb(sb), statp, NULL);
+	return -bhv_vfs_statvfs(vfs_from_sb(dentry->d_sb), statp,
+				vn_from_inode(dentry->d_inode));
 }
 
 STATIC int
@@ -871,14 +871,16 @@ fail_vfsop:
 	return -error;
 }
 
-STATIC struct super_block *
+STATIC int
 xfs_fs_get_sb(
 	struct file_system_type	*fs_type,
 	int			flags,
 	const char		*dev_name,
-	void			*data)
+	void			*data,
+	struct vfsmount		*mnt)
 {
-	return get_sb_bdev(fs_type, flags, dev_name, data, xfs_fs_fill_super);
+	return get_sb_bdev(fs_type, flags, dev_name, data, xfs_fs_fill_super,
+			   mnt);
 }
 
 STATIC struct super_operations xfs_super_operations = {
@@ -903,7 +905,7 @@ STATIC struct quotactl_ops xfs_quotactl_operations = {
 	.set_xquota		= xfs_fs_setxquota,
 };
 
-struct file_system_type xfs_fs_type = {
+STATIC struct file_system_type xfs_fs_type = {
 	.owner			= THIS_MODULE,
 	.name			= "xfs",
 	.get_sb			= xfs_fs_get_sb,
@@ -911,6 +913,7 @@ struct file_system_type xfs_fs_type = {
 	.fs_flags		= FS_REQUIRES_DEV,
 };
 EXPORT_SYMBOL(xfs_fs_type);
+
 
 STATIC int __init
 init_xfs_fs( void )

@@ -196,7 +196,7 @@ extern void vfs_force_shutdown(bhv_desc_t *, int, char *, int);
 extern void vfs_freeze(bhv_desc_t *);
 
 #define vfs_test_for_freeze(vfs)	((vfs)->vfs_super->s_frozen)
-#define vfs_wait_for_freeze(vfs, lvl)	vfs_check_frozen((vfs)->vfs_super, (lvl))
+#define vfs_wait_for_freeze(vfs, l)	vfs_check_frozen((vfs)->vfs_super, (l))
 
 #define XFS_DMOPS		"xfs_dm_operations"	/* Data Migration */
 #define XFS_QMOPS		"xfs_qm_operations"	/* Quota Manager  */

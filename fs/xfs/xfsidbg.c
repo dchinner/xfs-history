@@ -2122,55 +2122,55 @@ vn_trace_pr_entry(ktrace_entry_t *ktep)
 
 	switch ((__psint_t)ktep->val[0]) {
 	case VNODE_KTRACE_ENTRY:
-		kdb_printf("entry to %s i_count = %d",
+		kdb_printf("entry to %s i_count = %ld",
 						(char *)ktep->val[1],
-						(__psint_t)ktep->val[3]);
+						(long)ktep->val[3]);
 		break;
 
 	case VNODE_KTRACE_EXIT:
-		kdb_printf("exit from %s i_count = %d",
+		kdb_printf("exit from %s i_count = %lu",
 						(char *)ktep->val[1],
-						(__psint_t)ktep->val[3]);
+						(long)ktep->val[3]);
 		break;
 
 	case VNODE_KTRACE_HOLD:
 		if ((__psint_t)ktep->val[3] != 1)
-			kdb_printf("hold @%s:%d(%s) i_count %d => %d ",
+			kdb_printf("hold @%s:%ld(%s) i_count %ld => %ld ",
 						(char *)ktep->val[1],
-						(__psint_t)ktep->val[2],
+						(long)ktep->val[2],
 						funcname,
-						(__psint_t)ktep->val[3] - 1,
-						(__psint_t)ktep->val[3]);
+						(long)ktep->val[3] - 1,
+						(long)ktep->val[3]);
 		else
-			kdb_printf("get @%s:%d(%s) i_count = %d",
+			kdb_printf("get @%s:%ld(%s) i_count = %ld",
 						(char *)ktep->val[1],
-						(__psint_t)ktep->val[2],
+						(long)ktep->val[2],
 						funcname,
-						(__psint_t)ktep->val[3]);
+						(long)ktep->val[3]);
 		break;
 
 	case VNODE_KTRACE_REF:
-		kdb_printf("ref @%s:%d(%s) i_count = %d",
+		kdb_printf("ref @%s:%ld(%s) i_count = %ld",
 						(char *)ktep->val[1],
-						(__psint_t)ktep->val[2],
+						(long)ktep->val[2],
 						funcname,
-						(__psint_t)ktep->val[3]);
+						(long)ktep->val[3]);
 		break;
 
 	case VNODE_KTRACE_RELE:
 		if ((__psint_t)ktep->val[3] != 1)
-			kdb_printf("rele @%s:%d(%s) i_count %d => %d ",
+			kdb_printf("rele @%s:%ld(%s) i_count %ld => %ld ",
 						(char *)ktep->val[1],
-						(__psint_t)ktep->val[2],
+						(long)ktep->val[2],
 						funcname,
-						(__psint_t)ktep->val[3],
-						(__psint_t)ktep->val[3] - 1);
+						(long)ktep->val[3],
+						(long)ktep->val[3] - 1);
 		else
-			kdb_printf("free @%s:%d(%s) i_count = %d",
+			kdb_printf("free @%s:%ld(%s) i_count = %ld",
 						(char *)ktep->val[1],
-						(__psint_t)ktep->val[2],
+						(long)ktep->val[2],
 						funcname,
-						(__psint_t)ktep->val[3]);
+						(long)ktep->val[3]);
 		break;
 
 	default:
@@ -2180,8 +2180,8 @@ vn_trace_pr_entry(ktrace_entry_t *ktep)
 
 	kdb_printf("\n");
 
-	kdb_printf("  cpu = %d pid = %d ",
-			(__psint_t)ktep->val[6], (pid_t)ktep->val[7]);
+	kdb_printf("  cpu = %ld pid = %d ",
+			(long)ktep->val[6], (pid_t)ktep->val[7]);
 
 	printflags((__psunsigned_t)ktep->val[5], tab_vflags, "flag =");
 
@@ -6685,7 +6685,7 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		mp->m_rtdev_targp ? mp->m_rtdev_targp->bt_dev : 0);
 	kdb_printf("bsize %d agfrotor %d xfs_rotorstep %d agirotor %d\n",
 		mp->m_bsize, mp->m_agfrotor, xfs_rotorstep, mp->m_agirotor);
-	kdb_printf("ihash 0x%p ihsize %d\n",
+	kdb_printf("ihash 0x%p ihsize %ld\n",
 		mp->m_ihash, mp->m_ihsize);
 	kdb_printf("inodes 0x%p ilock 0x%p ireclaims 0x%x\n",
 		mp->m_inodes, &mp->m_ilock, mp->m_ireclaims);
@@ -6817,7 +6817,7 @@ xfsidbg_xihash(xfs_mount_t *mp)
 
 	kdb_printf("\n");
 
-	kdb_printf("total inodes = %d, average length = %d, adjusted average = %d \n",
+	kdb_printf("total inodes = %d, average length = %ld, adjusted average = %ld \n",
 		total, total / mp->m_ihsize,
 		total / (mp->m_ihsize - numzeros));
 

@@ -19,7 +19,6 @@
 #define __XFS_LINUX__
 
 #include <linux/types.h>
-#include <linux/config.h>
 
 /*
  * Some types are conditional depending on the target system.
@@ -212,7 +211,6 @@ BUFFER_FNS(PrivateStart, unwritten);
 #define MIN(a,b)	(min(a,b))
 #define MAX(a,b)	(max(a,b))
 #define howmany(x, y)	(((x)+((y)-1))/(y))
-#define roundup(x, y)	((((x)+((y)-1))/(y))*(y))
 
 /*
  * Various platform dependent calls that don't fit anywhere else
