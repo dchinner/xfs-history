@@ -905,7 +905,7 @@ STATIC struct quotactl_ops xfs_quotactl_operations = {
 	.set_xquota		= xfs_fs_setxquota,
 };
 
-STATIC struct file_system_type xfs_fs_type = {
+struct file_system_type xfs_fs_type = {
 	.owner			= THIS_MODULE,
 	.name			= "xfs",
 	.get_sb			= xfs_fs_get_sb,
