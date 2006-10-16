@@ -112,6 +112,7 @@ EXPORT_SYMBOL(xfs_dir2_trace_buf);
 #ifdef XFS_BUF_TRACE
 extern ktrace_t *xfs_buf_trace_buf;
 EXPORT_SYMBOL(xfs_buf_trace_buf);
+EXPORT_SYMBOL(xfs_buf_trace);
 #endif
 
 
