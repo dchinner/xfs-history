@@ -234,9 +234,7 @@ static void	xfs_xnode_fork(char *name, xfs_ifork_t *f);
 
 static int	kdbm_xfs_xagf(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -245,7 +243,7 @@ static int	kdbm_xfs_xagf(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -255,9 +253,7 @@ static int	kdbm_xfs_xagf(
 
 static int	kdbm_xfs_xagi(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -266,7 +262,7 @@ static int	kdbm_xfs_xagi(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -276,9 +272,7 @@ static int	kdbm_xfs_xagi(
 
 static int	kdbm_xfs_xaildump(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -287,7 +281,7 @@ static int	kdbm_xfs_xaildump(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -298,9 +292,7 @@ static int	kdbm_xfs_xaildump(
 #ifdef XFS_ALLOC_TRACE
 static int	kdbm_xfs_xalatrace(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -310,7 +302,7 @@ static int	kdbm_xfs_xalatrace(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -320,9 +312,7 @@ static int	kdbm_xfs_xalatrace(
 
 static int	kdbm_xfs_xalbtrace(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -332,7 +322,7 @@ static int	kdbm_xfs_xalbtrace(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -342,9 +332,7 @@ static int	kdbm_xfs_xalbtrace(
 
 static int	kdbm_xfs_xalgtrace(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -354,7 +342,7 @@ static int	kdbm_xfs_xalgtrace(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -366,9 +354,7 @@ static int	kdbm_xfs_xalgtrace(
 #ifdef XFS_ATTR_TRACE
 static int	kdbm_xfs_xattrtrace(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -378,7 +364,7 @@ static int	kdbm_xfs_xattrtrace(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -390,9 +376,7 @@ static int	kdbm_xfs_xattrtrace(
 #ifdef XFS_BLI_TRACE
 static int	kdbm_xfs_xblitrace(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -402,7 +386,7 @@ static int	kdbm_xfs_xblitrace(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -414,9 +398,7 @@ static int	kdbm_xfs_xblitrace(
 #ifdef XFS_BMAP_TRACE
 static int	kdbm_xfs_xbmatrace(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -426,7 +408,7 @@ static int	kdbm_xfs_xbmatrace(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -436,9 +418,7 @@ static int	kdbm_xfs_xbmatrace(
 
 static int	kdbm_xfs_xbmitrace(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -448,7 +428,7 @@ static int	kdbm_xfs_xbmitrace(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -458,9 +438,7 @@ static int	kdbm_xfs_xbmitrace(
 
 static int	kdbm_xfs_xbmstrace(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -470,7 +448,7 @@ static int	kdbm_xfs_xbmstrace(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -480,9 +458,7 @@ static int	kdbm_xfs_xbmstrace(
 
 static int	kdbm_xfs_xbxatrace(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -492,7 +468,7 @@ static int	kdbm_xfs_xbxatrace(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -502,9 +478,7 @@ static int	kdbm_xfs_xbxatrace(
 
 static int	kdbm_xfs_xbxitrace(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -514,7 +488,7 @@ static int	kdbm_xfs_xbxitrace(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -524,9 +498,7 @@ static int	kdbm_xfs_xbxitrace(
 
 static int	kdbm_xfs_xbxstrace(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -536,7 +508,7 @@ static int	kdbm_xfs_xbxstrace(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -548,9 +520,7 @@ static int	kdbm_xfs_xbxstrace(
 #ifdef XFS_DIR2_TRACE
 static int	kdbm_xfs_xdir2atrace(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -560,7 +530,7 @@ static int	kdbm_xfs_xdir2atrace(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -570,9 +540,7 @@ static int	kdbm_xfs_xdir2atrace(
 
 static int	kdbm_xfs_xdir2itrace(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -582,7 +550,7 @@ static int	kdbm_xfs_xdir2itrace(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -594,9 +562,7 @@ static int	kdbm_xfs_xdir2itrace(
 #ifdef XFS_LOG_TRACE
 static int	kdbm_xfs_xiclogtrace(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -606,7 +572,7 @@ static int	kdbm_xfs_xiclogtrace(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -618,9 +584,7 @@ static int	kdbm_xfs_xiclogtrace(
 #ifdef XFS_ILOCK_TRACE
 static int	kdbm_xfs_xilock_trace(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -630,7 +594,7 @@ static int	kdbm_xfs_xilock_trace(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -640,9 +604,7 @@ static int	kdbm_xfs_xilock_trace(
 
 static int	kdbm_xfs_xailock_trace(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -652,7 +614,7 @@ static int	kdbm_xfs_xailock_trace(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -664,9 +626,7 @@ static int	kdbm_xfs_xailock_trace(
 #ifdef XFS_LOG_TRACE
 static int	kdbm_xfs_xlog_granttrace(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -676,7 +636,7 @@ static int	kdbm_xfs_xlog_granttrace(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -688,9 +648,7 @@ static int	kdbm_xfs_xlog_granttrace(
 #ifdef XFS_DQUOT_TRACE
 static int	kdbm_xfs_xqm_dqtrace(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -700,7 +658,7 @@ static int	kdbm_xfs_xqm_dqtrace(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -712,9 +670,7 @@ static int	kdbm_xfs_xqm_dqtrace(
 #ifdef XFS_RW_TRACE
 static int	kdbm_xfs_xrwtrace(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long	addr;
 	int		nextarg = 1;
@@ -727,7 +683,7 @@ static int	kdbm_xfs_xrwtrace(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -749,9 +705,7 @@ static int	kdbm_xfs_xrwtrace(
 
 static int	kdbm_xfs_xalloc(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -760,7 +714,7 @@ static int	kdbm_xfs_xalloc(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -771,9 +725,7 @@ static int	kdbm_xfs_xalloc(
 #ifdef XFS_ALLOC_TRACE
 static int	kdbm_xfs_xalmtrace(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -782,7 +734,7 @@ static int	kdbm_xfs_xalmtrace(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -792,9 +744,7 @@ static int	kdbm_xfs_xalmtrace(
 
 static int	kdbm_xfs_xalttrace(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -803,7 +753,7 @@ static int	kdbm_xfs_xalttrace(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -814,9 +764,7 @@ static int	kdbm_xfs_xalttrace(
 
 static int	kdbm_xfs_xattrcontext(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -825,7 +773,7 @@ static int	kdbm_xfs_xattrcontext(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -835,9 +783,7 @@ static int	kdbm_xfs_xattrcontext(
 
 static int	kdbm_xfs_xattrleaf(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -846,7 +792,7 @@ static int	kdbm_xfs_xattrleaf(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -856,9 +802,7 @@ static int	kdbm_xfs_xattrleaf(
 
 static int	kdbm_xfs_xattrsf(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -867,7 +811,7 @@ static int	kdbm_xfs_xattrsf(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -877,9 +821,7 @@ static int	kdbm_xfs_xattrsf(
 
 static int	kdbm_xfs_xbirec(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -888,7 +830,7 @@ static int	kdbm_xfs_xbirec(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -898,9 +840,7 @@ static int	kdbm_xfs_xbirec(
 
 static int	kdbm_xfs_xbmalla(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -909,7 +849,7 @@ static int	kdbm_xfs_xbmalla(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -919,9 +859,7 @@ static int	kdbm_xfs_xbmalla(
 
 static int	kdbm_xfs_xbrec(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -930,7 +868,7 @@ static int	kdbm_xfs_xbrec(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -940,9 +878,7 @@ static int	kdbm_xfs_xbrec(
 
 static int	kdbm_xfs_xbroot(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -951,7 +887,7 @@ static int	kdbm_xfs_xbroot(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -961,9 +897,7 @@ static int	kdbm_xfs_xbroot(
 
 static int	kdbm_xfs_xbroota(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -972,7 +906,7 @@ static int	kdbm_xfs_xbroota(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -982,9 +916,7 @@ static int	kdbm_xfs_xbroota(
 
 static int	kdbm_xfs_xbtcur(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -993,7 +925,7 @@ static int	kdbm_xfs_xbtcur(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1003,9 +935,7 @@ static int	kdbm_xfs_xbtcur(
 
 static int	kdbm_xfs_xbuf(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1014,7 +944,7 @@ static int	kdbm_xfs_xbuf(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1025,9 +955,7 @@ static int	kdbm_xfs_xbuf(
 
 static int	kdbm_xfs_xarg(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1036,7 +964,7 @@ static int	kdbm_xfs_xarg(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1046,9 +974,7 @@ static int	kdbm_xfs_xarg(
 
 static int	kdbm_xfs_xchksum(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1057,7 +983,7 @@ static int	kdbm_xfs_xchksum(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1068,9 +994,7 @@ static int	kdbm_xfs_xchksum(
 
 static int	kdbm_xfs_xchash(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1079,7 +1003,7 @@ static int	kdbm_xfs_xchash(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1089,9 +1013,7 @@ static int	kdbm_xfs_xchash(
 
 static int	kdbm_xfs_xchashlist(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1100,7 +1022,7 @@ static int	kdbm_xfs_xchashlist(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1111,9 +1033,7 @@ static int	kdbm_xfs_xchashlist(
 
 static int	kdbm_xfs_xdaargs(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1122,7 +1042,7 @@ static int	kdbm_xfs_xdaargs(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1132,9 +1052,7 @@ static int	kdbm_xfs_xdaargs(
 
 static int	kdbm_xfs_xdabuf(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1143,7 +1061,7 @@ static int	kdbm_xfs_xdabuf(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1153,9 +1071,7 @@ static int	kdbm_xfs_xdabuf(
 
 static int	kdbm_xfs_xdanode(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1164,7 +1080,7 @@ static int	kdbm_xfs_xdanode(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1174,9 +1090,7 @@ static int	kdbm_xfs_xdanode(
 
 static int	kdbm_xfs_xdastate(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1185,7 +1099,7 @@ static int	kdbm_xfs_xdastate(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1195,9 +1109,7 @@ static int	kdbm_xfs_xdastate(
 
 static int	kdbm_xfs_xdir2free(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1206,7 +1118,7 @@ static int	kdbm_xfs_xdir2free(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1216,9 +1128,7 @@ static int	kdbm_xfs_xdir2free(
 
 static int	kdbm_xfs_xdir2sf(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1227,7 +1137,7 @@ static int	kdbm_xfs_xdir2sf(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1237,9 +1147,7 @@ static int	kdbm_xfs_xdir2sf(
 
 static int	kdbm_xfs_xexlist(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1248,7 +1156,7 @@ static int	kdbm_xfs_xexlist(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1258,9 +1166,7 @@ static int	kdbm_xfs_xexlist(
 
 static int	kdbm_xfs_xflist(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1269,7 +1175,7 @@ static int	kdbm_xfs_xflist(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1279,9 +1185,7 @@ static int	kdbm_xfs_xflist(
 
 static int	kdbm_xfs_xhelp(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	if (argc != 0)
 		return KDB_ARGCOUNT;
@@ -1292,9 +1196,7 @@ static int	kdbm_xfs_xhelp(
 
 static int	kdbm_xfs_xiclog(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1303,7 +1205,7 @@ static int	kdbm_xfs_xiclog(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1313,9 +1215,7 @@ static int	kdbm_xfs_xiclog(
 
 static int	kdbm_xfs_xiclogall(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1324,7 +1224,7 @@ static int	kdbm_xfs_xiclogall(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1334,9 +1234,7 @@ static int	kdbm_xfs_xiclogall(
 
 static int	kdbm_xfs_xiclogcb(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1345,7 +1243,7 @@ static int	kdbm_xfs_xiclogcb(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1355,9 +1253,7 @@ static int	kdbm_xfs_xiclogcb(
 
 static int	kdbm_xfs_xihash(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1366,7 +1262,7 @@ static int	kdbm_xfs_xihash(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1376,9 +1272,7 @@ static int	kdbm_xfs_xihash(
 
 static int	kdbm_xfs_xinodes(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1387,7 +1281,7 @@ static int	kdbm_xfs_xinodes(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1397,9 +1291,7 @@ static int	kdbm_xfs_xinodes(
 
 static int	kdbm_xfs_delayed_blocks(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1408,7 +1300,7 @@ static int	kdbm_xfs_delayed_blocks(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1419,9 +1311,7 @@ static int	kdbm_xfs_delayed_blocks(
 
 static int	kdbm_xfs_xinodes_quiesce(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1430,7 +1320,7 @@ static int	kdbm_xfs_xinodes_quiesce(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1440,9 +1330,7 @@ static int	kdbm_xfs_xinodes_quiesce(
 
 static int	kdbm_xfs_xlog(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1451,7 +1339,7 @@ static int	kdbm_xfs_xlog(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1461,9 +1349,7 @@ static int	kdbm_xfs_xlog(
 
 static int	kdbm_xfs_xlog_ritem(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1472,7 +1358,7 @@ static int	kdbm_xfs_xlog_ritem(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1482,9 +1368,7 @@ static int	kdbm_xfs_xlog_ritem(
 
 static int	kdbm_xfs_xlog_rtrans(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1493,7 +1377,7 @@ static int	kdbm_xfs_xlog_rtrans(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1503,9 +1387,7 @@ static int	kdbm_xfs_xlog_rtrans(
 
 static int	kdbm_xfs_xlog_rtrans_entire(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1514,7 +1396,7 @@ static int	kdbm_xfs_xlog_rtrans_entire(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1524,9 +1406,7 @@ static int	kdbm_xfs_xlog_rtrans_entire(
 
 static int	kdbm_xfs_xlog_tic(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1535,7 +1415,7 @@ static int	kdbm_xfs_xlog_tic(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1545,9 +1425,7 @@ static int	kdbm_xfs_xlog_tic(
 
 static int	kdbm_xfs_xlogitem(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1556,7 +1434,7 @@ static int	kdbm_xfs_xlogitem(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1566,9 +1444,7 @@ static int	kdbm_xfs_xlogitem(
 
 static int	kdbm_xfs_xmount(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1577,7 +1453,7 @@ static int	kdbm_xfs_xmount(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1587,9 +1463,7 @@ static int	kdbm_xfs_xmount(
 
 static int	kdbm_xfs_xnode(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1598,7 +1472,7 @@ static int	kdbm_xfs_xnode(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1608,9 +1482,7 @@ static int	kdbm_xfs_xnode(
 
 static int	kdbm_xfs_xcore(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1619,7 +1491,7 @@ static int	kdbm_xfs_xcore(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1629,9 +1501,7 @@ static int	kdbm_xfs_xcore(
 
 static int	kdbm_xfs_xperag(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1640,7 +1510,7 @@ static int	kdbm_xfs_xperag(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1650,9 +1520,7 @@ static int	kdbm_xfs_xperag(
 
 static int	kdbm_xfs_xqm_diskdq(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1661,7 +1529,7 @@ static int	kdbm_xfs_xqm_diskdq(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1671,9 +1539,7 @@ static int	kdbm_xfs_xqm_diskdq(
 
 static int	kdbm_xfs_xqm_dqattached_inos(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1682,7 +1548,7 @@ static int	kdbm_xfs_xqm_dqattached_inos(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1692,9 +1558,7 @@ static int	kdbm_xfs_xqm_dqattached_inos(
 
 static int	kdbm_xfs_xqm_dquot(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1703,7 +1567,7 @@ static int	kdbm_xfs_xqm_dquot(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1714,9 +1578,7 @@ static int	kdbm_xfs_xqm_dquot(
 #ifdef	CONFIG_XFS_QUOTA
 static int	kdbm_xfs_xqm(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	if (argc != 0)
 		return KDB_ARGCOUNT;
@@ -1727,9 +1589,7 @@ static int	kdbm_xfs_xqm(
 
 static int	kdbm_xfs_xqm_freelist(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	if (argc != 0)
 		return KDB_ARGCOUNT;
@@ -1740,9 +1600,7 @@ static int	kdbm_xfs_xqm_freelist(
 
 static int	kdbm_xfs_xqm_htab(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	if (argc != 0)
 		return KDB_ARGCOUNT;
@@ -1754,9 +1612,7 @@ static int	kdbm_xfs_xqm_htab(
 
 static int	kdbm_xfs_xqm_mplist(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1765,7 +1621,7 @@ static int	kdbm_xfs_xqm_mplist(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1775,9 +1631,7 @@ static int	kdbm_xfs_xqm_mplist(
 
 static int	kdbm_xfs_xqm_qinfo(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1786,7 +1640,7 @@ static int	kdbm_xfs_xqm_qinfo(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1796,9 +1650,7 @@ static int	kdbm_xfs_xqm_qinfo(
 
 static int	kdbm_xfs_xqm_tpdqinfo(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1807,7 +1659,7 @@ static int	kdbm_xfs_xqm_tpdqinfo(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1817,9 +1669,7 @@ static int	kdbm_xfs_xqm_tpdqinfo(
 
 static int	kdbm_xfs_xsb(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	unsigned long convert=0;
@@ -1829,12 +1679,12 @@ static int	kdbm_xfs_xsb(
 
 	if (argc != 1 && argc!=2)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 	if (argc==2) {
 	    /* extra argument - conversion flag */
-	    diag = kdbgetaddrarg(argc, argv, &nextarg, &convert, &offset, NULL, regs);
+	    diag = kdbgetaddrarg(argc, argv, &nextarg, &convert, &offset, NULL);
 	    if (diag)
 		    return diag;
 	}
@@ -1848,9 +1698,7 @@ static int	kdbm_xfs_xsb(
 
 static int	kdbm_xfs_xtp(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1859,7 +1707,7 @@ static int	kdbm_xfs_xtp(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -1869,9 +1717,7 @@ static int	kdbm_xfs_xtp(
 
 static int	kdbm_xfs_xtrans_res(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -1880,7 +1726,7 @@ static int	kdbm_xfs_xtrans_res(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -2000,9 +1846,7 @@ static void	printvnode(bhv_vnode_t *vp, unsigned long addr)
 
 static int	kdbm_vnode(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -2013,7 +1857,7 @@ static int	kdbm_vnode(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 
 	if (diag)
 		return diag;
@@ -2039,9 +1883,7 @@ print_vfs(bhv_vfs_t *vfs, unsigned long addr)
 
 static int	kdbm_bhv(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -2052,7 +1894,7 @@ static int	kdbm_bhv(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 
 	if (diag)
 		return diag;
@@ -2066,9 +1908,7 @@ static int	kdbm_bhv(
 
 static int	kdbm_vfs(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	unsigned long addr;
 	int nextarg = 1;
@@ -2079,7 +1919,7 @@ static int	kdbm_vfs(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 
 	if (diag)
 		return diag;
@@ -2206,9 +2046,7 @@ vn_trace_pr_entry(ktrace_entry_t *ktep)
  */
 static int	kdbm_vntrace(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	int		diag;
 	int		nextarg = 1;
@@ -2222,7 +2060,7 @@ static int	kdbm_vntrace(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 
 	if (diag)
 		return diag;
@@ -2253,9 +2091,7 @@ static int	kdbm_vntrace(
  */
 static int	kdbm_vntraceaddr(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	int		diag;
 	int		nextarg = 1;
@@ -2269,7 +2105,7 @@ static int	kdbm_vntraceaddr(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 
 	if (diag)
 		return diag;
@@ -2337,9 +2173,7 @@ static void	printinode(struct inode *ip)
 
 static int	kdbm_vn(
 	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
+	const char **argv)
 {
 	int		diag;
 	int		nextarg = 1;
@@ -2355,7 +2189,7 @@ static int	kdbm_vn(
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -2430,7 +2264,7 @@ static char	*bp_flags(xfs_buf_flags_t bp_flag)
 }
 
 static int
-kdbm_bp_flags(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdbm_bp_flags(int argc, const char **argv)
 {
 	unsigned long flags;
 	int diag;
@@ -2492,7 +2326,7 @@ print_xfs_buf(
 }
 
 static int
-kdbm_bp(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdbm_bp(int argc, const char **argv)
 {
 	xfs_buf_t bp;
 	unsigned long addr;
@@ -2504,7 +2338,7 @@ kdbm_bp(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)) ||
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL)) ||
 	    (diag = kdb_getarea(bp, addr)))
 		return diag;
 
@@ -2514,8 +2348,7 @@ kdbm_bp(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 }
 
 static int
-kdbm_bpdelay(int argc, const char **argv, const char **envp,
-	struct pt_regs *regs)
+kdbm_bpdelay(int argc, const char **argv)
 {
 #ifdef DEBUG
 	extern struct list_head xfs_buftarg_list;
@@ -2562,8 +2395,7 @@ kdbm_bpdelay(int argc, const char **argv, const char **envp,
 }
 
 static int
-kdbm_iomap(int argc, const char **argv, const char **envp,
-	struct pt_regs *regs)
+kdbm_iomap(int argc, const char **argv)
 {
 	xfs_iomap_t iomap;
 	unsigned long addr;
@@ -2575,7 +2407,7 @@ kdbm_iomap(int argc, const char **argv, const char **envp,
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)))
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL)))
 		return diag;
 	if ((diag = kdb_getarea(iomap, addr)))
 		return diag;
@@ -2591,8 +2423,7 @@ kdbm_iomap(int argc, const char **argv, const char **envp,
 }
 
 static int
-kdbm_i2vnode(int argc, const char **argv, const char **envp,
-	struct pt_regs *regs)
+kdbm_i2vnode(int argc, const char **argv)
 {
 	bhv_vnode_t vp;
 	struct inode *ip;
@@ -2605,7 +2436,7 @@ kdbm_i2vnode(int argc, const char **argv, const char **envp,
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)))
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL)))
 		return diag;
 	ip = (struct inode *)addr;
 	if ((diag = kdb_getarea(vp, (unsigned long)vn_from_inode(ip))))
@@ -2643,8 +2474,7 @@ static int xfs_buf_trace_entry(ktrace_entry_t *ktep)
 }
 
 static int
-kdbm_bptrace_offset(int argc, const char **argv, const char **envp,
-	struct pt_regs *regs)
+kdbm_bptrace_offset(int argc, const char **argv)
 {
 	long		mask = 0;
 	unsigned long	got_offset = 0, offset = 0;
@@ -2685,8 +2515,7 @@ kdbm_bptrace_offset(int argc, const char **argv, const char **envp,
 }
 
 static int
-kdbm_bptrace(int argc, const char **argv, const char **envp,
-	struct pt_regs *regs)
+kdbm_bptrace(int argc, const char **argv)
 {
 	unsigned long	addr = 0;
 	int		diag, nextarg;
@@ -2706,7 +2535,7 @@ kdbm_bptrace(int argc, const char **argv, const char **envp,
 		} else {
 			nextarg = 1;
 			diag = kdbgetaddrarg(argc, argv,
-					&nextarg, &addr, &offset, NULL, regs);
+					&nextarg, &addr, &offset, NULL);
 			if (diag) {
 				kdb_printf("non-numeric arg: %s\n", argv[1]);
 				return diag;
@@ -2732,7 +2561,7 @@ kdbm_bptrace(int argc, const char **argv, const char **envp,
 
 struct xif {
 	char	*name;
-	int	(*func)(int, const char **, const char **, struct pt_regs *);
+	int	(*func)(int, const char **);
 	char	*args;
 	char	*help;
 };
