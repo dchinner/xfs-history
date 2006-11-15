@@ -256,6 +256,7 @@ EXPORT_SYMBOL(xfs_fs_cmn_err);
 EXPORT_SYMBOL(xfs_highbit32);
 EXPORT_SYMBOL(xfs_highbit64);
 EXPORT_SYMBOL(xfs_idestroy);
+EXPORT_SYMBOL(xfs_iaccess);
 EXPORT_SYMBOL(xfs_iextract);
 EXPORT_SYMBOL(xfs_iext_add);
 EXPORT_SYMBOL(xfs_iext_destroy);
