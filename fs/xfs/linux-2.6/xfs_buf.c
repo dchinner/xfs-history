@@ -1686,14 +1686,15 @@ STATIC int
 xfs_buf_delwri_split(
 	xfs_buftarg_t	*target,
 	struct list_head *list,
-	unsigned long	age,
-	int		flags)
+	unsigned long	age)
 {
 	xfs_buf_t	*bp, *n;
 	struct list_head *dwq = &target->bt_delwrite_queue;
 	spinlock_t	*dwlk = &target->bt_delwrite_lock;
 	int		skipped = 0;
+	int		force;
 
+	force = test_and_clear_bit(XBT_FORCE_FLUSH, &target->bt_flags);
 	INIT_LIST_HEAD(list);
 	spin_lock(dwlk);
 	list_for_each_entry_safe(bp, n, dwq, b_list) {
@@ -1701,7 +1702,7 @@ xfs_buf_delwri_split(
 		ASSERT(bp->b_flags & XBF_DELWRI);
 
 		if (!xfs_buf_ispin(bp) && !xfs_buf_cond_lock(bp)) {
-			if (!(flags & XBT_FORCE_FLUSH) &&
+			if (!force &&
 			    time_before(jiffies, bp->b_queuetime + age)) {
 				xfs_buf_unlock(bp);
 				break;
@@ -1743,9 +1744,7 @@ xfsbufd(
 			xfs_buf_timer_centisecs * msecs_to_jiffies(10));
 
 		xfs_buf_delwri_split(target, &tmp,
-				xfs_buf_age_centisecs * msecs_to_jiffies(10),
-				test_bit(XBT_FORCE_FLUSH, &target->bt_flags)
-						? XBT_FORCE_FLUSH : 0);
+				xfs_buf_age_centisecs * msecs_to_jiffies(10));
 
 		count = 0;
 		while (!list_empty(&tmp)) {
@@ -1762,7 +1761,6 @@ xfsbufd(
 		if (count)
 			blk_run_address_space(target->bt_mapping);
 
-		clear_bit(XBT_FORCE_FLUSH, &target->bt_flags);
 	} while (!kthread_should_stop());
 
 	return 0;
@@ -1785,7 +1783,8 @@ xfs_flush_buftarg(
 	xfs_buf_runall_queues(xfsdatad_workqueue);
 	xfs_buf_runall_queues(xfslogd_workqueue);
 
-	pincount = xfs_buf_delwri_split(target, &tmp, 0, XBT_FORCE_FLUSH);
+	set_bit(XBT_FORCE_FLUSH, &target->bt_flags);
+	pincount = xfs_buf_delwri_split(target, &tmp, 0);
 
 	/*
 	 * Dropped the delayed write list lock, now walk the temporary list
