@@ -45,11 +45,11 @@
 #include "xfs_buf_item.h"
 #include "xfs_refcache.h"
 
-STATIC spinlock_t	xfs_refcache_lock = SPIN_LOCK_UNLOCKED;
-STATIC xfs_inode_t	**xfs_refcache;
-STATIC int		xfs_refcache_index;
-STATIC int		xfs_refcache_busy;
-STATIC int		xfs_refcache_count;
+static spinlock_t	xfs_refcache_lock = SPIN_LOCK_UNLOCKED;
+static xfs_inode_t	**xfs_refcache;
+static int		xfs_refcache_index;
+static int		xfs_refcache_busy;
+static int		xfs_refcache_count;
 
 /*
  * Insert the given inode into the reference cache.

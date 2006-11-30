@@ -295,8 +295,9 @@ typedef struct bhv_module_list {
 	const char *		bm_name;
 	void *			bm_ops;
 } bhv_module_list_t;
-STATIC DEFINE_SPINLOCK(bhv_lock);
-STATIC struct list_head bhv_list = LIST_HEAD_INIT(bhv_list);
+
+static DEFINE_SPINLOCK(bhv_lock);
+static struct list_head bhv_list = LIST_HEAD_INIT(bhv_list);
 
 void
 bhv_module_init(
