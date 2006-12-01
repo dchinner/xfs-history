@@ -6260,14 +6260,10 @@ xfsidbg_xlog_rtrans_entire(xlog_recover_t *trans)
 			   kdb_printf("type: %d cnt: %d total: %d\n",
 				   item->ri_type, item->ri_cnt, item->ri_total);
 				   */
-			if ((ITEM_TYPE(item) == XFS_LI_BUF) ||
-			    (ITEM_TYPE(item) == XFS_LI_6_1_BUF) ||
-			    (ITEM_TYPE(item) == XFS_LI_5_3_BUF)) {
+			if (ITEM_TYPE(item) == XFS_LI_BUF) {
 				kdb_printf("BUF:");
 				xfsidbg_xlog_buf_logitem(item);
-			} else if ((ITEM_TYPE(item) == XFS_LI_INODE) ||
-				   (ITEM_TYPE(item) == XFS_LI_6_1_INODE) ||
-				   (ITEM_TYPE(item) == XFS_LI_5_3_INODE)) {
+			} else if (ITEM_TYPE(item) == XFS_LI_INODE) {
 				kdb_printf("INODE:\n");
 			} else if (ITEM_TYPE(item) == XFS_LI_EFI) {
 				kdb_printf("EFI:\n");
@@ -6312,6 +6308,25 @@ xfsidbg_xlog_tic(xlog_ticket_t *tic)
 	qprintf("\n");
 }	/* xfsidbg_xlog_tic */
 
+static char *
+xfsidbg_item_type_str(xfs_log_item_t *lip)
+{
+	static char *lid_type[] = {
+		"efi",		/* 0 */
+		"efd",		/* 1 */
+		"iunlink",	/* 2 */
+		"6-1-inode",	/* 3 */
+		"6-1-buf",	/* 4 */
+		"inode",	/* 5 */
+		"buf",		/* 6 */
+		"dquot",	/* 7 */
+		"quotaoff",	/* 8 */
+		NULL
+		};
+	return (lip->li_type < XFS_LI_EFI || lip->li_type > XFS_LI_QUOTAOFF) ? "???"
+	       : lid_type[lip->li_type - XFS_LI_EFI];
+}
+
 /*
  * Print out a single log item.
  */
@@ -6319,28 +6334,13 @@ static void
 xfsidbg_xlogitem(xfs_log_item_t *lip)
 {
 	xfs_log_item_t	*bio_lip;
-	static char *lid_type[] = {
-		"???",		/* 0 */
-		"5-3-buf",	/* 1 */
-		"5-3-inode",	/* 2 */
-		"efi",		/* 3 */
-		"efd",		/* 4 */
-		"iunlink",	/* 5 */
-		"6-1-inode",	/* 6 */
-		"6-1-buf",	/* 7 */
-		"inode",	/* 8 */
-		"buf",		/* 9 */
-		"dquot",	/* 10 */
-		NULL
-		};
 	static char *li_flags[] = {
 		"in ail",	/* 0x1 */
 		NULL
 		};
 
 	kdb_printf("type %s mountp 0x%p flags ",
-		lid_type[lip->li_type - XFS_LI_5_3_BUF + 1],
-		lip->li_mountp);
+		xfsidbg_item_type_str(lip), lip->li_mountp);
 	printflags((uint)(lip->li_flags), li_flags,"log");
 	kdb_printf("\n");
 	kdb_printf("ail forw 0x%p ail back 0x%p lsn %s\ndesc %p ops 0x%p",
@@ -6391,20 +6391,6 @@ static void
 xfsidbg_xaildump(xfs_mount_t *mp)
 {
 	xfs_log_item_t *lip;
-	static char *lid_type[] = {
-		"???",		/* 0 */
-		"5-3-buf",	/* 1 */
-		"5-3-inode",	/* 2 */
-		"efi",		/* 3 */
-		"efd",		/* 4 */
-		"iunlink",	/* 5 */
-		"6-1-inode",	/* 6 */
-		"6-1-buf",	/* 7 */
-		"inode",	/* 8 */
-		"buf",		/* 9 */
-		"dquot",	/* 10 */
-		NULL
-		};
 	static char *li_flags[] = {
 		"in ail",	/* 0x1 */
 		NULL
@@ -6419,8 +6405,7 @@ xfsidbg_xaildump(xfs_mount_t *mp)
 	kdb_printf("AIL for mp 0x%p, oldest first\n", mp);
 	lip = (xfs_log_item_t*)mp->m_ail.ail_forw;
 	for (count = 0; lip; count++) {
-		kdb_printf("[%d] type %s ", count,
-			      lid_type[lip->li_type - XFS_LI_5_3_BUF + 1]);
+		kdb_printf("[%d] type %s ", count, xfsidbg_item_type_str(lip));
 		printflags((uint)(lip->li_flags), li_flags, "flags:");
 		kdb_printf("  lsn %s\n   ", xfs_fmtlsn(&(lip->li_lsn)));
 		switch (lip->li_type) {
