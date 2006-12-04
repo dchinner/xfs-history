@@ -2414,7 +2414,7 @@ kdbm_iomap(int argc, const char **argv)
 
 	kdb_printf("iomap_t at 0x%lx\n", addr);
 	kdb_printf("  bn 0x%llx offset 0x%Lx delta 0x%lx bsize 0x%llx\n",
-		(long long) iomap.iomap_bn, iomap.iomap_offset,
+		(long long) iomap.iomap_bn, (long long)iomap.iomap_offset,
 		(unsigned long)iomap.iomap_delta, (long long)iomap.iomap_bsize);
 	kdb_printf("  iomap_flags %s\n",
 		map_flags(iomap.iomap_flags, iomap_flag_vals));
@@ -3204,7 +3204,8 @@ xfs_broot(xfs_inode_t *ip, xfs_ifork_t *f)
 	pp = XFS_BMAP_BROOT_PTR_ADDR(broot, 1, f->if_broot_bytes);
 	for (i = 1; i <= be16_to_cpu(broot->bb_numrecs); i++)
 		kdb_printf("\t%d: startoff %Ld ptr %Lx %s\n",
-			i, INT_GET(kp[i - 1].br_startoff, ARCH_CONVERT), INT_GET(pp[i - 1], ARCH_CONVERT),
+			i, (long long)INT_GET(kp[i - 1].br_startoff, ARCH_CONVERT),
+			(unsigned long long)INT_GET(pp[i - 1], ARCH_CONVERT),
 			xfs_fmtfsblock(INT_GET(pp[i - 1], ARCH_CONVERT), ip->i_mount));
 }
 
@@ -3263,8 +3264,8 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 		be32_to_cpu(bt->bb_magic),
 		be16_to_cpu(bt->bb_level),
 		be16_to_cpu(bt->bb_numrecs),
-		be64_to_cpu(bt->bb_leftsib),
-		be64_to_cpu(bt->bb_rightsib));
+		(unsigned long long)be64_to_cpu(bt->bb_leftsib),
+		(unsigned long long)be64_to_cpu(bt->bb_rightsib));
 	if (!bt->bb_level) {
 		for (i = 1; i <= be16_to_cpu(bt->bb_numrecs); i++) {
 			xfs_bmbt_rec_t *r;
@@ -3289,9 +3290,10 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 
 			k = XFS_BTREE_KEY_ADDR(bsz, xfs_bmbt, bt, i, mxr);
 			p = XFS_BTREE_PTR_ADDR(bsz, xfs_bmbt, bt, i, mxr);
-			kdb_printf("key %d startoff %Ld ",
-				i, INT_GET(k->br_startoff, ARCH_CONVERT));
-			kdb_printf("ptr %Lx\n", INT_GET(*p, ARCH_CONVERT));
+			kdb_printf("key %d startoff %Ld ", i,
+				(unsigned long long)INT_GET(k->br_startoff, ARCH_CONVERT));
+			kdb_printf("ptr %Lx\n",
+				(unsigned long long)INT_GET(*p, ARCH_CONVERT));
 		}
 	}
 }
@@ -3318,7 +3320,7 @@ xfs_btino(xfs_inobt_block_t *bt, int bsz)
 			kdb_printf("rec %d startino 0x%x freecount %d, free %Lx\n",
 				i, INT_GET(r->ir_startino, ARCH_CONVERT),
 				INT_GET(r->ir_freecount, ARCH_CONVERT),
-				INT_GET(r->ir_free, ARCH_CONVERT));
+				(unsigned long long)INT_GET(r->ir_free, ARCH_CONVERT));
 		}
 	} else {
 		int mxr;
@@ -6838,13 +6840,13 @@ xfsidbg_xqm_diskdq(xfs_disk_dquot_t *d)
 		be16_to_cpu(d->d_magic), d->d_version,
 		be32_to_cpu(d->d_id), be32_to_cpu(d->d_id));
 	kdb_printf("bhard 0x%llx\tbsoft 0x%llx\tihard 0x%llx\tisoft 0x%llx\n",
-		be64_to_cpu(d->d_blk_hardlimit),
-		be64_to_cpu(d->d_blk_softlimit),
-		be64_to_cpu(d->d_ino_hardlimit),
-		be64_to_cpu(d->d_ino_softlimit));
+		(unsigned long long)be64_to_cpu(d->d_blk_hardlimit),
+		(unsigned long long)be64_to_cpu(d->d_blk_softlimit),
+		(unsigned long long)be64_to_cpu(d->d_ino_hardlimit),
+		(unsigned long long)be64_to_cpu(d->d_ino_softlimit));
 	kdb_printf("bcount 0x%llx icount 0x%llx\n",
-		be64_to_cpu(d->d_bcount),
-		be64_to_cpu(d->d_icount));
+		(unsigned long long)be64_to_cpu(d->d_bcount),
+		(unsigned long long)be64_to_cpu(d->d_icount));
 	kdb_printf("btimer 0x%x itimer 0x%x \n",
 		be32_to_cpu(d->d_btimer),
 		be32_to_cpu(d->d_itimer));
