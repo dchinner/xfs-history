@@ -42,7 +42,7 @@
 #include <linux/smp_lock.h>
 
 static struct vm_operations_struct xfs_file_vm_ops;
-#ifdef CONFIG_XFS_DMAPI
+#ifdef HAVE_DMAPI
 static struct vm_operations_struct xfs_dmapi_file_vm_ops;
 #endif
 
@@ -244,7 +244,7 @@ xfs_file_fsync(
 	return -bhv_vop_fsync(vp, flags, NULL, (xfs_off_t)0, (xfs_off_t)-1);
 }
 
-#ifdef CONFIG_XFS_DMAPI
+#ifdef HAVE_DMAPI
 STATIC struct page *
 xfs_vm_nopage(
 	struct vm_area_struct	*area,
@@ -259,7 +259,7 @@ xfs_vm_nopage(
 		return NULL;
 	return filemap_nopage(area, address, type);
 }
-#endif /* CONFIG_XFS_DMAPI */
+#endif /* HAVE_DMAPI */
 
 STATIC int
 xfs_file_readdir(
@@ -344,10 +344,10 @@ xfs_file_mmap(
 {
 	vma->vm_ops = &xfs_file_vm_ops;
 
-#ifdef CONFIG_XFS_DMAPI
+#ifdef HAVE_DMAPI
 	if (vn_from_inode(filp->f_dentry->d_inode)->v_vfsp->vfs_flag & VFS_DMI)
 		vma->vm_ops = &xfs_dmapi_file_vm_ops;
-#endif /* CONFIG_XFS_DMAPI */
+#endif /* HAVE_DMAPI */
 
 	file_accessed(filp);
 	return 0;
@@ -397,7 +397,7 @@ xfs_file_ioctl_invis(
 	return error;
 }
 
-#ifdef CONFIG_XFS_DMAPI
+#ifdef HAVE_DMAPI
 #ifdef HAVE_VMOP_MPROTECT
 STATIC int
 xfs_vm_mprotect(
@@ -418,7 +418,7 @@ xfs_vm_mprotect(
 	return error;
 }
 #endif /* HAVE_VMOP_MPROTECT */
-#endif /* CONFIG_XFS_DMAPI */
+#endif /* HAVE_DMAPI */
 
 #ifdef HAVE_FOP_OPEN_EXEC
 /* If the user is attempting to execute a file that is offline then
@@ -505,7 +505,7 @@ static struct vm_operations_struct xfs_file_vm_ops = {
 	.populate	= filemap_populate,
 };
 
-#ifdef CONFIG_XFS_DMAPI
+#ifdef HAVE_DMAPI
 static struct vm_operations_struct xfs_dmapi_file_vm_ops = {
 	.nopage		= xfs_vm_nopage,
 	.populate	= filemap_populate,
@@ -513,4 +513,4 @@ static struct vm_operations_struct xfs_dmapi_file_vm_ops = {
 	.mprotect	= xfs_vm_mprotect,
 #endif
 };
-#endif /* CONFIG_XFS_DMAPI */
+#endif /* HAVE_DMAPI */

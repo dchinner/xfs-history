@@ -109,6 +109,11 @@
 #undef  HAVE_PERCPU_SB	/* per cpu superblock counters are a 2.6 feature */
 #endif
 
+#undef HAVE_DMAPI
+#if defined(CONFIG_XFS_DMAPI) || defined(CONFIG_XFS_DMAPI_MODULE)
+#define HAVE_DMAPI
+#endif
+
 /*
  * State flag for unwritten extent buffers.
  *
