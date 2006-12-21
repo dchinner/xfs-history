@@ -32,7 +32,6 @@
 #include <linux/kthread.h>
 #include <linux/migrate.h>
 #include <linux/backing-dev.h>
-#include "xfs_linux.h"
 
 static kmem_zone_t *xfs_buf_zone;
 static kmem_shaker_t xfs_buf_shake;
