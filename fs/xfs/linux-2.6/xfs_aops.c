@@ -41,6 +41,8 @@
 #include <linux/pagevec.h>
 #include <linux/writeback.h>
 
+STATIC void xfs_vm_invalidatepage(struct page *, unsigned long);
+
 STATIC void
 xfs_count_page_state(
 	struct page		*page,
@@ -1061,7 +1063,7 @@ error:
 	 */
 	if (err != -EAGAIN) {
 		if (!unmapped)
-			block_invalidatepage(page, 0);
+			xfs_vm_invalidatepage(page, 0);
 		ClearPageUptodate(page);
 	}
 	return err;
@@ -1451,6 +1453,14 @@ xfs_vm_readpages(
 	return mpage_readpages(mapping, pages, nr_pages, xfs_get_blocks);
 }
 
+/*
+ * block_invalidatepage() doesn't clear private buffer flags like the unwritten
+ * flag. Leaving the unwritten flag behind on buffers that have been
+ * invalidated but are still attached to a page (i.e.  buffer size < page size
+ * and partial page invalidation) will result in incorrect allocation occurring
+ * during writeback if the file is extended to within or past the invalidated
+ * block before writeback.
+ */
 STATIC void
 xfs_vm_invalidatepage(
 	struct page		*page,
@@ -1458,6 +1468,32 @@ xfs_vm_invalidatepage(
 {
 	xfs_page_trace(XFS_INVALIDPAGE_ENTER,
 			page->mapping->host, page, offset);
+
+	/*
+	 * Need to clear private flags from buffers on partial
+	 * page truncations ourselves. Same inner loop as
+	 * block_invalidatepage() is used.
+	 */
+	if (offset && page_has_buffers(page)) {
+		struct buffer_head *head, *bh, *next;
+		unsigned int curr_off = 0;
+
+		head = page_buffers(page);
+		bh = head;
+		do {
+			unsigned int next_off = curr_off + bh->b_size;
+			next = bh->b_this_page;
+
+			/*
+			 * is this block fully invalidated?
+			 */
+			if (offset <= curr_off)
+				clear_buffer_unwritten(bh);
+			curr_off = next_off;
+			bh = next;
+		} while (bh != head);
+	}
+
 	block_invalidatepage(page, offset);
 }
 
