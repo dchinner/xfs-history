@@ -21,6 +21,8 @@ int  fs_noerr(void) { return 0; }
 int  fs_nosys(void) { return ENOSYS; }
 void fs_noval(void) { return; }
 
+#define XFS_OFF_TO_PCINDEX(off)	((off) >> PAGE_CACHE_SHIFT)
+
 void
 fs_tosspages(
 	bhv_desc_t	*bdp,
@@ -32,7 +34,9 @@ fs_tosspages(
 	struct inode	*ip = vn_to_inode(vp);
 
 	if (VN_CACHED(vp))
-		truncate_inode_pages(ip->i_mapping, first);
+		invalidate_inode_pages2_range(ip->i_mapping,
+					XFS_OFF_TO_PCINDEX(first),
+					XFS_OFF_TO_PCINDEX(last));
 }
 
 void
@@ -49,7 +53,9 @@ fs_flushinval_pages(
 		if (VN_TRUNC(vp))
 			VUNTRUNCATE(vp);
 		filemap_write_and_wait(ip->i_mapping);
-		truncate_inode_pages(ip->i_mapping, first);
+		invalidate_inode_pages2_range(ip->i_mapping,
+					XFS_OFF_TO_PCINDEX(first),
+					XFS_OFF_TO_PCINDEX(last));
 	}
 }
 
