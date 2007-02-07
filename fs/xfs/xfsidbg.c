@@ -3227,7 +3227,7 @@ xfs_btalloc(xfs_alloc_block_t *bt, int bsz)
 		for (i = 1; i <= be16_to_cpu(bt->bb_numrecs); i++) {
 			xfs_alloc_rec_t *r;
 
-			r = XFS_BTREE_REC_ADDR(bsz, xfs_alloc, bt, i, 0);
+			r = XFS_BTREE_REC_ADDR(xfs_alloc, bt, i);
 			kdb_printf("rec %d startblock 0x%x blockcount %d\n",
 				i,
 				be32_to_cpu(r->ar_startblock),
@@ -3241,8 +3241,8 @@ xfs_btalloc(xfs_alloc_block_t *bt, int bsz)
 			xfs_alloc_key_t *k;
 			xfs_alloc_ptr_t *p;
 
-			k = XFS_BTREE_KEY_ADDR(bsz, xfs_alloc, bt, i, mxr);
-			p = XFS_BTREE_PTR_ADDR(bsz, xfs_alloc, bt, i, mxr);
+			k = XFS_BTREE_KEY_ADDR(xfs_alloc, bt, i);
+			p = XFS_BTREE_PTR_ADDR(xfs_alloc, bt, i, mxr);
 			kdb_printf("key %d startblock 0x%x blockcount %d ptr 0x%x\n",
 				i,
 				be32_to_cpu(k->ar_startblock),
@@ -3271,8 +3271,7 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 			xfs_bmbt_rec_t *r;
 			xfs_bmbt_irec_t	irec;
 
-			r = (xfs_bmbt_rec_t *)XFS_BTREE_REC_ADDR(bsz,
-				xfs_bmbt, bt, i, 0);
+			r = (xfs_bmbt_rec_t *)XFS_BTREE_REC_ADDR(xfs_bmbt, bt, i);
 
 			xfs_bmbt_disk_get_all((xfs_bmbt_rec_t *)r, &irec);
 			kdb_printf("rec %d startoff %Ld startblock %Lx blockcount %Ld flag %d\n",
@@ -3288,8 +3287,8 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 			xfs_bmbt_key_t *k;
 			xfs_bmbt_ptr_t *p;
 
-			k = XFS_BTREE_KEY_ADDR(bsz, xfs_bmbt, bt, i, mxr);
-			p = XFS_BTREE_PTR_ADDR(bsz, xfs_bmbt, bt, i, mxr);
+			k = XFS_BTREE_KEY_ADDR(xfs_bmbt, bt, i);
+			p = XFS_BTREE_PTR_ADDR(xfs_bmbt, bt, i, mxr);
 			kdb_printf("key %d startoff %Ld ", i,
 				(unsigned long long)INT_GET(k->br_startoff, ARCH_CONVERT));
 			kdb_printf("ptr %Lx\n",
@@ -3316,7 +3315,7 @@ xfs_btino(xfs_inobt_block_t *bt, int bsz)
 		for (i = 1; i <= be16_to_cpu(bt->bb_numrecs); i++) {
 			xfs_inobt_rec_t *r;
 
-			r = XFS_BTREE_REC_ADDR(bsz, xfs_inobt, bt, i, 0);
+			r = XFS_BTREE_REC_ADDR(xfs_inobt, bt, i);
 			kdb_printf("rec %d startino 0x%x freecount %d, free %Lx\n",
 				i, INT_GET(r->ir_startino, ARCH_CONVERT),
 				INT_GET(r->ir_freecount, ARCH_CONVERT),
@@ -3330,8 +3329,8 @@ xfs_btino(xfs_inobt_block_t *bt, int bsz)
 			xfs_inobt_key_t *k;
 			xfs_inobt_ptr_t *p;
 
-			k = XFS_BTREE_KEY_ADDR(bsz, xfs_inobt, bt, i, mxr);
-			p = XFS_BTREE_PTR_ADDR(bsz, xfs_inobt, bt, i, mxr);
+			k = XFS_BTREE_KEY_ADDR(xfs_inobt, bt, i);
+			p = XFS_BTREE_PTR_ADDR(xfs_inobt, bt, i, mxr);
 			kdb_printf("key %d startino 0x%x ptr 0x%x\n",
 				i, INT_GET(k->ir_startino, ARCH_CONVERT),
 				be32_to_cpu(*p));
