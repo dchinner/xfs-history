@@ -181,9 +181,6 @@ EXPORT_SYMBOL(xfs_buf_offset);
 EXPORT_SYMBOL(xfs_buf_rele);
 EXPORT_SYMBOL(xfs_buf_readahead);
 EXPORT_SYMBOL(xfs_buf_unlock);
-#if ((defined(DEBUG) || defined(INDUCE_IO_ERROR)) && !defined(NO_WANT_RANDOM))
-EXPORT_SYMBOL(random);
-#endif
 EXPORT_SYMBOL(sys_cred);
 EXPORT_SYMBOL(uuid_create_nil);
 EXPORT_SYMBOL(uuid_equal);
