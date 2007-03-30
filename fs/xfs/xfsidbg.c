@@ -6693,6 +6693,8 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	kdb_printf("gen 0x%x delayed blks %d",
 		ip->i_gen,
 		ip->i_delayed_blks);
+	kdb_printf("size %lld\n",
+		ip->i_size);
 #ifdef XFS_BMAP_TRACE
 	qprintf(" bmap_trace 0x%p\n", ip->i_xtrace);
 #endif
