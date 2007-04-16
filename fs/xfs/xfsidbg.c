@@ -62,6 +62,7 @@
 #include "xfs_quota.h"
 #include "quota/xfs_qm.h"
 #include "xfs_iomap.h"
+#include "xfs_buf.h"
 
 MODULE_AUTHOR("Silicon Graphics, Inc.");
 MODULE_DESCRIPTION("Additional kdb commands for debugging XFS");
@@ -2350,8 +2351,7 @@ kdbm_bp(int argc, const char **argv)
 static int
 kdbm_bpdelay(int argc, const char **argv)
 {
-#ifdef DEBUG
-	extern struct list_head xfs_buftarg_list;
+	struct list_head	*xfs_buftarg_list = xfs_get_buftarg_list();
 	struct list_head	*curr, *next;
 	xfs_buftarg_t		*tp, *n;
 	xfs_buf_t		bp;
@@ -2372,7 +2372,7 @@ kdbm_bpdelay(int argc, const char **argv)
 	}
 
 
-	list_for_each_entry_safe(tp, n, &xfs_buftarg_list, bt_list) {
+	list_for_each_entry_safe(tp, n, xfs_buftarg_list, bt_list) {
 		list_for_each_safe(curr, next, &tp->bt_delwrite_queue) {
 			addr = (unsigned long)list_entry(curr, xfs_buf_t, b_list);
 			if ((diag = kdb_getarea(bp, addr)))
@@ -2388,9 +2388,6 @@ kdbm_bpdelay(int argc, const char **argv)
 			}
 		}
 	}
-#else
-	kdb_printf("bt_delwrite_queue inaccessible (non-debug)\n");
-#endif
 	return 0;
 }
 

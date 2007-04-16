@@ -125,9 +125,8 @@ EXPORT_SYMBOL(xfs_params);
 EXPORT_SYMBOL(xfs_bmbt_disk_get_all);
 #endif
 
-#if defined(CONFIG_XFS_DEBUG)
-extern struct list_head xfs_buftarg_list;
-EXPORT_SYMBOL(xfs_buftarg_list);
+#if defined(CONFIG_KDB_MODULES)
+EXPORT_SYMBOL(xfs_get_buftarg_list);
 #endif
 
 /*
