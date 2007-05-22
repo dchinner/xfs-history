@@ -6088,6 +6088,7 @@ xfsidbg_print_trans_type(unsigned int t_type)
 	case XFS_TRANS_GROWFSRT_ZERO:	kdb_printf("GROWFSRT_ZERO");	break;
 	case XFS_TRANS_GROWFSRT_FREE:	kdb_printf("GROWFSRT_FREE");	break;
   	case XFS_TRANS_SWAPEXT:		kdb_printf("SWAPEXT");		break;
+	case XFS_TRANS_SB_COUNT:	kdb_printf("SB_COUNT");		break;
  	case XFS_TRANS_DUMMY1:		kdb_printf("DUMMY1");		break;
  	case XFS_TRANS_DUMMY2:		kdb_printf("DUMMY2");		break;
  	case XLOG_UNMOUNT_REC_TYPE:	kdb_printf("UNMOUNT");		break;
