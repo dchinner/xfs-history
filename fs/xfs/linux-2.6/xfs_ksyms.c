@@ -154,8 +154,6 @@ EXPORT_SYMBOL(icmn_err);
 EXPORT_SYMBOL(kmem_alloc);
 EXPORT_SYMBOL(kmem_free);
 EXPORT_SYMBOL(kmem_realloc);
-EXPORT_SYMBOL(kmem_shake_deregister);
-EXPORT_SYMBOL(kmem_shake_register);
 EXPORT_SYMBOL(kmem_zalloc);
 EXPORT_SYMBOL(kmem_zone_alloc);
 EXPORT_SYMBOL(kmem_zalloc_greedy);
