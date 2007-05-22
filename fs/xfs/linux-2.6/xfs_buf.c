@@ -1874,7 +1874,7 @@ xfs_buf_terminate(void)
 }
 
 #ifdef CONFIG_KDB_MODULES
-struct list_head * 
+struct list_head *
 xfs_get_buftarg_list(void)
 {
 	return &xfs_buftarg_list;
