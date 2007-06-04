@@ -1458,6 +1458,7 @@ xfs_free_buftarg(
 	int			external)
 {
 	xfs_flush_buftarg(btp, 1);
+	xfs_blkdev_issue_flush(btp);
 	if (external)
 		xfs_blkdev_put(btp->bt_bdev);
 	xfs_free_bufhash(btp);
