@@ -5533,7 +5533,7 @@ xfs_dir2data(void *addr, int size)
 		/* XFS_DIR2_BLOCK_TAIL_P */
 		tail = (xfs_dir2_block_tail_t *)
 		       ((char *)bb + size - sizeof(xfs_dir2_block_tail_t));
-		l = XFS_DIR2_BLOCK_LEAF_P(tail);
+		l = xfs_dir2_block_leaf_p(tail);
 		t = (char *)l;
 	}
 	for (p = (char *)(h + 1); p < t; ) {
@@ -5543,7 +5543,7 @@ xfs_dir2data(void *addr, int size)
 				(unsigned long) (p - (char *)addr),
 				INT_GET(u->freetag, ARCH_CONVERT),
 				INT_GET(u->length, ARCH_CONVERT),
-				INT_GET(*XFS_DIR2_DATA_UNUSED_TAG_P(u), ARCH_CONVERT));
+				INT_GET(*xfs_dir2_data_unused_tag_p(u), ARCH_CONVERT));
 			p += INT_GET(u->length, ARCH_CONVERT);
 			continue;
 		}
@@ -5554,8 +5554,8 @@ xfs_dir2data(void *addr, int size)
 			e->namelen);
 		for (k = 0; k < e->namelen; k++)
 			kdb_printf("%c", e->name[k]);
-		kdb_printf("\" tag 0x%x\n", INT_GET(*XFS_DIR2_DATA_ENTRY_TAG_P(e), ARCH_CONVERT));
-		p += XFS_DIR2_DATA_ENTSIZE(e->namelen);
+		kdb_printf("\" tag 0x%x\n", INT_GET(*xfs_dir2_data_entry_tag_p(e), ARCH_CONVERT));
+		p += xfs_dir2_data_entsize(e->namelen);
 	}
 	if (INT_GET(h->magic, ARCH_CONVERT) == XFS_DIR2_DATA_MAGIC)
 		return;
@@ -5600,7 +5600,7 @@ xfs_dir2leaf(xfs_dir2_leaf_t *leaf, int size)
 		return;
 	/* XFS_DIR2_LEAF_TAIL_P */
 	t = (xfs_dir2_leaf_tail_t *)((char *)leaf + size - sizeof(*t));
-	b = XFS_DIR2_LEAF_BESTS_P(t);
+	b = xfs_dir2_leaf_bests_p(t);
 	for (j = 0; j < INT_GET(t->bestcount, ARCH_CONVERT); j++, b++) {
 		kdb_printf("0x%lx best %d 0x%x\n",
 			(unsigned long) ((char *)b - (char *)leaf), j,
@@ -5621,19 +5621,19 @@ xfsidbg_xdir2sf(xfs_dir2_sf_t *s)
 	int i, j;
 
 	sfh = &s->hdr;
-	ino = XFS_DIR2_SF_GET_INUMBER(s, &sfh->parent);
+	ino = xfs_dir2_sf_get_inumber(s, &sfh->parent);
 	kdb_printf("hdr count %d i8count %d parent %llu\n",
 		sfh->count, sfh->i8count, (unsigned long long) ino);
-	for (i = 0, sfe = XFS_DIR2_SF_FIRSTENTRY(s); i < sfh->count; i++) {
-		ino = XFS_DIR2_SF_GET_INUMBER(s, XFS_DIR2_SF_INUMBERP(sfe));
+	for (i = 0, sfe = xfs_dir2_sf_firstentry(s); i < sfh->count; i++) {
+		ino = xfs_dir2_sf_get_inumber(s, xfs_dir2_sf_inumberp(sfe));
 		kdb_printf("entry %d inumber %llu offset 0x%x namelen %d name \"",
 			i, (unsigned long long) ino,
-			XFS_DIR2_SF_GET_OFFSET(sfe),
+			xfs_dir2_sf_get_offset(sfe),
 			sfe->namelen);
 		for (j = 0; j < sfe->namelen; j++)
 			kdb_printf("%c", sfe->name[j]);
 		kdb_printf("\"\n");
-		sfe = XFS_DIR2_SF_NEXTENTRY(s, sfe);
+		sfe = xfs_dir2_sf_nextentry(s, sfe);
 	}
 }
 
