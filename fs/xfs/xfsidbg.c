@@ -63,6 +63,7 @@
 #include "quota/xfs_qm.h"
 #include "xfs_iomap.h"
 #include "xfs_buf.h"
+#include "xfs_filestream.h"
 
 MODULE_AUTHOR("Silicon Graphics, Inc.");
 MODULE_DESCRIPTION("Additional kdb commands for debugging XFS");
@@ -108,6 +109,9 @@ static void	xfsidbg_xlog_granttrace(xlog_t *);
 #endif
 #ifdef XFS_DQUOT_TRACE
 static void	xfsidbg_xqm_dqtrace(xfs_dquot_t *);
+#endif
+#ifdef XFS_FILESTREAMS_TRACE
+static void	xfsidbg_filestreams_trace(int);
 #endif
 
 
@@ -198,6 +202,9 @@ static int	xfs_bmbt_trace_entry(ktrace_entry_t *ktep);
 #endif
 #ifdef XFS_DIR2_TRACE
 static int	xfs_dir2_trace_entry(ktrace_entry_t *ktep);
+#endif
+#ifdef XFS_FILESTREAMS_TRACE
+static void	xfs_filestreams_trace_entry(ktrace_entry_t *ktep);
 #endif
 #ifdef XFS_RW_TRACE
 static void	xfs_bunmap_trace_entry(ktrace_entry_t   *ktep);
@@ -762,6 +769,27 @@ static int	kdbm_xfs_xalttrace(
 	return 0;
 }
 #endif /* XFS_ALLOC_TRACE */
+
+#ifdef XFS_FILESTREAMS_TRACE
+static int	kdbm_xfs_xfstrmtrace(
+	int	argc,
+	const char **argv)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
+	if (diag)
+		return diag;
+
+	xfsidbg_filestreams_trace((int) addr);
+	return 0;
+}
+#endif /* XFS_FILESTREAMS_TRACE */
 
 static int	kdbm_xfs_xattrcontext(
 	int	argc,
@@ -2685,6 +2713,10 @@ static struct xif xfsidbg_funcs[] = {
 				"Dump XFS bmap extents in inode"},
   {  "xflist",	kdbm_xfs_xflist,	"<xfs_bmap_free_t>",
 				"Dump XFS to-be-freed extent records"},
+#ifdef XFS_FILESTREAMS_TRACE
+  {  "xfstrmtrc",kdbm_xfs_xfstrmtrace,	"",
+				"Dump filestreams trace buffer"},
+#endif
   {  "xhelp",	kdbm_xfs_xhelp,		"",
 				"Print idbg-xfs help"},
   {  "xicall",	kdbm_xfs_xiclogall,	"<xlog_in_core_t>",
@@ -5351,6 +5383,162 @@ xfsidbg_xailock_trace(int count)
 }
 #endif
 
+#ifdef XFS_FILESTREAMS_TRACE
+static void
+xfs_filestreams_trace_entry(ktrace_entry_t *ktep)
+{
+	xfs_inode_t	*ip, *pip;
+
+	/* function:line#[pid]: */
+	kdb_printf("%s:%lu[%lu]: ", (char *)ktep->val[1],
+			((unsigned long)ktep->val[0] >> 16) & 0xffff,
+			(unsigned long)ktep->val[2]);
+	switch ((unsigned long)ktep->val[0] & 0xffff) {
+	case XFS_FSTRM_KTRACE_INFO:
+		break;
+	case XFS_FSTRM_KTRACE_AGSCAN:
+		kdb_printf("scanning AG %ld[%ld]",
+				(long)ktep->val[4], (long)ktep->val[5]);
+		break;
+	case XFS_FSTRM_KTRACE_AGPICK1:
+		kdb_printf("using max_ag %ld[1] with maxfree %ld",
+				(long)ktep->val[4], (long)ktep->val[5]);
+		break;
+	case XFS_FSTRM_KTRACE_AGPICK2:
+
+		kdb_printf("startag %ld newag %ld[%ld] free %ld scanned %ld"
+				" flags 0x%lx",
+				(long)ktep->val[4], (long)ktep->val[5],
+				(long)ktep->val[6], (long)ktep->val[7],
+				(long)ktep->val[8], (long)ktep->val[9]);
+		break;
+	case XFS_FSTRM_KTRACE_UPDATE:
+		ip = (xfs_inode_t *)ktep->val[4];
+		if ((__psint_t)ktep->val[5] != (__psint_t)ktep->val[7])
+			kdb_printf("found ip %p ino %llu, AG %ld[%ld] ->"
+				" %ld[%ld]", ip, (unsigned long long)ip->i_ino,
+				(long)ktep->val[7], (long)ktep->val[8],
+				(long)ktep->val[5], (long)ktep->val[6]);
+		else
+			kdb_printf("found ip %p ino %llu, AG %ld[%ld]",
+				ip, (unsigned long long)ip->i_ino,
+				(long)ktep->val[5], (long)ktep->val[6]);
+		break;
+
+	case XFS_FSTRM_KTRACE_FREE:
+		ip = (xfs_inode_t *)ktep->val[4];
+		pip = (xfs_inode_t *)ktep->val[5];
+		if (ip->i_d.di_mode & S_IFDIR)
+			kdb_printf("deleting dip %p ino %llu, AG %ld[%ld]",
+			       ip, (unsigned long long)ip->i_ino,
+			       (long)ktep->val[6], (long)ktep->val[7]);
+		else
+			kdb_printf("deleting file %p ino %llu, pip %p ino %llu"
+				", AG %ld[%ld]",
+				ip, (unsigned long long)ip->i_ino,
+				pip, (unsigned long long)(pip ?  pip->i_ino : 0),
+				(long)ktep->val[6], (long)ktep->val[7]);
+		break;
+
+	case XFS_FSTRM_KTRACE_ITEM_LOOKUP:
+		ip = (xfs_inode_t *)ktep->val[4];
+		pip = (xfs_inode_t *)ktep->val[5];
+		if (!pip) {
+			kdb_printf("lookup on %s ip %p ino %llu failed, returning %ld",
+			       ip->i_d.di_mode & S_IFREG ? "file" : "dir", ip,
+			       (unsigned long long)ip->i_ino, (long)ktep->val[6]);
+		} else if (ip->i_d.di_mode & S_IFREG)
+			kdb_printf("lookup on file ip %p ino %llu dir %p"
+				" dino %llu got AG %ld[%ld]",
+				ip, (unsigned long long)ip->i_ino,
+				pip, (unsigned long long)pip->i_ino,
+				(long)ktep->val[6], (long)ktep->val[7]);
+		else
+			kdb_printf("lookup on dir ip %p ino %llu got AG %ld[%ld]",
+				ip, (unsigned long long)ip->i_ino,
+				(long)ktep->val[6], (long)ktep->val[7]);
+		break;
+
+	case XFS_FSTRM_KTRACE_ASSOCIATE:
+		ip = (xfs_inode_t *)ktep->val[4];
+		pip = (xfs_inode_t *)ktep->val[5];
+		kdb_printf("pip %p ino %llu and ip %p ino %llu given ag %ld[%ld]",
+				pip, (unsigned long long)pip->i_ino,
+				ip, (unsigned long long)ip->i_ino,
+				(long)ktep->val[6], (long)ktep->val[7]);
+		break;
+
+	case XFS_FSTRM_KTRACE_MOVEAG:
+		ip = ktep->val[4];
+		pip = ktep->val[5];
+		if ((long)ktep->val[6] != NULLAGNUMBER)
+			kdb_printf("dir %p ino %llu to file ip %p ino %llu has"
+				" moved %ld[%ld] -> %ld[%ld]",
+				pip, (unsigned long long)pip->i_ino,
+				ip, (unsigned long long)ip->i_ino,
+				(long)ktep->val[6], (long)ktep->val[7],
+				(long)ktep->val[8], (long)ktep->val[9]);
+		else
+			kdb_printf("pip %p ino %llu and ip %p ino %llu moved"
+				" to new ag %ld[%ld]",
+				pip, (unsigned long long)pip->i_ino,
+				ip, (unsigned long long)ip->i_ino,
+				(long)ktep->val[8], (long)ktep->val[9]);
+		break;
+
+	case XFS_FSTRM_KTRACE_ORPHAN:
+		ip = ktep->val[4];
+		kdb_printf("gave ag %lld to orphan ip %p ino %llu",
+				(__psint_t)ktep->val[5],
+				ip, (unsigned long long)ip->i_ino);
+		break;
+	default:
+		kdb_printf("unknown trace type 0x%lx",
+				(unsigned long)ktep->val[0] & 0xffff);
+	}
+	kdb_printf("\n");
+}
+
+static void
+xfsidbg_filestreams_trace(int count)
+{
+	ktrace_entry_t  *ktep;
+	ktrace_snap_t   kts;
+	int	     nentries;
+	int	     skip_entries;
+
+	if (xfs_filestreams_trace_buf == NULL) {
+		qprintf("The xfs inode lock trace buffer is not initialized\n");
+		return;
+	}
+	nentries = ktrace_nentries(xfs_filestreams_trace_buf);
+	if (count == -1) {
+		count = nentries;
+	}
+	if ((count <= 0) || (count > nentries)) {
+		qprintf("Invalid count.  There are %d entries.\n", nentries);
+		return;
+	}
+
+	ktep = ktrace_first(xfs_filestreams_trace_buf, &kts);
+	if (count != nentries) {
+		/*
+		 * Skip the total minus the number to look at minus one
+		 * for the entry returned by ktrace_first().
+		 */
+		skip_entries = nentries - count - 1;
+		ktep = ktrace_skip(xfs_filestreams_trace_buf, skip_entries, &kts);
+		if (ktep == NULL) {
+			qprintf("Skipped them all\n");
+			return;
+		}
+	}
+	while (ktep != NULL) {
+		xfs_filestreams_trace_entry(ktep);
+		ktep = ktrace_next(xfs_filestreams_trace_buf, &kts);
+	}
+}
+#endif
 /*
  * Compute & print buffer's checksum.
  */
