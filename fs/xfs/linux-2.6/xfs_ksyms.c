@@ -63,6 +63,7 @@
 #include "xfs_trans_space.h"
 #include "xfs_utils.h"
 #include "xfs_iomap.h"
+#include "xfs_filestream.h"
 #include "support/ktrace.h"
 
 
@@ -105,6 +106,9 @@ EXPORT_SYMBOL(xfs_attr_trace_buf);
 #endif
 #ifdef XFS_DIR2_TRACE
 EXPORT_SYMBOL(xfs_dir2_trace_buf);
+#endif
+#ifdef XFS_FILESTREAMS_TRACE
+EXPORT_SYMBOL(xfs_filestreams_trace_buf);
 #endif
 
 #ifdef XFS_BUF_TRACE
