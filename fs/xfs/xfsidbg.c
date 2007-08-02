@@ -6705,9 +6705,8 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	kdb_printf("dircook_elog %d blkbit_log %d blkbb_log %d agno_log %d\n",
 		mp->m_dircook_elog, mp->m_blkbit_log, mp->m_blkbb_log,
 		mp->m_agno_log);
-	kdb_printf("agino_log %d nreadaheads %d inode cluster size %d\n",
-		mp->m_agino_log, mp->m_nreadaheads,
-		mp->m_inode_cluster_size);
+	kdb_printf("agino_log %d inode cluster size %d\n",
+		mp->m_agino_log, mp->m_inode_cluster_size);
 	kdb_printf("blockmask 0x%x blockwsize 0x%x blockwmask 0x%x\n",
 		mp->m_blockmask, mp->m_blockwsize, mp->m_blockwmask);
 	kdb_printf("alloc_mxr[lf,nd] %d %d alloc_mnr[lf,nd] %d %d\n",
