@@ -127,7 +127,7 @@ static void	xfsidbg_xattrleaf(xfs_attr_leafblock_t *);
 static void	xfsidbg_xattrsf(xfs_attr_shortform_t *);
 static void	xfsidbg_xbirec(xfs_bmbt_irec_t *r);
 static void	xfsidbg_xbmalla(xfs_bmalloca_t *);
-static void	xfsidbg_xbrec(xfs_bmbt_rec_64_t *);
+static void	xfsidbg_xbrec(xfs_bmbt_rec_host_t *);
 static void	xfsidbg_xbroot(xfs_inode_t *);
 static void	xfsidbg_xbroota(xfs_inode_t *);
 static void	xfsidbg_xbtcur(xfs_btree_cur_t *);
@@ -901,7 +901,7 @@ static int	kdbm_xfs_xbrec(
 	if (diag)
 		return diag;
 
-	xfsidbg_xbrec((xfs_bmbt_rec_64_t *) addr);
+	xfsidbg_xbrec((xfs_bmbt_rec_host_t *) addr);
 	return 0;
 }
 
@@ -3103,7 +3103,7 @@ xfs_bmbt_trace_entry(
 	ktrace_entry_t	  *ktep)
 {
 	int			line;
-	xfs_bmbt_rec_32_t	r;
+	xfs_bmbt_rec_host_t	r;
 	xfs_bmbt_irec_t		s;
 	int			type;
 	int			whichfork;
@@ -3181,11 +3181,12 @@ xfs_bmbt_trace_entry(
 			((long)ktep->val[5] >> 24) & 0xff,
 			((long)ktep->val[5] >> 16) & 0xff,
 			(long)ktep->val[5] & 0xffff);
-		r.l0 = (xfs_bmbt_rec_base_t)(unsigned long)ktep->val[6];
-		r.l1 = (xfs_bmbt_rec_base_t)(unsigned long)ktep->val[7];
-		r.l2 = (xfs_bmbt_rec_base_t)(unsigned long)ktep->val[8];
-		r.l3 = (xfs_bmbt_rec_base_t)(unsigned long)ktep->val[9];
-		xfsidbg_xbrec((xfs_bmbt_rec_64_t *)&r);
+		r.l0 = (unsigned long long)(unsigned long)ktep->val[6] << 32 |
+			(unsigned long)ktep->val[7];
+		r.l1 = (unsigned long long)(unsigned long)ktep->val[8] << 32 |
+			(unsigned long)ktep->val[9];
+
+		xfsidbg_xbrec(&r);
 		qprintf(" bufs 0x%p 0x%p 0x%p 0x%p ",
 			(xfs_buf_t *)ktep->val[10],
 			(xfs_buf_t *)ktep->val[11],
@@ -4870,11 +4871,11 @@ xfsidbg_xbmstrace(xfs_inode_t *ip)
  * Print xfs bmap record
  */
 static void
-xfsidbg_xbrec(xfs_bmbt_rec_64_t *r)
+xfsidbg_xbrec(xfs_bmbt_rec_host_t *r)
 {
 	xfs_bmbt_irec_t	irec;
 
-	xfs_bmbt_get_all((xfs_bmbt_rec_t *)r, &irec);
+	xfs_bmbt_get_all(r, &irec);
 	kdb_printf("startoff %Ld startblock %Lx blockcount %Ld flag %d\n",
 		irec.br_startoff, (__uint64_t)irec.br_startblock,
 		irec.br_blockcount, irec.br_state);
