@@ -135,8 +135,6 @@ static void	xfsidbg_xbuf(xfs_buf_t *);
 static void	xfsidbg_xbuf_real(xfs_buf_t *, int);
 static void	xfsidbg_xarg(int);
 static void	xfsidbg_xchksum(uint *);
-static void	xfsidbg_xchash(xfs_mount_t *mp);
-static void	xfsidbg_xchashlist(xfs_chashlist_t *chl);
 static void	xfsidbg_xdaargs(xfs_da_args_t *);
 static void	xfsidbg_xdabuf(xfs_dabuf_t *);
 static void	xfsidbg_xdanode(xfs_da_intnode_t *);
@@ -149,7 +147,6 @@ static void	xfsidbg_xhelp(void);
 static void	xfsidbg_xiclog(xlog_in_core_t *);
 static void	xfsidbg_xiclogall(xlog_in_core_t *);
 static void	xfsidbg_xiclogcb(xlog_in_core_t *);
-static void	xfsidbg_xihash(xfs_mount_t *mp);
 static void	xfsidbg_xinodes(xfs_mount_t *);
 static void	xfsidbg_delayed_blocks(xfs_mount_t *);
 static void	xfsidbg_xinodes_quiesce(xfs_mount_t *);
@@ -1020,46 +1017,6 @@ static int	kdbm_xfs_xchksum(
 	return 0;
 }
 
-
-static int	kdbm_xfs_xchash(
-	int	argc,
-	const char **argv)
-{
-	unsigned long addr;
-	int nextarg = 1;
-	long offset = 0;
-	int diag;
-
-	if (argc != 1)
-		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
-	if (diag)
-		return diag;
-
-	xfsidbg_xchash((xfs_mount_t *) addr);
-	return 0;
-}
-
-static int	kdbm_xfs_xchashlist(
-	int	argc,
-	const char **argv)
-{
-	unsigned long addr;
-	int nextarg = 1;
-	long offset = 0;
-	int diag;
-
-	if (argc != 1)
-		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
-	if (diag)
-		return diag;
-
-	xfsidbg_xchashlist((xfs_chashlist_t *) addr);
-	return 0;
-}
-
-
 static int	kdbm_xfs_xdaargs(
 	int	argc,
 	const char **argv)
@@ -1277,25 +1234,6 @@ static int	kdbm_xfs_xiclogcb(
 		return diag;
 
 	xfsidbg_xiclogcb((xlog_in_core_t *) addr);
-	return 0;
-}
-
-static int	kdbm_xfs_xihash(
-	int	argc,
-	const char **argv)
-{
-	unsigned long addr;
-	int nextarg = 1;
-	long offset = 0;
-	int diag;
-
-	if (argc != 1)
-		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
-	if (diag)
-		return diag;
-
-	xfsidbg_xihash((xfs_mount_t *) addr);
 	return 0;
 }
 
@@ -2173,15 +2111,11 @@ static void	printinode(struct inode *ip)
 		" i_mode = 0x%x  i_nlink = %d  i_rdev = 0x%x i_state = 0x%lx\n",
 					ip->i_mode, ip->i_nlink,
 					kdev_t_to_nr(ip->i_rdev), ip->i_state);
-	kdb_printf(" i_hash.nxt = 0x%p i_hash.pprv = 0x%p\n",
-                                        ip->i_hash.next, ip->i_hash.prev);
 #else
 	kdb_printf(
 		" i_mode = 0x%x  i_nlink = %d  i_rdev = 0x%x i_state = 0x%lx\n",
 					ip->i_mode, ip->i_nlink,
 					ip->i_rdev, ip->i_state);
-	kdb_printf(" i_hash.nxt = 0x%p i_hash.pprv = 0x%p\n",
-                                        ip->i_hash.next, ip->i_hash.pprev);
 #endif
 	kdb_printf(" i_list.nxt = 0x%p i_list.prv = 0x%p\n",
 					ip->i_list.next, ip->i_list.prev);
@@ -2670,10 +2604,6 @@ static struct xif xfsidbg_funcs[] = {
   {  "xbxstrc",	kdbm_xfs_xbxstrace,	"<xfs_inode_t>",
 				"Dump XFS bmap extent inode trace" },
 #endif
-  {  "xchash",	kdbm_xfs_xchash,	"<xfs_mount_t>",
-				"Dump XFS cluster hash"},
-  {  "xchlist",	kdbm_xfs_xchashlist,	"<xfs_chashlist_t>",
-				"Dump XFS cluster hash list"},
   {  "xchksum",	kdbm_xfs_xchksum,	"<addr>", "Dump chksum" },
 #ifdef XFS_DIR2_TRACE
   {  "xd2atrc",	kdbm_xfs_xdir2atrace,	"<count>",
@@ -2727,8 +2657,6 @@ static struct xif xfsidbg_funcs[] = {
   {  "xictrc",	kdbm_xfs_xiclogtrace,	"<xlog_in_core_t>",
 				"Dump XFS in-core log trace" },
 #endif
-  {  "xihash",	kdbm_xfs_xihash,	"<xfs_mount_t>",
-				"Dump XFS inode hash statistics"},
 #ifdef XFS_ILOCK_TRACE
   {  "xilocktrc",kdbm_xfs_xilock_trace,	"<xfs_inode_t>",
 				"Dump XFS ilock trace" },
@@ -6656,7 +6584,7 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		"BARRIER",	/* 0x20000 */
 		"IDELETE",	/* 0x40000 */
 		"SWALLOC",	/* 0x80000 */
-		"IHASHSIZE",	/* 0x100000 */
+		"UNUSED_100000", /* 0x100000 */
 		"DIRSYNC",	/* 0x200000 */
 		"COMPAT_IOSIZE",/* 0x400000 */
 		NULL
@@ -6688,8 +6616,6 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		mp->m_rtdev_targp ? mp->m_rtdev_targp->bt_dev : 0);
 	kdb_printf("bsize %d agfrotor %d xfs_rotorstep %d agirotor %d\n",
 		mp->m_bsize, mp->m_agfrotor, xfs_rotorstep, mp->m_agirotor);
-	kdb_printf("ihash 0x%p ihsize %zu\n",
-		mp->m_ihash, mp->m_ihsize);
 	kdb_printf("inodes 0x%p ilock 0x%p ireclaims 0x%x\n",
 		mp->m_inodes, &mp->m_ilock, mp->m_ireclaims);
 	kdb_printf("readio_log 0x%x readio_blocks 0x%x ",
@@ -6756,78 +6682,11 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		(xfs_dfiloff_t)mp->m_dirdatablk,
 		(xfs_dfiloff_t)mp->m_dirleafblk,
 		(xfs_dfiloff_t)mp->m_dirfreeblk);
-	kdb_printf("chsize %d chash 0x%p\n",
-		mp->m_chsize, mp->m_chash);
 	if (mp->m_fsname != NULL)
 		kdb_printf("mountpoint \"%s\"\n", mp->m_fsname);
 	else
 		kdb_printf("No name!!!\n");
 
-}
-
-static void
-xfsidbg_xihash(xfs_mount_t *mp)
-{
-	xfs_ihash_t	*ih;
-	int		i;
-	int		j;
-	int		total;
-	int		numzeros;
-	xfs_inode_t	*ip;
-	int		*hist;
-	int		hist_bytes = mp->m_ihsize * sizeof(int);
-	int		hist2[21];
-
-	hist = (int *) kmalloc(hist_bytes, GFP_KERNEL);
-
-	if (hist == NULL) {
-		kdb_printf("xfsidbg_xihash: kmalloc(%d) failed!\n",
-							hist_bytes);
-		return;
-	}
-
-	for (i = 0; i < mp->m_ihsize; i++) {
-		ih = mp->m_ihash + i;
-		j = 0;
-		for (ip = ih->ih_next; ip != NULL; ip = ip->i_next)
-			j++;
-		hist[i] = j;
-	}
-
-	numzeros = total = 0;
-
-	for (i = 0; i < 21; i++)
-		hist2[i] = 0;
-
-	for (i = 0; i < mp->m_ihsize; i++)  {
-		kdb_printf("%d ", hist[i]);
-		total += hist[i];
-		numzeros += hist[i] == 0 ? 1 : 0;
-		if (hist[i] > 20)
-			j = 20;
-		else
-			j = hist[i];
-
-		if (! (j <= 20)) {
-			kdb_printf("xfsidbg_xihash: (j > 20)/%d @ line # %d\n",
-							j, __LINE__);
-			return;
-		}
-
-		hist2[j]++;
-	}
-
-	kdb_printf("\n");
-
-	kdb_printf("total inodes = %d, average length = %zu, adjusted average = %zu\n",
-		total, total / mp->m_ihsize,
-		total / (mp->m_ihsize - numzeros));
-
-	for (i = 0; i < 21; i++)  {
-		kdb_printf("%d - %d , ", i, hist2[i]);
-	}
-	kdb_printf("\n");
-	kfree(hist);
 }
 
 /*
@@ -6845,12 +6704,8 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		NULL
 	};
 
-	kdb_printf("hash 0x%p next 0x%p prevp 0x%p mount 0x%p\n",
-		ip->i_hash,
-		ip->i_next,
-		ip->i_prevp,
-		ip->i_mount);
-	kdb_printf("mnext 0x%p mprev 0x%p vnode 0x%p \n",
+	kdb_printf("mount 0x%p mnext 0x%p mprev 0x%p vnode 0x%p \n",
+		ip->i_mount,
 		ip->i_mnext,
 		ip->i_mprev,
 		XFS_ITOV_NULL(ip));
@@ -6898,10 +6753,10 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	qprintf(" dir trace 0x%p\n", ip->i_dir_trace);
 #endif  
 	kdb_printf("\n");
-	kdb_printf("chash 0x%p cnext 0x%p cprev 0x%p\n",
-		ip->i_chash,
-		ip->i_cnext,
-		ip->i_cprev);
+	kdb_printf("icluster 0x%p cnext 0x%p cprev 0x%p\n",
+		ip->i_cluster,
+		ip->i_cnode.next,
+		ip->i_cnode.pprev);
 	xfs_xnode_fork("data", &ip->i_df);
 	xfs_xnode_fork("attr", ip->i_afp);
 	kdb_printf("\n");
@@ -6914,50 +6769,6 @@ xfsidbg_xcore(xfs_iocore_t *io)
 	kdb_printf("io_obj 0x%p io_flags 0x%x io_mount 0x%p\n",
 			io->io_obj, io->io_flags, io->io_mount);
 	kdb_printf("new_size %Lx\n", io->io_new_size);
-}
-
-/*
- * Command to print xfs inode cluster hash table: kp xchash <addr>
- */
-static void
-xfsidbg_xchash(xfs_mount_t *mp)
-{
-	int		i;
-	xfs_chash_t	*ch;
-
-	kdb_printf("m_chash 0x%p size %d\n",
-		mp->m_chash, mp->m_chsize);
-	for (i = 0; i < mp->m_chsize; i++) {
-		ch = mp->m_chash + i;
-		kdb_printf("[%3d] ch 0x%p chashlist 0x%p\n", i, ch, ch->ch_list);
-		xfsidbg_xchashlist(ch->ch_list);
-	}
-}
-
-/*
- * Command to print xfs inode cluster hash list: kp xchashlist <addr>
- */
-static void
-xfsidbg_xchashlist(xfs_chashlist_t *chl)
-{
-	xfs_inode_t	*ip;
-
-	while (chl != NULL) {
-		kdb_printf("hashlist inode 0x%p blkno %lld buf 0x%p",
-		       chl->chl_ip, (long long) chl->chl_blkno, chl->chl_buf);
-
-		kdb_printf("\n");
-
-		/* print inodes on chashlist */
-		ip = chl->chl_ip;
-		do {
-			kdb_printf("0x%p ", ip);
-			ip = ip->i_cnext;
-		} while (ip != chl->chl_ip);
-		kdb_printf("\n");
-
-		chl=chl->chl_next;
-	}
 }
 
 /*
