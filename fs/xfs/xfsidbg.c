@@ -170,7 +170,7 @@ static void	xfsidbg_xqm_mplist(xfs_mount_t *);
 static void	xfsidbg_xqm_qinfo(xfs_mount_t *mp);
 static void	xfsidbg_xqm_tpdqinfo(xfs_trans_t *tp);
 static void	xfsidbg_xsb(xfs_sb_t *);
-static void	xfsidbg_xsb_convert(xfs_sb_t *);
+static void	xfsidbg_xsb_convert(xfs_dsb_t *);
 static void	xfsidbg_xtp(xfs_trans_t *);
 static void	xfsidbg_xtrans_res(xfs_mount_t *);
 #ifdef CONFIG_XFS_QUOTA
@@ -1719,7 +1719,7 @@ static int	kdbm_xfs_xsb(
 	}
 
 	if (convert)
-		xfsidbg_xsb_convert((xfs_sb_t *) addr);
+		xfsidbg_xsb_convert((xfs_dsb_t *) addr);
 	else
 		xfsidbg_xsb((xfs_sb_t *) addr);
 	return 0;
@@ -4980,7 +4980,7 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 	void *d;
 	xfs_agf_t *agf;
 	xfs_agi_t *agi;
-	xfs_sb_t *sb;
+	xfs_dsb_t *sb;
 	xfs_alloc_block_t *bta;
 	xfs_bmbt_block_t *btb;
 	xfs_inobt_block_t *bti;
@@ -5065,7 +5065,7 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 			kdb_printf("buf 0x%p dinode 0x%p\n", bp, di);
 			xfs_inodebuf(bp);
 		}
-	} else if (INT_GET((sb = d)->sb_magicnum, ARCH_CONVERT) == XFS_SB_MAGIC) {
+	} else if (be32_to_cpu((sb = d)->sb_magicnum) == XFS_SB_MAGIC) {
 		if (summary) {
 			kdb_printf("Superblock (at 0x%p)\n", sb);
 		} else {
@@ -7358,11 +7358,11 @@ xfsidbg_xsb(xfs_sb_t *sbp)
 }
 
 static void
-xfsidbg_xsb_convert(xfs_sb_t *sbp)
+xfsidbg_xsb_convert(xfs_dsb_t *sbp)
 {
 	xfs_sb_t sb;
 
-	xfs_xlatesb(sbp, &sb, 1, XFS_SB_ALL_BITS);
+	xfs_sb_from_disk(&sb, sbp);
 
 	kdb_printf("<converted>\n");
 	xfsidbg_xsb(&sb);
