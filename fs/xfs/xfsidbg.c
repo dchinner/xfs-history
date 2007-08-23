@@ -232,7 +232,7 @@ static char *	xfs_fmtsize(size_t i);
 static char *	xfs_fmtuuid(uuid_t *);
 static void	xfs_inode_item_print(xfs_inode_log_item_t *ilip, int summary);
 static void	xfs_inodebuf(xfs_buf_t *bp);
-static void	xfs_prdinode_core(xfs_dinode_core_t *dip);
+static void	xfs_prdinode_incore(xfs_icdinode_t *dip);
 static void	xfs_qoff_item_print(xfs_qoff_logitem_t *lip, int summary);
 static void	xfs_xexlist_fork(xfs_inode_t *ip, int whichfork);
 static void	xfs_xnode_fork(char *name, xfs_ifork_t *f);
@@ -3828,7 +3828,7 @@ static void
 xfs_inodebuf(xfs_buf_t *bp)
 {
 	xfs_dinode_t *di;
-	xfs_dinode_core_t dic;
+	xfs_icdinode_t dic;
 	int n, i;
 
 	n = XFS_BUF_COUNT(bp) >> 8;
@@ -3836,11 +3836,10 @@ xfs_inodebuf(xfs_buf_t *bp)
 		di = (xfs_dinode_t *)xfs_buf_offset(bp,
 					i * 256);
 
-		xfs_xlate_dinode_core((xfs_caddr_t)&di->di_core, &dic, 1);
-		xfs_prdinode_core(&dic);
+		xfs_dinode_from_disk(&dic, &di->di_core);
+		xfs_prdinode_incore(&dic);
 		kdb_printf("next_unlinked 0x%x u@0x%p\n",
-			   INT_GET(di->di_next_unlinked, ARCH_CONVERT),
-			   &di->di_u);
+			   be32_to_cpu(di->di_next_unlinked), &di->di_u);
 	}
 }
 
@@ -3981,7 +3980,7 @@ xfs_inval_cached_trace_entry(ktrace_entry_t     *ktep)
  * Print disk inode core.
  */
 static void
-xfs_prdinode_core(xfs_dinode_core_t *dip)
+xfs_prdinode_incore(xfs_icdinode_t *dip)
 {
 	static char *diflags[] = {
 		"realtime",		/* XFS_DIFLAG_REALTIME */
@@ -5059,7 +5058,7 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 			kdb_printf("buf 0x%p dir/attr node 0x%p\n", bp, node);
 			xfsidbg_xdanode(node);
 		}
-	} else if (INT_GET((di = d)->di_core.di_magic, ARCH_CONVERT) == XFS_DINODE_MAGIC) {
+	} else if (be16_to_cpu((di = d)->di_core.di_magic) == XFS_DINODE_MAGIC) {
 		if (summary) {
 			kdb_printf("Disk Inode (at 0x%p)\n", di);
 		} else {
@@ -6906,7 +6905,7 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	xfs_xnode_fork("data", &ip->i_df);
 	xfs_xnode_fork("attr", ip->i_afp);
 	kdb_printf("\n");
-	xfs_prdinode_core(&ip->i_d);
+	xfs_prdinode_incore(&ip->i_d);
 }
 
 static void
