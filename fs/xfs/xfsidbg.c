@@ -1780,10 +1780,7 @@ static void printbhv(bhv_desc_t *bdp)
 static void	printvnode(bhv_vnode_t *vp, unsigned long addr)
 {
 	kdb_printf("vnode: 0x%lx\n", addr);
-
 	kdb_printf("\n");
-
-	kdb_printf("   v_number 0x%llx\n", (unsigned long long)vp->v_number);
 }
 
 static int	kdbm_vnode(
