@@ -64,6 +64,7 @@
 #include "xfs_utils.h"
 #include "xfs_iomap.h"
 #include "xfs_filestream.h"
+#include "xfs_vnodeops.h"
 #include "support/ktrace.h"
 
 
@@ -150,9 +151,9 @@ EXPORT_SYMBOL(bhv_module_exit);
 EXPORT_SYMBOL(bhv_remove_vfsops);
 EXPORT_SYMBOL(bhv_remove_all_vfsops);
 EXPORT_SYMBOL(bhv_remove_not_first);
-EXPORT_SYMBOL(fs_flush_pages);
-EXPORT_SYMBOL(fs_flushinval_pages);
-EXPORT_SYMBOL(fs_tosspages);
+EXPORT_SYMBOL(xfs_flush_pages);
+EXPORT_SYMBOL(xfs_flushinval_pages);
+EXPORT_SYMBOL(xfs_tosspages);
 EXPORT_SYMBOL(fs_noval);
 EXPORT_SYMBOL(icmn_err);
 EXPORT_SYMBOL(kmem_alloc);

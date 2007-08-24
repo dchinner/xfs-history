@@ -48,6 +48,7 @@
 #include "xfs_buf_item.h"
 #include "xfs_utils.h"
 #include "xfs_iomap.h"
+#include "xfs_vnodeops.h"
 
 #include <linux/capability.h>
 #include <linux/writeback.h>
@@ -180,27 +181,22 @@ unlock:
 
 ssize_t			/* bytes read, or (-)  error */
 xfs_read(
-	bhv_desc_t		*bdp,
+	xfs_inode_t		*ip,
 	struct kiocb		*iocb,
 	const struct iovec	*iovp,
 	unsigned int		segs,
 	loff_t			*offset,
-	int			ioflags,
-	cred_t			*credp)
+	int			ioflags)
 {
 	struct file		*file = iocb->ki_filp;
 	struct inode		*inode = file->f_mapping->host;
+	bhv_vnode_t		*vp = XFS_ITOV(ip);
+	xfs_mount_t		*mp = ip->i_mount;
 	size_t			size = 0;
 	ssize_t			ret = 0;
 	xfs_fsize_t		n;
-	xfs_inode_t		*ip;
-	xfs_mount_t		*mp;
-	bhv_vnode_t		*vp;
 	unsigned long		seg;
 
-	ip = XFS_BHVTOI(bdp);
-	vp = BHV_TO_VNODE(bdp);
-	mp = ip->i_mount;
 
 	XFS_STATS_INC(xs_read_calls);
 
@@ -249,8 +245,7 @@ xfs_read(
 		bhv_vrwlock_t locktype = VRWLOCK_READ;
 		int dmflags = FILP_DELAY_FLAG(file) | DM_SEM_FLAG_RD(ioflags);
 
-		ret = -XFS_SEND_DATA(mp, DM_EVENT_READ,
-					BHV_TO_VNODE(bdp), *offset, size,
+		ret = -XFS_SEND_DATA(mp, DM_EVENT_READ, vp, *offset, size,
 					dmflags, &locktype);
 		if (ret) {
 			xfs_iunlock(ip, XFS_IOLOCK_SHARED);
@@ -287,16 +282,15 @@ xfs_read(
 
 ssize_t
 xfs_sendfile(
-	bhv_desc_t		*bdp,
+	xfs_inode_t		*ip,
 	struct file		*filp,
 	loff_t			*offset,
 	int			ioflags,
 	size_t			count,
 	read_actor_t		actor,
-	void			*target,
-	cred_t			*credp)
+	void			*target)
 {
-	xfs_inode_t		*ip = XFS_BHVTOI(bdp);
+	bhv_vnode_t		*vp = XFS_ITOV(ip);
 	xfs_mount_t		*mp = ip->i_mount;
 	ssize_t			ret;
 
@@ -310,8 +304,7 @@ xfs_sendfile(
 		bhv_vrwlock_t locktype = VRWLOCK_READ;
 		int error;
 
-		error = XFS_SEND_DATA(mp, DM_EVENT_READ, BHV_TO_VNODE(bdp),
-				      *offset, count,
+		error = XFS_SEND_DATA(mp, DM_EVENT_READ, vp, *offset, count,
 				      FILP_DELAY_FLAG(filp), &locktype);
 		if (error) {
 			xfs_iunlock(ip, XFS_IOLOCK_SHARED);
@@ -330,16 +323,15 @@ xfs_sendfile(
 
 ssize_t
 xfs_splice_read(
-	bhv_desc_t		*bdp,
+	xfs_inode_t		*ip,
 	struct file		*infilp,
 	loff_t			*ppos,
 	struct pipe_inode_info	*pipe,
 	size_t			count,
 	int			flags,
-	int			ioflags,
-	cred_t			*credp)
+	int			ioflags)
 {
-	xfs_inode_t		*ip = XFS_BHVTOI(bdp);
+	bhv_vnode_t		*vp = XFS_ITOV(ip);
 	xfs_mount_t		*mp = ip->i_mount;
 	ssize_t			ret;
 
@@ -353,8 +345,7 @@ xfs_splice_read(
 		bhv_vrwlock_t locktype = VRWLOCK_READ;
 		int error;
 
-		error = XFS_SEND_DATA(mp, DM_EVENT_READ, BHV_TO_VNODE(bdp),
-					*ppos, count,
+		error = XFS_SEND_DATA(mp, DM_EVENT_READ, vp, *ppos, count,
 					FILP_DELAY_FLAG(infilp), &locktype);
 		if (error) {
 			xfs_iunlock(ip, XFS_IOLOCK_SHARED);
@@ -373,16 +364,15 @@ xfs_splice_read(
 
 ssize_t
 xfs_splice_write(
-	bhv_desc_t		*bdp,
+	xfs_inode_t		*ip,
 	struct pipe_inode_info	*pipe,
 	struct file		*outfilp,
 	loff_t			*ppos,
 	size_t			count,
 	int			flags,
-	int			ioflags,
-	cred_t			*credp)
+	int			ioflags)
 {
-	xfs_inode_t		*ip = XFS_BHVTOI(bdp);
+	bhv_vnode_t		*vp = XFS_ITOV(ip);
 	xfs_mount_t		*mp = ip->i_mount;
 	xfs_iocore_t		*io = &ip->i_iocore;
 	ssize_t			ret;
@@ -399,8 +389,7 @@ xfs_splice_write(
 		bhv_vrwlock_t locktype = VRWLOCK_WRITE;
 		int error;
 
-		error = XFS_SEND_DATA(mp, DM_EVENT_WRITE, BHV_TO_VNODE(bdp),
-					*ppos, count,
+		error = XFS_SEND_DATA(mp, DM_EVENT_WRITE, vp, *ppos, count,
 					FILP_DELAY_FLAG(outfilp), &locktype);
 		if (error) {
 			xfs_iunlock(ip, XFS_IOLOCK_EXCL);
@@ -634,24 +623,22 @@ out_lock:
 
 ssize_t				/* bytes written, or (-) error */
 xfs_write(
-	bhv_desc_t		*bdp,
+	struct xfs_inode	*xip,
 	struct kiocb		*iocb,
 	const struct iovec	*iovp,
 	unsigned int		nsegs,
 	loff_t			*offset,
-	int			ioflags,
-	cred_t			*credp)
+	int			ioflags)
 {
 	struct file		*file = iocb->ki_filp;
 	struct address_space	*mapping = file->f_mapping;
 	struct inode		*inode = mapping->host;
+	bhv_vnode_t		*vp = XFS_ITOV(xip);
 	unsigned long		segs = nsegs;
-	xfs_inode_t		*xip;
 	xfs_mount_t		*mp;
 	ssize_t			ret = 0, error = 0;
 	xfs_fsize_t		isize, new_size;
 	xfs_iocore_t		*io;
-	bhv_vnode_t		*vp;
 	unsigned long		seg;
 	int			iolock;
 	int			eventsent = 0;
@@ -661,9 +648,6 @@ xfs_write(
 	int			need_i_mutex;
 
 	XFS_STATS_INC(xs_write_calls);
-
-	vp = BHV_TO_VNODE(bdp);
-	xip = XFS_BHVTOI(bdp);
 
 	for (seg = 0; seg < segs; seg++) {
 		const struct iovec *iv = &iovp[seg];
@@ -789,7 +773,7 @@ start:
 	 */
 
 	if (pos > xip->i_size) {
-		error = xfs_zero_eof(BHV_TO_VNODE(bdp), io, pos, xip->i_size);
+		error = xfs_zero_eof(vp, io, pos, xip->i_size);
 		if (error) {
 			xfs_iunlock(xip, XFS_ILOCK_EXCL);
 			goto out_unlock_internal;
@@ -874,7 +858,7 @@ retry:
 
 	if (ret == -ENOSPC &&
 	    DM_EVENT_ENABLED(xip, DM_EVENT_NOSPACE) && !(ioflags & IO_INVIS)) {
-		xfs_rwunlock(bdp, locktype);
+		xfs_rwunlock(xip, locktype);
 		if (need_i_mutex)
 			mutex_unlock(&inode->i_mutex);
 		error = XFS_SEND_NAMESP(xip->i_mount, DM_EVENT_NOSPACE, vp,
@@ -882,7 +866,7 @@ retry:
 				0, 0, 0); /* Delay flag intentionally  unused */
 		if (need_i_mutex)
 			mutex_lock(&inode->i_mutex);
-		xfs_rwlock(bdp, locktype);
+		xfs_rwlock(xip, locktype);
 		if (error)
 			goto out_unlock_internal;
 		pos = xip->i_size;
@@ -913,7 +897,7 @@ retry:
 		if (error)
 			goto out_unlock_internal;
 
-		xfs_rwunlock(bdp, locktype);
+		xfs_rwunlock(xip, locktype);
 		if (need_i_mutex)
 			mutex_unlock(&inode->i_mutex);
 
@@ -922,7 +906,7 @@ retry:
 			error = -ret;
 		if (need_i_mutex)
 			mutex_lock(&inode->i_mutex);
-		xfs_rwlock(bdp, locktype);
+		xfs_rwlock(xip, locktype);
 	}
 
  out_unlock_internal:
@@ -940,7 +924,7 @@ retry:
 			xip->i_d.di_size = xip->i_size;
 		xfs_iunlock(xip, XFS_ILOCK_EXCL);
 	}
-	xfs_rwunlock(bdp, locktype);
+	xfs_rwunlock(xip, locktype);
  out_unlock_mutex:
 	if (need_i_mutex)
 		mutex_unlock(&inode->i_mutex);
@@ -979,14 +963,14 @@ xfs_bdstrat_cb(struct xfs_buf *bp)
 
 
 int
-xfs_bmap(bhv_desc_t	*bdp,
+xfs_bmap(
+	xfs_inode_t	*ip,
 	xfs_off_t	offset,
 	ssize_t		count,
 	int		flags,
 	xfs_iomap_t	*iomapp,
 	int		*niomaps)
 {
-	xfs_inode_t	*ip = XFS_BHVTOI(bdp);
 	xfs_iocore_t	*io = &ip->i_iocore;
 
 	ASSERT((ip->i_d.di_mode & S_IFMT) == S_IFREG);
