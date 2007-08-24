@@ -202,7 +202,7 @@ xfs_revalidate_inode(
 
 void
 xfs_initialize_vnode(
-	bhv_desc_t		*bdp,
+	struct xfs_mount	*mp,
 	bhv_vnode_t		*vp,
 	struct xfs_inode	*ip,
 	int			unlock)
@@ -222,7 +222,7 @@ xfs_initialize_vnode(
 	 * finish our work.
 	 */
 	if (ip->i_d.di_mode != 0 && unlock && (inode->i_state & I_NEW)) {
-		xfs_revalidate_inode(XFS_BHVTOM(bdp), vp, ip);
+		xfs_revalidate_inode(mp, vp, ip);
 		xfs_set_inodeops(inode);
 
 		xfs_iflags_clear(ip, XFS_INEW);
@@ -234,11 +234,11 @@ xfs_initialize_vnode(
 
 struct inode *
 xfs_get_inode(
-	bhv_desc_t	*bdp,
+	xfs_mount_t	*mp,
 	xfs_ino_t	ino,
 	int		flags)
 {
-	return iget_locked(bhvtovfs(bdp)->vfs_super, ino);
+	return iget_locked(XFS_MTOVFS(mp)->vfs_super, ino);
 }
 
 int
