@@ -509,7 +509,7 @@ xfs_flush_device_work(
 	void		*arg)
 {
 	struct inode	*inode = arg;
-	sync_blockdev(mp->m_vfsp->vfs_super->s_bdev);
+	sync_blockdev(mp->m_super->s_bdev);
 	iput(inode);
 }
 
@@ -590,7 +590,6 @@ STATIC void
 xfs_fs_put_super(
 	struct super_block	*sb)
 {
-	bhv_vfs_t		*vfsp = vfs_from_sb(sb);
 	struct xfs_mount	*mp = XFS_M(sb);
 	int			error;
 
@@ -598,12 +597,8 @@ xfs_fs_put_super(
 
 	xfs_sync(mp, SYNC_ATTR | SYNC_DELWRI);
 	error = xfs_unmount(mp, 0, NULL);
-	if (error) {
+	if (error)
 		printk("XFS: unmount got error=%d\n", error);
-		printk("%s: vfs=0x%p left dangling!\n", __FUNCTION__, vfsp);
-	} else {
-		vfs_deallocate(vfsp);
-	}
 }
 
 STATIC void
@@ -761,7 +756,6 @@ xfs_fs_fill_super(
 	int			silent)
 {
 	struct inode		*rootvp;
-	struct bhv_vfs		*vfsp = vfs_allocate(sb);
 	struct xfs_mount	*mp = NULL;
 	struct xfs_mount_args	*args = xfs_args_allocate(sb, silent);
 	struct kstatfs		statvfs;
@@ -773,8 +767,8 @@ xfs_fs_fill_super(
 	spin_lock_init(&mp->m_sync_lock);
 	init_waitqueue_head(&mp->m_wait_single_sync_task);
 
-	mp->m_vfsp = vfsp;
-	vfsp->vfs_mount = mp;
+	mp->m_super = sb;
+	sb->s_fs_info = mp;
 
 	if (sb->s_flags & MS_RDONLY)
 		mp->m_flags |= XFS_MOUNT_RDONLY;
@@ -844,7 +838,6 @@ fail_unmount:
 	xfs_unmount(mp, 0, NULL);
 
 fail_vfsop:
-	vfs_deallocate(vfsp);
 	kmem_free(args, sizeof(*args));
 	return -error;
 }

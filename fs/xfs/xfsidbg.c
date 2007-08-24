@@ -1784,40 +1784,6 @@ static int	kdbm_vnode(
 	return 0;
 }
 
-static void
-print_vfs(bhv_vfs_t *vfs, unsigned long addr)
-{
-	kdb_printf("vfsp at 0x%lx", addr);
-	kdb_printf(" vfs_super 0x%p", vfs->vfs_super);
-}
-
-static int	kdbm_vfs(
-	int	argc,
-	const char **argv)
-{
-	unsigned long addr;
-	int nextarg = 1;
-	long offset = 0;
-	int diag;
-	bhv_vfs_t vfs;
-
-	if (argc != 1)
-		return KDB_ARGCOUNT;
-
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
-
-	if (diag)
-		return diag;
-
-	if ((diag = kdb_getarea(vfs, addr)))
-		return diag;
-
-	print_vfs(&vfs, addr);
-
-	return 0;
-}
-
-
 #ifdef	XFS_VNODE_TRACE
 /*
  * Print a vnode trace entry.
@@ -2427,7 +2393,6 @@ struct xif {
 static struct xif xfsidbg_funcs[] = {
   {  "vn",	kdbm_vn,	"<vnode>", "Dump inode/vnode/trace"},
   {  "vnode",	kdbm_vnode,	"<vnode>", "Dump vnode"},
-  {  "vfs",	kdbm_vfs,	"<vfs>", "Dump vfs"},
 #ifdef XFS_VNODE_TRACE
   {  "vntrace",	kdbm_vntrace,	"<vntrace>", "Dump vnode Trace"},
   {  "vntraceaddr",	kdbm_vntraceaddr, "<vntrace>",
@@ -6503,8 +6468,8 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	};
 
 	kdb_printf("xfs_mount at 0x%p\n", mp);
-	kdb_printf("vfsp 0x%p tid 0x%x ail_lock 0x%p &ail 0x%p\n",
-		XFS_MTOVFS(mp), mp->m_tid, &mp->m_ail_lock, &mp->m_ail);
+	kdb_printf("tid 0x%x ail_lock 0x%p &ail 0x%p\n",
+		mp->m_tid, &mp->m_ail_lock, &mp->m_ail);
 	kdb_printf("ail_gen 0x%x &sb 0x%p\n",
 		mp->m_ail_gen, &mp->m_sb);
 	kdb_printf("sb_lock 0x%p sb_bp 0x%p dev 0x%x logdev 0x%x rtdev 0x%x\n",

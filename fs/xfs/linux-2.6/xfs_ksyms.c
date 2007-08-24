@@ -180,7 +180,6 @@ EXPORT_SYMBOL(uuid_getnodeuniq);
 EXPORT_SYMBOL(uuid_hash64);
 EXPORT_SYMBOL(uuid_is_nil);
 EXPORT_SYMBOL(uuid_table_remove);
-EXPORT_SYMBOL(vfs_from_sb);
 EXPORT_SYMBOL(vn_hold);
 EXPORT_SYMBOL(vn_initialize);
 EXPORT_SYMBOL(vn_revalidate);
