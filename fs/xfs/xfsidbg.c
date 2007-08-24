@@ -1788,7 +1788,6 @@ static void
 print_vfs(bhv_vfs_t *vfs, unsigned long addr)
 {
 	kdb_printf("vfsp at 0x%lx", addr);
-	kdb_printf(" vfs_flag 0x%x\n", vfs->vfs_flag);
 	kdb_printf(" vfs_super 0x%p", vfs->vfs_super);
 }
 
