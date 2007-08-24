@@ -236,10 +236,10 @@ xfs_vm_nopage(
 	int			*type)
 {
 	struct inode	*inode = area->vm_file->f_path.dentry->d_inode;
-	bhv_vnode_t	*vp = vn_from_inode(inode);
+	bhv_vfs_t	*vfsp = vfs_from_sb(inode->i_sb);
 
-	ASSERT_ALWAYS(vp->v_vfsp->vfs_flag & VFS_DMI);
-	if (XFS_SEND_MMAP(XFS_VFSTOM(vp->v_vfsp), area, 0))
+	ASSERT_ALWAYS(vfsp->vfs_flag & VFS_DMI);
+	if (XFS_SEND_MMAP(XFS_VFSTOM(vfsp), area, 0))
 		return NULL;
 	return filemap_nopage(area, address, type);
 }
@@ -285,7 +285,7 @@ xfs_file_mmap(
 	vma->vm_ops = &xfs_file_vm_ops;
 
 #ifdef HAVE_DMAPI
-	if (vn_from_inode(filp->f_path.dentry->d_inode)->v_vfsp->vfs_flag & VFS_DMI)
+	if (vfs_from_sb(filp->f_path.dentry->d_inode->i_sb)->vfs_flag & VFS_DMI)
 		vma->vm_ops = &xfs_dmapi_file_vm_ops;
 #endif /* HAVE_DMAPI */
 
@@ -344,16 +344,14 @@ xfs_vm_mprotect(
 	struct vm_area_struct *vma,
 	unsigned int	newflags)
 {
-	bhv_vnode_t	*vp = vn_from_inode(vma->vm_file->f_path.dentry->d_inode);
+	struct inode	*inode = vma->vm_file->f_path.dentry->d_inode;
+	bhv_vfs_t	*vfsp = vfs_from_sb(inode->i_sb);
 	int		error = 0;
 
-	if (vp->v_vfsp->vfs_flag & VFS_DMI) {
+	if (vfsp->vfs_flag & VFS_DMI) {
 		if ((vma->vm_flags & VM_MAYSHARE) &&
-		    (newflags & VM_WRITE) && !(vma->vm_flags & VM_WRITE)) {
-			xfs_mount_t	*mp = XFS_VFSTOM(vp->v_vfsp);
-
-			error = XFS_SEND_MMAP(mp, vma, VM_WRITE);
-		    }
+		    (newflags & VM_WRITE) && !(vma->vm_flags & VM_WRITE))
+			error = XFS_SEND_MMAP(XFS_VFSTOM(vfsp), vma, VM_WRITE);
 	}
 	return error;
 }
@@ -370,18 +368,17 @@ STATIC int
 xfs_file_open_exec(
 	struct inode	*inode)
 {
-	bhv_vnode_t	*vp = vn_from_inode(inode);
+	bhv_vfs_t	*vfsp = vfs_from_sb(inode->i_sb);
 
-	if (unlikely(vp->v_vfsp->vfs_flag & VFS_DMI)) {
-		xfs_mount_t	*mp = XFS_VFSTOM(vp->v_vfsp);
-		xfs_inode_t	*ip = xfs_vtoi(vp);
+	if (unlikely(vfsp->vfs_flag & VFS_DMI)) {
+		if (DM_EVENT_ENABLED(XFS_I(inode), DM_EVENT_READ)) {
+			bhv_vnode_t *vp = vn_from_inode(inode);
 
-		if (!ip)
-			return -EINVAL;
-		if (DM_EVENT_ENABLED(ip, DM_EVENT_READ))
-			return -XFS_SEND_DATA(mp, DM_EVENT_READ, vp,
-					       0, 0, 0, NULL);
+			return -XFS_SEND_DATA(XFS_VFSTOM(vfsp), DM_EVENT_READ,
+						vp, 0, 0, 0, NULL);
+		}
 	}
+
 	return 0;
 }
 #endif /* HAVE_FOP_OPEN_EXEC */
