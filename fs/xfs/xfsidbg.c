@@ -1796,9 +1796,6 @@ static void printbhv(bhv_desc_t *bdp)
 static void	printvnode(bhv_vnode_t *vp, unsigned long addr)
 {
 	kdb_printf("vnode: 0x%lx\n", addr);
-	kdb_printf(" v_bh 0x%p\n", &vp->v_bh);
-
-	printbhv(VNHEAD(vp));
 
 	printflags((__psunsigned_t)vp->v_flag, tab_vflags, "flag =");
 	kdb_printf("\n");
