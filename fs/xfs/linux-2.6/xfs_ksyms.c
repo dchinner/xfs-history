@@ -65,6 +65,7 @@
 #include "xfs_iomap.h"
 #include "xfs_filestream.h"
 #include "xfs_vnodeops.h"
+#include "xfs_vfsops.h"
 #include "support/ktrace.h"
 
 
@@ -140,17 +141,6 @@ EXPORT_SYMBOL(xfs_get_buftarg_list);
 
 EXPORT_SYMBOL(assfail);
 EXPORT_SYMBOL(cmn_err);
-EXPORT_SYMBOL(bhv_base);
-EXPORT_SYMBOL(bhv_get_vfsops);
-EXPORT_SYMBOL(bhv_head_destroy);
-EXPORT_SYMBOL(bhv_insert);
-EXPORT_SYMBOL(bhv_insert_initial);
-EXPORT_SYMBOL(bhv_lookup_range);
-EXPORT_SYMBOL(bhv_module_init);
-EXPORT_SYMBOL(bhv_module_exit);
-EXPORT_SYMBOL(bhv_remove_vfsops);
-EXPORT_SYMBOL(bhv_remove_all_vfsops);
-EXPORT_SYMBOL(bhv_remove_not_first);
 EXPORT_SYMBOL(xfs_flush_pages);
 EXPORT_SYMBOL(xfs_flushinval_pages);
 EXPORT_SYMBOL(xfs_tosspages);
@@ -190,18 +180,6 @@ EXPORT_SYMBOL(uuid_getnodeuniq);
 EXPORT_SYMBOL(uuid_hash64);
 EXPORT_SYMBOL(uuid_is_nil);
 EXPORT_SYMBOL(uuid_table_remove);
-EXPORT_SYMBOL(vfs_mount);
-EXPORT_SYMBOL(vfs_parseargs);
-EXPORT_SYMBOL(vfs_showargs);
-EXPORT_SYMBOL(vfs_unmount);
-EXPORT_SYMBOL(vfs_mntupdate);
-EXPORT_SYMBOL(vfs_root);
-EXPORT_SYMBOL(vfs_statvfs);
-EXPORT_SYMBOL(vfs_sync);
-EXPORT_SYMBOL(vfs_vget);
-EXPORT_SYMBOL(vfs_get_inode);
-EXPORT_SYMBOL(vfs_init_vnode);
-EXPORT_SYMBOL(vfs_force_shutdown);
 EXPORT_SYMBOL(vfs_from_sb);
 EXPORT_SYMBOL(vn_hold);
 EXPORT_SYMBOL(vn_initialize);
@@ -330,7 +308,6 @@ EXPORT_SYMBOL(xfs_trans_unlocked_item);
 EXPORT_SYMBOL(xfs_truncate_file);
 EXPORT_SYMBOL(xfs_unmount_flush);
 EXPORT_SYMBOL(xfs_unmountfs_writesb);
-EXPORT_SYMBOL(xfs_vfsops);
 EXPORT_SYMBOL(xfs_write_clear_setuid);
 EXPORT_SYMBOL(xfs_dinode_from_disk);
 EXPORT_SYMBOL(xfs_sb_from_disk);
@@ -338,3 +315,7 @@ EXPORT_SYMBOL(xfs_zero_eof);
 EXPORT_SYMBOL(xlog_recover_process_iunlinks);
 EXPORT_SYMBOL(xfs_ichgtime_fast);
 EXPORT_SYMBOL(xfs_free_eofblocks);
+
+EXPORT_SYMBOL(xfs_do_force_shutdown);
+EXPORT_SYMBOL(xfs_vget);
+EXPORT_SYMBOL(xfs_root);

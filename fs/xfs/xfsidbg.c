@@ -1752,31 +1752,6 @@ printflags(register uint64_t flags,
 }
 
 
-static void printbhv(bhv_desc_t *bdp)
-{
-	int maxbhv = 20; /* if you get 20 bhvs you're in trouble already */
-	kdb_symtab_t	 symtab;
-
-	if (bdp == NULL) {
-		kdb_printf("NULL bhv\n");
-		return;
-	}
-
-	kdb_printf("bhv at 0x%p\n", bdp);
-	while (bdp && maxbhv--) {
-		if (kdbnearsym((unsigned long)bdp->bd_ops, &symtab))
-			kdb_printf("  ops %s", symtab.sym_name);
-		else
-			kdb_printf("  ops %s/0x%p", "???", (void *)bdp->bd_ops);
-
-		kdb_printf(" vobj 0x%p pdata 0x%p next 0x%p\n",
-			   bdp->bd_vobj, bdp->bd_pdata, bdp->bd_next);
-
-		bdp = bdp->bd_next;
-	}
-}
-
-
 static void	printvnode(bhv_vnode_t *vp, unsigned long addr)
 {
 	kdb_printf("vnode: 0x%lx\n", addr);
@@ -1815,34 +1790,6 @@ print_vfs(bhv_vfs_t *vfs, unsigned long addr)
 	kdb_printf("vfsp at 0x%lx", addr);
 	kdb_printf(" vfs_flag 0x%x\n", vfs->vfs_flag);
 	kdb_printf(" vfs_super 0x%p", vfs->vfs_super);
-	kdb_printf(" vfs_bh 0x%p\n", &vfs->vfs_bh);
-
-	printbhv(VFSHEAD(vfs));
-}
-
-static int	kdbm_bhv(
-	int	argc,
-	const char **argv)
-{
-	unsigned long addr;
-	int nextarg = 1;
-	long offset = 0;
-	int diag;
-	bhv_desc_t	*bh;
-
-	if (argc != 1)
-		return KDB_ARGCOUNT;
-
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
-
-	if (diag)
-		return diag;
-
-	bh = (bhv_desc_t *)addr;
-
-	printbhv(bh);
-
-	return 0;
 }
 
 static int	kdbm_vfs(
@@ -2479,7 +2426,6 @@ struct xif {
 };
 
 static struct xif xfsidbg_funcs[] = {
-  {  "bhv",	kdbm_bhv,	"<bhv>", "Dump bhv chain"},
   {  "vn",	kdbm_vn,	"<vnode>", "Dump inode/vnode/trace"},
   {  "vnode",	kdbm_vnode,	"<vnode>", "Dump vnode"},
   {  "vfs",	kdbm_vfs,	"<vfs>", "Dump vfs"},
