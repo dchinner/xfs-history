@@ -1701,47 +1701,6 @@ static int	kdbm_xfs_xtrans_res(
 	return 0;
 }
 
-/*
- * Vnode descriptor dump.
- * This table is a string version of all the flags defined in vnode.h.
- */
-char *tab_vflags[] = {
-	/* local only flags */
-	"VINACT",		/*	 0x01 */
-	"VRECLM",		/*	 0x02 */
-	"VWAIT",		/*	 0x04 */
-	"VMODIFIED",		/*	 0x08 */
-	"INVALID0x10",		/*	 0x10 */
-	"INVALID0x20",		/*	 0x20 */
-	"INVALID0x40",		/*	 0x40 */
-	"INVALID0x80",		/*	 0x80 */
-	"INVALID0x100",		/*	0x100 */
-	"INVALID0x200",		/*	0x200 */
-	"INVALID0x400",		/*	0x400 */
-	"INVALID0x800",		/*	0x800 */
-	"INVALID0x1000",	/*     0x1000 */
-	"INVALID0x2000",	/*     0x2000 */
-	"INVALID0x4000",	/*     0x4000 */
-	"INVALID0x8000",	/*     0x8000 */
-	"INVALID0x10000",	/*    0x10000 */
-	"INVALID0x20000",	/*    0x20000 */
-	"INVALID0x40000",	/*    0x40000 */
-	"INVALID0x80000",	/*    0x80000 */
-	"VROOT",		/*   0x100000 */
-	"INVALID0x200000",	/*   0x200000 */
-	"INVALID00x400000",	/*   0x400000 */
-	"INVALID0x800000",	/*   0x800000 */
-	"INVALID0x1000000",	/*  0x1000000 */
-	"INVALID0x2000000",	/*  0x2000000 */
-	"VSHARE",		/*  0x4000000 */
-	"INVALID0x8000000",     /*  0x8000000 */
-	"VENF_LOCKING",		/* 0x10000000 */
-	"VOPLOCK",		/* 0x20000000 */
-	"VPURGE",		/* 0x40000000 */
-	"INVALID0x80000000",	/* 0x80000000 */
-	NULL
-};
-
 static void
 printflags(register uint64_t flags,
 	register char **strings,
@@ -1797,7 +1756,6 @@ static void	printvnode(bhv_vnode_t *vp, unsigned long addr)
 {
 	kdb_printf("vnode: 0x%lx\n", addr);
 
-	printflags((__psunsigned_t)vp->v_flag, tab_vflags, "flag =");
 	kdb_printf("\n");
 
 #ifdef	XFS_VNODE_TRACE
@@ -1985,8 +1943,6 @@ vn_trace_pr_entry(ktrace_entry_t *ktep)
 
 	kdb_printf("  cpu = %ld pid = %d ",
 			(long)ktep->val[6], (pid_t)ktep->val[7]);
-
-	printflags((__psunsigned_t)ktep->val[5], tab_vflags, "flag =");
 
 	if (kdbnearsym((unsigned int)ktep->val[4], &symtab)) {
 		unsigned long offval;
@@ -6697,6 +6653,8 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		"quiesce",	/* XFS_IQUIESCE */
 		"reclaim",	/* XFS_IRECLAIM */
 		"stale",	/* XFS_ISTALE */
+		"modified",	/* XFS_IMODIFIED */
+		"truncated",	/* XFS_ITRUNCATED */
 		NULL
 	};
 
