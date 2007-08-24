@@ -735,7 +735,7 @@ xfs_fs_quotasync(
 	struct super_block	*sb,
 	int			type)
 {
-	return -bhv_vfs_quotactl(vfs_from_sb(sb), Q_XQUOTASYNC, 0, NULL);
+	return -XFS_QM_QUOTACTL(XFS_M(sb), Q_XQUOTASYNC, 0, NULL);
 }
 
 STATIC int
@@ -743,7 +743,7 @@ xfs_fs_getxstate(
 	struct super_block	*sb,
 	struct fs_quota_stat	*fqs)
 {
-	return -bhv_vfs_quotactl(vfs_from_sb(sb), Q_XGETQSTAT, 0, (caddr_t)fqs);
+	return -XFS_QM_QUOTACTL(XFS_M(sb), Q_XGETQSTAT, 0, (caddr_t)fqs);
 }
 
 STATIC int
@@ -752,7 +752,7 @@ xfs_fs_setxstate(
 	unsigned int		flags,
 	int			op)
 {
-	return -bhv_vfs_quotactl(vfs_from_sb(sb), op, 0, (caddr_t)&flags);
+	return -XFS_QM_QUOTACTL(XFS_M(sb), op, 0, (caddr_t)&flags);
 }
 
 STATIC int
@@ -762,7 +762,7 @@ xfs_fs_getxquota(
 	qid_t			id,
 	struct fs_disk_quota	*fdq)
 {
-	return -bhv_vfs_quotactl(vfs_from_sb(sb),
+	return -XFS_QM_QUOTACTL(XFS_M(sb),
 				 (type == USRQUOTA) ? Q_XGETQUOTA :
 				  ((type == GRPQUOTA) ? Q_XGETGQUOTA :
 				   Q_XGETPQUOTA), id, (caddr_t)fdq);
@@ -775,7 +775,7 @@ xfs_fs_setxquota(
 	qid_t			id,
 	struct fs_disk_quota	*fdq)
 {
-	return -bhv_vfs_quotactl(vfs_from_sb(sb),
+	return -XFS_QM_QUOTACTL(XFS_M(sb),
 				 (type == USRQUOTA) ? Q_XSETQLIM :
 				  ((type == GRPQUOTA) ? Q_XSETGQLIM :
 				   Q_XSETPQLIM), id, (caddr_t)fdq);

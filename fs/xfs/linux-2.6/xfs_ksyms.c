@@ -199,7 +199,6 @@ EXPORT_SYMBOL(vfs_root);
 EXPORT_SYMBOL(vfs_statvfs);
 EXPORT_SYMBOL(vfs_sync);
 EXPORT_SYMBOL(vfs_vget);
-EXPORT_SYMBOL(vfs_quotactl);
 EXPORT_SYMBOL(vfs_get_inode);
 EXPORT_SYMBOL(vfs_init_vnode);
 EXPORT_SYMBOL(vfs_force_shutdown);
