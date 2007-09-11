@@ -113,11 +113,11 @@ static void	xfsidbg_xqm_dqtrace(xfs_dquot_t *);
 #ifdef XFS_FILESTREAMS_TRACE
 static void	xfsidbg_filestreams_trace(int);
 #endif
-#ifdef	XFS_VNODE_TRACE
+#ifdef	XFS_INODE_TRACE
 /*
- * Print a vnode trace entry.
+ * Print a inode trace entry.
  */
-static int	vn_trace_pr_entry(ktrace_entry_t *ktep);
+static int	xfs_itrace_pr_entry(ktrace_entry_t *ktep);
 #endif
 
 
@@ -1443,7 +1443,7 @@ static int	kdbm_xfs_xnode(
 	int nextarg = 1;
 	long offset = 0;
 	int diag;
-#ifdef	XFS_VNODE_TRACE
+#ifdef	XFS_INODE_TRACE
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
 #endif
@@ -1457,18 +1457,18 @@ static int	kdbm_xfs_xnode(
 
 	xfsidbg_xnode(ip);
 
-#ifdef	XFS_VNODE_TRACE
+#ifdef	XFS_INODE_TRACE
 	kdb_printf("--> itrace @ 0x%lx/0x%p\n", addr, ip->i_trace);
 	if (ip->i_trace == NULL)
 		return 0;
 	ktep = ktrace_first(ip->i_trace, &kts);
 	while (ktep != NULL) {
-		if (vn_trace_pr_entry(ktep))
+		if (xfs_itrace_pr_entry(ktep))
 			kdb_printf("\n");
 
 		ktep = ktrace_next(ip->i_trace, &kts);
 	}
-#endif	/* XFS_VNODE_TRACE */
+#endif	/* XFS_INODE_TRACE */
 	return 0;
 }
 
@@ -1784,12 +1784,12 @@ static int	kdbm_vnode(
 	return 0;
 }
 
-#ifdef	XFS_VNODE_TRACE
+#ifdef	XFS_INODE_TRACE
 /*
- * Print a vnode trace entry.
+ * Print a inode trace entry.
  */
 static int
-vn_trace_pr_entry(ktrace_entry_t *ktep)
+xfs_itrace_pr_entry(ktrace_entry_t *ktep)
 {
 	char		funcname[128];
 	kdb_symtab_t	symtab;
@@ -1812,19 +1812,19 @@ vn_trace_pr_entry(ktrace_entry_t *ktep)
 
 
 	switch ((__psint_t)ktep->val[0]) {
-	case VNODE_KTRACE_ENTRY:
+	case INODE_KTRACE_ENTRY:
 		kdb_printf("entry to %s i_count = %ld",
 						(char *)ktep->val[1],
 						(long)ktep->val[3]);
 		break;
 
-	case VNODE_KTRACE_EXIT:
+	case INODE_KTRACE_EXIT:
 		kdb_printf("exit from %s i_count = %lu",
 						(char *)ktep->val[1],
 						(long)ktep->val[3]);
 		break;
 
-	case VNODE_KTRACE_HOLD:
+	case INODE_KTRACE_HOLD:
 		if ((__psint_t)ktep->val[3] != 1)
 			kdb_printf("hold @%s:%ld(%s) i_count %ld => %ld ",
 						(char *)ktep->val[1],
@@ -1840,7 +1840,7 @@ vn_trace_pr_entry(ktrace_entry_t *ktep)
 						(long)ktep->val[3]);
 		break;
 
-	case VNODE_KTRACE_REF:
+	case INODE_KTRACE_REF:
 		kdb_printf("ref @%s:%ld(%s) i_count = %ld",
 						(char *)ktep->val[1],
 						(long)ktep->val[2],
@@ -1848,7 +1848,7 @@ vn_trace_pr_entry(ktrace_entry_t *ktep)
 						(long)ktep->val[3]);
 		break;
 
-	case VNODE_KTRACE_RELE:
+	case INODE_KTRACE_RELE:
 		if ((__psint_t)ktep->val[3] != 1)
 			kdb_printf("rele @%s:%ld(%s) i_count %ld => %ld ",
 						(char *)ktep->val[1],
@@ -1865,7 +1865,7 @@ vn_trace_pr_entry(ktrace_entry_t *ktep)
 		break;
 
 	default:
-		kdb_printf("unknown vntrace record\n");
+		kdb_printf("unknown intrace record\n");
 		return 1;
 	}
 
@@ -1891,9 +1891,9 @@ vn_trace_pr_entry(ktrace_entry_t *ktep)
 
 
 /*
- * Print out the trace buffer attached to the given vnode.
+ * Print out the trace buffer attached to the given inode.
  */
-static int	kdbm_vntrace(
+static int	kdbm_iptrace(
 	int	argc,
 	const char **argv)
 {
@@ -1917,17 +1917,17 @@ static int	kdbm_vntrace(
 	ip = (xfs_inode_t *)addr;
 
 	if (ip->i_trace == NULL) {
-		kdb_printf("The vnode trace buffer is not initialized\n");
+		kdb_printf("The inode trace buffer is not initialized\n");
 
 		return 0;
 	}
 
-	kdb_printf("vntrace ip 0x%p\n", ip);
+	kdb_printf("iptrace ip 0x%p\n", ip);
 
 	ktep = ktrace_first(ip->i_trace, &kts);
 
 	while (ktep != NULL) {
-		if (vn_trace_pr_entry(ktep))
+		if (xfs_itrace_pr_entry(ktep))
 			kdb_printf("\n");
 
 		ktep = ktrace_next(ip->i_trace, &kts);
@@ -1936,9 +1936,9 @@ static int	kdbm_vntrace(
 	return 0;
 }
 /*
- * Print out the trace buffer attached to the given vnode.
+ * Print out the trace buffer attached to the given inode.
  */
-static int	kdbm_vntraceaddr(
+static int	kdbm_iptraceaddr(
 	int	argc,
 	const char **argv)
 {
@@ -1961,12 +1961,12 @@ static int	kdbm_vntraceaddr(
 
 	kt = (struct ktrace *)addr;
 
-	kdb_printf("vntraceaddr kt 0x%p\n", kt);
+	kdb_printf("iptraceaddr kt 0x%p\n", kt);
 
 	ktep = ktrace_first(kt, &kts);
 
 	while (ktep != NULL) {
-		if (vn_trace_pr_entry(ktep))
+		if (xfs_itrace_pr_entry(ktep))
 			kdb_printf("\n");
 
 		ktep = ktrace_next(kt, &kts);
@@ -1974,7 +1974,7 @@ static int	kdbm_vntraceaddr(
 
 	return 0;
 }
-#endif	/* XFS_VNODE_TRACE */
+#endif	/* XFS_INODE_TRACE */
 
 
 static void	printinode(struct inode *ip)
@@ -2393,10 +2393,10 @@ struct xif {
 static struct xif xfsidbg_funcs[] = {
   {  "vn",	kdbm_vn,	"<vnode>", "Dump inode/vnode/trace"},
   {  "vnode",	kdbm_vnode,	"<vnode>", "Dump vnode"},
-#ifdef XFS_VNODE_TRACE
-  {  "vntrace",	kdbm_vntrace,	"<vntrace>", "Dump vnode Trace"},
-  {  "vntraceaddr",	kdbm_vntraceaddr, "<vntrace>",
-				"Dump vnode Trace by Address"},
+#ifdef XFS_INODE_TRACE
+  {  "iptrace",	kdbm_iptrace,	"<iptrace>", "Dump inode Trace"},
+  {  "iptraceaddr",	kdbm_iptraceaddr, "<iptrace>",
+				"Dump inode Trace by Address"},
 #endif
   {  "xagf",	kdbm_xfs_xagf,	"<agf>",
 				"Dump XFS allocation group freespace" },
@@ -6603,7 +6603,7 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	kdb_printf("size %lld\n",
 		ip->i_size);
 
-#ifdef	XFS_VNODE_TRACE
+#ifdef	XFS_INODE_TRACE
 	qprintf(" trace 0x%p\n", ip->i_trace);
 #endif
 #ifdef XFS_BMAP_TRACE

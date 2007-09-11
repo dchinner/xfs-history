@@ -83,12 +83,12 @@ EXPORT_SYMBOL(ktrace_first);
 EXPORT_SYMBOL(ktrace_next);
 #endif
 
-#ifdef XFS_VNODE_TRACE
-EXPORT_SYMBOL(vn_trace_ref);
-EXPORT_SYMBOL(vn_trace_entry);
-EXPORT_SYMBOL(vn_trace_exit);
-EXPORT_SYMBOL(vn_trace_hold);
-EXPORT_SYMBOL(vn_trace_rele);
+#ifdef XFS_INODE_TRACE
+EXPORT_SYMBOL(_xfs_itrace_ref);
+EXPORT_SYMBOL(_xfs_itrace_entry);
+EXPORT_SYMBOL(_xfs_itrace_exit);
+EXPORT_SYMBOL(xfs_itrace_hold);
+EXPORT_SYMBOL(xfs_itrace_rele);
 #endif
 
 #ifdef XFS_ILOCK_TRACE
