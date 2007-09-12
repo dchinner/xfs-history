@@ -209,10 +209,11 @@ xfs_vm_fault(
 	struct vm_fault	*vmf)
 {
 	struct inode	*inode = vma->vm_file->f_path.dentry->d_inode;
-	bhv_vnode_t	*vp = vn_from_inode(inode);
+	struct xfs_mount *mp = XFS_M(inode->i_sb);
 
-	ASSERT_ALWAYS(vp->v_vfsp->vfs_flag & VFS_DMI);
-	if (XFS_SEND_MMAP(XFS_VFSTOM(vp->v_vfsp), vma, 0))
+	ASSERT_ALWAYS(mp->m_flags & XFS_MOUNT_DMAPI);
+
+	if (XFS_SEND_MMAP(mp, vma, 0))
 		return VM_FAULT_SIGBUS;
 	return filemap_fault(vma, vmf);
 }
