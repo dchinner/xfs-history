@@ -122,30 +122,6 @@ xfs_file_aio_write_invis(
 }
 
 STATIC ssize_t
-xfs_file_sendfile(
-	struct file		*filp,
-	loff_t			*pos,
-	size_t			count,
-	read_actor_t		actor,
-	void			*target)
-{
-	return xfs_sendfile(XFS_I(filp->f_path.dentry->d_inode),
-				filp, pos, 0, count, actor, target);
-}
-
-STATIC ssize_t
-xfs_file_sendfile_invis(
-	struct file		*filp,
-	loff_t			*pos,
-	size_t			count,
-	read_actor_t		actor,
-	void			*target)
-{
-	return xfs_sendfile(XFS_I(filp->f_path.dentry->d_inode),
-				filp, pos, IO_INVIS, count, actor, target);
-}
-
-STATIC ssize_t
 xfs_file_splice_read(
 	struct file		*infilp,
 	loff_t			*ppos,
@@ -227,19 +203,18 @@ xfs_file_fsync(
 }
 
 #ifdef HAVE_DMAPI
-STATIC struct page *
-xfs_vm_nopage(
-	struct vm_area_struct	*area,
-	unsigned long		address,
-	int			*type)
+STATIC int
+xfs_vm_fault(
+	struct vm_area_struct	*vma,
+	struct vm_fault	*vmf)
 {
-	struct inode	*inode = area->vm_file->f_path.dentry->d_inode;
-	struct xfs_mount *mp = XFS_M(inode->i_sb);
+	struct inode	*inode = vma->vm_file->f_path.dentry->d_inode;
+	bhv_vnode_t	*vp = vn_from_inode(inode);
 
-	ASSERT_ALWAYS(mp->m_flags & XFS_MOUNT_DMAPI);
-	if (XFS_SEND_MMAP(mp, area, 0))
-		return NULL;
-	return filemap_nopage(area, address, type);
+	ASSERT_ALWAYS(vp->v_vfsp->vfs_flag & VFS_DMI);
+	if (XFS_SEND_MMAP(XFS_VFSTOM(vp->v_vfsp), vma, 0))
+		return VM_FAULT_SIGBUS;
+	return filemap_fault(vma, vmf);
 }
 #endif /* HAVE_DMAPI */
 
@@ -281,6 +256,7 @@ xfs_file_mmap(
 	struct vm_area_struct *vma)
 {
 	vma->vm_ops = &xfs_file_vm_ops;
+	vma->vm_flags |= VM_CAN_NONLINEAR;
 
 #ifdef HAVE_DMAPI
 	if (XFS_M(filp->f_path.dentry->d_inode->i_sb)->m_flags & XFS_MOUNT_DMAPI)
@@ -399,7 +375,6 @@ const struct file_operations xfs_file_operations = {
 	.write		= do_sync_write,
 	.aio_read	= xfs_file_aio_read,
 	.aio_write	= xfs_file_aio_write,
-	.sendfile	= xfs_file_sendfile,
 	.splice_read	= xfs_file_splice_read,
 	.splice_write	= xfs_file_splice_write,
 	.unlocked_ioctl	= xfs_file_ioctl,
@@ -421,7 +396,6 @@ const struct file_operations xfs_invis_file_operations = {
 	.write		= do_sync_write,
 	.aio_read	= xfs_file_aio_read_invis,
 	.aio_write	= xfs_file_aio_write_invis,
-	.sendfile	= xfs_file_sendfile_invis,
 	.splice_read	= xfs_file_splice_read_invis,
 	.splice_write	= xfs_file_splice_write_invis,
 	.unlocked_ioctl	= xfs_file_ioctl_invis,
@@ -446,15 +420,13 @@ const struct file_operations xfs_dir_file_operations = {
 };
 
 static struct vm_operations_struct xfs_file_vm_ops = {
-	.nopage		= filemap_nopage,
-	.populate	= filemap_populate,
+	.fault		= filemap_fault,
 	.page_mkwrite	= xfs_vm_page_mkwrite,
 };
 
 #ifdef HAVE_DMAPI
 static struct vm_operations_struct xfs_dmapi_file_vm_ops = {
-	.nopage		= xfs_vm_nopage,
-	.populate	= filemap_populate,
+	.fault		= xfs_vm_fault,
 	.page_mkwrite	= xfs_vm_page_mkwrite,
 #ifdef HAVE_VMOP_MPROTECT
 	.mprotect	= xfs_vm_mprotect,

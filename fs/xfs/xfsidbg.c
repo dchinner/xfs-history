@@ -3877,10 +3877,6 @@ xfs_rw_trace_entry(ktrace_entry_t *ktep)
 		qprintf("WRITE ENTER:\n");
 		xfs_rw_enter_trace_entry(ktep);
 		break;
-	case XFS_SENDFILE_ENTER:
-		qprintf("SENDFILE ENTER:\n");
-		xfs_rw_enter_trace_entry(ktep);
-		break;
 	case XFS_IOMAP_READ_ENTER:
 		qprintf("IOMAP READ ENTER:\n");
 		xfs_iomap_enter_trace_entry(ktep);
