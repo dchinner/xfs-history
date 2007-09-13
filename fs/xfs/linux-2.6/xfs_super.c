@@ -404,8 +404,10 @@ xfs_fs_write_inode(
 	int			error = 0, flags = FLUSH_INODE;
 
 	xfs_itrace_entry(XFS_I(inode));
-	if (sync)
+	if (sync) {
+		filemap_fdatawait(inode->i_mapping);
 		flags |= FLUSH_SYNC;
+	}
 	error = xfs_inode_flush(XFS_I(inode), flags);
 	if (error == EAGAIN) {
 		if (sync)

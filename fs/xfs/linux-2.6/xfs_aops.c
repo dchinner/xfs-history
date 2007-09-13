@@ -180,6 +180,7 @@ xfs_setfilesize(
 		ip->i_d.di_size = isize;
 		ip->i_update_core = 1;
 		ip->i_update_size = 1;
+		mark_inode_dirty_sync(ioend->io_inode);
 	}
 
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
