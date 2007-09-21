@@ -164,7 +164,6 @@ static void	xfsidbg_xlog_tic(xlog_ticket_t *);
 static void	xfsidbg_xlogitem(xfs_log_item_t *);
 static void	xfsidbg_xmount(xfs_mount_t *);
 static void	xfsidbg_xnode(xfs_inode_t *ip);
-static void	xfsidbg_xcore(xfs_iocore_t *io);
 static void	xfsidbg_xperag(xfs_mount_t *);
 static void	xfsidbg_xqm_diskdq(xfs_disk_dquot_t *);
 static void	xfsidbg_xqm_dqattached_inos(xfs_mount_t *);
@@ -1472,25 +1471,6 @@ static int	kdbm_xfs_xnode(
 	return 0;
 }
 
-static int	kdbm_xfs_xcore(
-	int	argc,
-	const char **argv)
-{
-	unsigned long addr;
-	int nextarg = 1;
-	long offset = 0;
-	int diag;
-
-	if (argc != 1)
-		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
-	if (diag)
-		return diag;
-
-	xfsidbg_xcore((xfs_iocore_t *) addr);
-	return 0;
-}
-
 static int	kdbm_xfs_xperag(
 	int	argc,
 	const char **argv)
@@ -2552,8 +2532,6 @@ static struct xif xfsidbg_funcs[] = {
 				"Dump XFS mount structure"},
   {  "xnode",	kdbm_xfs_xnode,		"<xfs_inode_t>",
 				"Dump XFS inode"},
-  {  "xiocore",	kdbm_xfs_xcore,		"<xfs_iocore_t>",
-				"Dump XFS iocore"},
   {  "xperag",	kdbm_xfs_xperag,	"<xfs_mount_t>",
 				"Dump XFS per-allocation group data"},
   {  "xqinfo",  kdbm_xfs_xqm_qinfo,	"<xfs_mount_t>",
@@ -6588,7 +6566,7 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		xfs_ipincount(ip));
 	kdb_printf("udquotp 0x%p gdquotp 0x%p\n",
 		ip->i_udquot, ip->i_gdquot);
-	kdb_printf("new_size %Ld\n", ip->i_iocore.io_new_size);
+	kdb_printf("new_size %Ld\n", ip->i_new_size);
 	printflags((int)ip->i_flags, tab_flags, "flags");
 	kdb_printf("\n");
 	kdb_printf("update_core %d update size %d\n",
@@ -6626,14 +6604,6 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	xfs_xnode_fork("attr", ip->i_afp);
 	kdb_printf("\n");
 	xfs_prdinode_incore(&ip->i_d);
-}
-
-static void
-xfsidbg_xcore(xfs_iocore_t *io)
-{
-	kdb_printf("io_obj 0x%p io_flags 0x%x io_mount 0x%p\n",
-			io->io_obj, io->io_flags, io->io_mount);
-	kdb_printf("new_size %Lx\n", io->io_new_size);
 }
 
 /*

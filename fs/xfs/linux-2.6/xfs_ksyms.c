@@ -246,7 +246,6 @@ EXPORT_SYMBOL(xfs_ilock_map_shared);
 EXPORT_SYMBOL(xfs_ilock_nowait);
 EXPORT_SYMBOL(xfs_inode_lock_init);
 EXPORT_SYMBOL(xfs_internal_inum);
-EXPORT_SYMBOL(xfs_iocore_inode_init);
 EXPORT_SYMBOL(xfs_iput);
 EXPORT_SYMBOL(xfs_iput_new);
 EXPORT_SYMBOL(xfs_iread);
