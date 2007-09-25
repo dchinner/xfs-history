@@ -6403,25 +6403,25 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	static char *xmount_flags[] = {
 		"WSYNC",	/* 0x0001 */
 		"INO64",	/* 0x0002 */
-		"UNUSED_4",	/* 0x0004 */
-		"UNUSED_8",	/* 0x0008 */
+		"DMAPI",	/* 0x0004 */
+		"WAS_CLEAN",	/* 0x0008 */
 		"FSSHUTDOWN",	/* 0x0010 */
 		"NOATIME",	/* 0x0020 */
 		"RETERR",	/* 0x0040 */
 		"NOALIGN",	/* 0x0080 */
 		"ATTR2",	/* 0x0100 */
-		"UNUSED_200",	/* 0x0200 */
+		"GRPID",	/* 0x0200 */
 		"NORECOVERY",	/* 0x0400 */
 		"SHARED",	/* 0x0800 */
 		"DFLT_IOSIZE",	/* 0x1000 */
 		"OSYNCISOSYNC",	/* 0x2000 */
 		"32BITINODES",	/* 0x4000 */
-		"32BITINOOPT",	/* 0x8000 */
+		"SMALL_INUMS",	/* 0x8000 */
 		"NOUUID",	/* 0x10000 */
 		"BARRIER",	/* 0x20000 */
 		"IDELETE",	/* 0x40000 */
 		"SWALLOC",	/* 0x80000 */
-		"UNUSED_100000", /* 0x100000 */
+		"RDONLY", 	/* 0x100000 */
 		"DIRSYNC",	/* 0x200000 */
 		"COMPAT_IOSIZE",/* 0x400000 */
 		NULL
