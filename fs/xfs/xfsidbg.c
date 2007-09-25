@@ -1778,10 +1778,10 @@ xfs_itrace_pr_entry(ktrace_entry_t *ktep)
 	if ((__psint_t)ktep->val[0] == 0)
 		return 0;
 
-	if (kdbnearsym((unsigned int)ktep->val[8], &symtab)) {
+	if (kdbnearsym((unsigned long)ktep->val[8], &symtab)) {
 		unsigned long offval;
 
-		offval = (unsigned int)ktep->val[8] - symtab.sym_start;
+		offval = (unsigned long)ktep->val[8] - symtab.sym_start;
 
 		if (offval)
 			sprintf(funcname, "%s+0x%lx", symtab.sym_name, offval);
@@ -1851,13 +1851,13 @@ xfs_itrace_pr_entry(ktrace_entry_t *ktep)
 
 	kdb_printf("\n");
 
-	kdb_printf("  cpu = %ld pid = %d ",
-			(long)ktep->val[6], (pid_t)ktep->val[7]);
+	kdb_printf("  cpu = %ld pid = %ld ",
+			(long)ktep->val[6], (long)ktep->val[7]);
 
-	if (kdbnearsym((unsigned int)ktep->val[4], &symtab)) {
+	if (kdbnearsym((unsigned long)ktep->val[4], &symtab)) {
 		unsigned long offval;
 
-		offval = (unsigned int)ktep->val[4] - symtab.sym_start;
+		offval = (unsigned long)ktep->val[4] - symtab.sym_start;
 
 		if (offval)
 			kdb_printf("  ra = %s+0x%lx", symtab.sym_name, offval);
