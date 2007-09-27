@@ -1819,7 +1819,8 @@ int
 xfs_create(
 	xfs_inode_t		*dp,
 	bhv_vname_t		*dentry,
-	bhv_vattr_t		*vap,
+	mode_t			mode,
+	xfs_dev_t		rdev,
 	bhv_vnode_t		**vpp,
 	cred_t			*credp)
 {
@@ -1829,7 +1830,6 @@ xfs_create(
 	xfs_inode_t		*ip;
 	bhv_vnode_t	        *vp = NULL;
 	xfs_trans_t		*tp;
-	xfs_dev_t		rdev;
 	int                     error;
 	xfs_bmap_free_t		free_list;
 	xfs_fsblock_t		first_block;
@@ -1840,20 +1840,18 @@ xfs_create(
 	xfs_prid_t		prid;
 	struct xfs_dquot	*udqp, *gdqp;
 	uint			resblks;
-	int			dm_di_mode;
 	int			namelen;
 
 	ASSERT(!*vpp);
 	xfs_itrace_entry(dp);
 
-	dm_di_mode = vap->va_mode;
 	namelen = VNAMELEN(dentry);
 
 	if (DM_EVENT_ENABLED(dp, DM_EVENT_CREATE)) {
 		error = XFS_SEND_NAMESP(mp, DM_EVENT_CREATE,
 				dir_vp, DM_RIGHT_NULL, NULL,
 				DM_RIGHT_NULL, name, NULL,
-				dm_di_mode, 0, 0);
+				mode, 0, 0);
 
 		if (error)
 			return error;
@@ -1868,8 +1866,6 @@ xfs_create(
 	udqp = gdqp = NULL;
 	if (dp->i_d.di_flags & XFS_DIFLAG_PROJINHERIT)
 		prid = dp->i_d.di_projid;
-	else if (vap->va_mask & XFS_AT_PROJID)
-		prid = (xfs_prid_t)vap->va_projid;
 	else
 		prid = (xfs_prid_t)dfltprid;
 
@@ -1921,8 +1917,7 @@ xfs_create(
 
 	if (resblks == 0 && (error = xfs_dir_canenter(tp, dp, name, namelen)))
 		goto error_return;
-	rdev = (vap->va_mask & XFS_AT_RDEV) ? vap->va_rdev : 0;
-	error = xfs_dir_ialloc(&tp, dp, vap->va_mode, 1,
+	error = xfs_dir_ialloc(&tp, dp, mode, 1,
 			rdev, credp, prid, resblks > 0,
 			&ip, &committed);
 	if (error) {
@@ -2013,7 +2008,7 @@ std_return:
 			dir_vp, DM_RIGHT_NULL,
 			*vpp ? vp:NULL,
 			DM_RIGHT_NULL, name, NULL,
-			dm_di_mode, error, 0);
+			mode, error, 0);
 	}
 	return error;
 
@@ -2702,7 +2697,7 @@ int
 xfs_mkdir(
 	xfs_inode_t             *dp,
 	bhv_vname_t		*dentry,
-	bhv_vattr_t		*vap,
+	mode_t			mode,
 	bhv_vnode_t		**vpp,
 	cred_t			*credp)
 {
@@ -2724,19 +2719,17 @@ xfs_mkdir(
 	xfs_prid_t		prid;
 	struct xfs_dquot	*udqp, *gdqp;
 	uint			resblks;
-	int			dm_di_mode;
 
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 
 	tp = NULL;
-	dm_di_mode = vap->va_mode;
 
 	if (DM_EVENT_ENABLED(dp, DM_EVENT_CREATE)) {
 		error = XFS_SEND_NAMESP(mp, DM_EVENT_CREATE,
 					dir_vp, DM_RIGHT_NULL, NULL,
 					DM_RIGHT_NULL, dir_name, NULL,
-					dm_di_mode, 0, 0);
+					mode, 0, 0);
 		if (error)
 			return error;
 		dm_event_sent = 1;
@@ -2750,8 +2743,6 @@ xfs_mkdir(
 	udqp = gdqp = NULL;
 	if (dp->i_d.di_flags & XFS_DIFLAG_PROJINHERIT)
 		prid = dp->i_d.di_projid;
-	else if (vap->va_mask & XFS_AT_PROJID)
-		prid = (xfs_prid_t)vap->va_projid;
 	else
 		prid = (xfs_prid_t)dfltprid;
 
@@ -2804,7 +2795,7 @@ xfs_mkdir(
 	/*
 	 * create the directory inode.
 	 */
-	error = xfs_dir_ialloc(&tp, dp, vap->va_mode, 2,
+	error = xfs_dir_ialloc(&tp, dp, mode, 2,
 			0, credp, prid, resblks > 0,
 		&cdp, NULL);
 	if (error) {
@@ -2898,7 +2889,7 @@ std_return:
 					created ? XFS_ITOV(cdp):NULL,
 					DM_RIGHT_NULL,
 					dir_name, NULL,
-					dm_di_mode, error, 0);
+					mode, error, 0);
 	}
 	return error;
 
@@ -3155,8 +3146,8 @@ int
 xfs_symlink(
 	xfs_inode_t		*dp,
 	bhv_vname_t		*dentry,
-	bhv_vattr_t		*vap,
 	char			*target_path,
+	mode_t			mode,
 	bhv_vnode_t		**vpp,
 	cred_t			*credp)
 {
@@ -3243,8 +3234,6 @@ xfs_symlink(
 	udqp = gdqp = NULL;
 	if (dp->i_d.di_flags & XFS_DIFLAG_PROJINHERIT)
 		prid = dp->i_d.di_projid;
-	else if (vap->va_mask & XFS_AT_PROJID)
-		prid = (xfs_prid_t)vap->va_projid;
 	else
 		prid = (xfs_prid_t)dfltprid;
 
@@ -3313,7 +3302,7 @@ xfs_symlink(
 	/*
 	 * Allocate an inode for the symlink.
 	 */
-	error = xfs_dir_ialloc(&tp, dp, S_IFLNK | (vap->va_mode&~S_IFMT),
+	error = xfs_dir_ialloc(&tp, dp, S_IFLNK | (mode & ~S_IFMT),
 			       1, 0, credp, prid, resblks > 0, &ip, NULL);
 	if (error) {
 		if (error == ENOSPC)
