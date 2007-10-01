@@ -181,7 +181,6 @@ EXPORT_SYMBOL(uuid_hash64);
 EXPORT_SYMBOL(uuid_is_nil);
 EXPORT_SYMBOL(uuid_table_remove);
 EXPORT_SYMBOL(vn_hold);
-EXPORT_SYMBOL(vn_initialize);
 EXPORT_SYMBOL(vn_revalidate);
 
 #if defined(CONFIG_XFS_POSIX_ACL)
@@ -244,7 +243,6 @@ EXPORT_SYMBOL(xfs_igrow_finish);
 EXPORT_SYMBOL(xfs_ilock);
 EXPORT_SYMBOL(xfs_ilock_map_shared);
 EXPORT_SYMBOL(xfs_ilock_nowait);
-EXPORT_SYMBOL(xfs_inode_lock_init);
 EXPORT_SYMBOL(xfs_internal_inum);
 EXPORT_SYMBOL(xfs_iput);
 EXPORT_SYMBOL(xfs_iput_new);
