@@ -5604,17 +5604,21 @@ xfsidbg_xiclog(xlog_in_core_t *iclog)
 	kdb_printf("xlog_in_core/header at 0x%p/0x%p\n",
 		iclog, iclog->hic_data);
 	kdb_printf("magicno: %x  cycle: %d  version: %d  lsn: 0x%Lx\n",
-		INT_GET(iclog->ic_header.h_magicno, ARCH_CONVERT), INT_GET(iclog->ic_header.h_cycle, ARCH_CONVERT),
-		INT_GET(iclog->ic_header.h_version, ARCH_CONVERT), INT_GET(iclog->ic_header.h_lsn, ARCH_CONVERT));
+		be32_to_cpu(iclog->ic_header.h_magicno),
+		be32_to_cpu(iclog->ic_header.h_cycle),
+		be32_to_cpu(iclog->ic_header.h_version),
+		be64_to_cpu(iclog->ic_header.h_lsn));
 	kdb_printf("tail_lsn: 0x%Lx  len: %d  prev_block: %d  num_ops: %d\n",
-		INT_GET(iclog->ic_header.h_tail_lsn, ARCH_CONVERT), INT_GET(iclog->ic_header.h_len, ARCH_CONVERT),
-		INT_GET(iclog->ic_header.h_prev_block, ARCH_CONVERT), INT_GET(iclog->ic_header.h_num_logops, ARCH_CONVERT));
+		be64_to_cpu(iclog->ic_header.h_tail_lsn),
+		be32_to_cpu(iclog->ic_header.h_len),
+		be32_to_cpu(iclog->ic_header.h_prev_block),
+		be32_to_cpu(iclog->ic_header.h_num_logops));
 	kdb_printf("cycle_data: ");
 	for (i=0; i<(iclog->ic_size>>BBSHIFT); i++) {
-		kdb_printf("%x  ", INT_GET(iclog->ic_header.h_cycle_data[i], ARCH_CONVERT));
+		kdb_printf("%x  ", be32_to_cpu(iclog->ic_header.h_cycle_data[i]));
 	}
 	kdb_printf("\n");
-	kdb_printf("size: %d\n", INT_GET(iclog->ic_header.h_size, ARCH_CONVERT));
+	kdb_printf("size: %d\n", be32_to_cpu(iclog->ic_header.h_size));
 	kdb_printf("\n");
 	kdb_printf("--------------------------------------------------\n");
 	kdb_printf("data: 0x%p  &forcesema: 0x%p  next: 0x%p bp: 0x%p\n",
