@@ -123,39 +123,6 @@ static ctl_table xfs_table[] = {
 		.extra2		= &xfs_params.syncd_timer.max
 	},
 	{
-		.ctl_name	= XFS_PROBE_DMAPI,
-		.procname	= "probe_dmapi",
-		.data		= &xfs_params.probe_dmapi.val,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec_minmax,
-		.strategy	= &sysctl_intvec,
-		.extra1		= &xfs_params.probe_dmapi.min,
-		.extra2		= &xfs_params.probe_dmapi.max
-	},
-	{
-		.ctl_name	= XFS_PROBE_IOOPS,
-		.procname	= "probe_ioops",
-		.data		= &xfs_params.probe_ioops.val,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec_minmax,
-		.strategy	= &sysctl_intvec,
-		.extra1		= &xfs_params.probe_ioops.min,
-		.extra2		= &xfs_params.probe_ioops.max
-	},
-	{
-		.ctl_name	= XFS_PROBE_QUOTA,
-		.procname	= "probe_quota",
-		.data		= &xfs_params.probe_quota.val,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec_minmax,
-		.strategy	= &sysctl_intvec,
-		.extra1		= &xfs_params.probe_quota.min,
-		.extra2		= &xfs_params.probe_quota.max
-	},
-	{
 		.ctl_name	= XFS_INHERIT_SYNC,
 		.procname	= "inherit_sync",
 		.data		= &xfs_params.inherit_sync.val,
