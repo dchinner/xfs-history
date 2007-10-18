@@ -2007,9 +2007,9 @@ print_xfs_buf(
 		   (unsigned long long) bp->b_file_offset,
 		   (unsigned long long) bp->b_buffer_length,
 		   bp->b_addr);
-	kdb_printf("  b_bn 0x%llx b_count_desired 0x%lxn",
+	kdb_printf("  b_bn 0x%llx b_count_desired 0x%lx b_locked %d\n",
 		   (unsigned long long)bp->b_bn,
-		   (unsigned long) bp->b_count_desired);
+		   (unsigned long) bp->b_count_desired, (int)bp->b_locked);
 	kdb_printf("  b_queuetime %ld (now=%ld/age=%ld) b_io_remaining %d\n",
 		   bp->b_queuetime, jiffies, bp->b_queuetime + age,
 		   bp->b_io_remaining.counter);
