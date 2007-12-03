@@ -336,16 +336,12 @@ xfs_iomap_valid(
 /*
  * BIO completion handler for buffered IO.
  */
-STATIC int
+STATIC void
 xfs_end_bio(
 	struct bio		*bio,
-	unsigned int		bytes_done,
 	int			error)
 {
 	xfs_ioend_t		*ioend = bio->bi_private;
-
-	if (bio->bi_size)
-		return 1;
 
 	ASSERT(atomic_read(&bio->bi_cnt) >= 1);
 	ioend->io_error = test_bit(BIO_UPTODATE, &bio->bi_flags) ? 0 : error;
@@ -356,7 +352,6 @@ xfs_end_bio(
 	bio_put(bio);
 
 	xfs_finish_ioend(ioend, 0);
-	return 0;
 }
 
 STATIC void
@@ -420,10 +415,9 @@ xfs_start_page_writeback(
 		clear_page_dirty_for_io(page);
 	set_page_writeback(page);
 	unlock_page(page);
-	if (!buffers) {
+	/* If no buffers on the page are to be written, finish it here */
+	if (!buffers)
 		end_page_writeback(page);
-		wbc->pages_skipped++;	/* We didn't write this page */
-	}
 }
 
 static inline int bio_add_buffer(struct bio *bio, struct buffer_head *bh)
@@ -1515,13 +1509,18 @@ xfs_vm_direct_IO(
 }
 
 STATIC int
-xfs_vm_prepare_write(
+xfs_vm_write_begin(
 	struct file		*file,
-	struct page		*page,
-	unsigned int		from,
-	unsigned int		to)
+	struct address_space	*mapping,
+	loff_t			pos,
+	unsigned		len,
+	unsigned		flags,
+	struct page		**pagep,
+	void			**fsdata)
 {
-	return block_prepare_write(page, from, to, xfs_get_blocks);
+	*pagep = NULL;
+	return block_write_begin(file, mapping, pos, len, flags, pagep, fsdata,
+								xfs_get_blocks);
 }
 
 STATIC sector_t
@@ -1575,8 +1574,8 @@ const struct address_space_operations xfs_address_space_operations = {
 	.sync_page		= block_sync_page,
 	.releasepage		= xfs_vm_releasepage,
 	.invalidatepage		= xfs_vm_invalidatepage,
-	.prepare_write		= xfs_vm_prepare_write,
-	.commit_write		= generic_commit_write,
+	.write_begin		= xfs_vm_write_begin,
+	.write_end		= generic_write_end,
 	.bmap			= xfs_vm_bmap,
 	.direct_IO		= xfs_vm_direct_IO,
 	.migratepage		= buffer_migrate_page,
