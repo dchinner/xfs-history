@@ -134,7 +134,7 @@ xfs_ichgtime(
 	 */
 	SYNCHRONIZE();
 	ip->i_update_core = 1;
-	if (!(inode->i_state & I_SYNC))
+	if (!(inode->i_state & I_NEW))
 		mark_inode_dirty_sync(inode);
 }
 
@@ -186,7 +186,7 @@ xfs_ichgtime_fast(
 	 */
 	SYNCHRONIZE();
 	ip->i_update_core = 1;
-	if (!(inode->i_state & I_SYNC))
+	if (!(inode->i_state & I_NEW))
 		mark_inode_dirty_sync(inode);
 }
 
