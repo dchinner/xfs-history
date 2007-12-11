@@ -41,11 +41,6 @@
 #define XFS_FILESTREAMS_TRACE 1
 #endif
 
-#include <linux/version.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #include <linux-2.6/xfs_linux.h>
-#else
-#include <linux-2.4/xfs_linux.h>
-#endif
 
 #endif	/* __XFS_H__ */
