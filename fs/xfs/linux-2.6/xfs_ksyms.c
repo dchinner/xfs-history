@@ -267,7 +267,6 @@ EXPORT_SYMBOL(xfs_read_buf);
 EXPORT_SYMBOL(xfs_rwlock);
 EXPORT_SYMBOL(xfs_rwunlock);
 EXPORT_SYMBOL(xfs_setattr);
-EXPORT_SYMBOL(xfs_fid2);
 EXPORT_SYMBOL(xfs_attr_get);
 EXPORT_SYMBOL(xfs_attr_set);
 EXPORT_SYMBOL(xfs_fsync);
@@ -310,5 +309,4 @@ EXPORT_SYMBOL(xfs_ichgtime_fast);
 EXPORT_SYMBOL(xfs_free_eofblocks);
 
 EXPORT_SYMBOL(xfs_do_force_shutdown);
-EXPORT_SYMBOL(xfs_vget);
 EXPORT_SYMBOL(xfs_root);
