@@ -308,4 +308,3 @@ EXPORT_SYMBOL(xfs_ichgtime_fast);
 EXPORT_SYMBOL(xfs_free_eofblocks);
 
 EXPORT_SYMBOL(xfs_do_force_shutdown);
-EXPORT_SYMBOL(xfs_root);
