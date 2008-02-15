@@ -210,7 +210,6 @@ EXPORT_SYMBOL(xfs_bulkstat);
 EXPORT_SYMBOL(xfs_bunmapi);
 EXPORT_SYMBOL(xfs_bwrite);
 EXPORT_SYMBOL(xfs_change_file_space);
-EXPORT_SYMBOL(xfs_icluster_zone);
 EXPORT_SYMBOL(xfs_dev_is_read_only);
 EXPORT_SYMBOL(xfs_dir_ialloc);
 EXPORT_SYMBOL(xfs_error_report);

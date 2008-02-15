@@ -6465,10 +6465,6 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	qprintf(" dir trace 0x%p\n", ip->i_dir_trace);
 #endif  
 	kdb_printf("\n");
-	kdb_printf("icluster 0x%p cnext 0x%p cprev 0x%p\n",
-		ip->i_cluster,
-		ip->i_cnode.next,
-		ip->i_cnode.pprev);
 	xfs_xnode_fork("data", &ip->i_df);
 	xfs_xnode_fork("attr", ip->i_afp);
 	kdb_printf("\n");
