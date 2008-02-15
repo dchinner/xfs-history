@@ -5633,7 +5633,7 @@ xfsidbg_xiclog(xlog_in_core_t *iclog)
 #else
 		NULL,
 #endif
-		iclog->ic_refcnt, iclog->ic_bwritecnt);
+		atomic_read(&iclog->ic_refcnt), iclog->ic_bwritecnt);
 	if (iclog->ic_state & XLOG_STATE_ALL)
 		printflags(iclog->ic_state, ic_flags, " state:");
 	else
