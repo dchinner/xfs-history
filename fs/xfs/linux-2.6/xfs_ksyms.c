@@ -261,8 +261,6 @@ EXPORT_SYMBOL(xfs_mountfs);
 EXPORT_SYMBOL(xfs_qm_dqcheck);
 EXPORT_SYMBOL(xfs_readsb);
 EXPORT_SYMBOL(xfs_read_buf);
-EXPORT_SYMBOL(xfs_rwlock);
-EXPORT_SYMBOL(xfs_rwunlock);
 EXPORT_SYMBOL(xfs_setattr);
 EXPORT_SYMBOL(xfs_attr_get);
 EXPORT_SYMBOL(xfs_attr_set);
