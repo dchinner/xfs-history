@@ -6288,7 +6288,7 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		"SMALL_INUMS",	/* 0x8000 */
 		"NOUUID",	/* 0x10000 */
 		"BARRIER",	/* 0x20000 */
-		"IDELETE",	/* 0x40000 */
+		"IKEEP",	/* 0x40000 */
 		"SWALLOC",	/* 0x80000 */
 		"RDONLY", 	/* 0x100000 */
 		"DIRSYNC",	/* 0x200000 */
