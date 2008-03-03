@@ -232,6 +232,7 @@ finish_inode:
 	 * write spinlock.
 	 */
 	if (radix_tree_preload(GFP_KERNEL)) {
+		xfs_idestroy(ip);
 		delay(1);
 		goto again;
 	}
