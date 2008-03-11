@@ -6167,7 +6167,7 @@ xfsidbg_xlogitem(xfs_log_item_t *lip)
 	printflags((uint)(lip->li_flags), li_flags,"log");
 	kdb_printf("\n");
 	kdb_printf("ail forw 0x%p ail back 0x%p lsn %s\ndesc %p ops 0x%p",
-		lip->li_ail.ail_forw, lip->li_ail.ail_back,
+		lip->li_ail.next, lip->li_ail.next,
 		xfs_fmtlsn(&(lip->li_lsn)), lip->li_desc, lip->li_ops);
 	kdb_printf(" iodonefunc &0x%p\n", lip->li_cb);
 	if (lip->li_type == XFS_LI_BUF) {
@@ -6220,45 +6220,39 @@ xfsidbg_xaildump(xfs_mount_t *mp)
 		};
 	int count;
 
-	if ((mp->m_ail.xa_ail.ail_forw == NULL) ||
-	    (mp->m_ail.xa_ail.ail_forw == (xfs_log_item_t *)&mp->m_ail.xa_ail)) {
+	if (list_empty(&mp->m_ail.xa_ail)) {
 		kdb_printf("AIL is empty\n");
 		return;
 	}
 	kdb_printf("AIL for mp 0x%p, oldest first\n", mp);
-	lip = (xfs_log_item_t*)mp->m_ail.xa_ail.ail_forw;
-	for (count = 0; lip; count++) {
-		kdb_printf("[%d] type %s ", count, xfsidbg_item_type_str(lip));
-		printflags((uint)(lip->li_flags), li_flags, "flags:");
-		kdb_printf("  lsn %s\n   ", xfs_fmtlsn(&(lip->li_lsn)));
-		switch (lip->li_type) {
-		case XFS_LI_BUF:
-			xfs_buf_item_print((xfs_buf_log_item_t *)lip, 1);
-			break;
-		case XFS_LI_INODE:
-			xfs_inode_item_print((xfs_inode_log_item_t *)lip, 1);
-			break;
-		case XFS_LI_EFI:
-			xfs_efi_item_print((xfs_efi_log_item_t *)lip, 1);
-			break;
-		case XFS_LI_EFD:
-			xfs_efd_item_print((xfs_efd_log_item_t *)lip, 1);
-			break;
-		case XFS_LI_DQUOT:
-			xfs_dquot_item_print((xfs_dq_logitem_t *)lip, 1);
-			break;
-		case XFS_LI_QUOTAOFF:
-			xfs_qoff_item_print((xfs_qoff_logitem_t *)lip, 1);
-			break;
-		default:
-			kdb_printf("Unknown item type %d\n", lip->li_type);
-			break;
-		}
-
-		if (lip->li_ail.ail_forw == (xfs_log_item_t*)&mp->m_ail.xa_ail) {
-			lip = NULL;
-		} else {
-			lip = lip->li_ail.ail_forw;
+	list_for_each_entry(lip, &mp->m_ail.xa_ail, li_ail) {
+		for (count = 0; lip; count++) {
+			kdb_printf("[%d] type %s ", count, xfsidbg_item_type_str(lip));
+			printflags((uint)(lip->li_flags), li_flags, "flags:");
+			kdb_printf("  lsn %s\n   ", xfs_fmtlsn(&(lip->li_lsn)));
+			switch (lip->li_type) {
+			case XFS_LI_BUF:
+				xfs_buf_item_print((xfs_buf_log_item_t *)lip, 1);
+				break;
+			case XFS_LI_INODE:
+				xfs_inode_item_print((xfs_inode_log_item_t *)lip, 1);
+				break;
+			case XFS_LI_EFI:
+				xfs_efi_item_print((xfs_efi_log_item_t *)lip, 1);
+				break;
+			case XFS_LI_EFD:
+				xfs_efd_item_print((xfs_efd_log_item_t *)lip, 1);
+				break;
+			case XFS_LI_DQUOT:
+				xfs_dquot_item_print((xfs_dq_logitem_t *)lip, 1);
+				break;
+			case XFS_LI_QUOTAOFF:
+				xfs_qoff_item_print((xfs_qoff_logitem_t *)lip, 1);
+				break;
+			default:
+				kdb_printf("Unknown item type %d\n", lip->li_type);
+				break;
+			}
 		}
 	}
 }
