@@ -871,85 +871,85 @@ xfs_ioc_fsgetxattr(
 }
 
 STATIC int
-xfs_ioc_xattr(
+xfs_ioc_fssetxattr(
 	xfs_inode_t		*ip,
 	struct file		*filp,
-	unsigned int		cmd,
 	void			__user *arg)
 {
 	struct fsxattr		fa;
 	struct bhv_vattr	*vattr;
-	int			error = 0;
+	int			error;
 	int			attr_flags;
-	unsigned int		flags;
+
+	if (copy_from_user(&fa, arg, sizeof(fa)))
+		return -EFAULT;
 
 	vattr = kmalloc(sizeof(*vattr), GFP_KERNEL);
 	if (unlikely(!vattr))
 		return -ENOMEM;
 
-	switch (cmd) {
-	case XFS_IOC_FSSETXATTR: {
-		if (copy_from_user(&fa, arg, sizeof(fa))) {
-			error = -EFAULT;
-			break;
-		}
+	attr_flags = 0;
+	if (filp->f_flags & (O_NDELAY|O_NONBLOCK))
+		attr_flags |= ATTR_NONBLOCK;
 
-		attr_flags = 0;
-		if (filp->f_flags & (O_NDELAY|O_NONBLOCK))
-			attr_flags |= ATTR_NONBLOCK;
+	vattr->va_mask = XFS_AT_XFLAGS | XFS_AT_EXTSIZE | XFS_AT_PROJID;
+	vattr->va_xflags  = fa.fsx_xflags;
+	vattr->va_extsize = fa.fsx_extsize;
+	vattr->va_projid  = fa.fsx_projid;
 
-		vattr->va_mask = XFS_AT_XFLAGS | XFS_AT_EXTSIZE | XFS_AT_PROJID;
-		vattr->va_xflags  = fa.fsx_xflags;
-		vattr->va_extsize = fa.fsx_extsize;
-		vattr->va_projid  = fa.fsx_projid;
+	error = -xfs_setattr(ip, vattr, attr_flags, NULL);
+	if (!error)
+		vn_revalidate(XFS_ITOV(ip));	/* update flags */
+	kfree(vattr);
+	return 0;
+}
 
-		error = xfs_setattr(ip, vattr, attr_flags, NULL);
-		if (likely(!error))
-			vn_revalidate(XFS_ITOV(ip));	/* update flags */
-		error = -error;
-		break;
-	}
+STATIC int
+xfs_ioc_getxflags(
+	xfs_inode_t		*ip,
+	void			__user *arg)
+{
+	unsigned int		flags;
 
-	case XFS_IOC_GETXFLAGS: {
-		flags = xfs_di2lxflags(ip->i_d.di_flags);
-		if (copy_to_user(arg, &flags, sizeof(flags)))
-			error = -EFAULT;
-		break;
-	}
+	flags = xfs_di2lxflags(ip->i_d.di_flags);
+	if (copy_to_user(arg, &flags, sizeof(flags)))
+		return -EFAULT;
+	return 0;
+}
 
-	case XFS_IOC_SETXFLAGS: {
-		if (copy_from_user(&flags, arg, sizeof(flags))) {
-			error = -EFAULT;
-			break;
-		}
+STATIC int
+xfs_ioc_setxflags(
+	xfs_inode_t		*ip,
+	struct file		*filp,
+	void			__user *arg)
+{
+	struct bhv_vattr	*vattr;
+	unsigned int		flags;
+	int			attr_flags;
+	int			error;
 
-		if (flags & ~(FS_IMMUTABLE_FL | FS_APPEND_FL | \
-			      FS_NOATIME_FL | FS_NODUMP_FL | \
-			      FS_SYNC_FL)) {
-			error = -EOPNOTSUPP;
-			break;
-		}
+	if (copy_from_user(&flags, arg, sizeof(flags)))
+		return -EFAULT;
 
-		attr_flags = 0;
-		if (filp->f_flags & (O_NDELAY|O_NONBLOCK))
-			attr_flags |= ATTR_NONBLOCK;
+	if (flags & ~(FS_IMMUTABLE_FL | FS_APPEND_FL | \
+		      FS_NOATIME_FL | FS_NODUMP_FL | \
+		      FS_SYNC_FL))
+		return -EOPNOTSUPP;
 
-		vattr->va_mask = XFS_AT_XFLAGS;
-		vattr->va_xflags = xfs_merge_ioc_xflags(flags,
-							xfs_ip2xflags(ip));
+	vattr = kmalloc(sizeof(*vattr), GFP_KERNEL);
+	if (unlikely(!vattr))
+		return -ENOMEM;
 
-		error = xfs_setattr(ip, vattr, attr_flags, NULL);
-		if (likely(!error))
-			vn_revalidate(XFS_ITOV(ip));	/* update flags */
-		error = -error;
-		break;
-	}
+	attr_flags = 0;
+	if (filp->f_flags & (O_NDELAY|O_NONBLOCK))
+		attr_flags |= ATTR_NONBLOCK;
 
-	default:
-		error = -ENOTTY;
-		break;
-	}
+	vattr->va_mask = XFS_AT_XFLAGS;
+	vattr->va_xflags = xfs_merge_ioc_xflags(flags, xfs_ip2xflags(ip));
 
+	error = -xfs_setattr(ip, vattr, attr_flags, NULL);
+	if (likely(!error))
+		vn_revalidate(XFS_ITOV(ip));	/* update flags */
 	kfree(vattr);
 	return error;
 }
@@ -1090,10 +1090,12 @@ xfs_ioctl(
 		return xfs_ioc_fsgetxattr(ip, 0, arg);
 	case XFS_IOC_FSGETXATTRA:
 		return xfs_ioc_fsgetxattr(ip, 1, arg);
-	case XFS_IOC_GETXFLAGS:
-	case XFS_IOC_SETXFLAGS:
 	case XFS_IOC_FSSETXATTR:
-		return xfs_ioc_xattr(ip, filp, cmd, arg);
+		return xfs_ioc_fssetxattr(ip, filp, arg);
+	case XFS_IOC_GETXFLAGS:
+		return xfs_ioc_getxflags(ip, arg);
+	case XFS_IOC_SETXFLAGS:
+		return xfs_ioc_setxflags(ip, filp, arg);
 
 	case XFS_IOC_FSSETDM: {
 		struct fsdmidata	dmi;
