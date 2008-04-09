@@ -5607,9 +5607,9 @@ xfsidbg_xiclog(xlog_in_core_t *iclog)
 		be32_to_cpu(iclog->ic_header.h_magicno),
 		be32_to_cpu(iclog->ic_header.h_cycle),
 		be32_to_cpu(iclog->ic_header.h_version),
-		be64_to_cpu(iclog->ic_header.h_lsn));
+		(unsigned long long)be64_to_cpu(iclog->ic_header.h_lsn));
 	kdb_printf("tail_lsn: 0x%Lx  len: %d  prev_block: %d  num_ops: %d\n",
-		be64_to_cpu(iclog->ic_header.h_tail_lsn),
+		(unsigned long long)be64_to_cpu(iclog->ic_header.h_tail_lsn),
 		be32_to_cpu(iclog->ic_header.h_len),
 		be32_to_cpu(iclog->ic_header.h_prev_block),
 		be32_to_cpu(iclog->ic_header.h_num_logops));
@@ -5829,11 +5829,8 @@ xfsidbg_xlog(xlog_t *log)
 	};
 
 	kdb_printf("xlog at 0x%p\n", log);
-	kdb_printf("&flushsm: 0x%p  flushcnt: %d tic_cnt: %d	 tic_tcnt: %d  \n",
-		&log->l_flushsema, log->l_flushcnt,
-		log->l_ticket_cnt, log->l_ticket_tcnt);
-	kdb_printf("freelist: 0x%p  tail: 0x%p	ICLOG: 0x%p  \n",
-		log->l_freelist, log->l_tail, log->l_iclog);
+	kdb_printf("&flushsm: 0x%p  flushcnt: %d  ICLOG: 0x%p  \n",
+		&log->l_flushsema, log->l_flushcnt, log->l_iclog);
 	kdb_printf("&icloglock: 0x%p  tail_lsn: %s  last_sync_lsn: %s \n",
 		&log->l_icloglock, xfs_fmtlsn(&log->l_tail_lsn),
 		xfs_fmtlsn(&log->l_last_sync_lsn));
