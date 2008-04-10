@@ -249,6 +249,7 @@ EXPORT_SYMBOL(xfs_itruncate_start);
 EXPORT_SYMBOL(xfs_iunlock);
 EXPORT_SYMBOL(xfs_iunlock_map_shared);
 EXPORT_SYMBOL(xfs_itruncate_finish);
+EXPORT_SYMBOL(xfs_log_force);
 EXPORT_SYMBOL(_xfs_log_force);
 EXPORT_SYMBOL(xfs_log_force_umount);
 EXPORT_SYMBOL(xfs_log_unmount_dealloc);
