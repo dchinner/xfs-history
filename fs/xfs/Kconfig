@@ -48,18 +48,6 @@ config XFS_DMAPI
 
 	  If unsure, say N.
 
-config XFS_SECURITY
-	bool "XFS Security Label support"
-	depends on XFS_FS
-	help
-	  Security labels support alternative access control models
-	  implemented by security modules like SELinux.  This option
-	  enables an extended attribute namespace for inode security
-	  labels in the XFS filesystem.
-
-	  If you are not using a security module that requires using
-	  extended attributes for inode security labels, say N.
-
 config XFS_POSIX_ACL
 	bool "XFS POSIX ACL support"
 	depends on XFS_FS
