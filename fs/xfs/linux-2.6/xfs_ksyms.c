@@ -240,6 +240,9 @@ EXPORT_SYMBOL(xfs_igrow_finish);
 EXPORT_SYMBOL(xfs_ilock);
 EXPORT_SYMBOL(xfs_ilock_map_shared);
 EXPORT_SYMBOL(xfs_ilock_nowait);
+#ifdef DEBUG
+EXPORT_SYMBOL(xfs_isilocked);
+#endif
 EXPORT_SYMBOL(xfs_internal_inum);
 EXPORT_SYMBOL(xfs_iput);
 EXPORT_SYMBOL(xfs_iput_new);

@@ -393,7 +393,7 @@ xfs_zero_last_block(
 	int		error = 0;
 	xfs_bmbt_irec_t	imap;
 
-	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE) != 0);
+	ASSERT(xfs_isilocked(ip, XFS_ILOCK_EXCL));
 
 	zero_offset = XFS_B_FSB_OFFSET(mp, isize);
 	if (zero_offset == 0) {
@@ -424,14 +424,14 @@ xfs_zero_last_block(
 	 * out sync.  We need to drop the ilock while we do this so we
 	 * don't deadlock when the buffer cache calls back to us.
 	 */
-	xfs_iunlock(ip, XFS_ILOCK_EXCL| XFS_EXTSIZE_RD);
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
 	zero_len = mp->m_sb.sb_blocksize - zero_offset;
 	if (isize + zero_len > offset)
 		zero_len = offset - isize;
 	error = xfs_iozero(ip, isize, zero_len);
 
-	xfs_ilock(ip, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	ASSERT(error >= 0);
 	return error;
 }
@@ -464,8 +464,7 @@ xfs_zero_eof(
 	int		error = 0;
 	xfs_bmbt_irec_t	imap;
 
-	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE));
-	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE));
+	ASSERT(xfs_isilocked(ip, XFS_ILOCK_EXCL|XFS_IOLOCK_EXCL));
 	ASSERT(offset > isize);
 
 	/*
@@ -474,8 +473,7 @@ xfs_zero_eof(
 	 */
 	error = xfs_zero_last_block(ip, offset, isize);
 	if (error) {
-		ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE));
-		ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE));
+		ASSERT(xfs_isilocked(ip, XFS_ILOCK_EXCL|XFS_IOLOCK_EXCL));
 		return error;
 	}
 
@@ -506,8 +504,7 @@ xfs_zero_eof(
 		error = xfs_bmapi(NULL, ip, start_zero_fsb, zero_count_fsb,
 				  0, NULL, 0, &imap, &nimaps, NULL, NULL);
 		if (error) {
-			ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE));
-			ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE));
+			ASSERT(xfs_isilocked(ip, XFS_ILOCK_EXCL|XFS_IOLOCK_EXCL));
 			return error;
 		}
 		ASSERT(nimaps > 0);
@@ -531,7 +528,7 @@ xfs_zero_eof(
 		 * Drop the inode lock while we're doing the I/O.
 		 * We'll still have the iolock to protect us.
 		 */
-		xfs_iunlock(ip, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
 		zero_off = XFS_FSB_TO_B(mp, start_zero_fsb);
 		zero_len = XFS_FSB_TO_B(mp, imap.br_blockcount);
@@ -547,13 +544,13 @@ xfs_zero_eof(
 		start_zero_fsb = imap.br_startoff + imap.br_blockcount;
 		ASSERT(start_zero_fsb <= (end_zero_fsb + 1));
 
-		xfs_ilock(ip, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
+		xfs_ilock(ip, XFS_ILOCK_EXCL);
 	}
 
 	return 0;
 
 out_lock:
-	xfs_ilock(ip, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	ASSERT(error >= 0);
 	return error;
 }
