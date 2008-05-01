@@ -5846,8 +5846,12 @@ xfsidbg_xlog(xlog_t *log)
 	     log->l_curr_cycle, log->l_prev_cycle, log->l_curr_block,
 	     log->l_prev_block);
 	kdb_printf("iclog_bak: 0x%p  iclog_size: 0x%x (%d)  num iclogs: %d\n",
-		log->l_iclog_bak, log->l_iclog_size, log->l_iclog_size,
-		log->l_iclog_bufs);
+#ifdef DEBUG
+		log->l_iclog_bak,
+#else
+		NULL,
+#endif
+		log->l_iclog_size, log->l_iclog_size, log->l_iclog_bufs);
 	kdb_printf("l_iclog_hsize %d l_iclog_heads %d\n",
 		log->l_iclog_hsize, log->l_iclog_heads);
 	kdb_printf("l_sectbb_log %u l_sectbb_mask %u\n",
