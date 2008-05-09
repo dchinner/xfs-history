@@ -5829,8 +5829,8 @@ xfsidbg_xlog(xlog_t *log)
 	};
 
 	kdb_printf("xlog at 0x%p\n", log);
-	kdb_printf("&flushsm: 0x%p  flushcnt: %d  ICLOG: 0x%p  \n",
-		&log->l_flushsema, log->l_flushcnt, log->l_iclog);
+	kdb_printf("&flush_wait: 0x%p  ICLOG: 0x%p  \n",
+		&log->l_flush_wait, log->l_iclog);
 	kdb_printf("&icloglock: 0x%p  tail_lsn: %s  last_sync_lsn: %s \n",
 		&log->l_icloglock, xfs_fmtlsn(&log->l_tail_lsn),
 		xfs_fmtlsn(&log->l_last_sync_lsn));
