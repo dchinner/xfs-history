@@ -90,7 +90,7 @@ kmem_zalloc_greedy(size_t *size, size_t minsize, size_t maxsize,
 }
 
 void
-kmem_free(void *ptr, size_t size)
+kmem_free(void *ptr)
 {
 	if (((unsigned long)ptr < VMALLOC_START) ||
 	    ((unsigned long)ptr >= VMALLOC_END)) {
@@ -111,7 +111,7 @@ kmem_realloc(void *ptr, size_t newsize, size_t oldsize,
 		if (new)
 			memcpy(new, ptr,
 				((oldsize < newsize) ? oldsize : newsize));
-		kmem_free(ptr, oldsize);
+		kmem_free(ptr);
 	}
 	return new;
 }
