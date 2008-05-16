@@ -1397,8 +1397,17 @@ xfs_fs_get_sb(
 	void			*data,
 	struct vfsmount		*mnt)
 {
-	return get_sb_bdev(fs_type, flags, dev_name, data, xfs_fs_fill_super,
+	int			error;
+
+	error = get_sb_bdev(fs_type, flags, dev_name, data, xfs_fs_fill_super,
 			   mnt);
+	if (!error) {
+		xfs_mount_t	*mp = XFS_M(mnt->mnt_sb);
+
+		mp->m_vfsmount = mnt;
+	}
+
+	return error;
 }
 
 static struct super_operations xfs_super_operations = {
