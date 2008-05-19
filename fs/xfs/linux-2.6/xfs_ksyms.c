@@ -235,8 +235,6 @@ EXPORT_SYMBOL(xfs_iflock_nowait);
 EXPORT_SYMBOL(xfs_iflush);
 EXPORT_SYMBOL(xfs_ifunlock);
 EXPORT_SYMBOL(xfs_iget);
-EXPORT_SYMBOL(xfs_igrow_start);
-EXPORT_SYMBOL(xfs_igrow_finish);
 EXPORT_SYMBOL(xfs_ilock);
 EXPORT_SYMBOL(xfs_ilock_map_shared);
 EXPORT_SYMBOL(xfs_ilock_nowait);
