@@ -75,7 +75,10 @@ xfs_args_allocate(
 {
 	struct xfs_mount_args	*args;
 
-	args = kmem_zalloc(sizeof(struct xfs_mount_args), KM_SLEEP);
+	args = kzalloc(sizeof(struct xfs_mount_args), GFP_KERNEL);
+	if (!args)
+		return NULL;
+
 	args->logbufs = args->logbufsize = -1;
 	strncpy(args->fsname, sb->s_id, MAXNAMELEN);
 
@@ -1397,8 +1400,12 @@ xfs_fs_remount(
 	char			*options)
 {
 	struct xfs_mount	*mp = XFS_M(sb);
-	struct xfs_mount_args	*args = xfs_args_allocate(sb, 0);
+	struct xfs_mount_args	*args;
 	int			error;
+
+	args = xfs_args_allocate(sb, 0);
+	if (!args)
+		return -ENOMEM;
 
 	error = xfs_parseargs(mp, options, args, 1);
 	if (error)
@@ -1421,7 +1428,7 @@ xfs_fs_remount(
 	}
 
  out_free_args:
-	kmem_free(args);
+	kfree(args);
 	return -error;
 }
 
@@ -1726,8 +1733,12 @@ xfs_fs_fill_super(
 {
 	struct inode		*root;
 	struct xfs_mount	*mp = NULL;
-	struct xfs_mount_args	*args = xfs_args_allocate(sb, silent);
+	struct xfs_mount_args	*args;
 	int			flags = 0, error;
+
+	args = xfs_args_allocate(sb, silent);
+	if (!args)
+		return -ENOMEM;
 
 	mp = xfs_mount_init();
 
@@ -1827,7 +1838,7 @@ xfs_fs_fill_super(
 
 	xfs_itrace_exit(XFS_I(sb->s_root->d_inode));
 
-	kmem_free(args);
+	kfree(args);
 	return 0;
 
  error2:
@@ -1875,7 +1886,7 @@ xfs_fs_fill_super(
 	kmem_free(mp);
 
  fail_vfsop:
-	kmem_free(args);
+	kfree(args);
 	return -error;
 }
 
