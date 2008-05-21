@@ -5237,7 +5237,10 @@ xfsidbg_xdaargs(xfs_da_args_t *n)
 		kdb_printf("0x%x", n->flags & i);
 	kdb_printf(">\n");
 	kdb_printf(" rename %d justcheck %d addname %d oknoent %d\n",
-		  n->rename, n->justcheck, n->addname, n->oknoent);
+		  n->op_flags & XFS_DA_OP_RENAME != 0,
+		  n->op_flags & XFS_DA_OP_JUSTCHECK != 0,
+		  n->op_flags & XFS_DA_OP_ADDNAME != 0,
+		  n->op_flags & XFS_DA_OP_OKNOENT != 0);
 	kdb_printf(" leaf: blkno %d index %d rmtblkno %d rmtblkcnt %d\n",
 		  n->blkno, n->index, n->rmtblkno, n->rmtblkcnt);
 	kdb_printf(" leaf2: blkno %d index %d rmtblkno %d rmtblkcnt %d\n",
