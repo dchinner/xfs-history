@@ -308,7 +308,7 @@ static int	kdbm_xfs_xalatrace(
 	int nextarg = 1;
 	long offset = 0;
 	int diag;
-	
+
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
@@ -5237,10 +5237,10 @@ xfsidbg_xdaargs(xfs_da_args_t *n)
 		kdb_printf("0x%x", n->flags & i);
 	kdb_printf(">\n");
 	kdb_printf(" rename %d justcheck %d addname %d oknoent %d\n",
-		  n->op_flags & XFS_DA_OP_RENAME != 0,
-		  n->op_flags & XFS_DA_OP_JUSTCHECK != 0,
-		  n->op_flags & XFS_DA_OP_ADDNAME != 0,
-		  n->op_flags & XFS_DA_OP_OKNOENT != 0);
+		  (n->op_flags & XFS_DA_OP_RENAME) != 0,
+		  (n->op_flags & XFS_DA_OP_JUSTCHECK) != 0,
+		  (n->op_flags & XFS_DA_OP_ADDNAME) != 0,
+		  (n->op_flags & XFS_DA_OP_OKNOENT) != 0);
 	kdb_printf(" leaf: blkno %d index %d rmtblkno %d rmtblkcnt %d\n",
 		  n->blkno, n->index, n->rmtblkno, n->rmtblkcnt);
 	kdb_printf(" leaf2: blkno %d index %d rmtblkno %d rmtblkcnt %d\n",
@@ -5958,7 +5958,7 @@ xfsidbg_xlog_granttrace(xlog_t *log)
 		xfsidbg_print_trans_type((unsigned long)ktep->val[12]);
 		qprintf("]\n");
 		qprintf("  t_ocnt = %lu, t_cnt = %lu, t_curr_res = %lu, "
-			"t_unit_res = %lu\n", 
+			"t_unit_res = %lu\n",
 			t_ocnt, t_cnt, (unsigned long)ktep->val[14],
 			(unsigned long)ktep->val[15]);
 		qprintf("  tic:0x%p resQ:0x%p wrQ:0x%p ",
@@ -6452,16 +6452,16 @@ xfsidbg_xnode(xfs_inode_t *ip)
 #endif
 #ifdef XFS_BMBT_TRACE
 	qprintf(" bmbt trace 0x%p\n", ip->i_btrace);
-#endif  
+#endif
 #ifdef XFS_RW_TRACE
 	qprintf(" rw trace 0x%p\n", ip->i_rwtrace);
-#endif  
+#endif
 #ifdef XFS_ILOCK_TRACE
 	qprintf(" ilock trace 0x%p\n", ip->i_lock_trace);
 #endif
 #ifdef XFS_DIR2_TRACE
 	qprintf(" dir trace 0x%p\n", ip->i_dir_trace);
-#endif  
+#endif
 	kdb_printf("\n");
 	xfs_xnode_fork("data", &ip->i_df);
 	xfs_xnode_fork("attr", ip->i_afp);
