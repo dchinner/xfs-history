@@ -482,6 +482,13 @@ xfs_vn_unlink(
 	if (likely(!error)) {
 		xfs_validate_fields(dir);	/* size needs update */
 		xfs_validate_fields(inode);
+		/*
+		 * With unlink, the VFS makes the dentry "negative": no inode,
+		 * but still hashed. This is incompatible with case-insensitive
+		 * mode, so invalidate (unhash) the dentry in CI-mode.
+		 */
+		if (xfs_sb_version_hasasciici(&XFS_M(dir->i_sb)->m_sb))
+			d_invalidate(dentry);
 	}
 	return -error;
 }
@@ -538,6 +545,13 @@ xfs_vn_rmdir(
 	if (likely(!error)) {
 		xfs_validate_fields(inode);
 		xfs_validate_fields(dir);
+		/*
+		 * With rmdir, the VFS makes the dentry "negative": no inode,
+		 * but still hashed. This is incompatible with case-insensitive
+		 * mode, so invalidate (unhash) the dentry in CI-mode.
+		 */
+		if (xfs_sb_version_hasasciici(&XFS_M(dir->i_sb)->m_sb))
+			d_invalidate(dentry);
 	}
 	return -error;
 }
