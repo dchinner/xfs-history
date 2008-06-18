@@ -17,7 +17,11 @@
  */
 
 #include "xfs.h"
+#include "xfs_da_btree.h"
+#include "xfs_bmap_btree.h"
+#include "xfs_inode.h"
 #include "xfs_attr.h"
+#include "xfs_attr_leaf.h"
 #include "xfs_acl.h"
 #include "xfs_vnodeops.h"
 
@@ -145,11 +149,6 @@ xfs_xattr_user_set(struct inode *inode, const char *name,
 	return __xfs_xattr_set(inode, name, value, size, flags, 0);
 }
 
-struct attrnames attr_user = {
-	.attr_name	= "user.",
-	.attr_namelen	= sizeof("user.") - 1,
-};
-
 static struct xattr_handler xfs_xattr_user_handler = {
 	.prefix	= XATTR_USER_PREFIX,
 	.get	= xfs_xattr_user_get,
@@ -170,11 +169,6 @@ xfs_xattr_trusted_set(struct inode *inode, const char *name,
 {
 	return __xfs_xattr_set(inode, name, value, size, flags, ATTR_ROOT);
 }
-
-struct attrnames attr_trusted = {
-	.attr_name	= "trusted.",
-	.attr_namelen	= sizeof("trusted.") - 1,
-};
 
 static struct xattr_handler xfs_xattr_trusted_handler = {
 	.prefix	= XATTR_TRUSTED_PREFIX,
@@ -197,11 +191,6 @@ xfs_xattr_secure_set(struct inode *inode, const char *name,
 	return __xfs_xattr_set(inode, name, value, size, flags, ATTR_SECURE);
 }
 
-struct attrnames attr_secure = {
-	.attr_name	= "security.",
-	.attr_namelen	= sizeof("security.") - 1,
-};
-
 static struct xattr_handler xfs_xattr_security_handler = {
 	.prefix	= XATTR_SECURITY_PREFIX,
 	.get	= xfs_xattr_secure_get,
@@ -216,6 +205,66 @@ struct xattr_handler *xfs_xattr_handlers[] = {
 	&xfs_xattr_system_handler,
 	NULL
 };
+
+static unsigned int xfs_xattr_prefix_len(int flags)
+{
+	if (flags & XFS_ATTR_SECURE)
+		return sizeof("security");
+	else if (flags & XFS_ATTR_ROOT)
+		return sizeof("trusted");
+	else
+		return sizeof("user");
+}
+
+static const char *xfs_xattr_prefix(int flags)
+{
+	if (flags & XFS_ATTR_SECURE)
+		return xfs_xattr_security_handler.prefix;
+	else if (flags & XFS_ATTR_ROOT)
+		return xfs_xattr_trusted_handler.prefix;
+	else
+		return xfs_xattr_user_handler.prefix;
+}
+
+static int
+xfs_xattr_put_listent(struct xfs_attr_list_context *context, int flags,
+		char *name, int namelen, int valuelen, char *value)
+{
+	unsigned int prefix_len = xfs_xattr_prefix_len(flags);
+	char *offset;
+	int arraytop;
+
+	ASSERT(context->count >= 0);
+
+	/*
+	 * Only show root namespace entries if we are actually allowed to
+	 * see them.
+	 */
+	if ((flags & XFS_ATTR_ROOT) && !capable(CAP_SYS_ADMIN))
+		return 0;
+
+	arraytop = context->count + prefix_len + namelen + 1;
+	if (arraytop > context->firstu) {
+		context->count = -1;	/* insufficient space */
+		return 1;
+	}
+	offset = (char *)context->alist + context->count;
+	strncpy(offset, xfs_xattr_prefix(flags), prefix_len);
+	offset += prefix_len;
+	strncpy(offset, name, namelen);			/* real name */
+	offset += namelen;
+	*offset = '\0';
+	context->count += prefix_len + namelen + 1;
+	return 0;
+}
+
+static int
+xfs_xattr_put_listent_sizes(struct xfs_attr_list_context *context, int flags,
+		char *name, int namelen, int valuelen, char *value)
+{
+	context->count += xfs_xattr_prefix_len(flags) + namelen + 1;
+	return 0;
+}
 
 static int
 list_one_attr(const char *name, const size_t len, void *data,
@@ -236,28 +285,30 @@ list_one_attr(const char *name, const size_t len, void *data,
 ssize_t
 xfs_vn_listxattr(struct dentry *dentry, char *data, size_t size)
 {
+	struct xfs_attr_list_context context;
+	struct attrlist_cursor_kern cursor = { 0 };
 	struct inode		*inode = dentry->d_inode;
-	struct xfs_inode	*ip = XFS_I(inode);
-	attrlist_cursor_kern_t	cursor = { 0 };
-	int			error, xflags;
-	ssize_t			result;
-
-	xflags = ATTR_KERNAMELS;
-	if (!size)
-		xflags |= ATTR_KERNOVAL;
-
-	if (capable(CAP_SYS_ADMIN))
-		xflags |= ATTR_KERNFULLS;
-	else
-		xflags |= ATTR_KERNORMALS;
-
+	int			error;
 
 	/*
 	 * First read the regular on-disk attributes.
 	 */
-	result = -xfs_attr_list(ip, data, size, xflags, &cursor);
-	if (result < 0)
-		return result;
+	memset(&context, 0, sizeof(context));
+	context.dp = XFS_I(inode);
+	context.cursor = &cursor;
+	context.resynch = 1;
+	context.alist = data;
+	context.bufsize = size;
+	context.firstu = context.bufsize;
+
+	if (size)
+		context.put_listent = xfs_xattr_put_listent;
+	else
+		context.put_listent = xfs_xattr_put_listent_sizes;
+
+	xfs_attr_list_int(&context);
+	if (context.count < 0)
+		return -ERANGE;
 
 	/*
 	 * Then add the two synthetic ACL attributes.
@@ -265,7 +316,7 @@ xfs_vn_listxattr(struct dentry *dentry, char *data, size_t size)
 	if (xfs_acl_vhasacl_access(inode)) {
 		error = list_one_attr(POSIX_ACL_XATTR_ACCESS,
 				strlen(POSIX_ACL_XATTR_ACCESS) + 1,
-				data, size, &result);
+				data, size, &context.count);
 		if (error)
 			return error;
 	}
@@ -273,10 +324,10 @@ xfs_vn_listxattr(struct dentry *dentry, char *data, size_t size)
 	if (xfs_acl_vhasacl_default(inode)) {
 		error = list_one_attr(POSIX_ACL_XATTR_DEFAULT,
 				strlen(POSIX_ACL_XATTR_DEFAULT) + 1,
-				data, size, &result);
+				data, size, &context.count);
 		if (error)
 			return error;
 	}
 
-	return result;
+	return context.count;
 }
