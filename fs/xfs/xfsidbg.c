@@ -6222,7 +6222,7 @@ xfsidbg_xaildump(xfs_mount_t *mp)
 		"in ail",	/* 0x1 */
 		NULL
 		};
-	int count;
+	int count = 0;
 
 	if (list_empty(&mp->m_ail.xa_ail)) {
 		kdb_printf("AIL is empty\n");
@@ -6230,33 +6230,32 @@ xfsidbg_xaildump(xfs_mount_t *mp)
 	}
 	kdb_printf("AIL for mp 0x%p, oldest first\n", mp);
 	list_for_each_entry(lip, &mp->m_ail.xa_ail, li_ail) {
-		for (count = 0; lip; count++) {
-			kdb_printf("[%d] type %s ", count, xfsidbg_item_type_str(lip));
-			printflags((uint)(lip->li_flags), li_flags, "flags:");
-			kdb_printf("  lsn %s\n   ", xfs_fmtlsn(&(lip->li_lsn)));
-			switch (lip->li_type) {
-			case XFS_LI_BUF:
-				xfs_buf_item_print((xfs_buf_log_item_t *)lip, 1);
-				break;
-			case XFS_LI_INODE:
-				xfs_inode_item_print((xfs_inode_log_item_t *)lip, 1);
-				break;
-			case XFS_LI_EFI:
-				xfs_efi_item_print((xfs_efi_log_item_t *)lip, 1);
-				break;
-			case XFS_LI_EFD:
-				xfs_efd_item_print((xfs_efd_log_item_t *)lip, 1);
-				break;
-			case XFS_LI_DQUOT:
-				xfs_dquot_item_print((xfs_dq_logitem_t *)lip, 1);
-				break;
-			case XFS_LI_QUOTAOFF:
-				xfs_qoff_item_print((xfs_qoff_logitem_t *)lip, 1);
-				break;
-			default:
-				kdb_printf("Unknown item type %d\n", lip->li_type);
-				break;
-			}
+		kdb_printf("[%d] type %s ", count, xfsidbg_item_type_str(lip));
+		printflags((uint)(lip->li_flags), li_flags, "flags:");
+		kdb_printf("  lsn %s\n   ", xfs_fmtlsn(&(lip->li_lsn)));
+		switch (lip->li_type) {
+		case XFS_LI_BUF:
+			xfs_buf_item_print((xfs_buf_log_item_t *)lip, 1);
+			break;
+		case XFS_LI_INODE:
+			xfs_inode_item_print((xfs_inode_log_item_t *)lip, 1);
+			break;
+		case XFS_LI_EFI:
+			xfs_efi_item_print((xfs_efi_log_item_t *)lip, 1);
+			break;
+		case XFS_LI_EFD:
+			xfs_efd_item_print((xfs_efd_log_item_t *)lip, 1);
+			break;
+		case XFS_LI_DQUOT:
+			xfs_dquot_item_print((xfs_dq_logitem_t *)lip, 1);
+			break;
+		case XFS_LI_QUOTAOFF:
+			xfs_qoff_item_print((xfs_qoff_logitem_t *)lip, 1);
+			break;
+		default:
+			kdb_printf("Unknown item type %d\n", lip->li_type);
+			break;
+		count++;
 		}
 	}
 }
