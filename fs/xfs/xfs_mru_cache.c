@@ -307,18 +307,15 @@ xfs_mru_cache_init(void)
 	xfs_mru_elem_zone = kmem_zone_init(sizeof(xfs_mru_cache_elem_t),
 	                                 "xfs_mru_cache_elem");
 	if (!xfs_mru_elem_zone)
-		goto out;
+		return ENOMEM;
 
 	xfs_mru_reap_wq = create_singlethread_workqueue("xfs_mru_cache");
-	if (!xfs_mru_reap_wq)
-		goto out_destroy_mru_elem_zone;
+	if (!xfs_mru_reap_wq) {
+		kmem_zone_destroy(xfs_mru_elem_zone);
+		return ENOMEM;
+	}
 
 	return 0;
-
- out_destroy_mru_elem_zone:
-	kmem_zone_destroy(xfs_mru_elem_zone);
- out:
-	return -ENOMEM;
 }
 
 void

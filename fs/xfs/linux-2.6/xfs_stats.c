@@ -98,21 +98,12 @@ xfs_read_xfsstats(
 	return len;
 }
 
-int
+void
 xfs_init_procfs(void)
 {
 	if (!proc_mkdir("fs/xfs", NULL))
-		goto out;
-
-	if (!create_proc_read_entry("fs/xfs/stat", 0, NULL,
-			xfs_read_xfsstats, NULL))
-		goto out_remove_entry;
-	return 0;
-
- out_remove_entry:
-	remove_proc_entry("fs/xfs", NULL);
- out:
-	return -ENOMEM;
+		return;
+	create_proc_read_entry("fs/xfs/stat", 0, NULL, xfs_read_xfsstats, NULL);
 }
 
 void

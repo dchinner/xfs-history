@@ -53,11 +53,6 @@
 #include "xfs_log_priv.h"
 #include "xfs_trans_priv.h"
 #include "xfs_filestream.h"
-#include "xfs_da_btree.h"
-#include "xfs_dir2_trace.h"
-#include "xfs_extfree_item.h"
-#include "xfs_mru_cache.h"
-#include "xfs_inode_item.h"
 
 #include <linux/namei.h>
 #include <linux/init.h>
@@ -993,6 +988,42 @@ xfs_fs_inode_init_once(
 	inode_init_once(vn_to_inode((bhv_vnode_t *)vnode));
 }
 
+STATIC int __init
+xfs_init_zones(void)
+{
+	xfs_vnode_zone = kmem_zone_init_flags(sizeof(bhv_vnode_t), "xfs_vnode",
+					KM_ZONE_HWALIGN | KM_ZONE_RECLAIM |
+					KM_ZONE_SPREAD,
+					xfs_fs_inode_init_once);
+	if (!xfs_vnode_zone)
+		goto out;
+
+	xfs_ioend_zone = kmem_zone_init(sizeof(xfs_ioend_t), "xfs_ioend");
+	if (!xfs_ioend_zone)
+		goto out_destroy_vnode_zone;
+
+	xfs_ioend_pool = mempool_create_slab_pool(4 * MAX_BUF_PER_PAGE,
+						  xfs_ioend_zone);
+	if (!xfs_ioend_pool)
+		goto out_free_ioend_zone;
+	return 0;
+
+ out_free_ioend_zone:
+	kmem_zone_destroy(xfs_ioend_zone);
+ out_destroy_vnode_zone:
+	kmem_zone_destroy(xfs_vnode_zone);
+ out:
+	return -ENOMEM;
+}
+
+STATIC void
+xfs_destroy_zones(void)
+{
+	mempool_destroy(xfs_ioend_pool);
+	kmem_zone_destroy(xfs_vnode_zone);
+	kmem_zone_destroy(xfs_ioend_zone);
+}
+
 /*
  * Attempt to flush the inode, this will actually fail
  * if the inode is pinned, but we dirty the inode again
@@ -1919,235 +1950,9 @@ struct file_system_type xfs_fs_type = {
 };
 EXPORT_SYMBOL(xfs_fs_type);
 
-STATIC int __init
-xfs_alloc_trace_bufs(void)
-{
-#ifdef XFS_ALLOC_TRACE
-	xfs_alloc_trace_buf = ktrace_alloc(XFS_ALLOC_TRACE_SIZE, KM_MAYFAIL);
-	if (!xfs_alloc_trace_buf)
-		goto out;
-#endif
-#ifdef XFS_BMAP_TRACE
-	xfs_bmap_trace_buf = ktrace_alloc(XFS_BMAP_TRACE_SIZE, KM_MAYFAIL);
-	if (!xfs_bmap_trace_buf)
-		goto out_free_alloc_trace;
-#endif
-#ifdef XFS_BMBT_TRACE
-	xfs_bmbt_trace_buf = ktrace_alloc(XFS_BMBT_TRACE_SIZE, KM_MAYFAIL);
-	if (!xfs_bmbt_trace_buf)
-		goto out_free_bmap_trace;
-#endif
-#ifdef XFS_ATTR_TRACE
-	xfs_attr_trace_buf = ktrace_alloc(XFS_ATTR_TRACE_SIZE, KM_MAYFAIL);
-	if (!xfs_attr_trace_buf)
-		goto out_free_bmbt_trace;
-#endif
-#ifdef XFS_DIR2_TRACE
-	xfs_dir2_trace_buf = ktrace_alloc(XFS_DIR2_GTRACE_SIZE, KM_MAYFAIL);
-	if (!xfs_dir2_trace_buf)
-		goto out_free_attr_trace;
-#endif
-
-	return 0;
-
-#ifdef XFS_DIR2_TRACE
- out_free_attr_trace:
-#endif
-#ifdef XFS_ATTR_TRACE
-	ktrace_free(xfs_attr_trace_buf);
- out_free_bmbt_trace:
-#endif
-#ifdef XFS_BMBT_TRACE
-	ktrace_free(xfs_bmbt_trace_buf);
- out_free_bmap_trace:
-#endif
-#ifdef XFS_BMAP_TRACE
-	ktrace_free(xfs_bmap_trace_buf);
- out_free_alloc_trace:
-#endif
-#ifdef XFS_ALLOC_TRACE
-	ktrace_free(xfs_alloc_trace_buf);
- out:
-#endif
-	return -ENOMEM;
-}
-
-STATIC void
-xfs_free_trace_bufs(void)
-{
-#ifdef XFS_DIR2_TRACE
-	ktrace_free(xfs_dir2_trace_buf);
-#endif
-#ifdef XFS_ATTR_TRACE
-	ktrace_free(xfs_attr_trace_buf);
-#endif
-#ifdef XFS_BMBT_TRACE
-	ktrace_free(xfs_bmbt_trace_buf);
-#endif
-#ifdef XFS_BMAP_TRACE
-	ktrace_free(xfs_bmap_trace_buf);
-#endif
-#ifdef XFS_ALLOC_TRACE
-	ktrace_free(xfs_alloc_trace_buf);
-#endif
-}
 
 STATIC int __init
-xfs_init_zones(void)
-{
-	xfs_vnode_zone = kmem_zone_init_flags(sizeof(bhv_vnode_t), "xfs_vnode",
-					KM_ZONE_HWALIGN | KM_ZONE_RECLAIM |
-					KM_ZONE_SPREAD,
-					xfs_fs_inode_init_once);
-	if (!xfs_vnode_zone)
-		goto out;
-
-	xfs_ioend_zone = kmem_zone_init(sizeof(xfs_ioend_t), "xfs_ioend");
-	if (!xfs_ioend_zone)
-		goto out_destroy_vnode_zone;
-
-	xfs_ioend_pool = mempool_create_slab_pool(4 * MAX_BUF_PER_PAGE,
-						  xfs_ioend_zone);
-	if (!xfs_ioend_pool)
-		goto out_destroy_ioend_zone;
-
-	xfs_log_ticket_zone = kmem_zone_init(sizeof(xlog_ticket_t),
-						"xfs_log_ticket");
-	if (!xfs_log_ticket_zone)
-		goto out_destroy_ioend_pool;
-
-	xfs_bmap_free_item_zone = kmem_zone_init(sizeof(xfs_bmap_free_item_t),
-						"xfs_bmap_free_item");
-	if (!xfs_bmap_free_item_zone)
-		goto out_destroy_log_ticket_zone;
-	xfs_btree_cur_zone = kmem_zone_init(sizeof(xfs_btree_cur_t),
-						"xfs_btree_cur");
-	if (!xfs_btree_cur_zone)
-		goto out_destroy_bmap_free_item_zone;
-
-	xfs_da_state_zone = kmem_zone_init(sizeof(xfs_da_state_t),
-						"xfs_da_state");
-	if (!xfs_da_state_zone)
-		goto out_destroy_btree_cur_zone;
-
-	xfs_dabuf_zone = kmem_zone_init(sizeof(xfs_dabuf_t), "xfs_dabuf");
-	if (!xfs_dabuf_zone)
-		goto out_destroy_da_state_zone;
-
-	xfs_ifork_zone = kmem_zone_init(sizeof(xfs_ifork_t), "xfs_ifork");
-	if (!xfs_ifork_zone)
-		goto out_destroy_dabuf_zone;
-
-	xfs_trans_zone = kmem_zone_init(sizeof(xfs_trans_t), "xfs_trans");
-	if (!xfs_trans_zone)
-		goto out_destroy_ifork_zone;
-
-	/*
-	 * The size of the zone allocated buf log item is the maximum
-	 * size possible under XFS.  This wastes a little bit of memory,
-	 * but it is much faster.
-	 */
-	xfs_buf_item_zone = kmem_zone_init((sizeof(xfs_buf_log_item_t) +
-				(((XFS_MAX_BLOCKSIZE / XFS_BLI_CHUNK) /
-				  NBWORD) * sizeof(int))), "xfs_buf_item");
-	if (!xfs_buf_item_zone)
-		goto out_destroy_trans_zone;
-
-	xfs_efd_zone = kmem_zone_init((sizeof(xfs_efd_log_item_t) +
-			((XFS_EFD_MAX_FAST_EXTENTS - 1) *
-				 sizeof(xfs_extent_t))), "xfs_efd_item");
-	if (!xfs_efd_zone)
-		goto out_destroy_buf_item_zone;
-
-	xfs_efi_zone = kmem_zone_init((sizeof(xfs_efi_log_item_t) +
-			((XFS_EFI_MAX_FAST_EXTENTS - 1) *
-				sizeof(xfs_extent_t))), "xfs_efi_item");
-	if (!xfs_efi_zone)
-		goto out_destroy_efd_zone;
-
-	xfs_inode_zone =
-		kmem_zone_init_flags(sizeof(xfs_inode_t), "xfs_inode",
-					KM_ZONE_HWALIGN | KM_ZONE_RECLAIM |
-					KM_ZONE_SPREAD, NULL);
-	if (!xfs_inode_zone)
-		goto out_destroy_efi_zone;
-
-	xfs_ili_zone =
-		kmem_zone_init_flags(sizeof(xfs_inode_log_item_t), "xfs_ili",
-					KM_ZONE_SPREAD, NULL);
-	if (!xfs_ili_zone)
-		goto out_destroy_inode_zone;
-
-#ifdef CONFIG_XFS_POSIX_ACL
-	xfs_acl_zone = kmem_zone_init(sizeof(xfs_acl_t), "xfs_acl");
-	if (!xfs_acl_zone)
-		goto out_destroy_ili_zone;
-#endif
-
-	return 0;
-
-#ifdef CONFIG_XFS_POSIX_ACL
- out_destroy_ili_zone:
-#endif
-	kmem_zone_destroy(xfs_ili_zone);
- out_destroy_inode_zone:
-	kmem_zone_destroy(xfs_inode_zone);
- out_destroy_efi_zone:
-	kmem_zone_destroy(xfs_efi_zone);
- out_destroy_efd_zone:
-	kmem_zone_destroy(xfs_efd_zone);
- out_destroy_buf_item_zone:
-	kmem_zone_destroy(xfs_buf_item_zone);
- out_destroy_trans_zone:
-	kmem_zone_destroy(xfs_trans_zone);
- out_destroy_ifork_zone:
-	kmem_zone_destroy(xfs_ifork_zone);
- out_destroy_dabuf_zone:
-	kmem_zone_destroy(xfs_dabuf_zone);
- out_destroy_da_state_zone:
-	kmem_zone_destroy(xfs_da_state_zone);
- out_destroy_btree_cur_zone:
-	kmem_zone_destroy(xfs_btree_cur_zone);
- out_destroy_bmap_free_item_zone:
-	kmem_zone_destroy(xfs_bmap_free_item_zone);
- out_destroy_log_ticket_zone:
-	kmem_zone_destroy(xfs_log_ticket_zone);
- out_destroy_ioend_pool:
-	mempool_destroy(xfs_ioend_pool);
- out_destroy_ioend_zone:
-	kmem_zone_destroy(xfs_ioend_zone);
- out_destroy_vnode_zone:
-	kmem_zone_destroy(xfs_vnode_zone);
- out:
-	return -ENOMEM;
-}
-
-STATIC void
-xfs_destroy_zones(void)
-{
-#ifdef CONFIG_XFS_POSIX_ACL
-	kmem_zone_destroy(xfs_acl_zone);
-#endif
-	kmem_zone_destroy(xfs_ili_zone);
-	kmem_zone_destroy(xfs_inode_zone);
-	kmem_zone_destroy(xfs_efi_zone);
-	kmem_zone_destroy(xfs_efd_zone);
-	kmem_zone_destroy(xfs_buf_item_zone);
-	kmem_zone_destroy(xfs_trans_zone);
-	kmem_zone_destroy(xfs_ifork_zone);
-	kmem_zone_destroy(xfs_dabuf_zone);
-	kmem_zone_destroy(xfs_da_state_zone);
-	kmem_zone_destroy(xfs_btree_cur_zone);
-	kmem_zone_destroy(xfs_bmap_free_item_zone);
-	kmem_zone_destroy(xfs_log_ticket_zone);
-	mempool_destroy(xfs_ioend_pool);
-	kmem_zone_destroy(xfs_ioend_zone);
-	kmem_zone_destroy(xfs_vnode_zone);
-
-}
-
-STATIC int __init
-init_xfs_fs(void)
+init_xfs_fs( void )
 {
 	int			error;
 	static char		message[] __initdata = KERN_INFO \
@@ -2156,70 +1961,40 @@ init_xfs_fs(void)
 	printk(message);
 
 	ktrace_init(64);
-	vn_init();
-	xfs_dir_startup();
 
 	error = xfs_init_zones();
-	if (error)
-		goto out;
-
-	error = xfs_alloc_trace_bufs();
-	if (error)
-		goto out_destroy_zones;
-
-	error = xfs_mru_cache_init();
-	if (error)
-		goto out_free_trace_buffers;
-
-	error = xfs_filestream_init();
-	if (error)
-		goto out_mru_cache_uninit;
+	if (error < 0)
+		goto undo_zones;
 
 	error = xfs_buf_init();
-	if (error)
-		goto out_filestream_uninit;
+	if (error < 0)
+		goto undo_buffers;
 
-	error = xfs_init_procfs();
-	if (error)
-		goto out_buf_terminate;
-
-	error = xfs_sysctl_register();
-	if (error)
-		goto out_cleanup_procfs;
+	vn_init();
+	xfs_init();
+	uuid_init();
 
 	error = register_filesystem(&xfs_fs_type);
 	if (error)
-		goto out_sysctl_unregister;
+		goto undo_register;
 	return 0;
 
- out_sysctl_unregister:
-	xfs_sysctl_unregister();
- out_cleanup_procfs:
-	xfs_cleanup_procfs();
- out_buf_terminate:
+undo_register:
 	xfs_buf_terminate();
- out_filestream_uninit:
-	xfs_filestream_uninit();
- out_mru_cache_uninit:
-	xfs_mru_cache_uninit();
- out_free_trace_buffers:
-	xfs_free_trace_bufs();
- out_destroy_zones:
+
+undo_buffers:
 	xfs_destroy_zones();
- out:
+
+undo_zones:
 	return error;
 }
 
 STATIC void __exit
-exit_xfs_fs(void)
+exit_xfs_fs( void )
 {
 	unregister_filesystem(&xfs_fs_type);
-	xfs_sysctl_unregister();
-	xfs_cleanup_procfs();
+	xfs_cleanup();
 	xfs_buf_terminate();
-	xfs_filestream_uninit();
-	xfs_mru_cache_uninit();
-	xfs_free_trace_bufs();
 	xfs_destroy_zones();
 	ktrace_uninit();
 }

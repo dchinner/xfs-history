@@ -259,17 +259,15 @@ static ctl_table xfs_root_table[] = {
 	{}
 };
 
-int
+void
 xfs_sysctl_register(void)
 {
 	xfs_table_header = register_sysctl_table(xfs_root_table);
-	if (!xfs_table_header)
-		return -ENOMEM;
-	return 0;
 }
 
 void
 xfs_sysctl_unregister(void)
 {
-	unregister_sysctl_table(xfs_table_header);
+	if (xfs_table_header)
+		unregister_sysctl_table(xfs_table_header);
 }
