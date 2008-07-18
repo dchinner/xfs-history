@@ -180,7 +180,6 @@ EXPORT_SYMBOL(uuid_hash64);
 EXPORT_SYMBOL(uuid_is_nil);
 EXPORT_SYMBOL(uuid_table_remove);
 EXPORT_SYMBOL(vn_hold);
-EXPORT_SYMBOL(vn_revalidate);
 
 #if defined(CONFIG_XFS_POSIX_ACL)
 EXPORT_SYMBOL(xfs_acl_vtoacl);
