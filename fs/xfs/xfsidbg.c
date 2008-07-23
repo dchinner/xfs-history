@@ -6413,7 +6413,7 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		ip->i_mount,
 		ip->i_mnext,
 		ip->i_mprev,
-		XFS_ITOV_NULL(ip));
+		VFS_I(ip));
 	kdb_printf("dev %x ino %s\n",
 		ip->i_mount->m_ddev_targp->bt_dev,
 		xfs_fmtino(ip->i_ino, ip->i_mount));
