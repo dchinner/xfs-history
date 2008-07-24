@@ -6951,17 +6951,17 @@ xfsidbg_xtp(xfs_trans_t *tp)
 	licp = &tp->t_items;
 	chunk = 0;
 	while (licp != NULL) {
-		if (XFS_LIC_ARE_ALL_FREE(licp)) {
+		if (xfs_lic_are_all_free(licp)) {
 			licp = licp->lic_next;
 			chunk++;
 			continue;
 		}
 		for (i = 0; i < licp->lic_unused; i++) {
-			if (XFS_LIC_ISFREE(licp, i)) {
+			if (xfs_lic_isfree(licp, i)) {
 				continue;
 			}
 
-			lidp = XFS_LIC_SLOT(licp, i);
+			lidp = xfs_lic_slot(licp, i);
 			kdb_printf("\n");
 			kdb_printf("chunk %d index %d item 0x%p size %d\n",
 				chunk, i, lidp->lid_item, lidp->lid_size);
