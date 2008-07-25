@@ -2427,14 +2427,8 @@ xlog_recover_do_inode_trans(
 	}
 
 	fields = in_f->ilf_fields;
-	switch (fields & (XFS_ILOG_DEV | XFS_ILOG_UUID)) {
-	case XFS_ILOG_DEV:
-		dip->di_u.di_dev = cpu_to_be32(in_f->ilf_u.ilfu_rdev);
-		break;
-	case XFS_ILOG_UUID:
-		dip->di_u.di_muuid = in_f->ilf_u.ilfu_uuid;
-		break;
-	}
+	if (fields & XFS_ILOG_DEV)
+		dip->di_u.di_dev = cpu_to_be32(in_f->ilf_rdev);
 
 	if (in_f->ilf_size == 2)
 		goto write_inode_buffer;

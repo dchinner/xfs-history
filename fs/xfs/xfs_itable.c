@@ -106,7 +106,6 @@ xfs_bulkstat_one_iget(
 		buf->bs_blocks = 0;
 		break;
 	case XFS_DINODE_FMT_LOCAL:
-	case XFS_DINODE_FMT_UUID:
 		buf->bs_rdev = 0;
 		buf->bs_blksize = mp->m_sb.sb_blocksize;
 		buf->bs_blocks = 0;
@@ -180,7 +179,6 @@ xfs_bulkstat_one_dinode(
 		buf->bs_blocks = 0;
 		break;
 	case XFS_DINODE_FMT_LOCAL:
-	case XFS_DINODE_FMT_UUID:
 		buf->bs_rdev = 0;
 		buf->bs_blksize = mp->m_sb.sb_blocksize;
 		buf->bs_blocks = 0;

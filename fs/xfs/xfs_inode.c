@@ -2891,14 +2891,6 @@ xfs_iflush_fork(
 		}
 		break;
 
-	case XFS_DINODE_FMT_UUID:
-		if (iip->ili_format.ilf_fields & XFS_ILOG_UUID) {
-			ASSERT(whichfork == XFS_DATA_FORK);
-			memcpy(&dip->di_u.di_muuid, &ip->i_df.if_u2.if_uuid,
-				sizeof(uuid_t));
-		}
-		break;
-
 	default:
 		ASSERT(0);
 		break;

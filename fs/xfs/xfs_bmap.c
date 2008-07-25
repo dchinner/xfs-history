@@ -3539,7 +3539,6 @@ xfs_bmap_forkoff_reset(
 {
 	if (whichfork == XFS_ATTR_FORK &&
 	    (ip->i_d.di_format != XFS_DINODE_FMT_DEV) &&
-	    (ip->i_d.di_format != XFS_DINODE_FMT_UUID) &&
 	    (ip->i_d.di_format != XFS_DINODE_FMT_BTREE) &&
 	    ((mp->m_attroffset >> 3) > ip->i_d.di_forkoff)) {
 		ip->i_d.di_forkoff = mp->m_attroffset >> 3;
@@ -4006,9 +4005,6 @@ xfs_bmap_add_attrfork(
 	switch (ip->i_d.di_format) {
 	case XFS_DINODE_FMT_DEV:
 		ip->i_d.di_forkoff = roundup(sizeof(xfs_dev_t), 8) >> 3;
-		break;
-	case XFS_DINODE_FMT_UUID:
-		ip->i_d.di_forkoff = roundup(sizeof(uuid_t), 8) >> 3;
 		break;
 	case XFS_DINODE_FMT_LOCAL:
 	case XFS_DINODE_FMT_EXTENTS:

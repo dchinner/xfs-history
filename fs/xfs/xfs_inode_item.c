@@ -71,8 +71,7 @@ xfs_inode_item_size(
 	switch (ip->i_d.di_format) {
 	case XFS_DINODE_FMT_EXTENTS:
 		iip->ili_format.ilf_fields &=
-			~(XFS_ILOG_DDATA | XFS_ILOG_DBROOT |
-			  XFS_ILOG_DEV | XFS_ILOG_UUID);
+			~(XFS_ILOG_DDATA | XFS_ILOG_DBROOT | XFS_ILOG_DEV);
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_DEXT) &&
 		    (ip->i_d.di_nextents > 0) &&
 		    (ip->i_df.if_bytes > 0)) {
@@ -87,8 +86,7 @@ xfs_inode_item_size(
 		ASSERT(ip->i_df.if_ext_max ==
 		       XFS_IFORK_DSIZE(ip) / (uint)sizeof(xfs_bmbt_rec_t));
 		iip->ili_format.ilf_fields &=
-			~(XFS_ILOG_DDATA | XFS_ILOG_DEXT |
-			  XFS_ILOG_DEV | XFS_ILOG_UUID);
+			~(XFS_ILOG_DDATA | XFS_ILOG_DEXT | XFS_ILOG_DEV);
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_DBROOT) &&
 		    (ip->i_df.if_broot_bytes > 0)) {
 			ASSERT(ip->i_df.if_broot != NULL);
@@ -113,8 +111,7 @@ xfs_inode_item_size(
 
 	case XFS_DINODE_FMT_LOCAL:
 		iip->ili_format.ilf_fields &=
-			~(XFS_ILOG_DEXT | XFS_ILOG_DBROOT |
-			  XFS_ILOG_DEV | XFS_ILOG_UUID);
+			~(XFS_ILOG_DEXT | XFS_ILOG_DBROOT | XFS_ILOG_DEV);
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_DDATA) &&
 		    (ip->i_df.if_bytes > 0)) {
 			ASSERT(ip->i_df.if_u1.if_data != NULL);
@@ -127,14 +124,7 @@ xfs_inode_item_size(
 
 	case XFS_DINODE_FMT_DEV:
 		iip->ili_format.ilf_fields &=
-			~(XFS_ILOG_DDATA | XFS_ILOG_DBROOT |
-			  XFS_ILOG_DEXT | XFS_ILOG_UUID);
-		break;
-
-	case XFS_DINODE_FMT_UUID:
-		iip->ili_format.ilf_fields &=
-			~(XFS_ILOG_DDATA | XFS_ILOG_DBROOT |
-			  XFS_ILOG_DEXT | XFS_ILOG_DEV);
+			~(XFS_ILOG_DDATA | XFS_ILOG_DBROOT | XFS_ILOG_DEXT);
 		break;
 
 	default:
@@ -320,8 +310,7 @@ xfs_inode_item_format(
 	switch (ip->i_d.di_format) {
 	case XFS_DINODE_FMT_EXTENTS:
 		ASSERT(!(iip->ili_format.ilf_fields &
-			 (XFS_ILOG_DDATA | XFS_ILOG_DBROOT |
-			  XFS_ILOG_DEV | XFS_ILOG_UUID)));
+			 (XFS_ILOG_DDATA | XFS_ILOG_DBROOT | XFS_ILOG_DEV)));
 		if (iip->ili_format.ilf_fields & XFS_ILOG_DEXT) {
 			ASSERT(ip->i_df.if_bytes > 0);
 			ASSERT(ip->i_df.if_u1.if_extents != NULL);
@@ -370,8 +359,7 @@ xfs_inode_item_format(
 
 	case XFS_DINODE_FMT_BTREE:
 		ASSERT(!(iip->ili_format.ilf_fields &
-			 (XFS_ILOG_DDATA | XFS_ILOG_DEXT |
-			  XFS_ILOG_DEV | XFS_ILOG_UUID)));
+			 (XFS_ILOG_DDATA | XFS_ILOG_DEXT | XFS_ILOG_DEV)));
 		if (iip->ili_format.ilf_fields & XFS_ILOG_DBROOT) {
 			ASSERT(ip->i_df.if_broot_bytes > 0);
 			ASSERT(ip->i_df.if_broot != NULL);
@@ -386,8 +374,7 @@ xfs_inode_item_format(
 
 	case XFS_DINODE_FMT_LOCAL:
 		ASSERT(!(iip->ili_format.ilf_fields &
-			 (XFS_ILOG_DBROOT | XFS_ILOG_DEXT |
-			  XFS_ILOG_DEV | XFS_ILOG_UUID)));
+			 (XFS_ILOG_DBROOT | XFS_ILOG_DEXT | XFS_ILOG_DEV)));
 		if (iip->ili_format.ilf_fields & XFS_ILOG_DDATA) {
 			ASSERT(ip->i_df.if_bytes > 0);
 			ASSERT(ip->i_df.if_u1.if_data != NULL);
@@ -412,21 +399,9 @@ xfs_inode_item_format(
 
 	case XFS_DINODE_FMT_DEV:
 		ASSERT(!(iip->ili_format.ilf_fields &
-			 (XFS_ILOG_DBROOT | XFS_ILOG_DEXT |
-			  XFS_ILOG_DDATA | XFS_ILOG_UUID)));
+			 (XFS_ILOG_DBROOT | XFS_ILOG_DEXT | XFS_ILOG_DDATA)));
 		if (iip->ili_format.ilf_fields & XFS_ILOG_DEV) {
-			iip->ili_format.ilf_u.ilfu_rdev =
-				ip->i_df.if_u2.if_rdev;
-		}
-		break;
-
-	case XFS_DINODE_FMT_UUID:
-		ASSERT(!(iip->ili_format.ilf_fields &
-			 (XFS_ILOG_DBROOT | XFS_ILOG_DEXT |
-			  XFS_ILOG_DDATA | XFS_ILOG_DEV)));
-		if (iip->ili_format.ilf_fields & XFS_ILOG_UUID) {
-			iip->ili_format.ilf_u.ilfu_uuid =
-				ip->i_df.if_u2.if_uuid;
+			iip->ili_format.ilf_rdev = ip->i_df.if_u2.if_rdev;
 		}
 		break;
 
@@ -1093,10 +1068,7 @@ xfs_inode_item_format_convert(
 		in_f->ilf_asize = in_f32->ilf_asize;
 		in_f->ilf_dsize = in_f32->ilf_dsize;
 		in_f->ilf_ino = in_f32->ilf_ino;
-		/* copy biggest field of ilf_u */
-		memcpy(in_f->ilf_u.ilfu_uuid.__u_bits,
-		       in_f32->ilf_u.ilfu_uuid.__u_bits,
-		       sizeof(uuid_t));
+		in_f->ilf_rdev = in_f32->ilf_rdev;
 		in_f->ilf_blkno = in_f32->ilf_blkno;
 		in_f->ilf_len = in_f32->ilf_len;
 		in_f->ilf_boffset = in_f32->ilf_boffset;
@@ -1111,10 +1083,7 @@ xfs_inode_item_format_convert(
 		in_f->ilf_asize = in_f64->ilf_asize;
 		in_f->ilf_dsize = in_f64->ilf_dsize;
 		in_f->ilf_ino = in_f64->ilf_ino;
-		/* copy biggest field of ilf_u */
-		memcpy(in_f->ilf_u.ilfu_uuid.__u_bits,
-		       in_f64->ilf_u.ilfu_uuid.__u_bits,
-		       sizeof(uuid_t));
+		in_f->ilf_rdev = in_f64->ilf_rdev;
 		in_f->ilf_blkno = in_f64->ilf_blkno;
 		in_f->ilf_len = in_f64->ilf_len;
 		in_f->ilf_boffset = in_f64->ilf_boffset;
