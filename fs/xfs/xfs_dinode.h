@@ -88,6 +88,7 @@ typedef struct xfs_dinode
 		xfs_dir2_sf_t	di_dir2sf;	/* shortform directory v2 */
 		char		di_c[1];	/* local contents */
 		__be32		di_dev;		/* device for S_IFCHR/S_IFBLK */
+		uuid_t		di_muuid;	/* mount point value */
 		char		di_symlink[1];	/* local symbolic link */
 	}		di_u;
 	union {
@@ -149,6 +150,7 @@ typedef enum xfs_dinode_fmt
 					/* LNK: di_symlink */
 	XFS_DINODE_FMT_EXTENTS,		/* DIR, REG, LNK: di_bmx */
 	XFS_DINODE_FMT_BTREE,		/* DIR, REG, LNK: di_bmbt */
+	XFS_DINODE_FMT_UUID		/* MNT: di_uuid */
 } xfs_dinode_fmt_t;
 
 /*

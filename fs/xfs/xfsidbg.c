@@ -3424,7 +3424,7 @@ xfs_inode_item_print(xfs_inode_log_item_t *ilip, int summary)
 	kdb_printf("dsize %d, asize %d, rdev 0x%x\n",
 		ilip->ili_format.ilf_dsize,
 		ilip->ili_format.ilf_asize,
-		ilip->ili_format.ilf_rdev);
+		ilip->ili_format.ilf_u.ilfu_rdev);
 	kdb_printf("blkno 0x%Lx len 0x%x boffset 0x%x\n",
 		ilip->ili_format.ilf_blkno,
 		ilip->ili_format.ilf_len,
