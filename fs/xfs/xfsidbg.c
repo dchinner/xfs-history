@@ -4579,10 +4579,6 @@ xfsidbg_xbtcur(xfs_btree_cur_t *c)
 			xfs_fmtfsblock(c->bc_private.b.firstblock, c->bc_mp),
 			c->bc_private.b.flist,
 			c->bc_private.b.allocated);
-	} else if (c->bc_btnum == XFS_BTNUM_INO) {
-		kdb_printf("private agbp 0x%p agno 0x%x\n",
-			c->bc_private.i.agbp,
-			c->bc_private.i.agno);
 	} else {
 		kdb_printf("private agbp 0x%p agno 0x%x\n",
 			c->bc_private.a.agbp,
