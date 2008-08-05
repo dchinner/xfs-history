@@ -2016,10 +2016,9 @@ print_xfs_buf(
 	kdb_printf("  b_page_count %u b_offset 0x%x b_pages 0x%p b_error %u\n",
 		   bp->b_page_count, bp->b_offset,
 		   bp->b_pages, bp->b_error);
-	kdb_printf("  b_iodonesema (%d,%d) b_sema (%d,%d) b_pincount (%d)\n",
-		   bp->b_iodonesema.count.counter,
-		   bp->b_iodonesema.sleepers,
-		   bp->b_sema.count.counter, bp->b_sema.sleepers,
+	kdb_printf("  b_iodonesema (%d) b_sema (%d) b_pincount (%d)\n",
+		   bp->b_iodonesema.count,
+		   bp->b_sema.count,
 		   bp->b_pin_count.counter);
 #ifdef XFS_BUF_LOCK_TRACKING
 	kdb_printf("  last holder %d\n", bp->b_last_holder);
