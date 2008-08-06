@@ -2016,8 +2016,8 @@ print_xfs_buf(
 	kdb_printf("  b_page_count %u b_offset 0x%x b_pages 0x%p b_error %u\n",
 		   bp->b_page_count, bp->b_offset,
 		   bp->b_pages, bp->b_error);
-	kdb_printf("  b_iodonesema (%d) b_sema (%d) b_pincount (%d)\n",
-		   bp->b_iodonesema.count,
+	kdb_printf("  &b_iowait 0x%p (%d) b_sema (%d) b_pincount (%d)\n",
+		   &bp->b_iowait, bp->b_iowait.done,
 		   bp->b_sema.count,
 		   bp->b_pin_count.counter);
 #ifdef XFS_BUF_LOCK_TRACKING
@@ -5619,9 +5619,8 @@ xfsidbg_xiclog(xlog_in_core_t *iclog)
 	kdb_printf("size: %d\n", be32_to_cpu(iclog->ic_header.h_size));
 	kdb_printf("\n");
 	kdb_printf("--------------------------------------------------\n");
-	kdb_printf("data: 0x%p  &forcesema: 0x%p  next: 0x%p bp: 0x%p\n",
-		iclog->ic_datap, &iclog->ic_forcesema, iclog->ic_next,
-		iclog->ic_bp);
+	kdb_printf("data: 0x%p next: 0x%p bp: 0x%p\n",
+		iclog->ic_datap, iclog->ic_next, iclog->ic_bp);
 	kdb_printf("log: 0x%p  callb: 0x%p  callb_tail: 0x%p\n",
 		iclog->ic_log, iclog->ic_callback, iclog->ic_callback_tail);
 	kdb_printf("size: %d (OFFSET: %d) trace: 0x%p refcnt: %d bwritecnt: %d",
@@ -6422,8 +6421,8 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	kdb_printf("&lock 0x%p &iolock 0x%p ",
 		&ip->i_lock,
 		&ip->i_iolock);
-	kdb_printf("&flock 0x%p (%d) pincount 0x%x\n",
-		&ip->i_flock, issemalocked(&ip->i_flock),
+	kdb_printf("&flush 0x%p (%d) pincount 0x%x\n",
+		&ip->i_flush, ip->i_flush.done,
 		xfs_ipincount(ip));
 	kdb_printf("udquotp 0x%p gdquotp 0x%p\n",
 		ip->i_udquot, ip->i_gdquot);
@@ -6577,10 +6576,9 @@ xfsidbg_xqm_dquot(xfs_dquot_t *dqp)
 		(unsigned long long)dqp->q_res_bcount,
 		(unsigned long long)dqp->q_res_icount,
 		(unsigned long long)dqp->q_res_rtbcount);
-	kdb_printf("qlock 0x%p  flock 0x%p (%s) pincount 0x%x\n",
-		&dqp->q_qlock, &dqp->q_flock,
-		issemalocked(&dqp->q_flock) ? "LCKD" : "UNLKD",
-		dqp->q_pincount);
+	kdb_printf("qlock 0x%p  &q_flush 0x%p (%d) pincount 0x%x\n",
+		&dqp->q_qlock, &dqp->q_flush,
+		dqp->q_flush.done, dqp->q_pincount);
 #ifdef XFS_DQUOT_TRACE
 	qprintf("dqtrace 0x%p\n", dqp->q_trace);
 #endif
