@@ -1148,6 +1148,7 @@ xfs_fs_put_super(
 	}
 
 	xfs_unmountfs(mp);
+	xfs_freesb(mp);
 	xfs_icsb_destroy_counters(mp);
 	xfs_close_devices(mp);
 	xfs_qmops_put(mp);
@@ -1804,7 +1805,7 @@ xfs_fs_fill_super(
 	WARN_ON(error);
 
 	xfs_unmountfs(mp);
-	goto out_free_fsname;
+	goto out_free_sb;
 }
 
 STATIC int
