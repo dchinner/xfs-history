@@ -5864,7 +5864,7 @@ xfsidbg_xlog(xlog_t *log)
 		(int)BTOBBT(log->l_grant_write_bytes),
 		log->l_grant_write_bytes % BBSIZE);
 #ifdef XFS_LOG_TRACE
-	qprintf("trace: 0x%p  grant_trace: use xlog value\n", log->l_trace);
+	qprintf("grant_trace: use xlog value\n");
 #endif
 }	/* xfsidbg_xlog */
 
