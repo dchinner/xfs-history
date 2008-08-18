@@ -4171,7 +4171,7 @@ xfsidbg_xattrcontext(xfs_attr_list_context_t *context)
 			  context->cursor->hashval, context->cursor->blkno,
 			  context->cursor->offset, context->cursor->pad1,
 			  context->cursor->pad2, context->cursor->initted);
-	kdb_printf("alist 0x%p, bufsize 0x%x, count %ld, firstu 0x%x\n",
+	kdb_printf("alist 0x%p, bufsize 0x%x, count %zd, firstu 0x%x\n",
 		       context->alist, context->bufsize, context->count,
 		       context->firstu);
 }
