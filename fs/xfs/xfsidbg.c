@@ -6324,9 +6324,8 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	kdb_printf("rsumlevels 0x%x rsumsize 0x%x rbmip 0x%p rsumip 0x%p\n",
 		mp->m_rsumlevels, mp->m_rsumsize, mp->m_rbmip, mp->m_rsumip);
 	kdb_printf("rootip 0x%p\n", mp->m_rootip);
-	kdb_printf("dircook_elog %d blkbit_log %d blkbb_log %d agno_log %d\n",
-		mp->m_dircook_elog, mp->m_blkbit_log, mp->m_blkbb_log,
-		mp->m_agno_log);
+	kdb_printf("blkbit_log %d blkbb_log %d agno_log %d\n",
+		mp->m_blkbit_log, mp->m_blkbb_log, mp->m_agno_log);
 	kdb_printf("agino_log %d inode cluster size %d\n",
 		mp->m_agino_log, mp->m_inode_cluster_size);
 	kdb_printf("blockmask 0x%x blockwsize 0x%x blockwmask 0x%x\n",
