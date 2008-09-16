@@ -18,8 +18,6 @@
 #ifndef __XFS_CLNT_H__
 #define __XFS_CLNT_H__
 
-/* this is some text */
-
 /*
  * XFS arguments structure, constructed from the arguments we
  * are passed via the mount system call.

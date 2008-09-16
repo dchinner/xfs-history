@@ -19,7 +19,6 @@
 #define __XFS_ACL_H__
 
 /* add some text */
-/* add some more text */
 
 /*
  * Access Control Lists
