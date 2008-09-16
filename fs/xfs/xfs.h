@@ -18,6 +18,8 @@
 #ifndef __XFS_H__
 #define __XFS_H__
 
+/* Add some text here */
+
 #ifdef CONFIG_XFS_DEBUG
 #define STATIC
 #define DEBUG 1
