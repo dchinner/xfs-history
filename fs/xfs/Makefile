@@ -24,6 +24,7 @@ ifeq ($(CONFIG_XFS_DEBUG),y)
 	EXTRA_CFLAGS += -g
 endif
 
+# added some text here
 obj-$(CONFIG_XFS_FS)		+= xfs.o
 obj-$(CONFIG_XFS_QUOTA)		+= quota/
 obj-$(CONFIG_XFS_DMAPI)		+= dmapi/

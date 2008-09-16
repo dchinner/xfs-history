@@ -18,6 +18,8 @@
 #ifndef __XFS_ACL_H__
 #define __XFS_ACL_H__
 
+/* add some text */
+
 /*
  * Access Control Lists
  */
