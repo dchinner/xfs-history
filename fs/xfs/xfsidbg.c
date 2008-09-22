@@ -6249,8 +6249,8 @@ xfsidbg_xaildump(xfs_mount_t *mp)
 		default:
 			kdb_printf("Unknown item type %d\n", lip->li_type);
 			break;
-		count++;
 		}
+		count++;
 	}
 }
 
