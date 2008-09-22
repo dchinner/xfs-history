@@ -1925,11 +1925,11 @@ static int	kdbm_iptraceaddr(
 
 
 static char	*bp_flag_vals[] = {
-/*  0 */ "READ", "WRITE", "MAPPED", "PARTIAL", "ASYNC",
-/*  5 */ "NONE", "DELWRI",  "STALE", "FS_MANAGED", "FS_DATAIOD",
-/* 10 */ "FORCEIO", "FLUSH", "READ_AHEAD", "DIRECTIO", "LOCK",
-/* 15 */ "TRYLOCK", "DONT_BLOCK", "PAGE_CACHE", "KMEM_ALLOC", "RUN_QUEUES",
-/* 20 */ "PRIVATE_BH", "DELWRI_Q",
+/*  0 */ "READ", "WRITE", "MAPPED", "<unknown(3)>", "ASYNC",
+/*  5 */ "DONE", "DELWRI",  "STALE", "FS_MANAGED", "<unknown(9)>",
+/* 10 */ "<unknown(10)>", "ORDERED", "READ_AHEAD", "<unknown(13)>", "LOCK",
+/* 15 */ "TRYLOCK", "DONT_BLOCK", "PAGE_CACHE", "PAGES", "RUN_QUEUES",
+/* 20 */ "<unknown(20)>", "DELWRI_Q", "PAGE_LOCKED",
 	 NULL };
 
 static char	*iomap_flag_vals[] = {
