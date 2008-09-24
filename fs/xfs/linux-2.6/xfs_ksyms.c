@@ -40,6 +40,7 @@
 #include "xfs_dinode.h"
 #include "xfs_inode.h"
 #include "xfs_btree.h"
+#include "xfs_btree_trace.h"
 #include "xfs_ialloc.h"
 #include "xfs_bmap.h"
 #include "xfs_rtalloc.h"
@@ -99,7 +100,9 @@ EXPORT_SYMBOL(xfs_alloc_trace_buf);
 #ifdef XFS_BMAP_TRACE
 EXPORT_SYMBOL(xfs_bmap_trace_buf);
 #endif
-#ifdef XFS_BMBT_TRACE
+#ifdef XFS_BTREE_TRACE
+EXPORT_SYMBOL(xfs_allocbt_trace_buf);
+EXPORT_SYMBOL(xfs_inobt_trace_buf);
 EXPORT_SYMBOL(xfs_bmbt_trace_buf);
 #endif
 #ifdef XFS_ATTR_TRACE

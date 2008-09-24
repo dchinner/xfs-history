@@ -45,6 +45,7 @@
 #include "xfs_dinode.h"
 #include "xfs_inode.h"
 #include "xfs_btree.h"
+#include "xfs_btree_trace.h"
 #include "xfs_buf_item.h"
 #include "xfs_inode_item.h"
 #include "xfs_extfree_item.h"
@@ -88,7 +89,7 @@ static void	xfsidbg_xattrtrace(int);
 static void	xfsidbg_xblitrace(xfs_buf_log_item_t *);
 #endif
 #ifdef XFS_BMAP_TRACE
-static void	xfsidbg_xbmatrace(int);
+static void	xfsidbg_xbtatrace(int, struct ktrace *, int);
 static void	xfsidbg_xbmitrace(xfs_inode_t *);
 static void	xfsidbg_xbmstrace(xfs_inode_t *);
 static void	xfsidbg_xbxatrace(int);
@@ -133,7 +134,7 @@ static void	xfsidbg_xattrleaf(xfs_attr_leafblock_t *);
 static void	xfsidbg_xattrsf(xfs_attr_shortform_t *);
 static void	xfsidbg_xbirec(xfs_bmbt_irec_t *r);
 static void	xfsidbg_xbmalla(xfs_bmalloca_t *);
-static void	xfsidbg_xbrec(xfs_bmbt_rec_host_t *);
+static void	xfsidbg_xbmbtrec(xfs_bmbt_rec_host_t *);
 static void	xfsidbg_xbroot(xfs_inode_t *);
 static void	xfsidbg_xbroota(xfs_inode_t *);
 static void	xfsidbg_xbtcur(xfs_btree_cur_t *);
@@ -198,9 +199,6 @@ static int	xfs_attr_trace_entry(ktrace_entry_t *ktep);
 #endif
 #ifdef XFS_BMAP_TRACE
 static int	xfs_bmap_trace_entry(ktrace_entry_t *ktep);
-#endif
-#ifdef XFS_BMAP_TRACE
-static int	xfs_bmbt_trace_entry(ktrace_entry_t *ktep);
 #endif
 #ifdef XFS_DIR2_TRACE
 static int	xfs_dir2_trace_entry(ktrace_entry_t *ktep);
@@ -422,9 +420,51 @@ static int	kdbm_xfs_xbmatrace(
 	if (diag)
 		return diag;
 
-	xfsidbg_xbmatrace((int) addr);
+	xfsidbg_xbtatrace(XFS_BTNUM_BMAP, xfs_bmbt_trace_buf, (int)addr);
 	return 0;
 }
+
+static int	kdbm_xfs_xbtaatrace(
+	int	argc,
+	const char **argv)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
+	if (diag)
+		return diag;
+
+	/* also contains XFS_BTNUM_CNT */
+	xfsidbg_xbtatrace(XFS_BTNUM_BNO, xfs_allocbt_trace_buf, (int)addr);
+	return 0;
+}
+
+static int	kdbm_xfs_xbtiatrace(
+	int	argc,
+	const char **argv)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
+	if (diag)
+		return diag;
+
+	xfsidbg_xbtatrace(XFS_BTNUM_INO, xfs_inobt_trace_buf, (int)addr);
+	return 0;
+}
+
 
 static int	kdbm_xfs_xbmitrace(
 	int	argc,
@@ -903,7 +943,7 @@ static int	kdbm_xfs_xbrec(
 	if (diag)
 		return diag;
 
-	xfsidbg_xbrec((xfs_bmbt_rec_host_t *) addr);
+	xfsidbg_xbmbtrec((xfs_bmbt_rec_host_t *) addr);
 	return 0;
 }
 
@@ -2293,6 +2333,10 @@ static struct xif xfsidbg_funcs[] = {
 				"Dump XFS bmap btree per-inode trace" },
   {  "xbmstrc",	kdbm_xfs_xbmstrace,	"<xfs_inode_t>",
 				"Dump XFS bmap btree inode trace" },
+  {  "xbtaatrc", kdbm_xfs_xbtaatrace,	"<count>",
+				"Dump XFS alloc btree count trace" },
+  {  "xbtiatrc", kdbm_xfs_xbtiatrace,	"<count>",
+				"Dump XFS inobt btree count trace" },
 #endif
   {  "xbrec",	kdbm_xfs_xbrec,		"<xfs_bmbt_rec_64_t>",
 				"Dump XFS bmap record"},
@@ -2728,16 +2772,115 @@ xfs_bmap_trace_entry(ktrace_entry_t *ktep)
 	return 1;
 }
 
+static void
+xfsidbg_btree_trace_record(
+	int			btnum,
+	unsigned long		l0,
+	unsigned long		l1,
+	unsigned long		l2,
+	unsigned long		l3,
+	unsigned long		l4,
+	unsigned long		l5)
+{
+	switch (btnum) {
+	case XFS_BTNUM_BMAP:
+	{
+		struct xfs_bmbt_irec s;
+
+		s.br_startoff = ((xfs_dfiloff_t)l0 << 32) | (xfs_dfiloff_t)l1;
+		s.br_startblock = ((xfs_dfsbno_t)l2 << 32) | (xfs_dfsbno_t)l3;
+		s.br_blockcount = ((xfs_dfilblks_t)l4 << 32) | (xfs_dfilblks_t)l5;
+
+		xfsidbg_xbirec(&s);
+		break;
+	}
+	case XFS_BTNUM_BNO:
+	case XFS_BTNUM_CNT:
+		qprintf(" startblock = %d, blockcount = %d\n",
+			(unsigned int)l0, (unsigned int)l2);
+		break;
+	case XFS_BTNUM_INO:
+		qprintf(" startino = %d, freecount = %d, free = %lld\n",
+			(unsigned int)l0, (unsigned int)l2,
+			((xfs_inofree_t)l4 << 32) | (xfs_inofree_t)l5);
+		break;
+	default:
+		break;
+	}
+}
+
+static void
+xfsidbg_btree_trace_key(
+	int			btnum,
+	unsigned long		l0,
+	unsigned long		l1,
+	unsigned long		l2,
+	unsigned long		l3)
+{
+	switch (btnum) {
+	case XFS_BTNUM_BMAP:
+		qprintf(" startoff 0x%x%08x\n", (unsigned int)l0, (unsigned int)l1);
+		break;
+	case XFS_BTNUM_BNO:
+	case XFS_BTNUM_CNT:
+		qprintf(" startblock %d blockcount %d\n",
+			(unsigned int)l0, (unsigned int)l3);
+		break;
+	case XFS_BTNUM_INO:
+		qprintf(" startino %d\n", (unsigned int)l0);
+		break;
+	default:
+		break;
+	}
+}
+
+static void
+xfsidbg_btree_trace_cursor(
+	int			btnum,
+	unsigned long		l0,
+	unsigned long		l1,
+	unsigned long		l2,
+	unsigned long		l3,
+	unsigned long		l4)
+{
+	switch (btnum) {
+	case XFS_BTNUM_BMAP:
+	{
+		struct xfs_bmbt_rec_host r;
+
+		qprintf(" nlevels %ld flags %ld allocated %ld ",
+			(l0 >> 24) & 0xff, (l0 >> 16) & 0xff, l0 & 0xffff);
+
+		r.l0 = (unsigned long long)l1 << 32 | l2;
+		r.l1 = (unsigned long long)l3 << 32 | l4;
+
+		xfsidbg_xbmbtrec(&r);
+		break;
+	}
+	case XFS_BTNUM_BNO:
+	case XFS_BTNUM_CNT:
+		qprintf(" agno %d startblock %d blockcount %d\n",
+			(unsigned int)l0, (unsigned int)l1, (unsigned int)l3);
+		break;
+	case XFS_BTNUM_INO:
+		qprintf(" agno %d startino %d free %lld\n",
+			(unsigned int)l0, (unsigned int)l1,
+			((xfs_inofree_t)l3 << 32) | (xfs_inofree_t)l4);
+		break;
+	default:
+		break;
+	}
+}
+
 /*
  * Print xfs bmap btree trace buffer entry.
  */
 static int
-xfs_bmbt_trace_entry(
-	ktrace_entry_t	  *ktep)
+xfs_btree_trace_entry(
+	int			btnum,
+	ktrace_entry_t	  	*ktep)
 {
 	int			line;
-	xfs_bmbt_rec_host_t	r;
-	xfs_bmbt_irec_t		s;
 	int			type;
 	int			whichfork;
 
@@ -2754,18 +2897,18 @@ xfs_bmbt_trace_entry(
 		"da"[whichfork],
 		(xfs_btree_cur_t *)ktep->val[4]);
 	switch (type) {
-	case XFS_BMBT_KTRACE_ARGBI:
+	case XFS_BTREE_KTRACE_ARGBI:
 		qprintf(" buf 0x%p i %ld\n",
 			(xfs_buf_t *)ktep->val[5],
 			(long)ktep->val[6]);
 		break;
-	case XFS_BMBT_KTRACE_ARGBII:
+	case XFS_BTREE_KTRACE_ARGBII:
 		qprintf(" buf 0x%p i0 %ld i1 %ld\n",
 			(xfs_buf_t *)ktep->val[5],
 			(long)ktep->val[6],
 			(long)ktep->val[7]);
 		break;
-	case XFS_BMBT_KTRACE_ARGFFFI:
+	case XFS_BTREE_KTRACE_ARGFFFI:
 		qprintf(" o 0x%x%08x b 0x%x%08x i 0x%x%08x j %ld\n",
 			(unsigned int)(long)ktep->val[5],
 			(unsigned int)(long)ktep->val[6],
@@ -2775,11 +2918,11 @@ xfs_bmbt_trace_entry(
 			(unsigned int)(long)ktep->val[10],
 			(long)ktep->val[11]);
 		break;
-	case XFS_BMBT_KTRACE_ARGI:
+	case XFS_BTREE_KTRACE_ARGI:
 		qprintf(" i 0x%lx\n",
 			(long)ktep->val[5]);
 		break;
-	case XFS_BMBT_KTRACE_ARGIFK:
+	case XFS_BTREE_KTRACE_ARGIPK:
 		qprintf(" i 0x%lx f 0x%x%08x o 0x%x%08x\n",
 			(long)ktep->val[5],
 			(unsigned int)(long)ktep->val[6],
@@ -2787,39 +2930,44 @@ xfs_bmbt_trace_entry(
 			(unsigned int)(long)ktep->val[8],
 			(unsigned int)(long)ktep->val[9]);
 		break;
-	case XFS_BMBT_KTRACE_ARGIFR:
+	case XFS_BTREE_KTRACE_ARGIPR:
 		qprintf(" i 0x%lx f 0x%x%08x ",
 			(long)ktep->val[5],
 			(unsigned int)(long)ktep->val[6],
 			(unsigned int)(long)ktep->val[7]);
-		s.br_startoff = (xfs_fileoff_t)
-			(((xfs_dfiloff_t)(unsigned long)ktep->val[8] << 32) |
-				(xfs_dfiloff_t)(unsigned long)ktep->val[9]);
-		s.br_startblock = (xfs_fsblock_t)
-			(((xfs_dfsbno_t)(unsigned long)ktep->val[10] << 32) |
-				(xfs_dfsbno_t)(unsigned long)ktep->val[11]);
-		s.br_blockcount = (xfs_filblks_t)
-			(((xfs_dfilblks_t)(unsigned long)ktep->val[12] << 32) |
-				(xfs_dfilblks_t)(unsigned long)ktep->val[13]);
-		xfsidbg_xbirec(&s);
+		xfsidbg_btree_trace_record(btnum,
+					 (unsigned long)ktep->val[8],
+					 (unsigned long)ktep->val[9],
+					 (unsigned long)ktep->val[10],
+					 (unsigned long)ktep->val[11],
+					 (unsigned long)ktep->val[12],
+					 (unsigned long)ktep->val[13]);
 		break;
-	case XFS_BMBT_KTRACE_ARGIK:
-		qprintf(" i 0x%lx o 0x%x%08x\n",
-			(long)ktep->val[5],
-			(unsigned int)(long)ktep->val[6],
-			(unsigned int)(long)ktep->val[7]);
+	case XFS_BTREE_KTRACE_ARGIK:
+		qprintf(" i 0x%lx\n", (long)ktep->val[5]);
+		xfsidbg_btree_trace_key(btnum,
+				      (unsigned long)ktep->val[6],
+				      (unsigned long)ktep->val[7],
+				      (unsigned long)ktep->val[8],
+				      (unsigned long)ktep->val[9]);
 		break;
-	case XFS_BMBT_KTRACE_CUR:
-		qprintf(" nlevels %ld flags %ld allocated %ld ",
-			((long)ktep->val[5] >> 24) & 0xff,
-			((long)ktep->val[5] >> 16) & 0xff,
-			(long)ktep->val[5] & 0xffff);
-		r.l0 = (unsigned long long)(unsigned long)ktep->val[6] << 32 |
-			(unsigned long)ktep->val[7];
-		r.l1 = (unsigned long long)(unsigned long)ktep->val[8] << 32 |
-			(unsigned long)ktep->val[9];
+	case XFS_BTREE_KTRACE_ARGR:
+		xfsidbg_btree_trace_record(btnum,
+					 (unsigned long)ktep->val[5],
+					 (unsigned long)ktep->val[6],
+					 (unsigned long)ktep->val[7],
+					 (unsigned long)ktep->val[8],
+					 (unsigned long)ktep->val[9],
+					 (unsigned long)ktep->val[10]);
+		break;
+	case XFS_BTREE_KTRACE_CUR:
+		xfsidbg_btree_trace_cursor(btnum,
+					  (unsigned long)ktep->val[5],
+					  (unsigned long)ktep->val[6],
+					  (unsigned long)ktep->val[7],
+					  (unsigned long)ktep->val[8],
+					  (unsigned long)ktep->val[9]);
 
-		xfsidbg_xbrec(&r);
 		qprintf(" bufs 0x%p 0x%p 0x%p 0x%p ",
 			(xfs_buf_t *)ktep->val[10],
 			(xfs_buf_t *)ktep->val[11],
@@ -4405,21 +4553,21 @@ xfsidbg_xbmalla(xfs_bmalloca_t *a)
 
 #ifdef XFS_BMAP_TRACE
 /*
- * Print out the last "count" entries in the bmap btree trace buffer.
+ * Print out the last "count" entries in a btree trace buffer.
  * The "a" is for "all" inodes.
  */
 static void
-xfsidbg_xbmatrace(int count)
+xfsidbg_xbtatrace(int btnum, struct ktrace *trace_buf, int count)
 {
 	ktrace_entry_t  *ktep;
 	ktrace_snap_t   kts;
 	int	     nentries;
 	int	     skip_entries;
 
-	if (xfs_bmbt_trace_buf == NULL) {
+	if (trace_buf == NULL) {
 		qprintf("The xfs bmap btree trace buffer is not initialized\n");		return;
 	}
-	nentries = ktrace_nentries(xfs_bmbt_trace_buf);
+	nentries = ktrace_nentries(trace_buf);
 	if (count == -1) {
 		count = nentries;
 	}
@@ -4428,23 +4576,23 @@ xfsidbg_xbmatrace(int count)
 		return;
 	}
 
-	ktep = ktrace_first(xfs_bmbt_trace_buf, &kts);
+	ktep = ktrace_first(trace_buf, &kts);
 	if (count != nentries) {
 		/*
 		 * Skip the total minus the number to look at minus one
 		 * for the entry returned by ktrace_first().
 		 */
 		skip_entries = nentries - count - 1;
-		ktep = ktrace_skip(xfs_bmbt_trace_buf, skip_entries, &kts);
+		ktep = ktrace_skip(trace_buf, skip_entries, &kts);
 		if (ktep == NULL) {
 			qprintf("Skipped them all\n");
 			return;
 		}
 	}
 	while (ktep != NULL) {
-		if (xfs_bmbt_trace_entry(ktep))
+		if (xfs_btree_trace_entry(btnum, ktep))
 			qprintf("\n");
-		ktep = ktrace_next(xfs_bmbt_trace_buf, &kts);
+		ktep = ktrace_next(trace_buf, &kts);
 	}
 }
 
@@ -4464,7 +4612,7 @@ xfsidbg_xbmitrace(xfs_inode_t *ip)
 
 	ktep = ktrace_first(ip->i_btrace, &kts);
 	while (ktep != NULL) {
-		if (xfs_bmbt_trace_entry(ktep))
+		if (xfs_btree_trace_entry(XFS_BTNUM_BMAP, ktep))
 			qprintf("\n");
 		ktep = ktrace_next(ip->i_btrace, &kts);
 	}
@@ -4487,7 +4635,7 @@ xfsidbg_xbmstrace(xfs_inode_t *ip)
 	ktep = ktrace_first(xfs_bmbt_trace_buf, &kts);
 	while (ktep != NULL) {
 		if ((xfs_inode_t *)(ktep->val[2]) == ip) {
-			if (xfs_bmbt_trace_entry(ktep))
+			if (xfs_btree_trace_entry(XFS_BTNUM_BMAP, ktep))
 				qprintf("\n");
 		}
 		ktep = ktrace_next(xfs_bmbt_trace_buf, &kts);
@@ -4499,7 +4647,7 @@ xfsidbg_xbmstrace(xfs_inode_t *ip)
  * Print xfs bmap record
  */
 static void
-xfsidbg_xbrec(xfs_bmbt_rec_host_t *r)
+xfsidbg_xbmbtrec(xfs_bmbt_rec_host_t *r)
 {
 	xfs_bmbt_irec_t	irec;
 
@@ -6442,7 +6590,7 @@ xfsidbg_xnode(xfs_inode_t *ip)
 #ifdef XFS_BMAP_TRACE
 	qprintf(" bmap_trace 0x%p\n", ip->i_xtrace);
 #endif
-#ifdef XFS_BMBT_TRACE
+#ifdef XFS_BTREE_TRACE
 	qprintf(" bmbt trace 0x%p\n", ip->i_btrace);
 #endif
 #ifdef XFS_RW_TRACE
