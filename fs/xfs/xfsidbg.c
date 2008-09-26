@@ -6725,7 +6725,7 @@ xfsidbg_xqm_dquot(xfs_dquot_t *dqp)
 		(unsigned long long)dqp->q_res_rtbcount);
 	kdb_printf("qlock 0x%p  &q_flush 0x%p (%d) pincount 0x%x\n",
 		&dqp->q_qlock, &dqp->q_flush,
-		dqp->q_flush.done, dqp->q_pincount);
+		dqp->q_flush.done, atomic_read(&dqp->q_pincount));
 #ifdef XFS_DQUOT_TRACE
 	qprintf("dqtrace 0x%p\n", dqp->q_trace);
 #endif
@@ -6909,10 +6909,9 @@ xfsidbg_xqm_qinfo(xfs_mount_t *mp)
 		return;
 	}
 
-	kdb_printf("uqip 0x%p, gqip 0x%p, &pinlock 0x%p &dqlist 0x%p\n",
+	kdb_printf("uqip 0x%p, gqip 0x%p, &dqlist 0x%p\n",
 		mp->m_quotainfo->qi_uquotaip,
 		mp->m_quotainfo->qi_gquotaip,
-		&mp->m_quotainfo->qi_pinlock,
 		&mp->m_quotainfo->qi_dqlist);
 
 	kdb_printf("btmlimit 0x%x, itmlimit 0x%x, RTbtmlim 0x%x\n",
