@@ -355,7 +355,7 @@ xfs_vn_ci_lookup(
 	/* else case-insensitive match... */
 	dname.name = ci_name.name;
 	dname.len = ci_name.len;
-	dentry = d_add_ci(VFS_I(ip), dentry, &dname);
+	dentry = d_add_ci(dentry, VFS_I(ip), &dname);
 	kmem_free(ci_name.name);
 	return dentry;
 }
@@ -529,8 +529,7 @@ xfs_check_acl(
 STATIC int
 xfs_vn_permission(
 	struct inode		*inode,
-	int			mask,
-	struct nameidata	*nd)
+	int			mask)
 {
 	return generic_permission(inode, mask, xfs_check_acl);
 }

@@ -883,7 +883,6 @@ xfs_fs_destroy_inode(
 
 STATIC void
 xfs_fs_inode_init_once(
-	kmem_zone_t		*zonep,
 	void			*vnode)
 {
 	inode_init_once((struct inode *)vnode);
@@ -900,7 +899,6 @@ xfs_fs_inode_init_once(
  */
 void
 xfs_inode_init_once(
-	kmem_zone_t		*zone,
 	void			*inode)
 {
 	struct xfs_inode	*ip = inode;
