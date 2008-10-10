@@ -3101,7 +3101,7 @@ xfsidbg_print_alloc_key(int i, union xfs_btree_key *key,
 }
 
 static struct xfsidbg_btree xfsidbg_allocbt = {
-	.block_len	= sizeof(struct xfs_btree_sblock),
+	.block_len	= XFS_BTREE_SBLOCK_LEN,
 	.key_len	= sizeof(xfs_alloc_key_t),
 	.rec_len	= sizeof(xfs_alloc_rec_t),
 	.ptr_len	= sizeof(__be32),
@@ -3133,7 +3133,7 @@ xfsidbg_print_bmbt_key(int i, union xfs_btree_key *key,
 }
 
 static struct xfsidbg_btree xfsidbg_bmbt = {
-	.block_len	= sizeof(struct xfs_btree_lblock),
+	.block_len	= XFS_BTREE_LBLOCK_LEN,
 	.key_len	= sizeof(xfs_bmbt_key_t),
 	.rec_len	= sizeof(xfs_bmbt_rec_t),
 	.ptr_len	= sizeof(__be64),
@@ -3161,7 +3161,7 @@ xfsidbg_print_inobt_key(int i, union xfs_btree_key *key,
 }
 
 static struct xfsidbg_btree xfsidbg_inobtbt = {
-	.block_len	= sizeof(struct xfs_btree_sblock),
+	.block_len	= XFS_BTREE_SBLOCK_LEN,
 	.key_len	= sizeof(xfs_inobt_key_t),
 	.rec_len	= sizeof(xfs_inobt_rec_t),
 	.ptr_len	= sizeof(__be32),
@@ -3185,8 +3185,7 @@ xfs_broot(xfs_inode_t *ip, xfs_ifork_t *f)
 		return;
 	}
 
-	xfs_btblock((struct xfs_btree_block *)f->if_broot, f->if_broot_bytes,
-		    &xfsidbg_bmbt);
+	xfs_btblock(f->if_broot, f->if_broot_bytes, &xfsidbg_bmbt);
 }
 
 
