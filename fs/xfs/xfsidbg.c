@@ -5915,20 +5915,27 @@ xfsidbg_xiclogtrace(xlog_in_core_t *iclog)
 static void
 xfsidbg_xinodes(xfs_mount_t *mp)
 {
-	xfs_inode_t	*ip;
+	int		i;
 
 	kdb_printf("xfs_mount at 0x%p\n", mp);
-	ip = mp->m_inodes;
-	if (ip != NULL) {
+	for (i = 0; i < mp->m_sb.sb_agcount; i++) {
+		xfs_perag_t	*pag = &mp->m_perag[i];
+		xfs_inode_t	*ip = NULL;
+		int		first_index = 0;
+		int		nr_found;
+
+		if (!pag->pag_ici_init)
+			continue;
 		do {
-			if (ip->i_mount == NULL) {
-				ip = ip->i_mnext;
-				continue;
-			}
+			nr_found = radix_tree_gang_lookup(&pag->pag_ici_root,
+						(void**)&ip, first_index, 1);
+			if (!nr_found)
+				break;
+			/* update the index for the next lookup */
+			first_index = XFS_INO_TO_AGINO(mp, ip->i_ino + 1);
 			kdb_printf("\n");
 			xfsidbg_xnode(ip);
-			ip = ip->i_mnext;
-		} while (ip != mp->m_inodes);
+		} while (nr_found);
 	}
 	kdb_printf("\nEnd of Inodes\n");
 }
@@ -5936,23 +5943,30 @@ xfsidbg_xinodes(xfs_mount_t *mp)
 static void
 xfsidbg_delayed_blocks(xfs_mount_t *mp)
 {
-	xfs_inode_t	*ip;
 	unsigned int	total = 0;
 	unsigned int	icount = 0;
+	int		i;
 
-	ip = mp->m_inodes;
-	if (ip != NULL) {
+	for (i = 0; i < mp->m_sb.sb_agcount; i++) {
+		xfs_perag_t	*pag = &mp->m_perag[i];
+		xfs_inode_t	*ip = NULL;
+		int		first_index = 0;
+		int		nr_found;
+
+		if (!pag->pag_ici_init)
+			continue;
 		do {
-			if (ip->i_mount == NULL) {
-				ip = ip->i_mnext;
-				continue;
-			}
+			nr_found = radix_tree_gang_lookup(&pag->pag_ici_root,
+						(void**)&ip, first_index, 1);
+			if (!nr_found)
+				break;
+			/* update the index for the next lookup */
+			first_index = XFS_INO_TO_AGINO(mp, ip->i_ino + 1);
 			if (ip->i_delayed_blks) {
 				total += ip->i_delayed_blks;
 				icount++;
 			}
-			ip = ip->i_mnext;
-		} while (ip != mp->m_inodes);
+		} while (nr_found);
 	}
 	kdb_printf("delayed blocks total: %d in %d inodes\n", total, icount);
 }
@@ -5960,21 +5974,28 @@ xfsidbg_delayed_blocks(xfs_mount_t *mp)
 static void
 xfsidbg_xinodes_quiesce(xfs_mount_t *mp)
 {
-	xfs_inode_t	*ip;
+	int		i;
 
 	kdb_printf("xfs_mount at 0x%p\n", mp);
-	ip = mp->m_inodes;
-	if (ip != NULL) {
+	for (i = 0; i < mp->m_sb.sb_agcount; i++) {
+		xfs_perag_t	*pag = &mp->m_perag[i];
+		xfs_inode_t	*ip = NULL;
+		int		first_index = 0;
+		int		nr_found;
+
+		if (!pag->pag_ici_init)
+			continue;
 		do {
-			if (ip->i_mount == NULL) {
-				ip = ip->i_mnext;
-				continue;
-			}
+			nr_found = radix_tree_gang_lookup(&pag->pag_ici_root,
+						(void**)&ip, first_index, 1);
+			if (!nr_found)
+				break;
+			/* update the index for the next lookup */
+			first_index = XFS_INO_TO_AGINO(mp, ip->i_ino + 1);
 			if (!(ip->i_flags & XFS_IQUIESCE)) {
 				kdb_printf("ip 0x%p not quiesced\n", ip);
 			}
-			ip = ip->i_mnext;
-		} while (ip != mp->m_inodes);
+		} while (nr_found);
 	}
 	kdb_printf("\nEnd of Inodes\n");
 }
@@ -6500,8 +6521,8 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		mp->m_rtdev_targp ? mp->m_rtdev_targp->bt_dev : 0);
 	kdb_printf("bsize %d agfrotor %d xfs_rotorstep %d agirotor %d\n",
 		mp->m_bsize, mp->m_agfrotor, xfs_rotorstep, mp->m_agirotor);
-	kdb_printf("inodes 0x%p ilock 0x%p ireclaims 0x%x\n",
-		mp->m_inodes, &mp->m_ilock, mp->m_ireclaims);
+	kdb_printf("ilock 0x%p ireclaims 0x%x\n",
+		&mp->m_ilock, mp->m_ireclaims);
 	kdb_printf("readio_log 0x%x readio_blocks 0x%x ",
 		mp->m_readio_log, mp->m_readio_blocks);
 	kdb_printf("writeio_log 0x%x writeio_blocks 0x%x\n",
@@ -6589,11 +6610,7 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		NULL
 	};
 
-	kdb_printf("mount 0x%p mnext 0x%p mprev 0x%p vnode 0x%p \n",
-		ip->i_mount,
-		ip->i_mnext,
-		ip->i_mprev,
-		VFS_I(ip));
+	kdb_printf("mount 0x%p vnode 0x%p \n", ip->i_mount, VFS_I(ip));
 	kdb_printf("dev %x ino %s\n",
 		ip->i_mount->m_ddev_targp->bt_dev,
 		xfs_fmtino(ip->i_ino, ip->i_mount));
@@ -6793,22 +6810,33 @@ xfsidbg_xqm_dquot(xfs_dquot_t *dqp)
 static void
 xfsidbg_xqm_dqattached_inos(xfs_mount_t	*mp)
 {
-	xfs_inode_t	*ip;
-	int		n = 0;
+	int		i, n = 0;
 
-	ip = mp->m_inodes;
-	do {
-		if (ip->i_mount == NULL) {
-			ip = ip->i_mnext;
+	kdb_printf("xfs_mount at 0x%p\n", mp);
+	for (i = 0; i < mp->m_sb.sb_agcount; i++) {
+		xfs_perag_t	*pag = &mp->m_perag[i];
+		xfs_inode_t	*ip = NULL;
+		int		first_index = 0;
+		int		nr_found;
+
+		if (!pag->pag_ici_init)
 			continue;
-		}
-		if (ip->i_udquot || ip->i_gdquot) {
-			n++;
-			kdb_printf("inode = 0x%p, ino %d: udq 0x%p, gdq 0x%p\n",
-				ip, (int)ip->i_ino, ip->i_udquot, ip->i_gdquot);
-		}
-		ip = ip->i_mnext;
-	} while (ip != mp->m_inodes);
+		do {
+			nr_found = radix_tree_gang_lookup(&pag->pag_ici_root,
+						(void**)&ip, first_index, 1);
+			if (!nr_found)
+				break;
+			/* update the index for the next lookup */
+			first_index = XFS_INO_TO_AGINO(mp, ip->i_ino + 1);
+			if (ip->i_udquot || ip->i_gdquot) {
+				n++;
+				kdb_printf("inode = 0x%p, ino %d: udq 0x%p, gdq 0x%p\n",
+					ip, (int)ip->i_ino, ip->i_udquot, ip->i_gdquot);
+			}
+			kdb_printf("\n");
+			xfsidbg_xnode(ip);
+		} while (nr_found);
+	}
 	kdb_printf("\nNumber of inodes with dquots attached: %d\n", n);
 }
 
