@@ -267,7 +267,6 @@ EXPORT_SYMBOL(xfs_attr_remove);
 EXPORT_SYMBOL(xfs_attr_list);
 EXPORT_SYMBOL(xfs_readdir);
 EXPORT_SYMBOL(xfs_setsize_buftarg);
-EXPORT_SYMBOL(xfs_syncsub);
 EXPORT_SYMBOL(xfs_sync_inodes);
 EXPORT_SYMBOL(xfs_trans_add_item);
 EXPORT_SYMBOL(xfs_trans_alloc);
