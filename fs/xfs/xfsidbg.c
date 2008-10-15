@@ -6520,8 +6520,7 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		mp->m_rtdev_targp ? mp->m_rtdev_targp->bt_dev : 0);
 	kdb_printf("bsize %d agfrotor %d xfs_rotorstep %d agirotor %d\n",
 		mp->m_bsize, mp->m_agfrotor, xfs_rotorstep, mp->m_agirotor);
-	kdb_printf("ilock 0x%p ireclaims 0x%x\n",
-		&mp->m_ilock, mp->m_ireclaims);
+	kdb_printf("ireclaims 0x%x\n", mp->m_ireclaims);
 	kdb_printf("readio_log 0x%x readio_blocks 0x%x ",
 		mp->m_readio_log, mp->m_readio_blocks);
 	kdb_printf("writeio_log 0x%x writeio_blocks 0x%x\n",
