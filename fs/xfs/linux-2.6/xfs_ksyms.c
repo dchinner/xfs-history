@@ -215,7 +215,6 @@ EXPORT_SYMBOL(xfs_error_report);
 EXPORT_SYMBOL(xfs_error_trap);
 #endif
 EXPORT_SYMBOL(xfs_file_last_byte);
-EXPORT_SYMBOL(xfs_finish_reclaim_all);
 EXPORT_SYMBOL(xfs_freesb);
 EXPORT_SYMBOL(xfs_fs_cmn_err);
 EXPORT_SYMBOL(xfs_highbit32);
