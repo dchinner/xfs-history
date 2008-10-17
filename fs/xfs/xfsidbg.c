@@ -30,6 +30,7 @@
 #include "xfs_log.h"
 #include "xfs_inum.h"
 #include "xfs_trans.h"
+#include "xfs_trans_priv.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
 #include "xfs_dir2.h"
@@ -6425,12 +6426,12 @@ xfsidbg_xaildump(xfs_mount_t *mp)
 		};
 	int count = 0;
 
-	if (list_empty(&mp->m_ail.xa_ail)) {
+	if (list_empty(&mp->m_ail->xa_ail)) {
 		kdb_printf("AIL is empty\n");
 		return;
 	}
 	kdb_printf("AIL for mp 0x%p, oldest first\n", mp);
-	list_for_each_entry(lip, &mp->m_ail.xa_ail, li_ail) {
+	list_for_each_entry(lip, &mp->m_ail->xa_ail, li_ail) {
 		kdb_printf("[%d] type %s ", count, xfsidbg_item_type_str(lip));
 		printflags((uint)(lip->li_flags), li_flags, "flags:");
 		kdb_printf("  lsn %s\n   ", xfs_fmtlsn(&(lip->li_lsn)));
@@ -6509,10 +6510,8 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	};
 
 	kdb_printf("xfs_mount at 0x%p\n", mp);
-	kdb_printf("tid 0x%x ail_lock 0x%p &ail 0x%p\n",
-		mp->m_tid, &mp->m_ail_lock, &mp->m_ail.xa_ail);
-	kdb_printf("ail_gen 0x%x &sb 0x%p\n",
-		mp->m_ail.xa_gen, &mp->m_sb);
+	kdb_printf("tid 0x%x ail 0x%p &sb 0x%p\n",
+		mp->m_tid, mp->m_ail, &mp->m_sb);
 	kdb_printf("sb_lock 0x%p sb_bp 0x%p dev 0x%x logdev 0x%x rtdev 0x%x\n",
 		&mp->m_sb_lock, mp->m_sb_bp,
 		mp->m_ddev_targp ? mp->m_ddev_targp->bt_dev : 0,
