@@ -268,7 +268,7 @@ EXPORT_SYMBOL(xfs_trans_bjoin);
 EXPORT_SYMBOL(xfs_trans_brelse);
 EXPORT_SYMBOL(xfs_trans_cancel);
 EXPORT_SYMBOL(_xfs_trans_commit);
-EXPORT_SYMBOL(xfs_trans_delete_ail);
+EXPORT_SYMBOL(xfs_trans_ail_delete);
 EXPORT_SYMBOL(xfs_trans_dquot_buf);
 EXPORT_SYMBOL(xfs_trans_find_item);
 EXPORT_SYMBOL(xfs_trans_get_buf);
