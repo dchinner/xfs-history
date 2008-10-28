@@ -169,7 +169,6 @@ EXPORT_SYMBOL(xfs_buf_offset);
 EXPORT_SYMBOL(xfs_buf_rele);
 EXPORT_SYMBOL(xfs_buf_readahead);
 EXPORT_SYMBOL(xfs_buf_unlock);
-EXPORT_SYMBOL(sys_cred);
 EXPORT_SYMBOL(uuid_create_nil);
 EXPORT_SYMBOL(uuid_equal);
 EXPORT_SYMBOL(uuid_getnodeuniq);
