@@ -59,6 +59,10 @@ mutex_t		xfs_Gqm_lock;
 struct xfs_qm	*xfs_Gqm;
 uint		ndquot;
 
+#ifdef CONFIG_KDB
+EXPORT_SYMBOL(xfs_Gqm);
+#endif
+
 kmem_zone_t	*qm_dqzone;
 kmem_zone_t	*qm_dqtrxzone;
 

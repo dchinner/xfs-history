@@ -132,7 +132,7 @@ enum {
 	Opt_barrier, Opt_nobarrier, Opt_err
 };
 
-static match_table_t tokens = {
+static const match_table_t tokens = {
 	{Opt_barrier, "barrier"},
 	{Opt_nobarrier, "nobarrier"},
 	{Opt_err, NULL}
@@ -643,7 +643,7 @@ xfs_blkdev_get(
 {
 	int			error = 0;
 
-	*bdevp = open_bdev_excl(name, 0, mp);
+	*bdevp = open_bdev_exclusive(name, FMODE_READ|FMODE_WRITE, mp);
 	if (IS_ERR(*bdevp)) {
 		error = PTR_ERR(*bdevp);
 		printk("XFS: Invalid device [%s], error=%d\n", name, error);
@@ -657,7 +657,7 @@ xfs_blkdev_put(
 	struct block_device	*bdev)
 {
 	if (bdev)
-		close_bdev_excl(bdev);
+		close_bdev_exclusive(bdev, FMODE_READ|FMODE_WRITE);
 }
 
 /*
@@ -1576,6 +1576,7 @@ xfs_fs_get_sb(
 	void			*data,
 	struct vfsmount		*mnt)
 {
+#ifdef HAVE_DMAPI
 	int			error;
 
 	error = get_sb_bdev(fs_type, flags, dev_name, data, xfs_fs_fill_super,
@@ -1587,6 +1588,10 @@ xfs_fs_get_sb(
 	}
 
 	return error;
+#else
+	return get_sb_bdev(fs_type, flags, dev_name, data, xfs_fs_fill_super,
+			   mnt);
+#endif
 }
 
 static struct super_operations xfs_super_operations = {
@@ -1895,6 +1900,8 @@ init_xfs_fs(void)
 	if (error)
 		goto out_cleanup_procfs;
 
+	vfs_initquota();
+
 	error = register_filesystem(&xfs_fs_type);
 	if (error)
 		goto out_sysctl_unregister;
@@ -1921,6 +1928,7 @@ init_xfs_fs(void)
 STATIC void __exit
 exit_xfs_fs(void)
 {
+	vfs_exitquota();
 	unregister_filesystem(&xfs_fs_type);
 	xfs_sysctl_unregister();
 	xfs_cleanup_procfs();

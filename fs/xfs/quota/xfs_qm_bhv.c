@@ -240,16 +240,15 @@ struct xfs_qmops xfs_qmcore_xfs = {
 };
 EXPORT_SYMBOL(xfs_qmcore_xfs);
 
-static int __init
+void __init
 xfs_qm_init(void)
 {
 	printk(KERN_INFO "SGI XFS Quota Management subsystem\n");
 	mutex_init(&xfs_Gqm_lock);
 	xfs_qm_init_procfs();
-	return 0;
 }
 
-static void __exit
+void __exit
 xfs_qm_exit(void)
 {
 	xfs_qm_cleanup_procfs();
@@ -258,6 +257,3 @@ xfs_qm_exit(void)
 	if (qm_dqtrxzone)
 		kmem_zone_destroy(qm_dqtrxzone);
 }
-
-module_init(xfs_qm_init);
-module_exit(xfs_qm_exit);

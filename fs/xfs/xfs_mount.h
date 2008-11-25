@@ -330,7 +330,9 @@ typedef struct xfs_mount {
 	spinlock_t		m_sync_lock;	/* work item list lock */
 	int			m_sync_seq;	/* sync thread generation no. */
 	wait_queue_head_t	m_wait_single_sync_task;
+#ifdef HAVE_DMAPI
 	struct vfsmount		*m_vfsmount;
+#endif
 } xfs_mount_t;
 
 /*

@@ -133,19 +133,13 @@ int
 xfs_qmops_get(struct xfs_mount *mp)
 {
 	if (XFS_IS_QUOTA_RUNNING(mp)) {
-		struct xfs_qmops *ops;
-
-		ops = symbol_get(xfs_qmcore_xfs);
-		if (!ops) {
-			request_module("xfs_quota");
-			ops = symbol_get(xfs_qmcore_xfs);
-		}
-
-		if (!ops) {
-			cmn_err(CE_WARN, "XFS: no quota support available.");
-			return EINVAL;
-		}
-		mp->m_qm_ops = ops;
+#ifdef CONFIG_XFS_QUOTA
+		mp->m_qm_ops = &xfs_qmcore_xfs;
+#else
+		cmn_err(CE_WARN,
+			"XFS: qouta support not available in this kernel.");
+		return EINVAL;
+#endif
 	} else {
 		mp->m_qm_ops = &xfs_qmcore_stub;
 	}
@@ -156,6 +150,4 @@ xfs_qmops_get(struct xfs_mount *mp)
 void
 xfs_qmops_put(struct xfs_mount *mp)
 {
-	if (mp->m_qm_ops != &xfs_qmcore_stub)
-		symbol_put(xfs_qmcore_xfs);
 }

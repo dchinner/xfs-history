@@ -20,6 +20,18 @@
 
 #include <linux/exportfs.h>
 
+#ifdef CONFIG_XFS_QUOTA
+# define vfs_insertquota(vfs)	vfs_insertops(vfsp, &xfs_qmops)
+extern void xfs_qm_init(void);
+extern void xfs_qm_exit(void);
+# define vfs_initquota()	xfs_qm_init()
+# define vfs_exitquota()	xfs_qm_exit()
+#else
+# define vfs_insertquota(vfs)	do { } while (0)
+# define vfs_initquota()	do { } while (0)
+# define vfs_exitquota()	do { } while (0)
+#endif
+
 #ifdef CONFIG_XFS_POSIX_ACL
 # define XFS_ACL_STRING		"ACLs, "
 # define set_posix_acl_flag(sb)	((sb)->s_flags |= MS_POSIXACL)
@@ -52,6 +64,12 @@
 # define XFS_TRACE_STRING
 #endif
 
+#ifdef CONFIG_XFS_DMAPI
+# define XFS_DMAPI_STRING      "dmapi support, "
+#else
+# define XFS_DMAPI_STRING
+#endif
+
 #ifdef DEBUG
 # define XFS_DBG_STRING		"debug"
 #else
@@ -63,6 +81,7 @@
 				XFS_REALTIME_STRING \
 				XFS_BIGFS_STRING \
 				XFS_TRACE_STRING \
+				XFS_DMAPI_STRING \
 				XFS_DBG_STRING /* DBG must be last */
 
 struct xfs_inode;

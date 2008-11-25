@@ -42,5 +42,4 @@
 #endif
 
 #include <linux-2.6/xfs_linux.h>
-
 #endif	/* __XFS_H__ */

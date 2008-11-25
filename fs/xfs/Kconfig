@@ -19,7 +19,7 @@ config XFS_FS
 	  to use an initial ramdisk (initrd) to boot.
 
 config XFS_QUOTA
-	tristate "XFS Quota support"
+	bool "XFS Quota support"
 	depends on XFS_FS
 	help
 	  If you say Y here, you will be able to set limits for disk usage on
@@ -102,4 +102,3 @@ config XFS_TRACE
 	  using the kdb kernel debugger.
 
 	  Say N unless you are an XFS developer.
-
