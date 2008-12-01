@@ -20,7 +20,6 @@
 #include "xfs_bit.h"
 #include "xfs_buf.h"
 #include "xfs_log.h"
-#include "xfs_imap.h"
 #include "xfs_inum.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
@@ -64,7 +63,6 @@
 #include "xfs_iomap.h"
 #include "xfs_filestream.h"
 #include "xfs_vnodeops.h"
-#include "xfs_vfsops.h"
 #include "support/ktrace.h"
 
 
