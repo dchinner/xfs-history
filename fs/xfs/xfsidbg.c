@@ -3658,10 +3658,10 @@ xfs_inodebuf(xfs_buf_t *bp)
 		di = (xfs_dinode_t *)xfs_buf_offset(bp,
 					i * 256);
 
-		xfs_dinode_from_disk(&dic, &di->di_core);
+		xfs_dinode_from_disk(&dic, di);
 		xfs_prdinode_incore(&dic);
 		kdb_printf("next_unlinked 0x%x u@0x%p\n",
-			   be32_to_cpu(di->di_next_unlinked), &di->di_u);
+			   be32_to_cpu(di->di_next_unlinked), XFS_DFORK_DPTR(di));
 	}
 }
 
@@ -4870,7 +4870,7 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 			kdb_printf("buf 0x%p dir/attr node 0x%p\n", bp, node);
 			xfsidbg_xdanode(node);
 		}
-	} else if (be16_to_cpu((di = d)->di_core.di_magic) == XFS_DINODE_MAGIC) {
+	} else if (be16_to_cpu((di = d)->di_magic) == XFS_DINODE_MAGIC) {
 		if (summary) {
 			kdb_printf("Disk Inode (at 0x%p)\n", di);
 		} else {
@@ -5787,7 +5787,7 @@ xfsidbg_xiclog(xlog_in_core_t *iclog)
 	};
 
 	kdb_printf("xlog_in_core/header at 0x%p/0x%p\n",
-		iclog, iclog->hic_data);
+		iclog, iclog->ic_data);
 	kdb_printf("magicno: %x  cycle: %d  version: %d  lsn: 0x%Lx\n",
 		be32_to_cpu(iclog->ic_header.h_magicno),
 		be32_to_cpu(iclog->ic_header.h_cycle),
@@ -6612,9 +6612,9 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		ip->i_mount->m_ddev_targp->bt_dev,
 		xfs_fmtino(ip->i_ino, ip->i_mount));
 	kdb_printf("blkno 0x%llx len 0x%x boffset 0x%x\n",
-		(long long) ip->i_blkno,
-		ip->i_len,
-		ip->i_boffset);
+		(long long) ip->i_imap.im_blkno,
+		ip->i_imap.im_len,
+		ip->i_imap.im_boffset);
 	kdb_printf("transp 0x%p &itemp 0x%p\n",
 		ip->i_transp,
 		ip->i_itemp);
@@ -6631,8 +6631,7 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	kdb_printf("\n");
 	kdb_printf("update_core %d update size %d\n",
 		(int)(ip->i_update_core), (int) ip->i_update_size);
-	kdb_printf("gen 0x%x delayed blks %d",
-		ip->i_gen,
+	kdb_printf("delayed blks %d",
 		ip->i_delayed_blks);
 	kdb_printf("size %lld\n",
 		ip->i_size);
