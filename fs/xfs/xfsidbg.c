@@ -6373,7 +6373,7 @@ xfsidbg_xlogitem(xfs_log_item_t *lip)
 	printflags((uint)(lip->li_flags), li_flags,"log");
 	kdb_printf("\n");
 	kdb_printf("ail forw 0x%p ail back 0x%p lsn %s\ndesc %p ops 0x%p",
-		lip->li_ail.next, lip->li_ail.next,
+		lip->li_ail.next, lip->li_ail.prev,
 		xfs_fmtlsn(&(lip->li_lsn)), lip->li_desc, lip->li_ops);
 	kdb_printf(" iodonefunc &0x%p\n", lip->li_cb);
 	if (lip->li_type == XFS_LI_BUF) {
