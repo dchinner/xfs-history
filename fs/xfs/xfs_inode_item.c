@@ -281,7 +281,7 @@ xfs_inode_item_format(
 	xfs_mark_inode_dirty_sync(ip);
 
 	vecp->i_addr = (xfs_caddr_t)&ip->i_d;
-	vecp->i_len  = sizeof(xfs_dinode_core_t);
+	vecp->i_len  = sizeof(struct xfs_icdinode);
 	XLOG_VEC_SET_TYPE(vecp, XLOG_REG_TYPE_ICORE);
 	vecp++;
 	nvecs++;
@@ -296,9 +296,8 @@ xfs_inode_item_format(
 	 * has a new version number, then we don't bother converting back.
 	 */
 	mp = ip->i_mount;
-	ASSERT(ip->i_d.di_version == XFS_DINODE_VERSION_1 ||
-	       xfs_sb_version_hasnlink(&mp->m_sb));
-	if (ip->i_d.di_version == XFS_DINODE_VERSION_1) {
+	ASSERT(ip->i_d.di_version == 1 || xfs_sb_version_hasnlink(&mp->m_sb));
+	if (ip->i_d.di_version == 1) {
 		if (!xfs_sb_version_hasnlink(&mp->m_sb)) {
 			/*
 			 * Convert it back.
@@ -311,7 +310,7 @@ xfs_inode_item_format(
 			 * so just make the conversion to the new inode
 			 * format permanent.
 			 */
-			ip->i_d.di_version = XFS_DINODE_VERSION_2;
+			ip->i_d.di_version = 2;
 			ip->i_d.di_onlink = 0;
 			memset(&(ip->i_d.di_pad[0]), 0, sizeof(ip->i_d.di_pad));
 		}
@@ -943,9 +942,9 @@ xfs_inode_item_init(
 
 	iip->ili_format.ilf_type = XFS_LI_INODE;
 	iip->ili_format.ilf_ino = ip->i_ino;
-	iip->ili_format.ilf_blkno = ip->i_blkno;
-	iip->ili_format.ilf_len = ip->i_len;
-	iip->ili_format.ilf_boffset = ip->i_boffset;
+	iip->ili_format.ilf_blkno = ip->i_imap.im_blkno;
+	iip->ili_format.ilf_len = ip->i_imap.im_len;
+	iip->ili_format.ilf_boffset = ip->i_imap.im_boffset;
 }
 
 /*
