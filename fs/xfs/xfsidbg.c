@@ -99,7 +99,6 @@ static void	xfsidbg_xbxstrace(xfs_inode_t *);
 #endif
 #ifdef XFS_ILOCK_TRACE
 static void	xfsidbg_xilock_trace(xfs_inode_t *);
-static void	xfsidbg_xailock_trace(int);
 #endif
 #ifdef XFS_DIR2_TRACE
 static void	xfsidbg_xdir2atrace(int);
@@ -647,26 +646,6 @@ static int	kdbm_xfs_xilock_trace(
 		return diag;
 
 	xfsidbg_xilock_trace((xfs_inode_t *) addr);
-	return 0;
-}
-
-static int	kdbm_xfs_xailock_trace(
-	int	argc,
-	const char **argv)
-{
-	unsigned long addr;
-	int nextarg = 1;
-	long offset = 0;
-	int diag;
-
-	if (argc != 1)
-		return KDB_ARGCOUNT;
-
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
-	if (diag)
-		return diag;
-
-	xfsidbg_xailock_trace((int) addr);
 	return 0;
 }
 #endif
@@ -2410,8 +2389,6 @@ static struct xif xfsidbg_funcs[] = {
 #ifdef XFS_ILOCK_TRACE
   {  "xilocktrc",kdbm_xfs_xilock_trace,	"<xfs_inode_t>",
 				"Dump XFS ilock trace" },
-  {  "xailcktrc",kdbm_xfs_xailock_trace,"<count>",
-				"Dump XFS global ilock trace" },
 #endif
   {  "xinodes",	kdbm_xfs_xinodes,	"<xfs_mount_t>",
 				"Dump XFS inodes per mount"},
@@ -5031,63 +5008,6 @@ xfsidbg_xbxstrace(xfs_inode_t *ip)
  * Print out the ilock trace buffer attached to the given inode.
  */
 static void
-xfsidbg_xilock_trace_entry(ktrace_entry_t *ktep)
-{
-	static char	*xiflags[] = {
-		"IOLOCK_EXCL",
-		"IOLOCK_SHAR",
-		"ILOCK_EXCL",
-		"ILOCK_SHAR",
-		"IUNLK_NONOT",
-		NULL
-	};
-
-	if ((__psint_t)ktep->val[0] &&
-	     (__psint_t)ktep->val[7] == 0) {
-		 printflags((__psint_t)ktep->val[2], xiflags,"Flags ");
-		if ((__psint_t)ktep->val[1] == 1)
-			 qprintf("LOCK\n");
-		else if ((__psint_t)ktep->val[1] == 2)
-			 qprintf("LOCK SHARED\n");
-		else if ((__psint_t)ktep->val[1] == 3)
-			 qprintf("UNLOCK\n");
-		qprintf("ip 0x%p %llx %ld\n",
-			ktep->val[0],
-			(unsigned long long)((xfs_inode_t*)ktep->val[0])->i_ino,
-			(long)ktep->val[6]);
-		qprintf("raddr 0x%p\n", ktep->val[3]);
-		qprintf("  Pid %ld, cpu %ld\n",
-			 (long)ktep->val[5],
-			 (long)ktep->val[4]);
-		qprintf("-----------------------\n");
-
-	} else if ((__psint_t)ktep->val[7] == 1) {
-		if ((__psint_t)ktep->val[1] == 1)
-			qprintf("FlushLOCK ");
-		else if ((__psint_t)ktep->val[1] == 2)
-			qprintf("FlushTRYLOCK %ld ",
-				(long)ktep->val[2]);
-		else if ((__psint_t)ktep->val[1] == 3)
-			qprintf("FlushUNLOCK ");
-		else if ((__psint_t)ktep->val[1] == 4)
-			qprintf("FlushInode 0x%p",
-				ktep->val[2]);
-		else if ((__psint_t)ktep->val[1] == 5)
-			qprintf("FlushInodeInt ");
-		else     qprintf("FlushUNKNOWN ");
-		qprintf("ip 0x%p ino %llx @ %ld\n",
-			ktep->val[0],
-			(unsigned long long)((xfs_inode_t*)ktep->val[0])->i_ino,
-			(long)ktep->val[6]);
-		qprintf("raddr 0x%p\n", ktep->val[3]);
-		qprintf("  Pid %ld, cpu %ld\n",
-			(long)ktep->val[5],
-			(long)ktep->val[4]);
-		qprintf("-----------------------\n");
-	}
-}
-
-static void
 xfsidbg_xilock_trace(xfs_inode_t *ip)
 {
 	static char *xiflags[] = {
@@ -5147,49 +5067,6 @@ xfsidbg_xilock_trace(xfs_inode_t *ip)
 		 }
 
 		 ktep = ktrace_next(ip->i_lock_trace, &kts);
-	}
-}
-
-/*
- * Print out the last "count" entries in the inode lock trace buffer.
- * The "a" is for "all" entries.
- */
-static void
-xfsidbg_xailock_trace(int count)
-{
-	ktrace_entry_t  *ktep;
-	ktrace_snap_t   kts;
-	int	     nentries;
-	int	     skip_entries;
-
-	if (xfs_ilock_trace_buf == NULL) {
-		qprintf("The xfs inode lock trace buffer is not initialized\n");		return;
-	}
-	nentries = ktrace_nentries(xfs_ilock_trace_buf);
-	if (count == -1) {
-		count = nentries;
-	}
-	if ((count <= 0) || (count > nentries)) {
-		qprintf("Invalid count.  There are %d entries.\n", nentries);
-		return;
-	}
-
-	ktep = ktrace_first(xfs_ilock_trace_buf, &kts);
-	if (count != nentries) {
-		/*
-		 * Skip the total minus the number to look at minus one
-		 * for the entry returned by ktrace_first().
-		 */
-		skip_entries = nentries - count - 1;
-		ktep = ktrace_skip(xfs_ilock_trace_buf, skip_entries, &kts);
-		if (ktep == NULL) {
-			qprintf("Skipped them all\n");
-			return;
-		}
-	}
-	while (ktep != NULL) {
-		xfsidbg_xilock_trace_entry(ktep);
-		ktep = ktrace_next(xfs_ilock_trace_buf, &kts);
 	}
 }
 #endif

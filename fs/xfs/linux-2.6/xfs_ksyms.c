@@ -88,9 +88,6 @@ EXPORT_SYMBOL(xfs_itrace_hold);
 EXPORT_SYMBOL(xfs_itrace_rele);
 #endif
 
-#ifdef XFS_ILOCK_TRACE
-EXPORT_SYMBOL(xfs_ilock_trace_buf);
-#endif
 #ifdef XFS_ALLOC_TRACE
 EXPORT_SYMBOL(xfs_alloc_trace_buf);
 #endif
