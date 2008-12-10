@@ -100,12 +100,11 @@ STATIC void xlog_ungrant_log_space(xlog_t	 *log,
 
 
 /* local ticket functions */
-STATIC xlog_ticket_t	*xlog_ticket_get(xlog_t *log,
+STATIC xlog_ticket_t	*xlog_ticket_alloc(xlog_t *log,
 					 int	unit_bytes,
 					 int	count,
 					 char	clientid,
 					 uint	flags);
-STATIC void		xlog_ticket_put(xlog_t *log, xlog_ticket_t *ticket);
 
 #if defined(DEBUG)
 STATIC void	xlog_verify_dest_ptr(xlog_t *log, __psint_t ptr);
@@ -360,7 +359,7 @@ xfs_log_done(xfs_mount_t	*mp,
 		 */
 		xlog_trace_loggrant(log, ticket, "xfs_log_done: (non-permanent)");
 		xlog_ungrant_log_space(log, ticket);
-		xlog_ticket_put(log, ticket);
+		xfs_log_ticket_put(ticket);
 	} else {
 		xlog_trace_loggrant(log, ticket, "xfs_log_done: (permanent)");
 		xlog_regrant_reserve_log_space(log, ticket);
@@ -514,7 +513,7 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 		retval = xlog_regrant_write_log_space(log, internal_ticket);
 	} else {
 		/* may sleep if need to allocate more tickets */
-		internal_ticket = xlog_ticket_get(log, unit_bytes, cnt,
+		internal_ticket = xlog_ticket_alloc(log, unit_bytes, cnt,
 						  client, flags);
 		if (!internal_ticket)
 			return XFS_ERROR(ENOMEM);
@@ -749,7 +748,7 @@ xfs_log_unmount_write(xfs_mount_t *mp)
 		if (tic) {
 			xlog_trace_loggrant(log, tic, "unmount rec");
 			xlog_ungrant_log_space(log, tic);
-			xlog_ticket_put(log, tic);
+			xfs_log_ticket_put(tic);
 		}
 	} else {
 		/*
@@ -1030,12 +1029,6 @@ xlog_iodone(xfs_buf_t *bp)
 	ASSERT(XFS_BUF_FSPRIVATE2(bp, unsigned long) == (unsigned long) 2);
 	XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)1);
 	aborted = 0;
-
-	/*
-	 * Some versions of cpp barf on the recursive definition of
-	 * ic_log -> hic_fields.ic_log and expand ic_log twice when
-	 * it is passed through two macros.  Workaround broken cpp.
-	 */
 	l = iclog->ic_log;
 
 	/*
@@ -1302,7 +1295,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 		XFS_BUF_SET_BDSTRAT_FUNC(bp, xlog_bdstrat_cb);
 		XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)1);
 		iclog->ic_bp = bp;
-		iclog->hic_data = bp->b_addr;
+		iclog->ic_data = bp->b_addr;
 #ifdef DEBUG
 		log->l_iclog_bak[i] = (xfs_caddr_t)&(iclog->ic_header);
 #endif
@@ -1322,7 +1315,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 		atomic_set(&iclog->ic_refcnt, 0);
 		spin_lock_init(&iclog->ic_callback_lock);
 		iclog->ic_callback_tail = &(iclog->ic_callback);
-		iclog->ic_datap = (char *)iclog->hic_data + log->l_iclog_hsize;
+		iclog->ic_datap = (char *)iclog->ic_data + log->l_iclog_hsize;
 
 		ASSERT(XFS_BUF_ISBUSY(iclog->ic_bp));
 		ASSERT(XFS_BUF_VALUSEMA(iclog->ic_bp) <= 0);
@@ -3222,22 +3215,33 @@ xlog_state_want_sync(xlog_t *log, xlog_in_core_t *iclog)
  */
 
 /*
- * Free a used ticket.
+ * Free a used ticket when it's refcount falls to zero.
  */
-STATIC void
-xlog_ticket_put(xlog_t		*log,
-		xlog_ticket_t	*ticket)
+void
+xfs_log_ticket_put(
+	xlog_ticket_t	*ticket)
 {
-	sv_destroy(&ticket->t_wait);
-	kmem_zone_free(xfs_log_ticket_zone, ticket);
-}	/* xlog_ticket_put */
+	ASSERT(atomic_read(&ticket->t_ref) > 0);
+	if (atomic_dec_and_test(&ticket->t_ref)) {
+		sv_destroy(&ticket->t_wait);
+		kmem_zone_free(xfs_log_ticket_zone, ticket);
+	}
+}
 
+xlog_ticket_t *
+xfs_log_ticket_get(
+	xlog_ticket_t	*ticket)
+{
+	ASSERT(atomic_read(&ticket->t_ref) > 0);
+	atomic_inc(&ticket->t_ref);
+	return ticket;
+}
 
 /*
  * Allocate and initialise a new log ticket.
  */
 STATIC xlog_ticket_t *
-xlog_ticket_get(xlog_t		*log,
+xlog_ticket_alloc(xlog_t		*log,
 		int		unit_bytes,
 		int		cnt,
 		char		client,
@@ -3308,6 +3312,7 @@ xlog_ticket_get(xlog_t		*log,
 		unit_bytes += 2*BBSIZE;
         }
 
+	atomic_set(&tic->t_ref, 1);
 	tic->t_unit_res		= unit_bytes;
 	tic->t_curr_res		= unit_bytes;
 	tic->t_cnt		= cnt;
@@ -3323,7 +3328,7 @@ xlog_ticket_get(xlog_t		*log,
 	xlog_tic_reset_res(tic);
 
 	return tic;
-}	/* xlog_ticket_get */
+}
 
 
 /******************************************************************************
@@ -3452,7 +3457,7 @@ xlog_verify_iclog(xlog_t	 *log,
 	ptr = iclog->ic_datap;
 	base_ptr = ptr;
 	ophead = (xlog_op_header_t *)ptr;
-	xhdr = (xlog_in_core_2_t *)&iclog->ic_header;
+	xhdr = iclog->ic_data;
 	for (i = 0; i < len; i++) {
 		ophead = (xlog_op_header_t *)ptr;
 
@@ -3558,7 +3563,8 @@ xfs_log_force_umount(
 	if (!log ||
 	    log->l_flags & XLOG_ACTIVE_RECOVERY) {
 		mp->m_flags |= XFS_MOUNT_FS_SHUTDOWN;
-		XFS_BUF_DONE(mp->m_sb_bp);
+		if (mp->m_sb_bp)
+			XFS_BUF_DONE(mp->m_sb_bp);
 		return 0;
 	}
 
@@ -3579,7 +3585,9 @@ xfs_log_force_umount(
 	spin_lock(&log->l_icloglock);
 	spin_lock(&log->l_grant_lock);
 	mp->m_flags |= XFS_MOUNT_FS_SHUTDOWN;
-	XFS_BUF_DONE(mp->m_sb_bp);
+	if (mp->m_sb_bp)
+		XFS_BUF_DONE(mp->m_sb_bp);
+
 	/*
 	 * This flag is sort of redundant because of the mount flag, but
 	 * it's good to maintain the separation between the log and the rest
