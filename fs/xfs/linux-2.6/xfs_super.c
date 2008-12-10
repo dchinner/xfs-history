@@ -48,7 +48,6 @@
 #include "xfs_buf_item.h"
 #include "xfs_utils.h"
 #include "xfs_vnodeops.h"
-#include "xfs_vfsops.h"
 #include "xfs_version.h"
 #include "xfs_log_priv.h"
 #include "xfs_trans_priv.h"
@@ -990,21 +989,26 @@ xfs_fs_write_inode(
 	struct inode		*inode,
 	int			sync)
 {
+	struct xfs_inode	*ip = XFS_I(inode);
 	int			error = 0;
 	int			flags = 0;
 
-	xfs_itrace_entry(XFS_I(inode));
+	xfs_itrace_entry(ip);
 	if (sync) {
-		filemap_fdatawait(inode->i_mapping);
+		error = xfs_wait_on_pages(ip, 0, -1);
+		if (error)
+			goto out_error;
 		flags |= FLUSH_SYNC;
 	}
-	error = xfs_inode_flush(XFS_I(inode), flags);
+	error = xfs_inode_flush(ip, flags);
+
+out_error:
 	/*
 	 * if we failed to write out the inode then mark
 	 * it dirty again so we'll try again later.
 	 */
 	if (error)
-		xfs_mark_inode_dirty_sync(XFS_I(inode));
+		xfs_mark_inode_dirty_sync(ip);
 
 	return -error;
 }
@@ -1863,10 +1867,9 @@ STATIC int __init
 init_xfs_fs(void)
 {
 	int			error;
-	static char		message[] __initdata = KERN_INFO \
-		XFS_VERSION_STRING " with " XFS_BUILD_OPTIONS " enabled\n";
 
-	printk(message);
+	printk(KERN_INFO XFS_VERSION_STRING " with "
+			 XFS_BUILD_OPTIONS " enabled\n");
 
 	ktrace_init(64);
 	vn_init();
