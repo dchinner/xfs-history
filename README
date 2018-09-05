@@ -1,0 +1,37 @@
+XFS Kernel History Archive
+--------------------------
+
+This repository contains the development history of XFS. It was originally
+published by SGI via their oss.sgi.com CVS repositories under the GPLv2. The CVS
+repo was then scraped into a git repository before the CVS repositories were
+retired. The history stops in 2008 when SGI started maintaining the upstream XFS
+code directly in git. SGI continued to publish this tree in a read-only state on
+oss.sgi.com right up until that site was decommissioned months after the 2017
+acquisition by HPE.
+
+The historic record of XFS has been a useful developer reference for the past 15
+years - code spelunking trips are frequently made when trying to understand
+where a bug was introduced or why the code did what it did. Much of this
+information has never been published anywhere else and the institutional
+knowledge behind it was lost long before it was published. As such, most XFS
+developers have local, personal copies of the repository they directly query
+duringtheir day-to-day work.
+
+However, with the oss.sgi.com repository going off line, there isn't a public
+repository we can refer people to, or for other XFS developers (new or old) to
+access and query themselves. Hence this repository is being published as a
+public service to the XFS developer community.
+
+Keep in mind this is a separate history to the mainline kernel history. While
+there is some overlap in contents with the upstream kernel git tree, the XFS
+history tree is completely independent and so cannot be merged into a mainline
+kernel tree. It stands alone.
+
+
+Disclaimer
+----------
+
+This repository is being republished under the understanding that the original
+repository was released by SGI under the GPLv2 license and so I am free to
+republish it in this form.  I take no responsibility for, nor claim ownership
+over the contents of this repository.
